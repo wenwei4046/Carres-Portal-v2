@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 /**
  * Regression test for the Phase 4.5 Chunk 2 procurement nested routing.
@@ -60,6 +60,19 @@ vi.mock("./OperationToOrder", () => ({
 vi.mock("./OperationManualPurchase", () => ({
   default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
 }));
+// CARD-2026-08-21-delivery-02 — Delivery Work draws its own Destination Header
+// and self-fetches; this suite only asks which route mounts it, and whether the
+// slim global bar stands down when it does.
+vi.mock("./OperationDelivery", () => ({
+  default: () => <div data-testid="delivery-work-stub">delivery-work</div>,
+}));
+// Edit Delivery (2026-08-24) self-fetches the arrangement — stubbed; what this
+// suite owns is that the URL actually MOUNTS it, which is precisely what the
+// production walk found broken: the route existed and the `isUrlDriven` gate
+// did not include it, so the main pane rendered nothing.
+vi.mock("./EditDelivery", () => ({
+  default: () => <div data-testid="edit-delivery-stub">edit-delivery</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -93,12 +106,18 @@ vi.mock("./OperationImport", () => ({
 
 import OperationApp from "./OperationApp";
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-probe">{location.pathname}{location.search}</output>;
+}
+
 function renderApp(initialPath: string) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/operation/*" element={<OperationApp />} />
       </Routes>
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -207,5 +226,103 @@ describe("OperationApp — one header on Manual Purchase", () => {
   it("the dashboard keeps its top bar — the suppression is per purchasing page", () => {
     renderApp("/operation?tab=dashboard");
     expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * ONE HEADER ON DELIVERY WORK (CARD-2026-08-21-delivery-02, caught on the
+ * production walk 2026-08-21).
+ *
+ * The identical defect Manual Purchase shipped with: `?tab=delivery` was
+ * missing from the GlobalTopBar suppression list, so the page's own 50px
+ * Destination Header — which embeds TopBarIcons — sat under a slim bar carrying
+ * a second Jump to, a second bell reading 59, a second Help and a second gear.
+ * `Delivery Orders` never showed it because it is a real route and was
+ * suppressed already, which is exactly why one route looked right and its
+ * sibling did not.
+ */
+describe("OperationApp — one header on Delivery Work", () => {
+  it("?tab=delivery mounts the page and stands the global top bar down", () => {
+    renderApp("/operation?tab=delivery");
+    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("its rail choices survive the mount — both filters ride the URL", () => {
+    renderApp("/operation?tab=delivery&date=__no_date&logistics=NETS");
+    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+  });
+});
+
+describe("OperationApp — Delivery is one page", () => {
+  it("the old Delivery Orders list address returns to the unified Delivery page", async () => {
+    renderApp("/operation/delivery-orders");
+    expect(await screen.findByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=delivery",
+    );
+  });
+});
+
+/**
+ * EDIT DELIVERY IS A ROUTE THAT MOUNTS (walk finding, 2026-08-24). The page
+ * shipped with its Route declared and the `isUrlDriven` gate unaware of it, so
+ * the URL fell through to the `?tab=` branch and drew an empty main pane. A
+ * component test cannot see that — only mounting the APP at the URL can.
+ */
+describe("OperationApp — Edit Delivery mounts at its URL", () => {
+  it("/operation/delivery/edit/:orderId mounts the page", () => {
+    renderApp("/operation/delivery/edit/order-1");
+    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+
+  it("and the slim global bar stands down — the page draws its own header", () => {
+    renderApp("/operation/delivery/edit/order-1");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("a leg keeps its query string", () => {
+    renderApp("/operation/delivery/edit/order-1?leg=2");
+    expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * PURCHASE DEMANDS — the newest BUY destination
+ * (CARD-2026-08-20-purchase-demands).
+ *
+ * The Register draws the Purchasing Destination Header itself, so the slim
+ * global bar must be suppressed exactly as it is for its five siblings — the
+ * same defect Manual Purchase shipped with in August.
+ */
+/**
+ * CARD-2026-08-22-purchasing-02 — the separate Purchase Demands page is RETIRED.
+ * `purchase_demand` is hidden canonical truth, not a destination
+ * (`docs/purchasing/MASTER.md` §4), and its useful capability now lives inside
+ * SO Batch Purchase. The old address REDIRECTS: a bookmark an operator saved
+ * must land somewhere that answers the same question, not on a 404.
+ */
+describe("OperationApp — the retired Purchase Demands address", () => {
+  it("?tab=purchase-demands lands on SO Batch Purchase", () => {
+    renderApp("/operation?tab=purchase-demands");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+
+  it("a saved link with the old rail parameters still lands on the buying page", () => {
+    renderApp("/operation?tab=purchase-demands&state=no_supplier,no_sku");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+  });
+
+  it("SO Batch Purchase suppresses the global bar — one header, not two", () => {
+    renderApp("/operation?tab=purchase");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("SO Batch Purchase mounts its own page at its own address", () => {
+    renderApp("/operation?tab=purchase");
+    expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
   });
 });

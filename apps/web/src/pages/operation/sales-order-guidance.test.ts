@@ -21,7 +21,7 @@ describe("missingDeliveryDateGuidance", () => {
       detail: [
         "Shasha · Kimmy · 019-3478913",
         "Ask which delivery date the customer agrees to.",
-        "Record the agreed Customer Delivery date.",
+        "Record the agreed Requested Delivery Date.",
       ].join("\n"),
     });
   });

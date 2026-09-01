@@ -37,13 +37,14 @@
   --radius-pill: 999px;
   --shadow-3: 0 8px 24px rgba(0, 0, 0, 0.16);
 
-  /* De-boxed (Wei Siang 2026-06-04): a flat, full-width table surface — NOT a
-     floating brochure card. No border, no radius — the grid is a flat
-     full-bleed panel that flows with the page instead of sitting in a "框框".
-     The toolbar's band + the header rule give all the structure needed. */
+  /* Owner correction 2026-08-31: the full Register has no enclosing border
+     around the Work Toolbar + table + status footer. Structure comes from
+     the toolbar divider, table cell grid and footer divider below — never a
+     second outside rectangle. */
   display: flex;
   flex-direction: column;
   background: var(--c-paper);
+  box-sizing: border-box;
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -78,20 +79,19 @@
    geometry, and no longer authors this destination.
 
    The opt-in stays because it names an intent, not because it is shielding
-   other pages. MEASURED 2026-08-14: this stylesheet reaches exactly one screen
-   — DataGrid.module.css is imported only by components/register/DataGrid.tsx,
-   which is imported only by pages/operation/SalesOrdersRegister.tsx. The
-   frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
-   Claim) render components/data-grid/DataGrid.tsx, a different component on
-   Tailwind classes at 40px rows, and never load this file at all. So `.root`
-   is not a shared base with those pages; do not plan a change around that
-   belief without re-measuring the import graph.
+   other pages. RE-MEASURED 2026-08-27: seven screens now render this engine
+   with appearance="reference" (Sales Orders · Delivery Orders · Delivery ·
+   Manual Purchase · Warehouse Stock · SO Batch · Supplier Items) — the
+   2026-08-14 "exactly one screen" note is history. A change here is a change
+   to the Register template on all of them, which is the point: one grammar.
+   The frozen Purchasing pages (To Order, Purchase Orders, Receiving, Supplier
+   Claim) still render components/data-grid/DataGrid.tsx and never load this
+   file.
 
    No px font-size literal lives in this scope: the sizes are the `.root`
    token aliases, never a token redefined to a different value. */
-.rootReference {
-  border: 1px solid var(--line);
-}
+/* Reference geometry keeps the shared internal listing structure. It does not
+   add an enclosing border around the toolbar, table and footer. */
 .rootReference .toolbar {
   box-sizing: border-box;
   height: 45px;

@@ -121,3 +121,124 @@ describe("GET /api/operation/suppliers", () => {
     expect(res.status).toBe(401);
   });
 });
+
+/**
+ * ⭐ POST /api/operation/suppliers — THE FIRST SUPPLIER-CREATION DOOR
+ * (2026-08-24).
+ *
+ * Before this the portal had none anywhere: no route, no screen. Every supplier
+ * was inserted by hand in the SQL editor, so onboarding a factory was an
+ * engineering task and a keyer who met a new supplier mid-catalog stopped.
+ *
+ * Nothing about RLS moved. `suppliers_principal_write` (0002) always said
+ * principal-only; there was simply nothing to call.
+ */
+describe("POST /api/operation/suppliers", () => {
+  function mockSb(opts: {
+    clash?: { id: string; name: string } | null;
+    inserted?: Record<string, unknown> | null;
+    records?: Record<string, unknown>[];
+  }) {
+    vi.mocked(userClient).mockReturnValue({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: opts.clash ?? null, error: null }),
+          }),
+        }),
+        insert: (body: Record<string, unknown>) => {
+          opts.records?.push(body);
+          return {
+            select: () => ({
+              maybeSingle: async () => ({ data: opts.inserted ?? null, error: null }),
+            }),
+          };
+        },
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  }
+
+  async function post(role: string, body: unknown) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request("http://t/api/operation/suppliers", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  const OK = { name: "Hookka", kind: "factory_pickup", catCovered: ["sofa"] };
+
+  it("creates the supplier and DERIVES its slug from the name", async () => {
+    const records: Record<string, unknown>[] = [];
+    mockSb({
+      inserted: { id: "00000000-0000-0000-0000-000000000c09", name: "Hookka" },
+      records,
+    });
+    const res = await post("principal", { ...OK, name: "  HoOKkA  " });
+    expect(res.status).toBe(201);
+    /* The slug is never typed. It is unique in production and keys SUPPLIER_SOP
+       across environments (0032), so a keyer who has never heard the word
+       cannot mistype it — and `HoOKkA` folds to the SAME slug the 0032 backfill
+       wrote, so a supplier added today reads like one added by that migration. */
+    expect(records[0]).toMatchObject({ name: "HoOKkA", slug: "hookka" });
+  });
+
+  it("⭐ refuses a name that already exists, naming the supplier rather than the column", async () => {
+    mockSb({ clash: { id: "00000000-0000-0000-0000-000000000c01", name: "HoOKkA" } });
+    // A DIFFERENT spelling of the same name — the clash is found on the
+    // derived slug, which is the whole reason to derive it.
+    const res = await post("principal", { ...OK, name: "hookka" });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("supplier_exists");
+    // Names the SUPPLIER the keyer would recognise, not the column.
+    expect(body.message).toContain("HoOKkA");
+  });
+
+  it("refuses a name with nothing sluggable in it", async () => {
+    mockSb({ clash: null, inserted: null });
+    const res = await post("principal", { ...OK, name: "!!!!" });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    // Caught BEFORE the insert — a blank slug would hit a NOT NULL constraint
+    // and surface as a raw 23502 about a column the keyer never saw.
+    expect(body.code).toBe("unusable_name");
+  });
+
+  it("⭐ is PRINCIPAL only — the same boundary 0002 has always drawn", async () => {
+    for (const role of ["operation", "dealer", "supplier"]) {
+      const res = await post(role, OK);
+      expect(res.status).toBe(403);
+    }
+    // And no Supabase round-trip happened for the refused roles.
+    expect(vi.mocked(userClient)).not.toHaveBeenCalled();
+  });
+
+  it("accepts a supplier that covers nothing yet", async () => {
+    /* Empty `cat_covered` is legal: auto-resolve will never pick them, but an
+       explicit pick on the SKU still routes to them. A keyer is not blocked by
+       a question they cannot answer while looking at one quotation. */
+    const records: Record<string, unknown>[] = [];
+    mockSb({
+      clash: null,
+      inserted: { id: "00000000-0000-0000-0000-000000000c10", name: "Hookka" },
+      records,
+    });
+    const res = await post("principal", { name: "Hookka", kind: "own_logistics", catCovered: [] });
+    expect(res.status).toBe(201);
+    expect(records[0]).toMatchObject({ cat_covered: [], kind: "own_logistics" });
+  });
+
+  it("rejects an unknown key rather than dropping it", async () => {
+    mockSb({ clash: null, inserted: null });
+    const res = await post("principal", { ...OK, slug: "hand-picked" });
+    // `.strict()` — the slug is DERIVED, so a caller trying to choose one is a
+    // caller who has misunderstood something, not a caller to quietly ignore.
+    expect(res.status).toBe(422);
+  });
+});

@@ -796,12 +796,12 @@ export default function DataTable<Row>({
       ref={rootRef}
       data-kit="data-table"
       data-testid={testId}
-      /* NO TOP RADIUS (card P16, Loo 2026-08-04). A rounded lip under a
+      /* COMPLETE FRAME, NO TOP RADIUS. Owner correction 2026-08-29 makes one
+       * light four-sided boundary mandatory for every current and future
+       * listing kit. A rounded lip under a
        * square toolbar reads as a card floating on a page; a list grid is a
-       * SHEET and meets what is above it flush. A page that wants a rounded
-       * frame still gets one from its own wrapper — the kit stopped drawing a
-       * corner nobody asked it for. Checked on all three pages that render
-       * this file: To Order, Purchase Orders, Receiving. */
+       * SHEET and meets what is above it flush. The kit owns the frame so a
+       * page cannot omit a left or right side. */
       className="min-h-0 flex-1 overflow-auto border border-kit-slate-5 bg-white"
     >
       <table

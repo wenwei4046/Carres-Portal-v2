@@ -122,7 +122,7 @@ describe("the node map", () => {
 
   it("carries the SO number and its labelled ordered date, and no circular door", () => {
     const so = node(resolveSalesOrderRoute(input()), "sales-order");
-    expect(so.lines).toEqual(["SO-1319", "Ordered: 2026-08-12"]);
+    expect(so.lines).toEqual(["SO-1319", "SO Date: 2026-08-12"]);
     expect(so.door).toBeNull();
     expect(so.mark).toBe("complete");
   });
@@ -185,7 +185,7 @@ describe("goods forks", () => {
       ownerKey: "purchasing",
       label: "Issue PO",
       context: {
-        detail: "B1201S · King · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+        detail: "B1201S · King · 2 Units · Carres Warehouse · Requested Delivery Date: 2026-09-24",
       },
     });
     /* The steps behind it are a path the work has not walked — dashed, not absent. */
@@ -258,7 +258,7 @@ describe("CURRENT", () => {
       ownerKey: "purchasing",
       label: "Confirm ready date",
       context: {
-        detail: "PO-2048 · 2 Units · Carres Warehouse · Customer Delivery: 2026-09-24",
+        detail: "PO-2048 · 2 Units · Carres Warehouse · Requested Delivery Date: 2026-09-24",
       },
     });
     /* A node nobody has reached carries no instruction. */

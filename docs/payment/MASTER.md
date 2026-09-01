@@ -174,14 +174,13 @@ Work definitions:
 
 The delivery money gate belongs to Sales Orders, not Payment.
 
-- ⭐ **MONEY IN FULL BEFORE DELIVERY — owner ruling 2026-08-19, REVERSING 2026-08-16.** After a
-  same-day incident (goods delivered, money uncollected, no approval) the owner reversed
-  *"outstanding money does not block the DO"*: **a Delivery Order issues only when outstanding
-  = 0, or a recorded APPROVED Delivery Payment Approval covers the order — and no OPEN Finance
-  exception holds it.** An approval authorises COD on the owner's exact terms: the customer may
-  see the goods on the truck, pays the full balance by online transfer BEFORE unloading, no
-  cash; unpaid, the goods return. The governing ruling, the approval record (0362) and the COD
-  terms live once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate; this
+- ⭐ **MONEY IN FULL BEFORE DELIVERY IS ABSOLUTE — owner instruction 2026-09-01, tightening the
+  2026-08-19 reversal of 2026-08-16.** A Delivery Order issues only when **outstanding = 0 and
+  no OPEN Finance exception holds it.** The one exception door (Delivery Payment Approval) was
+  removed from the screen (PR #1031): nothing can request one any more, and an owing order is
+  undeliverable until it is paid. An approval granted before the closure is still honoured by
+  the 0362 gate — history honoured, not a live path. The governing ruling and the 0362 record
+  live once in [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate; this
   MASTER does not restate it.
 - **RELEASE NEVER FORGIVES MONEY — survives every version of the gate.** A COD-approved order
   still OWES: collection work stays open (and survives delivery), and the **waiver is
@@ -323,7 +322,7 @@ Apply the governed Register Template:
 - `To collect` and `All` scopes.
 - Useful facts: collection due/late, goods ready/waiting/late, money state, region and PIC.
 - Core columns: Customer · Order · Current Action · Outstanding · Collection Due · Promise to Pay ·
-  Goods · Customer Delivery · Last Contact.
+  Goods · Requested Delivery Date · Last Contact.
 - Footer: visible count, exact outstanding total and separate `No price yet` count.
 - Expansion/detail: obligation breakdown, timeline, documents, contact brief and one posting form.
 

@@ -77,21 +77,29 @@ export async function loadPurchasingSettings(
 ): Promise<LoadedPurchasingSettings> {
   const numbers = await loadPurchasingNumbers(sb);
 
-  const [skusR, suppliersR, prodR, weekR, changesR] = await Promise.all([
+  const [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR] = await Promise.all([
     sb
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name"),
+    sb.from("suppliers").select("id, name, kind"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
-    sb.from("purchasing_supplier_settings").select("supplier_id, off_days, transit_days"),
+    sb
+      .from("purchasing_supplier_settings")
+      .select("supplier_id, off_days, transit_days, fixed_destination_id, collected_by_partner_id"),
     sb
       .from("purchasing_setting_changes")
       .select("setting_key, supplier_id, category, old_value, new_value, changed_at, changed_by")
       .order("changed_at", { ascending: false })
       .limit(400),
+    sb
+      .from("purchasing_destinations")
+      .select("id, name, address, is_default, active, warehouse_id, warehouses(address)")
+      .order("sort_order")
+      .order("name"),
+    sb.from("delivery_partners").select("id, name").order("name"),
   ]);
-  for (const r of [skusR, suppliersR, prodR, weekR, changesR]) {
+  for (const r of [skusR, suppliersR, prodR, weekR, changesR, destinationsR, partnersR]) {
     if (r.error) throw new Error(`purchasing settings: ${r.error.message}`);
   }
 
@@ -113,6 +121,10 @@ export async function loadPurchasingSettings(
 
   const transitBySupplier = new Map<string, number>();
   const offDaysBySupplier = new Map<string, number[]>();
+  const collectionBySupplier = new Map<
+    string,
+    { destinationId: string | null; partnerId: string | null }
+  >();
   for (const row of (weekR.data ?? []) as Array<Record<string, unknown>>) {
     offDaysBySupplier.set(
       row.supplier_id as string,
@@ -124,11 +136,17 @@ export async function loadPurchasingSettings(
     if (row.transit_days != null) {
       transitBySupplier.set(row.supplier_id as string, Number(row.transit_days));
     }
+    collectionBySupplier.set(row.supplier_id as string, {
+      destinationId: (row.fixed_destination_id as string | null) ?? null,
+      partnerId: (row.collected_by_partner_id as string | null) ?? null,
+    });
   }
 
   const nameById = new Map<string, string>();
+  const factoryPickupSupplierIds: string[] = [];
   for (const row of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
     nameById.set(row.id as string, (row.name as string | null) ?? "");
+    if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
   }
 
   const suppliers: PurchasingSupplierRow[] = [...catsBySupplier.entries()]
@@ -151,6 +169,42 @@ export async function loadPurchasingSettings(
       workingDays: Number(row.working_days),
     });
   }
+
+  const destinations = ((destinationsR.data ?? []) as Array<Record<string, unknown>>).map(
+    (row) => {
+      const warehouse = row.warehouses as
+        | { address?: string | null }
+        | { address?: string | null }[]
+        | null;
+      const warehouseAddress = Array.isArray(warehouse)
+        ? warehouse[0]?.address
+        : warehouse?.address;
+      return {
+        id: row.id as string,
+        name: (row.name as string | null) ?? "",
+        address:
+          row.warehouse_id != null
+            ? (warehouseAddress ?? null)
+            : ((row.address as string | null) ?? null),
+        isDefault: row.is_default === true,
+        active: row.active !== false,
+        warehouseLinked: row.warehouse_id != null,
+      };
+    },
+  );
+
+  const supplierCollections = factoryPickupSupplierIds
+    .map((supplierId) => ({
+      supplierId,
+      supplierName: nameById.get(supplierId) ?? "",
+      destinationId: collectionBySupplier.get(supplierId)?.destinationId ?? null,
+      partnerId: collectionBySupplier.get(supplierId)?.partnerId ?? null,
+    }))
+    .sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+  const deliveryPartners = ((partnersR.data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: row.id as string,
+    name: (row.name as string | null) ?? "",
+  }));
 
   // The screen shows ONE line per setting — the most recent change. Rows come
   // back newest-first, so the first hit per key wins.
@@ -188,5 +242,13 @@ export async function loadPurchasingSettings(
     }
   }
 
-  return { ...numbers, suppliers, productionDays, lastChanges };
+  return {
+    ...numbers,
+    suppliers,
+    productionDays,
+    destinations,
+    supplierCollections,
+    deliveryPartners,
+    lastChanges,
+  };
 }

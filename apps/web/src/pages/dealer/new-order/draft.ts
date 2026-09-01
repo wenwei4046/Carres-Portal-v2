@@ -219,12 +219,9 @@ export interface WizardDraft {
     // null = "auto = all items" (legacy behavior). Lets dealer charge for
     // partial coverage when only some of the lines go above the free floor.
     stairItems: number | null;
-    // 2026-05-10 (Loo) — "As Fast As Possible" pill on Step1. When clicked,
-    // sets date = today + 20 days and flips this flag. After successful
-    // order create, the wizard auto-fires the Proceed mutation so the order
-    // skips the manual Place→Proceed click. If Proceed conditions aren't
-    // met (e.g. insufficient deposit), we surface the error and the order
-    // stays in 'place' for the dealer to top up + manually proceed.
+    /** ⛔ RETIRED — saved-draft compatibility only. Final submit now asks the
+     *  database to complete the canonical handoff automatically whenever the
+     *  governed facts are ready; no browser-side second Proceed action. */
     asap?: boolean;
   };
   /** Step 2: products picked + addons toggled. Empty array = no products yet. */
@@ -479,6 +476,13 @@ export function step1FirstIssue(
     if (!c.addressState)                    return "Address — State, or tick 'Unknown'";
     if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
     if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
+    /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
+     * access and van parking all hang off it, and Operations was chasing the
+     * shop for it after the sale. The office door began refusing a create
+     * without it the same day; this is the POS half, and it sits INSIDE the
+     * address branch for the same reason the office one does — an address
+     * nobody has yet cannot be asked what kind of building it is. */
+    if (!c.buildingType)                    return "Address — Building type, or tick 'Unknown'";
   }
   // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
   // so the gate mirrors the delivery rules field-for-field.

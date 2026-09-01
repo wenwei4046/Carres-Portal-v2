@@ -235,6 +235,100 @@ describe("GET /api/operation/orders", () => {
     });
   });
 
+  /**
+   * THE LIST CARRIES THE CATALOG'S CATEGORY (2026-08-24).
+   *
+   * Jess: "Other goods 44 - the number doesn't tally." The register footer
+   * classified a line from its SKU TEXT alone while the SO detail read the
+   * catalog first, so one product counted two ways on two screens. The list
+   * now stamps `category` the SAME way the detail route has since PR 885,
+   * through `skuCategories` - the ONE category reader (Law D).
+   */
+  describe("category on list lines", () => {
+    function mockWithCatalog(
+      orders: Record<string, unknown>[],
+      productSkus: Record<string, unknown>[],
+    ) {
+      const from = vi.fn((table: string) => {
+        if (table === "product_skus") {
+          // ONE fixture serves BOTH readers of this table -
+          // `resolveSkuLabels` (name) and `skuCategories` (category).
+          const inFn = vi.fn().mockResolvedValue({ data: productSkus, error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        if (table === "purchase_orders") {
+          const or = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ or })) };
+        }
+        if (table === "purchase_order_lines") {
+          const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
+          return { select: vi.fn(() => ({ in: inFn })) };
+        }
+        const chain: Record<string, unknown> = {};
+        for (const k of ["in", "eq", "ilike", "or", "not", "is", "order"])
+          chain[k] = vi.fn(() => chain);
+        chain.limit = vi.fn().mockResolvedValue({ data: orders, error: null });
+        return { select: vi.fn(() => chain) };
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue({ from } as any);
+      return from;
+    }
+
+    async function lines() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request("http://t/api/operation/orders", {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      const body = (await res.json()) as {
+        orders: { order_lines: { sku: string; category: string | null }[] }[];
+      };
+      return body.orders[0]?.order_lines ?? [];
+    }
+
+    it("stamps the catalog category onto a line the SKU parser cannot read", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "1013Jager/Fab3-King", qty: 1 }] }],
+        [
+          {
+            sku: "1013Jager/Fab3-King",
+            variant: "King",
+            product_models: { name: "Jager", category: "mattress" },
+          },
+        ],
+      );
+      expect((await lines())[0]?.category).toBe("mattress");
+    });
+
+    it("a SKU the catalog does not hold reads null - never a guessed category", async () => {
+      mockWithCatalog(
+        [{ ...ORDER_ROW, order_lines: [{ sku: "NOT-IN-CATALOG", qty: 1 }] }],
+        [],
+      );
+      expect((await lines())[0]?.category).toBeNull();
+    });
+
+    it("ONE batched product_skus read for the whole page, never one per order", async () => {
+      // `skuCategories` and `resolveSkuLabels` each read this table once
+      // for the page. Two reads total is the documented price of keeping
+      // ONE category owner; what must never happen is a read PER ORDER.
+      const from = mockWithCatalog(
+        [
+          { ...ORDER_ROW, id: "a", so: 1206, order_lines: [{ sku: "S-1", qty: 1 }] },
+          { ...ORDER_ROW, id: "b", so: 1213, order_lines: [{ sku: "S-2", qty: 1 }] },
+          { ...ORDER_ROW, id: "c", so: 1216, order_lines: [{ sku: "S-3", qty: 1 }] },
+        ],
+        [],
+      );
+      await lines();
+      const skuCalls = from.mock.calls.filter((c) => c[0] === "product_skus");
+      expect(skuCalls.length).toBeLessThanOrEqual(2);
+    });
+  });
+
   it("returns status='place' rows in the response (pipeline v2 'Placed' column)", async () => {
     const PLACE_ROW = {
       ...ORDER_ROW,
@@ -383,6 +477,13 @@ describe("GET /api/operation/orders/:id", () => {
      *  `skuCategories` (category) — which is the point: they read one join. */
     productSkus?: any[];
     freeUnits?: any[];
+    /** The two name sources the History actor is resolved from. They are
+     *  SEPARATE fixtures on purpose: the staff door (`actor_display_names`,
+     *  0390) returns only internal-staff accounts, so a test that fed one
+     *  list to both would prove nothing about the case that actually breaks
+     *  — a salesperson whose name only `salespersons` can answer. */
+    appUsers?: any[];
+    salespersons?: any[];
   }) {
     const fromImpl = vi.fn((table: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -410,6 +511,9 @@ describe("GET /api/operation/orders/:id", () => {
         case 'order_history':
           chain.order = vi.fn(() => promise(opts.history ?? []));
           break;
+        case 'salespersons':
+          chain.in = vi.fn(() => promise(opts.salespersons ?? []));
+          break;
         case 'purchase_orders':
           chain.or = vi.fn(() => promise(opts.pos ?? []));
           break;
@@ -419,8 +523,27 @@ describe("GET /api/operation/orders/:id", () => {
         case 'warehouses':
           chain.maybeSingle = vi.fn(() => promise(opts.warehouse ?? null));
           break;
-        case 'stock_balances':
-          chain.in = vi.fn(() => promise(opts.stockBalances ?? []));
+        // 0366 — the order drawer reads the unit register's one availability
+        // authority. Fixtures still describe a site as {qty, reserved}; the
+        // view's `on_hand`/`available` are derived here as the register does.
+        case 'stock_sku_availability':
+          chain.in = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b: {
+                sku: string;
+                warehouse_id: string;
+                qty: number;
+                reserved: number;
+                available?: number;
+              }) => ({
+                sku: b.sku,
+                warehouse_id: b.warehouse_id,
+                on_hand: b.qty,
+                reserved: b.reserved,
+                available: b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
           break;
         // These two are awaited at the END of a chain whose length varies
         // (`ops_stock_items` appends `.eq(warehouse)` only when the order has
@@ -436,9 +559,17 @@ describe("GET /api/operation/orders/:id", () => {
       }
       return chain;
     });
+    /* The staff half of the actor lookup goes through the 0390 definer door,
+       not a table read — the fixture keeps its old name because it plays the
+       same part: what the internal-staff source answers. */
+    const rpcImpl = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from: fromImpl } as any);
-    return fromImpl;
+    vi.mocked(userClient).mockReturnValue({ from: fromImpl, rpc: rpcImpl } as any);
+    return Object.assign(fromImpl, { rpc: rpcImpl });
   }
 
   it("returns 404 when order does not exist", async () => {
@@ -495,6 +626,13 @@ describe("GET /api/operation/orders/:id", () => {
     expect(body.total).toBe(2 * 1500 + 1 * 800 + 4 * 50);
     expect(body.warehouse.name).toBe("KL HQ");
     expect(body.stockBalances).toHaveLength(2);
+    // 0366 — the drawer carries the register's `available` beside the on-hand
+    // count, so nothing downstream has to compute qty − reserved.
+    expect(body.stockBalances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sku: "BED-K-002", qty: 5, reserved: 0, available: 5 }),
+      ]),
+    );
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0].lines).toHaveLength(1);
     expect(body.history).toHaveLength(1);
@@ -585,6 +723,182 @@ describe("GET /api/operation/orders/:id", () => {
 
     // The label reader still works off the same rows — one join, two consumers.
     expect(body.lines[0].label).toBe("Hookka · Charcoal");
+  });
+
+  /**
+   * ⭐ HISTORY NAMES ITS ACTOR — TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE
+   * (2026-08-24).
+   *
+   * `by_role` said "Salesperson" and never which salesperson. The fix reads the
+   * name from TWO sources, and the split is an RLS fact, not a preference:
+   *
+   *   0390  `actor_display_names` — the definer door that names INTERNAL
+   *         staff (principal · operation · finance · bd · hr · warehouse),
+   *         because 0235's peers policy shows an operation JWT only
+   *         operation-role rows and a principal actor was rendering as an
+   *         audit defect on the very order that recorded her.
+   *   0002  `salespersons_scoped_read` lets any internal role read
+   *         `salespersons`, and that table carries `user_id`.
+   *
+   * The commonest actor on a sales order is a salesperson — exactly the one
+   * the staff door deliberately does NOT answer for. A test that fed one list
+   * to both sources would pass while the real page stated an audit defect on
+   * nearly every row — the defect moved rather than fixed. These cases hold
+   * both halves down.
+   */
+  describe("History names its actor", () => {
+    const SELLER = "00000000-0000-0000-0000-0000000000s1";
+    const STAFF = "00000000-0000-0000-0000-0000000000f1";
+    const BASE_ORDER = {
+      id: ORDER_ID, so: 4003, status: "proceed_order", operation_stage: "in_production",
+      warehouse_id: null,
+      customer_name: "Tan Ah Kow", customer_phone: "+60123456789", customer_address: "...",
+      delivery_date: null, placed_at: "2026-08-22T10:00:00Z",
+      do_number: null, do_note: null, dispatched_at: null, delivered_at: null,
+      delivery_partner_id: null, dealer_id: "00000000-0000-0000-0000-000000000d01",
+      dealers: { name: "BedHouse KL" }, outlet_id: null, outlets: null,
+    };
+
+    async function detail() {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+          headers: { Authorization: `Bearer ${jwt}` },
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await res.json()) as any;
+    }
+
+    it("⭐ names a salesperson the staff door does not answer for", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        // Exactly what production returns for a dealer-role id: the 0390
+        // door names internal staff only — not an error, just no row.
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Kimmy Lee");
+      expect(body.history[0].by_role).toBe("salesperson");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("names internal staff through the 0390 staff door", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Warehouse set", by_role: "operation", by_user_id: STAFF, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: STAFF, name: "Wen Wei" }],
+        salespersons: [],
+      });
+      expect((await detail()).history[0].actor).toBe("Wen Wei");
+    });
+
+    it("⭐ names a principal actor for an operation reader — the SO-1329 walk defect", async () => {
+      /* The production walk found `Staff identity not recorded · Principal` on an
+         order whose actor WAS recorded — the reader's JWT simply could not
+         see a principal-role row. The 0390 door answers for every internal
+         staff role, so the record now names her. */
+      const PRINCIPAL = "11111111-1111-1111-1111-000000000001";
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order created · 0% deposit · online", by_role: "principal", by_user_id: PRINCIPAL, occurred_at: "2026-08-27T04:30:36Z" }],
+        appUsers: [{ id: PRINCIPAL, name: "Jess" }],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBe("Jess");
+      expect(body.history[0].actor_kind).toBe("human");
+    });
+
+    it("prefers the account when the same person answers from both tables", async () => {
+      /* `app_users` IS the account; the `salespersons` row is the sales-side
+         profile of the same human. One person may not print two names. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" }],
+        appUsers: [{ id: SELLER, name: "Kimmy Lee" }],
+        salespersons: [{ user_id: SELLER, name: "Kimmy (showroom)" }],
+      });
+      expect((await detail()).history[0].actor).toBe("Kimmy Lee");
+    });
+
+    it("fails OPEN — an unresolvable id keeps the event and names nobody", async () => {
+      /* A cron, a database trigger, a deleted account, an RLS miss. The event
+         is the record; losing it to protect a name would be the worse bug. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Stock reserved", by_role: "system", by_user_id: "00000000-0000-0000-0000-0000000000c1", occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [],
+      });
+      const body = await detail();
+      expect(body.history).toHaveLength(2);
+      expect(body.history[0].actor).toBeNull();
+      expect(body.history[1].actor).toBeNull();
+      expect(body.history[0].text).toBe("Stock reserved");
+      /* Both are audit-data defects the UI must state — a recorded id the
+         reader cannot resolve, and a row that never recorded one. Neither is
+         a person, and neither is promoted to System. */
+      expect(body.history[0].actor_kind).toBe("missing");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("⭐ says System only when the event's own facts prove automation", async () => {
+      /* The Card's contract: `actor_kind` is derived server-side from
+         authoritative facts, and a missing person id does NOT by itself prove
+         the portal acted. The structured marker an automated writer stamps
+         (`metadata.actor = "system"`) is the proof; a bare null id is an
+         audit-data defect, not automation. */
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Delivery order voided", by_role: null, by_user_id: null, occurred_at: "2026-08-22T11:00:00Z", metadata: { actor: "system" } },
+          { text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z", metadata: null },
+        ],
+      });
+      const body = await detail();
+      expect(body.history[0].actor_kind).toBe("system");
+      expect(body.history[1].actor_kind).toBe("missing");
+    });
+
+    it("asks neither table when no event carries an actor id", async () => {
+      /* Cloudflare caps subrequests per invocation (50 Free / 1000 Paid) and
+         this route is already one of the heaviest reads in the portal. Two name
+         lookups are worth it when there is a name to look up, and are pure cost
+         when there is not. */
+      const fromImpl = mockDetailQueries({
+        order: BASE_ORDER,
+        history: [{ text: "Order placed", by_role: "dealer", by_user_id: null, occurred_at: "2026-08-22T10:00:00Z" }],
+      });
+      const body = await detail();
+      expect(body.history[0].actor).toBeNull();
+      const tables = fromImpl.mock.calls.map((c) => c[0]);
+      expect(tables).not.toContain("salespersons");
+      expect(fromImpl.rpc).not.toHaveBeenCalled();
+    });
+
+    it("looks each id up ONCE, however many events that person wrote", async () => {
+      mockDetailQueries({
+        order: BASE_ORDER,
+        history: [
+          { text: "Amendment proposed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T12:00:00Z" },
+          { text: "Amendment withdrawn", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T11:00:00Z" },
+          { text: "Order placed", by_role: "salesperson", by_user_id: SELLER, occurred_at: "2026-08-22T10:00:00Z" },
+        ],
+        appUsers: [],
+        salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+      });
+      const body = await detail();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(body.history.map((h: any) => h.actor)).toEqual(["Kimmy Lee", "Kimmy Lee", "Kimmy Lee"]);
+    });
   });
 });
 
@@ -2241,6 +2555,11 @@ describe("POST /api/operation/orders (create)", () => {
             dealer_id: "00000000-0000-0000-0000-0000000000d1",
             // orders_salesperson_required (0296) — the door demands it too.
             salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            // 0391 — the office door names the production start, as the POS
+            // door already did. This fixture gained the field rather than the
+            // rule being relaxed: this test's intent is the DEALER refusal, and
+            // a payload that is invalid for an unrelated reason cannot prove it.
+            proceed_date: "2026-09-01",
           },
           lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
         }),
@@ -2264,6 +2583,155 @@ describe("POST /api/operation/orders (create)", () => {
     );
     expect(bad.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⭐ THE OFFICE DOOR NAMES THE PRODUCTION START — owner ruling YH, 2026-08-28.
+   *
+   * The MASTER long read "`createOrderInput` refuses an order without one".
+   * TWO different objects carry that name: the POS door's
+   * `createOrderInputSchema` does refuse, and this local one did not. So the
+   * office could mint the single order nobody can repair — `proceed_date` is
+   * read-only on an existing order, so a NULL one had no screen that could
+   * supply it.
+   *
+   * The RPC refuses it again on its own side (0391); one layer is not a guard.
+   */
+  it("refuses an order with no proceed date, before the database", async () => {
+    const rpc = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: {
+            customer_name: "Walk-in",
+            dealer_id: "00000000-0000-0000-0000-0000000000d1",
+            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            // every other field valid — ONLY the proceed date is absent
+          },
+          lines: [{ sku: "B1201S-K", qty: 1, unit_price: 2499 }],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    /* COPY-STANDARD:1447 governs the words. A second spelling is exactly how
+       the POS ended up with two of them. */
+    expect(await res.json()).toMatchObject({
+      message: "Proceed date — pick the day production should start",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  /* ⭐ A BIRTH STAMPS THE STAIR FEE TOO (0393/0394).
+     The writer is main's, from the same report this branch answers — the office
+     create door was the one door that never stamped, so an order keyed here on
+     floor 3 with no lift was born carrying the three stair INPUTS and no fee.
+
+     This test is not the fix; it is the CONTRACT the fix has to keep, and that
+     door had none. What it pins is the non-fatal promise: the stamp runs after
+     the insert, so the order is already born and its Rev 1 minted, and a stamp
+     that fails may never report a create that did not fail. */
+  it("stamps the stair fee on a newly created order", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: { id: "00000000-0000-0000-0000-000000000b02", so: 1400, revision: 1 },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          header: {
+            customer_name: "Walk-in",
+            dealer_id: "00000000-0000-0000-0000-0000000000d1",
+            salesperson_id: "00000000-0000-0000-0000-0000000000a1",
+            proceed_date: "2026-09-01",
+            delivery_floor: 3,
+            delivery_has_lift: false,
+            delivery_stair_items: 3,
+          },
+          lines: [{ sku: "B1201S-K", qty: 5, unit_price: 1890 }],
+        }),
+      }),
+      env,
+    );
+    /* The create still succeeds and still returns the order. The stamp runs
+       after it and cannot change that — which is the contract being pinned. */
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ so: 1400 });
+  });
+
+  /* The EDIT door is deliberately untouched: `revisionHeaderInput` keeps
+     proceed_date nullable-optional, because a save that only fixes a phone
+     number must not be forced to restate a date it may not change. Narrowing
+     the shared object would have broken every ordinary correction. */
+  it("leaves the edit door's proceed_date optional", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: ["customer_phone"] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { customer_phone: "012-3456789" } }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalled();
+  });
+
+  /* ⭐ THE OFFICE DOOR CARRIES THE SAME CEILING AS EVERY OTHER SURFACE (YH,
+     2026-09-01 — audit F-8).
+     `MAX_DELIVERY_FLOOR` is 3 because Carres does not stair-carry above the
+     3rd floor. The POS clamps to it, the shared schema caps at it, and this
+     door had no upper bound at all — so an office-keyed order could store a
+     floor no shop floor can produce, promising a carry nobody performs. */
+  async function saveFloor(floor: number) {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { delivery_floor: floor } }),
+      }),
+      env,
+    );
+    return { res, rpc };
+  }
+
+  it("refuses a floor above the one Carres carries to, and writes nothing", async () => {
+    const { res, rpc } = await saveFloor(7);
+    /* 422 — the shape is right and the VALUE is refused, which is what this
+       door already answers for every other out-of-range field. */
+    expect(res.status).toBe(422);
+    expect(rpc, "refused before the RPC, not by it").not.toHaveBeenCalled();
+  });
+
+  it("still accepts the top floor Carres does carry to", async () => {
+    const { res } = await saveFloor(3);
+    expect(res.status).toBe(201);
+  });
+
+  /* ⛔ AND 0 STAYS LEGAL HERE. The POS asks `min(1)` because a customer
+     standing in a shop has a floor; the office inherits orders where nobody
+     recorded one, and 0 is how "ground, or nobody said" already reads in this
+     column. Refusing it would block a save of a row this door did not create. */
+  it("still accepts 0 — the office inherits orders with no floor recorded", async () => {
+    const { res } = await saveFloor(0);
+    expect(res.status).toBe(201);
   });
 });
 
@@ -2334,9 +2802,13 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
       ],
       ops_stock_items: [
-        { unit_code: "id-001", sku: "B1201S-K" },
-        { unit_code: "id-002", sku: "B1201S-K" },
+        { unit_code: "id-001", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: null },
+        { unit_code: "id-002", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: "party-nets" },
       ],
+      /* DELIVERY CARD 02 — Where and Who has it come from Stock's own two
+         lookup tables, never from a name copied onto the Unit. */
+      warehouses: [{ id: "wh-klang", name: "Carres Klang Warehouse" }],
+      stock_operating_parties: [{ id: "party-nets", name: "NETS Warehouse" }],
     };
     const from = vi.fn((table: string) => {
       const data = rows[table];
@@ -2355,6 +2827,13 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       defaultDeliverTo: "Carres Klang",
+      /* WHERE each Unit is and WHO has it — the SAME Units the lines already
+         name, resolved to Stock's own names. Delivery Work reads this block;
+         the Sales Orders register ignores it. */
+      place: [
+        { unitCode: "id-001", siteName: "Carres Klang Warehouse", holderName: null },
+        { unitCode: "id-002", siteName: "Carres Klang Warehouse", holderName: "NETS Warehouse" },
+      ],
       lines: [{
         lineId: "line-1",
         sku: "B1201S-K",
@@ -2368,17 +2847,40 @@ describe("GET /api/operation/orders/:id/expansion", () => {
   });
 });
 
+/**
+ * ⭐ A REVISION NAMES ITS RECORDER (CARD 2026-08-27). `created_by` has been
+ * stored since 0327; the read now resolves it to a real display name through
+ * the SAME two-source resolver History uses (Law D — one arithmetic), and
+ * classifies the recorder truthfully. `created_by` still rides the wire as
+ * the audit identity, and the immutable snapshot is never touched.
+ */
 describe("GET /api/operation/orders/:id/revisions", () => {
-  it("reads the immutable store oldest-first", async () => {
-    const order = vi.fn().mockResolvedValue({
-      data: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null }],
-      error: null,
-    });
+  const SELLER = "00000000-0000-0000-0000-0000000000s1";
+  const STAFF = "00000000-0000-0000-0000-0000000000f1";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function mockRevisionQueries(opts: { revisions: any[]; appUsers?: any[]; salespersons?: any[] }) {
+    const order = vi.fn().mockResolvedValue({ data: opts.revisions, error: null });
     const eq = vi.fn(() => ({ order }));
-    const select = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ select }));
+    const revisionSelect = vi.fn(() => ({ eq }));
+    const salespersonsIn = vi.fn(() => Promise.resolve({ data: opts.salespersons ?? [], error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "sales_order_revisions") return { select: revisionSelect };
+      if (table === "salespersons") return { select: vi.fn(() => ({ in: salespersonsIn })) };
+      throw new Error(`unexpected table ${table}`);
+    });
+    /* The staff half goes through the 0390 definer door. */
+    const rpc = vi.fn((fn: string) =>
+      fn === "actor_display_names"
+        ? Promise.resolve({ data: opts.appUsers ?? [], error: null })
+        : Promise.resolve({ data: null, error: { message: `unexpected rpc ${fn}` } }),
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ from } as any);
+    vi.mocked(userClient).mockReturnValue({ from, rpc } as any);
+    return { from, order, rpc, salespersonsIn };
+  }
+
+  async function revisions() {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/revisions", {
@@ -2387,11 +2889,85 @@ describe("GET /api/operation/orders/:id/revisions", () => {
       env,
     );
     expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (await res.json()) as any;
+  }
+
+  it("reads the immutable store oldest-first and keeps the audit identity", async () => {
+    const { from, order } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
     expect(from).toHaveBeenCalledWith("sales_order_revisions");
     expect(order).toHaveBeenCalledWith("revision", { ascending: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.revisions).toHaveLength(1);
+    expect(body.revisions.map((r: { revision: number }) => r.revision)).toEqual([1, 2]);
+    /* `created_by` remains the audit identity; the name is presentation,
+       added beside it, never a replacement. The snapshot is untouched. */
+    expect(body.revisions[0].created_by).toBe(STAFF);
+    expect(body.revisions[0].snapshot).toEqual({ header: {}, lines: [], addons: [] });
+  });
+
+  it("names internal staff through the 0390 staff door", async () => {
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: STAFF, change_type: null, note: null }],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Wen Wei");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("⭐ names a salesperson the staff door does not answer for", async () => {
+    /* The same split History carries: the 0390 door names internal staff
+       only; `salespersons.user_id` (0002) answers the sales-side half. */
+    mockRevisionQueries({
+      revisions: [{ revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null }],
+      appUsers: [],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBe("Kimmy Lee");
+    expect(body.revisions[0].actor_kind).toBe("human");
+  });
+
+  it("classifies an unrecorded or unresolvable recorder as missing, never a guess", async () => {
+    mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: null, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: "00000000-0000-0000-0000-0000000000c1", change_type: "customer_change", note: null },
+      ],
+      appUsers: [],
+      salespersons: [],
+    });
+    const body = await revisions();
+    expect(body.revisions[0].created_by_name).toBeNull();
+    expect(body.revisions[0].actor_kind).toBe("missing");
+    expect(body.revisions[1].created_by_name).toBeNull();
+    expect(body.revisions[1].actor_kind).toBe("missing");
+  });
+
+  it("looks each distinct id up ONCE, however many revisions it authored", async () => {
+    const { rpc, salespersonsIn } = mockRevisionQueries({
+      revisions: [
+        { revision: 1, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-09", created_by: SELLER, change_type: null, note: null },
+        { revision: 2, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-10", created_by: SELLER, change_type: "customer_change", note: null },
+        { revision: 3, snapshot: { header: {}, lines: [], addons: [] }, created_at: "2026-08-11", created_by: STAFF, change_type: "staff_correction", note: null },
+      ],
+      appUsers: [{ id: STAFF, name: "Wen Wei" }],
+      salespersons: [{ user_id: SELLER, name: "Kimmy Lee" }],
+    });
+    const body = await revisions();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("actor_display_names", { p_ids: [SELLER, STAFF] });
+    expect(salespersonsIn).toHaveBeenCalledTimes(1);
+    expect(salespersonsIn).toHaveBeenCalledWith("user_id", [SELLER, STAFF]);
+    expect(body.revisions.map((r: { created_by_name: string | null }) => r.created_by_name)).toEqual([
+      "Kimmy Lee", "Kimmy Lee", "Wen Wei",
+    ]);
   });
 });
 

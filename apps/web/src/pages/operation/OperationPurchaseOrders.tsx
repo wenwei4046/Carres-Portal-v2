@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   comparePoRisk,
@@ -77,6 +78,8 @@ import {
   type SupplierRow,
 } from "@/lib/queries";
 import CorrectionWorkList from "./CorrectionWorkList";
+/* ONE evidence component, shared with SO Batch Purchase (Card §9 Task 6). */
+import PoIssueEvidence from "./components/PoIssueEvidence";
 
 /**
  * OperationPurchaseOrders — the Supplier Execution Workspace
@@ -97,7 +100,7 @@ import CorrectionWorkList from "./CorrectionWorkList";
  *     2026-08-02: the listing is for FINDING — sort, filter, search; the
  *     work happens in the workspace). **NINE frozen columns, ONE fixed set**
  *     (Loo, 2026-08-04 — Q7): PO Issued · Supplier · PO No. · SO No. ·
- *     Items · Destination · Customer Delivery · Expected Arrival ·
+ *     Items · Destination · Requested Delivery Date · Expected Arrival ·
  *     Current Action.
  *
  *     **THE SET NEVER CHANGES BECAUSE THE PANEL OPENED.** His words:
@@ -128,7 +131,7 @@ import CorrectionWorkList from "./CorrectionWorkList";
  * **ONE PURCHASE ORDER, ONE WAY OF LOOKING AT IT** (Q10 · Loo, 2026-08-05,
  * from a top-to-toe review of the LIVE page). Measured at 1280: the register's
  * table is 1203px inside a 568px listing — 635px off the right edge, taking
- * `Customer Delivery`, `Expected Arrival` and `Current Action` with it — while
+ * `Requested Delivery Date`, `Expected Arrival` and `Current Action` with it — while
  * the expanded row showed `PO-2038` and the panel beside it showed `PO-2032`.
  * **Two different purchase orders on one screen.**
  *
@@ -369,7 +372,7 @@ const NO_EXPANSION: ReadonlySet<string> = new Set<string>();
 const ITEM_GRID =
   "grid grid-cols-[16px_64px_minmax(0,1fr)_40px_160px_64px] gap-2";
 
-export default function OperationPurchaseOrders() {
+export function LegacyOperationPurchaseOrders() {
   const posQ = useOperationPos({ status: "all" });
   const suppliersQ = useOperationSuppliers();
   const warehouseQ = useOperationWarehouse();
@@ -490,8 +493,9 @@ export default function OperationPurchaseOrders() {
    * same one the expand's picker reads), and a PO with no destination follows
    * its warehouse — so the register can never print a blank for a fact every
    * PO has. **The names are the SAVED ones**, never re-spelt: COPY-STANDARD
-   * locks `Carres Klang` · `AL Sungai Buloh` · `HOUZS` and warns by name
-   * against shortening `AL Sungai Buloh` to `AL`.
+   * defines the current Settings-owned names (`Carres Klang` ·
+   * `AL Sungai Buloh` · `HOUZS` · `Ohana`) and warns against shortening
+   * `AL Sungai Buloh` to `AL`. Future names ride the same master data.
    *
    * The PO's own destination LEADS when the lines disagree — the row is one
    * value for one document (§12.7.5's ROW test) and the per-line truth is the
@@ -1055,7 +1059,7 @@ export default function OperationPurchaseOrders() {
   //
   // Loo's frozen order (2026-08-04 · Q7):
   //   PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
-  //   Customer Delivery · Expected Arrival · Current Action
+  //   Requested Delivery Date · Expected Arrival · Current Action
   //
   // Every width below is MEASURED in a real browser against the app's own
   // stylesheet (13px Inter, the DataTable cell's `px-2` = 16px, header = the
@@ -1221,13 +1225,13 @@ export default function OperationPurchaseOrders() {
     },
     {
       key: "custdel",
-      label: "Customer Delivery",
+      label: "Requested Delivery Date",
       // A merged PO carries several customers' dates; until P5's allocation
       // splits them, this column is the EARLIEST — and says so (Jess,
       // 2026-08-02: never let staff read it as the whole PO's only date).
       headerTitle:
-        "Earliest customer delivery across this PO's sales orders — a merged PO carries more than one",
-      width: "140px",
+        "Earliest requested delivery date across this PO's sales orders — a merged PO carries more than one",
+      width: "192px",
       sortable: true,
       filter: filterFor("custdel", custdelOptions, { range: true }),
       cell: (p) => {
@@ -1701,6 +1705,11 @@ export default function OperationPurchaseOrders() {
     </div>
   );
 }
+
+// The current owner-approved Purchase Orders Register/Object Detail. The
+// legacy Supplier Execution Workspace remains below as implementation history
+// while governed write components are migrated through their shared seams.
+export { default } from "./purchase-orders/PurchaseOrdersPage";
 
 /**
  * ── THE WORKING AREA — the row expand (Q5, Loo 2026-08-04) ─────────────────
@@ -2442,7 +2451,7 @@ function WorkspaceBody({
               date has to be judged against, and it was not on this panel at
               all (Jess, 2026-08-03). Read-only here: purchasing cannot move
               a customer's promise. */}
-          <Prop label="Customer Delivery">
+          <Prop label="Requested Delivery Date">
             {po.customer_delivery ? (
               <span className="tabular-nums" data-testid="po-customer-delivery">
                 {fmtDateShort(po.customer_delivery)}
@@ -3387,11 +3396,11 @@ function ActivityDesk({
   supplier: SupplierRow | undefined;
   template: string | null;
 }) {
-  const [copied, setCopied] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const send = useRecordSend(po.id);
   const saveTemplate = useSetMessageTemplate();
+  const qc = useQueryClient();
 
   const supplierName = supplier?.name ?? "supplier";
   const items = po.purchase_order_lines
@@ -3461,36 +3470,49 @@ function ActivityDesk({
       )}&body=${encodeURIComponent(text)}`
     : null;
 
-  async function copyMessage() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      // Clipboard refused — the text stays selectable below.
-    }
-  }
-
   const sends = po.sends ?? [];
+  /* ⭐ THE SAME GOVERNED EVIDENCE JOURNEY AS SO BATCH PURCHASE
+     (Card §5.3 / §9 Task 6 — "reuse the same evidence component and law on the
+     Purchase Order detail page"). One component, so the two surfaces cannot
+     drift into telling an operator different things about the same document.
+     It reads PERSISTED `po_sends`, so a reload, a second operator and a
+     revision all agree, and it declares the CURRENT version — after a revise,
+     the previous version's evidence stays as history and the new version is
+     unsent. */
+  const issuedPo = {
+    id: po.id,
+    supplierId: po.supplier_id ?? "",
+    supplierName: supplier?.name ?? null,
+    destinationId: po.destination_id ?? "",
+    destination: null,
+  };
 
   return (
     <section className="mt-4 pt-3 border-t border-kit-slate-5" data-testid="po-activity">
-      {/* ① COMMUNICATION — the doors out of the Portal.
-          The `DOCUMENT` band that used to head this desk is GONE (Q10 Ⓔ): it
-          carried one button, and its title plus hairline cost ~30px for
-          nothing. `Print PDF` moved up beside the PO number, where the object's
-          own actions belong. The three CONTROLS below did NOT move with it and
-          that was measured, not preferred — `Print PDF` + `Copy message` +
-          `Open WhatsApp group` come to 385.1px, which does not fit 368px — and
+      {/* ① COMMUNICATION — ONE AREA, and it is `PoIssueEvidence` below.
           Loo froze this band's home on 2026-08-03: *"Communication starts from
-          the DOCUMENT, never from the register."* */}
+          the DOCUMENT, never from the register."* That still holds; what
+          changed on 2026-08-24 (Card 02 closure §7) is that this band no longer
+          keeps its OWN `Copy message` · `Open WhatsApp group` · `Open email`
+          beside the governed evidence surface, which carried the same three.
+          One document had two sets of send controls and two accounts of what
+          had happened to it — and a `Download PDF` that handed over JSON.
+
+          The supplier's real doors are resolved here, where the supplier is
+          known, and PASSED IN. `Message` still opens the draft below, because
+          composing is not communicating.
+
+          Every label names the DOOR it opens, never the outcome it hopes for —
+          `docs/ACTION-FLOW-STANDARD.md` Law 8, the Observation Law (Jess,
+          2026-08-03): *opening an external application, copying text, or
+          generating a file does not prove that the external outcome occurred.*
+          So no control anywhere here may say `Send`.
+
+          `Record the PDF sent` is the one act that completes Issue PO, and it
+          is not a tick-box: it asks WHO received it and WHICH VERSION, and
+          refuses a version the operator did not actually see (0378). */}
       <DeskBand>Communication</DeskBand>
       <div className="mt-1 flex items-center gap-2">
-        {copied && (
-          <span className="text-label font-medium text-kit-green-11" data-testid="po-copied">
-            Copied
-          </span>
-        )}
         {saved && (
           <span className="text-label font-medium text-kit-green-11" data-testid="po-template-saved">
             Template saved
@@ -3509,60 +3531,22 @@ function ActivityDesk({
           <Icon name={draftOpen ? "collapse" : "expand"} size={14} />
           Message
         </button>
-        {/* Every label names the DOOR it opens, never the outcome it hopes for
-            — `docs/ACTION-FLOW-STANDARD.md` Law 8, the Observation Law (Jess,
-            2026-08-03): *opening an external application, copying text, or
-            generating a file does not prove that the external outcome
-            occurred.* The portal watches a link be clicked; it never watches a
-            message leave, so no button here may say `Send`.
-
-            This REPLACES the 2026-08-02 note that said "opening WhatsApp IS
-            the send". There is still no "I've sent" button, and the reason is
-            unchanged and good — a record somebody must remember to make
-            afterwards is a record that will be wrong. What changed is the
-            claim: opening a door is not the same act as a message arriving.
-
-            Copy still records NOTHING (guarded by a test): copying is taking
-            the words somewhere else, not communicating them. */}
-        <button
-          type="button"
-          onClick={() => void copyMessage()}
-          data-testid="po-copy-message"
-          className={DOC_BTN}
-        >
-          Copy message
-        </button>
-        {wa && (
-          <a
-            href={wa.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => send.mutate({ channel: "whatsapp" })}
-            data-testid="po-open-whatsapp"
-            className={`${DOC_BTN} font-medium`}
-          >
-            {wa.isGroup ? "Open WhatsApp group" : "Open WhatsApp"}
-          </a>
-        )}
-        {/* The portal has NO email sender (Jess picked mailto): the operator's
-            own client sends it, with the subject and body already filled. */}
-        {mailto ? (
-          <a
-            href={mailto}
-            onClick={() => send.mutate({ channel: "email" })}
-            data-testid="po-open-email"
-            className={`${DOC_BTN} font-medium`}
-          >
-            Open email
-          </a>
-        ) : (
-          <span className="text-label text-kit-slate-9" data-testid="po-no-email">
-            No email on file for {supplierName}
-          </span>
-        )}
         {send.isPending && (
           <span className="text-label text-kit-slate-9">Recording…</span>
         )}
+      </div>
+
+      <div className="mt-3" data-testid="po-issue-evidence">
+        <PoIssueEvidence
+          po={issuedPo}
+          version={po.version ?? 1}
+          evidence={sends}
+          /* The supplier's own doors, resolved where the supplier is known. */
+          doors={{ whatsapp: wa, mailto, message: text, supplierName: supplier?.name ?? null }}
+          /* An external app OPENED — history, and it completes nothing. */
+          onOpened={(channel) => send.mutate({ channel })}
+          onConfirmed={() => void qc.invalidateQueries({ queryKey: ["operation", "pos"] })}
+        />
       </div>
 
       {draftOpen && (

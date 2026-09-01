@@ -3,7 +3,6 @@ import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type 
 import { DB } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
-import { assertRpcCallShape } from "../../test-utils/assert-rpc";
 
 vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
@@ -36,15 +35,20 @@ async function makeJwt(role: string) {
     .sign(signKey);
 }
 
-// The route reads sku/warehouse_id/qty/reserved/low_threshold/high_threshold
-// off stock_balances rows; updated_at (present on DB.StockBalanceRow) is
-// irrelevant for these fixtures, so we use a column-Pick to keep test fixtures
-// minimal while still typing against the shared schema. T42-pass3-C1 added the
-// threshold fields to the route's select clause.
-type StockBalanceFixture = Pick<
-  DB.StockBalanceRow,
-  "sku" | "warehouse_id" | "qty" | "reserved"
-> & {
+// 0366 — the route's totals now come from `stock_sku_availability`, the unit
+// register's one availability authority, and the Settings thresholds are read
+// separately off `stock_balances`. The fixture carries BOTH halves and the mock
+// splits them, which is exactly the seam the route sees.
+type StockBalanceFixture = {
+  sku: string;
+  warehouse_id: string;
+  /** what is physically at this Site */
+  qty: number;
+  reserved: number;
+  /** what may be OFFERED. Defaults to qty − reserved for fixtures written
+   *  before the distinction existed; a fixture that wants to prove a unit in
+   *  repair is unsellable sets it explicitly. */
+  available?: number;
   low_threshold?: number | null;
   high_threshold?: number | null;
 };
@@ -73,10 +77,30 @@ function mockWarehouseQueries(opts: {
       const select = vi.fn(() => ({ order }));
       return { select };
     }
+    if (table === "stock_sku_availability") {
+      const select = vi.fn().mockResolvedValue({
+        data: opts.balancesError
+          ? null
+          : (opts.balances ?? []).map((b) => ({
+              sku: b.sku,
+              warehouse_id: b.warehouse_id,
+              on_hand: b.qty,
+              reserved: b.reserved,
+              available: b.available ?? b.qty - b.reserved,
+            })),
+        error: opts.balancesError ?? null,
+      });
+      return { select };
+    }
     if (table === "stock_balances") {
       const select = vi.fn().mockResolvedValue({
-        data: opts.balancesError ? null : opts.balances ?? [],
-        error: opts.balancesError ?? null,
+        data: (opts.balances ?? []).map((b) => ({
+          sku: b.sku,
+          warehouse_id: b.warehouse_id,
+          low_threshold: b.low_threshold ?? null,
+          high_threshold: b.high_threshold ?? null,
+        })),
+        error: null,
       });
       return { select };
     }
@@ -332,181 +356,11 @@ describe("GET /api/operation/warehouse", () => {
   });
 });
 
-describe("POST /api/operation/warehouse/adjust", () => {
-  // Hex-only UUID — adjustStockInput.warehouseId is z.string().uuid(); the
-  // 'w' shape used in this file's GET tests is fine for raw fixtures but
-  // would fail zod parsing here.
-  const SKU = "MAT-K-001";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000b01";
-  const VALID_BODY = { sku: SKU, warehouseId: WAREHOUSE_ID, delta: 5, reason: "Found extra units in back room" };
-
-  it("returns 200 on positive delta and calls RPC with snake_case args", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { sku: SKU, warehouse_id: WAREHOUSE_ID, delta: 5, qty_after: 17, reason: VALID_BODY.reason },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID_BODY),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { sku: string; qty_after: number };
-    expect(body.sku).toBe(SKU);
-    expect(body.qty_after).toBe(17);
-    expect(rpc).toHaveBeenCalledWith("operation_adjust_stock", {
-      p_sku: SKU,
-      p_warehouse_id: WAREHOUSE_ID,
-      p_delta: 5,
-      p_reason: VALID_BODY.reason,
-    });
-    assertRpcCallShape(rpc, "operation_adjust_stock", [
-      "p_sku",
-      "p_warehouse_id",
-      "p_delta",
-      "p_reason",
-    ]);
-  });
-
-  it("returns 200 on negative delta (shrinkage / damage)", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { sku: SKU, warehouse_id: WAREHOUSE_ID, delta: -3, qty_after: 9, reason: "Damaged in transit" },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -3, reason: "Damaged in transit" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_adjust_stock", {
-      p_sku: SKU,
-      p_warehouse_id: WAREHOUSE_ID,
-      p_delta: -3,
-      p_reason: "Damaged in transit",
-    });
-    assertRpcCallShape(rpc, "operation_adjust_stock", [
-      "p_sku",
-      "p_warehouse_id",
-      "p_delta",
-      "p_reason",
-    ]);
-  });
-
-  it("maps SQLSTATE P0001 negative_stock → 422 rule_violation", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "P0001", message: "stock would go negative", details: "negative_stock" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -999, reason: "Big shrinkage" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string; code: string; message: string };
-    expect(body.error).toBe("rule_violation");
-    expect(body.code).toBe("negative_stock");
-    expect(body.message).toBe("stock would go negative");
-  });
-
-  it("maps SQLSTATE P0001 below_reserved → 422 rule_violation", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "P0001", message: "stock would fall below reserved units", details: "below_reserved" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: SKU, warehouseId: WAREHOUSE_ID, delta: -2, reason: "Test" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string; code: string };
-    expect(body.error).toBe("rule_violation");
-    expect(body.code).toBe("below_reserved");
-  });
-
-  it("returns 422 invalid_input when required fields are missing (zod)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: SKU }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("invalid_input");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 422 invalid_input when extra keys are passed (.strict)", async () => {
-    // adjustStockInput is .strict() post-Prep-2 — extra keys must be rejected
-    // before reaching Supabase, otherwise PostgREST PGRST202 leaks through.
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...VALID_BODY, malicious: "drop tables" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("invalid_input");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 403 for non-operation role (no rpc call)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request("http://t/api/operation/warehouse/adjust", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify(VALID_BODY),
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
-  });
-});
+// 0366 — the "POST /api/operation/warehouse/adjust" block is GONE with the
+// endpoint and the `operation_adjust_stock` RPC behind it. It moved a stored
+// total by a signed delta and never named a physical Unit, which is the
+// "Add stock / Remove stock" door the Stock MASTER rejects. Stock is counted
+// from the exact Units now, so there is nothing left here to test.
 
 describe("GET /api/operation/warehouse/reserved-drilldown", () => {
   // Hex-only UUIDs — the route's reservedDrilldownQuery uses z.string().uuid()

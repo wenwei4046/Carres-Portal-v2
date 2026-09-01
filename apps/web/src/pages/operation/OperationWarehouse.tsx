@@ -7,7 +7,6 @@ import {
   type WarehouseStockEntry,
 } from "@/lib/queries";
 import type { ProductCategory, ProductSkuDto } from "@carres/shared";
-import AdjustStockModal from "./components/AdjustStockModal";
 import ReserveDrilldownDialog from "./components/ReserveDrilldownDialog";
 import SetThresholdDialog from "./components/SetThresholdDialog";
 import {
@@ -39,7 +38,9 @@ import {
  *     icons) — active = base-900 fill / white text.
  *   - Stock table (4 cols): Product · This warehouse · All warehouses · Status.
  *     Row click = future "view log" prefill (M5.5). "+ Adjust" button per row
- *     opens AdjustStockModal pre-filled with sku + warehouseId + current qty.
+ *     0366 — the "+ Adjust" button is GONE. Stock is counted from the exact
+ *     Units, so a total can no longer be nudged by hand; what happened to a
+ *     Unit is recorded through its own door and the totals follow.
  *   - Status badge: outline-style 9px UPPERCASE, color from low_stock_status.
  *     Plan §18.5 + comment in queries.ts:988-993:
  *       - "out" → danger (vivid red, proto #b91c1c)
@@ -128,14 +129,6 @@ export default function OperationWarehouse({
     initialAlert ? "alerts" : "mattress",
   );
   const [search, setSearch] = useState("");
-  const [adjustTarget, setAdjustTarget] = useState<{
-    sku: string;
-    warehouseId: string;
-    warehouseName: string;
-    currentQty: number;
-    reservedQty: number;
-    skuLabel?: string;
-  } | null>(null);
   // Pipeline v2 (C4) — drill-down dialog state. Set when the user clicks a
   // row on the "Reserved" tab; cleared on Modal onClose.
   const [drilldownTarget, setDrilldownTarget] = useState<{
@@ -637,41 +630,12 @@ export default function OperationWarehouse({
                     >
                       <Settings2 size={13} strokeWidth={2} className="mr-1" /> Threshold
                     </button>
-                    <button
-                      type="button"
-                      className="btn-secondary text-label py-1 px-2.5"
-                      onClick={() =>
-                        setAdjustTarget({
-                          sku: row.sku,
-                          warehouseId: activeWarehouse.id,
-                          warehouseName: activeWarehouse.name,
-                          currentQty: row.qty,
-                          reservedQty: row.reserved,
-                          skuLabel: skuMeta?.variant,
-                        })
-                      }
-                      data-testid={`warehouse-adjust-${row.sku}`}
-                    >
-                      + Adjust
-                    </button>
                   </div>
                 </div>
               );
             })
           )}
         </div>
-      )}
-
-      {adjustTarget && (
-        <AdjustStockModal
-          sku={adjustTarget.sku}
-          warehouseId={adjustTarget.warehouseId}
-          warehouseName={adjustTarget.warehouseName}
-          currentQty={adjustTarget.currentQty}
-          reservedQty={adjustTarget.reservedQty}
-          skuLabel={adjustTarget.skuLabel}
-          onClose={() => setAdjustTarget(null)}
-        />
       )}
 
       {drilldownTarget && (

@@ -119,6 +119,13 @@ function mockSb(opts: MockOpts = {}) {
         filters.push([col, val]);
         return chain;
       },
+      // 2026-08-24: the active-rule read now goes through the ONE ordered
+      // door (readActivePwpRules), i.e. .eq().order().order(). The double
+      // does not need to SORT - every assertion here is per-rule - it only
+      // has to stay chainable through the extra hops.
+      order() {
+        return chain;
+      },
       in(col: string, vals: unknown[]) {
         ins.push([col, vals]);
         // product_skus join is awaited directly on .in()

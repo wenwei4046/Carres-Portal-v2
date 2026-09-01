@@ -1,1349 +1,882 @@
-import { useMemo, useState } from "react";
-import { RefreshCw, Truck } from "lucide-react";
-import {
-  bookingDayOf,
-  carrierDayLoads,
-  carrierDayNote,
-  daysInRange,
-  deliveryGroupLabel,
-  deliveryRange,
-  deliveryQueueForLabel,
-  deliveryQueueLeads,
-  deliveryScopeSentence,
-  deliveryStepDueIso,
-  deliveryStepOverdue,
-  DELIVERY_QUEUES,
-  DELIVERY_RANGE_KEYS,
-  myHolidaySet,
-  orderActionLine,
-  orderActionQueue,
-  orderDeliveryGroups,
-  partnerBookingWarnings,
-  partnerDeliveryRules,
-  sortDeliveryRows,
-  type DayBooking,
-  type DeliveryGroupKey,
-  type DeliveryQueueKey,
-  type DeliveryRangeKey,
-  type PartnerDeliveryRules,
-} from "@carres/shared";
-import {
-  useDeliveryPartners,
-  useOperationOrders,
-  useOperationStock,
-  useOrderBookingBrief,
-  usePurchasingSettings,
-  type operationOrderListRow,
-} from "@/lib/queries";
-import { orderBookingDay, orderControlOf } from "@/lib/order-booking";
-import { fmtDate } from "@/lib/fmt-date";
-import { displayCustomerName } from "@/lib/customer-name";
-import { cjkClassName } from "@/lib/cjk";
-import { locationForAddress } from "@/lib/region";
-import ListPageShell, { type ActiveChip } from "@/components/ListPageShell";
-import { SectionBand, SectionCard } from "@/components/SectionPanel";
-import BookingSpine from "./components/BookingSpine";
-import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
-import OrderDetailDrawer from "./components/OrderDetailDrawer";
-import ModuleHeader from "./components/ModuleHeader";
-// The ladder and its inputs are IMPORTED from the Orders list, never re-derived.
-// T11's own law is "the same computed actions the Orders list shows, so the two
-// pages can never disagree" — the only way to guarantee that is to run ONE
-// `nextActionOf`. When C2 rewrites the ladder into its two layers, both surfaces
-// move on the same commit instead of one drifting into a second answer.
-import {
-  deliveryStepAnchor,
-  logisticStateOf,
-  moneyOf,
-  nextActionOf,
-  openActionsOf,
-  stageOf,
-  stockReadiness,
-  todayIso,
-} from "./OperationOrdersControl";
-
 /**
- * OperationDelivery — T11, the Delivery module page and the LAST card of the
- * delivery line (docs/delivery-execution-queue.md · docs/delivery-module-proposal.md).
+ * DELIVERY — the one planning and document workspace.
+ * `CARD-2026-08-21-delivery-02-work-layout` · `docs/delivery/MASTER.md` §8.
  *
- * **This card is ASSEMBLY. It invents nothing**, and that is the point: by T11
- * every signal, queue, word, reason, profile and calendar already ships, so the
- * module is three panes reading what exists —
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⭐ WHAT THIS PAGE REPLACED, AND WHY THE OLD ONE HAD TO GO
  *
- *   facet   ← the four live delivery queues + their auto-overdue deadlines (T7)
- *   list    ← the SAME computed action the Orders list shows (one `nextActionOf`)
- *   detail  ← the booking (D1/T1) · groups (T8) · the logistics company's own
- *             delivery rules (T9) · the delivery-photo ledger (T6) · the T5 spine
- *   calendar← `bookingDayOf` (T10) — the ONE confirmed-vs-provisional rule
+ * The shipped Delivery Work was a three-pane action-card wall: a queue facet, a
+ * `Work list / Calendar` switch, a KPI preamble, a Refresh control and a
+ * permanent detail pane. It answered *what should somebody be nagged about
+ * today*. That is a Work Engine question, and My Work / Team Work already own
+ * it — which is precisely why this page could never answer the LOGISTICS
+ * question the operator actually sits down with:
  *
- * It carries the ONE new sidebar item in the whole plan; everything else in
- * every line upgrades an existing door.
+ *      "Everything going out on Friday — who is carrying it, and is any of it
+ *       missing a date, a partner or its goods?"
  *
- * **What this page deliberately does NOT do: write anything.** Every booking,
- * every photo, every reason is entered through the order drawer, which is the
- * one place those gates live (server-side `bookingConfirmGate`, the T6 upload
- * door). A second write surface would mean a second set of gates to keep in
- * step, and the first time they diverged an operator would get a confirmation
- * the server refuses. So the detail pane states facts and hands over to the same
- * drawer the Orders list opens — `Open order` is the only door out of it.
+ * An action-card wall cannot be scanned by day, cannot be filtered by partner
+ * and by date at once, and cannot be read column-by-column. So the page is now
+ * what every other planning surface in the portal is: a 200px local rail and
+ * ONE expandable register. Nothing was rewritten for taste — the old shape was
+ * structurally unable to hold the job.
  *
- * **No new endpoint.** Every field is already on the orders list payload (T1 put
- * the booking there, T7 the photo ledger) or on `/api/operation/partners` (T9).
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⭐ THE SHAPE
+ *
+ * ```
+ * ┌──────────────────────────────────────────────────────────────────────────┐
+ * │ Delivery                                             🔔 ❓ ⚙  (50px)      │
+ * ├──────────── 200px ──────────────┬────────────────────────────────────────┤
+ * │ DELIVERY DATE                   │ Search              Filters  Columns   │
+ * │   No confirmed date        88   ├────────────────────────────────────────┤
+ * │   Overdue                  1   │ ▸ SO-1322 · customer · dates …         │
+ * │   Fri, 21 Aug               2   │   └ Category · Unit ID · Deliver To …  │
+ * │ LOGISTICS                       │                                        │
+ * │   All · NETS · AL · TEOW …      ├────────────────────────────────────────┤
+ * │                                 │ 12 of 91 delivery scopes               │
+ * └─────────────────────────────────┴────────────────────────────────────────┘
+ * ```
+ *
+ * ── THE RAIL IS PAGE-OWNED FILTERING, NOT NAVIGATION ────────────────────────
+ *
+ * The same 200px `RailGroup`/`RailItem` recipe Purchase Orders, Goods Receipts
+ * and Purchase Demands already wear (`docs/ui/MASTER.md` — LOCAL RAIL ACTIVE
+ * ROW). Both groups are independent toggle sets and they COMBINE: picking
+ * `Fri, 21 Aug` and `NETS` asks one question, not two. Each group's counts are
+ * computed over the rows the OTHER group has already narrowed, so a count is
+ * always "what I will get if I click this" — never a number that disagrees with
+ * the listing under it (Architecture Law D).
+ *
+ * Choices ride the URL (`?date=` · `?logistics=`), so a refresh, a share and
+ * the back button all land on the same listing.
+ *
+ * **Never `Today`, never `Tomorrow`** (owner ruling 2026-08-15) and never
+ * `Due` · `Next Action` · `Priority` · `Pending` (COPY-STANDARD): a date says
+ * which day it is, and a fact says what is true.
+ *
+ * ── THE LISTING IS THE ONE REGISTER ENGINE ──────────────────────────────────
+ *
+ * `components/register/DataGrid` — the same engine, density, search, ▽ column
+ * filters, resize/reorder, Columns chooser, horizontal scroll and sticky
+ * identity as Sales Orders. This page supplies only what the engine cannot
+ * know: the rows, the columns and where a number opens.
+ *
+ * **This page writes NOTHING.** There is no `New DO`, no `Issue`, no `Release`
+ * and no `Approve` — the SYSTEM issues a Delivery Order when a trip's
+ * requirements are met (`docs/delivery/MASTER.md` §3), and the one governed
+ * manual door lives on the order, not here. `SO No` opens the Sales Order,
+ * `DO No` opens the Delivery Order, and those two doors are the only ways out.
+ *
+ * ── ▸ HAS EXACTLY ONE JOB ───────────────────────────────────────────────────
+ *
+ * That scope's goods and the physical facts about them: the shared
+ * `GoodsMiniTable`, then `Where` · `Who has it` · `Stock ETA`, then the Loan
+ * block when a loan is genuinely out. No editable field, no partner selector,
+ * no Save — a second write surface means a second set of gates to keep in step,
+ * and the first time they diverged an operator would be told something the
+ * server refuses.
  */
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
+import { fmtDate } from "@/lib/fmt-date";
+import StatusPill from "@/components/kit/StatusPill";
+import {
+  useDeliveryOrdersRegister,
+  useDeliveryPartners,
+  useDeliveryArrangements,
+  useOperationOrders,
+  useOrderLoans,
+  useSalesOrderExpansion,
+  type DeliveryArrangementRow,
+} from "@/lib/queries";
+import { DataGrid, type DataGridColumn, type DataGridContextMenuItem } from "@/components/register/DataGrid";
+import ModuleHeader from "./components/ModuleHeader";
+import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import { RailGroup, RailItem } from "./components/workspace-rail";
+import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
 
-/** The four delivery queues, keyed by their live label. The LABELS are not
- *  copied into this file: they come from the shared constant, so the queue word
- *  here, the queue word in the Orders facet and the NEXT-column verb are one
- *  string. (COPY-STANDARD rule 8: renaming them app-wide is C1's job — a
- *  synonym invented here would be the exact failure that rule names.) */
-const QUEUE_DEFS = DELIVERY_QUEUES as readonly {
-  key: DeliveryQueueKey;
-  label: string;
-  description: string;
-}[];
+/** The two governed action words on this workspace (COPY-STANDARD). */
+const ASSIGN_LOGISTICS = "Assign logistics";
+const EDIT_DELIVERY = "Edit Delivery";
+import { lineName } from "./sales-order-facts";
+import {
+  DATE_TO_BE_CONFIRMED_CELL,
+  DATE_TO_BE_CONFIRMED_FULL,
+} from "./sales-order-guidance";
+import { stockEtaOf } from "./OperationOrdersControl";
+import {
+  buildDateRail,
+  buildDeliveryScopeRows,
+  buildLogisticsRail,
+  matchesDate,
+  matchesLogistics,
+  scopeFooter,
+  DW,
+  NO_LOGISTICS_KEY,
+  type DeliveryScopeRow,
+} from "./delivery-work";
 
-const NO_LOGISTICS = "__none" as const;
-/** COPY-STANDARD, the Logistics word law: `Carrier` / `Partner` are banned UI
- *  words, and a fact may state an absence but never carry a to-do word. */
-const NO_LOGISTICS_LABEL = "No logistics picked";
+const STORAGE_KEY = "carres.deliveryWork.register.v1";
 
-function deliveryQueueDisplay(key: DeliveryQueueKey): string {
-  switch (key) {
-    case "assign":
-      return "Choose logistics partner";
-    case "chase":
-      return "Get customer delivery date";
-    case "deliver_today":
-      return "Deliver on scheduled date";
-    case "photo":
-      return "Get delivery photo";
-  }
+/** Owner column ruling 2026-08-18, held here too — one status vocabulary. */
+/**
+ * The OPERATIONAL ladder's tones (owner ruling 2026-08-24). Two rungs are
+ * deliberately quiet — waiting on a customer or a warehouse is the normal
+ * state of most rows on a planning screen, and painting eighty of them amber
+ * would spend the attention colour on "nothing is wrong yet".
+ */
+const STATUS_TONE: Record<DeliveryWorkStatusKind, OrderActionTone> = {
+  waiting_customer_date: "neutral",
+  confirmed: "info",
+  waiting_warehouse: "neutral",
+  ready_for_handover: "info",
+  out_for_delivery: "info",
+  delivered: "success",
+  failed: "warning",
+};
+
+/** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
+function Absent({ children }: { children: string }) {
+  return (
+    <span className="text-kit-slate-9" data-absence="true">
+      {children}
+    </span>
+  );
 }
 
-type ViewKey = "queues" | "calendar";
+/** Today, in Carres' own business timezone — never the browser's. */
+function businessToday(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  return parts;
+}
 
-/** One row of the board: the order plus everything the panes ask of it. */
-interface DeliveryRow {
-  order: operationOrderListRow;
-  /** The delivery queue its action names — null when the ladder's answer is
-   *  not a delivery step at all (money-held, still waiting on stock, Done). */
-  queue: DeliveryQueueKey | null;
-  /** The action's QUEUE word — party-free, used for the facet chip. */
-  label: string;
-  /** The action's ROW LINE, party named — what the operator reads (C1). */
-  line: string;
-  actionKey: string;
-  tone: "danger" | "warning" | "info" | "success" | "neutral";
-  locked: boolean;
-  dueIso: string | null;
-  overdue: boolean;
-  bookingIso: string | null;
-  promisedIso: string | null;
-  so: number;
-  logisticsId: string | null;
-  logisticsName: string | null;
+/**
+ * ▸ — the scope's goods and the physical facts about them, and nothing else.
+ *
+ * Its own component because it asks its own two questions per scope (Stock's
+ * allocation and the order's loans), and a hook cannot be called conditionally
+ * inside a render callback.
+ */
+function ScopeExpansion({ row }: { row: DeliveryScopeRow }) {
+  const expansion = useSalesOrderExpansion(row.orderId);
+  const loans = useOrderLoans(row.orderId);
+  const lines = row.o.order_lines ?? [];
+  const addons = row.o.order_addons ?? [];
+
+  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  const placeByUnit = new Map((expansion.data?.place ?? []).map((p) => [p.unitCode, p]));
+
+  const miniLines: GoodsMiniLine[] = [
+    ...lines.map((line, index): GoodsMiniLine => {
+      const fact = factsByLine.get(line.id ?? "");
+      return {
+        key: line.id ?? `${line.sku}-${index}`,
+        testId: `delivery-good-${line.sku}`,
+        /* ONE answer for this cell, shared with the Sales Orders register.
+           This page's own copy used to stop before `lineClass` and printed
+           `Other goods` on all 90 live rows while the register, reading the
+           same line, printed `Mattress`. */
+        category: goodsCategoryOf(line),
+        unitIds: fact?.unitIds ?? [],
+        unitAbsence: "Not allocated",
+        deliverTo: (fact?.deliverTo ?? []).map((d) =>
+          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+        ),
+        deliverToAbsence: expansion.isLoading ? "Loading…" : DW.notRecorded,
+        sku: line.sku,
+        qty: line.qty,
+        item: lineName(line),
+        selectable: true,
+      };
+    }),
+    /* A Service moves no goods and allocates no Unit — the dash is the shipped
+       ruling for that cell, not an invented word. */
+    ...addons.map((addon, index): GoodsMiniLine => ({
+      key: `addon-${index}`,
+      category: "Service",
+      unitIds: [],
+      unitAbsence: "—",
+      deliverTo: [],
+      deliverToAbsence: "—",
+      sku: addon.addon_key ?? "",
+      qty: addon.qty,
+      item: addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on",
+      selectable: false,
+    })),
+  ];
+
+  /* WHERE / WHO HAS IT — Stock's record of the Units this scope is allocated.
+     Several Units may sit in one place; the fact is printed ONCE per place
+     rather than once per Unit, because a column repeating `Carres Klang` six
+     times says nothing the first line did not. */
+  const places = [...placeByUnit.values()];
+  const sites = [...new Set(places.map((p) => p.siteName).filter(Boolean))] as string[];
+  const holders = [...new Set(places.map((p) => p.holderName).filter(Boolean))] as string[];
+  const eta = stockEtaOf(row.o);
+
+  const openLoans = (loans.data?.loans ?? []).filter((l) => l.status === "on_loan");
+
+  return (
+    <div data-testid="delivery-scope-expansion" className="flex flex-col gap-2">
+      {miniLines.length === 0 ? (
+        <div className="px-2 py-2 text-body text-kit-slate-11">{DW.noGoods}</div>
+      ) : (
+        <GoodsMiniTable label={`Goods on SO-${row.so}`} lines={miniLines} />
+      )}
+
+      {/* The physical facts, read-only. Three owners speak here and none of
+          them is Delivery: Stock owns Where and Who has it, Purchasing owns
+          the arrival date. The row states them; it never edits them. */}
+      <dl
+        className="flex flex-wrap gap-x-8 gap-y-1 px-2 text-body"
+        data-testid="delivery-scope-facts"
+      >
+        <div className="flex gap-2">
+          <dt className="text-kit-slate-11">{DW.where}</dt>
+          <dd>{sites.length ? sites.join(" · ") : <Absent>{DW.notRecorded}</Absent>}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-kit-slate-11">{DW.whoHasIt}</dt>
+          <dd>{holders.length ? holders.join(" · ") : <Absent>{DW.notRecorded}</Absent>}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-kit-slate-11">{DW.stockEta}</dt>
+          <dd>
+            {eta.etaIso ? fmtDate(eta.etaIso) : <Absent>{DW.notRecorded}</Absent>}
+          </dd>
+        </div>
+      </dl>
+
+      {/* ⭐ THE LOAN BLOCK RENDERS ONLY WHEN A LOAN IS ACTUALLY OUT. An empty
+          heading over an empty table teaches the operator that the block means
+          nothing, and the day a real loan appears they will not read it. */}
+      {openLoans.length > 0 && (
+        <div className="px-2" data-testid="delivery-scope-loan">
+          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+            {DW.itemsToCollect}
+          </div>
+          <table className="text-left text-body">
+            <thead>
+              <tr className="text-label font-semibold uppercase text-base-500">
+                <th scope="col" className="pr-6">{DW.loanUnit}</th>
+                <th scope="col" className="pr-6">{DW.loanItem}</th>
+                <th scope="col" className="pr-6">{DW.loanSince}</th>
+                <th scope="col">{DW.loanReturnTo}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openLoans.map((loan) => (
+                <tr key={loan.id}>
+                  <td className="pr-6 font-mono">
+                    {loan.item_unit_code ?? <Absent>{DW.notRecorded}</Absent>}
+                  </td>
+                  <td className="pr-6">
+                    {loan.borrowed_label ?? loan.item_sku ?? <Absent>{DW.notRecorded}</Absent>}
+                  </td>
+                  <td className="pr-6">{fmtDate(loan.loaned_at)}</td>
+                  {/* Where the piece owes itself back to: a borrowed piece goes
+                      to the supplier we borrowed it from; our own goes home. */}
+                  <td>
+                    {loan.source === "supplier"
+                      ? loan.supplier_name ?? <Absent>{DW.notRecorded}</Absent>
+                      : DW.loanReturnWarehouse}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function OperationDelivery() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
-  const stockQ = useOperationStock();
+  const docsQ = useDeliveryOrdersRegister();
+  /* 0379 — Delivery's OWN records. Read alongside the documents so the row can
+     prefer what Delivery wrote over what Sales' door left behind. */
+  const arrangementsQ = useDeliveryArrangements();
+  const today = businessToday();
 
-  const [view, setView] = useState<ViewKey>("queues");
-  const [queueFilter, setQueueFilter] = useState<Set<DeliveryQueueKey>>(new Set());
-  const [logisticsFilter, setLogisticsFilter] = useState<Set<string>>(new Set());
-  const [range, setRange] = useState<DeliveryRangeKey>("today");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drawerId, setDrawerId] = useState<string | null>(null);
-  const [facetOpen, setFacetOpen] = useState(true);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const toggleGroup = (k: string) =>
-    setCollapsed((prev) => {
-      const n = new Set(prev);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
-
-  const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
-
   const partnerNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of partners) m.set(p.id, p.name);
     return m;
   }, [partners]);
 
-  /** T9 rules per logistics company. A row nobody has edited normalises to the
-   *  default, which produces ZERO warnings — absent data means "we never asked",
-   *  never "it's fine" (the T9 law, held here). */
-  const rulesByPartner = useMemo(() => {
-    const m = new Map<string, PartnerDeliveryRules>();
-    for (const p of partners) {
-      m.set(
-        p.id,
-        partnerDeliveryRules({
-          offDays: p.off_days ?? undefined,
-          blackoutDates: (p.blackout_dates ?? []).map((d) => String(d).slice(0, 10)),
-          dailyCapacity: p.daily_capacity ?? null,
-          bookingLeadDays: p.booking_lead_days ?? 0,
-        }),
-      );
-    }
+  const arrangementsByScope = useMemo(() => {
+    const m = new Map<string, DeliveryArrangementRow>();
+    for (const a of arrangementsQ.data?.arrangements ?? []) m.set(`${a.order_id}#${a.leg}`, a);
     return m;
-  }, [partners]);
+  }, [arrangementsQ.data]);
 
-  const availableBySku = useMemo(() => {
-    const rows = stockQ.data?.skus ?? [];
-    if (rows.length === 0) return undefined;
-    const m = new Map<string, number>();
-    for (const s of rows) m.set(s.sku, s.available);
-    return m;
-  }, [stockQ.data]);
-
-  const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
-  // P1 — the working days of notice on `Confirm delivery date` is a setting
-  // (Purchasing → Settings). Read here so this module and the Orders list can
-  // never call the same step late on different days.
-  const purchasingSettingsQ = usePurchasingSettings();
-  const queueLeads = useMemo(
+  const rows = useMemo(
     () =>
-      purchasingSettingsQ.data ? deliveryQueueLeads(purchasingSettingsQ.data) : undefined,
-    [purchasingSettingsQ.data],
+      buildDeliveryScopeRows({
+        orders: ordersQ.data?.orders ?? [],
+        deliveryOrders: docsQ.data?.deliveryOrders ?? [],
+        attempts: docsQ.data?.attempts ?? [],
+        handoverEvents: docsQ.data?.handoverEvents ?? [],
+        partnerNameById,
+        arrangements: arrangementsByScope,
+      }),
+    [ordersQ.data, docsQ.data, partnerNameById, arrangementsByScope],
   );
-  const today = todayIso();
+
+  /* ── The two rails, on the URL ─────────────────────────────────────────── */
+  const dateSet = useMemo(
+    () => new Set((searchParams.get("date") ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
+    [searchParams],
+  );
+  const logisticsSet = useMemo(
+    () =>
+      new Set(
+        (searchParams.get("logistics") ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+      ),
+    [searchParams],
+  );
+
+  const toggle = useCallback(
+    (param: "date" | "logistics", key: string) => {
+      const current = new Set(
+        (searchParams.get(param) ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+      );
+      if (current.has(key)) current.delete(key);
+      else current.add(key);
+      const next = new URLSearchParams(searchParams);
+      if (current.size === 0) next.delete(param);
+      else next.set(param, [...current].join(","));
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const clear = useCallback(
+    (param: "date" | "logistics") => {
+      const next = new URLSearchParams(searchParams);
+      next.delete(param);
+      setSearchParams(next, { replace: false });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  /* Each rail counts the rows the OTHER rail has already narrowed, so a count
+     is always what clicking it will actually produce. */
+  const dateRail = useMemo(
+    () =>
+      buildDateRail(
+        rows.filter((r) => matchesLogistics(r, logisticsSet)),
+        today,
+        (iso) => fmtDate(iso),
+        dateSet,
+      ),
+    [rows, logisticsSet, today, dateSet],
+  );
+  const logisticsRail = useMemo(
+    () =>
+      buildLogisticsRail(
+        rows.filter((r) => matchesDate(r, dateSet, today)),
+        partners,
+        logisticsSet,
+      ),
+    [rows, dateSet, today, partners, logisticsSet],
+  );
+
+  const visible = useMemo(
+    () => rows.filter((r) => matchesDate(r, dateSet, today) && matchesLogistics(r, logisticsSet)),
+    [rows, dateSet, logisticsSet, today],
+  );
+
+  /** `SO No` is a door to the Sales Order — the ONLY thing that opens it. */
+  const openOrder = useCallback(
+    (r: DeliveryScopeRow) => navigate(`/operation/orders/so/${r.orderId}`),
+    [navigate],
+  );
 
   /**
-   * Every order, read through the SAME engine ONCE.
+   * ⭐ DOUBLE-CLICK OPENS EDIT DELIVERY, NEVER THE SALES ORDER.
    *
-   * `queue` is the whole scoping rule: an order is delivery WORK exactly when
-   * the engine has an open action on the DELIVERY TRACK. A money-held order
-   * carries no delivery action at all (`deliveryHeldOnMoney` returns the track
-   * silent) and so never reaches the board — you do not arrange a delivery you
-   * are not allowed to make (the PayHold law, decided in T7, and it still falls
-   * out by construction rather than by a rule written here).
-   *
-   * ⭐ CARD 3 (owner ruling 2026-08-13) — WHY THIS READS THE TRACK AND NOT THE
-   * HEADLINE, and it is the defect the card was raised to close.
-   *
-   * This page used to scope itself with `nextActionOf` — Layer 2, the ONE action
-   * that leads the row across all three tracks. But Law 4 ranks goods work
-   * (`Issue PO` 31 · `Call {supplier} — confirm ready date` 30) ABOVE delivery
-   * preparation (`Assign logistics` 40 · `Call {logistics} — confirm delivery
-   * date` 41). So for every order whose goods were not yet in, the headline was
-   * a goods action and the order was INVISIBLE on the logistics operator's own
-   * page — which made two of the ruling's permanent rules unreachable in
-   * practice:
-   *
-   *   Rule 1  "Assign Logistics early ... do NOT wait until stock is
-   *            physically ready"
-   *   Rule 2  "Customer contact happens at T−3 ... regardless of stock
-   *            readiness. Got stock or no stock, Logistics still starts the
-   *            conversation."
-   *
-   * Measured on production 2026-08-13: 86 live orders · 51 with logistics
-   * assigned · ZERO customer appointments ever confirmed. The engine permitted
-   * the early work all along; the workspace never showed it.
-   *
-   * This is NOT a re-ranking of Law 4 — the Orders row still leads with the
-   * same headline it always did, and no word changes. It is the same Layer 1
-   * output read through this page's own lens, which is what §3 of the Delivery
-   * MASTER already says this page is for: *"the Orders list sorts by risk to
-   * the PROMISE; this page sorts by risk to the TRUCK."* Membership was still
-   * being decided by the other page's lens.
-   *
-   * Queue-less orders are still BUILT, because the calendar shows every booked
-   * truck — including the money-held ones — and clicking one must open a detail
-   * pane that says what the Orders list says about it, not a blank. Those rows
-   * keep the ORDER's headline (`nextActionOf`), so a held order still reads
-   * `Collect RM 1,500.00 🔒` here exactly as it does there.
+   * Owner correction 2026-08-24, caught on production: this page shipped with
+   * `onRowDoubleClick={openOrder}`, which sent a logistics operator mid-plan
+   * into a commercial document they must not edit. A row on this workspace IS
+   * a delivery scope, so opening it opens the delivery.
    */
-  const rows = useMemo(() => {
-    const out: DeliveryRow[] = [];
-    for (const o of orders) {
-      const stock = stockReadiness(o, availableBySku);
-      const lines = o.order_lines ?? [];
-      // Layer 1, filtered to this page's track. One engine, one mapping, one
-      // set of words — the Orders list runs the identical call.
-      const open = openActionsOf(o, stock, lines);
-      const onTrack = open.find((a) => a.track === "delivery");
-      // The ruling's own trigger for assignment: *"Ready Stock route known OR
-      // Purchase Order placed → ASSIGN LOGISTICS EARLY."* An open `Issue PO` is
-      // exactly the state where NEITHER is true — nobody has bought these goods
-      // and no shelf covers them — so there is no route to plan capacity around
-      // yet. Rule 1 forbids waiting for the goods to be READY; it does not ask
-      // anyone to pick a truck for goods nobody has ordered.
-      //
-      // The moment the PO exists the assign step joins the board, goods or no
-      // goods — and every LATER delivery step joins unconditionally, because by
-      // then logistics is assigned and Rule 2 governs: *"Customer contact
-      // happens at T−3 ... regardless of stock readiness. Got stock or no
-      // stock, Logistics still starts the conversation."*
-      const routeUnknown = open.some((a) => a.key === "issue_po");
-      const onBoard =
-        onTrack && !(onTrack.key === "assign_logistics" && routeUnknown)
-          ? onTrack
-          : null;
-      const headline = nextActionOf(o, stock, lines);
-      const next = onBoard
-        ? {
-            key: onBoard.key,
-            label: orderActionQueue(onBoard.key),
-            tone: onBoard.tone,
-            locked: onBoard.locked,
-          }
-        : headline;
-      const def = onBoard ? deliveryQueueForLabel(next.label) : null;
-      const anchor = def ? deliveryStepAnchor(o, def.key) : null;
-      const state = logisticStateOf(o, partnerNameById);
-      const money = moneyOf(o);
-      out.push({
-        order: o,
-        queue: def?.key ?? null,
-        label: next.label,
-        // C1 — the row says the action WITH the party in it, built by the same
-        // shared helper the Orders list uses; no second spelling can appear.
-        // C3 — the money line has to carry its FIGURE here too: a held order is
-        // exactly the kind that reaches this pane (booked truck, off the board),
-        // and `Collect from Kong Chai Yin` names no measurable object. The date
-        // is deliberately NOT passed: for an order waiting on its booked day the
-        // line reads the short `Delivering`, because the two lines under this
-        // one already state `confirmed 27 Jul · 12pm–3pm`.
-        line: orderActionLine(next.key, {
-          logistics: state.partner,
-          customer: displayCustomerName(o.customer_name),
-          // C11 — the RAW number; the words module prints it to the cent.
-          amount: money.known ? money.outstanding : null,
-        }),
-        actionKey: next.key,
-        tone: next.tone,
-        locked: !!next.locked,
-        // CARD 3 (2026-08-11): `queueLeads` was computed above and never
-        // passed, so this page called the chase step late on the SEED while
-        // the Orders list read the setting — two surfaces, one step, two
-        // answers, invisible only while the setting equalled the seed.
-        dueIso: def ? deliveryStepDueIso(def.key, anchor, holidayOpts, queueLeads) : null,
-        overdue: def
-          ? deliveryStepOverdue(def.key, anchor, today, holidayOpts, queueLeads)
-          : false,
-        bookingIso: orderBookingDay(o).date,
-        promisedIso: o.delivery_date_tbd ? null : o.delivery_date,
-        so: o.so,
-        logisticsId: o.delivery_partner_id ?? o.ops_assigned_logistic ?? null,
-        logisticsName: state.partner,
-      });
-    }
-    return sortDeliveryRows(out);
-  }, [orders, availableBySku, partnerNameById, holidayOpts, today, queueLeads]);
-
-  /** The board itself — the queue-carrying rows, in delivery-risk order. */
-  const board = useMemo(
-    () => rows.filter((r): r is DeliveryRow & { queue: DeliveryQueueKey } => r.queue !== null),
-    [rows],
+  const openEditDelivery = useCallback(
+    (r: DeliveryScopeRow) =>
+      navigate(`/operation/delivery/edit/${r.orderId}${r.leg != null ? `?leg=${r.leg}` : ""}`),
+    [navigate],
   );
 
-  const queueStats = useMemo(() => {
-    const m = new Map<DeliveryQueueKey, { n: number; late: number }>();
-    for (const r of board) {
-      const cur = m.get(r.queue) ?? { n: 0, late: 0 };
-      cur.n += 1;
-      if (r.overdue) cur.late += 1;
-      m.set(r.queue, cur);
-    }
-    return m;
-  }, [board]);
+  /* ── SELECTION ──────────────────────────────────────────────────────────
+     The Sales Orders grammar: ☐ · ▸ · SO / Ref …, and the 45px toolbar is
+     REPLACED in place when anything is ticked (the engine already does that).
+     Selection here scopes a WRITE, which a truth register never does — but
+     this is a workspace, and `Assign logistics` is Delivery's own act. */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState<DeliveryScopeRow[] | null>(null);
 
-  /** Every logistics company is an option even at 0 (the Orders-facet rule), so
-   *  the rail reads as the whole roster rather than only today's busy ones. */
-  const logisticsEntries = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of board) {
-      const key = r.logisticsId ?? NO_LOGISTICS;
-      m.set(key, (m.get(key) ?? 0) + 1);
-    }
-    const named = partners
-      .map((p) => ({ key: p.id, label: p.name, count: m.get(p.id) ?? 0 }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    const none = m.get(NO_LOGISTICS) ?? 0;
-    return none > 0
-      ? [{ key: NO_LOGISTICS as string, label: NO_LOGISTICS_LABEL, count: none }, ...named]
-      : named;
-  }, [board, partners]);
-
-  const filtered = useMemo(
-    () =>
-      board.filter((r) => {
-        if (queueFilter.size > 0 && !queueFilter.has(r.queue)) return false;
-        if (logisticsFilter.size > 0 && !logisticsFilter.has(r.logisticsId ?? NO_LOGISTICS))
-          return false;
-        return true;
+  const toggleRow = useCallback(
+    (key: string) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
       }),
-    [board, queueFilter, logisticsFilter],
+    [],
   );
-
-  const lateCount = filtered.filter((r) => r.overdue).length;
-
-  const selected = useMemo(
-    () => rows.find((r) => r.order.id === selectedId) ?? null,
-    [rows, selectedId],
-  );
-
-  const activeChips: ActiveChip[] = [
-    ...[...queueFilter].map((k) => ({
-      label: deliveryQueueDisplay(k),
-      onClear: () =>
-        setQueueFilter((prev) => {
-          const n = new Set(prev);
-          n.delete(k);
-          return n;
-        }),
-    })),
-    ...[...logisticsFilter].map((id) => ({
-      label: id === NO_LOGISTICS ? NO_LOGISTICS_LABEL : partnerNameById.get(id) ?? id,
-      onClear: () =>
-        setLogisticsFilter((prev) => {
-          const n = new Set(prev);
-          n.delete(id);
-          return n;
-        }),
-    })),
-  ];
-
-  return (
-    <>
-      <div className="flex h-full min-h-0 flex-col" data-testid="operation-delivery">
-        <ModuleHeader
-          testId="delivery-work-destination-header"
-          word="Delivery Work"
-          docTitle="Delivery Work — Carres"
-          destinationHeader
-        />
-        <div className="flex h-[45px] shrink-0 items-center gap-3 border-b border-base-200 bg-white px-3">
-          <div className="flex items-center gap-1 rounded-control border border-base-200 bg-white p-1" role="tablist">
-            {(["queues", "calendar"] as ViewKey[]).map((v) => (
-              <button
-                key={v}
-                role="tab"
-                aria-selected={view === v}
-                onClick={() => setView(v)}
-                className={`rounded-control px-3 py-1 text-meta whitespace-nowrap ${
-                  view === v
-                    ? "bg-kit-blue-3 text-kit-blue-9 font-semibold"
-                    : "text-base-600 font-medium hover:bg-hovertint hover:text-base-900"
-                }`}
-              >
-                {v === "queues" ? "Work list" : "Calendar"}
-              </button>
-            ))}
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-meta text-base-500 tabular-nums">
-            <span>{filtered.length} to do</span>
-            {lateCount > 0 && <span className="text-danger font-semibold">{lateCount} late</span>}
-            <button
-              type="button"
-              onClick={() => void ordersQ.refetch()}
-              title="Refresh"
-              aria-label="Refresh delivery work"
-              className="rounded-control p-1.5 text-base-500 hover:bg-hovertint hover:text-base-900"
-            >
-              <RefreshCw size={14} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-      <ListPageShell
-        facetOpen={facetOpen}
-        onFacetToggle={() => setFacetOpen((v) => !v)}
-        facetWidthPx={210}
-        activeChips={activeChips}
-        facet={
-          <>
-            <SectionCard>
-              <SectionBand
-                title="DELIVERY"
-                strong
-                collapsed={collapsed.has("DELIVERY")}
-                onToggle={() => toggleGroup("DELIVERY")}
-                total={board.length}
-              />
-              {/* All FOUR queues always show, even at 0 — unlike the Orders
-                  facet, which hides an empty row because delivery is one group
-                  among a dozen there. Here the four steps ARE the module, so a
-                  rail that shrinks to two rows reads as though the page were
-                  broken, and "0 to assign" is a real answer. */}
-              {!collapsed.has("DELIVERY") && (
-                <div className="flex flex-col gap-0.5 mt-0.5" data-testid="delivery-queues">
-                  {QUEUE_DEFS.map((def) => {
-                    const key = def.key;
-                    const s = queueStats.get(key);
-                    return (
-                      <FacetRow
-                        key={key}
-                        label={deliveryQueueDisplay(key)}
-                        // Numbers up front (COPY-STANDARD rule 3): "5 · 2 late".
-                        value={s ? (s.late > 0 ? `${s.n} · ${s.late} late` : `${s.n}`) : "0"}
-                        tone={s && s.late > 0 ? "danger" : undefined}
-                        active={queueFilter.has(key)}
-                        title={
-                          s && s.late > 0
-                            ? `${def.description}. ${s.late} of ${s.n} already past that deadline.`
-                            : def.description
-                        }
-                        onClick={() =>
-                          setQueueFilter((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(key)) n.delete(key);
-                            else n.add(key);
-                            return n;
-                          })
-                        }
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </SectionCard>
-
-            {logisticsEntries.length > 0 && (
-              <SectionCard>
-                <SectionBand
-                  title="LOGISTICS"
-                  strong
-                  collapsed={collapsed.has("LOGISTICS")}
-                  onToggle={() => toggleGroup("LOGISTICS")}
-                />
-                {!collapsed.has("LOGISTICS") && (
-                  <div className="flex flex-col gap-0.5 mt-0.5" data-testid="delivery-logistics">
-                    {logisticsEntries.map((e) => (
-                      <FacetRow
-                        key={e.key}
-                        label={e.label}
-                        value={`${e.count}`}
-                        active={logisticsFilter.has(e.key)}
-                        onClick={() =>
-                          setLogisticsFilter((prev) => {
-                            const n = new Set(prev);
-                            if (n.has(e.key)) n.delete(e.key);
-                            else n.add(e.key);
-                            return n;
-                          })
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
-            )}
-          </>
+  const toggleAll = useCallback(
+    (keys: string[], allSelected: boolean) =>
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) {
+          if (allSelected) next.delete(k);
+          else next.add(k);
         }
-        className="min-h-0"
-      >
-        {/* The 3-pane body: list ~420 · detail fills the rest. The facet rail is
-            the shell's own aside, so the three panes share one frame with
-            Purchasing and Orders (module discipline — the one part of the old
-            proposal that survives intact). */}
-        <div className="flex-1 min-h-0 flex gap-4">
-          <div className="w-[420px] shrink-0 flex flex-col min-h-0 bg-white border border-base-200 rounded-[12px] overflow-hidden">
-            {view === "queues" ? (
-              <QueueList
-                rows={filtered}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                loading={ordersQ.isLoading}
-              />
-            ) : (
-              <CalendarPane
-                orders={orders}
-                partnerNameById={partnerNameById}
-                rulesByPartner={rulesByPartner}
-                range={range}
-                onRange={setRange}
-                today={today}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-            )}
-          </div>
-          <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-white border border-base-200 rounded-[12px] overflow-y-auto">
-            {selected ? (
-              <DeliveryDetail
-                row={selected}
-                rulesByPartner={rulesByPartner}
-                today={today}
-                holidays={holidayOpts.holidays}
-                onOpenOrder={() => setDrawerId(selected.order.id)}
-              />
-            ) : (
-              <div className="flex-1 grid place-items-center p-8 text-center">
-                <div className="max-w-[280px]">
-                  <Truck size={18} className="mx-auto mb-2 text-base-300" aria-hidden />
-                  <div className="text-body text-base-600">
-                    Pick a row on the left to see the delivery, who is carrying it, and
-                    what is still missing.
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </ListPageShell>
-      </div>
-
-      {drawerId && (
-        <OrderDetailDrawer orderId={drawerId} onClose={() => setDrawerId(null)} />
-      )}
-    </>
+        return next;
+      }),
+    [],
   );
-}
 
-/* ─── Facet row ───────────────────────────────────────────────────────────── */
-
-function FacetRow({
-  label,
-  value,
-  active,
-  tone,
-  title,
-  onClick,
-}: {
-  label: string;
-  value: string;
-  active: boolean;
-  tone?: "danger";
-  title?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      className={`w-full flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-left transition-colors ${
-        active ? "is-selected" : "hover:bg-hovertint"
-      }`}
-    >
-      <span
-        className={`flex-1 min-w-0 truncate text-body ${
-          active ? "font-semibold text-base-900" : "text-base-700"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`text-body tabular-nums shrink-0 ${
-          tone === "danger" ? "text-danger font-semibold" : "text-base-500"
-        }`}
-      >
-        {value}
-      </span>
-    </button>
-  );
-}
-
-/* ─── Queue list pane ─────────────────────────────────────────────────────── */
-
-/** Every action pill on this page is the ladder's own tone, mapped to the same
- *  status pill the Orders list MANAGE column uses (UI-KIT §A0 action law) — one
- *  colour language across the two pages. */
-function QueueList({
-  rows,
-  selectedId,
-  onSelect,
-  loading,
-}: {
-  rows: DeliveryRow[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  loading: boolean;
-}) {
-  if (loading && rows.length === 0) {
-    return (
-      <div className="p-1.5" data-testid="delivery-list-skeleton">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-16 mb-1 rounded animate-pulse bg-base-50" />
-        ))}
-      </div>
-    );
-  }
-  if (rows.length === 0) {
-    return (
-      <div className="flex-1 grid place-items-center p-8 text-center">
-        {/* An empty state that teaches (COPY-STANDARD rule 5): it says what the
-            list means, not "no results". */}
-        <div className="max-w-[300px] text-body text-base-600">
-          Nothing to do here. An order joins this board the moment its goods are in
-          and a delivery step is the next thing someone must do.
-        </div>
-      </div>
-    );
-  }
-  const groups = new Map<string, DeliveryRow[]>();
-  for (const row of rows) {
-    const date = row.dueIso ?? row.bookingIso ?? row.promisedIso ?? "";
-    const list = groups.get(date) ?? [];
-    list.push(row);
-    groups.set(date, list);
-  }
-  return (
-    <div className="flex-1 overflow-y-auto" data-testid="delivery-list">
-      {[...groups.entries()].map(([date, datedRows]) => (
-        <section key={date || "date-not-set"}>
-          <div
-            className="sticky top-0 z-10 border-b border-base-200 bg-base-50 px-3 py-1.5 text-label font-semibold uppercase tracking-[0.04em] text-base-700"
-            data-testid="delivery-date-group"
-          >
-            {date ? fmtDate(date) : "Date not set"}
-          </div>
-          {datedRows.map((r) => (
-            <QueueRow
-              key={r.order.id}
-              row={r}
-              selected={r.order.id === selectedId}
-              onSelect={() => onSelect(r.order.id)}
-            />
-          ))}
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function deliveryWorkWords(row: DeliveryRow): { happened: string; action: string } {
-  const partner = row.logisticsName?.trim() || "the logistics partner";
-  switch (row.actionKey) {
-    case "assign_logistics":
-      return { happened: "No logistics partner", action: "Choose a logistics partner." };
-    case "confirm_delivery_date":
-      return {
-        happened: "No customer delivery date",
-        action: `Ask ${partner} for the customer’s delivery date.`,
-      };
-    case "arrange_new_delivery_date":
-    case "arrange_new_date":
-      return {
-        happened: "The goods were not delivered",
-        action: `Ask ${partner} for a new delivery date.`,
-      };
-    case "upload_delivery_photo":
-    case "upload_photo":
-      return {
-        happened: "No delivery photo",
-        action: `Ask ${partner} for the delivery photo.`,
-      };
-    case "deliver_today":
-      return {
-        happened: "Delivery is on this date",
-        action: "Deliver the goods to the customer.",
-      };
-    default:
-      return { happened: row.label, action: row.line };
-  }
-}
-
-function QueueRow({
-  row,
-  selected,
-  onSelect,
-}: {
-  row: DeliveryRow;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const o = row.order;
-  const words = deliveryWorkWords(row);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      data-testid="delivery-row"
-      className={`w-full text-left px-3 py-2.5 border-b border-base-100 transition-colors ${
-        selected ? "is-selected" : "hover:bg-hovertint"
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-body font-semibold text-base-900">SO-{o.so}</span>
-        <span className={`truncate text-body text-base-700 ${cjkClassName(o.customer_name)}`}>
-          {displayCustomerName(o.customer_name) || "No customer name"}
-        </span>
-      </div>
-      <div className={`mt-1 text-label ${row.overdue ? "font-semibold text-danger" : "text-base-600"}`}>
-        {words.happened}
-      </div>
-      <div className="mt-0.5 text-body font-medium text-base-900">
-        {row.locked && <span aria-hidden>🔒 </span>}
-        {words.action}
-      </div>
-      <div className="mt-1 flex items-center gap-1.5 text-meta text-base-500">
-        <span className="truncate">{row.logisticsName?.trim() || NO_LOGISTICS_LABEL}</span>
-        {row.bookingIso && (
-          <>
-            <span aria-hidden>·</span>
-            <span className="tabular-nums shrink-0">{fmtDate(row.bookingIso)}</span>
-          </>
-        )}
-      </div>
-    </button>
-  );
-}
-
-/* ─── Calendar pane ───────────────────────────────────────────────────────── */
-
-interface DayDelivery extends DayBooking {
-  orderId: string;
-  so: number;
-  customer: string;
-  slot: string | null;
-  address: string | null;
-}
-
-/**
- * The calendar view — the same rule, the same shape and the same words as the
- * right-rail Calendar's Deliveries lens (T10). A day is filled by the BOOKING,
- * never by the date we promised; the promise is kept on screen as what it is,
- * with the call that fixes it, and is never counted as a delivery.
- */
-function CalendarPane({
-  orders,
-  partnerNameById,
-  rulesByPartner,
-  range,
-  onRange,
-  today,
-  selectedId,
-  onSelect,
-}: {
-  orders: operationOrderListRow[];
-  partnerNameById: Map<string, string>;
-  rulesByPartner: Map<string, PartnerDeliveryRules>;
-  range: DeliveryRangeKey;
-  onRange: (k: DeliveryRangeKey) => void;
-  today: string;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const partnerOf = (o: operationOrderListRow) => {
-    const id = o.delivery_partner_id ?? o.ops_assigned_logistic ?? null;
-    return {
-      id,
-      name: o.delivery_partners?.name ?? (id ? partnerNameById.get(id) ?? null : null),
-    };
-  };
-
-  const byDay = useMemo(() => {
-    const m = new Map<string, DayDelivery[]>();
-    for (const o of orders) {
-      const booking = orderBookingDay(o);
-      if (booking.kind === "none" || !booking.date) continue;
-      const p = partnerOf(o);
-      const arr = m.get(booking.date) ?? [];
-      arr.push({
-        orderId: o.id,
-        so: o.so,
-        customer: displayCustomerName(o.customer_name),
-        partnerId: p.id,
-        partnerName: p.name,
-        kind: booking.kind,
-        date: booking.date,
-        slot: booking.slot,
-        address: o.customer_address ?? null,
-      });
-      m.set(booking.date, arr);
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, partnerNameById]);
-
-  const promisedByDay = useMemo(() => {
-    const m = new Map<string, operationOrderListRow[]>();
-    for (const o of orders) {
-      if (o.delivery_date_tbd || !o.delivery_date) continue;
-      if (o.status === "delivered") continue; // a kept promise is not work
-      if (orderBookingDay(o).kind !== "none") continue;
-      const key = o.delivery_date.slice(0, 10);
-      const arr = m.get(key) ?? [];
-      arr.push(o);
-      m.set(key, arr);
-    }
-    return m;
-  }, [orders]);
-
-  const active = deliveryRange(range, today);
-  const days = daysInRange(active.fromIso, active.toIso);
-  const dayEmpty = (d: string) =>
-    (byDay.get(d)?.length ?? 0) === 0 && (promisedByDay.get(d)?.length ?? 0) === 0;
-  const anything = days.some((d) => !dayEmpty(d));
-
-  return (
-    <div className="flex flex-col min-h-0" data-testid="delivery-calendar">
-      <div className="flex gap-1 p-2 border-b border-base-100">
-        {DELIVERY_RANGE_KEYS.map((key) => {
-          const r = deliveryRange(key, today);
-          const n = daysInRange(r.fromIso, r.toIso).reduce(
-            (s, d) => s + (byDay.get(d)?.length ?? 0),
-            0,
-          );
-          return (
+  const columns = useMemo<DataGridColumn<DeliveryScopeRow>[]>(
+    () => [
+      {
+        /* THE IDENTITY COLUMN, and the one that pins while the sheet scrolls.
+           The SO number is the door; the customer's own reference rides the
+           same cell because that is the string a partner and a supplier both
+           recognise — never a second column for one identity. A Journey leg
+           adds its leg number and its two places, so two rows of one order can
+           never be mistaken for a duplicate. */
+        key: "so",
+        label: "SO / Ref",
+        width: 150,
+        sortable: true,
+        filterType: "numbering",
+        chooserGroup: "Document",
+        accessor: (r) => (
+          <span className="block min-w-0">
             <button
-              key={key}
               type="button"
-              onClick={() => onRange(key)}
-              /* A SPAN still needs its hover — `This week` names no date.
-                 A single-day chip does NOT: THE YEAR RULE (owner ruling
-                 2026-08-15) put the full ruled date on the chip face, so a
-                 hover could only ever repeat it or, worse, say less. */
-              title={
-                r.fromIso === r.toIso
-                  ? undefined
-                  : `${fmtDate(r.fromIso)} – ${fmtDate(r.toIso)}`
-              }
-              className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-meta font-semibold transition-colors ${
-                range === key
-                  ? "bg-base-900 text-white"
-                  : "bg-white text-base-500 border border-base-200 hover:bg-hovertint"
-              }`}
+              className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                openOrder(r);
+              }}
             >
-              <span className="truncate">
-                {key === "week" ? "This week" : fmtDate(r.fromIso)}
-              </span>
-              {n > 0 && <span className="tabular-nums">{n}</span>}
+              SO-{r.so}
             </button>
-          );
-        })}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-2 space-y-4">
-        {days.length > 1 && !anything && (
-          <div className="text-body text-base-500 text-center py-6">
-            No deliveries booked these days.
-          </div>
-        )}
-        {days.map((day) => {
-          const deliveries = byDay.get(day) ?? [];
-          const promised = promisedByDay.get(day) ?? [];
-          // On a multi-day range an empty day is noise; on ONE day it is the
-          // answer, and must still be said out loud.
-          if (days.length > 1 && dayEmpty(day)) return null;
-          const loads = carrierDayLoads(deliveries, day, rulesByPartner);
-          return (
-            <div key={day} data-testid={`delivery-day-${day}`}>
-              {/* NO RELATIVE DATE WORDS (owner ruling 2026-08-15, and already
-                  the delivery execution words of 2026-08-14): a schedule group
-                  names its actual weekday + date. */}
-              <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-2">
-                {fmtDate(day)}
-              </div>
-              {deliveries.length === 0 ? (
-                <div className="text-meta text-base-400 text-center py-3">
-                  No deliveries booked this day.
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {deliveries.map((d) => (
-                    <button
-                      key={d.orderId}
-                      type="button"
-                      onClick={() => onSelect(d.orderId)}
-                      className={`w-full text-left flex gap-2 rounded px-2 py-1.5 transition-colors ${
-                        d.orderId === selectedId ? "is-selected" : "bg-base-50 hover:bg-hovertint"
-                      }`}
-                    >
-                      <span
-                        className={`w-1 rounded-full shrink-0 ${
-                          d.kind === "confirmed" ? "bg-success" : "bg-warning"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-meta font-semibold text-base-900">
-                            SO-{d.so}
-                          </span>
-                          <span
-                            className={`text-label font-semibold shrink-0 ${
-                              d.kind === "confirmed" ? "text-success" : "text-warning"
-                            }`}
-                          >
-                            {d.kind === "confirmed"
-                              ? d.slot
-                                ? shortSlot(d.slot)
-                                : "Confirmed"
-                              : "Logistics' date"}
-                          </span>
-                        </div>
-                        <div
-                          className={`text-meta text-base-700 truncate ${cjkClassName(d.customer)}`}
-                        >
-                          {d.customer || "—"}
-                        </div>
-                        <div className="text-label text-base-500 truncate">
-                          {d.partnerName?.trim() || NO_LOGISTICS_LABEL}
-                          {locationForAddress(d.address).label
-                            ? ` · ${locationForAddress(d.address).label}`
-                            : ""}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {loads.map((l) => {
-                const note = carrierDayNote(l);
-                return (
-                  <div key={l.partnerId ?? "none"} className="px-2 pt-1.5">
-                    <div
-                      className={`flex items-center justify-between gap-2 text-label ${
-                        !l.runs || l.atLimit ? "text-warning font-semibold" : "text-base-500"
-                      }`}
-                    >
-                      <span className="truncate">{l.partnerName}</span>
-                      <span className="tabular-nums shrink-0">
-                        {l.capacity != null
-                          ? `${l.confirmed} of ${l.capacity}`
-                          : `${l.confirmed + l.provisional}`}
-                      </span>
-                    </div>
-                    {note && <div className="text-label text-warning mt-0.5">{note}</div>}
-                  </div>
-                );
-              })}
-              {promised.length > 0 && (
-                <div className="pt-2 space-y-1.5">
-                  <div className="text-label uppercase tracking-[0.05em] text-warning">Promised this day, no date yet</div>
-                  {promised.map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => onSelect(o.id)}
-                      className={`w-full text-left flex gap-2 rounded px-2 py-1.5 transition-colors ${
-                        o.id === selectedId ? "is-selected" : "bg-base-50 hover:bg-hovertint"
-                      }`}
-                    >
-                      <span className="w-1 rounded-full bg-warning shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-mono text-meta font-semibold text-base-900">
-                          SO-{o.so}
-                        </div>
-                        <div className="text-label text-base-500 truncate">
-                          Call {displayCustomerName(o.customer_name?.trim()) || "the customer"} — book delivery date
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+            {r.refs.length > 0 ? (
+              <span className="ml-1.5 text-kit-slate-11">{r.refs.join(" · ")}</span>
+            ) : null}
+            {r.leg != null ? (
+              <span
+                className="block truncate text-label text-kit-slate-11"
+                title={r.legRoute ?? undefined}
+              >
+                Leg {r.leg}
+                {r.legRoute ? ` · ${r.legRoute}` : ""}
+              </span>
+            ) : null}
+          </span>
+        ),
+        searchValue: (r) => `SO-${r.so} ${r.so} ${r.refs.join(" ")}`,
+        filterValue: (r) => `SO-${r.so}`,
+        exportValue: (r) => `SO-${r.so}${r.refs.length ? ` ${r.refs.join(" ")}` : ""}`,
+        sortFn: (a, b) => a.so - b.so || (a.leg ?? 0) - (b.leg ?? 0),
+      },
+      {
+        key: "customer",
+        label: "Customer",
+        width: 170,
+        sortable: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.customer}>
+            {r.customer}
+          </span>
+        ),
+        searchValue: (r) => `${r.customer} ${r.o.customer_phone ?? ""}`,
+        filterValue: (r) => r.customer,
+      },
+      {
+        key: "location",
+        label: "Delivery Location",
+        width: 170,
+        sortable: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.location}>
+            {r.location}
+          </span>
+        ),
+        searchValue: (r) => r.location,
+        filterValue: (r) => r.location,
+      },
+      {
+        /* Not decoration: a condo with no lift on floor 12 is a different
+           delivery from a landed house, and the planner has to see it before
+           committing a two-man van. */
+        key: "building",
+        label: "Building",
+        width: 120,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Customer",
+        accessor: (r) =>
+          r.building === DW.notGiven ? <Absent>{DW.notGiven}</Absent> : r.building,
+        searchValue: (r) => r.building,
+        filterValue: (r) => r.building,
+      },
+      {
+        /* Sales Orders' promise, in Sales Orders' own word. Delivery reads it
+           and may never rewrite it (`docs/orders/MASTER.md`). */
+        key: "customer_delivery",
+        label: "Requested Delivery Date",
+        width: 192,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Dates",
+        dateValue: (r) => r.customerDeliveryIso,
+        /* THE 8 vs THE 3 (owner ruling 2026-08-15): a customer who HAS been
+           asked and answered "not yet" is a different fact from one nobody has
+           asked, and the portal already owns both words. Neither is amber
+           here — this listing states facts and carries no action clause. */
+        accessor: (r) =>
+          r.customerDeliveryIso ? (
+            fmtDate(r.customerDeliveryIso)
+          ) : r.customerDateTbd ? (
+            <span title={DATE_TO_BE_CONFIRMED_FULL}>
+              <Absent>{DATE_TO_BE_CONFIRMED_CELL}</Absent>
+            </span>
+          ) : (
+            <Absent>{DW.noCustomerDate}</Absent>
+          ),
+        searchValue: (r) => (r.customerDeliveryIso ? fmtDate(r.customerDeliveryIso) : DW.noCustomerDate),
+        filterValue: (r) =>
+          r.customerDeliveryIso
+            ? fmtDate(r.customerDeliveryIso)
+            : r.customerDateTbd
+              ? DATE_TO_BE_CONFIRMED_CELL
+              : DW.noCustomerDate,
+        sortFn: (a, b) => (a.customerDeliveryIso ?? "").localeCompare(b.customerDeliveryIso ?? ""),
+      },
+      {
+        /* Delivery's OWN confirmed operational date for this scope — the
+           document's when one exists, else the confirmed booking. A carrier's
+           provisional date is not confirmed and is not printed here. */
+        key: "confirmed_delivery",
+        label: "Confirmed Delivery",
+        width: 150,
+        sortable: true,
+        filterType: "date",
+        chooserGroup: "Delivery",
+        dateValue: (r) => r.confirmedIso,
+        accessor: (r) =>
+          r.confirmedIso ? fmtDate(r.confirmedIso) : <Absent>{DW.noConfirmedDate}</Absent>,
+        searchValue: (r) => (r.confirmedIso ? fmtDate(r.confirmedIso) : DW.noConfirmedDate),
+        filterValue: (r) => (r.confirmedIso ? fmtDate(r.confirmedIso) : DW.noConfirmedDate),
+        sortFn: (a, b) => (a.confirmedIso ?? "").localeCompare(b.confirmedIso ?? ""),
+      },
+      {
+        key: "confirmed_time",
+        label: "Confirmed Time",
+        width: 120,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) => r.confirmedTime ?? <Absent>{DW.noTime}</Absent>,
+        searchValue: (r) => r.confirmedTime ?? DW.noTime,
+        filterValue: (r) => r.confirmedTime ?? DW.noTime,
+      },
+      {
+        key: "logistics",
+        label: "Logistics Partner",
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) => r.logisticsName ?? <Absent>{DW.noLogistics}</Absent>,
+        searchValue: (r) => r.logisticsName ?? DW.noLogistics,
+        filterValue: (r) => r.logisticsName ?? DW.noLogistics,
+      },
+      {
+        key: "goods",
+        label: "Goods",
+        width: 220,
+        sortable: true,
+        chooserGroup: "Items",
+        accessor: (r) => (
+          <span className="block truncate" title={r.goods}>
+            {r.goods}
+          </span>
+        ),
+        searchValue: (r) => r.goods,
+        filterValue: (r) => r.goods,
+      },
+      {
+        key: "do_number",
+        label: "DO No",
+        width: 150,
+        sortable: true,
+        filterType: "numbering",
+        chooserGroup: "Document",
+        accessor: (r) =>
+          r.doNumber ? (
+            <button
+              type="button"
+              className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/operation/delivery-orders/${encodeURIComponent(r.doNumber!)}`);
+              }}
+            >
+              {r.doNumber}
+            </button>
+          ) : (
+            /* The SYSTEM issues the document when the trip's requirements are
+               met, so the absence is a stage, not a missing click. */
+            <Absent>{DW.noDeliveryOrder}</Absent>
+          ),
+        searchValue: (r) => r.doNumber ?? DW.noDeliveryOrder,
+        filterValue: (r) => r.doNumber ?? DW.noDeliveryOrder,
+      },
+      {
+        key: "delivery_status",
+        label: "Delivery Status",
+        width: 180,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        /* The ONE shared arithmetic (`deliveryOrderStatusOf`), rendered in the
+           register's own two-line grammar: the pill, then an exception's ONE
+           reason in the quieter rank. */
+        /* ⭐ THE OPERATION'S progress, not the DOCUMENT's (owner ruling
+           2026-08-24). It ALWAYS has an answer — a scope with no document is
+           `Waiting for customer date` or `Delivery confirmed`, never a blank
+           and never `Created`, which is a fact about paper. */
+        accessor: (r) => (
+          <span className="block min-w-0">
+            <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
+            {r.status.reasonLabel ? (
+              <span className="block truncate text-label font-normal text-base-600">
+                {r.status.reasonLabel}
+              </span>
+            ) : null}
+          </span>
+        ),
+        searchValue: (r) => r.status.label,
+        filterValue: (r) => r.status.label,
+      },
+      {
+        /* Off by default. A planner arranging a day phones the customer, and
+           the number belongs one click away rather than permanently widening
+           the sheet. */
+        key: "phone",
+        label: "Phone",
+        width: 140,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Customer",
+        accessor: (r) => r.o.customer_phone ?? <Absent>{DW.notGiven}</Absent>,
+        searchValue: (r) => r.o.customer_phone ?? "",
+        filterValue: (r) => r.o.customer_phone ?? DW.notGiven,
+      },
+      {
+        key: "address",
+        label: "Delivery address",
+        width: 280,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.o.customer_address ?? undefined}>
+            {r.o.customer_address ?? <Absent>{DW.notGiven}</Absent>}
+          </span>
+        ),
+        searchValue: (r) => r.o.customer_address ?? "",
+        filterValue: (r) => r.o.customer_address ?? DW.notGiven,
+      },
+    ],
+    [navigate, openOrder],
   );
-}
 
-/** "Afternoon (12pm–3pm)" → "12pm–3pm" — the drawer's short-slot read. */
-function shortSlot(slot: string): string {
-  return /\(([^)]+)\)/.exec(slot)?.[1] ?? slot;
-}
+  const contextMenu = useCallback(
+    (r: DeliveryScopeRow): DataGridContextMenuItem[] => [
+      { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
+      { divider: true },
+      { label: `Open SO-${r.so}`, onClick: () => openOrder(r) },
+      ...(r.doNumber
+        ? [
+            {
+              label: `Open ${r.doNumber}`,
+              onClick: () =>
+                navigate(`/operation/delivery-orders/${encodeURIComponent(r.doNumber!)}`),
+            },
+          ]
+        : []),
+    ],
+    [navigate, openOrder, openEditDelivery],
+  );
 
-/* ─── Detail pane ─────────────────────────────────────────────────────────── */
-
-function DeliveryDetail({
-  row,
-  rulesByPartner,
-  today,
-  holidays,
-  onOpenOrder,
-}: {
-  row: DeliveryRow;
-  rulesByPartner: Map<string, PartnerDeliveryRules>;
-  today: string;
-  holidays?: ReadonlySet<string>;
-  onOpenOrder: () => void;
-}) {
-  const o = row.order;
-  // CARD 3 — the facts Operations puts on the T−3 call, composed server-side
-  // from Card 1's commitment and Card 2's allocation. Fetched only for the
-  // order the operator has actually picked.
-  const briefQ = useOrderBookingBrief(o.id);
-  const brief = briefQ.data?.brief ?? null;
-  const ovl = orderControlOf(o);
-  const booking = bookingDayOf({
-    stage: ovl?.booking_stage ?? null,
-    confirmedDate: ovl?.confirmed_date ?? null,
-    confirmedSlot: ovl?.confirmed_time_slot ?? null,
-    provisionalDate: ovl?.logistic_eta ?? null,
-  });
-  const photos = ovl?.delivery_photos;
-  // The SAME delivered fold the list and the drawer use (`stageOf`): the
-  // collapsed `operation_stage`, else `status`. Reading `delivered_at` here
-  // instead would let this spine tick a step the drawer's spine does not.
-  const delivered = stageOf(o) === "delivered";
-  const rules = row.logisticsId ? rulesByPartner.get(row.logisticsId) : undefined;
-  const allGroups = orderDeliveryGroups(o.order_lines ?? []);
-  // T8: `booking_groups` NULL = the trip carries the whole order (zero backfill
-  // by design), so an absent value is never read as "nothing is going".
-  const scope = ((ovl?.booking_groups ?? null) as DeliveryGroupKey[] | null) ?? allGroups;
-  const secondTrip = deliveryScopeSentence(scope, allGroups);
-  const warnings =
-    booking.date && row.logisticsName && rules
-      ? partnerBookingWarnings({
-          partnerName: row.logisticsName,
-          rules,
-          dateIso: booking.date,
-          todayIso: today,
-          holidays,
-        })
-      : [];
-  const words = deliveryWorkWords(row);
+  const isError = ordersQ.isError || docsQ.isError;
+  const isLoading = ordersQ.isLoading || docsQ.isLoading;
 
   return (
-    <div className="flex flex-col" data-testid="delivery-detail">
-      <div className="flex items-start gap-3 px-4 py-3 border-b border-base-100">
-        <div className="min-w-0">
-          <div className="font-mono text-strong font-semibold text-base-900">SO-{o.so}</div>
-          <div className={`text-body text-base-700 truncate ${cjkClassName(o.customer_name)}`}>
-            {displayCustomerName(o.customer_name) || "—"}
-          </div>
-          {o.customer_address && (
-            <div className="text-meta text-base-500 mt-0.5">{o.customer_address}</div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onOpenOrder}
-          className="ml-auto shrink-0 btn-secondary text-meta py-1.5 px-3"
-          title="Open the order to book the date, record a reason or upload the delivery photo"
+    <div className="flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="operation-delivery">
+      <ModuleHeader
+        testId="delivery-work-destination-header"
+        word={DW.page}
+        docTitle={DW.docTitle}
+        destinationHeader
+      />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <aside
+          className="flex w-[200px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3"
+          data-testid="delivery-work-rail"
         >
-          Open order
-        </button>
-      </div>
+          <RailGroup title={DW.railDate}>
+            {dateRail.map((item) => (
+              <RailItem
+                key={item.key}
+                label={item.label}
+                count={item.count}
+                active={dateSet.has(item.key)}
+                onClick={() => toggle("date", item.key)}
+                testId={`delivery-date-${item.key}`}
+                title={`${item.count} ${item.count === 1 ? "delivery scope" : "delivery scopes"}`}
+              />
+            ))}
+          </RailGroup>
+          <RailGroup title={DW.railLogistics}>
+            <RailItem
+              label={DW.railAll}
+              count={logisticsRail.reduce((n, i) => n + i.count, 0)}
+              active={logisticsSet.size === 0}
+              onClick={() => clear("logistics")}
+              testId="delivery-logistics-all"
+            />
+            {logisticsRail.map((item) => (
+              <RailItem
+                key={item.key}
+                label={item.label}
+                count={item.count}
+                active={logisticsSet.has(item.key)}
+                onClick={() => toggle("logistics", item.key)}
+                testId={`delivery-logistics-${item.key === NO_LOGISTICS_KEY ? "none" : item.key}`}
+              />
+            ))}
+          </RailGroup>
+        </aside>
 
-      {/* The date is the group/header fact. These two plain-English lines tell
-          a new operator what is wrong and exactly what to do. */}
-      <div className="px-4 py-3 border-b border-base-100">
-        <div className="text-label text-base-500">What happened</div>
-        <div className={`mt-0.5 text-body ${row.overdue ? "font-semibold text-danger" : "text-base-700"}`}>
-          {words.happened}
-        </div>
-        <div className="mt-3 text-label text-base-500">What to do</div>
-        <div className="mt-0.5 text-body font-medium text-base-900">
-          {row.locked && <span aria-hidden>🔒 </span>}
-          {words.action}
-        </div>
-        {(row.dueIso ?? row.bookingIso ?? row.promisedIso) && (
-          <div className="mt-2 text-meta font-semibold tabular-nums text-base-700">
-            {fmtDate(row.dueIso ?? row.bookingIso ?? row.promisedIso ?? "")}
-          </div>
-        )}
-      </div>
-
-      {/* ⭐ CARD 3 — BEFORE YOU CALL (owner ruling 2026-08-13).
-          The approved journey puts the customer conversation THREE working days
-          before the promised deadline "regardless of stock readiness", and says
-          in the same breath what Operations must hand Logistics for it: the
-          customer promised deadline · the latest expected arrival · the expected
-          delivery scope · what IS and IS NOT expected in.
-
-          Until this card those four facts lived in four different reads and were
-          never assembled for the person holding the phone. This panel is that
-          assembly and nothing else — it computes NOTHING (the server's one
-          arithmetic does), and it writes NOTHING (`Open order` remains this
-          page's only door out, exactly as §2 froze).
-
-          It renders whether or not the goods are in. That is the point: an empty
-          warehouse is a fact the customer needs on the call, not a reason to
-          skip it. */}
-      {brief && (
-        <div className="px-4 py-3 border-b border-base-100">
-          <div className="flex items-baseline gap-2 mb-1.5">
-            <div className="text-label uppercase tracking-[0.05em] text-base-500">
-              Before you call
-            </div>
-            {brief.contactWindow !== "done" && brief.contactDueIso && (
-              <span
-                className={`ml-auto text-meta tabular-nums ${
-                  brief.contactOverdue
-                    ? "text-danger font-semibold"
-                    : brief.contactWindow === "open"
-                      ? "text-warning font-semibold"
-                      : "text-base-500"
-                }`}
+        {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
+        <div className="flex min-w-0 flex-1 flex-col p-2" data-testid="delivery-work-listing">
+          {isError ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
+              <p className="text-body text-kit-slate-12">{DW.loadFailed}</p>
+              {((ordersQ.error ?? docsQ.error) as Error | undefined)?.message ? (
+                <p className="text-meta text-kit-slate-11">
+                  {((ordersQ.error ?? docsQ.error) as Error).message}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                className="rounded-control border border-kit-slate-6 bg-white px-3 py-1.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+                onClick={() => {
+                  void ordersQ.refetch();
+                  void docsQ.refetch();
+                }}
               >
-                {brief.contactOverdue
-                  ? `Late — was due ${fmtDate(brief.contactDueIso)}`
-                  : `Call by ${fmtDate(brief.contactDueIso)}`}
-              </span>
-            )}
-          </div>
-
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-meta">
-            <dt className="text-base-500">Promised to the customer</dt>
-            <dd className="text-base-800 tabular-nums">
-              {brief.promisedDateIso ? fmtDate(brief.promisedDateIso) : "No date yet"}
-            </dd>
-
-            <dt className="text-base-500">Expected arrival</dt>
-            <dd className="text-base-800 tabular-nums">
-              {brief.stockEtaIso
-                ? fmtDate(brief.stockEtaIso)
-                : brief.goodsNotIn.length > 0
-                  ? "The factory has not given a date"
-                  : "Everything is on hand"}
-            </dd>
-
-            {brief.goodsNotIn.length > 0 && (
-              <>
-                <dt className="text-warning">Not in yet</dt>
-                <dd className="text-base-800">
-                  {brief.goodsNotIn
-                    .map((l) => `${l.sku} ×${l.shortQty}`)
-                    .join(" · ")}
-                </dd>
-              </>
-            )}
-          </dl>
-        </div>
-      )}
-
-      {/* The booking, as a FACT (T1's vocabulary): confirmed is the only green. */}
-      <div className="px-4 py-3 border-b border-base-100">
-        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery date</div>
-        {booking.kind === "confirmed" && booking.date ? (
-          <div className="text-body text-success font-semibold">
-            {/* CARD 3 (0346) — a confirmed booking names the company it was
-                AGREED WITH, never the one assigned right now. Reading the
-                current assignment here is the collapse the ruling forbids:
-                reassigning logistics would silently restate what the customer
-                said yes to. `brief.carrierDrift` below is how the two truths
-                part company on screen instead of in silence. */}
-            {brief?.appointment?.carrier.partnerName?.trim() ||
-              row.logisticsName?.trim() ||
-              NO_LOGISTICS_LABEL}{" "}
-            · confirmed {fmtDate(booking.date)}
-            {booking.slot ? ` · ${shortSlot(booking.slot)}` : ""}
-          </div>
-        ) : booking.kind === "provisional" && booking.date ? (
-          <div className="text-body text-warning font-semibold">
-            {row.logisticsName?.trim() || NO_LOGISTICS_LABEL} · logistics&rsquo; date{" "}
-            {fmtDate(booking.date)}
-          </div>
-        ) : (
-          <div className="text-body text-base-600">
-            {row.logisticsName?.trim() || NO_LOGISTICS_LABEL}
-          </div>
-        )}
-        {row.promisedIso && (
-          <div className="text-meta text-base-500 mt-1 tabular-nums">
-            Promised to the customer: {fmtDate(row.promisedIso)}
-          </div>
-        )}
-        {/* CARD 3 — the two truths parted company. The customer agreed this day
-            with one company and a different one is assigned now, so somebody has
-            to either put the original company back or call the customer again.
-            The sentence names both, and it names the fix (COPY rule: a warning
-            that only states a fact tells a new hire nothing). */}
-        {brief?.carrierDrift && (
-          <div className="text-meta text-warning mt-1">
-            Assigned to {brief.assignedLogistics?.partnerName ?? NO_LOGISTICS_LABEL} since the
-            customer agreed this day with{" "}
-            {brief.appointment?.carrier.partnerName ?? NO_LOGISTICS_LABEL} — put the original
-            company back, or call the customer to agree the day again.
-          </div>
-        )}
-      </div>
-
-      {/* T5's spine, unchanged — the same component the drawer renders, fed the
-          same signals, so a tick here can never disagree with a tick there. */}
-      <div className="px-1">
-        <BookingSpine
-          partnerAssigned={!!row.logisticsName}
-          customerConfirmed={booking.kind === "confirmed"}
-          doIssued={!!o.do_number}
-          delivered={delivered}
-          photoUploaded={Array.isArray(photos) && photos.length > 0}
-        />
-      </div>
-
-      {/* §4 HANDOVER CHAIN (card 2026-08-19) — the acts live HERE, on the work
-          surface; the DO object page shows the same facts read-only. The block
-          renders only once a document exists: no DO, no handover. */}
-      {o.do_number && (
-        <WarehouseHandoverBlock
-          doNumber={o.do_number}
-          logisticsName={row.logisticsName ?? null}
-        />
-      )}
-
-      {/* T8 — what this trip carries, and what is still owed. */}
-      {allGroups.length > 0 && (
-        <div className="px-4 py-3 border-t border-base-100">
-          <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">This trip</div>
-          <div className="text-body text-base-800">
-            {scope.map(deliveryGroupLabel).join(" + ") || "—"}
-          </div>
-          {secondTrip && (
-            <div className="text-meta text-warning mt-1">Second trip — {secondTrip}</div>
+                {DW.tryAgain}
+              </button>
+            </div>
+          ) : (
+            <DataGrid<DeliveryScopeRow>
+              appearance="reference"
+              rows={visible}
+              columns={columns}
+              storageKey={STORAGE_KEY}
+              rowKey={(r) => r.key}
+              exportName={DW.page}
+              searchPlaceholder={DW.search}
+              isLoading={isLoading}
+              emptyMessage={DW.empty}
+              groupBanner={false}
+              stickyIdentity
+              chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
+              /* Owner ruling 2026-08-24 — a row on THIS workspace is a delivery
+                 scope, so opening it opens the delivery. */
+              onRowDoubleClick={openEditDelivery}
+              contextMenu={contextMenu}
+              expandTitle={DW.showItems}
+              expandable={{ renderExpansion: (r) => <ScopeExpansion row={r} /> }}
+              selectable={{
+                selectedKeys: selected,
+                onToggle: toggleRow,
+                onToggleAll: toggleAll,
+              }}
+              selectionSummary={(n) =>
+                n === 1 ? "1 delivery scope selected" : `${n} delivery scopes selected`
+              }
+              selectionActions={[
+                {
+                  /* Delivery's own write, valid for ONE scope or many. */
+                  label: () => ASSIGN_LOGISTICS,
+                  kind: "write",
+                  onClick: (rows) => setAssigning(rows as unknown as DeliveryScopeRow[]),
+                },
+                {
+                  /* ⭐ ONE scope only. Edit Delivery opens a single arrangement,
+                     so offering it beside three ticked rows invites a click
+                     whose only possible answer is a refusal. */
+                  label: () => EDIT_DELIVERY,
+                  kind: "write",
+                  visible: (n) => n === 1,
+                  onClick: (rows) => {
+                    const row = (rows as unknown as DeliveryScopeRow[])[0];
+                    if (row) openEditDelivery(row);
+                  },
+                },
+              ]}
+              statusSummary={(filtered) => {
+                const line = scopeFooter(filtered.length, rows.length);
+                return (
+                  <span className="block truncate" title={line}>
+                    {line}
+                  </span>
+                );
+              }}
+            />
           )}
         </div>
+      </div>
+
+      {assigning && assigning.length > 0 && (
+        <AssignLogisticsDialog
+          scopes={assigning}
+          open
+          onOpenChange={(next) => {
+            if (!next) setAssigning(null);
+          }}
+          onAssigned={() => {
+            /* The picks are spent: leaving them ticked would offer `Assign
+               logistics` again over scopes that just took one. */
+            setSelected(new Set());
+            void ordersQ.refetch();
+          }}
+        />
       )}
-
-      {/* T9 — the logistics company's own rules, and anything the booked date
-          crosses. These WARN and never block (T9's law): the Confirm button
-          never reads them, and this page never writes. */}
-      <div className="px-4 py-3 border-t border-base-100">
-        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery rules</div>
-        {!row.logisticsName ? (
-          <div className="text-meta text-base-500">
-            No logistics picked — the rules appear once a company is chosen.
-          </div>
-        ) : !rules || isBareRules(rules) ? (
-          <div className="text-meta text-base-500">
-            No delivery rules recorded for {row.logisticsName}.
-          </div>
-        ) : (
-          <div className="text-meta text-base-700 space-y-0.5">
-            {rules.bookingLeadDays > 0 && (
-              <div>
-                {rules.bookingLeadDays} working day{rules.bookingLeadDays === 1 ? "" : "s"} notice
-              </div>
-            )}
-            {rules.dailyCapacity != null && <div>{rules.dailyCapacity} deliveries a day</div>}
-            {rules.blackoutDates.length > 0 && (
-              <div>Not running on {rules.blackoutDates.map((d) => fmtDate(d)).join(" · ")}</div>
-            )}
-          </div>
-        )}
-        {warnings.map((w) => (
-          <div key={w.key} className="text-meta text-warning mt-1.5">
-            {w.message}
-          </div>
-        ))}
-      </div>
-
-      {/* T6 — the delivery photo ledger. `undefined` is UNKNOWN, not "none"
-          (an older Worker that does not select the column): it stays silent
-          rather than demanding proof it cannot substantiate. */}
-      <div className="px-4 py-3 border-t border-base-100">
-        <div className="text-label uppercase tracking-[0.05em] text-base-500 mb-1.5">Delivery photo</div>
-        {!Array.isArray(photos) ? (
-          <div className="text-meta text-base-500">Open the order to see the delivery photo.</div>
-        ) : photos.length > 0 ? (
-          <div className="text-meta text-base-700 tabular-nums">
-            {photos.length} delivery photo{photos.length === 1 ? "" : "s"} on file
-          </div>
-        ) : delivered ? (
-          <div className="text-meta text-warning">
-            No delivery photo yet — open the order to upload it.
-          </div>
-        ) : (
-          <div className="text-meta text-base-500">Uploaded after the delivery.</div>
-        )}
-      </div>
     </div>
   );
-}
-
-/** A logistics company nobody has configured: the house default, which by T9's
- *  law produces no warnings and has nothing worth printing as a rule. */
-function isBareRules(r: PartnerDeliveryRules): boolean {
-  return r.bookingLeadDays === 0 && r.dailyCapacity == null && r.blackoutDates.length === 0;
 }

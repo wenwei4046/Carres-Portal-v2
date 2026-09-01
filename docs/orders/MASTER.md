@@ -150,13 +150,55 @@ Order | Revisions | History | Order Route
 The identity/header persists across all four views. There is no invented overall status and no
 second View/Edit page state.
 
+### Revisions and History — operator-readable records
+
+Both views obey the shared `ui/MASTER.md` **History + Revision three-rank record grammar**. They do
+not place actor, role, event and raw field values on one line merely because every value is present.
+
+```text
+REVISIONS
+
+Original order
+Rev 1 · Current
+Recorded by {real staff name} · Mon, 24 Aug 11:16
+
+HISTORY
+
+Order created
+{real staff name} · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+```
+
+- **Revisions** remains the complete-version index. `Original order` is Rev 1; each later row names
+  the approved/applied change. Selecting a row opens the complete read-only SO version and its
+  historical PDF/document truth.
+- **History** remains the append-only event ledger. Line 1 states the event in Primary School
+  Standard English; line 2 names the actor, role and actual time; line 3 states only the important
+  result. A simple event without extra detail uses two lines.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess).** `Who did it?` is answered by a person,
+  never a permission. Every staff member uses an individual authenticated account; `Principal`,
+  `Operation` and `Finance` are roles, not names; every Sales Order write stores the individual
+  `user_id`, and these views resolve it to the real display name from the authoritative identity
+  source — never a hardcoded mapping, never a role dressed as a person. `System` only when the
+  event's own facts prove automation. An actor that cannot be recovered — including a write from
+  a shared role-labeled login — says `Staff identity not recorded`. The full ruling, approved and
+  forbidden displays live in `ui/MASTER.md` § HISTORY + REVISION THREE-RANK RECORD GRAMMAR;
+  the account/governance work is `docs/cards/CARD-2026-08-27-individual-staff-identity.md`.
+- `0% deposit · online` is raw-field copy. The employee-facing result is `No deposit · Online
+  order` when those are the authoritative facts.
+
 ## Sales Orders Register — find truth, never assign work
 
 The approved default columns remain:
 
 ```
-SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No
+SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No
 ```
+
+**Sales Order date vocabulary — Owner correction 2026-08-31.** `SO Date` is the date the Sales
+Order was created (`orders.placed_at`). It is one read-only fact and uses that exact label in the
+Register, Order info, Order Route and field catalogs. The bare word `Ordered` is not an SO date:
+Purchasing retains it only for an ordered state or quantity (`Ordered` · `Ordered Qty`).
 
 Search, filters, sorting, Columns and Export remain. Selection scopes output only. The Register
 contains no owner, avatar, next-action sentence, Priority or workflow button. A document number is
@@ -194,53 +236,196 @@ It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or w
 
 ## Order view — one page, foreign facts read-only
 
-The Order view keeps the governed object header and one-page document composition. Its business
-sections are:
+The Order view keeps the governed object header and one-page document composition.
+
+### THE MERGED ORDER TAB — OWNER RULING 2026-08-26 (Jess) · APPROVED / LOCKED
+
+**This OVERWRITES the seven-section list ruled on 2026-08-20 and the left-pane block order ruled
+on 2026-08-15 (§ SALES ORDER OBJECT PAGE V2).** Jess reviewed the built page and ruled it too tall
+and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing space occupied on
+each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
+sections left THIS TAB because `Order Route` already owns them.**
 
 ```
-CUSTOMER PROMISE
-Customer · phone · address · Customer Delivery · Delivery Location
-
-SALES OWNERSHIP
-Dealer · Showroom · Salesperson
-
-DATES / ACCESS
-Ordered · Proceed date · floor · lift and governed access facts
-
-GOODS
-Item · SKU · quantity · commercial value
-
-DELIVERY JOURNEY
-Read-only Delivery calculation, legs, dates, current holder and risk · Open Order Route →
-
-MONEY
-Total · paid · outstanding · Open Payments →
-
-RELATED DOCUMENTS
-Every linked PO, Receiving Session, Unit, DO, Payment and applicable Case/Guarantee
+CUSTOMER                name · phone · email · demographics
+  ├ header              New customer / Existing customer — the standing answer, beside the name
+  ├ Delivery address    the MY cascade · building type · billing
+  └ Emergency contact   name · phone · relationship
+MONEY                   Total · paid · outstanding · Open Payments →
+ORDER INFO              SO Date · Requested Delivery Date · Proceed date · floor · stair carry · lift
+  ├ Sales ownership     Dealer · Showroom · Salesperson
+  └ Amend delivery date the governed three fields · creates a Revision · needs approval
+GOODS                   the six-column truth
+WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
+
+**THE THIRD MERGE PASS — 2026-08-27 (YH).** Seven cards became **four**, and the order changed:
+`MONEY` rises above `ORDER INFO`, directly under `CUSTOMER`. `Emergency contact` joins the customer
+it describes; `Amend delivery date` joins the dates it moves.
+
+Those were the last two COLLAPSIBLE cards, and merging retires the `forceOpen` machinery with the
+fold: a section that is always on screen cannot hide an unsaved change or a live amendment, which
+is the only thing those guards existed for. Neither section loses its name, and
+`creates a Revision · needs approval` is governed copy that moved onto the subsection heading
+rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
+now pins the card list and its order.
+
+**A merged section keeps its NAME.** `Delivery address` and `Sales ownership` are locked words and
+survive as in-card headings; the merge moves a border, a 24px gap and a second heading rule, never
+a word. The names are governed by `docs/COPY-STANDARD.md` § *Its section names*.
+
+**`DELIVERY JOURNEY` LEAVES THE ORDER TAB.** *"Delivery journey doesn't need to be viewed at order
+tab or a SO but keep it at order route tab."* It was a read-only mirror: `Order Route` builds a
+`LOGISTICS` node from the same partner name, a `DELIVERY DATE` node carrying the appointment and
+its slot, and a `DELIVERY ORDER` node. Removing it also ended a **Law D duplication** — the
+customer's promised date printed twice under two labels, `Requested Delivery Date` in Order info and
+`Customer promise` here — and retired a banned word: `Journey` was already ruled out in favour of
+`Order Route` (COPY-STANDARD:1337, :1453).
+
+**`RELATED DOCUMENTS` LEAVES THE ORDER TAB.** *"Remove related documents."* Every owner it indexed
+— PO, Receiving Session, Stock Unit, DO, Payment, Case, Guarantee — is a node with a door on
+`Order Route`, and each document stays independently findable in its own Register. The card was a
+second index of facts the map already draws, and it cost three network round-trips (Delivery
+Orders, Payments, Guarantees) on every open. **The completeness rule that governed it is retired
+with it**; what survives is the rule it existed to serve — *a door, never a duplicate* (Law C).
+
+**PROCEED DATE IS READ-ONLY ONCE THE ORDER EXISTS.** *"Proceed date shouldn't be editable at SO
+view under operations."* **This overwrites §725-728 below**, which gave Operations a direct writer
+here. The Sales Portal asks for the production start as a REQUIRED question at the point of sale,
+so on an existing order it is a recorded answer, not a field. The CREATE door keeps the picker.
+
+**⭐ A DATE THAT WAS NEVER RECORDED IS NOT A DATE THAT IS LOCKED — OWNER RULING (YH, 2026-08-28).
+APPROVED / LOCKED.** *"Office new SO should follow [the POS] as well; and for existing SO that
+doesn't have it recorded, change it so that it can be filled in."* Two changes, and Jess's ruling
+above survives both:
+
+```
+CREATE      every door REQUIRES a proceed date — the POS already does; the OFFICE door must too
+BLANK       an existing order with NO proceed date may be filled in ONCE
+RECORDED    an order that HAS one stays read-only — unchanged, this is Jess's ruling
+```
+
+**The lock is on the ANSWER, never on the emptiness.** Filling a blank is completion; changing a
+recorded date is moving when the factory starts, and that stays shut. YH's reason for the
+fill-once bound: *"those that accept blank proceed date are most likely due to bugs from past
+versions"* — so the door exists to repair history, not to reopen a decision.
+
+⛔ **The `createOrderInput` sentence removed above was AMBIGUOUS and read as false.** There are
+**two different objects with that name**: the POS door's `createOrderInputSchema`
+(`packages/shared/src/schemas/orders.ts:325-327`, which genuinely does refuse — and
+`order-entry.ts:246` pins the field `locked · defaultRequired · not toggleable`), and the OFFICE
+door's local `createOrderInput` (`apps/api/src/routes/operation/orders.ts:1483-1499`), which
+**does not**. Measured 2026-08-28: the office door is permissive at all three of its layers — no
+`validateDraft` guard, `proceed_date` inherited `.nullable().optional()` from
+`revisionHeaderInput`, and `sales_order_create` inserts `nullif(…)::date` with no NULL check
+(`0374:115`). That is what this ruling closes.
+
+**WHAT THE DATE MEANS, since no rule computes it.** The planned production-START day, keyed by the
+salesperson at the point of sale (`0165:6-13`). There is **no derivation anywhere** — no lead-time
+arithmetic, no production calendar, no delivery-minus-lead formula. The only guidance in the
+product is prose on the POS: *"pick it deliberately (e.g. ~a month before delivery) so we don't
+reserve stock too early"* (`Step3Delivery.tsx:139-143`). The one rule enforced at every layer is
+`proceed_date <= delivery_date`. It is a planned date only and is never auto-stamped.
+
+📌 **Provenance, recorded because it was asked.** The three read-only lines above entered this file
+in ONE commit — `2515a136`, authored by `yhcominthruWork` as squashed PR #923, whose body never
+mentions proceed date. The `(Jess)` attribution is a **quoted ruling recorded by a session**, and
+those quotation marks are the whole of the provenance; no separate artefact backs it. Neither Lim,
+Chai nor Jess has ever committed a proceed-date line here. YH confirmed the ruling stands on
+2026-08-28 with the refinement above, which is what makes it binding now.
+
+**BOTH SIDES ASK EACH QUESTION THE SAME WAY.** *"Ensure both sides of filling in are the same."*
+The measured failure was the lift: the POS offered two named answers (`No lift` / `Has lift`) while
+this page offered an unlabelled tickbox, so an unticked box meant BOTH *no lift* and *nobody said*.
+The answers now live once, in `packages/shared/src/sales-order-form.ts` (`LIFT_OPTIONS`), and both
+surfaces import them. The same ruling brought the POS's stair-carry working-out to this page —
+`3 of 5 items × 2 floors above 2F × RM50 = RM300` — through the one imported `floorSurchargeRaw`
+(Law D: one derived fact, ONE arithmetic).
+
+**THE SECOND DENSITY PASS — 2026-08-26 (YH), after reading the merged page.** Six lines of standing
+explanation came off once the fields they explained stopped being editable:
+
+- `ORDER INFO` loses its subtitle. It taught what `Proceed date` meant while that was a box the
+  office had to reason about; it is a recorded fact now.
+- The stair-carry working-out prints **only when there is a charge**. It used to narrate the zero
+  (*"No stair carry — floor 1 is within the free 2F"*) on the majority of orders, repeating the two
+  fields directly above it.
+- `Floor` carries its own ceiling — **`Floor (Max is 3rd Floor)`** — instead of a hint underneath
+  that read as advice rather than as the limit the input enforces.
+- `Items needing stair carry` carries a number, never a blank.
+
+**⭐ AN UNSET STAIR-CARRY COUNT CHARGES NOTHING — OWNER RULING 2026-08-27 (YH), A PRICING DECISION.**
+It used to mean EVERY item: an order where nobody was asked how many pieces needed carrying was
+charged the maximum stair fee. It now means NONE — somebody says how many before the customer is
+charged. Applied in `order-totals.ts` (`floorSurcharge` + `draftTotals`), the POS panel and the
+object page **together**, so a quote and an order can never disagree about the money.
+🟡 Any order whose count was never set now computes RM 0 stair carry where it previously computed a
+full one. That is the ruling, not a side effect.
+⛔ Migration `0104`'s column comment still reads *NULL = auto = every item*. A committed migration
+may not be edited (red line 6) — **this section is the current meaning.**
+
+**⭐⭐ STAIR CARRY IS MONEY THE CUSTOMER OWES — OWNER RULING (YH, 2026-08-28). APPROVED / LOCKED.**
+*"If stair carry requires money for it, it should be included — whether it's paid on the carry day
+or before, it still needs to be paid."*
+
+So the fee is **revenue on this sales order**, not a delivery-day cash arrangement. It belongs in
+the order's total, in what the customer owes, and in what every payment door will accept. **The
+timing of payment does not change whether it is owed.**
+
+⛔ **This settles a three-way contradiction the repo has carried since 0184.** Three files each
+state a different answer, and each is locally coherent:
+| File | Claims |
+|---|---|
+| `apps/api/src/lib/delivery-fee-recompute.ts:38-39` | stair *"folds into the order total"* — revenue |
+| `apps/api/src/routes/orders.ts:258-261` | *"a delivery-time concern, not a sales metric"* — excluded |
+| `apps/api/src/routes/stripe-checkout.ts:115-116` | *"a client-side display extra"* — not a charge at all |
+**The first is now the ruling.** The other two describe an implementation that must change; their
+comments are corrected in the same PR that changes them, never left to contradict this section.
+
+**MEASURED STATE THIS RULING OVERTURNS** (Sales Order Workspace field audit, 2026-08-28, §2 F-2):
+the fee is computed in the browser on every render from three stored inputs plus a globally
+mutable rate, and is **written down nowhere**. The customer signs a POS screen that itemises it
+twice and folds it into the headline total (`Step3SignaturePayment.tsx:271-278, :314, :123`) under
+a T&C clause promising it is *"billed on this sales order"* (`:655-657`) — while the order's own
+total is lines + addons only (`order-money.ts:100`). Every payment door caps against that lower
+figure: Stripe returns 422 `amount_exceeds_outstanding` **before Stripe is called**
+(`stripe-checkout.ts:158-168`) and `top_up_order` refuses cash identically (`0351:245-249`).
+At seeded rates a 5-item floor-3 order signs at RM 9,600 against a record that can only ever
+describe RM 9,450. **No door in the portal can collect the difference.**
+
+**THE SHAPE OF THE FIX — the pattern already exists and is not to be invented.**
+`delivery-fee-recompute.ts` computes the delivery TRIP fee server-side and appends `order_addons`
+rows (`DELIVERY` · `DELIVERY_CROSS` · `DELIVERY_ADD`, seeded `0184:112-116`). Stair carry follows
+the same road: ① seed a stair key into `addons` — the set is **not** closed, `POST /api/catalog/addons`
+(`catalog.ts:1854-1880`, gate `internalOnly`) creates one and the door is on screen at
+**Settings → Catalog → Special Add-ons**; ② have the server recompute write the per-order figure
+into `order_addons.qty` / `unit_price`, exactly as the delivery-fee rows do, since `addons.price`
+is a fixed per-key price and stair carry is computed. The total, the outstanding and every payment
+cap then include it with no further change, because they already read `order_addons`.
+⚠️ The fee must be **stamped at the order**, not re-derived: today changing
+`floor_config.per_floor_per_item` in Settings silently reprices every historic order's displayed
+stair carry. A charge the customer signed for may not move because a rate changed afterwards.
+🟡 Sequencing is the owner's, not the code's: this changes what existing orders are worth. Under
+`CLAUDE.md` §6 every row today is test data, so **no backfill is proposed** — the ruling binds new
+orders from the day it ships.
+- **`Address not given yet` appears only while there is no address**, or while it is already
+  ticked. On an order that carries one, a permanent tickbox whose only power is to discard it is a
+  hazard, not a field.
+- The `SALES OWNERSHIP` door drops its suffix and both standing sentences — see the ruling above.
+
+**`Propose a change to the customer` MOVED INTO `More actions`** — 2026-08-26, on the exact
+precedent `Report a problem` set on 2026-08-15: a rare act does not hold permanent space on a page
+read every day. Its standing sentence is deleted and its idle strip with it.
+
+⛔ **The door was NOT deleted, and that distinction is load-bearing.** That modal is the only way to
+change **items, unit price and instalment months** anywhere on the Sales Order — `AMEND DELIVERY
+DATE` submits a date and nothing else. Removing the button would have retired three capabilities
+silently, so it moved instead. A LIVE proposal still draws its panel on the card, because a pending
+amendment is truth rather than an action; only the rule and padding are conditional on one
+existing. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`.
 
 Sales may directly correct only its governed safe/customer facts. A commercial commitment change
 uses the amendment path. Purchasing, Warehouse, Delivery and Finance facts have links, never forms.
-
-### Related Documents is complete, not a one-number mirror
-
-The object lists zero, one or many documents from each owner. It must not show only the latest or
-first Delivery Order when more exist.
-
-```
-Purchase Orders       PO-2048
-Receiving Sessions    —
-Stock Units           UNT-8821
-Delivery Orders       DO-KLJB-001 · DO-JBSG-001
-Payments              1 receipt
-Service Cases         —
-```
-
-For many documents the summary says, for example, `2 Delivery Orders →`; the door opens the
-authoritative Delivery Orders Register filtered to this SO. Every related document also remains
-independently findable in its owning Register. Optional Route branches such as Loan or Service are
-absent when no such obligation exists; the Related Documents summary may use the governed `—`.
 
 ## Order Route — one connected drawing
 
@@ -334,7 +519,7 @@ CUSTOMER PROMISE (Sales Orders)
 Delivery owns the one backward calculation:
 
 ```
-customer delivery date
+requested delivery date
 → latest stock arrival at the selected JB partner warehouse
 → KL pickup date
 → latest Carres Warehouse ready date
@@ -397,6 +582,11 @@ Related Documents and Order Route only link to the documents. For Singapore, eac
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 
+If a successful Delivery Visit contains an exact supplier-consignment Unit, the resulting
+Consignment Sale Notice is created under Purchasing and appears only as a linked Related Document /
+Order Route consequence. Sales Order creation, reservation, deposit and planning never create that
+notice, and Sales cannot issue or correct it.
+
 ## Completion, empty, loading and error truth
 
 There is no fake overall status. Each route states its own truth:
@@ -443,13 +633,15 @@ read only as implementation history.
 ## Register
 
 - The default business columns are exactly, in order:
-  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`
+  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`
   (re-ruled to EIGHT by the owner on 2026-08-15 — see REGISTER AND OBJECT COMPOSITION below).
   The small `▸` is UI chrome, not a business column. There is no invented overall `Current` or
   combined status column.
-- The page has a compact destination header/work toolbar, then a breathing gap, then one light,
-  clearly bordered Register. It is neither a borderless continuous slab nor a giant dashboard
-  card. KPI cards do not precede it.
+- The page has a compact destination header/work toolbar, then breathing room, then one flat
+  Register. It is neither a giant dashboard card nor one box per row. **Owner correction
+  2026-08-31 overwrites the 2026-08-29 four-sided-frame record:** there is no rectangle enclosing
+  the toolbar + table + footer. The toolbar divider, table grid and footer divider remain visible;
+  the shared Register engine owns this rule and Sales Orders does not override it page-locally.
 - Default widths are governed and usable without staff resizing. Optional columns may widen the
   sheet and create horizontal scroll; default columns are never squeezed unnaturally to make an
   added column fit.
@@ -548,7 +740,7 @@ name: edges carry no route captions. Colour still belongs to STATE alone (blue C
 done · amber exception); routes are told apart by band and spacing, never by hue.
 
 **The Sales Order is the ONLY root**, and goods, delivery and money leave it simultaneously. The
-origin carries its number and labelled Ordered date as evidence but **no circular `Open SO-{n} →`
+origin carries its number and labelled SO Date as evidence but **no circular `Open SO-{n} →`
 door** back to the object already open.
 
 ### Node anatomy
@@ -618,11 +810,16 @@ ask (Law D — the guard that bound decision B, decision A and this ruling alike
 engine may never disagree):
 
 ```
-outstanding = 0                                   → ✓ Money in full
-APPROVED Delivery Payment Approval, still owing   → ✓ COD approved — collect before unloading
-owing, request pending                            → ✗ … approval waiting for decision
-owing, nothing raised                             → ✗ … collect, or request a payment approval
+outstanding = 0   → ✓ Money in full
+owing             → ✗ collect first — the delivery cannot be arranged while money is owed
 ```
+
+**RE-RULED 2026-09-01 — the exception is CLOSED.** The owner made money-in-full absolute: the
+Delivery Payment Approval door was removed from the screen (PR #1031) and nothing can request
+one any more. An approval granted before the removal is still honoured by the 0362 gate —
+history honoured, not a live path. The `order_delivery_payment_approvals` record, its doors and
+the trigger remain in the database untouched so that restoring the door, if ever re-ruled, is a
+revert rather than a rebuild.
 
 **The OPEN Finance exception (0355) is the SECOND, independent money requirement** — it blocks a
 fully-paid order, and an approval does not clear it. The full ruling, the approval record's
@@ -717,19 +914,20 @@ Wiring Delivery's handover status is approved-target, not built.
   `b7d68eed`; its production acceptance exposed only the Edit notice occupying a document column.
   PR #788 corrected that composition and merged as `ebc8fb5d`; deploy run `31790978222` proved the
   exact final SHA. Authenticated checks covered the Register and approved goods expansion, Object
-  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date uses the
-  pre-existing Operations writer; Customer Delivery remains read-only and Delivery's Confirmed
+  View/Edit/Revisions/History/Order Route, and coexistence with My Work open. Proceed date used the
+  pre-existing Operations writer — **superseded 2026-08-26: it is read-only on an existing order,
+  see § THE MERGED ORDER TAB**; Requested Delivery Date remains read-only and Delivery's Confirmed
   Delivery Date remains distinct. No new address, access, delivery-date or destination field was
   created. `docs/ui/MASTER.md` §6.6 records the final reusable UI proof.
 - **FINAL OWNER VISUAL CORRECTION — PRODUCTION-VERIFIED / LOCKED 2026-08-14.** Owner review
   reopened the preceding acceptance record. The final correction is PR #795, merged as
   `759d49efaee6c643bd9d8e1840cb991dee2b7015`; CI run `31804608716` passed the complete gate and
   deploy run `31805501074` converged the exact
-  SHA on the governed production surfaces. Authenticated acceptance proved: Customer Delivery
+  SHA on the governed production surfaces. Authenticated acceptance proved: Requested Delivery Date
   remains a date fact with exact missing value `No delivery date` and separate two-line guidance;
   Register location is concise and collapses duplicate city/state; the six-column goods mini-table
   remains unchanged, with `Carres Klang` shown without quantity for a single destination; the
-  object exposes the governed goods truth, keeps Customer Delivery read-only and Sales ownership
+  object exposes the governed goods truth, keeps Requested Delivery Date read-only and Sales ownership
   governed; Save and Discard disappear in Revisions, History and Order Route and dirty navigation
   is refused safely; Activity translates logistics and
   stock ETA events into governed operator terms; and Order Route retains its per-goods architecture
@@ -741,22 +939,34 @@ Wiring Delivery's handover status is approved-target, not built.
   governed print handler, focused tests and production build passed. This record supersedes the
   earlier closure and locks Owner Visual Acceptance without changing business authority.
 
-## THE THREE DELIVERY DATES — OWNER RULING 2026-08-15 (Jess) · APPROVED / LOCKED
+## THE THREE DELIVERY DATES — the split ruled 2026-08-15 (Jess); fact #1 re-ruled 2026-08-27 (owner) · APPROVED / LOCKED
 
 **One cell has been carrying three different business facts.** Sales Order owns exactly one of
 them. This section defines all three so that no screen, import or job may substitute one for
 another.
 
+> ### ⛔ WHAT `Requested Delivery Date` IS — OWNER RULING 2026-08-27
+>
+> **The date the customer is currently asking Carres to deliver on.**
+>
+> It is **NOT** Carres' latest-delivery commitment · **NOT** the delivery Logistics has confirmed ·
+> **NOT** the date the goods actually arrived. Those are three other facts with three other owners
+> — see § THE CROSS-MODULE DATE CONTRACT below.
+>
+> **Retired, and banned from reuse:** `Customer Delivery` · `Deliver By` · `Promised Delivery` ·
+> `Customer 1st Requested Delivery`. **`Delivery Window` may never name this date** — `window`
+> already carries another meaning in the Delivery authority.
+
 | # | Name | What it is | Who writes it | Where it shows | May it be overwritten? |
 |---|---|---|---|---|---|
-| 1 | **`Customer Delivery`** | The date Carres has **promised** the customer. A commitment. | Sales at order entry; Operation only through the governed amendment, which records who and why | `Customer Delivery` column · Object Header · every customer-facing document | **NEVER automatically.** Only a governed amendment with an owner and a reason. |
-| 2 | **`Customer Delivery Window`** | What the customer answered when they have no firm date — `Mid September`, `This month`, `Customer will call` | Sales, at the Sales Portal, at the moment the customer cannot give a date | The same `Customer Delivery` cell, **marked as a window, never rendered as a date** | Replaced by #1 the moment a firm date is agreed. Never by a job. |
-| 3 | **`Estimated delivery`** | When Carres **believes** it can deliver, derived from goods arrival and logistics facts. **Not a promise.** | Nobody types it. Derived from Purchasing/Delivery facts. | Order Route and Delivery surfaces; in the Register cell only as the third fallback, **always labelled `Estimated`** | Recomputed freely — it is derived, never committed |
+| 1 | **`Requested Delivery Date`** | The date the customer is currently asking Carres to deliver on. | Sales at order entry; Operation only through the governed revision/amendment path, which records who, when and why | `Requested Delivery Date` column · Object Header · every customer-facing document | **NEVER automatically and NEVER silently.** Only through the governed revision path, which preserves the original and every previous requested date. |
+| 2 | **`Requested Delivery Window`** | What the customer answered when they have no firm date — `Mid September`, `This month`, `Customer will call` | Sales, at the Sales Portal, at the moment the customer cannot give a date | The same `Requested Delivery Date` cell, **marked as a window, never rendered as a date** | Replaced by #1 the moment a firm date is agreed. Never by a job. |
+| 3 | **`Estimated delivery`** | When Carres **believes** it can deliver, derived from goods arrival and logistics facts. **Not what the customer asked for.** | Nobody types it. Derived from Purchasing/Delivery facts. | Order Route and Delivery surfaces; in the Register cell only as the third fallback, **always labelled `Estimated`** | Recomputed freely — it is derived, never committed |
 
-### FALLBACK ORDER — what the `Customer Delivery` cell shows
+### FALLBACK ORDER — what the `Requested Delivery Date` cell shows
 
 ```
-1  a promised date exists            →  show the date
+1  a requested date exists           →  show the date
 2  else a customer window exists     →  show the window, marked as a window
 3  else goods/logistics facts exist  →  show it, labelled `Estimated`
 4  else nobody has asked the customer→  the fact, then the action
@@ -764,15 +974,17 @@ another.
 
 ### TWO HARD RULES
 
-- **`Estimated delivery` is never presented as `Customer Delivery`.** It is always labelled and
-  always visually quieter. A derived guess may not wear a promise's clothes — a customer-facing
-  document carries #1 and nothing else.
-- **No process, import, scheduled job or screen may overwrite an existing `Customer Delivery`.**
-  Changing a promise is an amendment: it has an owner, a reason and a history entry.
+- **`Estimated delivery` is never presented as `Requested Delivery Date`.** It is always labelled
+  and always visually quieter. A derived guess may not wear the customer's own words — a
+  customer-facing document carries #1 and nothing else.
+- **No process, import, scheduled job or screen may overwrite an existing `Requested Delivery
+  Date`.** Changing it is a governed revision: it has an owner, a reason and a history entry, and
+  **History preserves the original requested date and every previous one.** The active Register
+  column shows the LATEST requested date and **never carries `First` or `Original` in its name.**
 
 ### THE WRONG ATTRIBUTION THIS RULING CORRECTS
 
-Measured on production 2026-08-15 — 11 not-delivered orders carry no `Customer Delivery`:
+Measured on production 2026-08-15 — 11 not-delivered orders carry no `Requested Delivery Date`:
 
 ```
 8  delivery_date_tbd = TRUE    the customer WAS asked and answered "not sure yet"
@@ -788,13 +1000,83 @@ carries the distinction and the screen discards it.
 `Estimated delivery` does not exist as a stored fact today and is not invented by this ruling; it
 enters the fallback only where Purchasing/Delivery already own the facts it derives from.
 
+## THE CROSS-MODULE DATE CONTRACT — OWNER RULING 2026-08-27 · APPROVED / LOCKED
+
+**Four different dates, four different owners. No surface may substitute one for another, and no
+module may rename another module's date.**
+
+| Canonical label | What it means | Owner |
+|---|---|---|
+| **`Requested Delivery Date`** | Customer requested this date. | **Sales Orders** |
+| **`Confirmed Delivery`** | Logistics and the customer agreed to this delivery day. | **Delivery** |
+| **`Confirmed Time`** | Logistics and the customer agreed to this time range. | **Delivery** |
+| **`Delivered`** | The goods were actually delivered. | **Delivery result** |
+
+**Sales Orders owns `Requested Delivery Date`. Delivery may READ it and may NEVER silently
+overwrite it.**
+
+### When the customer requests another date
+
+- the current Sales Order shows the **latest** `Requested Delivery Date`;
+- the change follows the governed Sales Order revision / amendment path;
+- History preserves the original requested date, every previous date, **who** changed it, **when**
+  and **why**;
+- **`First` and `Original` never appear in the active Register column name.**
+
+### The Purchasing connection
+
+SO Batch Purchase reads `Requested Delivery Date` and derives purchasing timing from it:
+
+```
+Requested Delivery Date − 14 Safety days                          = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days   = Order By
+```
+
+**Purchasing must NEVER wait for `Confirmed Delivery` before ordering.**
+
+### The Delivery connection
+
+Delivery keeps the three apart and prints them apart:
+
+```
+Requested Delivery Date  |  Confirmed Delivery  |  Confirmed Time
+```
+
+`Confirmed Delivery` and `Confirmed Time` are **NOT renamed by this ruling.**
+**No confirmed-logistics column is added to the Sales Orders Register by this ruling** — that
+placement requires separate owner review.
+
+### Required UI wording — every surface, one label
+
+Register · Object Detail · create/edit flow · document preview · Revisions · History · Order Route
+· filters · exports · every cross-module reader print the same canonical label:
+
+```
+Requested Delivery Date
+Thu, 24 Sep
+```
+
+Where a second explanatory line helps, and **always smaller than the fact line**:
+
+```
+Customer requested this date
+```
+
+A legacy record with no date:
+
+```
+No requested delivery date
+Ask the customer which date they want
+```
+
+
 ## THE SALES PORTAL ENTRY GATE — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
 
 **Two things must be true before Operation may receive a Sales Order.** Both are enforced in the
 wizard AND at the create door, because a rule that lives only in the browser is a rule a stale tab
 can break.
 
-### 1 · Customer Delivery is mandatory at order entry
+### 1 · Requested Delivery Date is mandatory at order entry
 
 **If the date is not confirmed with the customer, Operation must not receive the order.** The
 `(TBD)` / `Confirm later` option is REMOVED from the new-order wizard's Step 3; a real date
@@ -835,6 +1117,24 @@ fails OPEN for the same reason; the client gate is the primary UX and the door i
 read (ownership Law D), and `sku-categories.ts` is the ONE catalog join the lead-time floor and the
 goods gate share.
 
+### Final submit is the handoff — owner correction 2026-08-27 · APPROVED / LOCKED
+
+When the existing Proceed facts are complete, Sales Portal final submit creates the Sales Order and
+hands it to Operations automatically in one database transaction. There is no routine second
+`Move to Proceed` step. If a governed fact is still missing — for example payment is below 50% —
+the valid order stays `Placed`; the later payment, address, date or governed correction retries the
+same transition automatically. `Move to Proceed` remains only as recovery for a legacy/raw record.
+`orders.sales_final_submitted_at` is the authoritative Sales Portal final-submit fact. Raw, office,
+rental and imported orders do not receive it. Historical Portal and raw records cannot be separated
+truthfully from creator role or completeness, so legacy recovery accepts only exact IDs confirmed by
+Principal, requires a written reason, rejects office/rental/imported records and records
+History + Audit before using the canonical transition. No missing fact is manufactured. Every later
+retry runs after the transaction's final header, line and add-on state, never midway through a
+revision.
+
+`orders.proceeded_at` is the actual Sales-to-Operations handoff timestamp. It is separate from
+`orders.proceed_date`, which remains the salesperson's planned production-start date.
+
 ## REGISTER AND OBJECT COMPOSITION — OWNER RULING 2026-08-15 (Chai) · APPROVED / LOCKED
 
 From an authenticated top-to-toe production review at 1364px and 924px. Everything below is
@@ -844,7 +1144,7 @@ query.**
 ### Register
 
 - **The default columns are exactly EIGHT**, in order:
-  `SO No | Ordered | Customer Delivery | Customer | Delivery Location | Showroom | PO No | DO No`.
+  `SO No | SO Date | Requested Delivery Date | Customer | Delivery Location | Showroom | PO No | DO No`.
   This overwrites the seven-column default in §0.1. `Showroom` READS the Sales-ownership fact the
   order already carries (`outlets.name`); it has been a declaration in the register's catalog since
   Stage 1 and is promoted, not invented. It is read-only and the register may never gain a writer
@@ -981,8 +1281,11 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **Two panes, 50% / 50%.** Left is the form, right is the document. Each pane scrolls on its
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
-- **The left pane's block order is:** `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
-  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. **`GOODS` follows them**, and
+- **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
+  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN 2026-08-26 —
+  see § THE MERGED ORDER TAB, which is the current composition:** `DELIVERY ADDRESS` merged into
+  `CUSTOMER` and `SALES OWNERSHIP` into `ORDER INFO`, both keeping their names as in-card
+  headings. What survives from this ruling is the rest of the sentence — **`GOODS` follows them**, and
   it is not a form: the six-column `Category | Unit ID | SKU | Qty | Item | Deliver To` truth
   locked above is Stock's and Purchasing's fact, and the customer document beside it never prints
   Unit ID or Deliver To. Removing it would have lost governed truth the card did not name.
@@ -1019,8 +1322,9 @@ the amendment machinery, the goods truth and the Order Route architecture are un
 - **The emergency contact is THREE validated fields** — name · phone · relationship — over the one
   `customer_emergency` text column. The three-fields-⇄-one-column codec lives in
   `packages/shared/src/sales-order-form.ts` and is the same one the POS composes with, so a legacy
-  or hand-typed string round-trips character for character when nobody edits it. The section note
-  is `Used only if we cannot reach the customer on delivery day`.
+  or hand-typed string round-trips character for character when nobody edits it. ⛔ The section note
+  `Used only if we cannot reach the customer on delivery day` is RETIRED (YH, 2026-08-27) — the
+  section carries no note.
 - **Stored data is never normalised, repaired or back-filled by this ruling.** Migration `0354`
   widens what the writer may correct; it rewrites no value and asserts no row count.
 - **The writer widened to the portal's remaining questions.** `sales_order_save_revision` now
@@ -1028,8 +1332,8 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   customer_billing_same · delivery_stair_items · entry_fields` (the 0219 bag carrying the building
   type and the operator's custom fields). `entry_fields` MERGES — a config field retired last month
   is not erased by an unrelated save.
-- **The write boundary is unchanged.** Goods, price and `Customer Delivery` are never a direct
-  write here; `Ordered` and `Customer Delivery` render as read-only facts. Attribution still moves
+- **The write boundary is unchanged.** Goods, price and `Requested Delivery Date` are never a direct
+  write here; `SO Date` and `Requested Delivery Date` render as read-only facts. Attribution still moves
   by request (0329). `Customer type (auto)` is derived from the same phone probe the POS runs and
   is read-only on both surfaces.
 
@@ -1044,14 +1348,22 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   holds, and while one is open this block submits nothing. `Amend date (from customer)` is a
   column (`sales_order_amendments.customer_asked_on`, 0354), not a substring of the reason: a
   change phoned in on Monday and typed on Thursday is a Monday request.
-- **The MONEY block is read-only and weighted** — Total large · Paid medium · **Outstanding
-  loudest, red whenever any of it is still owed**. This is an explicit owner ruling and it
-  overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when genuinely late". The
-  existing `Open this order in Payments` door is unchanged.
+- **The MONEY block is read-only, and its three amounts are ONE SIZE** — Total · Paid ·
+  **Outstanding, red whenever any of it is still owed**. The red is the 2026-08-15 owner ruling
+  and it stands; it overrides `docs/ui/MASTER.md` §6.4 challenge C1's narrower "only when
+  genuinely late". **The `Total large · Paid medium · Outstanding loudest` half of that ruling
+  is RETIRED (YH, 2026-08-28).** It never reached the amounts: `<Money>` renders every value at
+  its `row` tone, so all three digits were always the same size and only their CONTAINERS
+  differed — three line-heights under `items-end`, which is why the three numbers never sat on
+  one line. Weighting that only moves the box around the number is not weighting. Colour does
+  the separating now, which is the half that was always visible.
+  The existing `Open this order in Payments` door is unchanged.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
-  `Change salesperson — needs approval`. A pending request stays visible to everyone: it is truth,
-  not an action.
+  **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired
+  2026-08-26: it was the third statement of one fact around an unpressed button, and the rule is
+  carried once by the modal the button opens). A pending request stays visible to everyone: it is
+  truth, not an action.
 - **`Report a problem` moved into `More actions`**, beside `Copy to new Sales Order` and
   `Cancel SO`. The permanent Problems card is deleted; the order's Service Cases remain on
   `Order Route`, which already reads them from the route facts.
@@ -1089,12 +1401,12 @@ gate proves the code does what its tests say; only the walk proves it does what 
 ## Guided operations and Service Case boundary — CLOSED / PRODUCTION-VERIFIED 2026-08-14
 
 - ⭐ **RE-RULED 2026-08-18 (owner): the fact is said ONCE per surface, and never as a lecture.**
-  A missing Customer Delivery date prints the amber fact (`No delivery date`) with no action
+  A missing Requested Delivery Date prints the amber fact (`No delivery date`) with no action
   clause in the Register cell — **a register lists documents; actions live in My Work /
   Team Work / the Order Route.** The SO object page's seven-answer guidance banner
   (Why · Who must act · Who to contact · What to ask · What to use · What to record · What
   happens next) is **DELETED** — it lectured instead of working and said one thing in three
-  places. What survives: the amber field-level note on `Customer Delivery`, the cell's
+  places. What survives: the amber field-level note on `Requested Delivery Date`, the cell's
   who/phone/ask hover, and the owned action in My Work / Team Work / the Order Route. This
   overwrites the 2026-08-14 guidance-block ruling under the MASTER OVERWRITE LAW. The guidance
   stores no second action or delivery truth.
@@ -1164,7 +1476,7 @@ official Card numbers.
    `carres-pos` `db39d1c6`) and all four canonicals converged on that exact asset. Production Worker
    version `5c669747-8a6b-4998-9643-fcc39604c69d` serves the API change at 100%. Authenticated
    production verification on `erp.carresofficial.com/operation/orders` proved the exact default
-   order **SO No / Ordered / Customer Delivery / Customer / Delivery Location / PO No / DO No**,
+   order **SO No / SO Date / Requested Delivery Date / Customer / Delivery Location / PO No / DO No**,
    bounded bordered surface, preserved Search / typed filters / Columns / Export,
    inline goods-only grouped disclosure (SKU/model/size/quantity), direct SO document
    navigation, and the 2990-style right-click actions **View / Edit / Preview PDF / Print PDF / Copy
@@ -2638,7 +2950,7 @@ sort is TOTAL — two actions can never tie and flip between renders.
 fact about the ORDER, not about the kind of action.
 
 ```
-1  Broken commitment or today's run     Deliver today · Upload delivery photo
+1  Broken commitment or the day's run   Deliver on {weekday, date} · Upload delivery photo
 2  The customer must be told — THROUGH LOGISTICS, never by us
                                         Call {logistics} — arrange new delivery date
 3  Goods are not secured                Call {supplier} — confirm ready date · Issue PO
@@ -2673,11 +2985,38 @@ work resolves to the responsible salesperson; Purchasing, Receiving, Payment and
 resolves through those modules' governed duty/ownership rules. Owner identity is displayed
 structurally and is not repeated inside every action sentence.
 
-**APPROVED TARGET / NOT BUILT — 2026-08-14.** The current shipped order work composition still
-uses the Sales Order PIC for its order-track items and its registry does not yet carry separate
-Owner Rule and Display Owner fields. This documentation ruling does not change ERP code. A later
-BUILD/DELIVERY scope must migrate the registry and Work surfaces, preserve the existing completion
-facts and clocks, and production-verify roster/cover resolution plus the two-line presentation.
+**BUILT 2026-08-27 — the Action Owner Engine resolution.** The Card 9 registry
+(`packages/shared/src/work-engine.ts`) now carries a **structured `ownerRule` beside the prose**
+(`po_duty · salesperson · order_pic · payment_duty · delivery_duty · finance_duty · system`, plus
+the cross-module rules' own precise keys `grn_duty · claim_month_po_duty` recorded for the later
+feed wiring), and `workItemsForOrder` resolves the person per RULE instead of borrowing the PIC:
+
+- **Purchasing's order-track work (`Issue PO` · `Confirm ready date`) lands on the month's
+  PO-duty holder** (`ops_po_duty`, the one rostered duty that exists) — in the holder's My Work,
+  their Team group and their Quick Rail counts. A dormant duty layer leaves the duty word
+  `Purchasing` standing; the PIC is never borrowed for Purchasing's work.
+- **The missing customer promise composes `Ask for the delivery date` for the responsible
+  salesperson** (§0.1 row 1) — a NAME from Sales ownership grouped as a person in Team Work, not
+  an ops account; the fallback duty word is `Sales`, exactly as the register's hover guidance
+  falls back. Composed only for the rows nobody asked (`delivery_date` null AND
+  `delivery_date_tbd` false — the 3, never the 8; owner ruling 2026-08-15) on an unfinished
+  order. The ladder never raises it, so no register cell or drawer headline changed.
+- **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
+  choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
+  is ours, and a partner has no login), today's run and its photo.
+- **`collect` records `payment_duty` as its rule** (payment/MASTER §5); no payment-duty roster
+  exists yet, so the PIC stands as governed COVER — money never sits unowned (the 2026-08-19
+  incident is why). When a payment-duty roster exists, only the resolver changes.
+- Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
+  (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
+  filters on the RESOLVED account, and Team Work groups by account, then named person, then duty
+  word.
+
+**Measured boundaries, reported not hidden:** no delivery-staff, finance or payment-duty roster
+fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
+the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
+unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
+what `/api/operation/po-duty` already applies is not re-derived here.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -2754,7 +3093,7 @@ are out, owing money is always RED: there is nothing left to wait for.
   assigned · the date confirmed · that date still ahead — there is nothing for a human to do,
   which is why the old `Confirm delivery with {customer}` was the one drawer row **no button in
   the portal could close.** It is a quiet FACT — `Delivering 27 Jul · 9–11 AM` — and
-  `Deliver today` takes over on the day.
+  the delivery-day action (`Deliver on {weekday, date}`) takes over on the day.
 
 ## 2.6 · What the flow reads
 
@@ -2786,9 +3125,9 @@ is why the middle two are named as they are.
 All · Placed · Proceed · To book · Customer confirmed · Delivered
 ```
 
-- **Placed** — genuinely new, not yet triaged.
+- **Placed** — submitted but still missing a governed Proceed fact, or a legacy/raw recovery record.
 - **Proceed** — being arranged. **Includes AutoCount-imported orders** by the agreed entry rule
-  (AutoCount import → Proceed; a future salesperson order → Placed).
+  (AutoCount import → Proceed; a complete Sales Portal final submit → Proceed automatically).
 - **To book** — past placement, goods and/or the customer's date still outstanding.
 - **Customer confirmed** — stock in AND the customer confirmed a date + slot.
 - **Delivered** · **All**.
@@ -4140,8 +4479,12 @@ can see or close. It moves to them the day that portal covers appointments.
 
 # §7 · Delivery on an order
 
-> **The delivery PAGE is [`../delivery/MASTER.md`](../delivery/MASTER.md). The ACTIONS are
-> defined here, once.** That page renders them and writes nothing.
+> **The delivery WORKSPACE is [`../delivery/MASTER.md`](../delivery/MASTER.md) and it OWNS the
+> delivery ARRANGEMENT** (owner ruling 2026-08-24): the Logistics Partner, Confirmed Delivery,
+> Confirmed Time, expected arrival, logistics note, reply proof and driver/vehicle are Delivery's
+> writes on `ops_delivery_arrangements` (0386). **This section defines the ORDER's own delivery
+> facts once** — the customer promise, the booking gate and the order-lifecycle Work triggers.
+> Sales Orders may never write an arrangement fact, and Delivery may never write a Sales fact.
 
 **`Assign logistics`** — trigger: the order needs delivering and no company is chosen ·
 completion: **a company is recorded. Never "they accepted"** — assigning is our decision ·
@@ -4177,7 +4520,9 @@ gate fails, the door refuses and names the gate; the request and the issuance ar
 every other issue event (`… — on Request Delivery Order`). It lives on the drawer's
 Delivery-order row.
 
-**`Deliver today`** — trigger: the confirmed date is today and nothing has been delivered ·
+**`Deliver on {weekday, date}`** (the delivery-day action; never displayed as `Deliver today` —
+the Delivery UI dictionary bans Today/Tomorrow) — trigger: the confirmed date is today and
+nothing has been delivered ·
 completion: **Delivered**, or a **Delivery Exception carrying its reason** (customer
 unreachable · customer rejected the date · driver absent · vehicle breakdown · condominium entry
 refused · lift booking not done · delivery failed). **Every module fails the same way: one
@@ -4296,7 +4641,13 @@ still hold (owner re-confirmed 2026-08-19: *"已付清也要有 ETA 才发 DO"*)
 manual door is `Request Delivery Order` (§7) — the same path, the same gates, merely not
 waiting for the booking-confirm trigger.
 
-### `Delivery Payment Approval` — OWNER DEFINITION 2026-08-19 · APPROVED / LOCKED
+### `Delivery Payment Approval` — OWNER DEFINITION 2026-08-19 · **DOOR CLOSED 2026-09-01**
+
+**The owner closed the exception on 2026-09-01 (PR #1031): money in full before delivery is
+absolute, the raise/decide surface was removed from the screen, and nothing can request an
+approval any more.** The definition below is retained because the record, its doors and the
+0362 trigger stay in the database untouched: an approval granted before the closure is still
+honoured by the gate, and restoring the door — if ever re-ruled — is a revert, not a rebuild.
 
 One append-only record owned by Sales Orders (`order_delivery_payment_approvals`, 0362), beside
 the Finance exception it mirrors:
@@ -4311,6 +4662,32 @@ DECIDE          the configured approver ONLY — today that is Jess. The approve
 APPROVED        opens the money gate for that order's DOs
 PENDING/REFUSED keeps it shut
 ```
+
+**⭐ THE APPROVER IS THE PRINCIPAL ONLY — OWNER RULING (YH, 2026-08-28). CHANGEABLE.**
+The `delivery_payment_approver` duty above describes the *intended* shape and is **not reachable
+today**: the key was never created. `org_duties` holds exactly six seeded keys
+(`0260:30-41` + `0286:74-79`) and this is not among them; `org_position_duties.duty_key` is
+`references org_duties(key)` (`0260:46-51`) and `hr_set_position_duty` raises `duty_not_found`
+before it would insert (`0260:203-204`). A holder row is therefore impossible, the HR team screen
+shows no checkbox for it (its column list is read live from `org_duties`), and
+`delivery_payment_approver_gate()` is behaviourally **identical to `role = 'principal'`**.
+
+**This is deliberate, not a defect.** Carres has ~8 registered users and the departments that
+would hold the duty are not set up yet, so a second approver has nobody to be. The UI's
+`canDecide = role === "principal"` and the RPC gate admit exactly the same person, and they agree.
+
+⚠️ **Do not "fix" the UI to read the duty.** That was raised as a gate mismatch by the Sales Order
+Workspace field audit (2026-08-28) and **refuted on measurement** — see
+`docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` §5 G-4. Reading a duty nobody can hold changes nothing
+and adds a branch that cannot be tested against a real holder.
+
+**WHEN THIS CHANGES.** The ruling is explicitly temporary and turns on Carres's org, not on the
+code. When a manager should approve COD without Jess, the order of work is: ① seed the
+`delivery_payment_approver` key into `org_duties` and add it to `DUTY_KEYS`
+(`packages/shared/src/schemas/org-duties.ts:18-29`, a closed tuple pinned by its own test);
+② grant it to a position through the HR team screen; ③ only then widen `canDecide` to read the
+duty. Steps ① and ② are owner/HR decisions; ③ is the code change, and it is the smallest of the
+three. Until ① happens, the duty branch in the RPC is correct-but-dormant and must stay.
 
 Nobody else may create, edit or delete a decision; deletion is refused by trigger and a decision
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
@@ -4385,7 +4762,7 @@ deadline day changed: `delivery − 2 working days`.**
 
 ```
 T−3  attention — chase begins
-T−2  DEADLINE — money in full (or the approval request is already raised)
+T−2  DEADLINE — money in full; since 2026-09-01 there is no exception path
 T−1  logistics takes the DO; the trip is scheduled
 T    delivery
 ```
@@ -4443,7 +4820,7 @@ scope still re-verified atomically. The fallback manual door and the work-engine
 
 **AUTHENTICATED PRODUCTION ACCEPTANCE — walked 2026-08-18 on `erp.carresofficial.com`, PASS.**
 Staged on **SO-1322** (`IT WALK SLICE2 AUTO` · JAGER-SS ×1 · RM 1,500 outstanding · NETS ·
-deliberately no customer delivery date beforehand — the gate does not need one):
+deliberately no requested delivery date beforehand — the gate does not need one):
 
 - Old Orders drawer → Delivery panel → `Confirm with customer` → **Thu 20 Aug + Afternoon
   (12pm–3pm)** → `Record confirmation`. The DELIVERY ORDER row filled **by itself** with
@@ -4564,8 +4941,8 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 | buying the goods | **a SUMMARY, and a broken one** | `purchase_orders` — [`../purchasing/MASTER.md`](../purchasing/MASTER.md) | the PO exists · `received_qty` |
 | receiving the goods | **a SUMMARY** — the count is read, never written (D2) | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
 | reserving / releasing a unit | **a trigger** | `ops_stock_items` — [`../stock/MASTER.md`](../stock/MASTER.md) | the unit's status + `reserved_ref` |
-| booking a delivery | **THE OWNER of the record** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
-| the delivery WORKSPACE | a VIEW | nothing — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
+| booking a delivery | **THE OWNER of the customer promise** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
+| the delivery ARRANGEMENT (partner, confirmed operational date/time, ETA, note, reply proof, driver/vehicle) | **Delivery's write** — this MASTER only reads it | `ops_delivery_arrangements` (0386) — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
 | carrier rules | 🟡 **a duplicated editor** | the partner's own config | — |
 | a customer complaint | **a link** | `service_cases` — [`../service/MASTER.md`](../service/MASTER.md) | the customer confirmed |
 | a supplier claim | **not present** | `supplier_claims` — Purchasing | — |
@@ -4833,23 +5210,49 @@ right-click menu follows the approved 2990 Sales Orders action set and order exa
 ```
 Edit
 View
-Preview
 Print
 ────────
-Issue Delivery Order
-Copy to new Sales Order
+Request Delivery Order
 ────────
 Cancel SO
 ```
+
+**The fourth row is re-worded by the system-issuance rulings** (Jess 2026-08-16 / 2026-08-19,
+overwriting the Loo 2026-08-11 `Issue Delivery Order` line): the SYSTEM issues the DO when the
+governed gate is met, so no surface may carry an `Issue` control. The one governed manual door
+is **`Request Delivery Order`** — the outstation trip's door, same single issuing path and same
+gates — and that is the only act this menu row may hand off to.
+
+**`Copy to new Sales Order` IS RETIRED — owner ruling (Jess, 2026-08-28, relayed by YH),
+overwriting the Loo 2026-08-11 line above.** Jess called the act dangerous, and the code says why:
+`copySalesOrderDraft` dropped each line's `attrs` — the fabric and colour a sofa is configured
+with — even though migration `0374` opened that slot on the create door specifically so
+configuration would cross, and two code comments claimed it did. The consequence was not a
+visible failure but a quiet wrong one: a copied configured order reached Purchasing as a PO that
+could not autofill. Both doors are removed (register row menu, and the object page's
+`More actions`), and the `?copyFrom=` route branch with them — a door nobody can see is still a
+door if the URL still works. **If Carres wants copy back it is a BUILD with its own card**, and
+that card must answer what a copied promo line means, whether configuration crosses, and whether
+a cancelled order may be copied — the three questions `§11` required and no document ever
+answered.
+
+**`Preview` IS RETIRED — owner ruling (YH, 2026-08-28), overwriting the Loo 2026-08-11 line
+above.** The locked menu had meant `Preview` and `Print` as two acts: a governed document
+preview, and the governed document output. Only the second was ever built. Both rows shipped
+calling `openSalesOrderPdf(r.id, r.so)` with the same arguments, so the menu asked the reader to
+choose between two names for one behaviour — the shape ERP-ARCHITECTURE ownership law C
+(*a door, never a duplicate*) exists to stop. The duplicate label is removed and the act is named
+once. **No capability was lost, because none was ever built behind the first name.** A real
+preview act, if Carres wants one, is a BUILD with its own card — not a restoration of this row.
 
 This is a Sales Orders module exception, not a Register Template requirement for every module.
 The menu copies the reference action inventory and ordering; Carres frozen tokens, typography,
 spacing, hover/current treatment, permissions and confirmation components still govern its visual
 and interaction treatment. Each item routes to the Carres-owned capability rather than executing
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
-`View` opens the owned read view; `Preview` opens the governed document preview; `Print` uses the
-governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
-flow; `Copy to new Sales Order` starts a new draft from the governed copy boundary; and `Cancel SO`
+`View` opens the owned read view; `Print` uses the
+governed Sales Order document output; `Request Delivery Order` hands off to the Delivery-owned
+governed request door (the system still issues through the one path); and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must
 define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
 new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
@@ -4857,9 +5260,9 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 
 | What | Why it is not built |
 |---|---|
-| **`Issue Delivery Order` in the Sales Orders row context menu** | §11's locked menu lists it between `Print` and `Copy to new Sales Order`, and the Cancel slice deliberately did not add it. It is **Delivery's** issue flow, not a Sales Orders capability — the menu item is a handoff, and the handoff belongs to whichever card next touches the Delivery-owned issue door. Adding it from the Sales Orders side would have minted a second entrance to another module's act. |
+| **`Request Delivery Order` in the Sales Orders row context menu** | §11's locked menu lists the row (re-worded from `Issue Delivery Order` by the system-issuance rulings), and the Cancel slice deliberately did not add it. It is **Delivery's** governed request door, not a Sales Orders capability — the menu item is a handoff, and the handoff belongs to whichever card next touches that Delivery-owned door. Adding it from the Sales Orders side would have minted a second entrance to another module's act. |
 | **`Scan Order` in the normal-state `…` overflow** | The `…` overflow and `Scan Order` arrive together with the Intake card. Building the overflow first, with one item that answers `503`, would put an unfinished promise on an operator's screen — the exact defect the Settings gear's `Coming soon.` placeholder was. |
-| **The follow-up action after a FAILED delivery** | `Deliver today` completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
+| **The follow-up action after a FAILED delivery** | The delivery-day action (`Deliver on {weekday, date}`) completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
 | **Persistent Facts as a real strip** | RESERVED, not law. It needs the four facts to have ONE home first; on today's drawer they sit in four blocks under a frozen *"ZERO order data here"* ruling. **The first page migrated through `DetailShell` is where they get that home.** |
 | **Gap** | RESERVED, not built. The upgrade trigger is written into the model. |
 | **The drawer through `DetailShell`** | Approved as the destination; blocked because L4's persistent-facts tuple does not exist on the drawer yet. **Not a gap — a ruling.** |
@@ -4874,12 +5277,12 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 |---|---|---|
 | ~~**D1**~~ | ✅ **FIXED 2026-08-06** — the list reads both PO sources through one shared helper. See §5.1 |
 | ~~**D2**~~ | ✅ **FIXED 2026-08-06** — the door, the hook, the route and its suite are deleted; a guard asserts the route now 404s. See §9.5 |
-| **D3** 🟡 | **The drawer computes `stage` a SECOND time** (its own IIFE at line ~1469) instead of importing the list's exported `stageOf`. Two spellings of one derivation, in two files. | read |
-| **D4** 🟡 | **The drawer computes money a second way for its own header.** The list hands down `holdAmount` from the shared `orderMoney`, and the drawer separately fetches `order_payments` for `Collected` — the one ledger the shared rule refuses to read. **The drawer's Collected and the row's Outstanding can disagree.** | read |
+| ~~**D3**~~ | ✅ **FIXED 2026-08-28 — and it was never "two spellings of one derivation".** It was **two questions**, each spelt once, in two files, with nothing naming the difference. `stageOf` answers *where is this order in the pipeline* — and `place` is a real slot there, because `controlTabOf` ends `return "proceed"; // confirmed OR autocount-placed`, so an imported row has to REACH `placed` for that fall-through to route it. The drawer's copy answered *what do we tell the operator*, applying Jess's 2026-07-02 ruling that an AutoCount import arrived already proceeded and is never "waiting for the dealer to push". **Merging them is the obvious move and it is wrong:** tried first, it moved imported rows out of `proceed` and six control tests caught it. The two questions now carry two names — `stageOf` and `displayStageOf` — one spelling each, in `components/StageChip.tsx` beside the type both surfaces already import. **That module is the home because the cycle was the cause:** the control imports the drawer, so the drawer could never import the rule back, which is why it was written twice. Eight tests hold both rules, including one pinning the single case they differ on so it cannot be tidied away. | fixed |
+| ~~**D4**~~ | ✅ **FIXED 2026-08-27 — one money rule, asked once. And the audit was pointing at the wrong half.** What it described — *"the drawer separately fetches `order_payments` for Collected"* — had already been corrected on 2026-07-27 by C5, ten days before this row was written; the drawer's own comment carries the production receipt (SO-1209 read *RM 7,248 outstanding · HOLD DELIVERY* while `orders.paid` said paid in full). **What actually survived was worse:** the goods half came through the shared `orderMoney` while the storage half was re-derived locally as `invoiceTotal - collectedAll`, so the screen carried TWO `outstanding` figures — the money sticker showing the shared rule's goods-only number, the payment dial showing the local goods+storage one — and they disagreed on every order with a fee owing, with one of them captioned `holding delivery`. **No invention was needed:** `orderMoney` already took `storageOwing` and `storageReleased` and already returned `outstanding` / `holding` / `holds`; nobody passed them. **Two deliberate behaviour changes, both recorded at the call site:** a manager-released fee is now still OWED and merely stops HOLDING (C9's rule, which the local boolean folded away), and overpaid goods no longer silently offset a storage fee only a manager may waive (`ERP-ARCHITECTURE.md` §6.1). Four source-scan tests hold it, including one asserting the rule is called exactly once. | fixed |
 | **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
-| **D8** ⚪ | **`stockWindowDays` is still a flat 7 / 5** in `orderActionSignalsOf`, while Purchasing's real production numbers are 7 · 7 · **14** and manager-editable. The Orders ladder therefore turns the ready-date call red on a sofa **nine days later** than Purchasing's own window says it should. | read + Purchasing §2.3 |
+| ~~**D8**~~ | ✅ **FIXED 2026-08-27 — Orders stopped holding Purchasing's number.** `orderActionSignalsOf` read `hasMsbf ? 7 : hasSofa ? 5 : 7`, and its own comment said why: *"the supplier master holds production time as free text, so nothing can compute a real one yet"*. **Migration `0303` removed that blocker on 2026-07-28** — `purchasing_settings.order_by_buffer_days` is one governed, manager-editable value, which Purchasing's own reads already call `safetyDays` (`purchase-demands.ts:407`, `:611`) and `purchasing/MASTER.md:650` ruled visible as **`Safety days`** on 2026-08-26. Two arithmetics for one derived fact is Law D, so the ladder now takes the number as a parameter and `OperationOrdersControl` hands it Purchasing's. **The per-category fork went with it, and that is the second half:** it asked `lineCategory()` — the keyword parser `carry-forwards.md` records as display-only — to decide a business threshold, making it a third caller filtering on a guess. **`null` is not a default:** a window nobody has answered leaves the ready-date call amber rather than escalating it on an invented deadline. Two tests that pinned the old constants are rewritten to the governed contract; `lines` is now unread by the signals builder and marked so. | fixed |
 | ~~**D9**~~ | ✅ **FIXED 2026-08-08** — `lineClass` answers `unknown` where it used to answer `acc`, and `acc` is now earned by an accessory word instead of by elimination. **20 orders that could never fail a stock check → 0**, with **zero** lines re-classified into anything else. Two follow-ups named and left open on purpose: delete the `lineCategory` display fold, and name the sixteen SKUs alongside migration 0148. See the D9 block above |
-| **D10** 🟡 | **Two dead surfaces are still compiled into the bundle, and both had live test suites.** `OperationOrders.tsx` (450 lines, the 6-column kanban) is imported by **nothing** — §3 records that the list merged it away — and `OrderCustomerCard` (in the drawer) is exported, rendered nowhere, and superseded by `CustomerIdentityCard` (Jess 2026-07-17 rev 4). **Purchasing's own C1 ruling applies to the second one:** its `startEditRef` door has no caller, so the safe-edit mode is unreachable, **and the `status === 'place'` gate that used to guard it is gone from the component** — whoever re-mounts it inherits an editor with no gate. | `grep` — the only non-test reference to each is its own declaration |
-| **D11** ⚪ | **`receive-po-<id>` names TWO different controls** in `ProcurementTabContent` — the primary `Check in` button and the always-available `Direct receive →` escape hatch. A test cannot tell them apart by handle, only by word. | read |
+| ~~**D10**~~ | ✅ **RETIRED 2026-08-28, on the owner's explicit instruction** (red line 5 — the files were not deleted until asked for by name). **Half of it was already done:** `OperationOrders.tsx`, the 450-line kanban, no longer exists. What survived was a dead ISLAND the audit never named — `OrderColumn.tsx` had zero importers and `OrderCard.tsx` was imported only by `OrderColumn`, both orphaned when the kanban went. `OrderCustomerCard` was not a file at all: an exported component inside `OrderDetailDrawer.tsx` whose only importer was its own test. Its comment promised *"the Edit affordance only shows for status 'place'"* and the component carried no such check — unreachable, and fail-safe at the server (`update_order` 422s on a non-Place order), so no data was ever at risk. **Deleting it revealed more dead code, which is the point:** `CompactField` was its private helper and went with it, and two imports went stale. `GuaranteeCoverStrip` was NOT deleted — only the drawer's import of it; `PosOrderDetail.tsx` renders it. Precedent: the Cancel SO closeout deleted `CancelOrderDialog` for this exact shape. | fixed |
+| ~~**D11**~~ | ✅ **FIXED 2026-08-28 — two controls, two handles.** `receive-po-<id>` named BOTH the primary `Check in` button and the always-available `Direct receive →` escape hatch, so a test could only tell two different affordances apart by their WORDS. The hatch is now `direct-receive-<id>`; the primary keeps `receive-po-<id>`. **It stayed open for a boundary reason, not a technical one** — `OhanaSofaTab.test.tsx` recorded it as *REPORTED, NOT FIXED* because *"renaming one reaches the component, and the S2 card rules components DO NOT TOUCH"*; that note is corrected in the same change. The suite that previously had to accept *either* control now asserts the hatch is present **and the primary is not**, which is the fact the shared handle could never express. Procurement suites 43 pass. | fixed |

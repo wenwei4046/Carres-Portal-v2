@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PORTAL_NAV, navItemHref, type PortalNavItem } from "./portal-nav";
 import {
   PURCHASING_PAGE_GROUPS,
+  PURCHASING_LANDING_KEY,
   purchasingChildBlocks,
   activePurchasingGroup,
   parsePurchasingSidebarState,
@@ -10,26 +11,40 @@ import {
 } from "./purchasing-sidebar";
 
 /**
- * THE PURCHASING MAP (CARD-2026-08-20-purchasing-sidebar-groups).
+ * THE FINAL PURCHASING MAP — FOUR GROUPS, ELEVEN PAGES
+ * (CARD-2026-08-22-purchasing-01-final-sidebar-listing; the approved tree is
+ * `docs/purchasing/MASTER.md` §4).
  *
- * Eighteen destinations stopped being scannable as one flat list, so the
- * module's pages hang off five NAMED groups. This file owns the contract:
- * the group order, which page belongs to which group, and the route truth
- * underneath — none of which may drift because a renderer changed.
+ * The earlier eighteen-row rail carried a Blueprint the owner rejected. This
+ * file owns the replacement contract: four group labels in order, eleven pages
+ * in order, the five live addresses byte-for-byte, and the eight retired rows
+ * that may never return. None of it may drift because a renderer changed.
  */
 
 const operation = PORTAL_NAV[0];
 const purchasing = operation.items.filter((item) => item.section === "Purchasing");
 const label = (item: PortalNavItem) => item.label;
 
-describe("the five groups", () => {
-  it("is REQUESTS · BUY · RECEIVE · PROBLEMS · CONSIGNMENT, in that order", () => {
+/** The rows the owner deleted on 2026-08-22. A row that comes back here is a
+ *  destination nobody approved — the assertion is the whole point. */
+const RETIRED = [
+  "purchasing-home",
+  "purchasing-work",
+  "new-supplier-requests",
+  "new-sku-requests",
+  "purchase-demands",
+  "consignment-overview",
+  "consignment-receipts",
+  "purchasing-report",
+];
+
+describe("the four groups", () => {
+  it("is BUY · RECEIVE · PROBLEMS · SHOWROOM, in that order", () => {
     expect(PURCHASING_PAGE_GROUPS.map((group) => group.label)).toEqual([
-      "REQUESTS",
       "BUY",
       "RECEIVE",
       "PROBLEMS",
-      "CONSIGNMENT",
+      "SHOWROOM",
     ]);
   });
 
@@ -37,27 +52,18 @@ describe("the five groups", () => {
     const keys = PURCHASING_PAGE_GROUPS.map((g) => g.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const item of purchasing) {
-      if (!item.pageGroup) continue;
-      expect(keys).toContain(item.pageGroup);
+      expect(keys, item.key).toContain(item.pageGroup);
     }
   });
 });
 
 describe("the approved hierarchy", () => {
-  it("draws two direct rows, five groups, then Report", () => {
+  it("draws four groups and nothing else — no direct row, no Report", () => {
     const blocks = purchasingChildBlocks(purchasing);
     expect(
       blocks.map((b) => (b.kind === "page" ? b.item.label : b.group.label)),
-    ).toEqual([
-      "Purchasing Home",
-      "My Purchasing Work",
-      "REQUESTS",
-      "BUY",
-      "RECEIVE",
-      "PROBLEMS",
-      "CONSIGNMENT",
-      "Report",
-    ]);
+    ).toEqual(["BUY", "RECEIVE", "PROBLEMS", "SHOWROOM"]);
+    expect(blocks.every((b) => b.kind === "group")).toBe(true);
   });
 
   it("fills each group with the approved pages, in the approved order", () => {
@@ -67,15 +73,9 @@ describe("the approved hierarchy", () => {
         .filter((b) => b.kind === "group" && b.group.key === key)
         .flatMap((b) => (b.kind === "group" ? b.pages.map(label) : []));
 
-    expect(group("purchasing-requests")).toEqual([
-      "New Supplier Requests",
-      "New SKU Requests",
-      "Display Requests",
-      "Manual Purchase Requests",
-    ]);
     expect(group("purchasing-buy")).toEqual([
-      "Purchase Demands",
       "SO Batch Purchase",
+      "Manual Purchase",
       "Purchase Orders",
     ]);
     expect(group("purchasing-receive")).toEqual(["Goods Receipts"]);
@@ -84,54 +84,82 @@ describe("the approved hierarchy", () => {
       "Purchase Returns",
       "Repair Orders",
     ]);
-    expect(group("purchasing-consignment")).toEqual([
-      "Consignment Overview",
+    expect(group("purchasing-showroom")).toEqual([
+      "Display Requests",
       "Consignment Orders",
-      "Consignment Receipts",
       "Consignment Returns",
       "Consignment Sale Notices",
     ]);
   });
 
-  it("Report is the trailing row and it carries the hairline", () => {
-    const blocks = purchasingChildBlocks(purchasing);
-    const last = blocks[blocks.length - 1];
-    expect(last.kind).toBe("page");
-    if (last.kind !== "page") return;
-    expect(last.item.label).toBe("Report");
-    expect(last.item.dividerAbove).toBe(true);
+  it("is exactly eleven pages", () => {
+    expect(purchasing).toHaveLength(11);
   });
 
-  it("the two direct rows belong to no group", () => {
-    for (const key of ["purchasing-home", "purchasing-work"]) {
-      const item = purchasing.find((i) => i.key === key);
-      expect(item, key).toBeDefined();
-      expect(item?.pageGroup).toBeUndefined();
+  it("no row carries a hairline — Reports are central, not a Purchasing row", () => {
+    for (const item of purchasing) {
+      expect(item.dividerAbove, item.key).toBeUndefined();
     }
+  });
+
+  it("every retired row is gone from the module, not hidden behind a flag", () => {
+    for (const key of RETIRED) {
+      expect(
+        purchasing.find((item) => item.key === key),
+        key,
+      ).toBeUndefined();
+    }
+    for (const word of [
+      "Purchasing Home",
+      "My Purchasing Work",
+      "New Supplier Requests",
+      "New SKU Requests",
+      "Purchase Demands",
+      "Consignment Overview",
+      "Consignment Receipts",
+      "Manual Purchase Requests",
+      "Report",
+    ]) {
+      expect(purchasing.map(label), word).not.toContain(word);
+    }
+  });
+
+  it("REQUESTS and CONSIGNMENT are not group labels any more", () => {
+    const labels = PURCHASING_PAGE_GROUPS.map((g) => g.label);
+    expect(labels).not.toContain("REQUESTS");
+    expect(labels).not.toContain("CONSIGNMENT");
+    const keys = PURCHASING_PAGE_GROUPS.map((g) => g.key) as string[];
+    expect(keys).not.toContain("purchasing-requests");
+    expect(keys).not.toContain("purchasing-consignment");
   });
 });
 
-/** THE ROUTE TRUTH — the Card's own minimum assertion. A rename moved WORDS. */
+/** THE ROUTE TRUTH — the Card's own minimum assertion. Words moved; no address did. */
 describe("the live destinations keep their exact current addresses", () => {
-  it("six live pages, six unchanged routes", () => {
+  it("five live pages, at the five unchanged addresses", () => {
     expect(
       purchasing
         .filter((item) => !item.soon)
         .map((item) => [item.label, navItemHref(operation, item)]),
     ).toEqual([
-      ["Manual Purchase Requests", "/operation?tab=manual-purchase"],
       ["SO Batch Purchase", "/operation?tab=purchase"],
+      ["Manual Purchase", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
       ["Goods Receipts", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
-      ["Report", "/operation?tab=purchasing-report"],
     ]);
   });
 
-  it("the two renamed pages kept their keys — only the word changed", () => {
-    expect(purchasing.find((i) => i.key === "manual-purchase")?.label).toBe(
-      "Manual Purchase Requests",
+  it("`Manual Purchase` kept its key and its address — only the word changed", () => {
+    const item = purchasing.find((i) => i.key === "manual-purchase");
+    expect(item?.label).toBe("Manual Purchase");
+    expect(item?.pageGroup).toBe("purchasing-buy");
+    expect(navItemHref(operation, item as PortalNavItem)).toBe(
+      "/operation?tab=manual-purchase",
     );
+  });
+
+  it("`Goods Receipts` is unchanged", () => {
     expect(purchasing.find((i) => i.key === "receiving")?.label).toBe("Goods Receipts");
   });
 
@@ -141,11 +169,28 @@ describe("the live destinations keep their exact current addresses", () => {
     expect(navItemHref(operation, item as PortalNavItem)).toBe("/operation?tab=purchase");
   });
 
-  it("every other row is a non-control — no route may be invented for it", () => {
-    for (const item of purchasing.filter((i) => i.soon)) {
+  it("the six planned pages are non-controls — no route may be invented for them", () => {
+    const soon = purchasing.filter((i) => i.soon);
+    expect(soon.map(label)).toEqual([
+      "Purchase Returns",
+      "Repair Orders",
+      "Display Requests",
+      "Consignment Orders",
+      "Consignment Returns",
+      "Consignment Sale Notices",
+    ]);
+    for (const item of soon) {
       expect(item.path, item.key).toBeUndefined();
       expect(item.badge, item.key).toBeUndefined();
+      expect(item.tab, item.key).toBeUndefined();
     }
+  });
+
+  it("the named landing page is permanent, and it is SO Batch Purchase", () => {
+    expect(PURCHASING_LANDING_KEY).toBe("purchase");
+    const landing = purchasing.find((i) => i.key === PURCHASING_LANDING_KEY);
+    expect(landing?.label).toBe("SO Batch Purchase");
+    expect(landing?.soon).toBeUndefined();
   });
 });
 
@@ -154,13 +199,13 @@ describe("the group holding the page you are on", () => {
     expect(activePurchasingGroup(purchasing, "receiving")).toBe("purchasing-receive");
     expect(activePurchasingGroup(purchasing, "claims")).toBe("purchasing-problems");
     expect(activePurchasingGroup(purchasing, "purchase")).toBe("purchasing-buy");
-    expect(activePurchasingGroup(purchasing, "manual-purchase")).toBe(
-      "purchasing-requests",
-    );
+    expect(activePurchasingGroup(purchasing, "manual-purchase")).toBe("purchasing-buy");
+    expect(activePurchasingGroup(purchasing, "purchase-orders")).toBe("purchasing-buy");
   });
 
-  it("a direct row and Report belong to no group, and neither does nothing", () => {
+  it("a retired key and another module's page belong to no group", () => {
     expect(activePurchasingGroup(purchasing, "purchasing-report")).toBeNull();
+    expect(activePurchasingGroup(purchasing, "purchase-demands")).toBeNull();
     expect(activePurchasingGroup(purchasing, null)).toBeNull();
     expect(activePurchasingGroup(purchasing, "stock")).toBeNull();
   });
@@ -169,12 +214,16 @@ describe("the group holding the page you are on", () => {
 /**
  * PRESENTATION STATE ONLY, AND PER SIGNED-IN USER. It remembers which drawers
  * the operator likes open — never a route, a count or a business fact.
+ *
+ * V2 because the allowed group keys changed: the old five-group preference
+ * names two drawers that no longer exist, so it is not read as final truth.
  */
 describe("the remembered open state", () => {
-  it("keys on the auth user id, versioned", () => {
+  it("keys on the auth user id, at version v2", () => {
     expect(purchasingSidebarStorageKey("abc-123")).toBe(
-      "carres:portal-sidebar:purchasing:v1:abc-123",
+      "carres:portal-sidebar:purchasing:v2:abc-123",
     );
+    expect(purchasingSidebarStorageKey("abc-123")).not.toContain(":v1:");
   });
 
   it("round-trips", () => {
@@ -215,10 +264,10 @@ describe("the remembered open state", () => {
     });
   });
 
-  it("drops a group key it does not recognise instead of trusting it", () => {
+  it("drops a retired group key instead of carrying a name nothing renders", () => {
     expect(
       parsePurchasingSidebarState(
-        '{"moduleOpen":true,"openGroups":["purchasing-buy","purchasing-ghost"]}',
+        '{"moduleOpen":true,"openGroups":["purchasing-buy","purchasing-requests","purchasing-consignment","purchasing-ghost"]}',
       ),
     ).toEqual({ moduleOpen: true, openGroups: ["purchasing-buy"] });
   });

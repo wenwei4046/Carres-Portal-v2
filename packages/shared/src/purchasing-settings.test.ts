@@ -3,13 +3,16 @@ import { addWorkingDays } from "./working-days";
 import {
   PURCHASING_NUMBER_KEYS,
   expectedArrivalOf,
+  orderByFromDeliveryDate,
   isPurchasingCategory,
   isPurchasingNumberKey,
   lastChangeFor,
   parsePgIntArray,
   productionWorkingDaysFor,
   purchasingSetNumberInput,
+  purchasingCreateDestinationInput,
   purchasingSetProductionDaysInput,
+  purchasingUpdateDestinationInput,
   purchasingSetWorkWeekInput,
   purchasingUrgentWindowDays,
   settingValueLabel,
@@ -39,6 +42,24 @@ const SETTINGS: PurchasingSettings = {
     { supplierId: NICE, category: "mattress", workingDays: 7 },
     { supplierId: OHANA, category: "bedframe", workingDays: 7 },
     { supplierId: OHANA, category: "sofa", workingDays: 14 },
+  ],
+  destinations: [
+    {
+      id: "44444444-0000-0000-0000-000000000004",
+      name: "Carres Klang",
+      address: "Lot 12, Klang",
+      isDefault: true,
+      active: true,
+      warehouseLinked: true,
+    },
+    {
+      id: "55555555-0000-0000-0000-000000000005",
+      name: "Ohana",
+      address: null,
+      isDefault: false,
+      active: true,
+      warehouseLinked: false,
+    },
   ],
   lastChanges: [
     {
@@ -161,6 +182,40 @@ describe("workWeekLabel", () => {
 });
 
 describe("the wire refuses what the database would refuse", () => {
+  it("accepts a future Deliver To and trims its name and address", () => {
+    expect(
+      purchasingCreateDestinationInput.parse({
+        name: "  Ohana  ",
+        address: "  Sungai Buloh  ",
+      }),
+    ).toEqual({ name: "Ohana", address: "Sungai Buloh" });
+  });
+
+  it("refuses a blank Deliver To name", () => {
+    expect(
+      purchasingCreateDestinationInput.safeParse({ name: "   ", address: null }).success,
+    ).toBe(false);
+  });
+
+  it("a destination edit carries the full governed state", () => {
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: true,
+        isDefault: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      purchasingUpdateDestinationInput.safeParse({
+        name: "Ohana",
+        address: null,
+        active: false,
+        isDefault: true,
+      }).success,
+    ).toBe(false);
+  });
+
   it("only the three single numbers are settable by key", () => {
     expect(PURCHASING_NUMBER_KEYS).toEqual([
       "order_by_buffer_days",
@@ -313,6 +368,91 @@ describe("expectedArrivalOf — the ONE expected-arrival arithmetic", () => {
         holidays: NO_HOLIDAYS,
       }),
     ).toBe("2026-08-12");
+  });
+});
+
+/**
+ * `orderByFromDeliveryDate` — the ONE inverse of `expectedArrivalOf`
+ * (Purchasing Card 06). Delivery Date − transit on the OFFICE week −
+ * production on the FACTORY's own week = Order By; null is a real answer.
+ */
+describe("orderByFromDeliveryDate — the ONE Order By arithmetic (Card 06)", () => {
+  it("walks both legs backwards on their OWN calendars — Ohana works Saturday", () => {
+    // 30 Sep 2026 (Wed) − 1 office transit day = Tue 29 Sep; − 14 Ohana
+    // working days (Mon–Sat) = Sat 12 Sep.
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-12");
+    // Nice Future does not work Saturday: the same delivery date and a
+    // 7-day production lands Fri 18 Sep, not the Saturday arithmetic.
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NICE,
+        category: "mattress",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-18");
+  });
+
+  it("is the exact inverse of the forward planner on its own answer", () => {
+    const orderBy = orderByFromDeliveryDate(SETTINGS, {
+      supplierId: OHANA,
+      category: "sofa",
+      deliveryDateIso: "2026-09-30",
+      holidays: NO_HOLIDAYS,
+    });
+    expect(
+      expectedArrivalOf(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        fromIso: orderBy,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBe("2026-09-30");
+  });
+
+  it("skips an injected public holiday on the office transit leg", () => {
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NICE,
+        category: "mattress",
+        deliveryDateIso: "2026-09-30",
+        holidays: new Set(["2026-09-29"]),
+      }),
+    ).toBe("2026-09-17");
+  });
+
+  it("NULL is a real answer — no production, no transit or no date means no Order By", () => {
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: NOBODY,
+        category: "sofa",
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "mattress", // no Ohana × mattress number exists
+        deliveryDateIso: "2026-09-30",
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
+    expect(
+      orderByFromDeliveryDate(SETTINGS, {
+        supplierId: OHANA,
+        category: "sofa",
+        deliveryDateIso: null,
+        holidays: NO_HOLIDAYS,
+      }),
+    ).toBeNull();
   });
 });
 

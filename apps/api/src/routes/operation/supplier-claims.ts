@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
+  CARRES_EXECUTION_KEYS,
   CUSTOMER_RESOLUTION_KEYS,
   HELD_STOCK_STATUS,
   STOCK_HOLD_OUTCOME_KEYS,
@@ -12,6 +13,7 @@ import {
   holdOutcomeNeedsNote,
 } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { chunk } from "../../lib/purchase-demand-read";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -39,8 +41,17 @@ import type { AppEnv } from "../../types";
  * doing for the customer?" and is a SECOND decision beside the item's outcome,
  * never a replacement for it — the customer can cancel AND the mattress be
  * destroyed, and a single list would force the operator to record only one of
- * the two. It derives no consequence: consequences are f(Resolution, Execution)
- * and Carres Execution is frozen-but-unbuilt (Loo, 2026-08-05).
+ * the two.
+ *
+ * Layer ④ adds the ORDER OF EVENTS (0409) and completes Loo's model. `Carres
+ * Execution` answers "in what order do the goods actually move?" — a third
+ * independent axis, because `replace` is a promise and `Replace First` /
+ * `Collect First` are two ways of keeping it that leave Carres holding a
+ * different number of units. Both arguments of f(Resolution, Execution) now
+ * exist, so the consequence is computable for the first time; WHICH stock,
+ * finance and demand moves each pair produces is still unruled and is not
+ * guessed here. Purchase Returns (§9.6) and Repair Orders (§9.7) were frozen on
+ * exactly this missing argument.
  *
  *   GET  /                — the queue (status filter, names, who owes next)
  *   GET  /:id/photos      — signed URLs for that claim's evidence
@@ -49,6 +60,7 @@ import type { AppEnv } from "../../types";
  *   POST /:id/close       — settle it (refuses unless both sides are on file)
  *   POST /:id/hold-resolve — R4: what happened to the quarantined units
  *   POST /:id/customer-resolution — layer ③: what we are doing for the customer
+ *   POST /:id/carres-execution    — layer ④: in what order the goods move
  *
  * Role: operation + principal, on every route. `supplier_claims` RLS admits
  * every internal role (principal/operation/finance/bd) for SELECT; this
@@ -61,12 +73,48 @@ import type { AppEnv } from "../../types";
 const supplierClaimsRouter = new Hono<AppEnv>();
 
 const DEFAULT_LIMIT = 200;
+const CLAIM_READ_CONCURRENCY = 4;
 const SIGNED_URL_TTL_SECONDS = 3600;
 /** A note long enough to record a real agreement, short enough not to become a
  *  document. Prose belongs in the note, never instead of the picked answer. */
 const NOTE_MAX = 500;
 
 type ClaimPhoto = { path: string; at?: string; by?: string | null };
+type ClaimReadError = { code?: string; message?: string; details?: string };
+type ClaimPagedRead<T> = {
+  range: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: ClaimReadError | null }>;
+};
+
+async function readEveryClaimRelation<T>(
+  ids: readonly string[],
+  query: (batch: string[]) => ClaimPagedRead<T>,
+): Promise<{ data: T[]; error: ClaimReadError | null }> {
+  const data: T[] = [];
+  const batches = chunk([...new Set(ids)]);
+  for (let index = 0; index < batches.length; index += CLAIM_READ_CONCURRENCY) {
+    const group = await Promise.all(
+      batches.slice(index, index + CLAIM_READ_CONCURRENCY).map(async (batch) => {
+        const rows: T[] = [];
+        for (let from = 0; ; from += DEFAULT_LIMIT) {
+          const result = await query(batch).range(from, from + DEFAULT_LIMIT - 1);
+          if (result.error) return { data: [] as T[], error: result.error };
+          const page = result.data ?? [];
+          rows.push(...page);
+          if (page.length < DEFAULT_LIMIT) break;
+        }
+        return { data: rows, error: null };
+      }),
+    );
+    for (const result of group) {
+      if (result.error) return { data: [], error: result.error };
+      data.push(...result.data);
+    }
+  }
+  return { data, error: null };
+}
 
 function gate(c: { var: { auth: { role: string } } }) {
   const role = c.var.auth.role;
@@ -90,35 +138,59 @@ supplierClaimsRouter.get("/", async (c) => {
   const statusParam = (c.req.query("status") ?? "open").toLowerCase();
   const status =
     statusParam === "closed" || statusParam === "all" ? statusParam : "open";
+  const poId = c.req.query("poId")?.trim() || null;
 
-  let q = sb
-    .from("supplier_claims")
-    .select(
-      "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at",
-    )
-    .order("reported_at", { ascending: false })
-    .limit(DEFAULT_LIMIT);
-  if (status !== "all") q = q.eq("status", status);
+  const claims: Array<Record<string, unknown>> = [];
+  for (let from = 0; ; from += DEFAULT_LIMIT) {
+    let q = sb
+      .from("supplier_claims")
+      .select(
+        "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
+      )
+      .order("reported_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (status !== "all") q = q.eq("status", status);
+    if (poId) q = q.eq("po_id", poId);
 
-  const { data, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
+    const { data, error } = poId
+      ? await q.range(from, from + DEFAULT_LIMIT - 1)
+      : await q.limit(DEFAULT_LIMIT);
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    const page = (data ?? []) as Array<Record<string, unknown>>;
+    claims.push(...page);
+    // A PO object is a complete connection. The general Claims worklist keeps
+    // its existing 200-row window and reports its counts separately below.
+    if (!poId || page.length < DEFAULT_LIMIT) break;
   }
-  const claims = (data ?? []) as Array<Record<string, unknown>>;
 
   // Counts for the tab chips come from a separate, unfiltered head-count so the
   // numbers stay right even when the visible page is capped at DEFAULT_LIMIT.
-  const [{ count: openCount }, { count: closedCount }] = await Promise.all([
-    sb
-      .from("supplier_claims")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "open"),
-    sb
-      .from("supplier_claims")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "closed"),
-  ]);
+  let openCount: number;
+  let closedCount: number;
+  if (poId) {
+    openCount = claims.filter((claim) => claim.status === "open").length;
+    closedCount = claims.filter((claim) => claim.status === "closed").length;
+  } else {
+    const [openResult, closedResult] = await Promise.all([
+      sb
+        .from("supplier_claims")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open"),
+      sb
+        .from("supplier_claims")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "closed"),
+    ]);
+    if (openResult.error || closedResult.error) {
+      const m = mapPgError(openResult.error ?? closedResult.error!);
+      return c.json(m.body, m.status);
+    }
+    openCount = openResult.count ?? 0;
+    closedCount = closedResult.count ?? 0;
+  }
 
   const supplierIds = [
     ...new Set(claims.map((r) => r.supplier_id as string).filter(Boolean)),
@@ -129,20 +201,28 @@ supplierClaimsRouter.get("/", async (c) => {
 
   const supplierNames = new Map<string, string>();
   if (supplierIds.length > 0) {
-    const { data: sup } = await sb
-      .from("suppliers")
-      .select("id, name")
-      .in("id", supplierIds);
-    for (const s of sup ?? [])
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      supplierIds,
+      (ids) => sb.from("suppliers").select("id, name").in("id", ids),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const s of result.data)
       supplierNames.set(s.id as string, s.name as string);
   }
   const reporterNames = new Map<string, string>();
   if (reporterIds.length > 0) {
-    const { data: users } = await sb
-      .from("app_users")
-      .select("id, name")
-      .in("id", reporterIds);
-    for (const u of users ?? [])
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      reporterIds,
+      (ids) => sb.from("app_users").select("id, name").in("id", ids),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const u of result.data)
       reporterNames.set(u.id as string, u.name as string);
   }
 
@@ -167,11 +247,15 @@ supplierClaimsRouter.get("/", async (c) => {
   ];
   const linePending = new Map<string, boolean>();
   if (lateLineIds.length > 0) {
-    const { data: lines } = await sb
-      .from("purchase_order_lines")
-      .select("id, qty, received_qty")
-      .in("id", lateLineIds);
-    for (const l of lines ?? []) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      lateLineIds,
+      (ids) => sb.from("purchase_order_lines").select("id, qty, received_qty").in("id", ids),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const l of result.data) {
       linePending.set(
         l.id as string,
         Number(l.qty ?? 0) > Number(l.received_qty ?? 0),
@@ -189,12 +273,19 @@ supplierClaimsRouter.get("/", async (c) => {
   const claimIds = claims.map((r) => r.id as string);
   const heldByClaim = new Map<string, { units: number; reason: string | null }>();
   if (claimIds.length > 0) {
-    const { data: held } = await sb
-      .from("ops_stock_items")
-      .select("hold_claim_id, hold_reason")
-      .in("hold_claim_id", claimIds)
-      .eq("status", HELD_STOCK_STATUS);
-    for (const u of held ?? []) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      claimIds,
+      (ids) => sb
+        .from("ops_stock_items")
+        .select("hold_claim_id, hold_reason")
+        .in("hold_claim_id", ids)
+        .eq("status", HELD_STOCK_STATUS),
+    );
+    if (result.error) {
+      const m = mapPgError(result.error);
+      return c.json(m.body, m.status);
+    }
+    for (const u of result.data) {
       const key = u.hold_claim_id as string;
       const prev = heldByClaim.get(key);
       heldByClaim.set(key, {
@@ -236,9 +327,9 @@ supplierClaimsRouter.get("/", async (c) => {
       };
     }),
     counts: {
-      open: openCount ?? 0,
-      closed: closedCount ?? 0,
-      all: (openCount ?? 0) + (closedCount ?? 0),
+      open: openCount,
+      closed: closedCount,
+      all: openCount + closedCount,
     },
   });
 });
@@ -439,6 +530,50 @@ supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
     {
       p_claim_id: c.req.param("id"),
       p_resolution: parsed.data.customer_resolution,
+      p_note: parsed.data.note ?? null,
+    },
+  );
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/**
+ * Layer ④ — in what ORDER the goods move (0409).
+ *
+ * The last of Loo's four layers, ruled 2026-08-05 alongside layer ③ and left
+ * frozen until now. It is a SEPARATE axis from the customer's resolution, not a
+ * narrowing of it: `replace` is a promise, and `Replace First` and
+ * `Collect First` are two ways of keeping it that leave Carres holding a
+ * different number of units for as long as the collection takes.
+ *
+ * Deliberately shaped exactly like the customer-resolution route above — same
+ * gate, same optional note, same enum-from-shared. Two layers recorded through
+ * two doors that behave differently is how they start disagreeing about who may
+ * record what.
+ *
+ * **It still derives no consequence.** f(Resolution, Execution) is computable
+ * for the first time, but which stock, finance and demand moves each pair
+ * produces is unruled, and this route is not where that gets guessed.
+ */
+const carresExecutionSchema = z.object({
+  carres_execution: z.enum(CARRES_EXECUTION_KEYS),
+  note: noteSchema,
+});
+
+supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, carresExecutionSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc(
+    "supplier_claim_record_carres_execution",
+    {
+      p_claim_id: c.req.param("id"),
+      p_execution: parsed.data.carres_execution,
       p_note: parsed.data.note ?? null,
     },
   );

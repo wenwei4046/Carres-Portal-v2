@@ -1,2104 +1,1551 @@
 # PURCHASING — MASTER
 
-> **This is the ONLY Purchasing document.** There is no queue file, no checkpoint, no
-> information model, no map, no NEXT. When something is re-ruled, **this file is overwritten**
-> — never annotated "superseded", never copied to a v2. **Git history is the archive.**
->
-> **You read `CLAUDE.md` (the Constitution) and this file. That is all.**
-> Open `COPY-STANDARD.md` only when you need a word, `ACTION-FLOW-STANDARD.md` only when you
-> need the engine law, `01/02/03-*.md` only when you need a token.
+Status: **APPROVED / LOCKED — OWNER REVIEW COMPLETE 2026-08-29**
+Lane: **PLAN COMPLETE**
 
-## How to use this file — go straight to your business object
-
-**Organised by what you are working on, not by document type.** You are not looking for
-"the workflow"; you are looking for **Receiving**.
-
-| I am working on | Read |
-|---|---|
-| anything | **§1 · §2 first — they are short and they bind every Purchasing page** |
-| SO Batch Purchase · Manual Purchase (today: To Order) | **§3** |
-| Purchase Orders | **§4** |
-| Receiving | **§5** |
-| Claims | **§6** |
-| Report | **§7** |
-| Settings | **§8** |
-| a decision that crosses Purchasing pages | **§9** |
-| something already approved and deliberately not built | **§10 Approved Evolution** |
-
-**Every object section has the same six blocks:** `MISSION · WORKFLOW · WHAT IS ON SCREEN
-TODAY · API + DATA · FROZEN RULES · APPROVED EVOLUTION`.
-
-**Update law.** Ship something → this file is overwritten in the same PR. The
-`WHAT IS ON SCREEN TODAY` block and its `measured` line are what a chat trusts; **a stale one
-is the single most expensive defect this document can carry.**
+This file is the only canonical Purchasing Blueprint. It owns Purchasing and the governed
+Purchasing → Receiving seam. Receiving owns its physical-receipt workspace and GRN facts under
+ERP Architecture §3.4; §9.4 below records only the owner-confirmed seam while that page's separate
+owner review replaces its stale presentation. Cross-module files keep only their ownership seams;
+Git history keeps superseded designs. A screen or earlier chat cannot create a second truth.
 
 ---
 
-# §1 · Overview
+## 1 · Mission and boundary
 
-**Purchasing turns approved purchasing demand into goods on a Carres floor.** It is the
-buyer's module. It does not own goods movement (that is Receiving's warehouse half and
-Stock) and it does not own money (that is Finance).
+Purchasing answers five questions:
 
-**TWO WAYS A PO IS BORN, ONE WAY IT LIVES** (Loo, 2026-08-06; the page list rewritten
-by Jess 2026-08-18 and **BUILT** — the rail below is the shipped navigation as of
-`c80dad43` / PR #868; the pages it opens are §3–§8's measured blocks):
+1. What must Carres buy or ask a supplier to place?
+2. Why is it required, in what quantity and by which actual date?
+3. Which supplier document must be sent, to whom and at which destination?
+4. Which supplier outcome follows the physical receipt, repair, replacement or collection fact?
+5. Which supplier-owned showroom Unit was sold and must now be reported to the supplier?
 
-```
-SALES                       PURCHASING
-Sales Order  ····read···▶ SO Batch Purchase ─┐
-                                             ├─▶ Purchase Order ─▶ Receiving ─▶ Supplier Claim
-                          Manual Purchase   ─┘
-```
+Purchasing owns supplier commitment from an approved buying need through formal document control
+and the handoff to Receiving. Receiving owns the physical receipt and creates the GRN. Purchasing
+does not own customer promises, physical stock location after receipt, customer delivery, customer
+money or supplier payment.
+
+| Truth | Authority |
+|---|---|
+| Customer order, customer promise and cancellation | Sales Orders |
+| Buy reason, purchase demand remainder, supplier, PO, supplier date and `Deliver To` | Purchasing |
+| Physical count, condition, Supplier DO and Goods Receipt/numbered GRN evidence | Receiving — ERP Architecture §3.4; seam in §9.4 |
+| Exact Unit, ownership, custody, location and availability | Stock / Warehouse |
+| Actual customer handover and delivery proof | Delivery |
+| Customer money | Payment |
+| Supplier invoice, settlement, credit and payment | Finance / AP |
+| Customer or product problem intake and outcome authority | Service Case |
+| Formal Supplier Claim, Purchase Return and Repair Order execution | Purchasing after an authorised source/outcome |
+
+The same object may appear in several modules. Only its authority edits it; every other module reads,
+summarises and links.
+
+---
+
+## 2 · Resolution Pass and Owner Decision Gate
+
+### 2.1 Evidence searched
+
+The completion pass checked the former emergency-order approval law, Manual Purchase authority,
+`purchase_demand` truth, PO issuance ownership, Sales Order purchasing seam, Stock Unit ownership,
+Goods Receipt, Service Case outcomes and Finance/AP boundary.
+
+### 2.2 Ruling — RESOLVED FROM AUTHORITY
+
+There are not two genuine Carres operating models.
+
+- A Sales Order creates a system purchase demand only for the uncovered quantity.
+- A person starts a non-SO buy in `Manual Purchase`; approval creates the same governed purchase
+  demand truth.
+- There is no `Emergency`, `Urgent` or `Unknown` Manual Purchase purpose, question, queue or special
+  PO door. Manual Purchase carries `Proceed Date` and `Delivery Date`: Proceed Date is the actual
+  successful request hand-off; Delivery Date is when the supplier's goods must reach `Deliver To`.
+  Settings lead days derive `Order By`; none bypass quantity, Catalog, supplier, destination,
+  approval, PO issuance or History.
+- Every approved demand reaches the same PO issuance authority. Sales, Warehouse and the requester
+  cannot mark goods as ordered.
+- `purchase_demand` remains the canonical line-level need and coverage remainder, but it is not a
+  staff destination and has no separate sidebar page.
+- `SO Batch Purchase` and `Manual Purchase` are the two operator doors. `Purchase Orders` is the
+  formal supplier commitment register.
+
+Therefore the Manual Purchase relationship, demand truth and PO ownership are **RESOLVED FROM
+AUTHORITY**. No Owner Decision remains.
+
+### 2.3 Ruling — daily Purchasing → Receiving → GRN → Claim / Return chain
+
+**OWNER-APPROVED / LOCKED 2026-08-29.** Purchasing and Receiving execute in their owning
+modules while the shared Work Engine gives staff and managers one daily list. The governing design
+is recorded in
+[`docs/superpowers/specs/2026-08-29-purchasing-receiving-work-design.md`](../superpowers/specs/2026-08-29-purchasing-receiving-work-design.md).
+
+The six questions must be answerable for every open action: **who acts · which actual working day ·
+where they act · what proves completion · who supervises · what consequence follows**. `My Work`
+and `Team Work` project these module actions; they never store a second completion or expose manual
+`Done`. These actions appear in owner-resolved `My Work` / `Team Work`; a module Register rail does
+not copy them into a second local work panel.
+
+---
+
+## 3 · Whole-domain research audit
+
+### 3.1 What was mined from 2990
+
+The 2990 purchasing domain was inspected top-to-toe, including MRP, SO-to-PO selection, blank PO
+entry, PO listing/detail, goods received, purchase returns, purchase consignment orders, consignment
+orders, consignment notes and consignment returns.
+
+Useful proven capability:
+
+- server-recomputed demand rather than a staff-maintained checklist;
+- line-level SO source, warehouse and delivery-date context;
+- supplier grouping before PO creation;
+- dense searchable registers with filter, sort, display and export;
+- ordered, received and remaining quantity on the same commercial line;
+- source-document links, versions, History and printable documents;
+- Purchase Return born from a receiving/problem source.
+
+Capability deliberately rejected or improved:
+
+- blank PO/return/consignment creation without a governed source;
+- delete and right-click commands that hide authority;
+- many cloned consignment engines whose document type, ownership and accounting meaning diverge;
+- a separate consignment-receipt workflow when one Goods Receipt can preserve ownership;
+- model/quantity-only consignment control without exact Unit identity;
+- finance fields and settlement decisions inside Operations;
+- `RelationshipMap` terminology and a UI system separate from Carres Shell/Register/Object Detail.
+
+### 3.2 Mature ERP / WMS / logistics lessons
+
+- Purchase requisition is internal authorisation; the PO is the external supplier commitment.
+  Carres adapts this into two simple operator doors feeding one `purchase_demand` truth.
+- A PO must retain line source, delivery destination, promised date, received quantity, remaining
+  quantity and version history.
+- Supplier collaboration may record promised dates, split quantities and changed versions, but
+  supplier silence is not a Carres `Acknowledged` status.
+- Consignment receipt preserves supplier ownership and creates no payable. Actual consumption or
+  sale creates supplier advice; Finance later matches the supplier invoice and pays.
+- Physical receipt, ownership change and financial posting are separate authoritative events.
+
+Primary references: [Dynamics purchase requisitions](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/purchase-requisitions-overview),
+[Dynamics purchase orders](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/purchase-order-overview),
+[Dynamics consignment](https://learn.microsoft.com/en-us/dynamics365/supply-chain/inventory/consignment),
+[Dynamics supplier collaboration](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/vendor-collaboration-work-external-vendors),
+[Oracle consigned inventory lifecycle](https://docs.oracle.com/en/cloud/saas/supply-chain-and-manufacturing/26b/famml/consigned-inventory-lifecycle.html),
+[Oracle consumption advice](https://docs.oracle.com/en/cloud/saas/supply-chain-and-manufacturing/26a/faspc/create-consumption-advice.html).
+
+### 3.3 Capability decision matrix
+
+| Major capability | CURRENT CARRES | 2990 / MATURE ERP LESSON | Decision | RECOMMENDED CARRES BUSINESS FLOW | OPERATOR JOURNEY | UI / PAGE / OBJECT PLACEMENT | CROSS-MODULE CONNECTION |
+|---|---|---|---|---|---|---|---|
+| SO buying | Staff rely on Sales messages and personal memory | 2990 computes SO/MRP need and groups supplier lines | **ADAPT + IMPROVE** | SO uncovered quantity becomes demand; stock/PO coverage reduces it; ready lines batch by supplier | Open dated work, fix named blockers, set/split `Deliver To`, issue | `SO Batch Purchase` Register + row inspector + issue surface | Sales Order source; Stock coverage; Delivery required-arrival date |
+| Non-SO buying | Requests are informal and may omit the business reason | Mature requisition separates internal approval from external PO | **ADAPT** | Staff create Manual Purchase; approval produces demand; rejection ends it | Select purpose, goods, quantity, date and destination; system routes approval | `Manual Purchase` Register and object; no separate request page | Catalog, Stock planning, approved Display Request, Finance approval boundary |
+| Purchase demand | Staff may confuse “need” with a document to send | 2990 recomputes need; mature ERP keeps requisition/demand separate from PO | **KEEP + RELOCATE** | One hidden canonical line record stores required, covered, ordered and remaining quantity | Staff see demand facts through the correct work door; never create/send a demand document | No sidebar page; read in SO Batch, Manual Purchase, PO and Order Route | Source object creates/reduces/cancels demand; PO allocation covers it |
+| Purchase Order | PDF/WhatsApp means the real order; changes can be lost | 2990 retains line balance, version and documents | **KEEP + IMPROVE** | Current PO Duty checks, sends the actual PDF, records channel/time; later changes create a version | Use 50/50 check/preview; send; record supplier promise or exception | `Purchase Orders` Register; full-width view; 50/50 only while issuing/editing | Demand, supplier, Goods Receipt, Stock, Finance read-only |
+| Physical receipt / GRN | Supplier DO and Carres GRN can be confused; counts may hide damaged/wrong/extra goods | Mature ERP separates supplier delivery evidence, physical receipt and payable invoice | **ADAPT + IMPROVE** | Receiving starts from the PO/CO, records the supplier DO and physical counts, then Carres creates the numbered GRN once | Open the exact source, record Order/Received/Damaged/Wrong/Pending facts and evidence, finish once | Receiving-owned workspace and GRN record; no second receipt door | PO/CO source; Stock receives only valid goods; Supplier Claim consequence; no AP for consignment |
+| Supplier problem | Receipt differences and later defects can be mixed | Source-linked claim/return flows preserve evidence | **IMPROVE** | Receiving records damaged/wrong/extra separately without reducing pending delivery or making stock available; later discovery enters Service Case and creates Purchasing claim work | Check source, evidence, supplier response and authorised outcome | `Supplier Claims` Register; claim object and optional supplier claim pack | Service Case authority; GRN/Unit evidence; Finance credit read-only |
+| Purchase return | Staff may create a return because goods look wrong | 2990 can derive a return from GRN but also permits blank return | **ADAPT / REJECT blank create** | Only an approved claim/outcome creates a return; issue document; collection proof moves custody | Send return, obtain collection date, scan exact Units, record handover | `Purchase Returns` Register; formal object; 50/50 while issuing/revising | Claim source; Stock custody; Finance credit consequence |
+| Repair order | Repair can be confused with replacement | Mature service logistics preserves exact serial/Unit custody | **IMPROVE** | Approved repair outcome creates RO; same Unit leaves and must return; replacement gets a new Unit ID | Issue repair order, hand over, chase dated return, inspect same Unit | `Repair Orders` Register; formal object; 50/50 while issuing/revising | Service outcome; Stock custody; Goods Receipt/inspection on return |
+| Display request | Sales negotiates with supplier while Purchasing places/controls order | Requisition should state purpose before external commitment | **IMPROVE** | Showroom asks for a model/display change; Purchasing decides buy, consignment, swap or no action | Showroom enters simple request; Purchasing resolves supplier/SKU/path | `Display Requests` Register and internal object; no PDF preview | Showroom/Sales request; Catalog; Manual Purchase or CO; Stock location |
+| Consignment order | Supplier-owned sofas are hard to count; purchased Hooka/Ohana displays are mixed in | Mature ERP keeps supplier ownership on receipt; 2990 has documents but fragmented truth | **ADAPT + IMPROVE** | Approved display/claim swap creates CO; exact Units and supplier ownership are fixed before delivery | Issue CO, send Unit IDs, record promise, receive through the one Receiving engine | `Consignment Orders` Register; formal object; 50/50 while issuing/revising | Display Request; Stock Unit; Goods Receipt; Consignment Return |
+| Consignment return | Removal/swap may be arranged informally | Physical handover, not document issue, changes custody | **IMPROVE** | Approved remove/swap/claim/overdelivery creates return; combined swap can share one CO PDF | Send standalone return if needed; obtain collection date; scan and prove handover | `Consignment Returns` Register; formal object; 50/50 while issuing/revising | CO swap, Stock custody, supplier proof; no refund/credit on unsold consignment |
+| Consignment sale notice | Staff may forget to tell supplier after a sale | Mature ERP creates consumption advice after actual consumption | **ADAPT + IMPROVE** | Successful delivery of exact supplier-owned Unit auto-creates one notice per supplier × attempt | Current PO Duty checks and sends; Finance later matches invoice | `Consignment Sale Notices` Register; no `+ New`; 50/50 while issuing/correcting | Delivery success; Stock ownership; source CO; Finance/AP continuation |
+
+---
+
+## 4 · Final navigation and information architecture
 
 ```text
-Purchasing
-├── Purchasing Home
-├── My Purchasing Work
-├── REQUESTS
-│   ├── New Supplier Requests
-│   ├── New SKU Requests
-│   ├── Display Requests
-│   └── Manual Purchase Requests
-├── BUY
-│   ├── Purchase Demands
-│   ├── SO Batch Purchase
-│   └── Purchase Orders
-├── RECEIVE
-│   └── Goods Receipts
-├── PROBLEMS
-│   ├── Supplier Claims
-│   ├── Purchase Returns
-│   └── Repair Orders
-└── CONSIGNMENT
-    ├── Consignment Overview
-    ├── Consignment Orders
-    ├── Consignment Receipts
-    ├── Consignment Returns
-    └── Consignment Sale Notices
-
-Report and Settings remain PORTAL responsibilities. The existing Purchasing Report door stays
-below its hairline until report consolidation has its own approved scope. Settings remains only in
-the governed Page Header gear (`../ERP-ARCHITECTURE.md` §2.1).
+Purchasing ▾
+├─ BUY ▾
+│  ├─ SO Batch Purchase
+│  ├─ Manual Purchase
+│  └─ Purchase Orders
+├─ RECEIVE ▾
+│  └─ Receiving
+├─ PROBLEMS ▾
+│  ├─ Supplier Claims
+│  ├─ Purchase Returns
+│  └─ Repair Orders
+└─ SHOWROOM ▾
+   ├─ Display Requests
+   ├─ Consignment Orders
+   ├─ Consignment Returns
+   └─ Consignment Sale Notices
 ```
 
-**PURCHASING HAS NO MODULE TABS** (Loo, 2026-08-11 — **APPROVED / LOCKED**).
-`SO Batch Purchase` · `Manual Purchase Requests` · `Purchase Orders` · `Goods Receipts` ·
-`Supplier Claims` are separate operator jobs and separate destinations. They are not sibling
-views of one record or one work surface, so they must not be placed in a shared tab strip.
-Purchasing navigation exposes each destination individually through the governed portal
-navigation. A page may not recreate the old `PurchasingTabs` strip as a second navigation.
+Rules:
 
-**PURCHASING IS ONE EXPANDABLE MODULE ROW WITH A TWO-LEVEL LISTING TREE (Jess,
-2026-08-20 — APPROVED / LOCKED, and SHIPPED `c80dad43` / PR #868, owner-walked at 1440px and
-1130px before merge).** The
-existing 232px/60px `PortalSidebar` remains the only left navigation surface. Clicking anywhere on
-the `Purchasing` row expands or hides the complete Purchasing tree; it does not create another
-sidebar, flyout, tab strip or page-owned navigation column. `Purchasing Home` and `My Purchasing
-Work` are direct children. `REQUESTS`, `BUY`, `RECEIVE`, `PROBLEMS` and `CONSIGNMENT` are full-row
-group headers, each independently expandable; more than one group may remain open. The group that
-contains the current page opens automatically and may not hide that page. Open state is remembered
-per signed-in user.
+- The Purchasing row and each group header expand/collapse; more than one group may stay open.
+- An active page remains visible. Open tree: only the active child is blue. Closed tree: the
+  Purchasing parent is blue. At 60px: the Purchasing icon is blue.
+- The 60px Purchasing icon permanently lands on `SO Batch Purchase`.
+- The destination header follows Sales Orders: 50px high, 24px page title, no leading page icon and
+  no `Purchasing ·` prefix.
+- There is no Purchasing Home. Module summaries come from registers and reports.
+- There is no My Purchasing Work. `My Work` and `Team Work` are the shared Work Engine.
+- There is no Purchase Demands page. Demand is a record, not a staff destination.
+- There are no New Supplier or New SKU request pages. A blocked buy opens an in-context governed
+  supplier/SKU request to Catalog/Master Data and returns to the same buy.
+- There is no Consignment Overview or Consignment Receipts page. Receiving handles purchased
+  and consignment goods; Stock Register reports supplier-owned Units.
+- Settings stays behind the global header gear. Reports use the central Reports area and Register
+  export, not permanent Purchasing sidebar rows.
 
-The tree extends PR #861's approved wire-line language: one module icon, child rows without icons,
-quiet 1px connectors/elbows and separators, no heavy boxes/cards/popovers/shadows. The 200px
-`STATUS / WORK TO DO` rail remains inside an individual page and never becomes portal navigation.
-
-**ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED.** Purchasing follows the
-shared module active-indication law (`../ui/MASTER.md`); grouping its Listing rows is presentation
-and does not earn it a selection rule of its own. The rail never says nothing about where the
-operator is standing, and never says it twice:
-
-```
-tree OPEN                        →  only the exact current child row is blue
-                                    (module parent and group headers stay neutral)
-tree SHUT, current page is ours  →  the Purchasing PARENT row is blue
-60px collapsed, page is ours     →  the Purchasing ICON is blue
-```
-
-An open module or group header never becomes a second active row; a shut parent standing on its
-own page is never a neutral one.
-
-**THE 60px ICON OPENS A NAMED DESTINATION — APPROVED / LOCKED.** The collapsed Purchasing icon
-links to **`SO Batch Purchase`** (`/operation?tab=purchase`), the module's existing landing
-destination. It is never derived from "the first live row": a module's landing page is a
-capability in its own right and may not move because the order of the rows around it changed. When
-`Purchasing Home` is built, that page's own approved scope may change this destination. Jump To
-ordering is untouched — it lists pages, and a landing choice is not a page.
-
-Manual Purchase's `QUEUES + NEED FOR` rail remains on the LEFT at 200px like its measured siblings
-(SO Batch §3, Receiving, Claims); the RIGHT side belongs to supervision widgets.
-
-**PURCHASING SETTINGS ENTRY — THE HEADER GEAR IS THE ONE DOOR (Jess, 2026-08-19, amending the
-corrections card in place).** *"Settings should be at the header settings, not every panel got
-one setting."* The rail's `Settings` row is DELETED (shipped 2026-08-19 with the walk-fixes
-PR); the Page Header's global Settings gear is the governed entry into the one full-page
-Settings Workspace (`/operation/settings/purchasing`), and no rail carries a Settings door.
-The page itself, its route and its server gate are unchanged — only the rail door died, and
-with it the rail's manager-gate RPC read. `Report` keeps its hairline row: it is a PORTAL page
-reached from here, and the hairline is what stops that convenience reading as ownership. Page
-Toolbars and `…` still do not repeat the door; the manager gate and audit requirements remain
-authoritative.
-
-**THE COMPLETE MAP IS PERMANENT, BUT OWNERSHIP DOES NOT DUPLICATE.** Three staff who each do every
-job cannot be asked to remember which workspace hides which document. Every governed request,
-buying, receipt, problem and consignment object therefore has a named Listing destination from day
-one. An unbuilt destination remains a truthful `Coming soon` non-control until its own approved
-scope makes it live; the map never silently points to a fake Register.
-
-`My Purchasing Work` is a Purchasing-filtered view over the one shared Work Engine Action contract.
-It stores no task/status and never outranks the user's cross-module My Work. `Purchase Demands` is
-the authoritative demand Register and has no independent Issue authority: it inspects and prepares
-the governed demand; `SO Batch Purchase` remains the sole PO creation workspace. These destinations
-therefore improve findability without creating a second action engine, demand remainder or PO door.
-
-**SALES ORDERS IS NOT A PURCHASING TAB** (Loo, 2026-08-06 — his refinement of
-the same day's ruling). Purchasing READS the sales orders; it does not carry
-them. The two answer different questions and the difference is the whole
-point: *what did the customer buy?* is every order, while *which orders need
-buying today?* is a filtered few — an order already covered by stock never
-reaches SO Batch Purchase at all.
-
-> **`PortalSidebar` is available on every operation screen**
-> (`OperationApp.tsx:243`) and provides navigation between Orders and
-> Purchasing. `GlobalTopBar` is suppressed on working pages
-> (`OperationApp.tsx:254-260`), but it is not responsible for module navigation.
->
-> **The navigation difference from AutoCount is not reachability — it is
-> information architecture.** AutoCount exposes all business documents
-> permanently in the navigation; Carres exposes modules first, then reveals
-> documents inside the module. **Navigation decisions are based on operator
-> workflow, not on implementation history or another ERP.**
-
-**THE SPLIT IS BY JOB, NEVER BY TABLE.** Both lanes may store their demand in
-`purchase_demands`; what differs is the OPERATOR'S INTENT, and that is what a
-page is organised around. Customer-driven buying runs on the PO days with an
-engine plan; internal buying is keyed in when somebody needs something.
-
-**A PO CARRIES THE REASON IT WAS BORN FOR.** *"Supplier doesn't care — the PO
-is ours"* (Loo): the factory receives a PDF either way, so consolidating a
-customer's mattress with the shelf's into one document buys nothing and costs
-the answer to *why did we buy this?* Two lanes therefore issue their own POs,
-and Report can split the month by reason — `Customer Sales · Ready Stock · Showroom Display ·
-Service Case · Internal Staff Purchase · Subsidiary Purchase · Other Purchase` — instead of
-reconstructing it.
-
-> **🔴 What this ruling needs and the database does not have (measured
-> 2026-08-06): `purchase_orders` carries NO reason column and
-> `purchase_order_lines` carries no link back to its demand.** Until one
-> exists the split report cannot be built at all. It is the first thing the
-> build owes.
-
-*Measured reality (2026-08-06):* typed demands live in `purchase_demands` with
-`purpose ∈ ready_stock · display · office · warranty` (0323's gate; Spare Parts
-and Other are not offered yet). Customer-order demand is COMPUTED from order
-lines rather than stored as rows.
-
-**Before you change any tab, answer both:** does what upstream sends still get in, and can
-downstream still catch it?
-
-**Live scale, measured 2026-08-06.** Every row is TEST data — at go-live the database starts
-clean. These numbers are evidence about whether CODE WORKS, never about business volume.
-
-```
-purchase_demands   2      purchase_orders   24  (22 open · 16 with no arrival date)
-purchase_order_lines 38   units ordered     47
-received / damaged / wrong    4 / 1 / 0
-warehouse_receipts 3      receiving_events   3      supplier_claims 1     units on_hold 0
-suppliers 10  —  5 have no WhatsApp group, 0 of 10 have a phone
-
-po_supplier_promises 6  —  4 arrivals across 3 POs · 1 ready date · 1 balance
-                           SIX POs hold an arrival date; only THREE were given one.
-```
+Every Register destination uses the approved Register Template. Receiving's separate owner review
+governs its physical-receipt workspace and any listing around it. A Listing never becomes 50/50.
+Every Listing retains the shared 240px page-owned `FilterRail` containing concrete
+record/work facets; it never says `Today`, `Tomorrow`, `Follow Up`, `Needs Attention`, `Priority` or
+`Next Action`.
 
 ---
 
-# §2 · What crosses every tab
+## 5 · Core objects and arithmetic
 
-## 2.0 · ⭐ ONE PO CREATION AUTHORITY — Card 4B, proven on production 2026-08-11
+### 5.1 `purchase_demand` — one hidden canonical need
 
+Each demand line stores:
+
+```text
+Source object and line
+Purpose
+Carres SKU and required configuration
+Required quantity
+Required at Carres location by actual date
+Deliver To
+Stock-covered quantity
+Open-PO-covered quantity
+Purchase quantity remaining
+Approval and hold facts
 ```
-purchasing_issue_pos_batch(jsonb)
-        is the ONLY externally reachable authority that can create a
-        Purchase Order. Nothing else may. Not a page, not a route,
-        not an RPC, not a table.
+
+The one arithmetic is:
+
+```text
+purchase quantity remaining
+= required quantity
+− usable stock allocated
+− valid open PO quantity allocated
 ```
 
-**The chain, and the only shape it has:**
+The remainder cannot be copied into another editable field. Cancellation or quantity change at the
+source recalculates the demand and creates a concrete PO impact if a supplier commitment already
+exists.
 
+### 5.2 Two input doors
+
+`SO Batch Purchase` is system demand from customer Sales Orders. `Manual Purchase` is conscious
+internal intent under the owner-approved purpose vocabulary (rulings 2026-08-28 Card 03 /
+2026-08-29 Card 04) — exactly `Ready Stock` · `Showroom Display` · `Service Case` ·
+`Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase`, with Management included
+under `Internal Staff Purchase` (there is no `Management Purchase`). Only `Other Purchase`
+asks — and must answer — `What is this for?`; routine purposes do not ask a duplicate `Why`.
+Each exceptional purpose names its STRUCTURED object at creation (0401): a `Service Case`
+purchase links the actual Case, an `Internal Staff Purchase` names the real staff member, a
+`Subsidiary Purchase` names the actual subsidiary company; `Ready Stock` and
+`Showroom Display` are served by the governed destination on the request. There is no urgent or
+emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
+(`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
+door accepts them for a new request and no historical row is relabelled into the new
+vocabulary. A new Manual Purchase is numbered `MPR-YYYYMMDD-RRRR` through the one §6.1
+allocator (0401); pre-0401 `REQ-####` identities are permanent and print exactly as stored.
+An approved Display Request may route to Manual Purchase or Consignment Order; staff do not
+retype it.
+
+### 5.3 One PO issue authority
+
+Current PO Duty, or the dated cover while one is in force, is the normal work owner and remains
+accountable for PO issuance. A governed Operations Superuser may also complete any operational PO
+action without becoming — or being displayed/audited as — the duty holder. Jess is an Operations
+Superuser through Principal authority; `operation@carres.com` is the explicitly governed shared
+Operations Superuser. An ordinary Operations login that is neither duty, cover nor superuser is
+refused. Commercial approval remains separate and never follows from issue authority.
+
+**HOW IT IS ENFORCED — migrations 0379 / 0380 plus 0403, and the dependent web/API code, are
+production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
+`operation@carres.com` walk selected an eligible SO, saw the compact duty chip and active `Issue PO`
+action, and reached `Review Purchase Orders`; the preview was not issued.**
+`purchasing_po_actor()` is the production-verified **legacy module-local resolver**, not the final
+architecture authority. **OWNER RULING 2026-09-01 supersedes its ownership boundary:** it must
+converge behind ERP Architecture Law F.1's Shared Duty Resolver; no new Purchasing page or API may
+read `ops_po_duty` or `ops_po_duty_cover` directly. Until that convergence is built, its existing
+behaviour is implementation evidence only: it reads the month's duty holder and dated cover and
+returns normal holder and acting cover separately. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
+application code never checks an email. `purchasing_actor_may_issue()` combines duty, dated cover
+and that capability, and is asked by SO Batch Purchase, Manual Purchase, the API issue routes, the
+creation authority `purchasing_issue_pos_batch`, and the evidence door
+`purchasing_confirm_po_sent`. PO History records actual actor, normal duty, dated cover and the
+authority used as distinct fields; a superuser is never rewritten as Yu Jun or the cover. Cover has
+no browser write policy.
+
+### 5.4 Deliver To
+
+The destination comes from the source PO/CO `Deliver To`. When a new buy needs a default, use the
+configured Carres warehouse (currently Carres Klang); a showroom is an explicit exception, never a
+Receiving guess.
+
+Permitted destinations are Purchasing Settings master data, not a fixed browser list. The current
+set is `Carres Klang` · `AL Sungai Buloh` · `HOUZS` · `Ohana`; an authorised Settings manager may
+add a future destination, record its address, make it the default or stop offering it for new POs.
+Historical POs keep the destination name and address saved on their issued version.
+
+Every active destination also resolves the receiving station/party, applicable arrival calendar,
+whether it links to a Carres warehouse or is external/no-Stock, and whether Unit scan and signed-DO
+evidence are required. A warehouse-linked destination derives its address and Stock consequence
+from Warehouse authority. An external destination does not create Carres Stock merely because it
+can receive a supplier PO. These receiving fields are **APPROVED TARGET / NOT BUILT**; until they
+exist, a new destination may not silently invent who receives or what Stock consequence follows.
+
+- Before issue: change or split quantity freely in SO Batch Purchase / Manual Purchase.
+- Numbered PDF prepared but not sent: update the same issue surface; History records it.
+- Supplier already received a PDF: `Change Deliver To` creates a new version/change record and
+  concrete work to send the new PDF.
+
+**Owner B, 2026-08-28:** one PO may carry several governed Deliver To destinations. The PO-level
+destination is the default; a goods line may name another active Purchasing destination. The formal
+PDF prints every line's effective destination and, when several are used, every exact address in its
+DELIVER TO block. A closed destination remains visible on old records but cannot be selected for new
+work. The final destination of each goods line is Purchasing-owned truth read by Sales Order and
+receiving/logistics. Changing it after the supplier received the PDF mints a new PO version and send
+work; it never silently changes the paper already sent.
+
+### 5.5 Supplier and SKU resolution
+
+Staff never guess a SKU, supplier or document.
+
+- If an approved catalog relationship exists, the system resolves it.
+- If the SKU is missing, the buy stays blocked and opens an in-context Catalog request.
+- If the SKU exists but has no approved supplier relationship, the buy stays blocked and opens an
+  in-context supplier relationship request.
+- A new supplier is added and approved in Supplier Master/Catalog governance, not inside a separate
+  Purchasing sidebar page.
+- When resolved, the original row continues; it is not re-entered.
+
+### 5.6 Issue means the PDF was actually sent
+
+Opening WhatsApp, email or a PDF is not issue. The system generates the numbered version in the
+50/50 surface and completion requires the actual outbound fact: document version, recipient,
+channel, sent by and sent time. Once the PDF is sent by WhatsApp/email, the order is `Issued` even if
+the supplier is silent. There is no `Acknowledged` status.
+
+Supplier out-of-stock, delayed model/fabric, changed quantity or changed price is a later exception.
+A supplier price change stops the issue/change and routes to the commercial approver; Operations
+does not decide it.
+
+**HOW IT IS ENFORCED — BUILT, migrations 0378 / 0379 / 0380, PR #894.**
+
+- **THE VERSION IS DECLARED, NOT READ BACK.** The confirmation states the version it RENDERED;
+  SQL locks the purchase order, compares, and refuses `stale_po_version` writing nothing. Reading
+  the current version at confirmation time recorded a revision as sent that the supplier never
+  received.
+- **CATALOG IS THE NORMAL PRICE AUTHORITY.** Issue review is not a second cost-maintenance screen.
+  The server reads the governed Catalog cost and sends that value as both the line cost and
+  `expected_catalog_cost`; `purchasing_check_line_commercials` re-reads it inside the creation
+  transaction. A missing or changed Catalog cost creates ZERO purchase orders. Commercial
+  exceptions are approved and maintained in their governed Catalog/approval flow, never typed into
+  SO Batch or Manual Purchase Issue review.
+- **SUPPLIER COLLECTION IS MASTER DATA.** A factory-pickup supplier's collector and optional fixed
+  destination come from `purchasing_supplier_settings`. SO Batch Purchase, Manual Purchase, the API
+  and the `purchase_orders` database guard all use that same rule. Review neither repeats the
+  collection arrangement nor asks the operator to choose a collector for one PO. Managers maintain
+  both fields in `Settings → Purchasing → Supplier collection`; future factory-pickup suppliers appear from master
+  data and future destinations continue to come from the adjacent `Deliver To` setting.
+- **AN EXCEPTION NEEDS SOMEBODY ELSE'S APPROVAL.** A hand-entered cost and a Free of Charge each
+  require an open, unexpired `po_cost_approvals` record. `purchasing_approve_po_cost` admits only
+  `principal` or `finance`, and refuses a manager who is also today's PO actor: one person cannot be
+  both sides of an exception. An approval is SPENT when used.
+- **EVIDENCE CARRIES WHO.** `po_sends` stores the actor, the month's duty holder and the authorised
+  cover, with channel, recipient, Malaysia time and the exact version. An `external_open` is
+  communication history and completes nothing; a `confirmed_sent` for an EARLIER version stays
+  history and never completes the current one.
+
+### 5.7 PO states and balances
+
+The operator sees facts, not a vague workflow:
+
+```text
+Not sent to supplier
+Issued
+Supplier Delivery Date missing
+Supplier Delivery Date changed
+Partly received
+Completed
+Cancelled
 ```
-Batch Purchase  →  POST /api/operation/purchase/to-order/issue
-                →  purchasing_issue_pos_batch(jsonb)      ← the authority
-                →  _operation_create_po_inner(...)        ← a helper, never a door
-                →  purchase_orders · purchase_order_lines
+
+Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
+Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
+Delivery Qty and never create available stock. A supplier date may split by quantity. A late,
+missing or changed promise creates supplier-contact work; it never rewrites the original PO
+Delivery Date or the customer promise.
+
+---
+
+## 6 · Document and Unit identity
+
+### 6.1 Formal document numbers
+
+```text
+PREFIX-YYYYMMDD-RRRR
 ```
 
-**`_operation_create_po_inner` is an implementation detail and is spelled as one.**
-The governed RPC reaches it because that RPC is a `postgres`-owned SECURITY
-DEFINER and therefore executes as `postgres`; the browser cannot reach it at all.
-Its PO construction logic is NEVER duplicated — one writer, one arithmetic.
+- `YYYYMMDD` is the Malaysia server issue date for an external document and creation date for an
+  internal Manual Purchase/Display Request, always with a four-digit year.
+- `RRRR` is chosen from the unused four-digit codes for that date. It is not a sequence, timestamp,
+  customer, supplier or parent-document number.
+- All Carres formal documents share the daily visible-code pool. A database uniqueness rule prevents
+  duplicates. Cancelled/void numbers are never reused.
+- Every new object gets its own number. Relationships live in Source and `Order Route`, never in
+  matching tail digits.
+- A revision keeps the original number: `PO-20260820-4827 · Version 2`.
 
-**What was closed, and how (migration `0339`).** The Card 4 audit found four more
-reachable authorities. All four are shut, and **every one was re-tested by actually
-attempting the write as the `authenticated` operation user, not by reading a grant:**
+**HOW IT IS ENFORCED — BUILT, migration 0381, PR #894.** `allocate_formal_document_code(prefix)`
+DRAWS `RRRR` at random from the day's unused codes and is unique on `(date, code)` ACROSS prefixes,
+so one day has one `4827` whatever document holds it. A losing race gets a unique violation and draws
+again; no lock is held and no number is skipped. Rows are never deleted, so a cancelled number stays
+taken. Production minted `PO-2054` from `max(seq) + 1` until then — a number that told any supplier
+holding two of our purchase orders how much Carres bought in between. **Existing identities are
+permanent and are NOT renumbered.**
 
-| Authority | Before | Now | Proof |
+| Prefix | Document |
+|---|---|
+| `MPR` | Manual Purchase |
+| `PO` | Purchase Order |
+| `GRN` | Goods Receipt |
+| `SC` | Supplier Claim |
+| `PRTN` | Purchase Return |
+| `RO` | Repair Order |
+| `DR` | Display Request |
+| `CO` | Consignment Order |
+| `CRTN` | Consignment Return |
+| `CSN` | Consignment Sale Notice |
+
+Internal records still use invisible permanent technical IDs.
+
+### 6.2 Unit ID
+
+The locked human-readable format is:
+
+```text
+U1-000-001
+```
+
+- Six system-controlled digits per Series, displayed 3 + 3.
+- After `U1-999-999`, continue at `U2-000-001`.
+- One company-wide allocation authority; never reset, reuse or manually type a new identity.
+- Search/scan may normalise `U1-000-001`, `U1-000001` and `U1000001` to the same Unit.
+- A repair keeps the same Unit ID. A physical replacement gets a new Unit ID.
+- Non-separable set pieces may use `U1-000-001-A/B`; independently saleable pieces get separate
+  Unit IDs as defined by Catalog.
+
+**HOW IT IS ENFORCED — BUILT, migrations 0381 / 0382, PR #894.** `unit_id_series` is ONE row, locked
+`FOR UPDATE` while allocating, so two receipts cannot mint one Unit ID; it is a table rather than a
+sequence because a sequence cannot roll `U1-999-999` into `U2-000-001` and cannot be read back
+without consuming. `allocate_unit_id()` is the only door and the table is revoked from
+`authenticated`. `normalise_unit_id()` makes `U1-000-001`, `U1-000001` and `U1000001` the same Unit
+for search and scan. Units are minted for EVERY governed destination, not only Carres-owned
+warehouses, because §6.2 requires the supplier to write the Unit ID on a showroom or external
+delivery's package too. The series is seeded ABOVE anything already in the locked format:
+**existing units are never recoded.**
+
+Unit IDs are allocated when the PO/CO is confirmed for issue so the supplier-facing document can
+list every expected Unit. Current supplier capability requires one simple extra line on its own
+package label:
+
+```text
+CARRES UNIT ID: U1-000-001
+```
+
+No supplier physical-Unit label, QR, barcode or Carres label template is required now. Carres
+Operations attaches the same text Unit ID to the physical sofa at the showroom. Future suppliers
+may attach the physical label and future QR/barcode may encode the same permanent machine value;
+neither upgrade may renumber the Unit.
+
+Legacy showroom stock receives a Unit ID during opening count with supplier, ownership, model,
+location, existing serial/label and photo evidence. Until the physical label is attached, the Unit
+remains usable but carries concrete label work.
+
+---
+
+## 7 · End-to-end business flows
+
+### 7.1 SO purchase
+
+```text
+Sales Order line
+→ Stock reads available/reserved/incoming quantity
+→ uncovered quantity becomes purchase_demand
+→ Delivery-derived latest arrival date becomes Purchasing required date
+→ SO Batch Purchase groups ready lines by supplier
+→ operator checks/splits Deliver To
+→ an authorised issuer uses the one PO door; normal PO Duty remains the work owner
+→ exact version, recipient, channel, actual actor and normal duty/cover are recorded
+→ supplier promise/exception, answer and response evidence are recorded on the exact PO
+→ Receiving starts from that exact PO and the supplier DO
+→ Carres records physical receipt and creates the numbered GRN
+→ Stock owns only valid received Units and location
+```
+
+Partial availability creates separate Warehouse work for available quantity and Purchasing work for
+missing quantity. Sales Orders only displays the risk.
+
+### 7.2 Manual Purchase
+
+```text
+Staff selects purpose
+→ enters goods, quantity and Deliver To
+→ Catalog resolves supplier/category and Settings resolves production + transit days
+→ server previews Proceed Date and defaults Delivery Date from the slowest selected line
+→ Delivery Date minus those same lead days derives each line's Order By
+→ Catalog/supplier/price authority checks
+→ governed approver approves or rejects
+→ approved record creates purchase_demand
+→ an authorised issuer uses the same PO path; Manual grouping keeps Delivery Date distinct
+→ the same Receiving engine handles physical arrival
+```
+
+### 7.3 Receiving and later defect
+
+```text
+PO/CO carries the official Deliver To and original PO Delivery Date
+→ supplier provides its Supplier DO and may provide a changed Supplier Delivery Date
+→ Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
+→ record Goods Received At as the physical receipt date
+→ record Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty
+→ attach Supplier DO/evidence and exact Unit IDs where required
+→ finish physical receiving; Carres creates the numbered GRN
+├─ valid received goods → Stock receives custody/location
+├─ damaged/wrong/extra → no available stock and no reduction of Pending Delivery Qty
+└─ problem found later → Service Case → Supplier Claim workstream
+```
+
+Office direct receiving and Warehouse submission are two entry doors to one Receiving Session and
+one posting engine. A Warehouse submission moves no Stock until GRN Duty posts it. Office direct
+receiving posts one `posted` event because one person performed one business act. `GRN-…` is the
+formal Receiving Record number and exists from the posted session; a draft/submitted count is not a
+formal GRN.
+
+Normal GRN Duty, dated cover and actual actor remain separate evidence. Jess and the governed
+Operations Superuser may perform the operational act without becoming GRN Duty. An ordinary person
+outside duty/cover/capability is refused by the same web, API and SQL authority.
+
+The user-facing gate uses two lines:
+
+> **Delivery note is missing**
+> Upload it before you finish receiving.
+
+### 7.4 Partial, reject, claim and return consequences
+
+- **Partial receipt:** accepted Units post immediately; the exact open balance remains Incoming.
+  `Confirm balance delivery date` opens for PO Duty and closes only from a new evidenced supplier
+  promise. Partial by itself is not damage and does not create a claim.
+- **Reject on the spot:** rejected/not-delivered Units never become available Stock. The receipt
+  records exact quantity/Units, observable reason, photos and supplier/carrier hand-back proof. A
+  Claim opens only when Carres still needs a replacement, repair, collection or other supplier
+  result.
+- **Accept with issue:** Carres accepts physical custody but the exact Unit is controlled and
+  unavailable. The same posted receipt creates the source-linked Supplier Claim and retains GRN
+  evidence.
+- **Purchase Return:** only an approved Claim/outcome creates it. Issuing the document does not
+  move custody. Exact-Unit scan/count, actual collector, time and handover proof create the Stock
+  consequence. Partial collection leaves the remaining Units open.
+
+### 7.5 Purchased showroom display
+
+Hooka/Ohana display goods are Carres purchases, not consignment. A Display Request resolves to Manual
+Purchase/PO. When the model changes, the Unit returns to Carres custody, may go to Hooka/Ohana for
+repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
+changes it.
+
+### 7.6 Supplier-consignment showroom display
+
+Other sofa suppliers such as Dorsettloft may own display stock.
+
+```text
+Display Request approved for consignment
+→ CO lists exact incoming Units and supplier ownership
+→ supplier writes each Carres Unit ID on the package label
+→ Goods Receipt accepts without payable
+→ Stock places supplier-owned Unit at selected showroom
+→ display swap/removal creates Consignment Return path
+→ successful customer delivery of exact Unit creates CSN
+→ Purchasing sends CSN to supplier
+→ Finance matches supplier invoice and settles
+```
+
+A model swap uses one CO external instruction with `COMING IN` and `GOING BACK`. The outgoing return
+record is auto-linked; no duplicate supplier message. Document issue alone does not move either Unit.
+
+### 7.7 Consignment sale notice trigger
+
+Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
+notice. SO creation, deposit, reservation and delivery planning do not.
+
+One notice is created idempotently per supplier × delivery attempt and contains only successfully
+delivered Units. It excludes customer identity/contact/address, customer selling price, discount and
+supplier settlement amount. A customer return never deletes the original notice; an authoritative
+correction preserves lineage.
+
+---
+
+## 8 · Shared UI and writing grammar
+
+### 8.1 Shell and Register
+
+```text
+┌─ destination header · 50px · title 24px · no icon ──────────────────────────┐
+├─ toolbar · search / filter / sort / display / export ───────────────────────┤
+├──── 240px local rail ────┬──────── full-width register table ───────────────┤
+│ record facets            │ 36px header · 38px rows · 32px footer           │
+│ concrete work facets     │ row inspector; safe bulk actions only           │
+└───────────────────────────┴──────────────────────────────────────────────────┘
+```
+
+The local rail helps find records and work; it does not become a second Work Engine or show PIC
+summary. Action ownership uses structured avatar metadata.
+
+### 8.2 Object Detail
+
+- View is full width and usually one scroll: WORK, authoritative facts, lines/Units, source,
+  connections, evidence, corrections and History.
+- Tabs exist only for parallel/reference surfaces: Document, Revisions where applicable, History and
+  `Order Route`.
+- Use `Order Route`, never `RelationMap`, `RelationshipMap` or `Relation Map`.
+- A formal outside-readable document uses 50% edit/check + 50% live PDF preview only during
+  issue/edit/revision. It returns to full-width view after completion.
+- **THE 50/50 BINDS FROM 1130px** (measured: two 565px halves is the narrowest a readable A4 preview
+  and a full decision column both fit). Narrower, the surface STACKS — decision work first, the
+  document below it keeping a readable height — and the surface scrolls. Nothing is compressed:
+  walked at 1129px on 2026-08-24, a one-column grid squeezed the decision pane to 208px and clipped
+  the cost block, the blocker and both buttons with no scrollbar, because the row reported that it
+  fitted.
+- **ONE COMMUNICATION AREA PER DOCUMENT.** The doors out of the Portal (`Copy message`,
+  `Open WhatsApp group` / `Open WhatsApp`, `Open email`, `Download PDF`) and the act
+  (`Record the PDF sent`) are drawn by ONE component on every surface that chases a document. Two
+  sets of send controls on one object is two accounts of what happened to it.
+- **`Download PDF` HANDS OVER A PDF.** Never a link to the JSON payload behind it: a page that
+  shows an API response as if it were a document teaches the operator that the document is
+  unreliable.
+- Internal Manual Purchase and Display Request objects have no empty PDF preview.
+
+### 8.3 Two-line fact/action copy
+
+Official UI language is English at primary-school reading level.
+
+```text
+Supplier date is missing
+[YJ] Ask Dorsettloft for the delivery date
+```
+
+Line 1 is the authoritative blocking fact. Line 2 is a smaller 11px action. The avatar is structured
+owner metadata, not part of the sentence. Object number, supplier/customer and owner name are not
+repeated when their column/header already supplies them. A sentence names recipient + action +
+object/result where needed; vague `Send`, `Handle`, `Follow up` or `Check it` is not allowed.
+
+### 8.4 Action contract
+
+```text
+Trigger
+Owner rule
+Resolved owner
+Action
+Completion fact
+Governed due date
+Source object
+Cover rule
+```
+
+My Work omits the current user's repeated avatar. Team Work groups by resolved owner. Leave/buddy
+cover changes who sees today's work while preserving normal owner and cover evidence.
+
+The owning module supplies stable action identity, source, trigger, due date/calendar, recipient,
+required result, completion fact and exact deep link. Work composes these actions and writes no
+business outcome. Managers, including the governed Operations Manager accounts, supervise through
+`Team Work`; the normal owner group survives even when a dated cover or Operations Superuser acts.
+Module Register rails remain factual filters and do not copy central Work actions.
+
+---
+
+## 9 · Page blueprints
+
+### 9.1 SO Batch Purchase
+
+**Purpose / source:** system-generated uncovered SO lines only; no `+ New`.
+
+**Table listing frame — APPROVED / LOCKED, Owner correction 2026-08-29.** SO Batch inherits the
+shared Register Kit's complete light four-sided frame around its Work Toolbar, table and fixed status
+footer. It does not add a page-local second frame. This is not a card around the page and not a box
+around every row. Selecting a row replaces the Register's top Work Toolbar in the same fixed-height
+band with the summary, `Clear`, PO Duty chip and `Issue PO` on the left, and valid outputs such as
+`Export Excel` at the far right. The primary action is never placed in a second bar below the table
+or at the bottom of the viewport.
+
+**Left rail — APPROVED / LOCKED, latest owner ruling 2026-08-30.** The rail lets an operator inspect
+what remains unordered, when each order should be placed, which product category and which actual
+supplier and delivery region — with every label fully readable. It does not repeat central Work or
+expose Sales/Catalog actions to Operation. Six sections, in this exact order:
+
+An unavailable row explains its own blocker inside that Sales Order's framed expansion. Missing
+Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {item} in Catalog` on
+the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
+
+```text
+TO ORDER
+  All not ordered
+
+ORDER TIMING
+  Can order early
+  14 safety days left
+  1–13 safety days left
+  No safety days left
+  Not enough production days
+
+PRODUCT
+  All products
+  Mattress
+  Bedframe
+  Sofa
+
+SUPPLIER
+  All suppliers
+  [actual supplier names, alphabetical — never hardcoded]
+
+REGION
+  All regions
+  Klang Valley
+  [actual outstation Delivery State names, alphabetical]
+  Others                    ← only when Delivery State is not recorded
+
+SETUP TO FIX              ← the whole section renders only when at least one affected SO exists
+  Production days not set
+```
+
+- **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
+  governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
+  `Issue PO` selection. One filter may be selected per section; filters from different
+  sections combine; clicking a selected timing row again clears it; `All products` and
+  `All suppliers`, and `All regions` clear their sections; clearing every filter restores the
+  complete permanent Register, Ordered records included. `All not ordered` remains the
+  explicit outstanding-only filter.
+- **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
+  quantities or PO counts. Each section's counts update against the other selected sections,
+  so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
+  the five timing rows, the three product rows and the setup row) print
+  their live count, zero included. A supplier or region appears only while it has a matching SO
+  under the other active filters — except the currently selected row, which stays visible with `0`.
+- **`All not ordered` reads the permanent Register's exact coverage facts** — for each SO line,
+  customer quantity less Ready Stock already taken and less non-cancelled PO lineage. A generic
+  Open PO SKU pool may prevent the same units being issued twice today, but it does not make that
+  Sales Order ordered and must not remove it from this count without exact `po_line_sources`
+  evidence. The issue leaf is an action contract, never the count authority.
+- **Product comes from the authoritative Catalog category** — never SKU text, model name,
+  description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
+  under every matching category and still appears once in the Register. Records outside the
+  three categories remain visible under `All products` and never silently leave the
+  permanent Register.
+- **Supplier uses the same projection as the Register's `Supplier` column** — the resolved
+  outstanding-demand supplier plus the issued PO lineage supplier
+  (`soBatchOrderSupplierNames`), no second browser-only supplier calculation. Actual names
+  only, alphabetical. There is no `No supplier` fact category: an unexpectedly missing
+  supplier fails at Catalog authority; its concrete `Check the supplier` action belongs to the
+  responsible owner's central Work list, not this Operation rail.
+- **Region reads the server's recorded Delivery State** — never customer text, supplier address or
+  a postcode guessed on this page. Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`;
+  every outstation state keeps its own name; a missing state remains findable as `Others`.
+- Every timing row remains orderable. `Can order early`, `1–13 safety days left`,
+  `No safety days left` and `Not enough production days` express timing risk, never
+  `Cannot buy`. Order By is a planned date, never an unlock date.
+- `Production days not set` is the only normal setup blocker on this surface. It belongs to
+  Purchasing Settings, and its lines are not selectable until the Supplier × Category
+  production days exist.
+- **The readable rail shell (Card 02-C):** 240px wide · 12px outer padding · 8px heading →
+  first row · 20px between groups · 36px minimum row · a wrapped label takes its natural
+  height (≥ 48px) in the same body font. A governed label is never truncated and never
+  hidden behind a tooltip; the count stays visible and right-aligned; the rail scrolls
+  vertically as supplier names grow; at narrow desktop widths the Register scrolls
+  horizontally and the rail is never squeezed below 240px. The shell/group/row grammar is
+  the shared `FilterRail` component (`workspace-rail.tsx`). Manual Purchase imports the
+  same shell, grammar, daily-work lens, Product authority and unique-object count rule (§9.2,
+  Card 06). Its `ORDER TIMING` reads Manual `Order By`; it never imports SO Safety-days arithmetic
+  or the SO-specific meaning of `All not ordered`.
+- **The rail may hide completely.** Its top-right `Hide filters` control uses the same governed
+  panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
+  the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
+  that staff browser. This is one local-filter control, not another module-navigation control.
+- **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
+  never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
+  bottom action bar. The selected bar direction is
+  `1 selected · 1 unit · Issue 1 PO  [Clear]  [YJ]  [Issue PO]          [Export Excel (1)]`.
+  `[YJ]` is a compact structured owner
+  avatar chip; hover/title reads `Yu Jun · PO Duty`. A dated cover replaces the initials and title
+  with the cover identity. The action sentence never names Yu Jun. The chip states normal ownership;
+  button authority comes from §5.3, so duty/cover, Jess and `operation@carres.com` see the live action.
+- Fully covered / `Buy = 0` DEMAND leaves the buying selection — it is not offered a tick, and
+  the leaf listing drops it — but the SALES ORDER'S ROW never leaves (Card 02-B). If a PO is
+  cancelled and the quantity is still required, the selectable demand returns automatically by
+  recomputation; nothing is stored.
+- A line whose customer date, SKU or supplier is unexpectedly missing fails safely at its owning
+  boundary (Sales / Catalog). It is named on its own row; the owning person's central Work action
+  deep-links to that owning door. It never becomes a local rail category and is never silently
+  defaulted.
+- Every category derives from the one server planning engine. There is no second stored status.
+- Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
+  `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
+  `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
+  `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
+  `Waiting` · `Next Action` · `Buffer`.
+
+**Safety days — APPROVED 2026-08-26.** The visible term is `Safety days`; `buffer` never reaches
+a screen. `Safety days = 14 working days` on the governed Office working calendar and holidays;
+`Production working days` is the existing Supplier × Category setting on the supplier's configured
+work week and holidays. The one server planning engine owns the arithmetic — browser code performs
+no working-day arithmetic, and Safety days are subtracted exactly once:
+
+```text
+Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
+Goods Must Arrive − Supplier × Category production working days  = Order By
+```
+
+Timing classification, derived by the same engine:
+
+```text
+today < Order By                                                   → Can order early
+today = Order By                                                   → 14 safety days left
+today > Order By · completion lands 1–13 working days early        → 1–13 safety days left
+expected production completion = Requested Delivery Date            → No safety days left
+expected production completion > Requested Delivery Date            → Not enough production days
+```
+
+`Order By` stays fixed for a demand unless an authoritative source fact changes; `Safety days
+left` changes as working days pass. The Settings row reads
+`Safety days · 14 working days` with the line `Extra time allowed for delays.` — the one existing
+governed setting and engine field, never a second Safety-days field or arithmetic.
+
+**THE PERMANENT ORDER REGISTER — APPROVED / LOCKED, owner ruling 2026-08-27 (Card 02-B).**
+The right Register shows **one row per proceeded physical-goods Sales Order**
+(`orders.status = 'proceed_order'`; `place` is not proceeded; Service-only orders stay outside
+Purchasing), and the row never leaves when a purchase order is issued — the page is both the
+buying surface and the permanent purchasing audit register.
+
+**THE PROCEEDED-ORDER BOUNDARY — APPROVED / LOCKED, owner correction 2026-08-27.** A complete
+Sales Portal final submit completes the canonical `Proceed` transition automatically in the same
+database transaction; the salesperson does not press a second button. A submitted order that is
+still missing a governed Proceed fact remains `place` and stays outside Purchasing. When payment,
+address, date or a governed correction supplies the last missing fact, the same transition is
+retried automatically. `Move to Proceed` remains only as a recovery door for legacy/raw records.
+`orders.status = 'proceed_order'` is the authoritative Purchasing boundary.
+`orders.sales_final_submitted_at` is the final-submit/retry fact that lets the system re-test that
+boundary after a later correction. Raw, office, rental and imported orders do not receive it.
+Historical Portal and raw records cannot be separated truthfully from
+creator role or completeness, so legacy recovery accepts only exact IDs confirmed by Principal,
+requires a written reason, rejects office/rental/imported records and records
+History + Audit before using the canonical transition. The retry runs at the final transaction
+state, so a multi-part Sales revision cannot enter Purchasing on an intermediate total.
+
+**PRODUCTION-VERIFIED 2026-08-28 (Card 02-D cutover).** Merge `97b7acd2` live on all five
+governed surfaces; migrations `0396_sales_final_submit_is_the_handoff` and
+`0397_retire_the_unguarded_sales_order_birth_door` applied in the governed order (0397 only
+after the Worker SHA was verified), so `create_order` no longer carries a direct authenticated
+grant. The five handoff behaviours were proven against production with rolled-back probes, and
+the Owner-confirmed legacy recovery ran as one Principal batch: 32 exact IDs recovered with a
+written reason (History + Audit per order), 20 entered the Register immediately (4 → 24 rows),
+12 stayed `place` with their named blockers, and 7 candidates without POS submit evidence were
+deliberately not recovered. Walked on the real Operation account: 24 rows, real buying lines on
+expand, rail counts matching the register facts, and the live PO-duty holder named.
+
+The read boundary is still drawn ONCE, at `loadToOrder`, before the engine ever sees a line — so a
+genuine `place` order is invisible to the WHOLE surface: no planning, no netting (it cannot consume
+Open PO coverage ahead of a proceeded order), no rail count, no Register row, no selection, no
+Ready Stock take and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the
+same read at POST time; a demand naming a `place` order resolves to nothing and is refused by name,
+creating and reserving nothing. Every rail count — timing, Product, Supplier — draws from this same
+proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a timing facet shows
+only rows satisfying both.
+
+**Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
+Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
+`Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky
+during horizontal scrolling. `Proceed Date` reads `orders.proceeded_at`: the actual date Sales
+handed the complete order to Operations. It never reads `orders.proceed_date`, the planned
+production-start date. Retired as Register columns, never to return: `Source SO` ·
+`Required For` · `SKU / configuration` · `Required` · `Stock` · `Open PO` · `Buy` ·
+`Goods Must Arrive` · `Work` · `Action` — their FACTS survive off-screen (`goodsMustArrive`
+keeps feeding the rail and Work Engine; structured actions keep feeding central Work).
+
+- **Status is derived, never stored:** blank · `Partial` · `Ordered`, from the quantity that
+  genuinely requires purchasing (demanded minus Ready-Stock coverage) against the quantity
+  covered by a NON-CANCELLED purchase order whose CURRENT PDF version has confirmed-sent
+  evidence (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`).
+  `external_open` never counts; supplier silence changes nothing; a numbered but unsent PO shows
+  under `PO No` with blank Status; a new unsent revision invalidates older-version completeness;
+  received lineage with valid evidence stays `Ordered`; a fully Ready-Stock-covered order stays
+  visible, blank and unselectable.
+- **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
+  `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
+  `purchase_orders.eta_date`, the official supplier-facing date — never `expected_ready_date`,
+  never the internal `Goods Must Arrive`, never an "if ordered today" estimate.
+- **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
+  `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
+- **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
+  a Partial order selects only its uncovered remainder; Ordered and fully Ready-Stock rows refuse
+  the tick; part-selected children render the checkbox indeterminate; the header checkbox covers
+  visible eligible demand only. The issue contract remains the leaf `SoBatchSelection[]`.
+
+**Journey:** choose ready orders/lines → group by supplier → change/split destination if
+exceptional → 50/50 check grouped POs → send PDFs.
+**Object/placement:** the row expand is **`GoodsMiniTable`**, the ONE child table Sales Orders and
+Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24; widened with the
+optional `Covered by` · `Supplier` · `PO Delivery Date` columns 2026-08-27 — siblings that do not
+ask render byte-identically). It says only what the ROW cannot: per item line, what covers it
+(`Ready Stock` · the exact PO numbers · `Not ordered yet`), the Unit ID where one is allocated
+(read through the Sales Order expansion door), the exact supplier/`Deliver To`/`PO Delivery Date`
+mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
+duplicate demand editor and no second mini-table.
+**Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
+late, price changed, split destination.
+**Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
+
+**THE DOCUMENT PARTITION — ONE CONTRACT, BOTH SIDES.** A purchase order is one
+`Supplier × Deliver To × Category × (one-PO-per-order category ? Source Order : —)`. The browser and
+the server compute that key from the same facts (`documentPartitionKey`), so `Issue N POs`, `1 of N`,
+the commercial decisions, the server's grouping and the number of purchase orders created cannot
+drift apart; the server still recomputes it from its own recomputation, which is agreement rather
+than trust. A commercial decision names the exact document it belongs to, and a duplicate, foreign,
+stale or partial-coverage decision is refused BY NAME. A `Deliver To` split therefore buys the
+demand ONCE: lines are composed from the ALLOCATION, not from the whole build.
+
+**EVERY PO LINE CARRIES ITS SOURCE.** `po_line_sources` records which customer order, SO number and
+order line each unit is for, validated in SQL rather than trusted, and the parts must add up to the
+line. The supplier-facing document prints that breakdown, so a bulk purchase order no longer shows a
+blank `SO NO`.
+
+### 9.2 Manual Purchase
+
+**Purpose / source:** non-SO internal buys under the approved §5.2 purpose vocabulary:
+`Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` ·
+`Subsidiary Purchase` · `Other Purchase` (Card 04, 2026-08-29 — only `Other Purchase`
+asks `What is this for?`).
+
+**Left rail — OWNER-CORRECTED 2026-08-29 (Card 06 supersedes Card 03's four-section
+shape; Card 03 remains the shipped shell/count history); PRODUCTION-VERIFIED on merge
+`87ef0e2812fc80271d1e527f74513571b32466e9` 2026-08-30** (PR #987; no migration; walked
+authenticated on the live `operation@carres.com` account: the exact seven sections with
+live unique-MPR counts, `ORDER TIMING` deriving `Order date passed 1` for the real
+`MPR-20260829-2779` from the configured lead days, the timing filter narrowing to exactly
+that request, and `SETUP TO FIX` honestly absent with no affected request — Card 06 §12
+holds the complete evidence, including the create form's server-proposed Delivery Date
+and the `Approve {MPR}` Work hand-off grouped under Jess, due on Order By, deep-linking
+the exact object).** The vocabulary's applied door authority is
+migration 0399 (2026-08-28), widened by 0401 (Card 04) with `other_purchase`; the sixth
+rail row arrives through the one shared `DEMAND_PURPOSES` list, so the rail and the doors
+cannot drift. The shared 240px
+`FilterRail` shell Card 02-C built — same group-heading typography and spacing, same blue
+`NavRow` active treatment, no checkboxes, labels wrap and never truncate, counts visible and
+right-aligned, rail scrolls vertically, Register scrolls horizontally when narrow and the
+rail is never squeezed below 240px. Seven sections, in this exact order:
+
+```text
+WORK TO DO
+  Approve purchase
+  Issue PO
+  Check the supplier
+  Add production days
+  Add transit days
+
+TO ORDER
+  All not ordered
+
+ORDER TIMING
+  Can order early
+  Order date reached
+  Order date passed
+
+PURCHASE PURPOSE
+  All purposes
+  Ready Stock
+  Showroom Display
+  Service Case
+  Internal Staff Purchase
+  Subsidiary Purchase
+  Other Purchase
+
+PRODUCT
+  All products
+  Mattress
+  Bedframe
+  Sofa
+
+SUPPLIER
+  All suppliers
+  [actual supplier names, dynamic and alphabetical — never hardcoded]
+
+SETUP TO FIX
+  Production days not set
+  Transit days not set
+```
+
+- The default no-filter Register is the permanent Manual Purchase listing, ordered history
+  included. Counts are UNIQUE Manual Purchase requests, cross-computed against the other
+  selected sections. One filter per section; sections combine with AND; each `All …` row
+  clears only its own section; a second click on the active row clears it.
+- `WORK TO DO` is a local action lens over central Work's same stable action identities, not a
+  second queue. All five rows remain visible with zero. `Approve purchase` is submitted and
+  undecided approval; `Issue PO` is approved remaining demand; the other three name the exact
+  Catalog/Settings repair. `Need approval` and `Ready to order` retire from `TO ORDER` because
+  their capability has moved to these concrete action rows without duplication.
+- Everyone permitted to read Manual Purchase may use these rows as filters. The filtered
+  Register/object names the real action owner; a filter never grants approval or PO authority.
+- `All not ordered` = live quantity not yet fully issued to a PO. Fully ordered requests leave
+  this filter but stay searchable in the permanent Register.
+- `ORDER TIMING` reads the request's earliest calculated `Order By`: today before it =
+  `Can order early`; today equals it = `Order date reached`; today after it =
+  `Order date passed`. These are filters and facts, not permission gates; an authorised issuer
+  may buy early.
+- `SETUP TO FIX` renders only when an affected request exists. `Production days not set` and
+  `Transit days not set` state the configuration fact; their owning actions and Settings links
+  live in `WORK TO DO`. The engine never invents a date.
+- Product is the authoritative Catalog category — never SKU text or a browser-only mapping.
+  Supplier is the demand line's Catalog-derived supplier (plus identical PO lineage) —
+  derived, never selected by Operation; actual names only, alphabetical; the selected
+  supplier stays visible with `0`.
+- **Banned rail rows, never to return:** `Supplier not selected` · `No supplier` ·
+  `Not in catalog` · `Need price` · `Ordered` · `Part received` · `Received` · `Arrived` ·
+  `Cancelled` · `My drafts` · `Need correction` · `Queues` · safety-days rows. A missing SKU or
+  supplier is named inside the affected request and handled through
+  its owning Catalog boundary; it never becomes a permanent rail facet. Price is not a rail
+  state or filter.
+- The rail says `Approve purchase`; the Register/object shows the real action owner's name —
+  the governed sentence `{name} approves` beside `Waiting for approval`, naming the resolved
+  `ops_manager` duty holder(s); a robot or shared-password login never prints while a named
+  person holds the duty; nothing resolved prints nothing.
+  The approver is the configured Purchasing Settings manager gate — Jess today, changeable
+  without redesigning this rail; Jess may approve a purchase for herself. Operation
+  prepares and submits; it does not approve and does not control price. Approved requests
+  continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
+  Purchase remain separate doors.
+- **The decision renders only for who the SQL door would pass (fixed 2026-08-29).**
+  `purchasing_decide_request`'s gate (`purchasing_settings_gate`, 0360) is the `principal`
+  role or the real `ops_manager` position duty — no legacy-email pass — and `canApprove`
+  (the Approve/Refuse controls AND the approver-only money) asks exactly that, never the
+  wider daily-surface manager check that admits the shared `operation@` login. Card 04's
+  production walk measured the disagreement (`MPR-20260829-2779`: controls offered, door
+  refused with the raw word `forbidden`); the door's 42501 now leaves as the governed two
+  lines (`not_purchase_approver`), naming the resolved approver.
+- **The vocabulary's applied door authority is migration 0399** (2026-08-28): two Card-03
+  build lanes collided on 0398, and the intermediate `0398a` apply left two inert
+  `purchasing_purpose_approval` rows (`internal_staff`, `subsidiary`) that 0399 documents
+  and tolerates; the repo's `0398_a_purchase_names_the_approved_purpose.sql` is superseded
+  by 0399 and must never be applied. The vocabulary itself is unchanged from the owner
+  ruling above.
+
+**THE PERMANENT REGISTER — APPROVED / LOCKED, Card 04 (2026-08-29); PRODUCTION-VERIFIED
+on `a1d11d53` 2026-08-29** (migration 0401 applied; walked authenticated — the live door
+minted `MPR-20260829-2779`). One Manual
+Purchase request per parent row, on the same Register engine and visual grammar as Sales
+Orders (`register/DataGrid`, `appearance="reference"`, 36px header / 38px rows / 32px
+footer, sticky Manual Purchase identity, horizontal scroll that never squeezes the 240px
+rail). The default population is the COMPLETE permanent history, ordered records included —
+`All not ordered` stays an explicit rail filter, never a silent default. Default order:
+newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
+`Order By` first, then newest Proceed Date.
+
+**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06);
+PRODUCTION-VERIFIED on `87ef0e28` 2026-08-30 together with the date contract below (the
+issued PO's `eta_date` now IS the approved Manual Delivery Date, and the issue partition
+adds Delivery Date — different approved dates create different POs through the one
+`purchasing_issue_pos_batch` door):** Proceed Date ·
+Approval Status · Manual Purchase No · PO No · Delivery Date · For · Items · Qty · Supplier ·
+Deliver To · Requested By.
+
+- `Proceed Date` is the Malaysia date of the successful `Send for approval` header transaction,
+  projected from the actual `created_at`. It is immutable and never approval date, PO issue date,
+  Delivery Date or calculated Order By.
+- `Delivery Date` is `purchase_requests.required_by`: when supplier goods must reach `Deliver To`,
+  not a customer promise or physical receipt time. With complete Catalog/Settings, the create form
+  defaults it to the latest `expectedArrivalOf(Settings, Proceed Date)` across selected lines.
+  Staff may move it; the engine never silently overwrites a chosen value.
+- `Order By` is derived for every line by walking Delivery Date backwards through supplier transit
+  days on the Office calendar and Supplier × Category production days on that supplier's calendar.
+  One request uses the earliest line result. It drives timing/work and the optional quiet
+  `Order by {date}` second line; it is not another parent column or stored date.
+- Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
+  Carres. Missing production/transit Settings produce no default or Order By.
+- `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
+  `No approval needed`); while approval is needed a quiet second line names the real
+  configured approver — `{name} approves` (Card 03 §3's arithmetic).
+- `Manual Purchase No` is the identity and link, sticky during horizontal scrolling. New
+  requests mint `MPR-YYYYMMDD-RRRR` (§6.1 allocator, 0401); historical numbers print
+  exactly as stored.
+- `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
+  demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
+  `Not ordered yet` · the one clickable number · `{n} POs`. Never a UUID, never a
+  SKU/supplier/date inference.
+- `For` is the structured object the purchase serves (§5.2): destination context for
+  `Ready Stock` / `Showroom Display`, the linked Service Case, the real staff member, the
+  actual subsidiary, or `Other Purchase`'s required answer. A historical row without the
+  structured fact prints nothing.
+- `Items` speaks Catalog human words through the ONE item-label arithmetic
+  (`railItemLabel`): one item's name, or `{first item} + {n} more`; the SKU stays
+  searchable and shows in the expansion. `Qty` is the total originally requested
+  quantity, never the remainder. `Supplier` is Card 03's Catalog-derived projection —
+  one actual name or `{n} suppliers`, never `Supplier not selected`. `Deliver To` prints
+  the governed destination, `Multiple` when several. `Requested By` is the real staff
+  name — never a shared account, role, email or `(you)`.
+- **Purpose is NOT a parent column** — it lives in the rail, the expansion context and
+  the object. Banned parent columns, never to return: `Purchase Purpose` · `Order late` ·
+  `Need price` · `Part received` · `Received` · `Arrived` ·
+  `Work` · `Next action` · `Reason` · `Remark` · `Price` · a permanent PO Duty ·
+  row action buttons.
+
+**The row expansion** is ONE quiet read-only child table — `SKU · Item · Requested Qty ·
+Approved Qty · Ordered Qty · Still To Order · Supplier · Deliver To · PO No` — using the
+one governed remainder arithmetic (`manualPurchaseLineRemainingOf`: the approver's number,
+falling back to the ask, less what was issued, floored at zero — the same function the
+issue door and issue-costs read). No Approve/Refuse/Receive, no price editing, no PO
+creation and no PDF preview inside it.
+
+**Selection and PO Duty.** Only requests whose derived status is `Ready to order` with
+live remaining quantity take the tick. With no selection there is NO PO Duty block,
+initials or reminder anywhere on the page; with a selection, PO Duty appears once beside
+the one issue action — `{n} selected · {u} unit(s) · Issue {p} PO(s)`, the resolved
+person, `Issue PO` — where the PO count is the same document partition the issue door
+groups by (supplier × category × destination × purpose × Manual Delivery Date, merged across
+requests only when every fact matches). One PO has one official supplier-facing Delivery Date;
+different dates therefore report and create different POs. The issued PO saves the approved
+Manual Delivery Date instead of recomputing an ETA from issue day. Work ownership and reminders
+stay in central `Work`; issuance authority remains the one `purchasing_issue_pos_batch` door.
+
+**THE OBJECT DETAIL — APPROVED / LOCKED, Card 05 (2026-08-29); PRODUCTION-VERIFIED on
+`a43de3b7` 2026-08-29** (PR #984; no migration; walked authenticated on the live
+`operation@carres.com` account against the real `MPR-20260829-2779`: full-width six-section
+object, `Requested By` honestly `Staff identity not recorded` for the shared-login record,
+Approval showing `Need approval · Jess approves` with NO money and NO controls, `Not ordered
+yet` lineage, History `Purchase requested` in the three-rank grammar, and `‹ Manual Purchase`
+restoring the Register; the approver money/decision surface and the prev/next stepping were
+proven on the same SHA's seeded dev walk plus the API contract tests — Jess's live positive
+walk remains hers). Clicking `Manual Purchase
+No` opens WORK: one full-width, one-scroll object on the approved Object Header + Summary +
+Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
+720/900px islands. Sections, exactly and in this order:
+`Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
+
+- **Object Header** — the shared object identity header (the Sales Order / Delivery Order
+  implementation, Law C): one back destination `Manual Purchase` that restores the complete
+  Register state the operator left (the grid stays mounted underneath — rail filters, search,
+  column filters, sort, scroll and expansion survive); the actual `MPR-…` identity; one derived
+  state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
+  keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
+  page title, pseudo-tab, breadcrumb or PDF action; no new edit/delete/undo/take-back door.
+- **Request** — `Proceed Date · Delivery Date · Need for · For · Deliver To · Requested By`, in
+  that reading order. Proceed Date is the actual successful request hand-off; Delivery Date is
+  supplier-goods arrival at Deliver To. With a complete plan, a quiet second line reads
+  `Order by {date}`; if passed, the fact first states `Order date passed`. `Requested By` is the
+  real individual resolved server-side; a
+  shared-account record reads `Staff identity not recorded` — a person is never invented. A
+  pre-Card-04 stored reason stays visible under the historical `Why`.
+- **Items Requested** — read-only `SKU · Item · Supplier · Requested Qty · Deliver To · Note`;
+  Catalog human words beside the explicit SKU; a missing Catalog supplier is a named fact on
+  the line (`No supplier yet` + the Catalog act) and never a rail facet.
+- **What We Already Have** — `SKU · Free Stock · Already On PO · Still Needed` per live SKU,
+  through the one shared arithmetic (`stillNeededOf`) and the same stock/open-PO reads the
+  create workspace uses. Decision facts, not buttons and not Work rows.
+- **Approval** — always present. `No approval needed`; or `Need approval` + `{name} approves`
+  for a viewer without the gate; or, for the actual approver only, one line per live SKU
+  (`SKU · Requested Qty · Still Needed · Approved Qty · Transaction Cost · Line Total`) with
+  `Approved Qty` prefilled once from Still Needed (whole 0..Requested; a human edit is never
+  overwritten by a refetch), `Approve` as the one primary action, `Refuse` neutral behind a
+  required `Decision reason`. Cost is read-only approval evidence, never an Operation price
+  control. A decision is atomic and final; success STAYS on the object, refetches the facts,
+  removes the controls and appends History. A decided object shows the fact, the real actor,
+  date/time and (approved) the per-line quantity / (refused) the reason.
+- **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
+  `Ordered Qty` · `Still To Order` · `PO Issued` (`placed_at`) · `PO Delivery Date` (the
+  ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
+  it, else the issue-stamped date) · `Supplier Delivery Date` only when that ledger proves a
+  change (unchanged reads `Same as PO`). No lineage reads `Not ordered yet`. **The PO number
+  IS `purchase_orders.id`** — no `po_no` column exists; Card 05 fixed the latent register read
+  that selected one (it would have 400'd the whole Register on first lineage).
+- **History** — the final section: `Today · Yesterday · Earlier`, the locked three-rank record
+  grammar, stored facts only (`Purchase requested` · `Purchase approved` · `Purchase refused`
+  · `Marked not going ahead` · `Purchase order issued`). Real individual actor and actual
+  server time; an event whose individual was never stored (line cancel, PO issue,
+  shared-account creation) reads `Staff identity not recorded`; nothing infers that a supplier
+  received a PO or that goods arrived.
+- **What the object does NOT hold** — no second `Issue PO`, consolidation prompt (`Issue as
+  one PO?` is retired with the old detail), PO Duty block, transaction-cost editor, Receive
+  button, receipt quantity or PDF preview. Card 04's selected Register action is the only
+  Manual Purchase issuance placement; issued demand belongs to `Purchase Orders` and the one
+  shared Receiving engine. There is no Manual Purchase receipt lane.
+- **One decision refusal dictionary** (Card 05; shared `purchasingRefusal`): the 0360 door's
+  refusals leave as the governed two lines — `not_purchase_approver` (naming the resolved
+  approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
+  `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
+  role or an email.
+- **Work Engine boundary — owner-corrected by Card 06:** undecided approval supplies
+  `Approve {MPR}` to the configured real approver, due no later than Order By and completed only by
+  the stored decision. Approved remaining demand supplies `Issue the purchase order for {MPR}` to
+  normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
+  current PO version has confirmed-sent evidence. Both deep-link the exact source; the local
+  `WORK TO DO` rail filters these same identities and never becomes a second queue or manual Done.
+
+**Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
+structured For object → enter goods/quantity/destination → system previews Proceed Date and
+defaults Delivery Date from Settings → Send records actual Proceed Date → approval → approved
+demand goes to PO Duty by Order By.
+**Exceptions:** duplicate stock, missing quantity/date/destination, unapproved price,
+missing governed Catalog/supplier relationship, refused/withdrawn request.
+**Connections:** Catalog, Stock planning, Display Request, Purchase Demand, PO, Service Case.
+
+### 9.3 Purchase Orders
+
+**Purpose / source:** every numbered supplier purchase commitment and version. No blank independent
+PO; source is approved demand.
+**Left rail — OWNER-CORRECTED 2026-08-31 (Card 07):** the open 240px rail has no visible generic
+`Filters` title. It uses business groups and the existing filter truth/counts:
+
+```text
+PURCHASE ORDERS
+  All purchase orders
+
+DOCUMENT
+  PDF not sent
+  Version changed
+  Send the new version to supplier   ← line 2 of the same row/count
+
+DELIVERY DATE
+  Supplier date missing
+  Supplier date passed
+
+RECEIVING
+  Partly received
+  Completed
+```
+
+The version row is one `supplier_update_required` filter, not two rows. Its fact and action are
+deliberate separate lines; the em dash and the ambiguous phrase `supplier update required` never
+render. Grouping changes no population, filter key, count, permission or completion fact.
+**Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
+commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
+`Supplier Delivery Date` Register column appears only when the supplier has changed that date;
+unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
+any of these dates.
+**Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
+Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
+**Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
+outbound fact → record supplier date or exception → monitor receipt balance.
+**Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
+History, Order Route.
+**Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
+overdelivery, price change, cancellation and post-send destination change.
+**Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
+
+### 9.4 Receiving / GRN seam — OWNER CORRECTION 2026-08-29
+
+This section supersedes the stale `Goods Receipts` rail, status legend, `Source`, `Arrival Date`,
+`Expected`, `Accepted`, `Rejected` and Receiving `Work` column proposal that formerly lived here.
+The separate Receiving owner review owns its final page presentation; Purchasing binds these shared
+facts only:
+
+- Navigation/workspace is `Receiving`. The supplier gives the Supplier DO; Carres creates the Goods
+  Receipt and numbered GRN only after physical receiving.
+- One Receiving engine handles PO and CO arrivals. SO Batch Purchase and Manual Purchase both pass
+  through the one PO authority and this same Receiving engine; no Manual receipt lane exists.
+- Source `Deliver To` is authoritative. The normal default is the configured Carres warehouse; a
+  showroom is an explicit source exception.
+- `Goods Received At` is the physical receipt date only. It never means keyed, submitted or posted
+  time and never replaces PO Issued, PO Delivery Date or Supplier Delivery Date.
+- Quantity words are `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
+  `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
+  Pending Delivery Qty and never create available stock.
+- Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
+  creates the GRN once and moves only valid received goods into Stock custody.
+- Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
+  deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+
+No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
+
+### 9.5 Supplier Claims
+
+**Purpose / source:** Purchasing workstream for a supplier-responsible Service Case or receiving
+problem; no second problem intake.
+**Left rail:** `Supplier reply missing`, `Carres decision missing`, `Item outcome missing`, `Supplier evidence missing`, `Closed`.
+**Columns:** Claim No., Supplier, Source Case/GRN/PO, Unit, Problem, Requested Result, Supplier Reply,
+Authorised Outcome, Work.
+**Journey:** open source evidence → issue claim pack where needed → record supplier response → obtain
+authorised outcome → system offers only valid downstream document.
+**Object/placement:** full-width claim record; 50/50 only when producing/revising an external claim
+pack.
+**Exceptions:** supplier denies responsibility, no source Unit, replacement vs repair dispute,
+commercial credit mismatch.
+**Connections:** Service Case authority, Goods Receipt, Unit, Purchase Return, Repair Order, Finance.
+
+**THE FOUR LAYERS ARE COMPLETE — APPROVED / LOCKED, owner ruling YH 2026-09-01 (migration 0409).**
+Loo's claim model (`Customer Problem → Supplier Response → Carres Resolution → Carres Execution`,
+ruled 2026-08-05) carried three built layers and one frozen. `Carres Execution` is now built —
+`Return to Supplier · Collect Defective Item · Replace First · Collect First · Exchange on
+Collection` — and it is the argument §9.6 and §9.7 were waiting on. Both remain unbuilt; this
+unfreezes them, it does not create them.
+
+**THE LAYERS ARE NOT CROSS-VALIDATED, AND THAT IS THE RULING (YH, 2026-09-01).** An incoherent
+pair — `Replace First` with `No Replacement Required` — is accepted by the database on purpose.
+**Flexibility wins over the guard**, for two reasons the owner accepted:
+
+1. A CHECK across the two would **collapse two layers the model exists to keep apart.** The moment
+   answering one narrows the other, they are no longer two questions.
+2. It would refuse a real event. The van is already out collecting; the office records
+   `Collect First` because it is happening, while the customer has not yet settled what they
+   want. A matched-pair rule would make an operator type a false answer to record a true one —
+   the failure this repo keeps finding whenever two things that move on different days are tied.
+
+**A consequence engine may revisit this**, because `f(Resolution, Execution)` becomes computable
+only once both are on file. Until that function is ruled, no surface derives a Stock, Finance or
+Demand consequence from either layer.
+
+### 9.6 Purchase Returns
+
+**Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
+`+ New`.
+**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
+**Columns:** Return No., Supplier, Source Claim/PO/GRN, Units/Qty, Collect From, Collection Date,
+Handover, Credit Consequence, Work.
+**Journey:** system creates from outcome → check exact goods → send return PDF → record collection
+date → scan/count at handover → upload proof.
+**Object/placement:** full-width view; 50/50 while issuing/revising.
+**Exceptions:** supplier refuses collection, partial collection, wrong Unit collected, credit note
+missing/different.
+**Connections:** Claim, Stock custody, supplier, Finance credit read-only.
+
+### 9.7 Repair Orders
+
+**Purpose / source:** send a specific Carres-owned Unit for approved supplier/repairer work; no blank
+`+ New`.
+**Left rail:** `PDF not sent`, `Handover out missing`, `Expected back date missing`, `Expected back date passed`, `Return inspection missing`, `Closed`.
+**Columns:** RO No., Repairer, Source Claim/Case, Unit, Problem, Sent Out, Expected Back, Returned,
+Inspection, Work.
+**Journey:** create from approved repair outcome → issue → prove same Unit handed out → chase actual
+date → receive/inspect same Unit → close or route failed repair.
+**Object/placement:** full-width view; 50/50 while issuing/revising.
+**Exceptions:** cannot repair, repairer returns a different physical Unit, date changed, damage added,
+replacement offered.
+**Connections:** Service Case/Claim, Stock custody/history, Goods Receipt/inspection.
+
+### 9.8 Display Requests
+
+**Purpose / source:** showroom staff request a new model, replacement, removal or display change;
+Purchasing chooses the commercial path.
+**Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
+**Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
+Date, Purchasing Decision, Source Order, Work.
+**Journey:** showroom logs in → records simple request/photo/current Unit → Purchasing decides Buy,
+Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
+**Object/placement:** internal full-width object; no PDF preview.
+**Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
+duplicate request.
+**Connections:** Showroom, Catalog, Manual Purchase, CO/CRTN, Stock transfer/Unit.
+
+### 9.9 Consignment Orders
+
+**Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
+no blank `+ New`.
+**Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
+**Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
+Date, Received, Return Handover, Work.
+**Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
+send one PDF → record promise → receive through Receiving → prove outgoing handover.
+**Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
+**Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
+swap, supplier changes model/date.
+**Connections:** Display Request, Stock ownership/location, Goods Receipt, linked Consignment Return.
+
+### 9.10 Consignment Returns
+
+**Purpose / source:** return an unsold supplier-owned Unit after approved removal, paired swap,
+supplier collection, overdelivery or claim outcome; no blank `+ New`.
+**Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
+**Columns:** Return No., Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
+Paired CO, Work.
+**Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
+combined CO PDF → scan exact Unit and prove collection.
+**Object/placement:** full-width view; 50/50 only for standalone issue/revision.
+**Exceptions:** supplier collects wrong/partial Unit, Unit condition disputed, date changed,
+unidentified legacy Unit.
+**Connections:** CO/Display/Claim, Stock custody, supplier. Unsold return creates no refund, credit or
+value posting.
+
+### 9.11 Consignment Sale Notices
+
+**Purpose / source:** system report of exact supplier-owned Units successfully delivered to a
+customer; no `+ New`.
+**Left rail:** `Ready to issue`, `PDF not sent`, `Supplier contact missing`, `Correction must be sent`, `Sent`. Finance invoice/match facts are read-only links, not Purchasing work.
+**Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Source CO, Notice,
+Finance. Customer personal information and selling price are absent.
+**Journey:** Delivery success auto-creates → Current PO Duty checks exact Units → sends notice →
+Finance later reads the same object.
+**Object/placement:** full-width view; 50/50 check/preview during issue/correction.
+**Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
+disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
+**Connections:** Delivery attempt/proof, Stock Unit ownership, source CO/GRN, Sales reference, Finance
+invoice/settlement.
+
+---
+
+## 10 · Work, Quick Rail and Calendar
+
+| Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| `operation_create_po(...)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
-| `operation_create_pos_batch(jsonb)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
-| `_operation_create_po_inner(...)` | EXECUTE to PUBLIC · anon · authenticated | revoked | `42501` |
-| `purchase_orders` direct INSERT | granted + `po_operation_insert` policy | grant revoked, policy dropped | `42501` |
-| `purchase_order_lines` direct INSERT | granted + `po_lines_operation_insert` policy | grant revoked, policy dropped | `42501` |
+| Manual Purchase awaits decision; due no later than its Order By | Configured real purchase approver | `Approve MPR-20260829-2779` | Stored approval or refusal with actual actor/time exists |
+| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
+| Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
+| Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
+| Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
+| PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
+| Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
+| Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
+| Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
+| Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
+| Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
+| Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
+| Consignment Unit sold | Current PO Duty | `Issue the sale notice to Dorsettloft` | Current notice version sent |
+| Supplier invoice missing | Finance/AP Duty | `Ask Dorsettloft to send the invoice` | Supplier invoice fact exists |
 
-**Nothing was dropped except the two INSERT policies.** Both legacy functions keep
-their definitions — they are the construction history of every PO on file, and the
-governed RPC shares their helper.
+Quick Rail may show source, exact Unit, supplier contact, current document/version, destination,
+proof, linked object and read-only foreign-module state. It never edits another module's truth.
 
-**The UI doors that are gone, and stay gone:** Purchase Orders' `+ New PO` and the
-`CreatePOModal` it opened (deleted) · the order drawer's `Issue PO` and
-`Raise PO for shortages`, on Delivery and everywhere else the drawer mounts ·
-Old Orders' door (Card 3). **`POST /api/operation/pos` and `POST /api/operation/pos/batch`
-return 404, not 403** — a compatibility write door is the hidden authority this
-card exists to remove.
+Calendar displays only governed work dates with actual weekday + calendar date. Purchasing /
+Operation uses the Office calendar (Mon–Fri); Receiving / GRN / Warehouse uses the Warehouse
+calendar (Mon–Sat). Sunday and Selangor public holidays are excluded. Recorded business dates are
+never silently moved: PO Delivery Date, Supplier Delivery Date and Goods Received At remain the
+dates actually stated/observed. A computed work due date may use its governed calendar only when
+the rule and resulting date are visible.
 
-**`purchasing_split_line_destination(uuid,int,uuid)` deliberately keeps its grant.**
-It inserts a LINE into a document that already exists and cannot mint a
-`purchase_orders` row, so it is existing-PO workflow, not creation.
+`My Work` is the employee's complete daily list and is the default even for a manager. `Team Work`
+is supervision over the same set: normal owner, dated cover, actual actor, due/late state, named
+blocker and missing evidence. Neither surface exposes manual `Done`; actions close from the module
+completion facts in the table above.
 
-**⛔ THE STANDING RULE FOR EVERY LATER CARD.** A new PO creation door does not get
-built next to this one. If a flow needs a Purchase Order, it produces a
-`purchase_demand` and Batch Purchase issues it. *"This case is special"* is the
-sentence that produced the four authorities Card 4B had to close.
+---
 
-### PRODUCTION EVIDENCE — Card 4B, 2026-08-11, run not described
+## 11 · Settings
 
-**Deploy.** main `32af7b46` · bundle `index-DUNp7gpt.js` → **`index-AP7_jhKp.js`**, live
-SHA-256 `a38fccbd8bc6…` == local build, `SERVICE_ROLE` **0**, all four canonicals converged
-on the first poll (carres-portal `b9bb8dd6` · carres-pos `89a1c8e5`). Worker **owed and
-paid** — `apps/api/src/routes/operation/pos.ts` and `packages/shared` both changed —
-version `47a24dfd-baec-4ac3-8413-cbef29f7f6aa`, `/health` **200 `{"ok":true}`**.
+Settings lives under the global header gear and requires authorised roles. It includes:
 
-Bundle proven in BOTH directions against the predecessor, with two controls:
+- document number format/version and locked Unit ID family;
+- a read-only door to Team's PO Duty / GRN Duty and buddy-cover settings; Purchasing Settings
+  stores no roster and performs no Duty calculation;
+- approval limits and Manual Purchase purposes;
+- default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
+  availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
+  consequence, Unit-scan requirement and signed-DO evidence controls;
+- supplier channels, contacts, lead/production days and calendars;
+- PO grouping rules and source-preservation law;
+- purchased vs supplier-consignment agreements and settlement terms;
+- supplier Unit-label capability (package, physical Unit, future machine-readable support);
+- outside-readable PDF templates and permitted external notes;
+- claim/return/repair outcome permissions;
+- customer-privacy exclusion from supplier documents.
 
-```
-new-po-button              1 -> 0     purchase/to-order/issue   1 -> 1  CONTROL
-+ New PO                   1 -> 0     procurement-tab-strip     1 -> 1  CONTROL
-/api/operation/pos/batch   1 -> 0
-po-lines-table             1 -> 0     bytes  5,283,581 -> 5,257,683  (-25,898)
-Raise PO for shortages     1 -> 0
-allowIssuePO               6 -> 0
-```
+Every setting change has actor, time, old value, new value and effective date. It never silently
+rewrites an issued document or historical Unit.
 
-**A · UI and B · API — signed in on production at 1440 and 1130, 26 checks, 0 failures.**
+---
 
-```
-A1  Purchase Orders channel page loads · no + New PO · no CreatePOModal reachable
-A2  Delivery still opens the order drawer; 4 overflow menus opened, no Issue PO
-    and no Raise PO for shortages in any of them
-A3  Old Orders loads, 30 rows, no Issue PO (Card 3 still true)
-A4  Batch Purchase still carries the governed `Issue 1 PO`, and `+ Create Purchase`
-    (the DEMAND door, never a PO) survives
-B   POST /api/operation/pos        404  with a live operation session token
-    POST /api/operation/pos/batch  404  with the same token
-    GET  /api/operation/pos        200  — the read door on the same prefix answers
-```
+## 12 · Reports and exports
 
-**C · D · E — every denial proven by ATTEMPTING THE WRITE as the `authenticated`
-operation user (`app_role()` = `operation`), never by reading a grant.** The whole probe
-ran inside a transaction that was then aborted.
+Reports are generated from authoritative records and open in central Reports or from a Register:
 
-```
-operation_create_po                      NO   42501 permission denied
-operation_create_pos_batch               NO   42501 permission denied
-_operation_create_po_inner  (direct)     NO   42501 permission denied
-direct purchase_orders INSERT            NO   42501 permission denied
-direct purchase_order_lines INSERT       NO   42501 permission denied
-Old Orders order-level Issue RPC         NO   42501 permission denied   (Card 3 holds)
-purchasing_issue_pos_batch               YES  reached — own rule 22023, not permission
-  · invalid governed flow                REJECTED by its own rules ("supplier not found")
-  · VALID governed flow                  minted PO-2055, 24 -> 25 POs / 38 -> 39 lines,
-                                         then ROLLED BACK
-```
+- demand remaining/covered/ordered by source;
+- purchase quantity and open balance by supplier/SKU/destination;
+- missing, changed and passed supplier dates;
+- partial receipts, quantity/condition differences and missing delivery notes;
+- supplier delivery, claim, return and repair performance;
+- supplier-owned Units by showroom, label state and age;
+- consignment placement, return and sale notices by supplier/Unit/date;
+- document versions not sent to the supplier;
+- Units allocated but not received, legacy Units not labelled and replacement lineage.
 
-**F · Regression.** `purchase_orders` **24** and `purchase_order_lines` **38** — identical
-before and after; newest PO still 2026-08-05; **zero probe rows left behind.** INSERT
-policies on the two tables: **NONE**. SELECT/UPDATE policies preserved: **7**.
+Finance owns supplier invoice, credit, payable, settlement and payment amounts. Operations exports
+are snapshots, not editable truth or a second settlement ledger.
 
-**VERDICT — PASS.** `purchasing_issue_pos_batch(jsonb)` is the sole reachable Purchase
-Order creation authority.
+---
 
-## 2.0.1 · 🔴 GAP — Emergency has no governed continuation. NOT SOLVED HERE.
+## 13 · Permissions
 
-**Recorded under Card 4B §7, deliberately unsolved: it needs a business decision.**
+| Role | May do | May not do |
+|---|---|---|
+| Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
+| Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
+| Approver / Manager | approve/reject governed internal buy and commercial exceptions; the configured approver may approve their own request | replace receiving/PO evidence |
+| Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
+| Operations Superuser (`operation@carres.com`, Jess) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
+| Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |
+| Stock / Warehouse | label, locate, move, reserve and prove physical custody | issue/cancel supplier commitments |
+| Service | intake problem and govern problem/outcome record | create unapproved Purchasing consequence |
+| Finance / AP | match supplier invoice, credit, settlement and payment | rewrite receipt, Unit, delivery or PO facts |
+| Administrator | govern masters, templates, calendars, rosters and number versions | silently alter historical documents |
+| Owner / Audit | read all authority, History and reports | bypass required source/evidence without an explicit governed authority |
 
-Urgent restock (card K3, migration 0290, `UrgentRestockPanel` under the monthly
-Stock plan) runs:
+No Purchasing object has one universal owner. Each action resolves owner and cover from its rule.
 
-```
-somebody raises an ask  →  the COO approves it  →  … →  someone ticks "I ordered it"
-```
+---
 
-**The "…" was `+ New PO`.** The approved ask created no `purchase_demands` row and
-never reached Batch Purchase; a human read the list and raised the PO on the legacy
-modal. That modal is deleted and those authorities are revoked, so **an approved
-emergency now has no governed way to become a Purchase Order.** `I ordered it` is
-still a self-declared tick and will now be ticked against work done elsewhere, or
-not at all.
+## 14 · External integration boundaries
 
-**What must NOT be done about it** (each was considered and each is forbidden by
-the card that found the gap): keep a legacy authority alive for Emergency · bypass
-the governed boundary · auto-convert approved emergency asks into `purchase_demands`
-· mint a new emergency exception.
+- WhatsApp/email: supplier-facing PDF/questions are sent outside; the Portal records version,
+  recipient, channel, actor and time. Opening the app is not proof of sending or chasing. A chase
+  completes only when the actual supplier answer plus channel, evidence, reporter/recorder and
+  relevant times are stored on the exact PO.
+- Supplier portal: future read/response surface must write to the same PO/CO/claim/notice records,
+  not create a parallel acknowledgement ledger.
+- AutoCount/Finance: may receive approved PO/GRN/invoice references at the Finance boundary. It does
+  not own purchase demand, receiving count, Unit ownership or consignment receipt payable.
+- Barcode/QR: future carrier for `U1-000-001`; the Unit identity and History do not change.
+- Logistics/Delivery: reads final `Deliver To` and emits actual movement/delivery facts; it does not
+  revise the supplier document.
+- Supplier documents always use the real Supplier Master name. Blueprint examples use Hooka, Ohana
+  and Dorsettloft; production never shows a placeholder supplier name.
 
-**What the decision actually is, for whoever cards it:** does an approved emergency
-ask become a `purchase_demand` — and if so, who owns the supplier, quantity, cost and
-destination that Batch Purchase will demand of it, given K3's own ruling that an
-emergency deliberately carries NO suggested quantity? That is a business question,
-not an engineering one.
+---
 
-## 2.1 · The shell
+## 15 · Intentional rejects
 
-Each Purchasing destination uses the governed Register destination header. **There is no
-shared Purchasing tab header.** Page identity is drawn once; a page may not add a duplicate
-breadcrumb, title, icon row or module-tab strip.
+The final Carres model rejects:
 
-> **SHIPPED 2026-08-19** (Jess, on a production screenshot: *"why you don't follow sales
-> order header?"*). `PurchasingTabs` had kept drawing the 13px `Purchasing · {page}`
-> module-word pair after the strip died — the code lagging this section, not a second law.
-> It now renders `ModuleHeader destinationHeader` with the page's own word (`SO Batch
-> Purchase` · `Manual Purchase Requests` · `Goods Receipts` · …), the SAME component and geometry Sales Orders and
-> Delivery Orders draw (50px, 24px word, no icon, no `Purchasing ·` prefix — the sidebar's
-> Purchasing module row already answers which module you are in).
+- a Purchasing Home/dashboard that duplicates registers;
+- a module-specific My Purchasing Work;
+- a Purchase Demands page or a `Purchase Needs` synonym;
+- separate New Supplier/New SKU request destinations;
+- blank independent PO, Return, Repair, CO, CRTN or CSN creation;
+- separate Consignment Overview or Consignment Receipts;
+- `Acknowledged` after Carres has sent the PDF;
+- quiet post-send changes and silent price acceptance;
+- generic work words or relative `Today/Tomorrow` dates;
+- a permanent object Owner column;
+- duplicate consignment receipt/accounting engines;
+- customer personal/selling-price data in a Consignment Sale Notice;
+- supplier payable at consignment receipt;
+- reusing document numbers or Unit IDs;
+- copying 2990 terminology, layout, deletion/right-click behaviour or cloned business rules.
 
-**One Workspace template**: 200px navigation rail → kit `DataTable` listing (for FINDING —
-sort, filter, search) → 400px workspace pane (where the WORK happens). Receiving, Purchase
-Orders and Report all run it. To Order runs the same shell with a launcher rail.
+---
 
-## 2.2 · Shared machinery — one home each, and a second copy is a defect
+## 16 · PLAN completion gate
 
-| Concern | The ONE home |
+| Gate | Result |
 |---|---|
-| action words (queue · line · button · done · empty) | `packages/shared/src/order-action-words.ts` — `PurchasingActionKey`, six keys |
-| the supplier calls and their due dates | `packages/shared/src/purchasing-supplier-calls.ts` |
-| the receiving ladder (4 rungs; the ORDER is the rule) | `packages/shared/src/po-receiving.ts` |
-| PO risk order · work state · **who said the arrival date** | `comparePoRisk` · `poWorkStateOf` · `PoWorkspacePo.supplierArrivalDateIso`, `packages/shared/src/po-workspace.ts` |
-| **when the goods reach us — the ONE arithmetic** | `expectedArrivalOf`, `packages/shared/src/purchasing-settings.ts`. Production on the FACTORY's week + transit on the OFFICE week. **Both the issue path and the register call it; a third spelling is the defect it was extracted to end.** |
-| claim lifecycle, asks, answers, close gates | `packages/shared/src/supplier-claim.ts` |
-| quarantine outcomes + status mapping | `packages/shared/src/stock-hold.ts` |
-| the engine's numbers | `packages/shared/src/purchasing-settings.ts` + `purchasing_settings` |
-| who is on PO duty this month, **and who is on GRN duty** | `ops_po_duty` → `GET /operation/po-duty` → `useOperationPoDuty()`. ONE rota, ONE endpoint: the response carries `holder`, `grnHolder` and `grnMonth`, and `grnDutyMonth()` (`packages/shared`) is the only place the offset is computed |
-| the rail recipe · the facet row | `components/rail/workspace-rail.tsx` · `components/FacetRow.tsx` |
-
-> **`org_duties` does NOT hold the PO-duty holder.** Its six keys are `ops_manager` ·
-> `po_duty_editor` · `account_creator` · `finance_approver` · `roster_editor` ·
-> `stock_planner`; `po_duty_editor` is *the person who edits the rota*. The rota is
-> **`ops_po_duty`** (month → user). Live: Jul = Shasha · Aug = **Yu Jun (CR004)** · Sep = Khor Yee.
-
-**THE DUTY MODEL** (Jess 2026-07-24, LOCKED · cover ruled by Loo 2026-08-06 · active-headcount
-continuity ruled by Jess 2026-09-01). Two rotating duties, offset by ONE month, over the active
-Carres office assignment pool — there is no separate Carres warehouse crew:
-
-```
-        PO duty (issue + call)    GRN duty (receive)    no duty this month
-Jul     Shasha                    Yu Jun                Khor Yee
-Aug     Yu Jun                    Khor Yee              Shasha
-Sep     Khor Yee                  Shasha                Yu Jun
-```
-
-- **GRN duty is COMPUTED — the NEXT month's PO holder from the same rota. No second table,
-  no second API.** Read the table down a column: July's GRN holder is Yu Jun, who is
-  *August's* PO holder. The person who ordered never receives (segregation of duties).
-  Urgent orders may bypass the rotation; only the COO may override the rota.
-
-  > **⚠️ "offset-1" IS AMBIGUOUS AND IT COST A YEAR OF EMPTY ROWS. The arithmetic reaches
-  > FORWARD.** This line used to read "offset-1" with no direction, and two readers took it
-  > backwards: `work-engine.ts` recorded *"`ops_po_duty` offset−1"*, and the Team panel
-  > implemented it as the PREVIOUS month. The API's roster is `gte(month, current)` — it only
-  > ever contains this month and later — so the panel looked for a month that was never in the
-  > payload, found nothing, and printed `Not assigned` **every single month from the day the
-  > row shipped**. The direction is now a named function, `grnDutyMonth()`, and the rota
-  > table above is its test.
-
-- **THE ROTA ADAPTS TO ACTIVE HEADCOUNT; STAFF DO NOT REASSIGN ROUTINE WORK ONE ROW AT A TIME.**
-  The three-person table above is an example of the present rotation, not a permanent three-name
-  rule. Team/People supplies the active staff and employment/access facts; the duty resolver supplies
-  the current answer.
-  - With three or more assignable staff, PO Duty and GRN Duty remain separate and another active
-    person is the buddy/cover where available.
-  - With two assignable staff, the two duties rotate between them; there is no required third
-    buddy row.
-  - With one assignable staff member, that person holds both PO Duty and GRN Duty. The Portal must
-    state both duties truthfully and must not emit `Not assigned` merely because separation is no
-    longer possible.
-  - `Not assigned` is valid only when zero assignable staff exist. That is a management continuity
-    failure, not an ordinary Warehouse action.
-  This continuity rule preserves service when headcount changes; it does not give the duty holder
-  approval powers reserved to the COO.
-
-- **OFFBOARDING RE-RESOLVES DUTY AUTOMATICALLY.** The COO records the person's actual last working
-  date and disables access through the governed People/Team account controls. From the effective
-  date the person leaves the assignable pool; the Portal recalculates current and future PO Duty,
-  GRN Duty and buddy/cover, and routes every still-open duty-owned Action to the newly resolved
-  active holder. Past actions, avatars, receipts, approvals, handovers and cover evidence keep the
-  actor who actually performed them. Offboarding never rewrites history and never requires manual
-  reassignment of each PO, receipt or Stock action.
-
-- **GRN DUTY IS AUTO-ASSIGNED AND EDITABLE — owner ruling 2026-08-15, BUILT.** The row must
-  always name a current holder.
-  - **Auto-assignment reuses the PO machinery unchanged** — `resolveDutyMonth()` pointed at
-    `grnDutyMonth(thisMonth)`, filling a missing month lazily through `pickNextDutyHolder`
-    (fewest months served, deterministic, so two sessions converge). It is resolved on the
-    SERVER, not derived on the client, because the client cannot see a month the payload omits.
-  - **Segregation of duties never costs the row its holder.** The current PO holder is excluded
-    from the GRN pick **only while somebody else can take it**. With one assignable person left,
-    that person genuinely holds both and saying so is more honest than showing nobody.
-  - **The edit door is on the Team panel**, gated by the `po_duty_editor` duty (Jess's own key —
-    STRICTER than manager; the shared `operation@` login must not rewrite the rota). It writes
-    the GRN month's row through the existing `PUT /operation/po-duty`, and **it names that month
-    on screen**: because duty is derived from one rota, changing the receiver also changes who
-    issues POs then. That is the locked model, not a side effect to hide.
-  - **`Not assigned` may appear ONLY when no assignable staff exists**, and it must then say
-    where to fix it (`Add someone to the assignment pool in Settings.`). A dead-end absence is
-    a defect.
-- **BUDDY COVER.** When an additional active member has NO duty this month, that person covers
-  EITHER duty. **The absence
-  signal and the cutoff are the Orders pool's own law** (`staff.ts`, Jess round-3 —
-  reused, never respelt): before 10:00 MYT late ≠ absent; from 10:00 with no heartbeat
-  today the holder is absent TODAY and the free member covers; the holder logging in later
-  takes the duty straight back; `away` (planned leave) covers from the start. **The two
-  hat-wearers never cover each other** — that would put issuing and receiving in one pair
-  of hands. Both absent → the remaining member does both and the Team panel says so to a
-  COO. With two active staff there may be no separate buddy; with one, the same person visibly
-  carries both duties. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
-  to "who, today?", never a row.**
-- **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It states
-  `PO DUTY` and `GRN DUTY` — **both BUILT and both always named, 2026-08-15**. A page never
-  repeats a duty block and no rail carries a duty chip. A per-row avatar circle appears
-  ONLY where rows can carry DIFFERENT names — Claims (owner = the month it was opened).
-  To Order and the supplier calls carry no per-row identity: the whole surface belongs to
-  the month's holder, and repeating one name down a page is noise.
-
-## 2.3 · The numbers the engine reads
-
-Seven, all manager-editable on **Settings**, all audited (who · when · what it was before).
-**A supplier × category with no number is NOT defaulted to 7** — it reads `Set a number`, gets
-no order-by date at all, and To Order names the pair out loud. Migration 0303.
-
-```
-production working days   mattress 7 · bedframe 7 · sofa 14
-order-by buffer           7 today → 10 at go-live
-PO days                   Mon · Wed · Fri
-supplier work week        per supplier (Ohana works Saturday)
-```
-
-## 2.4 · Words
-
-**A word not in `COPY-STANDARD.md` may not appear on screen. Stop and ask Loo.**
-Seven portal verbs: `Assign · Call · Issue · Upload · Close · Return · Check`.
-Retired and permanently banned from reuse: `Chase` · `Send` (as an action) · `Contact` ·
-`Prepare` · `Draft PO`.
-
-**FIELDS AND ACTIONS ARE TWO LAYERS AND NEVER SHARE A NAME** (Loo, 2026-08-06).
-`Expected Arrival` is a FIELD — our own arithmetic. `Confirm ready date` ·
-`Confirm tomorrow's delivery` · `Confirm balance delivery date` are ACTIONS — a
-conversation with the supplier. `Check Expected Arrival` was proposed as the call's name
-and REJECTED: naming the call after the field re-merges the two mouths the provenance work
-separated (the operator is not checking our estimate; they are asking the factory).
-
-**DATES ON A RAIL PRINT WEEKDAY + DATE — `Thu 6 Aug` — on every row, one format**
-(Loo, 2026-08-06). Never a bare weekday (`Monday` is ambiguous — which Monday?), never
-`Today` / `Tomorrow` (relative words rot in screenshots and re-sort themselves overnight).
-The full date stays on hover. `Later` is the word for beyond a rolling window — never
-`Next Week`, which starts lying on Thursday.
-
-## 2.5 · A measurement trap that has cost this module real time
-
-> **`apps/web/src/pages/operation/OperationSupplierClaims.tsx:240` holds a NUL byte** (a
-> deliberate sort-key separator). **Shell `grep` treats the whole file as binary and returns
-> NOTHING without `-a`.** Node's `readFileSync(…, "utf8")` is unaffected, so the repo's own
-> test guards are safe — a chat measuring by hand is not.
-
-**And the general form of it:** `grep` answers *"is the word I already thought of present?"*.
-It cannot tell you about a button you have not imagined. **Read the file.**
-
----
-
-# §3 · SO Batch Purchase *(on screen today as `To Order`)*
-
-### MISSION
-Review, consolidate and issue purchase orders for **demand the engine generated from
-customer orders**. Purchase Orders MANAGES the documents once they exist.
-
-> **THE SPLIT SHIPPED (Jess 2026-08-07, executed 2026-08-19 —
-> CARD-2026-08-18-manual-purchase):** the hand-typed purposes (Ready Stock · Display ·
-> Office · Warranty · Spare Parts) LEFT this grid for their own page, **`Manual
-> Purchase`** — a FULL-PAGE create workspace (the 600px dialog is retired), a request
-> register (`REQ-` series), a manager approval (0359/0360), and its own same-day Issue
-> through the ONE authority (0361 taught `purchasing_issue_pos_batch` the `purpose` and
-> the per-line `demand_id`). **Both lanes issue their own POs and a PO says which lane
-> bore it.** `+ Create Purchase` left this rail with them; this grid now answers ONE
-> question — what have customers ordered that we still have to buy. The rename to
-> **`SO Batch Purchase`** rides the rail (shipped with the sidebar card); this page's
-> own grid rebuild is `CARD-2026-08-18-so-batch-purchase.md`.
->
-> **SUPERSEDED PURPOSE WORDING — owner ruling 2026-09-01.** The list above is historical build
-> evidence only. Current Manual Purchase `Need for` is exactly `Ready Stock · Showroom Display ·
-> Service Case · Internal Staff Purchase · Subsidiary Purchase · Other Purchase`. `Office`,
-> `Spare Parts`, bare `Display` and `Warranty` are not approved current categories.
-
-> ### ⭐ THE GRID BECOMES A HIERARCHY, AND SOFA GROUPS DIFFERENTLY (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** Today's grid is FLAT — one row per SO line. Four customers
-> wanting the same beige three-seater are four rows scattered down the list, and the buyer
-> adds them up in their head. **But Carres buys from a FACTORY, not from a sales order**, and
-> every quantity that matters commercially — MOQ, pack, what fills a lorry — is per item.
-> Every mature planning screen groups by item for exactly this reason: SAP's MD04 is per
-> material, Odoo's replenishment is per product, Dynamics' requisition worksheet is per item.
->
-> **So the grid becomes three levels:**
-> ```
-> Item · Description        Qty Needed · Stock · On PO · To Buy
->   └─ variant (fabric / colour)
->        └─ SO No · Customer · Customer Delivery · Qty · Coverage · Supplier
-> ```
-> **`To Buy` is PRINTED, never left as `11 − 3 − 2`** — the same law Receiving already carries
-> for `Outstanding`. **Rows with nothing to buy sink; shortages float to the top, and only a
-> shortage line is selectable.** Every SO line carries a `Coverage` tag saying what holds it
-> up — `stock` · `PO-2041 · 22 Aug` · `SHORT` — so the buyer sees at a glance which promises
-> have nothing behind them.
->
-> **SOFA IS THE EXCEPTION AND IT GROUPS BY SALES ORDER.** A sofa is sold as a colour-matched
-> SET; two customers' sofas may not be merged onto one PO line because the fabric batch must
-> match within the set. **Selecting any piece selects the whole same-SO set.** 2990s runs
-> exactly this split in production and states the reason in its own header —
-> `apps/backend/src/pages/Mrp.tsx:15-17`: *"A sofa is one PO per SO, so selecting any sofa
-> variant selects the whole same-SO set together."* Mattress, bedframe, pillow and protector
-> group by item; sofa groups by SO. **One page, two groupings, chosen by category.**
->
-> **The trade-off, stated:** two grouping paths cost more to build than one flat list. The
-> complexity is already in the business — refusing it does not remove it, it moves it into a
-> buyer's head every morning.
-
-> ### ⭐ DERIVE THE DESTINATION AND THE DATE — NEVER ASK THE BUYER (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** 2990s shipped a "PO Defaults" card asking Expected Delivery and
-> Purchase Location on the batch screen, then DELETED it —
-> `apps/backend/src/pages/PurchaseOrderFromSo.tsx:6-9`: *"REMOVED the 'PO Defaults' card …
-> Those are NOT asked anymore — the server derives each PO line's warehouse from the source
-> SO's Sales Location, and each line's delivery date from the SO line's own delivery date …
-> header expected_at / purchase location are rolled up from the lines server-side."*
->
-> **The customer's order already says where the goods go and when they are wanted.** Asking a
-> buyer to retype it invites a mismatch between the SO and the PO that nobody can reconcile,
-> and it is work for an answer the system already holds. **The line derives; the header rolls
-> UP from the lines.** A buyer may still change a line, and the change is an exception with a
-> reason — never the default keystroke. **It is an INLINE CELL, never a queue action:** every
-> line always carries a destination, so an action would fire on every PO and be ignored on all
-> but one, and a prompt everybody dismisses daily is a prompt nobody reads on the day it
-> matters. **A change has a consequence the screen must state** — goods landing at `AL` for an
-> order shipping from `Carres` need a stock transfer before the delivery date, and the system
-> says so at the moment of the change rather than letting the warehouse find out on the morning
-> of the run. *(This retires the proposed action `Assign where the goods go` entirely: on the
-> customer lane it is derived, and on Manual Purchase the requester picks it in the form.)*
->
-> **Grouping is the SERVER's, not the buyer's** — `PurchaseOrderFromSo.tsx:17`: *"Server groups
-> by main supplier and emits one PO per supplier."* Same rule Dynamics states for requisition
-> consolidation: differ on legal entity, vendor or currency and a separate order is created.
-> **The buyer picks WHAT to buy; the system decides how it splits.**
-
-> ### ⭐ MANUAL PURCHASE — THE REQUEST, THE APPROVAL, THE ORDER (Jess, 2026-08-18)
-> **SHIPPED 2026-08-19 (CARD-2026-08-18-manual-purchase, three slices — PRs #848/#849 +
-> the issue slice; migrations 0359/0360/0361).** Built exactly as ruled below, with the
-> execution facts recorded in the card: the request header (`purchase_requests`, REQ-
-> series, `why` door-enforced), the per-purpose approval switches
-> (`purchasing_purpose_approval`, default ON, no amounts), one decide door
-> (`purchasing_decide_request` — the Settings manager gate; refusal's reason required in
-> SQL; cuts per line), approver-only money, and same-day Issue through the one authority
-> with the consolidation OFFER declinable on the same screen. `Arrived` derives from the
-> linked PO's posted receipt — no button anywhere. **The same-day owner walk (2026-08-19)
-> corrected three built facts in its own PR:** a picked line prints `SKU · Model`, never the
-> model word alone (P15's own defect, returned); `Needed by` is enforced before Send — a
-> request with no date leaves the approver and issuer nothing to plan against; and the
-> disabled Send NAMES its gap (`Send — pick a date` · `Send — say why`, the Receiving button
-> law, first missing header fact wins). 2990s had nothing to copy here: its manual entrance is a BLANK
-> New PO (`PurchaseOrderNew.tsx`), which this module already rejects — a PO with no demand
-> behind it has no reason on the record. The pattern is the Purchase Requisition every mature
-> ERP carries (SAP `ME57` / `ME59N`, Dynamics' purchase requisitions, Oracle's AutoCreate).
->
-> **Anyone raises it, in six fields:** `Need for` (Ready Stock · Showroom Display · Service Case ·
-> Internal Staff Purchase · Subsidiary Purchase · Other Purchase)
-> · what · how many · where to · needed by · **why**. `why` may not be blank — it is the
-> sentence the approver reads, and *"restock"* answers nothing.
->
-> **Before it is submitted the system answers the question first:** free stock, quantity already
-> on an open PO, and what is therefore still needed. Half of these requests are for goods Carres
-> already has or already bought.
->
-> **Every purpose requires approval** (Settings, §8) and **a customer order requires none — the
-> order IS the authority.** The approver sees the money; the three operators never do.
->
-> **APPROVED REQUESTS DO NOT WAIT FOR A PO DAY** (Jess, 2026-08-18). Consolidation windows exist
-> to win price and freight from large vendors; a furniture factory charges the same for one
-> order or three, so making a request wait buys nothing and costs days. **PO days stay on the
-> customer lane only**, where they exist to let a factory plan production. Consolidation here is
-> an OFFER, never a gate: several approved requests for one supplier surface together with
-> `Issue as one PO?`, and issuing them separately is always available.
->
-> ### ⭐ DISPLAY REQUESTS — Sales says what a floor needs; Purchasing decides how (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT, AND ENTIRELY NEW.** Measured: `showroom` and `display request` grep
-> ZERO across `apps/web/src` and zero across all eight governing documents; 2990s has no request
-> ahead of its consignment order either. **Nothing exists to copy and nothing exists to unpick.**
->
-> Today a salesperson notices a tired floor model and WhatsApps somebody. Purchasing cannot see
-> how many of those are open, how long they have waited, or which were quietly dropped.
->
-> **Five fields, and one of them may be vague on purpose:** which showroom · add / change /
-> remove · which unit now (scan the Unit ID; only for a change or a removal) · **what they want**
-> · why · wanted by. **`what they want` accepts a description and a photo, not only a catalog
-> SKU** — a salesperson says *"the Ohana beige, lower than the one we have"*, and a form that
-> demands a published SKU is a form they abandon for WhatsApp. No SKU on file raises the
-> New SKU work to the month's PO duty, and the request waits on it.
->
-> **The states are facts a new hire can read, and `Waiting` always names what it waits ON**
-> (`../COPY-STANDARD.md`): `Waiting for Purchasing` · `Waiting for the SKU` · `Ready to order` ·
-> `Ordered` · `On display` · `Not going ahead`. *`Not looked at yet` was written and rejected —
-> it reads as an accusation, and the useful half of it is WHO it waits on.*
->
-> **`Not going ahead` is a required exit, and it carries a reason.** Purchasing may refuse — the
-> model is discontinued, the price does not justify it, a unit already sitting in Klang can be
-> moved instead. Without the exit, a refused request is simply never touched again, and three
-> months later nobody can say why. **The refusal goes back by PHONE, recorded by Operations** —
-> the portal never parks work with a salesperson and waits.
->
-> **`On display` is not a tick.** It is three facts: the right Unit ID received, its place
-> recorded, and the showroom's handover signed. A request that can be closed by pressing a button
-> will be closed while the floor is still empty.
->
-> ### ⭐ THE THREE CONSIGNMENT PAGES — one engine, one ownership fact (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** 2990s ships ELEVEN consignment pages, and its own header says how:
-> `apps/backend/src/pages/PurchaseConsignmentOrders.tsx:9` is the Purchase Orders page COPIED and
-> the queries re-pointed at `/purchase-consignment-orders`. Two codebases for one screen — a fix
-> lands twice or it lands once and rots. **And measured: no consignment page carries an ownership
-> flag on a line or a unit** (`grep -in "owner" *Consignment*.tsx` returns code comments only).
-> 2990s cannot tell consigned goods from bought goods by looking at them; it tells them apart by
-> which TABLE the paperwork sits in. **That is the failure Carres avoids by putting the fact on
-> the UNIT** (`../stock/MASTER.md` — `ownership`, `carres` or `supplier`).
->
-> **CONSIGNMENT ORDER = a purchase order plus two things.** Ownership is fixed to the supplier and
-> may not be edited; and when a floor model is being swapped, **the unit coming IN and the unit
-> going BACK ride the same document.** Two documents let the new sofa land while the old one
-> stays, and the position holds two — or the old one leaves and the position stands empty.
-> ```
-> New unit          Ohana 3 Seater · Grey · 1
-> Old unit back     CU-000128 · Beige · on display since 12 Feb 26 · 187 days
-> ```
-> **It creates no payable.** Goods arrive, stand at HOUZS, and Carres owes nothing until one
-> sells — and what happens then is Finance's, not this module's.
-> **No blank create, same as a PO:** the source is an approved Display Request or a claim ruling a
-> swap. Consignment is where "where did this sofa come from" gets lost fastest, and a unit with no
-> source is a unit nobody can pay for correctly.
->
-> **CONSIGNMENT RECEIPT IS NOT A SECOND RECEIVING ENGINE.** The person at HOUZS counts, checks for
-> damage, photographs and uploads the supplier DO — **identical work whether the sofa is bought or
-> consigned**, and they should not have to know which. The difference is already carried on the
-> unit. **One receipt document, ONE number series;** `Consignment Receipts` is a FILTERED VIEW of
-> Goods Receipts. *(Refused: a `CGRN-` series. It makes staff remember which prefix to look under,
-> and it breaks outright the day one van carries both.)*
->
-> **CONSIGNMENT RETURN — the supplier takes its own goods back.** It is not a Purchase Return:
-> nothing is owed back, no credit note is chased, because the goods were never Carres'. It carries
-> the same physical law as every other handover — **issuing the document moves no stock; a signed
-> collection note or a handover photo does.** On a swap the return is bound to the incoming
-> Consignment Order so the floor position is never briefly empty or briefly double-booked.
-> **Over-delivery reuses this same collection mechanism** rather than growing a fourth path.
-
-> ### ⭐ THE TEN OBJECT DETAILS — what is on each one (Jess, 2026-08-18)
-**APPROVED, NOT YET BUILT.** Shape comes from `../ui/MASTER.md` §4.1 and is not re-argued here;
-this records only what each object PUTS in it. All ten are ONE SCROLL except Supplier Claim, which
-adds History and Order Route as reference tabs.
-
-**GOODS RECEIPT** — from / landed at / **Supplier DO No.** (theirs, no default) / **Goods received
-at** (when the goods physically arrived, never when they were keyed) / counted by. Then per line:
-ordered · received · `Receive now` · damaged · wrong · Unit IDs ticked as they are scanned ·
-photos. **The Save button names the gap** (`Save — add a DO number`) and
-`Remaining after save: {n} (stays on this PO)` prints beside it. **The scanned/not-scanned ticks
-are the point** — a counter sees how many units are still missing without counting them again.
-**No split, ever:** receiving RECORDS a count, it composes nothing anyone outside will read.
-
-**PURCHASE RETURN** — source claim, GRN and PO / collect from / pickup date / **version and whether
-it was shared**. Units going back with their reason and photo. Then `HANDOVER`: proof, handed to,
-signed by — **and stock does not move until those three are filled.** A shared return that changed
-its collection point or its units mints a version and is shared again, exactly like a PO.
-
-**REPAIR ORDER** — unit / sent from / what is wrong + photo / **chargeable or under warranty** /
-expected back. `HANDOVER OUT` with its proof. Then `BACK`, and it prints **`Unit ID must be
-CU-000184`** — a scan of anything else stops the receipt. Ownership never moves; this is not a
-Purchase Return.
-
-**DISPLAY REQUEST** — raised by / what kind / the unit standing there now, with **`on display {n}
-days` and `no enquiry in {n} days`** / what they want (a description and a photo are enough) / why
-/ wanted by. **`WILL BECOME` names the document this turns into** — read from the supplier's
-ownership setting, so nobody has to remember which supplier is consignment.
-
-**MANUAL PURCHASE** — raised by / what / how many / deliver to / needed by / **why, never blank**.
-Then `WHAT WE ALREADY HAVE`: free stock · already on PO · **still needed** — and **`still needed`
-is the number the approver acts on**, not the number that was asked for. Money appears on this
-surface for the approver only.
-
-**CONSIGNMENT ORDER** — deliver to / source request / **ownership fixed to the supplier and not
-editable** / consignment cost (approver only). `COMING IN` and `GOING BACK` on ONE document, the
-old unit carrying its days on display. **Splits when edited** — the supplier receives it.
-
-**CONSIGNMENT RECEIPT** — identical to a Goods Receipt, same engine, same number series; only the
-source reads `CO-` instead of `PO-`. **The person counting at a showroom does not need to know
-whether the sofa is bought or consigned** — the fact rides the unit, and posting stamps
-`Supplier Consignment` on it.
-
-**CONSIGNMENT RETURN** — collect from / pickup date / **`Paired with {CO}`** when it is a swap /
-the unit and its days on display / handover proof. **No credit note is chased and none is owed** —
-the goods were never Carres'.
-
-**SUPPLIER CLAIM** — `THE ITEM` is permanent and never collapses (`PO · GRN · Supplier · DO` +
-Unit). Then what went wrong with its photos, **and who is waiting** — the customer, their order and
-their promised date, because a claim with a customer behind it cannot be argued about for three
-weeks. What we asked (frozen once answered) · what the supplier answered · **what the customer
-gets** · **what happens to the item**. The second decision does not open until the first is made:
-what happens to a broken sofa depends on what the customer is getting instead.
-**The screen states the money line itself** — `{supplier} refused — this is Carres paying now` —
-and the owner chip flips to the approver, because that is the ruled boundary and an operator should
-not have to remember it at 5pm.
-
-**A NEW SHOWROOM IS A SETTINGS ROW, MANAGER-GATED — never a field Sales can type into.** The
-> name reaches a supplier's PO and a driver follows the address; it also needs a receiving
-> contact and a ruling on whether goods may land there at all, and Sales owns none of those.
-> Sales picks from the list; the list is maintained where the seven engine numbers are.
-
-> **The order form is 2990s' full-page create form, unchanged** (`PurchaseOrderNew.tsx`:
-> two-column header + inline line table, with the sofa variant block — fabric · gap · divan
-> height · leg height · seat size). **Only the entrance differs:** 2990s starts blank, Carres
-> starts pre-filled from the approved request. **A sofa PO without its fabric and configuration
-> is a factory building the wrong sofa.**
-
-### WORKFLOW
-The engine computes a plan per PO day and pre-selects exactly its own plan (`orderBy ≤ today`).
-Rows in later buckets start unticked and a human ticks them — **human ticks are DELTAS a
-refetch cannot overturn.** `Issue` posts one call per supplier × category group.
-
-**Ready stock is SUGGESTED, never consumed** (Jess, 2026-07-21). The engine allocates the free
-pool earliest-deadline-first and shows the operator a number and the records behind it; a human
-presses `Reserve`. Whole records only — a bulk record that would over-reserve is skipped, never
-split. Every draw records a reason on K4's dated ledger.
-
-### WHAT IS ON SCREEN TODAY
-`OperationToOrder.tsx` · route `/operation?tab=purchase` · *measured 2026-08-06, after T3
-shipped: the grid rebuilt AutoCount-aligned (T1, approved by Loo on the exact mock), widths
-measured in a real browser with the kit's own header classes, the longest customer name and the
-open-PO cover both counted with SQL.*
-
-```
-LEFT 200px    PO SCHEDULE  rolling calendar of configured PO days, red OVERDUE row above it
-                           which the next run may never swallow; every day row prints
-                           weekday + date in ONE format (`Fri 7 Aug` — Loo 2026-08-06,
-                           never a bare weekday, never Today/Tomorrow; full date on hover)
-              CATEGORY     All · Mattress · Bedframe · Sofa · Pillow · Mattress Protector,
-                           with UNIT counts (bare numbers)
-              + Create Purchase        the manual entrance — may never be missing
-              the rail is WHITE on the canvas grey, the other four tabs' base
-
-RIGHT         toolbar  pill search · selection state · Issue pill (exists ONLY while
-                       something is selected) · quiet `Updated hh:mm`, never a Refresh
-                       A deep link from one Sales Order adds ONE removable
-                       `Sales Order · SO-{number}` scope in this same toolbar.
-              grid     TEN aligned columns (T1's seven + T1.1's two + T3's one,
-                       2026-08-06):
-                       ☑ · SO No. · Customer · Customer Delivery · Proceed date ·
-                       Supplier · Qty · Model · Ready Stock · On PO · PO No.
-                       widths 99 · 181 · 163 · 143 · 111 · 55 · 155 · 99 · 71 · 175
-                       The last three are the buyer's question in order — *is it
-                       in the warehouse · is it already bought · did I buy it
-                       today* (2990s' MRP row: `Stock · PO Outstanding ·
-                       Shortage`). `On PO` is NEUTRAL ink, never green: green is
-                       `Ready Stock`, something you can take today.
-                       A row every unit of which is already on an open purchase
-                       order is a RECEIPT (T6): it stays, prints that PO number
-                       as the same blue link, cannot be ticked and is in no
-                       total. `Total · N units` counts what is still TO BUY.
-                       ONE aligned ORDER LINE per customer order, WHITE with a
-                       `slate-6` rule above it — never a grey band (Loo, T1.1: six
-                       bands down one sheet read as stripes, and grey is chrome while
-                       an order is data). It carries SO · customer · date · proceed
-                       date + waited days, and in the PO cell the `Partly ordered`
-                       pill beside the numbers; item rows leave the identity cells
-                       blank. The Supplier‥Ready Stock span on an order line is EMPTY:
-                       no order fact is ever parked under an item header.
-                       A Ready Stock group prints `Required By {date}` in the Delivery
-                       column and its destination under Customer.
-                       The order line's ☑ toggles ALL its builds (all / indeterminate /
-                       none); selection itself stays BUILD-level, frozen.
-                       Header-click sort on every column · per-column ▼: SO No. and
-                       Customer are searchable checklists, Customer Delivery is the
-                       portal's Excel date ▼ (Overdue · presets · month buckets ·
-                       Custom Date Range…), the PO filter speaks business
-                       (`Yet to Order` + the real numbers).
-                       Below its own 1326px (the ten + the ☑ + the ⊞) the grid
-                       SCROLLS SIDEWAYS, never truncates — Purchase Orders' own
-                       behaviour; deleting a business column, or shrinking one
-                       below its measured content, to avoid a scrollbar is
-                       forbidden.
-              totals   `Total · N units` — ALWAYS ON, counts the visible sheet
-              footer   units per category for what is TICKED (P9) · Clear filters
-```
-
-**Controls** `to-order-create-purchase` · `to-order-issue` · `to-order-retry` ·
-`to-order-cancel-dialog`/`-qty`/`-submit` · `to-order-clear-filters` · `to-order-footer-clear`
-· `to-order-total` · `kit-table-group-{orderId}` (the order line's ☑) ·
-`to-order-free-{row}` (the Ready Stock number) · `to-order-onpo-{row}` (the On PO number) ·
-`table-expand-{row}` → `to-order-reserve-{row}`
-· `to-order-cancel-{row}` (both acts, one door — see FROZEN RULES)
-· `to-order-so-scope` / `to-order-so-scope-clear` · `to-order-scope-status`
-
-**Create Purchase** is a multi-line dialog (`+ Add line` / `Remove`, 600px wide). One POST per
-line; a created line can never post twice because the loop walks only rows that are not
-`created`; a failed line keeps the server's own sentence and `Create` retries exactly those.
-
-### API + DATA
-
-`GET /api/operation/purchase/to-order?so={SO number}` is the Sales Order entrance. The
-server first recomputes the complete Batch Purchase projection, including global stock and
-open-PO allocation, and only then scopes the response. It returns issuable rows, unresolved
-demand, existing engine blocks, open-PO cover and the complete issued-PO history needed to
-explain an empty scope. The unscoped response keeps its ordinary 14-day Ordered window.
-
-`POST /api/operation/purchase/to-order/issue` is the single governed Batch Purchase Issue
-door. Scoped and normal browsers post the same document arrangement; the server recomputes
-the full plan, validates it again, and atomically calls `purchasing_issue_pos_batch`. That RPC
-delegates PO construction to the existing `_operation_create_po_inner` helper and retains the
-existing thread claim, supplier grouping, destination and ETA arithmetic. Old Orders remains
-readable and operational for its remaining responsibilities, but has no Issue PO control,
-review, route or executable order-level PO creation RPC.
-
-The browser route is `/operation/to-order?so={SO number}`. It mounts the same
-`OperationToOrder` component as the existing `/operation?tab=purchase` entrance; the latter
-remains the normal Purchasing-tab route.
-`GET /operation/purchase/to-order` · `GET …/demand/pick-items` · `POST …/demand` ·
-`POST …/demand/:id/cancel` · `POST …/issue` · `POST …/take-stock`
-Tables: `purchase_demands` (**2 rows**) — one row per SKU; `issued_qty` is writable only
-through `purchasing_demand_record_issue` and `remaining_qty` is GENERATED (0320), so two stored
-numbers can never disagree. A cancel stamps `cancelled_at` and lets the remainder FREEZE (0321)
-— **no cancelled-quantity column exists, deliberately.**
-
-### FROZEN RULES
-
-**ONE ENGINE, ONE LENS (owner, 2026-08-10).** `/operation/to-order?so={number}` is navigation
-and population scoping only. It may not change eligibility, selection, supplier grouping,
-document construction, validation, atomicity, destination or ETA arithmetic. With no explicit
-PO-day filter it shows the whole Sales Order; clearing `so` restores normal Batch Purchase and
-preserves the other URL filters. Blocked and unresolved demand is explained, never repaired
-here. Card 2 governs the Issue boundary itself:
-
-- A Customer Order without a confirmed delivery date remains visible but is blocked.
-- The SKU supplier master is authoritative. Missing or mismatched supplier truth blocks only
-  the affected demand and any document containing it. There is no emergency override yet.
-- `NULL` cost is unknown and blocks the affected document. A positive Catalog reference cost
-  may seed the PO transaction cost; a hand-entered positive transaction cost belongs only to
-  that PO and is audited. `0` is accepted only as explicit `free_of_charge`, with a mandatory
-  reason and audit. Neither path silently updates Catalog.
-- Every `factory_pickup` Issue document requires one existing procurement partner. This is a
-  document fact, not a demand blocker or line fact. The current partner table has no lifecycle
-  state, so Card 2 validates existence only and invents no active/inactive law.
-- Validation is server-side inside one transaction. The RPC serializes PO-number allocation,
-  rejects stale Catalog-seeded cost with `40001`, retains the existing demand-thread conflict
-  claim, and rolls the whole batch back when any document fails.
-
-Migration `0337_governed_batch_purchase_issue` adds nullable legacy-compatible
-`purchase_order_lines.commercial_treatment` and `commercial_reason` plus the governed
-commercial constraint and RPC. Governed Issue always writes `normal` or `free_of_charge`;
-`NULL` remains only for historical rows and unrelated legacy creation paths. Migration
-`0338_old_orders_cannot_issue_purchase_orders` removes browser-role execution from the
-historical `operation_issue_pos_for_order(uuid)` function without deleting legacy history;
-`purchasing_issue_pos_batch(jsonb)` remains executable by authenticated Purchasing users.
-- **`Order By` never reaches the screen.** Each row carries it only to know its time bucket;
-  the operator sees the CUSTOMER's date.
-- **Issue = zero popups, zero toasts.** Rows update in place; a partial failure stays with
-  `Retry` until it succeeds.
-- **⭐ A BOUGHT ROW READS AS DONE FROM THE LEFT EDGE, AND RED STAYS ON WORK** (Loo, 2026-08-07,
-  on the live page). T6 put every already-bought order back on the sheet and they arrived
-  wearing the **overdue bar** — the page telling an operator to act now about goods somebody
-  had already bought — and otherwise looking identical to work, with the only distinguishing
-  fact, the purchase-order number, sitting past 900px of table. Measured after the fix: **60
-  bought rows, 0 red bars, 60 muted; 27 work rows, 9 red, 0 muted.**
-  `rowLate` now asks `!poOf(r)` — `01-design-tokens` §2.2 gives red exactly one job and a row
-  with a purchase order has no claim on it — and a bought row wears the kit's `rowMuted`, the
-  same wash Purchase Orders puts on a cancelled document. **The ORDER LINE above stays
-  full-strength:** who the customer is and when they want it is still worth reading.
-- **An ITEM row prints `↳` in the `SO No.` cell and nothing else.** The identity columns are
-  blank on an item row by design (the fact is stated once), which was fine while the goods sat
-  beside them; at nine columns the grid is 1,255px, so on a narrower window the only columns
-  visible are the four that are deliberately empty and the sheet reads as blank blocks. The
-  marker is **2990s' own answer** (`Mrp.module.css:348-353`): a literal glyph in a cell, never a
-  `padding-left` indent, because it survives a column resize and copies into Excel as a
-  character instead of vanishing.
-- **⭐ A CUSTOMER ORDER IS NEVER TORN APART — AND A RECEIPT ROW'S KEY IS UNIQUE** (Loo, on the
-  live page 2026-08-07: *"wrong"*). Measured: sorting the grid produced **64 group headers for
-  47 orders — 17 orders split into fragments** scattered down the sheet, and the first five rows
-  had no order line above them at all. It read as a sorting bug and it was a KEYING bug: a
-  receipt row was keyed `po:{poId}:{orderId}` while the wire sends one row per BUILD, so a
-  purchase order carrying three pieces for one customer minted **three rows with the same key**
-  — React placed them where it liked, and `rowByKey` and the selection had been reading a
-  colliding map the whole time. The key now carries the row's ordinal.
-  **Both halves stay, because they are two different rules.** The key is unique, AND the page
-  re-clusters after every sort so an order's items stay under their own line whatever column is
-  clicked — the kit emits a header when the key CHANGES from the row above (its own contract:
-  the page's sort decides grouping), so a sort on any per-ITEM fact would interleave orders and
-  shatter the grouping. The sort still means what the header says: click `Qty` and the order
-  holding the biggest quantity comes first.
-- **⭐ AN ORDER ALREADY BOUGHT STAYS ON THE SHEET, WITH ITS PURCHASE ORDER** (Loo, 2026-08-06 —
-  T6, closing G11). A demand line every unit of which sits on an open purchase order used to be
-  DROPPED by the engine, and with it the whole customer order when all its lines were covered:
-  measured that day, **41 of 78 eligible demand lines were covered and every one of them in
-  FULL**, so `SO-1210` vanished and *"where is SO-1210?"* was answered on no screen. **A
-  workspace can only be checked by what it shows.**
-  It returns as a **RECEIPT — the exact shape an already-ordered row has had since
-  2026-08-01** — which is what keeps it out of the selection, the rail counts, the category
-  footer and `Issue` without one new rule: every one of those already asks *does this row have a
-  purchase order?* `validateIssuePlan` refuses it server-side as `already_on_po`, because a rule
-  that lives only in the browser is not a rule.
-  **The number it shows may be a purchase order raised for ANOTHER customer.** The engine nets
-  per SKU, earliest deadline first, so units go to whoever needs them soonest — measured, **18 of
-  54 covered demand rows**. It answers *where are these units coming from*, never *this is your
-  document*, and **it can change between refreshes** when a more urgent order joins the pool.
-  Nothing is lost when it moves; the allocation moved. Loo was shown this and took the trade for
-  a real number over a vague word.
-- **`Total` counts what is still TO BUY, not every row on the sheet** — the receipts forced the
-  repair. It summed the visible rows while the only receipts were a handful of POs from the last
-  fortnight; with T6 the sheet carries **35 of 62** rows that are already bought, and summing it
-  said `71 units` on a day the buyer had 32 to place. The rail's category counts have skipped
-  bought rows since P9, so this is two numbers on one screen agreeing instead of contradicting
-  each other 200px apart.
-- **⭐ A FACT IS SCANNED; AN ACT IS CHOSEN** (Loo, T1.1, 2026-08-06). A fact the buyer reads
-  down the page gets a COLUMN — `Ready Stock` is the case that named the rule: the free-stock
-  number existed on every row since P10 and could only be reached by noticing a ⊞, so the
-  answer to *must I buy this at all* was invisible (measured the day it shipped: **91 free
-  units across 50 SKUs**, ONE row on the page saying so). An ACT stays behind the row's ⊞,
-  where a scanning finger cannot reach it by accident: `Reserve` writes the stock register and
-  `Cancel Purchase` cannot be undone from any screen. **Two acts, one door — G10 is CLOSED**
-  and the `PO No.` cell answers one question again.
-- **⭐ `On PO` IS THE THIRD OF FOUR NUMBERS, AND IT ANSWERS *WHY 1?*** (T3, Loo, 2026-08-06).
-  `net-requirements.ts` has netted open purchase orders out of demand since the day it was
-  written (`coveredByOpenPo`), and the number **had ZERO readers in the repository**: a fully
-  covered line was dropped and a PARTLY covered line printed its REDUCED quantity with nothing
-  beside it. The grid said `Qty 1` where the customer ordered 3, and the two units on `PO-2051`
-  were stated on no screen — so the buyer could not check the plan before signing it. 2990s'
-  MRP row is the reference (`Qty Needed · Stock · PO Outstanding · Shortage`); this page already
-  had two of the four, and `On PO` is the third. **Neutral ink, blank at zero, no ▼, and no act
-  in the cell** — a fact is scanned, an act is chosen. The hover names the purchase orders
-  behind the number (`2 on PO-2051`), recovered by replaying the ENGINE's own allocation order
-  over the API's per-document list; **when it cannot be resolved the number ships alone — a
-  reference is never invented**, because an operator can phone a PO number that does not exist.
-  **No migration, no new query**: `po_id` IS the PO number, and it rode a query already run.
-- **⚠️ A FULLY COVERED LINE IS NOT ON THIS GRID, AND THAT IS NOT A BUG.** It has nothing left to
-  buy, so it leaves the workspace exactly as a stock-covered line does. **The demand is NOT
-  lost**: the engine reads `status = 'open'` and nothing else, so cancelling the purchase order
-  brings the requirement straight back. The consequence to hold on to is that **the pool drains
-  earliest-deadline first, so at most ONE line per SKU can ever be PARTLY covered** — the one
-  the pool ran out on. **Measured on production the day T3 shipped: 78 eligible demand lines,
-  41 of them covered by an open purchase order and ALL 41 covered in FULL (43 units across 24
-  SKUs), 0 partly — so the column is blank on every live row today.** It is a correctness
-  instrument, not a busy one, and the next chat must not read the blank as a defect.
-- **THE ORDER LINE IS WHITE, RULED — NEVER A GREY BAND.** Measured on the live page: the band
-  was `bg-kit-slate-2`, a step the palette does not publish, so it had rendered as NOTHING and
-  the order line was byte-identical to the item rows under it. Painting it grey fixed the
-  hierarchy and broke the reading (*"every customer is grey too — i confused"*): a group line
-  every two rows makes six bands a stripe pattern. The separation is a `slate-6` rule above
-  the line — the `divider` token, whose stated use is *section split* — and grey stays what
-  the surface law says it is: chrome.
-- **No Status pills, no Sort By, no Group By** — two filter doors for one fact is the Excel sin.
-  The `PO No.` column IS the status answer: `Yet to Order` / the number / the order line's
-  amber `Partly ordered` pill. **No Status column is ever added beside it.**
-- **The engine owns the schedule; operators own the PO.** `Hold` / `Skip` / `Next-Run` /
-  `Postpone` are banned forever. The two exceptions are `Change Required Date` and
-  `Cancel Purchase`.
-- **A sofa line with no modules carries its own quantity**; a group of more than one line is a
-  build and collapses to 1.
-- **The grid is ALIGNED, never a sentence** (T1, Loo 2026-08-06). An order's facts print once,
-  on their own row, each in the column whose header names it — a free-text group header was
-  ruled hard to read and may not come back.
-- **Ordered rows STAY on the grid** in their 14-day window (AutoCount's Posted/Partial habit);
-  a PO number is the door to Purchase Orders with that document open — the PDF button lives
-  there, never here.
-- `resize` and `reorder` are **REFUSED here in writing** (Q6) and a test asserts their absence:
-  content sizes every column, nothing truncates at 1280, and **below ~1200px the grid scrolls
-  sideways rather than truncating** — Purchase Orders' own behaviour.
-- **NO `Ref` column, ever** (Loo, 2026-08-06). CR/TCF refs (`source_ref`) are AutoCount /
-  Master-Sheet IMPORT artifacts — test data only. Go-live starts clean with no such import, so
-  **no feature may depend on `source_ref` existing** and the ruling is recorded here so the
-  column never comes back.
-- **An order with no delivery date does not reach operation** (Loo, 2026-08-06). The SALES
-  portal enforces the date at entry; To Order's guard (a dateless customer order is not listed)
-  is a backstop, not the enforcement. **The enforcement build belongs to the Orders module,
-  not Purchasing.** A Ready Stock demand is exempt: its empty date means *buy on the next run*.
-
-### APPROVED EVOLUTION
-- **The Planning Workspace** — the frozen information architecture made true on this tab.
-  FOUR measured gaps carry it: **G1** demand whose supplier cannot be resolved is silently
-  discarded · **G2** supplier resolution runs by TWO different rules in one module (planning
-  by the item's own supplier; PO creation also by category coverage) · **G3** intentionally
-  held demand produces no output at all — it must state what · who · why · until when ·
-  **G5** `Check in` must leave To Order and **Receiving must gain PO · supplier · customer name
-  · SO number · warehouse · ETA · quantity-still-to-receive FIRST**, or information is deleted.
-  *(**G8** · **G10** · **G11** are CLOSED, 2026-08-06. G8 by T1: the customer's date sits under
-  the `Customer Delivery` header and a typed demand prints `Required By {date}`. G10 by T1.1:
-  `Cancel` left the `PO No.` cell for the row's ⊞, on the rule a fact is scanned and an act is
-  chosen. G11 by T6 — see FROZEN RULES.)*
-- **The September switch** — Nice Future stops supplying; a new mattress supplier takes over on
-  the subscription model. Sofa and bedframe unchanged.
-
-### ⛔ THE CHILD MINI-TABLE ON THIS TAB — NOT ADOPTED, AND THE OWNER MUST RULE
-
-**Status: OPEN OWNER DECISION, 2026-08-15. Nothing below is law.** The Expand Mini-Table card
-ruled the shared child mini-table (`docs/orders/MASTER.md` §0.1 — THE CHILD MINI-TABLE) onto BOTH
-the Sales Orders Register and this tab, with the ☑ capability switched on here. **The Register half
-is built and shipped. This half is not**, and the reason is measured, not preferred.
-
-**WHAT THE CARD ASSUMES.** That this tab is a grid of customer ORDERS, each with a `▸` that opens
-its goods. **It is not.** This tab is a flat grid of BUILDS — one row per piece of goods to buy —
-clustered under a white order line, and its `▸` opens the row's two ACTS (`Reserve` ·
-`Cancel Purchase`), not a table. Adopting the card literally means rebuilding the grid into
-order-rows plus expansions.
-
-**THREE OF THE CARD'S FOUR SELECTION RULES ALREADY HOLD HERE, AND THE FOURTH CANNOT OCCUR.**
-
-| Card §4 rule | This tab today |
-|---|---|
-| every purchasable line has its own checkbox | ✅ selection is BUILD-level and frozen that way |
-| the parent switch cycles `☐ none · ▣ partial · ☑ all` | ✅ `groupSelState` / `groupSelToggle` |
-| the action bar counts selected LINES, never orders | ✅ the toolbar's selection state |
-| a Service line shows `—` and select-all skips it | **cannot occur** — a service never becomes purchase demand, so this tab has no service rows |
-
-**WHAT ADOPTING IT WOULD COST, MEASURED.** The ruled child columns are
-`Category | Unit ID | Deliver To | SKU | Qty | Item`. On this tab:
-
-- **TWO OF THE SIX WOULD BE PERMANENTLY EMPTY.** `Unit ID` reads Stock's allocation and
-  `Deliver To` reads the PO/PO-line result (`GET /api/operation/orders/:id/expansion`). A row a
-  buyer can still ACT on is by definition a row with no purchase order and no allocated unit — a
-  row that has both is a RECEIPT and cannot be ticked. So every actionable line would print
-  `Not allocated` and a constant default destination. **`CLAUDE.md` §10: empty fields do not reach
-  the screen.**
-- **FOUR DECISION COLUMNS WOULD LEAVE THE SCAN PATH.** `Supplier · Ready Stock · On PO · PO No.`
-  are not among the ruled six. `Ready Stock` and `On PO` exist precisely because *a fact is
-  scanned, an act is chosen* (T1.1 · T3 above) — burying them inside a disclosure re-creates the
-  defect those two cards were written to close.
-- **THE SCAN ITSELF WOULD BECOME A CLICK.** The buyer's morning is *tick everything due today*.
-  Order-rows plus expansions turns one pass down a sheet into one expand per order.
-
-**RECOMMENDATION (Carres, evidence-based): KEEP this tab's grid; the ruling stands unchanged on the
-Sales Orders Register.** The shared component carries the ☑ capability and is tested, so the day a
-page genuinely needs a goods child table with line selection — `Manual Purchase`'s create
-workspace is the likely one — it switches on rather than being rebuilt.
-
-**WHAT WOULD OVERTURN IT (the falsifier):** either (a) the owner's intent is the grid restructure
-itself, in which case the four buyer columns need a ruled home before any code moves, or (b)
-`Unit ID` and `Deliver To` gain a pre-purchase meaning on this tab — a planned destination on the
-demand row rather than a PO result — which is a Purchasing business change, not a presentation one.
-
----
-
-# §4 · Purchase Orders
-
-### MISSION
-Pick today's purchase order → update supplier progress → talk to the supplier → hand over to
-Receiving.
-
-### WORKFLOW
-A PO is ISSUED as one act (there is no draft). The portal then asks the supplier three
-questions in order, and each one closes only while the answer still names the CURRENT facts:
-
-```
-Confirm ready date              when will it be finished?
-Confirm tomorrow's delivery     is the van going tomorrow?
-Confirm balance delivery date   per PO LINE, after a short delivery
-```
-
-**Every promise is kept, never overwritten** — `po_supplier_promises` is append-only and each
-row names what it was made ABOUT, so a factory that slips again re-opens the call by itself.
-
-**Supplier reply evidence — owner ruling 2026-08-14.** A prepared/copied/opened/sent WhatsApp or
-email proves only Carres' outbound communication and never completes `Confirm ready date`, `Confirm
-tomorrow's delivery` or `Confirm balance delivery date`. The call closes only when the supplier's
-actual answer is recorded with its reply screenshot/email, reporter, Operations recorder, channel
-and reported/recorded times. Operations records on the supplier's behalf; no trust-based `Sent`
-checkbox may create a supplier promise. Future messaging/email/Open APIs use the same append-only
-promise authority and evidence contract rather than a second supplier-communication store.
-
-**AND IT IS THE PROVENANCE OF THE ARRIVAL DATE** (Loo, 2026-08-05; built). `purchase_orders`
-holds ONE arrival date and it may have come from either of two mouths — the factory's, or our
-own arithmetic at issue time. **The ledger is what tells them apart**: an arrival is the
-supplier's word only while a `tomorrow_delivery` promise stands behind it. A `ready_date`
-promise is fact ① and never counts, because *"finished on the 12th"* is not *"with you on the
-14th"*. Read once, through `poDateHistoryOf(...).currentDate`.
-
-**All three calls are in the engine** (T2, 2026-08-06). `purchasingSupplierCallsOf` carries
-`confirm_ready_date` · `confirm_tomorrows_delivery` · `confirm_balance_delivery_date`. The
-ready-date call opens on an open PO that still owes goods when the factory has neither a
-STANDING ready date nor a STANDING arrival promise (standing = about a day not yet passed —
-S4's rule, so a factory that slips re-opens the call by itself). Its due is
-`customer date − buffer (OFFICE week) − production working days (FACTORY week)`; a
-supplier × category with no production number, or a PO with no customer date, gets NO due and
-can never turn late (P1/T7). The facts are OPT-IN on `SupplierCallPo` — a caller that does not
-carry them (Receiving's mapping) asks no ready-date question. **And a ready date the factory
-gives MOVES the expected arrival** (0325): the API computes
-`ready date + transit working days` with `arrivalFromReadyDate` — the ONE spelling, shared
-with `expectedArrivalOf` — and the RPC records it in the same transaction as the promise row;
-no transit number → the old arrival stands, never a guessed one. The previous arrival is
-never destroyed: the ledger is append-only, `po_history` prints old → new, and the cell keeps
-its `(revised)` marker.
-
-### WHAT IS ON SCREEN TODAY
-`OperationPurchaseOrders.tsx` · route `/operation/procurement` · *measured 2026-08-06, after
-T2 shipped: the rail rebuilt on screen, the calendar walked in tests against the frozen
-sketch's own dates.*
-
-```
-LEFT 200px   CALLS      — the week's factory calls, a rolling FIVE-office-
-                          working-day window (T2, frozen with Loo 2026-08-06):
-                          Overdue      red · above the days · only when > 0
-                          Thu 6 Aug    today — always the first day row
-                          …            weekday + date on EVERY row, one format
-                                       (§2.4); full date on hover; zero-count
-                                       day rows STILL render
-                          Later        beyond the window · only when > 0
-                          Counts = the engine's own dues (a dueless call plans
-                          no day — P1/T7 — and shows in the unfiltered listing
-                          only). Public holidays skip exactly as weekends
-                          (`myHolidaySet()` until the Working Calendar, §10).
-                          Day rows are VIEWS — a click only narrows the
-                          listing; a call cannot be made early. No duty chip
-                          (§2.2). A factory-Saturday due files under the
-                          office's LAST day on or before it, never the day
-                          after (it would first surface already late).
-             SUPPLIER PROGRESS
-                          Waiting Supplier Date · Waiting for Goods · Ready to Receive ·
-                          Completed · Cancelled            (PO_WORK_STATE_LABEL)
-                          Both groups draw the shared rail recipe
-                          (`components/workspace-rail.tsx`) — the inline copy
-                          this page carried is deleted (its own docblock's
-                          instruction, done with T2).
-
-CENTRE       TEN frozen columns, ONE fixed set (Jess, 2026-08-18 — `Receiving`
-             added so a scan answers "how much landed" without opening a row;
-             `SO No.` and `Customer Delivery` stay, they are HOW a row is ranked;
-             a second date column was refused — see the arrival law below):
-             PO Issued · Supplier · PO No. · SO No. · Items · Destination ·
-             Customer Delivery · Expected Arrival · Receiving · Current Action
-             widths 96 · 88 · 83 · 95 · 136 · 135 · 140 · 206 · 96 · 192,
-             min-width 1304 (re-measure in a real browser before build)
-             default order = RISK TO THE CUSTOMER'S PROMISE
-             Current Action on a dateless PO now reads the ENGINE's own
-             `Confirm ready date` — a real due underneath the same word, in
-             place of the state word `Check Expected Arrival` (Q8's sameness
-             held: overdue and dateless still read ONE word)
-
-RIGHT 400px  WORKING HEADER → REFERENCE LAYER → SUPPLIER FOLLOW-UP →
-             RECEIVING SUMMARY → ACTIVITY
-             The working header prints `Need for` — WHY the PO was born
-             (0361's `purpose`: `Customer Sales` auto-stamp or the typed
-             demand purpose; shipped 2026-08-19 with the walk-fixes PR).
-             A pre-0361 PO has NULL, never backfilled — the row hides
-             rather than printing a dash the operator must interpret.
-```
-
-**Controls** `po-date-open`/`-form`/`-input`/`-save`/`-reason`/`-remarks`/`-extend` ·
-`po-ready-date-open`/`-input` · `po-print-pdf` · `po-open-whatsapp` · `po-open-email` ·
-`po-copy-message` · `po-wa-toggle` · `po-save-template` · `po-history` · `po-activity` ·
-`po-panel-items` · `po-panel-close` · `po-overdue` · `po-arrival-gap` · `po-version` ·
-`po-unshared` · `po-revise-open`/`-form`/`-line-{i}`/`-qty-{i}`/`-destination-{i}`/
-`-floor-{i}`/`-reason`/`-save`/`-cancel`/`-error`
-
-### API + DATA
-`GET /operation/pos` · `/:id/print-data` · `/:id/receiving` · `/:id/source-orders` ·
-`/:id/units` · `/awaiting-stock-shortage` · `/report` · `POST /` · `/batch` · `/:id/ready-date`
-· `/:id/tomorrow-delivery` · `/:id/sends` · `/:id/revise` · `/:id/cancel` · `/:id/office-receive` ·
-`/:id/assign-pickup-partner` · `/:id/reassign-warehouse` · `/:id/chase-event` ·
-`POST /lines/:lineId/balance-date` · `/destination` · `/ops-remark` · `/split` ·
-`PUT /message-template`
-
-Tables: `purchase_orders` **24** · `purchase_order_lines` **38** · `po_history` **26** ·
-`po_sends` **5** · `po_revisions` **3** · `po_supplier_promises` **6**
-*(counts re-measured 2026-08-19, the revision card's own baseline)*
-
-### Deliver To — owner-locked operating rule (2026-08-14)
-
-`Deliver To` is Purchasing's authoritative instruction, at PO level with a PO-line override.
-It is not Warehouse's current physical Unit location and must not be copied onto Sales Orders.
-
-- Default: `Carres Klang` from the governed destination registry.
-- Batch Purchase / before Issue PO: Operations may change Deliver To directly. A SKU quantity
-  may split, for example `Carres Klang ×10 / AL Sungai Buloh ×1`; the split remains lines on the
-  same supplier PO.
-- After Issue PO but before the PO is sent to the supplier: Operations may change it directly;
-  the append-only PO History records the change.
-- After any supplier send: it may still change, but never silently. Preserve the previous
-  instruction, mint/record the changed revision, and require supplier update/recommunication so
-  Activity proves which revision was re-sent. A plain overwrite is not an accepted completion.
-- Every read resolves `coalesce(purchase_order_lines.destination_id,
-  purchase_orders.destination_id)`. The Sales Order expansion is a read-only projection of that
-  Purchasing result; it has no destination writer or duplicate destination column.
-
-**`GET /operation/pos` already ships every promise per PO** (`promises`, read since 0310 for the
-date history), which is why provenance needed **no migration and no new wire field** — the
-answer was already on the page, unread.
-
-**`purchasing_record_ready_date` is 4-arg since 0325** (`p_po_id, p_new_date, p_reason,
-p_new_eta`) — the old 3-arg signature is DROPPED, not overloaded, and a sanity block aborts
-the migration if two signatures survive. The arithmetic is NOT in plpgsql: the API computes
-`p_new_eta` with the shared `arrivalFromReadyDate` (Law D — one spelling) and the RPC only
-records it.
-
-### FROZEN RULES
-- **The nine columns NEVER change because the panel opened.** No compact variant. When they do
-  not fit, the LISTING REGION scrolls sideways — deleting a business column to avoid a
-  scrollbar is forbidden. `resize` and `reorder` are how an operator rebalances.
-- **ONE purchase order, ONE way of looking at it.** State is `{ poId, mode }`: row click opens
-  the panel · the ⌄ expands the row and CLOSES the panel · collapsing brings it back on the
-  same PO. Two POs on one screen are structurally unrepresentable.
-- **PO-line quantities are RPC-only** (0316). No client may PATCH `received_qty`.
-- **A sent PO is not overwritten — it is REVISED** (Jess, 2026-08-18, overturning *"a sent PO
-  is never edited · there are no revisions to keep"*). Cancel-and-reissue puts TWO numbers for
-  ONE job in the factory's hands, and a factory reads two numbers as two jobs. A change KEEPS
-  the number and mints `PO-2041 · Version 2`: the prior version is snapshotted, the reason and
-  the author are stored, and the PO drops back to `Issued` until the new version's share is
-  confirmed. **THE FLOOR — no line may be revised BELOW what has already been received;** the
-  excess goes back through a Purchase Return first. (2990s proves both halves in production:
-  `PurchaseOrderDetail.tsx:621` snapshots the prior version into `po_revisions`, and approve-po
-  409s `received_floor` at `:639`.) Adding items is still a NEW PO; stopping is still the whole PO.
-  **SHIPPED 2026-08-19** (CARD-2026-08-19-po-revisions, migration 0364): `purchasing_revise_po`
-  — reason required IN SQL, author from auth, the floor refuses with `received_floor` (409),
-  the PRIOR version snapshotted into `po_revisions` (0312's exact snapshot shape, so
-  `purchasing_record_send`'s changed-since-last-send comparison is untouched) with `reason` +
-  `created_by`, `purchase_orders.version` + `revised_at`, one `po_history` row printing old →
-  new. The panel title reads `PO-2041 · Version 2` (Version 1 prints nothing) and the panel's
-  `Revise` door takes the stage with the floor stated inline; the disabled Save names its gap.
-  `{po} Version {n} has not reached {supplier}` is DERIVED — `revised_at` newer than the latest
-  send — never stored. A trigger closes the silent doors: once any send exists, a direct line
-  qty / destination write refuses with `A shared PO changes through Revise.` (the Deliver To
-  after-send rule made structural; a SPLIT on a shared PO is refused too — revise cannot split
-  yet, its own card). The two-step share's STEP TWO (`Record what you sent`) remains ruled but
-  unbuilt — this card mints the version fact that step will answer about.
-- **The portal never claims it sent anything.** Pressing a channel button records
-  `{Channel} opened · Snapshot N` — a click is all the system observed. Print writes no history,
-  moves no status and has no limit.
-- **A SHARE IS A HUMAN FACT, IN TWO STEPS** (Jess, 2026-08-18). Step one is the click, and it
-  records only the opening. Step two is a question the portal asks and an operator answers:
-  WHICH version, to WHICH supplier, on WHICH channel. **Only the answer is the share.** A press
-  that never became an answer is a PO nobody sent, and the register says so.
-- **Communication is still not a STATUS.** The five Operation Status words are unchanged and
-  none of them is `Ordered`. `PO PDF not shared` is work to do, never a stage.
-- **Row order is risk to the customer's promise**, and clearing a header sort returns to it.
-- **Red is reserved for a date the factory GAVE.** Our own estimate warns amber, greys the
-  date, prints `· expected` on the expand, and makes the supplier draft ASK for a date instead
-  of quoting ours back at them. **Provenance is the promise ledger, never a null test on
-  `eta_date`** — that test broke on 2026-08-03 and was repaired 2026-08-06. `same day` stays
-  amber either way: tight is not broken.
-- **A promise can be broken; our own guess cannot.** `Overdue` counts only against a date the
-  supplier named. A PO whose estimate has run out is `Waiting Supplier Date`, and its Current
-  Action is already the identical phone call.
-- **THE RAIL MOVES WITH PROVENANCE — LET IT** (Loo, 2026-08-06). He was shown the alternative
-  — grey the date and freeze the counts — and rejected it: *a quiet queue that says goods are
-  coming about a factory nobody has phoned is the same lie one level up.* **A louder queue
-  whose number is true beats a calm one whose number is not.** Measured on the day it shipped,
-  `Waiting Supplier Date` 16 → 19 and `Waiting for Goods` 6 → 3. *(His ruling quoted 16 → 21
-  and 8 → 3, counted before `PO-2052` and `PO-2054` were received; the rule is what binds, not
-  the two POs that finished in between.)*
-- **The expected arrival has ONE arithmetic** — `expectedArrivalOf`: production on the
-  FACTORY's week, transit on the OFFICE week. The register spelt it a second time without the
-  transit leg and under-warned by exactly the day it forgot.
-- **One editing surface per fact.** The expand is the working area; the right panel is Activity.
-- **GROUP BY SUPPLIER, and it is the ONE grouping this register offers** (Jess, 2026-08-18).
-  Collapsing the list to one row per factory is how a buyer prepares a phone call: everything
-  Ohana owes, in one place, one call, no scrolling back. 2990s makes `Supplier` groupable on
-  its own PO register (`apps/backend/src/pages/PurchaseOrders.tsx:122`). Grouping is a VIEW —
-  it re-sorts nothing else, remembers nothing across a reload, and never becomes a saved layout.
-- **`Total` EXISTS AND IS PERMISSIONED, not deleted** (Jess, 2026-08-18, refining *"no money on
-  Purchasing"*). The three operators buy, chase and receive without ever seeing a price — price
-  is not theirs to judge and a number on their screen invites them to judge it. The approver
-  sees it, because approving a purchase without its cost is not approving anything. **The same
-  page shows different columns to different people; permission rides the PERSON, never the
-  page** — which is also how a future purchasing manager gets access without a rebuild.
-
-### WHAT THE 2990s REGISTER SHOWED AND CARRES DOES NOT COPY
-2990s' PO register is a document BOOK; this one is a WORK LIST, and the gap is measurable.
-It carries no `SO No.` and no `Customer Delivery` (`PurchaseOrders.tsx:114-256`), so it cannot
-rank by risk to a customer's promise and falls back to date order. It has no `Current Action`
-column at all. It hides received quantity behind `Transfer To (GRN)`, `defaultHidden: true`
-(`:239`) — the answer to *did it land* is one picker-click away from a buyer who asks it hourly.
-And its Confirm / Edit / Cancel / Convert live on a right-click menu (`GoodsReceivedList.tsx:546`),
-which Register Law 8 forbids outright. **Take the grouping, take the drill-down, leave the rest.**
-
-### APPROVED EVOLUTION
-*(The CALLS calendar, the `Confirm ready date` queue and "a ready date MOVES the expected
-arrival" all SHIPPED with T2 on 2026-08-06 — 0325 + the engine's third call + the rail — and
-their rules now live under WORKFLOW and WHAT IS ON SCREEN TODAY above. Still separate,
-deliberately: `expected_ready_date` and `eta_date` remain two columns and two facts — 0325
-links them at the moment of recording; it does not merge them.)*
-- **Prove it with a real PO, end to end** — the line has never run. Two gates have no home yet
-  (a PO cannot be issued twice for the same customer line and quantity; a check-in cannot be
-  posted twice for the same supplier DO number), and **whoever is on an action must show on
-  it** — a lightweight claim `(action identity) → claimed by → claimed at`, expiring on
-  `ACTION_CLAIM_TIMEOUT_MS` (already exported from `packages/shared/order-actions.ts` — import
-  it, never retype the number), read ONLY through the open-action list. **`ops_tasks` has
-  `claimed_by`/`claimed_at` and is still the WRONG home**: minting a task row per engine action
-  turns the ladder back into a manual to-do list.
-- **Fulfilment ≠ received.** A PO whose goods never touch a Carres floor must still be able to
-  finish. **Two paths, per LINE** (*"本来就是一项一項"*): into a Carres warehouse → the
-  Receiving Session IS the confirmation, **no button**; never touching a Carres floor →
-  Operation confirms explicitly, and **customer self-collection is that second path, not a
-  third**. Fulfilment carries its own record — who · when · which path — and may **never** be
-  expressed by writing `received_qty`. **Measured: PO-2032 carries two lines to an
-  address-only destination, so it can never reach `Completed` today.**
-
----
-
-# §5 · Receiving
-
-### MISSION
-Book in what physically arrived, through ONE door that leaves a record.
-
-### WORKFLOW
-**THE SESSION IS BORN WITH THE PO, NOT WITH THE TRUCK** (Jess, 2026-08-18, following Odoo,
-Dynamics BC and SAP's inbound delivery). Issuing a PO opens its Receiving Session and mints its
-number in the same act. Nobody presses `Start Receiving`; the operator opens the tab and reads
-*"what is due to land"* — the session is already there, waiting. **A half-counted session keeps
-its number and stays in `To receive` reading `6 of 10`**, which is the whole point: the truck
-that arrives at 17:30 does not have to be finished by 18:00, and tomorrow morning nobody has to
-hunt for what they were doing.
-
-`Session exists → Receiving Mode → Save → Posted`. A Carres-staff receipt at a Carres-controlled
-destination writes ONE `posted` event,
-through the same validator and the same receive engine the warehouse uses. **A `submitted` event
-is deliberately NOT written for that personally performed receipt path** — one operator pressing
-Save once performs the physical check and post, and an event records what happened in the BUSINESS
-world, not the steps the system walked. This is a receiving method, not a Manual Purchase `Office`
-category.
-
-**GOODS THAT LAND AWAY FROM THE OFFICE USE THE WAREHOUSE'S TWO ACTS** (Jess, 2026-08-18). Three
-office staff cannot stand at HOUZS Balakong when a van arrives. Whoever is THERE counts, checks
-condition, photographs and uploads the supplier DO — that is `submitted`. The month's GRN duty
-reads it and posts it. **Segregation survives intact: the person who ordered still never posts
-the receipt.** This is not a new path; it is the warehouse path pointed at a second address.
-
-Damaged or wrong units become `on_hold` at the moment of receipt and stop counting as future
-supply (0299), and a claim is raised automatically (0288's trigger).
-
-**MORE ARRIVED THAN WAS ORDERED — THE DEFAULT IS THE DRIVER TAKES IT BACK** (Jess, 2026-08-18).
-The counter records what is in front of them; the system never blocks the count. Excess is
-refused at the tailgate and never enters stock — the receipt reads the ordered quantity and one
-line records that the supplier over-shipped, so *"how often does this factory over-ship"* stays
-answerable. **Found after the van has gone:** the surplus is marked for the supplier's next
-collection, held out of sellable stock because it is not Carres' goods, and it rides the SAME
-collection mechanism as a consignment return. Purchasing is TOLD, and does not decide — the one
-case that needs a buyer is Carres wanting to KEEP the surplus, which is a commercial conversation.
-
-### WHAT IS ON SCREEN TODAY
-`OperationReceiving.tsx`, 1036 lines · route `/operation?tab=receiving` · ***measured
-2026-08-06, after T5 shipped: the file read END TO END — the rail is TWO QUEUES with two
-independent facet sets, which the previous entry did not say.***
-
-```
-LEFT 200px   QUEUES              To receive  ·  Goods Received      ← always both,
-                                 never hidden at zero (a switch, not a facet).
-                                 `?queue=received` rides the URL.
-
-             ── while `To receive` is open ──
-             RECEIVING PROGRESS  Receiving issue (danger) · Partially received ·
-                                 In transit · Fully received
-             SUPPLIER            per factory
-
-             ── while `Goods Received` is open (its OWN facets, held apart) ──
-             RECEIVED            Today · This week · This month · Earlier
-             SUPPLIER            per factory
-             SOURCE              last, and only once TWO desks have filed
-
-CENTRE       `To receive` — SEVEN columns: PO Issued · Supplier · PO No. · Items ·
-             Goods Arrival · Received · Current Action.
-             Default order = PO Issued OLDEST first.
-             `Goods Arrival` COLOURS WHEN IT IS LATE (T5, 2026-08-06) — red for a
-             date the factory GAVE, amber for our own estimate, plain when it is
-             not late, the existing grey dash when there is none. No new word:
-             the colour is the whole change.
-             ⚠️ MEASURED: `Goods Arrival` and `Received` are OUTSIDE the
-             reading-pane compact set (`COMPACT_KEYS`), so with the workspace pane
-             open — the default — neither renders. The operator sees the colour by
-             putting the pane away or by sorting on the column (the honesty guard
-             never hides a sorted column). NOT changed by T5, which was ruled to
-             touch nothing but the colour; whether the compact set is right is a
-             Workspace-layer question.
-
-             `Goods Received` — SIX columns: Received · GRN No. · Supplier ·
-             PO No. · Supplier DO No. · Units. No Status column: the queue itself
-             is the status, and it holds POSTED records only.
-
-RIGHT 400px  ONE PO's Receiving Session. Receiving Mode takes the stage rather than
-             opening an overlay — five lines with three numbers each do not fit in 400px.
-             On `Goods Received` the pane is the read-only record (`?receipt=`, its
-             own key — a PO and a Session are two documents).
-```
-
-**Controls** `receiving-rail` · `receiving-listing` · `receiving-workspace-toggle`/`-pane`/
-`-page` · `receiving-clear-filters` · `receiving-queue-to-receive`/`-received` ·
-`receiving-rail-state-{state}`/`-supplier-{id}`/`-bucket-{key}`/`-rec-supplier-{name}`/
-`-source-{key}` · `receiving-arrival-{poId}` (the arrival cell, carrying `data-tone`
-`promised` · `estimate` · `plain`)
-
-### API + DATA
-`POST /operation/pos/:id/office-receive` (→ `office_receive_post`, 0315) ·
-`GET /operation/warehouse-receipts` · `POST /:id/check-in` · `POST /:id/send-back`
-Tables: `warehouse_receipts` **3** · `receiving_events` **3**
-
-### THE INFORMATION MODEL — frozen
-
-**ONE physical delivery (one truck) = ONE Receiving Session.**
-
-**RECEIVING-TO-INVENTORY RECONCILIATION — owner-approved 2026-09-01.** Receiving owns the actual
-arrival result; Inventory consumes it and never asks NETS or Carres staff to type the count again.
-For each PO/Consignment scope, the page prints `Expected · Received · Not yet received · With
-issue`, with every traceable Unit result drilling to its Unit ID. The governed equation is
-`expected = cumulatively received + not yet received`; `With issue` is a condition subset of what
-arrived, not extra quantity. Posting the Receiving Session creates the GRN and the physical facts
-Stock may consume:
-
-- received acceptable Unit → enters Inventory at the actual receiving Site/current holder;
-- received with issue → enters Inventory under `Needs checking`, never Ready Stock;
-- not yet received → remains expected Inbound and cannot enter Inventory;
-- unexpected/excess Unit → follows the refused or controlled-surplus rule above, never a shortcut
-  into available Stock.
-
-The shared contract, including partials, disagreement handling and clickable lineage, is defined
-once in `../ERP-ARCHITECTURE.md` §3.5.1. Receiving may show Inventory consequence read-only, but it
-does not write a second current-holder or available-total field.
-
-- A missed line on the same truck is an **Amend** on the same Session — never a second one.
-- A genuinely second truck is a NEW Session (a normal partial delivery).
-- A wrong record (wrong qty / PO / DO) is a **Void** plus a correct new Session.
-  **History is never overwritten and never edited in place.**
-- **Duplicate guard: same Supplier + same PO + same DO number cannot create a second live
-  Session.** One DO number MAY span several POs — one van, two POs is legal, and each PO gets
-  its own Session.
-- **A field's owner is the module that CREATES it.** Foreign fields display read-only with a
-  jump to their owner. The Session owns: session id · PO ref · **the warehouse SNAPSHOT**
-  (never re-derived after a PO relocation) · supplier DO number · lines (received-this-time as
-  a DELTA · damaged · wrong · photos) · the internal note, **which is never mixed with
-  supplier-facing text.**
-
-**THREE TIMES, never one `created_at`:**
-
-| Time | Set by | Editable | Means |
-|---|---|---|---|
-| **Goods Received At** | human | ✅ default today; never future; never before the PO date | when the goods PHYSICALLY arrived |
-| **Submitted At** | system | ❌ | when it entered the system |
-| **Posted At** | system | ❌ | when it hit the books |
-
-**Friday's truck keyed in on Monday reads: Received Friday · Submitted Monday.** Reports use
-the business date, audit keeps the system dates, **and both are true.**
-
-**THE EVENT LEDGER IS THE ONE HISTORY.** `receiving_events` is append-only; the Activity
-timeline reads it **and nothing else.** A single status column loses *"was once returned"* the
-moment it resubmits, and a second return overwrites the first reason.
-
-**Event names are business facts and the list is CLOSED:**
-`submitted · returned · resubmitted · posted · voided · amended`
-(**`resubmitted` is a first-class event — never `submitted` with a flag.**)
-
-**The payload dictionary is closed too, and a new key enters the table before it enters any
-payload:** `do_number` · `goods_received_at` · `units_counted` · `entry_source`
-(`office | warehouse`) · `reason` · `claims_linked` · `changes`.
-**Both doors write the same five keys on `posted`**, so a report over the ledger reads the same
-regardless of which desk keyed the count — which is why the Office's single act **widened the
-payload rather than manufacturing a `submitted` event nobody performed.** Here legacy
-`entry_source = office` names the Carres-staff receipt method; it is not an approved Manual
-Purchase `Need for` category.
-
-### FROZEN RULES
-- **The Supplier DO number is THEIRS.** No default, no suggestion — a number we invent is a
-  reference the supplier never issued, and it defeats the duplicate guard that reads it.
-- **`Received` is PRINTED, never left as `5 − 3`.** An operator should never subtract to learn
-  what is still owed.
-- **The Save button NAMES the gap** (`Save — add a DO number`). A grey button that will not say
-  why is a puzzle.
-- **No `GRN` tab, ever.** GRN is a document OF Receiving, not a module.
-- **A LATE TRUCK MUST LOOK LATE — and §4's colour law is the SAME law here** (T5, approved by
-  Loo 2026-08-06). `Goods Arrival` had exactly two states, the date or a grey dash, so on the
-  one page whose whole job is goods physically turning up a truck three days late was
-  pixel-identical to one arriving on time; the only red on the row was `Current Action`.
-  **Red is reserved for a date the FACTORY GAVE. Our own arithmetic warns AMBER and never
-  accuses a supplier of breaking a promise nobody made** — the two need opposite next moves.
-  **Provenance is the promise ledger, `poDateHistoryOf(...).currentDate`, never a null test on
-  `eta_date`** (which has held our own estimate since 2026-08-03). **`late` is the engine's own
-  open calls** — the identical expression `Current Action` and Purchase Orders' `Expected
-  Arrival` already read, so one date cannot turn late on two tabs on two different days. **A
-  second clock or a second provenance test on this page is a defect, not a refinement.**
-- **THE TWO QUEUES CARRY THE SESSION, NOT THE PO** (Jess, 2026-08-18). Now that a session is
-  born with its order, `To receive` shows `GRN No.` from the first day — `PO Issued` leaves the
-  set, because this queue lists RECEIPTS and the PO has its own register. And **`Received`
-  prints a fraction, `6 / 10`**, so a half-counted truck is legible without opening a row: the
-  van that arrives at 17:30 is finished tomorrow, by whoever is on duty, without anyone hunting.
-  ```
-  To receive       GRN No. · Supplier · PO No. · Items · Goods Arrival ·
-                   Received · Current Action
-  Goods Received   Received · GRN No. · Supplier · PO No. ·
-                   Supplier DO No. · Units · Claim
-  ```
-  **`Claim` is the last column of the posted queue**, adapted from 2990s' `Transfer To (PI / PR)`
-  (`apps/backend/src/pages/GoodsReceivedList.tsx:98`) and re-pointed: the question this business
-  asks of a past delivery is *did that truck cause trouble*, not *was it invoiced* — invoicing is
-  Finance's and never appears here.
-- **✅ THE COMPACT-SET DEFECT DIES WITH THE ALWAYS-OPEN PANE.** Measured 2026-08-06: `Goods
-  Arrival` and `Received` sat outside `COMPACT_KEYS`, so with the workspace pane open — the
-  DEFAULT — this page's two most-read columns rendered for nobody. The listing is now full width
-  until a row is opened (Jess, 2026-08-18), so the compact set stops deciding what a receiver
-  can see.
-- **The receiving ladder is FOUR rungs and the ORDER is the rule:** `fully_received` →
-  `receiving_issue` → `partially_received` → `in_transit`. **Live consequence today: PO-2054 is
-  3 received of 3 with 1 damaged, so it reads `Fully received` and the damaged unit is
-  invisible on the rail.** That is the published precedence working as ruled.
-
-### ✅ RECEIVING HAS ONE DOOR — the third one is deleted (D2, 2026-08-06)
-
-The Orders drawer used to call `useReceiveLine` → `POST /operation/orders/:id/receive-line`,
-rendered on its Items tab as **`Goods arrived at the warehouse (GRN)`**. It booked units into
-the stock register and stamped `ops_order_control.line_received` **without opening a Receiving
-Session**: no `warehouse_receipts` row, no `receiving_events` entry, and it never moved
-`purchase_order_lines.received_qty`. **Two surfaces recorded one physical act two different
-ways, and no surface could reconcile them.**
-
-**Measured on production before removal: it had been used ZERO times** — `line_received` empty
-on all 65 control rows and 0 units reserved to an SO — while this module's Receiving Workspace
-had posted **3** sessions through `office_receive_post`. That measurement is what made the
-removal an engineering decision rather than a business question.
-
-**The route is DELETED, not left unrendered**, on this module's own C1 ruling: *a live route
-with no caller is a bypass one curl away.* An old tab now meets a loud 404 instead of quietly
-writing an untraceable receive, and a guard asserts exactly that.
-
-**The Orders drawer still SHOWS the received count and hands over through the PO row's
-`Check in` link.** Orders may show cross-module work; it may not write it.
-
-### THINGS A CHAT GETS WRONG HERE
-- **The rail is a PROGRESS rail, not an action queue.** There is no `Check in` queue tile.
-- **`Current Action` is NOT limited to `Check in`** — `callsById` is still computed and can
-  render either supplier call. Today's data reaches only `Check in`; that is a DATA fact.
-- **`OperationReceiving.tsx` says `claim` exactly ONCE in 1036 lines** (re-counted 2026-08-06,
-  after T5). Receiving is blind to what it produces.
-
-### APPROVED EVOLUTION
-- **The rail becomes a QUEUE model** (`To Receive` / `Received`), ruled by Jess 2026-08-03.
-- **Receiving sees its own Claims** — `Claims · n open · n closed` without switching tabs.
-- **⚠️ Both are the RECEIVING workstream's**, on its own worktree. Jess, 2026-08-03: *"Do not
-  modify the Receiving module in this Purchase Orders workstream."*
-  **UNRESOLVED:** Q14, a Purchase Orders card, edited this file on 2026-08-05. Either her
-  ruling is narrower than it reads (the RAIL only), or Q14 crossed it. **Somebody must say
-  which, or the next card guesses.** *(T5 is not that guess: Loo lifted the boundary for it
-  EXPLICITLY on 2026-08-06, and T5 is a Receiving-owned card on its own worktree touching
-  `OperationReceiving.tsx` and its tests and nothing else. The open question is still about
-  PURCHASE ORDERS cards reaching in.)*
-
----
-
-# §6 · Supplier Claim
-
-### MISSION
-Resolve the exception a receiving produced — and Claims owns the defective item's whole life.
-
-### WORKFLOW
-A claim is BORN from a PO line (0288's trigger). **There is no create button and there never
-will be** — this is SAP QM's Quality Notification, not a Zendesk ticket, and the reference
-object (`PO · SKU · Supplier · DO`) is carried forever.
-
-```
-we ask the supplier  →  the supplier answers  →  Carres decides  →  Carres executes
-```
-
-A recorded side becomes READ-ONLY prose: the ask FREEZES the moment an answer lands, which is
-what makes *"what we wanted vs what we got"* worth reading later. Close is refused, in the UI
-and server-side, unless both sides are on file.
-
-### WHAT IS ON SCREEN TODAY
-`OperationSupplierClaims.tsx` 854 lines + `SupplierClaimPanel.tsx` 712 lines ·
-route `/operation?tab=claims` · ***measured 2026-08-06, after layer ③ shipped: both files read
-END TO END, and the four columns and one row were counted in production with SQL.***
-
-```
-LEFT 200px   QUEUES    Confirm what happens next        ← the only queue tile TODAY
-             SUPPLIER · PROBLEM
-CENTRE       kit DataTable, eight measured widths 150 · 111 · 181 · 154 · 147 · 194 · 368 · 134
-             status picker Open / Closed / All — a STAGE, one is always on
-             ⚠ NO column was added for the resolution — the grid already totals 1481 in a
-               1022 container, and layer ③ is a decision you make in the panel, not a fact you
-               scan the list for
-RIGHT        NOTHING. There is no right panel on this tab.
-```
-
-> ### ⭐ THE RAIL GAINS THE TWO DECISIONS — the recorded gap, closed (Jess, 2026-08-18)
-> **APPROVED, NOT YET BUILT.** §6's own Approved Evolution says it out loud: **"NOTHING TELLS
-> ANYONE TO PICK A RESOLUTION."** One queue tile exists and it is the phone call. The moment the
-> supplier answers, the claim goes SILENT — the answer is on file, the decision is not made, and
-> no surface anywhere asks anybody to make it. A claim that needs a human decision and raises no
-> action is exactly what Law 7 was written to prevent.
-> ```
-> QUEUES
->   Confirm what happens next        waiting on the supplier
->   Decide what we do                the supplier answered; layer ③ is open
->   Decide what happens to the item  resolution chosen; the unit is still in limbo
-> ```
-> **The two new tiles ARE the two frozen decisions** — `Customer Resolution` (*what are we doing
-> for the customer?*) and `Item Outcome` (*what happened to THIS item?*) — and they are separate
-> tiles for the same reason they are separate fields: **both can be true at once, and a claim can
-> sit waiting on either.** Recording the supplier's answer moves the claim from the first tile to
-> the second by itself, onto the Work day of the duty holder who owns it. **Nobody has to remember
-> to come back.**
->
-> **No `Resolution` COLUMN is added, and the refusal stands** — the grid already measures 1481px
-> in a 1022px container, and layer ③ is a decision made in the panel, not a fact scanned in a
-> list. The rail answers *how many are waiting on me*; the panel is where the answer is given.
->
-> **2990s contributes nothing here and the reason is worth recording:** it has no claim object at
-> all — a bad receipt becomes a Purchase Return and the questions *what did the supplier say* and
-> *what did WE decide* have nowhere to live. On this page Carres is a generation ahead, and the
-> only thing to copy is the discipline of not copying.
-
-**The expanded row** — a 2-column grid, and the whole 712-line panel lives inside the kit
-table's `expansion`:
-
-```
-LEFT                                       RIGHT
-  Evidence             photos, or            What we asked    ask buttons → [ Send to {supplier} ]
-                       "No photo — a late                       or [ Save what we asked ] · [ Copy ]
-                        delivery has nothing                     once recorded → read-only prose
-                        to photograph."
-  Customer Resolution  "What are we doing    What {supplier} answered
-   ← LAYER ③, LIVE       for the customer?"    ○ Replacement · Deliver remaining · Repair ·
-     2026-08-06        ○ Replace                 Return & replace · Reject · Other agreement
-                       ○ Repair               note REQUIRED for reject / other agreement
-                       ○ Accept As-Is         [ Save {supplier}'s answer ]
-                       ○ No Replacement Required
-                       one DEFINITION line under the pick
-                       note (optional) · [ Save what we are doing ] · Recorded {date}
-                       closed claim → read-only, or
-                       "Nothing recorded — this claim closed without one."
-  Item Outcome         "{n} unit on hold"    Settle it        note (optional) · [ Close claim ]
-   ← renamed from       "What happened to                      STILL gated on both sides and
-     `The goods`         this item?"                           NOTHING ELSE — layer ③ does not
-     2026-08-06        ○ Put back in stock                     gate the close
-                       ○ Returned to supplier
-                       ○ Write off
-                       note REQUIRED for write off
-                       [ Save what happened ]
-  Closed               date + close note
-```
-
-**Each decision's buttons sit in a `role="group"` carrying its section's name.** The panel now
-holds two buttons reading `Replace` and two reading `Repair` — the supplier saying it and
-Carres deciding it are different facts about different parties — so the heading disambiguates
-them for a reader and the group's accessible name does the same for a screen reader.
-
-> **THE FACT MOST CHATS GET WRONG.** The item-outcome picker **already exists and Claims is its
-> only home**: `STOCK_HOLD_OUTCOMES` (`packages/shared/src/stock-hold.ts`) is imported by
-> **exactly one file in the repository** — `SupplierClaimPanel.tsx` — and its endpoint lives
-> under Claims. **Removing it leaves quarantined goods with no way out of quarantine.**
-> Shipped by migration **0299**, 2026-07-27.
-
-### API + DATA
-`GET /operation/supplier-claims` · `GET /:id/photos` · `POST /:id/request` · `/:id/response` ·
-`/:id/hold-resolve` · `/:id/close` · **`/:id/customer-resolution`** (0324)
-`supplier_claims` — **32 columns, not one is money**; **1 live row**. Migration **0324** added
-the four: `customer_resolution` · `_note` · `_at` · `_by`, all NULLable with no backfill.
-
-**`SC-1014`**, a full end-to-end test on 2026-08-05: `PO-2054 · JAGER-SS · damaged · qty 1 ·
-DO-P5-0001 · 1 photo`, reported → requested `replace` → responded `replacement` → closed, **all
-four timestamps present** — real data for a timeline to render against. **It is CLOSED, so it
-carries no resolution and never can**, and its panel prints
-`Nothing recorded — this claim closed without one.` rather than a blank. Re-measured after
-0324: still 1 row, still all four timestamps, `customer_resolution` NULL.
-
-### FROZEN RULES — the claim model, ruled by Loo 2026-08-05
-
-**The four layers, and they may never be collapsed:**
-
-```
-Customer Problem → Supplier Response → Carres Resolution → Carres Execution
-                                                     → Stock · Finance · Demand
-```
-
-**The test that keeps them apart:** *can both be true at the same time?* **If yes, they are two
-fields, not one list.**
-
-**TWO decisions, because they answer two different questions. BOTH ARE ON SCREEN (2026-08-06):**
-
-| | Asks | Options | Stored |
-|---|---|---|---|
-| **Customer Resolution** | what are we doing for the CUSTOMER? | `Replace` · `Repair` · `Accept As-Is` · `No Replacement Required` | `supplier_claims.customer_resolution` (0324) |
-| **Item Outcome** | what happened to THIS item? | `Put Back in Stock` · `Return to Supplier` · `Write Off` | `ops_stock_items.status` via `ops_stock_resolve_hold` (0299) |
-
-**`Repair` is on BOTH the supplier's answer list and the resolution list, and that is not a
-collision.** The supplier saying *"we will repair it"* is their answer; Carres deciding the
-customer gets a repair is our decision. Different columns, allowed to disagree — preserving the
-disagreement is why the layers are kept apart at all.
-
-**The worked case, and it is why the split exists.** The customer cancelled AND the mattress is
-destroyed. Under one list the operator must choose which truth to record — **must lie**. Under
-two, both are recorded.
-
-**Removed from the resolution list, and do not put them back:**
-
-| Removed | Reason |
-|---|---|
-| `Return to Supplier` | **it loops back** — "send it back and wait for their next word" resolves nothing. It is an EXECUTION move |
-| `Write Off` | answers what happened to the ITEM. It lives in Item Outcome, where it already is |
-| `Cancel Outstanding` | replaced by `No Replacement Required`. **`SC-1014` is 3 ordered / 3 received, so outstanding = 0 and `Cancel Outstanding` could not be pressed at all** — the rename changed what the option DOES |
-| `Reject` · `Deliver Remaining` · `Replacement` · `Return and Replace` | all SUPPLIER answers, not Carres decisions. `Return and Replace` is two concepts in one option |
-
-**`Refund` is NOT built and NOT deleted.** Supplier credit note? cash? offset against future
-purchases? **The business meaning is not frozen and nobody may guess it.**
-
-**Carres Execution — frozen, NOT built:** `Return to Supplier · Collect Defective Item ·
-Replace First · Collect First · Exchange on Collection`. No option here may be folded into a
-resolution list.
-
-**Five business laws:**
-
-1. **`Replace` = a NEW item.** How the defective item is collected is an EXECUTION decision.
-2. **`Repair` = the SAME item**, returning to the SAME customer — unless Carres decides the
-   customer cannot wait, in which case the customer gets a replacement first and the repaired
-   item goes to warehouse stock. **Carres' decision, not the supplier's.**
-3. **Default policy — recover the defective item whenever practical.** Repair for resale,
-   reduce losses, preserve asset value. **Not because the supplier asks; because the item is
-   still worth money to Carres.** Replacement-first is the exception.
-4. **When the supplier refuses, the screen states the fact and stops.**
-   `Supplier Response: Rejected` → a waiting state → `Next Action: Select Resolution`.
-   **Stock, Finance and Demand are NOT derived until a resolution is chosen** — nothing is yet
-   known about any of them, and a screen may only show what is true right now.
-5. **Consequences are `f(Resolution, Execution)`, never `f(Resolution)`.** Law 2 is the proof.
-
-**⭐ WHO DECIDES, AND THE LINE IS WHOSE MONEY IT IS** (Jess, 2026-08-18). Owning a claim is not
-the same as being allowed to spend on it. **The supplier accepts responsibility → the duty holder
-records the outcome and it is finished** — Ohana saying *"we will replace it"* needs nobody's
-permission; it is Ohana's sofa and Ohana's cost. **The supplier refuses, or the item is to be
-written off → Carres is paying now, and it goes to the approver.** A replacement sofa is thousands
-of ringgit and it is not one operator's call at 5pm on a Friday.
-**This is the SAME line the purchase approval already draws** — a customer's order authorises
-itself; money Carres spends on its own account needs a person with the authority. Staff carry ONE
-sentence, not two rules: **if it comes out of Carres' pocket, it goes to Jess.**
-
-**A claim's owner:** the PO-duty holder **of the month it was OPENED in, forever** — it never
-changes when the month rolls over, because the person who spoke to the factory is the person
-who knows the case. **DERIVED from `ops_po_duty`, never an `assigned_to` column.**
-
-**Where a claim is born:** Supplier Claims has no independent intake. Staff use `Report Problem`
-on PO/Receiving or any other source record; the one Service Case authority opens or links the
-Case and creates a Supplier Claim workstream when supplier responsibility is in scope.
-`Purchasing → Supplier Claims` is the Purchasing work view of those workstreams. It is where
-Purchasing asks the supplier, records the answer, obtains external credit/debit-note evidence and
-finishes its work; it never asks Purchasing to rekey the original problem or choose whether a
-Case should exist.
-
-**Implementation gap:** today's receiving path and 0299 transition guard still embody the older
-receiving-only entrance. The Service Case completion build must change the claim entry rule and
-the refurbish door in the same migration, so a held/refurbished unit cannot return to the free
-pool while its claim is unanswered.
-
-### THE PANEL LOO FROZE, 2026-08-05 — three of six built, 2026-08-06
-
-```
-The Item              what this claim is about              NOT BUILT — it is the Workspace
-                                                            layer's un-collapsible header
-Customer Resolution   what are we doing for the customer?   ✅ LIVE 2026-08-06
-Item Outcome          what happened to this item?           ✅ LIVE — renamed from `The goods`
-Evidence              photos                                ✅ already there
-Supplier Response     what did the supplier say?            the screen says `What {supplier}
-                                                            answered` — see below
-Decision Guide        live guidance under the selected      PART built: one DEFINITION line per
-                      option                                option, and nothing more
-```
-
-**`Supplier Response` was NOT taken to screen, and that is a decision.** The live heading is
-`What {supplier} answered`, which NAMES THE PARTY — the thing COPY-STANDARD asks for everywhere
-else. Renaming it to the generic noun is a Workspace-layer call about section headings, not
-part of recording a resolution, so it waits for that card rather than being taken in passing.
-
-**`Decision Guide` stops at a DEFINITION and may not grow into a consequence here.** Each
-option carries one line saying what it means for the customer (`The customer gets a NEW item.`
-— Loo's law 1, verbatim). **`What happens next` and `Typical examples` are NOT built**, because
-both would state a consequence, and consequences are `f(Resolution, Execution)` with Execution
-unbuilt. A guide that named stock, money or the outstanding quantity would be a guess wearing a
-screen's authority — law 5, applied.
-
-**The words are now IN `COPY-STANDARD.md`** (§ *The Claims decision words*, written 2026-08-06,
-attributed to Loo's ruling of 2026-08-05): `Customer Resolution` · `Item Outcome` · `The Item` ·
-`Accept As-Is` · `No Replacement Required` · `Supplier Response` · `Next Action`, the four
-definition lines, the two questions, the button and the closed-claim line. **`Refund` has a row
-that records it as NOT ruled**, so its absence cannot be read as an oversight.
-
-**Both collisions are settled, by law already in the dictionary — apply them, do not re-open:**
-
-1. Loo's `Waiting Internal Resolution` **loses** to the already-locked
-   `Case owner decision required` (2026-07-27). One meaning, one word, and the older lock is
-   what the rest of the portal's exception vocabulary is built around.
-2. **`Return` (the verb — a record goes back to whoever produced it) and `Return to Supplier`
-   (an Item Outcome about GOODS) BOTH STAND.** Two senses of one spelling, exactly as `Recovery`
-   is; neither is renamed to avoid the other. Recorded in COPY-STANDARD.
-
-### APPROVED EVOLUTION
-- **NOTHING TELLS ANYONE TO PICK A RESOLUTION.** Layer ③ ships the decision and no prompt for
-  it: `claimNextMove` is untouched, so the queue tile, the `Next move` column and the row line
-  say exactly what they said before. **That is deliberate** — Loo's law 4 names the state
-  (`Supplier Response: Rejected` → a waiting state → `Next Action: Select Resolution`), and
-  `Next Action` is a REGION of the unbuilt Workspace layer; wiring it would silently re-word a
-  dictionary-locked queue from inside a panel card. **The next card on this tab should be that
-  wiring, and until it lands a resolution is found only by opening the row.** Reported, not
-  softened.
-- **The Workspace layer.** §12.7.5's two-tier split, the un-collapsible `PO · SKU · Supplier ·
-  DO` header (= `The Item`), a Timeline off the four existing timestamps (**no migration** —
-  and 0324 adds a fifth, `customer_resolution_at`), the Consequences region with its mapping,
-  the `Supplier Response` heading rename, and the Owner. **⚠️ There is no right panel today** —
-  `w-[400px]` greps 0 in that page — so this CREATES the second tier rather than moving things
-  between two.
-- **One claim, ONE outcome, and a button that splits it.** Loo ruled option A on AutoCount's own
-  evidence (`Cancel Purchase Order` / `Goods Return` / `Purchase Return` are three documents and
-  none holds two outcomes). Three binding conditions: **R5 counts problem PO LINES, never claim
-  documents** (`ScorecardClaim` carries `po_id` and not `po_line_id`, and `claimRate` keys on a
-  Set of distinct POs — the claim STATS move with it or the fix is half done) · **the split is a
-  BUTTON**, never *"go and open a second claim"* · **the A→B upgrade path is written down while
-  it is free** (every claim becomes one child row: outcome copied, quantity equal to the whole).
-  A claim with a NULL `po_line_id` is counted BY NAME, never dropped.
-- **The close does not ask for a resolution, and a claim can still close without one.** 0291's
-  gate is "both sides on file" and 0324 left it exactly there — a third condition is a NEW
-  business rule and layer ③ was not ruled to make one. If Loo wants a claim to be unclosable
-  until the customer's side is decided, that is one constraint and one sentence, and it is his
-  call, not engineering's.
-- **Item Outcome wired to the resolution** — pure WIRING: 0299 already ships
-  `returned_to_supplier` · `written_off` · `back_to_stock`, and `Replace` is the receive engine.
-  `Repaired` and `Disposed` are NOT built: 0299's guard admits exactly three destinations, so
-  adding them is a migration.
-- **⭐ REPAIR ORDERS — the page that covers the gap between "flagged" and "back"** (Jess,
-  2026-08-18). **APPROVED, NOT YET BUILT.** A repair surface already exists and it is 14 lines:
-  `apps/web/src/pages/operation/OperationOpsRepair.tsx` is a thin wrapper over
-  `OpsStockListView` — *"Units flagged for repair, or in old / damaged condition. Unflag when
-  fixed, or takeout if written off"* — with exactly two actions, `flag-repair` and `takeout`.
-  Stock carries one word for the same thing, `needs_repair` (`../stock/MASTER.md`).
-  **Measured consequence: a unit is flagged and then the record goes silent** — who took it out,
-  which repairer has it, when it was promised back, whether it is chargeable, none of it exists
-  anywhere.
-  **The split, and neither side duplicates the other:** Stock's queue owns *which units are
-  faulty*; a Repair Order owns *the trip out and back*. `RO No · Repairer · Unit ID · Model ·
-  Sent From · Handover · Expected Back · Next Action`. States read as facts —
-  `Not shared with {repairer}` · `Waiting for handover` · `With {repairer}` · `Back, not checked`.
-  **A repair is never a Purchase Return**: ownership does not move, and the SAME Unit ID must
-  come back — a different one stops the receipt, because a repairer substituting a unit is a
-  claim, not a repair.
-  **AND IT NEEDS THE UNHAPPY ENDING.** *"Cannot be repaired"* may not close the order — the sofa
-  is still at the repairer and nobody owns it. The unit comes BACK first, is checked, and only
-  then does a human choose: sell it as damaged, or write it off. Without that path a
-  beyond-repair unit sits in `With {repairer}` forever, which is how a physical asset quietly
-  leaves a business.
-- **The money, and a Finance queue.** `supplier_claims` has 28 columns and not one is money; the
-  cost sits in `purchase_order_lines.cost`. **A Finance Action completes on an EXTERNAL EVIDENCE
-  reference** — the supplier's credit-note or debit-note number — never a tick-box, which is why
-  §8's ban on self-declaration does not kill the queue. *2990s is the worked example of getting
-  it wrong: its `purchase_returns.credit_note_ref` has exactly two readers in that whole
-  repository, a PDF and a detail page.* **Operations never sees AP; Finance never sees photos.**
-  Jess's locked rule stands and does not block this: hers is the credit note **Carres issues to
-  a customer**; this queue records the one **a supplier issues to Carres**.
-- **The facet rail filters a table holding 0–5 rows** for the foreseeable future. Law vs
-  reality; reported, not changed.
-
----
-
-# §7 · Report
-
-> **This page belongs to the PORTAL layer, not to Purchasing**
-> (`../ERP-ARCHITECTURE.md` §2.1). It lives here until it moves.
-
-### MISSION
-How many did we buy this month — and every number is a door.
-
-### WHAT IS ON SCREEN TODAY
-`OperationPurchasingReport.tsx`, 327 lines · *measured 2026-08-05 from its docblock.*
-200px rail (`Month` · `Supplier` · `Category`, all three toggle) → grouped table → `Total`.
-No Refresh button — a report recomputes itself and states when it did.
-
-### API + DATA
-`GET /operation/pos/report`. **Stores nothing** — no table, no RPC, no cached figure.
-
-### FROZEN RULES
-- **It stores nothing**, and `buildPoReport` computes at read time from the same
-  `purchase_order_lines` the register reads.
-- **Every number is a DOOR** — a row unfolds into exactly the purchase orders its count was made
-  of, and each is a link into the register at that document. *This is what AutoCount cannot do:
-  its answer to every analysis is export to Excel, and a number in Excel has left the system.*
-- **Cancelled purchase orders are excluded, and the exclusion is stated on screen.** A silent
-  filter is how two people get two answers from one report.
-- **NO MONEY**, structurally: the wire has no cost field, so the page could not print one.
-- **An `All` row prints the number its OWN click produces**, never the filtered total.
-- **Six words and no seventh:** `Report` (singular — Loo's spelling and AutoCount's own menu
-  word; `Reports` and `Reporting` are both wrong) · `POs` · `Ordered` · `Received` ·
-  `Outstanding` · `Total`.
-
----
-
-# §8 · Settings
-
-### MISSION
-Every number the ordering engine reads, on one manager-only screen.
-
-### WHAT IS ON SCREEN TODAY
-`OperationPurchasingSettings.tsx`, 561 lines · *measured 2026-08-05 from its docblock.*
-The seven numbers, server-gated to a manager. The supplier × category matrix is derived from
-the catalog, so only factories that actually own a SKU appear — nobody reads a 10 × 3 grid of
-blanks. Every row carries **who changed it, when, and what it was before**.
-
-### API + DATA
-`GET /operation/purchasing/settings` · `PUT /number` · `/po-days` · `/production-days` ·
-`/work-week` · table `purchasing_settings` (**1 row**) · migration 0303.
-
-### WHAT SETTINGS HOLDS — the full list (Jess, 2026-08-18)
-```
-production working days     per supplier x category      Ohana sofa 14
-supplier work week          per supplier                 Ohana works Saturday
-order-by buffer             days kept back to arrange the delivery
-PO days                     Mon / Wed / Fri
-company holidays            the one calendar every engine counts on
-
-approval required?          Ready Stock              yes
-                            Showroom Display         yes
-                            Service Case             yes
-                            Internal Staff Purchase  yes
-                            Subsidiary Purchase      yes
-                            Other Purchase           yes
-                            a customer order needs none — the order IS the authority
-
-no-answer rounds            3, then the work changes from "call the supplier"
-                            to "tell the salesperson this order is at risk"
-
-unit-tracked categories     sofa yes · bedframe yes · consumables no
-supplier contact channel    the WhatsApp group / email a share actually goes to
-destinations                name · full name · address · receiving contact ·
-                            may goods land here?   ADD A DESTINATION HERE,
-                            never in code — a fourth outlet is a settings row
-```
-
-### FROZEN RULES
-- **A supplier × category with no number says `Set a number`** and gets no order-by date at all.
-  It is never quietly planned on a 7 — a quiet screen must mean *watched and fine*, never
-  *nobody looked*.
-- **`approval required?` has no amount, because Purchasing has no money** (Jess, 2026-08-18).
-  It is a switch per PURPOSE, not a threshold: an amount on this screen would make three
-  operators judge prices, and price is not theirs. The approver sees the money; the buyer
-  never does. **A purpose whose switch is off still records WHY it was bought.**
-- **Nothing here has a default parameter.** A fallback is how one file's constant read
-  `Mon + Thu` for months after the engine had moved to `Mon/Wed/Fri`.
-
----
-
-# §9 · Architecture decisions that cross Purchasing pages
-
-| Decision | Ruling |
-|---|---|
-| **Navigation never defines ownership** | Architecture decisions are justified by business ownership. Navigation may support those decisions, but navigation never defines ownership. |
-| **Where an action lives** | The destination that owns the WORK owns the door AND its queue. **CLOSED by T2 (2026-08-06): the CALLS calendar on Purchase Orders is the queue for all three supplier calls** — each call's due files under its day, `Overdue` holds the late ones, and the door (the expand) sits on the same page. |
-| **Two status axes, never merged** | `purchase_orders.status` is a 3-value stored enum. The 5-word Operation Status is derived and never stored. A reader who confuses them will "fix" one to match the other. |
-| **A quantity means exactly one thing** | No column is ever reused for a second meaning — that is how `ops_order_control.balance` became a lock reading a column nobody wrote. |
-| **Deliberately not stored** | `in_transit_qty` · `ready_for_collection_qty` · `supplier_confirmed_qty`. **A column nobody writes is worse than a missing one.** |
-| **No cancelled quantity anywhere** | Stopping is the whole PO. A per-line cancelled quantity would put a policy decision into an arithmetic column. |
-| **A held unit is not "on the way"** | `on_hold` stops counting as future supply (0299), or the planner keeps believing goods are coming that never will. |
-| **Widths are MEASURED in a real browser** | jsdom has no widths, so a page test structurally cannot catch a truncated cell. **A guessed number may never be written down.** |
-| **The map must not go stale** | A guard that FAILS when a PR changes a Purchasing page file and does not change this document's `WHAT IS ON SCREEN TODAY`. **A rule in a document gets skipped; a failing test does not.** Not built. |
-
----
-
-# ▶︎ P20 · SHIPPED 2026-08-08 — ONE width mechanism across the five tabs
-
-> **The card is DONE and this block is the record of what it changed.** Six commits, one per
-> item, page-side only. **`kit/DataTable.tsx` was never touched** — `sizing` is an existing
-> prop, so nothing here needed the kit and nothing waited on S2.
-
-**THE DEFECT WAS: three width mechanisms and TWO different scrollbars in one module, so a
-gesture learned on one tab did not work on the next.** All five tabs now run one mechanism.
-
-```
-tab               sizing      declares    renders    who scrolls
-To Order          "content"   1,252px     1,252px    the KIT's box     (unchanged)
-Supplier Claims   "content"   1,439px     1,439px    the KIT's box     (unchanged)
-Purchase Orders   "content"   1,172px     1,172px    the KIT's box     <- was "fill", PAGE pane
-Receiving         "content"     826px       826px    the KIT's box     <- was "fill", 2 wrappers
-Report            "content"     352px       352px    the KIT's box     <- was 37/15/15/15/15 %
-```
-
-**EVERY WIDTH IS NOW EXACT, NOT A MINIMUM.** `"fill"` (the absence of the prop) spends a
-declared pixel as a SHARE, so a browser measurement became a ratio the moment the pane was
-wider than the sum. Under `"content"` a column gets what its def asks for and the slack goes
-to the kit's filler, which holds no word and no figure.
-
-## What each item found — and the findings are worth more than the fixes
-
-| Item | What was actually wrong |
-|---|---|
-| **P20.1** | Purchase Orders' `action` needed **192 -> 193**: `"content"` puts a filler after the last column, so it now carries P17's rule, which takes 1px of the BOX — Q13's pixel arriving one column later. **Receiving's widths had never had to carry their own content**: `arriving` 104 -> 105 · `received` 72 -> 82 · `grn` 132 -> 142 · two `auto` columns -> 193 / 61. `fill` had been topping them up out of the pane's slack — 160px of make-up. |
-| **P20.2** | The kit's `<thead>` is `sticky top-0` **against the KIT's box**, so while a page-owned pane was the scroller the column headers scrolled away with the rows. Receiving's min-width was CONDITIONAL on the workspace being closed — which element scrolled changed with a record being open. |
-| **P20.3** | 37% of a ~1,040px pane is 385px of column for the word `Mattress`, and the hole GREW with the monitor. Measured: 83 · 60 · 61 · 66 · 82, with a **stated** five-digit guard on the number columns — an allowance, not a measurement, and said so. |
-| **P20.4** 🔴 | The entire audit trail in production is TWO rows, both `supplier_work_week` — so the only two history lines this page had ever shown read `was {0}` and `was {0,6}`. `po_days` held the identical defect, waiting for a manager's first change. |
-| **P20.5** | **The cause was not the data.** 22 open POs and **21 have no arrival promise from any factory** — the one thing an operator cannot do to those 21 is check them in. Receiving was answering its own question (`Check in` whenever a PO owed a unit, true of every open PO from issue) while Purchase Orders read the shared `poCurrentActionOf` — **two tabs, one PO, two answers.** |
-| **P20.6** | The empty sentence asserted *"every delivery so far arrived complete and on time"* while a closed claim sat in the table. And it centred on the 1,439px TABLE: measured, its centre is pinned at **721px at every pane width**, so below a ~700px pane it is off-screen and the operator lands on a blank grid. |
-
-## Rulings this card is now evidence for
-
-- **A width measured under `"fill"` was never really tested.** Five of Receiving's and Report's
-  numbers only worked because the browser was topping them up. **A page that declares pixels
-  must pass `sizing="content"`, or the pixels are decoration.**
-- **`container-type: inline-size` belongs on the PANE, not on a scroller.** A page cannot style
-  the kit's box, so the pane is the only handle on the visible width. It is **2px wider than
-  the scrollport** (the kit's 1px borders), which `PoWorkArea`'s ceiling now pays for
-  explicitly and the empty state deliberately does not.
-- **`sticky left-0` inside a `<td>` does not hold horizontally.** Measured by Q10, re-used here
-  rather than re-probed. It is never left in as a class that does nothing.
-- **A second arithmetic hides as a page convenience.** P20.5's `Check in` and P20.4's raw
-  `oldValue` were both a page answering a question a shared module already owns.
-
-## Left open, deliberately — NOT LAW, and each names what would close it
-
-- 🟡 **Receiving cannot ask `Confirm ready date`.** Purchase Orders passes the ready-date facts
-  (`expected_ready_date` + the production/buffer arithmetic, which need the settings and catalog
-  queries); Receiving does not, so it gets the state word `Check Expected Arrival` where that
-  tab gets the dated call. That is the degradation `poCurrentActionOf` documents by name.
-  **Passing HALF the facts would be worse** — the call would fire with no due and could never be
-  late, so one word would mean two urgencies on two tabs (T7 · T5). *Closes when: one extracted
-  hook feeds both pages. It touches the frozen Purchase Orders page, so it is its own card.*
-- 🔴 **Sticky columns — still nobody's.** F72 stands: no engine here has them, it is the obvious
-  fix for a 1,439px grid, and it needs the kit.
-- 🟡 **Report's number columns carry a five-digit guard, not a measurement.** Every row today is
-  TEST data (§6), so nothing on screen can size them honestly. *Closes when: real volume exists
-  and the widest figure can be measured.*
-- **Whether `Open` should stay Claims' landing tab when it is empty is the OWNER'S**, and it was
-  NOT changed. A work queue opening on the work, with a rail stating `Closed` and `All` beside
-  it, is a true screen; only what it said was wrong.
-
-**WHY THE LAST COLUMN MATTERED AND THIS WAS NOT COSMETIC.** On four of the six screenshots the
-column that fell off the right edge was the one answering the tab's own question — `On PO` /
-`PO No.` (*did I buy it*), `Customer Delivery` (*when do they want it*), `Next move` (*what do
-I do*). **The operator's answer was the thing that went missing.**
-
----
-
-# §10 · Approved Evolution — decided, deliberately not implemented
-
-> **This is architecture, not a to-do list.** Everything here has been ruled; none of it is
-> waiting for a decision. **Who builds it and when belongs to GitHub Issues, not to this file.**
-
-| What | Status |
-|---|---|
-| **`Refund` as a claim resolution** | **Approved as a concept, blocked on business meaning** — supplier credit note? cash? AP offset? Hidden until Loo rules it. **Do not guess and do not delete it.** |
-| **`Repaired` · `Disposed` as item outcomes** | Approved. Needs a migration: 0299's transition guard admits exactly three destinations. |
-| **Carres Execution as a real field** | Frozen (five options, §6). Not built. |
-| **One Service Case intake feeding Supplier Claim work** | Approved architecture. Not live: replace the receiving-only claim creation path and settle the entry rule plus refurbish door in the SAME change. |
-| **`DecisionGuideCard`** | Approved as a **portal-wide kit component**, not a Claims feature. One card under the selector, updating live: title → 1–2 sentences → max 3 `Typical examples` → max 3 `What happens next`. **Never a hover tooltip for business guidance** (users do not discover them; mobile cannot hover; staff stop reading after the first week). **Content from a configuration object, never hard-coded in the component.** Next homes: `Deliver To` · `Receiving Method` · `Purpose` · `Delivery Status` · `Payment Result`. |
-| **The September supplier switch** | Approved. Nice Future stops; a subscription-model mattress supplier takes over. |
-| **PO revisions** | **RULED IN, 2026-08-18 (Jess), reversing the 2026-08-06 exclusion.** A sent PO keeps its number and mints `Version n+1`; the prior version is snapshotted with its reason and author. The excluded thing was OVERWRITING, and that stays excluded. Floor: no line revises below `received_qty`. |
-| **The Working Calendar** | Approved 2026-08-06. Public holidays live in code (`packages/shared/src/my-holidays.ts`) and a manager cannot edit them — but the real fact is *"is Carres working that day?"*, which only the office can answer (a gazetted holiday can be a working day, and the company can close on an ordinary one). Settings gains ONE company calendar: the official list auto-loads each year, a manager marks a day working / adds a closure, audited like every Settings number. **Every engine — order-by, the CALLS calendar, delivery arithmetic — reads this ONE calendar.** Until built, `myHolidaySet()` stands. |
-| **`Order Route`** | Approved 2026-08-06 as `View Flow`; **renamed `Order Route` by Jess 2026-08-18** — the Sales Order canvas and this one draw the SAME chain entered through different doors, and one chain earns one name. **the ONE function worth porting from AutoCount's PO-register menu** (2990s' `RelationshipMap` is the worked example): one click shows SO → PO → Receiving → Claim for a document. Everything else on that menu is either already here or REJECTED: blank `New` (bypasses PURCHASING DEMAND, the single entry) · `Delete` (red line — `Cancel` keeps the record) · AP/invoice transfers (Purchasing never touches money). **`Edit` is no longer on the reject list** — see §4's revision rule. |
-| ~~**Team panel `GRN DUTY` row**~~ | **DONE 2026-08-15.** The row states an auto-assigned holder and carries an edit door for the `po_duty_editor`; the rota reaches FORWARD one month. The ruling now lives in §2.2 where the duty model is, not here. |
+| ERP PLAN CHAT START PROTOCOL re-read | PASS |
+| Current authority and conflicts audited | PASS |
+| Manual / demand / PO Owner Decision Gate | **RESOLVED FROM AUTHORITY** |
+| Purchasing → Receiving owner seam reconciled 2026-08-29 | **PASS — no implementation/migration authorised** |
+| Current Carres challenged | PASS |
+| 2990 purchasing/consignment domain mined top-to-toe | PASS |
+| Mature ERP/WMS/logistics references reconciled | PASS |
+| Navigation and all 11 pages owner reviewed | PASS |
+| Daily journey, registers, detail, actions and exceptions defined | PASS |
+| Work, Quick Rail, Calendar, Settings, Reports and permissions defined | PASS |
+| External boundaries and cross-module ownership defined | PASS |
+| Superseded page model rejected from final truth | PASS |
+| Final truth persisted to canonical MASTER | PASS |
+
+**PLAN MISSION COMPLETE**

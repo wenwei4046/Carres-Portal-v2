@@ -106,6 +106,38 @@ export const recordSendInput = z.object({
 export type RecordSendInput = z.infer<typeof recordSendInput>;
 
 /**
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The operator states that the official PDF actually reached the supplier.
+ * `recipient` is required and is not decoration: "sent" that cannot say TO WHOM
+ * is a claim nobody can check against the supplier later. The VERSION is not
+ * here on purpose — the server reads it off the purchase order, because a
+ * caller able to name it could claim Version 1 was shared while the factory
+ * holds Version 2.
+ */
+export const confirmPoSentInput = z.object({
+  channel: z.enum(["whatsapp", "email", "print"]),
+  recipient: z.string().trim().min(1).max(200),
+  /**
+   * ⭐ THE VERSION THE OPERATOR ACTUALLY RENDERED (0378).
+   *
+   * 0377 left this out and had SQL read the newest version instead, reasoning
+   * that a caller able to name a version could lie about it. That was
+   * backwards, and it built the defect it meant to stop: send Version 1, let
+   * another session revise to Version 2, confirm — and Carres records Version 2
+   * as shared while the supplier holds Version 1.
+   *
+   * DECLARING IS NOT TRUSTING. The caller says which document it saw; SQL locks
+   * the row, compares, refuses `stale_po_version` on a mismatch, and still
+   * stores only its own read. A caller that names a version it never rendered
+   * is refused, not believed.
+   */
+  poVersion: z.number().int().positive(),
+  note: z.string().trim().max(300).optional(),
+}).strict();
+export type ConfirmPoSentInput = z.infer<typeof confirmPoSentInput>;
+
+/**
  * PO Revisions (0364, Jess 2026-08-18) — POST /api/operation/pos/:id/revise →
  * `purchasing_revise_po`. A sent PO keeps its number and mints a version:
  * EXISTING lines only, qty floored at `received_qty` (the RPC refuses with
@@ -303,19 +335,21 @@ export const officeReceiveInput = z.object({
 export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
 
 /**
- * `adjustStockInput` — POST /api/operation/warehouse/adjust.
- * Maps to `operation_adjust_stock(sku, warehouse_id, delta, reason)` RPC.
- * `delta` is signed (positive for ad-hoc inbound, negative for damage/loss);
- * `reason` is required for the audit trail. Server enforces qty >= reserved
- * post-adjust via CHECK constraint (P0001 below_reserved otherwise).
+ * `adjustStockInput` IS GONE — 0366.
+ *
+ * It mapped to `operation_adjust_stock(sku, warehouse_id, delta, reason)`,
+ * which moved a stored total by a signed delta and never named a physical
+ * Unit. That is the "Add stock / Remove stock" door the Stock MASTER rejects
+ * (§2) and the stored total the Card forbids from deciding availability (§3):
+ * inventory appeared and disappeared with no Unit behind it, and
+ * `stock_balances` drifted away from the register with nothing to reconcile
+ * against.
+ *
+ * Stock is now COUNTED from the exact Units. What actually happened to a Unit
+ * is recorded through its own governed door — receipt, hold, takeout,
+ * write-off, site change — and the totals follow. The RPC survives only to
+ * raise `unit_authority_only` at any client that has not caught up.
  */
-export const adjustStockInput = z.object({
-  sku: z.string().min(1),
-  warehouseId: z.string().uuid(),
-  delta: z.number().int(),
-  reason: z.string().min(1),
-}).strict();
-export type AdjustStockInput = z.infer<typeof adjustStockInput>;
 
 /**
  * `abandonOrderInput` — POST /api/operation/orders/:id/abandon.
@@ -335,8 +369,11 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * Both routes are retired and the RPCs behind them are revoked from every browser
  * role (migration 0339), so the schemas describe doors that no longer exist.
  *
- * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
- * payload — and ONE authority behind it, `purchasing_issue_pos_batch(jsonb)`. */
+ * Purchase Order creation has ONE authority behind it,
+ * `purchasing_issue_pos_batch(jsonb)`, reached through the governed operator
+ * journeys — SO Batch Purchase and Manual Purchase — each with its own wire
+ * contract. (Corrected 2026-08-23: this said there was one wire contract; there
+ * is one AUTHORITY, and more than one governed way in.) */
 
 /**
  * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.

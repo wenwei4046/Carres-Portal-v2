@@ -1,7 +1,7 @@
 > # ⛔ SUPERSEDED — 2026-07-27
 >
 > **This is the RETIRED v4 law. It contradicts the current one.**
-> **Read [`docs/UI-KIT.md`](../../../docs/UI-KIT.md) instead — take nothing from here.**
+> **Read [`docs/ui/MASTER.md`](../../../docs/ui/MASTER.md) instead — take nothing from here.**
 >
 > Contradicts on: row height · text sizes · canvas colour · type class names ·
 > where the flame may appear · icon stroke. See `SKILL.md` for the table.

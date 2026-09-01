@@ -372,17 +372,24 @@ export default function PosConfigurePage({
   const sku = skus.find((s) => s.id === skuId);
   const sp = useSpecials(model, specialAddons, edit?.specials);
 
-  // Remark + optional ± RM price adjustment (Loo 2026-07-12) — a special
-  // remark sometimes ADJUSTS the price ("custom headboard +200"). The amount
-  // is optional (empty = plain note), PER UNIT like every other surcharge, and
-  // folds into unitPrice + attrs.remark_surcharge. Non-sofa unitPrice is
-  // client-priced (only options/specials totals are server-verified), so no
-  // API change is needed here.
-  const [remark, setRemark] = useState(edit?.remark ?? "");
-  const [remarkPrice, setRemarkPrice] = useState<string>(() =>
-    edit?.remarkSurcharge ? String(edit.remarkSurcharge) : "",
-  );
-  const remarkAdj = Math.round((parseFloat(remarkPrice) || 0) * 100) / 100;
+  // ⭐ THE REMARK CONTROL IS RETIRED (Loo — free-text remarks; YH confirmed on
+  // 2026-08-24 that the POS one is the target, the Warehouse box having already
+  // gone). Its text half was a free-text note wearing a price field: the
+  // placeholder itself read "custom headboard, deliver before CNY" — half
+  // pricing reason, half delivery instruction, structured as neither.
+  //
+  // BOTH halves go together, deliberately. Keeping the ± RM with no text would
+  // leave a price adjustment whose ONLY justification was the free text that was
+  // just retired — manufacturing exactly the untraceable discount the office
+  // lane is already criticised for. Special cases carry structured reasons now;
+  // Activity & notes (0138) is the surviving note channel.
+  //
+  // A STORED remark still CARRIES THROUGH on edit. Dropping it here would
+  // silently re-price a live line and erase the only record of why its price is
+  // what it is. Nothing can author or change one any more; what exists is
+  // preserved and printed exactly as before.
+  const remark = edit?.remark ?? "";
+  const remarkAdj = Math.round((edit?.remarkSurcharge ?? 0) * 100) / 100;
 
   // The option picks + their server-verifiable total — the SAME pure resolver
   // Hono re-runs on submit (option-picks-recompute), so this preview cannot
@@ -1047,52 +1054,6 @@ export default function PosConfigurePage({
                 special remark sometimes ADJUSTS the price — the amount is
                 optional (per unit) and folds into the live total. Locked while
                 a PWP voucher is applied (the reward price is forced). */}
-            <div className="cfg-section" data-testid="cfg-remark-section">
-              <div className="cfg-section__head">
-                <span className="pos-eyebrow">Remark</span>
-                <span className="cfg-section__detail">
-                  {remarkAdj !== 0
-                    ? `${remarkAdj > 0 ? "+" : "−"}RM ${Math.abs(remarkAdj).toLocaleString("en-MY")}`
-                    : "± RM optional · adjusts the price"}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <textarea
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="e.g. custom headboard, deliver before CNY…"
-                  rows={2}
-                  className="cfg-select"
-                  style={{ resize: "vertical" }}
-                  data-testid="cfg-remark"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={remarkPrice}
-                  onChange={(e) => setRemarkPrice(e.target.value)}
-                  placeholder="± RM 0.00"
-                  aria-label="Remark price adjustment (RM)"
-                  disabled={pwpActive}
-                  title={
-                    pwpActive
-                      ? "A PWP-priced item can't take a manual adjustment"
-                      : undefined
-                  }
-                  className="cfg-select font-mono disabled:opacity-40"
-                  data-testid="cfg-remark-price"
-                />
-                {effUnitPrice < 0 && (
-                  <p
-                    style={{ margin: 0, fontSize: 12, color: "var(--c-danger, #B4321A)" }}
-                    data-testid="cfg-remark-negative"
-                  >
-                    The adjustment puts this item below RM 0 — reduce the discount.
-                  </p>
-                )}
-              </div>
-            </div>
-
             {/* PWP & Promo voucher — 2990s configurator rail parity. Rendered
                 only when the catalog carries an ACTIVE pwp_rule (DORMANT
                 otherwise). Auto Fill binds the same-cart RESERVED code; typing

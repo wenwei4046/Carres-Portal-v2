@@ -13,7 +13,7 @@
  * through.
  *
  * THE DEFAULT ROW — re-ruled to EIGHT by the owner, 2026-08-15:
- *   ☐ ▸ SO No · Ordered · Customer Delivery · Customer · Delivery Location ·
+ *   ☐ ▸ SO No · Ordered · Requested Delivery Date · Customer · Delivery Location ·
  *   Showroom · PO No · DO No
  *
  * `text` IS THE COLUMN. It is what the cell prints, what the column's filter
@@ -29,6 +29,8 @@
  *   No price yet / Paid in full                     the money states
  *   No date yet    a promise with no date on it
  */
+import { parseEmergencyContact } from "@carres/shared";
+
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -42,9 +44,14 @@ import {
   type MoneyState,
 } from "./sales-order-facts";
 
-/** The dictionary's absence words, so no caller spells them. */
-export const NOT_GIVEN = "Not given";
-export const NOT_RECORDED = "Not recorded";
+/** The dictionary's ONE absence word, so no caller spells it. It and the
+ *  locality rule live in the neutral `@/lib/locality` — Purchasing reads them
+ *  too, and a Purchasing surface may not import a Sales page file.
+ *
+ *  This file used to hold TWO words and spend them by hand, 20 cells against
+ *  18. Same table, two spellings of empty (YH, 2026-08-29). */
+export { NOT_RECORDED, conciseLocality } from "@/lib/locality";
+import { NOT_RECORDED, conciseLocality } from "@/lib/locality";
 export const NO_DATE_YET = "No delivery date";
 
 /**
@@ -80,16 +87,7 @@ export function showroomShort(name: string | null | undefined): string {
  * absence — it is the head of a governed two-line action, and §0.1 already
  * rules how it paints.
  */
-export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_GIVEN, NOT_RECORDED]);
-
-export function conciseLocality(city?: string | null, state?: string | null): string {
-  const cleanCity = city?.trim() || "";
-  const cleanState = state?.trim() || "";
-  if (cleanCity && cleanState && cleanCity.localeCompare(cleanState, undefined, { sensitivity: "accent" }) === 0) {
-    return cleanCity;
-  }
-  return [cleanCity, cleanState].filter(Boolean).join(", ") || NOT_GIVEN;
-}
+export const MUTED_ABSENCES: ReadonlySet<string> = new Set([NOT_RECORDED]);
 
 /** One register row: the order, plus every fact already resolved to a string. */
 export interface RegisterRow {
@@ -109,6 +107,13 @@ export interface RegisterRow {
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
+  /* ONE COLUMN, THREE FACTS - so the register prints THREE cells.
+     `customer_emergency` stores name, phone and relationship joined with a
+     dot. The Sales Order page has always split them into three validated
+     fields; the register printed the joined string raw, which is the
+     dot-separated schema dump COPY-STANDARD bans. Parsed ONCE here, at the
+     row, for the same reason `customer` is cased once here. */
+  emergency: { name: string; phone: string; relationship: string };
   needle: string;
   phoneDigits: string;
 }
@@ -141,6 +146,7 @@ export function buildRegisterRow(
      * `RM 0`. */
     paid: { kind: "amount", value: money.paid },
     balance: outstandingState(money),
+    emergency: parseEmergencyContact(o.customer_emergency),
     needle: searchHaystack(o),
     phoneDigits: digits(phone),
   };
@@ -202,10 +208,10 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* The eight owner-ruled defaults, in their governed order. */
   { key: "so", label: "SO No", width: "85px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "Ordered", width: "113px", group: "Dates", on: true,
+  { key: "ordered", label: "SO Date", width: "113px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
-  { key: "customer_delivery", label: "Customer Delivery", width: "148px", group: "Dates", on: true,
+  { key: "customer_delivery", label: "Requested Delivery Date", width: "192px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
   { key: "customer", label: "Customer", width: "190px", group: "Customer", on: true,
@@ -252,7 +258,7 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
       : null,
     footerSum: (r) => amountOf(r.balance) },
   /* `Promised` is DELETED (owner ruling 2026-08-18): it derived from exactly
-     the same fact as `Customer Delivery` (`orders.delivery_date` under the
+     the same fact as `Requested Delivery Date` (`orders.delivery_date` under the
      same tbd guard), so opening it printed one date twice under two labels —
      ONE customer date column is the law. */
   { key: "dealer", label: "Dealer", width: "160px", group: "Sales ownership",
@@ -267,27 +273,76 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* ── CUSTOMER — the customer's own facts (BUILD-QUEUE "STRUCTURED ADDRESS":
      raw fallback + the five structured parts + Building Type) ─────────────── */
   { key: "phone", label: "Phone", width: "103px", group: "Customer",
-    text: (r) => r.phone || NOT_GIVEN },
+    text: (r) => r.phone || NOT_RECORDED },
   { key: "email", label: "Email", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_email || NOT_GIVEN },
+    text: (r) => r.o.customer_email || NOT_RECORDED },
   { key: "address", label: "Address", width: "280px", group: "Customer",
-    text: (r) => r.o.customer_address || NOT_GIVEN },
+    text: (r) => r.o.customer_address || NOT_RECORDED },
   { key: "address_line1", label: "Address line 1", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_address_line1 || NOT_GIVEN },
+    text: (r) => r.o.customer_address_line1 || NOT_RECORDED },
   { key: "address_line2", label: "Address line 2", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_address_line2 || NOT_GIVEN },
+    text: (r) => r.o.customer_address_line2 || NOT_RECORDED },
   { key: "city", label: "City", width: "140px", group: "Customer",
-    text: (r) => r.o.customer_address_city || NOT_GIVEN },
+    text: (r) => r.o.customer_address_city || NOT_RECORDED },
   { key: "state", label: "State", width: "140px", group: "Customer",
-    text: (r) => r.o.customer_address_state || NOT_GIVEN },
+    text: (r) => r.o.customer_address_state || NOT_RECORDED },
   { key: "postcode", label: "Postcode", width: "96px", group: "Customer",
-    text: (r) => r.o.customer_address_postcode || NOT_GIVEN },
+    text: (r) => r.o.customer_address_postcode || NOT_RECORDED },
   { key: "building_type", label: "Building type", width: "130px", group: "Customer",
-    text: (r) => r.o.building_type || NOT_GIVEN },
-  { key: "emergency", label: "Emergency contact", width: "200px", group: "Customer",
-    text: (r) => r.o.customer_emergency || NOT_GIVEN },
+    text: (r) => r.o.building_type || NOT_RECORDED },
+  /* THREE FACTS, THREE COLUMNS. `RegisterField.text` is "the ONE string:
+     printed, filtered, sorted and exported", so a cell cannot carry a second
+     line - and it should not: an operator filtering by relationship or sorting
+     by emergency phone could do neither while all three shared one cell.
+     A legacy/imported string that `composeEmergencyContact` never wrote lands
+     wholly in `name` (see `parseEmergencyContact`), so nothing is lost and the
+     other two read `Not given`. */
+  { key: "emergency", label: "Emergency contact", width: "150px", group: "Customer",
+    text: (r) => r.emergency.name || NOT_RECORDED },
+  { key: "emergency_phone", label: "Emergency phone", width: "150px", group: "Customer",
+    text: (r) => r.emergency.phone || NOT_RECORDED },
+  { key: "emergency_relationship", label: "Emergency relationship", width: "180px", group: "Customer",
+    text: (r) => r.emergency.relationship || NOT_RECORDED },
+  /* "SAME AS DELIVERY" IS AN ANSWER, NOT A BLANK.
+     `customer_billing` is empty BY DESIGN whenever the customer ticked
+     `Billing address same as delivery` - the detail row type says so in its own
+     comment: "only meaningful when customer_billing_same is false". The column
+     printed `Not recorded` on every one of those orders, which reads as "nobody
+     asked" when the truth is "asked, and the answer was: the same address".
+
+     So the cell prints the address we would actually bill. It prints the ADDRESS
+     rather than the sentence `Billing address same as delivery` because
+     `RegisterField.text` is the one string that is also FILTERED, SORTED and
+     EXPORTED - a column of identical sentences can be none of those. Deriving a
+     displayed value from a sibling column is the same thing `Delivery Location`
+     already does from city + state.
+
+     An order with the flag set and no delivery address either (the governed
+     `Address not given yet` case) still reads `Not recorded`, because then
+     nothing IS recorded. */
   { key: "billing", label: "Billing address", width: "220px", group: "Customer",
-    text: (r) => r.o.customer_billing || NOT_GIVEN },
+    text: (r) =>
+      (r.o.customer_billing_same ? r.o.customer_address : r.o.customer_billing) ||
+      NOT_RECORDED },
+
+  /* ⭐ PARITY WITH WHAT THE TILL ACTUALLY ASKS (2026-08-24).
+     A salesperson fills these at SO creation and the register route already
+     SELECTS them — they simply had no column, so a fact the customer was asked
+     for could not be read back by the office that has to act on it. Added as
+     ordinary optional columns: off by default, in the chooser like every other,
+     so the owner-ruled default view is untouched. */
+  { key: "race", label: "Race", width: "110px", group: "Customer",
+    text: (r) => r.o.customer_race || NOT_RECORDED },
+  { key: "gender", label: "Gender", width: "100px", group: "Customer",
+    text: (r) => r.o.customer_gender || NOT_RECORDED },
+  { key: "birthday", label: "Birthday", width: "120px", group: "Customer",
+    text: (r) => r.o.customer_birthday || NOT_RECORDED },
+  /* Stair carry is a DELIVERY fact, not a customer one — it sits with Floor and
+     Lift, which is where the operator planning the trip looks. */
+  { key: "stair_items", label: "Stair carry items", width: "140px", align: "right", numeric: true,
+    group: "Delivery",
+    text: (r) =>
+      r.o.delivery_stair_items == null ? NOT_RECORDED : String(r.o.delivery_stair_items) },
 
   /* ── SOURCE — who sold it, through which door ───────────────────────────── */
   { key: "salesperson", label: "Salesperson", width: "167px", group: "Sales ownership",

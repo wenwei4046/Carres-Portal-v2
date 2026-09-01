@@ -53,6 +53,10 @@ against a real session.
   locked out.
 - **A residual is accepted and documented:** a token issued BEFORE the disable lives out its
   hour.
+- **Team is the ONE Duty settings door** (owner ruling 2026-09-01). It stores current and future
+  effective-month `PO Duty` and `GRN Duty`, buddy/cover and COO override. No Warehouse,
+  Purchasing, Receiving or Delivery Settings surface keeps another Duty roster. The Shared Duty
+  Resolver defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
 
 # §3 · People — one record per CR-coded human
 
@@ -74,6 +78,10 @@ against a real session.
   a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
   `../purchasing/MASTER.md` §2.2 and its one edit door remains Team.
 - **Checklists are a shared constant, not a config table.**
+- **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
+  personal account, active/disabled, last working date and membership of the eligible Carres staff
+  rotation pool. A last-working-date change removes the person from future resolution; People does
+  not store PO Duty, GRN Duty or buddy/cover.
 
 # §4 · Commission
 

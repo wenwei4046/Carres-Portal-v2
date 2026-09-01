@@ -31,7 +31,7 @@ import {
   EMPTY_PURCHASING_SIDEBAR_STATE,
   type PurchasingChildBlock,
   type PurchasingPageGroupKey,
-  type PurchasingSidebarStateV1,
+  type PurchasingSidebarStateV2,
 } from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
@@ -63,7 +63,7 @@ const ICON_TO_ROW_BOTTOM = (36 - MODULE_ICON) / 2;
 const DIVIDER_GAP = 13;
 
 /* ── ONE NESTED LEVEL, DERIVED — NEVER MEASURED AGAIN
- * (CARD-2026-08-20-purchasing-sidebar-groups).
+ * (CARD-2026-08-22-purchasing-01-final-sidebar-listing).
  *
  * A Purchasing GROUP is a row sitting at the module's own child indent, so its
  * children repeat the same drawing one level down. Every number below comes
@@ -116,8 +116,8 @@ const PURCHASING: PortalSection = "Purchasing";
  * reference screenshots). Every module draws an ICON + NAME + CHEVRON row and
  * its pages hang beneath it, each on its own rounded elbow. This SUPERSEDES
  * the same morning's uppercase-heading rail: she saw the headings in
- * production and re-ruled. One module is open at a time — thirteen purchasing
- * pages and six delivery pages cannot stack — and the module you are standing
+ * production and re-ruled. One module is open at a time — eleven purchasing
+ * pages and a Warehouse module cannot stack — and the module you are standing
  * in is the open one when the rail loads.
  *
  * Collapse (ported from main's 2026-06-29 operation sidebar, now portal-wide):
@@ -308,7 +308,7 @@ export default function PortalSidebar() {
   >(null);
 
   /* ── PURCHASING REMEMBERS ITS DRAWERS, PER SIGNED-IN USER ────────────────
-   * (CARD-2026-08-20-purchasing-sidebar-groups.)
+   * (CARD-2026-08-22-purchasing-01-final-sidebar-listing.)
    *
    * Eighteen destinations behind five drawers is only kind if the operator
    * does not have to re-open theirs every morning. So Purchasing's parent and
@@ -320,7 +320,7 @@ export default function PortalSidebar() {
    * render; a rail preference may never become a second source of truth. */
   const userId = session?.user?.id ?? null;
   const storageKey = userId ? purchasingSidebarStorageKey(userId) : null;
-  const [purchasingState, setPurchasingState] = useState<PurchasingSidebarStateV1>(
+  const [purchasingState, setPurchasingState] = useState<PurchasingSidebarStateV2>(
     EMPTY_PURCHASING_SIDEBAR_STATE,
   );
 
@@ -339,7 +339,7 @@ export default function PortalSidebar() {
   }, [storageKey]);
 
   /** A HUMAN turned this handle — remember it. */
-  function writePurchasingState(next: PurchasingSidebarStateV1) {
+  function writePurchasingState(next: PurchasingSidebarStateV2) {
     setPurchasingState(next);
     if (!storageKey) return;
     try {
@@ -418,12 +418,12 @@ export default function PortalSidebar() {
     /* ⭐ THE PURCHASING ROW IS A DRAWER HANDLE, NOT A DOOR (Jess, 2026-08-20).
      *
      * Every other module opens its first live page, because clicking it is how
-     * you GO there. Purchasing cannot: its first row is `Purchasing Home`,
-     * which is not built, and eighteen destinations mean the operator clicks
-     * this row to LOOK — to find which drawer their job is in — far more often
-     * than to travel. So it reveals the map and leaves the URL exactly where
-     * it was. It still shuts whatever other module was open: one module at a
-     * time is the shipped accordion's rule and it holds. */
+     * you GO there. Purchasing cannot: its first row is a DRAWER, not a page,
+     * and eleven destinations in four drawers mean the operator clicks this
+     * row to LOOK — to find which drawer their job is in — far more often than
+     * to travel. So it reveals the map and leaves the URL exactly where it
+     * was. It still shuts whatever other module was open: one module at a time
+     * is the shipped accordion's rule and it holds. */
     if (block.module.section === PURCHASING) {
       const next = openSection !== PURCHASING;
       setOverride({ at: here, section: "" }); // the location rule steps aside
@@ -452,11 +452,11 @@ export default function PortalSidebar() {
    * ⭐ NOT "the first live row" (owner review, 2026-08-20). Deriving the
    * destination from row order means the module's landing page silently moves
    * the day a page above it goes live — grouping Purchasing had already
-   * dragged its icon from `SO Batch Purchase` to `Manual Purchase Requests`
-   * without anyone deciding that. Purchasing names its landing page instead,
-   * and it stays named until `Purchasing Home` is built and its own approved
-   * scope changes it. Every other module keeps first-live-row until it has a
-   * reason not to.
+   * dragged its icon off `SO Batch Purchase` without anyone deciding that.
+   * Purchasing names its landing page instead, and the name is PERMANENT:
+   * there is no Purchasing Home to hand it to (`docs/purchasing/MASTER.md`
+   * §4). Every other module keeps first-live-row until it has a reason not
+   * to.
    */
   function moduleLandingPage(
     block: Extract<NavBlock, { kind: "module" }>,
@@ -616,7 +616,7 @@ export default function PortalSidebar() {
 
   /**
    * A DRAWER — one named group of Purchasing pages
-   * (CARD-2026-08-20-purchasing-sidebar-groups).
+   * (CARD-2026-08-22-purchasing-01-final-sidebar-listing).
    *
    * It hangs off the module's trunk exactly as a page does, and then repeats
    * the drawing one level down for its own children. THE WORD IS A LABEL RANK,

@@ -180,7 +180,7 @@ function buildSb(
 }
 
 /**
- * Like buildSb but also stubs `.rpc('create_order', { payload })` so POST tests
+ * Like buildSb but also stubs the Sales Portal final-submit RPC so POST tests
  * can assert on what was sent and on rpc-returned errors. Use for POST flow.
  */
 /** P1 (0303) — the seeded settings singleton. `earliest_sell_days` is the ONE
@@ -208,13 +208,22 @@ function buildSbForCreate(opts: {
   const rpcCalls: Array<{ name: string; payload: unknown }> = [];
   const eqs: Array<[string, unknown]> = [];
   let currentTable: string | null = null;
+  // 2026-08-24: the active-rule read is `.eq().order().order()` through the ONE
+  // ordered door (readActivePwpRules), so `order` has to CHAIN. This chain has
+  // no `then`, so the hop object carries its own - and it still resolves EMPTY,
+  // which is the point: this builder is the UNCONFIGURED-rule path, and an
+  // empty rule set is what makes a claim reject as pwp_unknown_rule.
+  const orderChain: Record<string, unknown> = {
+    order: () => orderChain,
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null }),
+  };
   const chain = {
     eq(col: string, val: unknown) {
       eqs.push([col, val]);
       return chain;
     },
     in: async () => ({ data: opts.productSkuCategoryRows ?? [], error: null }),
-    order: async () => ({ data: [], error: null }),
+    order: () => orderChain,
     maybeSingle: async () => {
       // P1 — the earliest-sell floor is a setting, not a constant.
       if (currentTable === "purchasing_settings") {
@@ -225,6 +234,18 @@ function buildSbForCreate(opts: {
               : PURCHASING_SETTINGS_ROW,
           error: null,
         };
+      }
+      /* 0393 — the stair-carry recompute asks for the rate, but ONLY when a fee
+         could apply (no lift AND a count > 0). Fixtures written before this key
+         take the short-circuit and never reach here. Seeded values, 0184’s. */
+      if (currentTable === "floor_config") {
+        return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
+      }
+      /* 0393 — the FK guard checks the key exists before the row can reference
+         it, because production ran the code before the migration. A seeded
+         database is the normal case, so the fixture answers as one. */
+      if (currentTable === "addons") {
+        return { data: { key: "STAIR_CARRY" }, error: null };
       }
       return { data: opts.fetchedRow ?? null, error: null };
     },
@@ -277,7 +298,7 @@ type ReservedRow = {
 
 function buildSbForCreatePwp(opts: {
   rpcResult?: { id: string; so: number; placed_at: string };
-  /** Force create_order to error (to test the exit-10 rollback). */
+  /** Force the final-submit RPC to error (to test the exit-10 rollback). */
   createOrderError?: { code?: string; message?: string; details?: string };
   /** Force the claim RPC (pwp_claim_code OR pwp_claim_available_code) to return
    *  NULL (not claimable / phone mismatch / expired). */
@@ -291,6 +312,10 @@ function buildSbForCreatePwp(opts: {
   /** Override the active pwp_rules the sweep + P8b read (carry_forward toggle /
    *  inactive scenarios). Defaults to the single P8C carry-forward rule. */
   ruleRows?: unknown[];
+  /** 2026-08-24 - override what `pwp_discover_available` returns for a
+   *  cross-order code. `[]` simulates an unknown / already-USED voucher.
+   *  Default: a snapshot mirroring the active rule fixture. */
+  discoverRows?: Array<Record<string, unknown>>;
   fetchedRow?: unknown;
 }) {
   const rpcCalls: Array<{ name: string; args: unknown }> = [];
@@ -346,8 +371,23 @@ function buildSbForCreatePwp(opts: {
         }
         return chain;
       },
-      maybeSingle: async () => ({ data: opts.fetchedRow ?? null, error: null }),
-      order: async () => ({ data: [], error: null }),
+      maybeSingle: async () => {
+        /* 0393 — the stair-carry recompute reads the seeded rate. It only asks
+           when a fee could apply (no lift AND a count > 0), so every fixture
+           written before this key still takes the short-circuit and never
+           reaches here. Seeded values, matching 0184’s. */
+        if (table === "floor_config") {
+          return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
+        }
+        return { data: opts.fetchedRow ?? null, error: null };
+      },
+      // 2026-08-24: `order` was TERMINAL here, resolving an empty list. The
+      // active-rule read now goes through the ONE ordered door
+      // (readActivePwpRules) as .eq().order().order(), so a terminal stub
+      // handed every PWP test an EMPTY rule set and 11 of them 500'd.
+      // Chainable instead: the chain is awaitable via `then` -> rowsFor,
+      // which still yields [] for every dormant table.
+      order: () => chain,
       then: (resolve: (v: unknown) => unknown) => resolve({ data: rowsFor(table), error: null }),
     };
     return chain;
@@ -362,7 +402,7 @@ function buildSbForCreatePwp(opts: {
     }),
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ name, args });
-      if (name === "create_order") {
+      if (name === "create_order_from_sales_portal") {
         if (opts.createOrderError) return { data: null, error: opts.createOrderError };
         return { data: opts.rpcResult ?? null, error: null };
       }
@@ -371,6 +411,32 @@ function buildSbForCreatePwp(opts: {
       if (name === "pwp_claim_code" || name === "pwp_claim_available_code") {
         if (opts.claimReturnsNull) return { data: null, error: null };
         return { data: { code: String((args as { p_code: string }).p_code) }, error: null };
+      }
+      // 2026-08-24 - the cross-order snapshot door. A crossOrder claim now
+      // validates the line against the reward scope FROZEN on the voucher at
+      // mint, read through the DEFINER discover RPC, because a saved voucher
+      // is redeemed on an order that need not contain the trigger at all.
+      // Mirrors the ACTIVE rule fixture above so the snapshot is truthful.
+      if (name === "pwp_discover_available") {
+        if (opts.discoverRows) return { data: opts.discoverRows, error: null };
+        const first = ruleRows[0] as Record<string, unknown> | undefined;
+        if (!first) return { data: [], error: null };
+        return {
+          data: [
+            {
+              code: String((args as { p_code?: string }).p_code ?? ""),
+              rule_id: first.id,
+              type: first.type,
+              reward_category: first.reward_category,
+              reward_targets: first.reward_targets,
+              source_order_id: null,
+              expires_at: null,
+              phone_matches: true,
+              name_matches: true,
+            },
+          ],
+          error: null,
+        };
       }
       if (name === "pwp_release_codes") return { data: 1, error: null };
       if (name === "pwp_release_available_code") return { data: 1, error: null };
@@ -1215,6 +1281,78 @@ describe("POST /api/orders", () => {
     expect(sb._eqs).toContainEqual(["id", NEW_ORDER_ID]);
   });
 
+  /* STAIR CARRY REACHES THE ORDER (owner ruling YH, 2026-08-28; migration 0393).
+
+     The fee was computed in the browser and written down nowhere, so the
+     customer signed a total the order could not describe and every payment door
+     capped below it. These pin the two halves of the fix at the route: a
+     chargeable order carries the row into the RPC, and a client may not send
+     one itself. */
+  it("stamps a STAIR_CARRY addon onto a chargeable order", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: NEW_ORDER_ID, so: 1252, placed_at: "2026-05-02T10:00:00Z" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            // 1 item, floor 3, no lift, 1 needing carry, at the seeded rate:
+            // (3 − 2) flight × RM50 × 1 item = RM50.
+            delivery: {
+              date: "2026-06-01",
+              proceedDate: "2026-05-15",
+              dateTbd: false,
+              floor: 3,
+              hasLift: false,
+              stairItems: 1,
+            },
+          }),
+        ),
+      }),
+      env,
+    );
+    const payload = sb._rpcCalls[0]!.payload as { addons: Array<Record<string, unknown>> };
+    expect(payload.addons).toContainEqual(
+      expect.objectContaining({ addon_key: "STAIR_CARRY", qty: 1, unit_price: 50 }),
+    );
+  });
+
+  it("refuses a client-sent STAIR_CARRY — the charge is the server’s alone", async () => {
+    const sb = buildSbForCreate({
+      rpcResult: { id: NEW_ORDER_ID, so: 1253, placed_at: "2026-05-02T10:00:00Z" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("dealer", DEALER_A);
+    await app.fetch(
+      new Request("http://t/api/orders", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          validCreateBody({
+            // A lift means no charge — so a row here could ONLY have come from
+            // the client, and it must not survive.
+            delivery: {
+              date: "2026-06-01",
+              proceedDate: "2026-05-15",
+              dateTbd: false,
+              floor: 3,
+              hasLift: true,
+              stairItems: 3,
+            },
+            addons: [{ addonKey: "STAIR_CARRY", qty: 1, unitPrice: 9999, attrs: null }],
+          }),
+        ),
+      }),
+      env,
+    );
+    const payload = sb._rpcCalls[0]!.payload as { addons: Array<Record<string, unknown>> };
+    expect(payload.addons).toHaveLength(0);
+  });
+
   it("returns 400 on invalid payload (missing required field)", async () => {
     vi.mocked(userClient).mockReturnValue(buildSbForCreate({}));
     const jwt = await makeJwt("dealer", DEALER_A);
@@ -1471,9 +1609,9 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(201);
-    // ONLY create_order ran — no voucher claim / release.
+    // ONLY the governed final-submit RPC ran — no voucher claim / release.
     const rpcNames = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
-    expect(rpcNames).toEqual(["create_order"]);
+    expect(rpcNames).toEqual(["create_order_from_sales_portal"]);
   });
 
   // 0187 — CONFIGURED-PATH Stage B (via buildSbForCreatePwp, which returns a real
@@ -1498,8 +1636,10 @@ describe("POST /api/orders", () => {
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // The claim happens BEFORE create_order; no release on the happy path.
     expect(names).toContain("pwp_claim_code");
-    expect(names).toContain("create_order");
-    expect(names.indexOf("pwp_claim_code")).toBeLessThan(names.indexOf("create_order"));
+    expect(names).toContain("create_order_from_sales_portal");
+    expect(names.indexOf("pwp_claim_code")).toBeLessThan(
+      names.indexOf("create_order_from_sales_portal"),
+    );
     expect(names).not.toContain("pwp_release_codes");
   });
 
@@ -1546,7 +1686,7 @@ describe("POST /api/orders", () => {
     expect(j.code).toBe("pwp_code_rejected");
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // No order created (claim failed before create_order).
-    expect(names).not.toContain("create_order");
+    expect(names).not.toContain("create_order_from_sales_portal");
   });
 
   it("Confirm-pass fail-closed — a SHORT stamp releases the claim + 500", async () => {
@@ -1568,7 +1708,7 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(500);
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
     // create_order committed, then the short stamp → release + 500.
-    expect(names).toContain("create_order");
+    expect(names).toContain("create_order_from_sales_portal");
     expect(names).toContain("pwp_release_codes");
   });
 
@@ -1773,7 +1913,7 @@ describe("POST /api/orders", () => {
     const j = (await res.json()) as { code: string };
     expect(j.code).toBe("pwp_code_rejected");
     const names = (sb._rpcCalls as Array<{ name: string }>).map((r) => r.name);
-    expect(names).not.toContain("create_order"); // rejected before the order
+    expect(names).not.toContain("create_order_from_sales_portal"); // rejected before the order
   });
 
   it("returns 403 when dealer role JWT has no dealerId", async () => {
@@ -1966,7 +2106,11 @@ describe("POST /api/orders", () => {
       );
       expect(res.status).toBe(201);
       // RPC fired exactly once (lead-time gate passed)
-      expect(sb._rpcCalls.filter((c: { name: string }) => c.name === "create_order")).toHaveLength(1);
+      expect(
+        sb._rpcCalls.filter(
+          (c: { name: string }) => c.name === "create_order_from_sales_portal",
+        ),
+      ).toHaveLength(1);
     });
 
     /**

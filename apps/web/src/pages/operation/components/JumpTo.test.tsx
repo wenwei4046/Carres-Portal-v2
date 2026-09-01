@@ -112,17 +112,17 @@ describe("the empty query", () => {
       .map((el) => el.textContent);
     /* Six were stored; the MASTER caps the recent block at five, and the sixth
      * still appears once — below, as an ordinary destination. */
-    /* `operation:stock` is the On hand page since the WAREHOUSE heading
-     * (CARD-2026-08-19-warehouse-rail) — same key, the sidebar's own word. */
+    /* `operation:stock` is the Stock Register since CARD-2026-08-20-stock-register
+     * replaced On hand — same key, same route, the sidebar's own word. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
       "Sales OrdersOperations",
-      "On handOperations",
+      "StockOperations",
       "PaymentsOperations",
       // `Delivery Work` since the Delivery module's pages joined the rail
       // (CARD-2026-08-19-sidebar-expandable-modules) — same key, same route,
       // the governed name.
-      "Delivery WorkOperations",
+      "DeliveryOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
@@ -139,15 +139,35 @@ describe("what typing searches", () => {
   it("matches governed destination NAMES — the pages, never an unbuilt door", () => {
     // The PAGES are the destinations, never the module row. `Purchase Returns`
     // is `Coming soon` and a door the rail refuses to open may not be offered
-    // here — grouping the rail (CARD-2026-08-20) changed no destination and
-    // added no door, because a drawer is presentation and Jump To lists pages.
+    // here — grouping the rail changed no destination and added no door,
+    // because a drawer is presentation and Jump To lists pages.
     //
-    // Starts-with ranks first, then contains in nav order — and in the grouped
-    // nav `Manual Purchase Requests` (REQUESTS) now precedes `SO Batch
-    // Purchase` (BUY). Same three doors, same three routes.
+    // CARD-2026-08-22-purchasing-01: the final rail lists eleven pages, five of
+    // them live. `Purchase Demands` and `Report` LEFT the rail, so Jump To may
+    // not offer them either — a demand is a hidden record, not a destination.
+    //
+    // Starts-with ranks first — `Purchase Orders` — then contains, in NAV
+    // order, which is the BUY drawer's own order: `SO Batch Purchase` then
+    // `Manual Purchase`.
     expect(
       matchDestinations(permittedDestinations("operation"), "purch").map((d) => d.label),
-    ).toEqual(["Purchase Orders", "Manual Purchase Requests", "SO Batch Purchase"]);
+    ).toEqual(["Purchase Orders", "SO Batch Purchase", "Manual Purchase"]);
+  });
+
+  it("every retired Purchasing row is unreachable from Jump To", () => {
+    const all = permittedDestinations("operation").map((d) => d.label);
+    for (const word of [
+      "Purchasing Home",
+      "My Purchasing Work",
+      "New Supplier Requests",
+      "New SKU Requests",
+      "Purchase Demands",
+      "Consignment Overview",
+      "Consignment Receipts",
+      "Manual Purchase Requests",
+    ]) {
+      expect(all, word).not.toContain(word);
+    }
   });
 
   it("a document result prints its number, its type and the identifying party", async () => {

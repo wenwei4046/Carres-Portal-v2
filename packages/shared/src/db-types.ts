@@ -162,6 +162,8 @@ export interface ProductSkuRow {
   // follow-up tightening migration runs (carry-forward
   // phase-4-v3-skus-supplier-id-not-null-tighten).
   supplier_id: string | null;
+  /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
+  supplier_code?: string | null;
   // 0074 — fixed procurement cost per unit. NULL = "not yet set" (Create-PO
   // refuses lines whose SKU has cost=null until operation sets a value via
   // the catalog admin UI).
@@ -728,6 +730,12 @@ export interface OrderRow {
   // ("Proceed") date. Pairs with delivery_date via delivery_date_tbd
   // (both-or-neither). NULL when TBD. Must be <= delivery_date.
   proceed_date: string | null;
+  // 0396 — actual Sales → Operations handoff timestamp. Optional until the
+  // generated/live schema catches up in every test fixture.
+  proceeded_at?: string | null;
+  // 0396 — authoritative Sales Portal final-submit fact. NULL for raw,
+  // office, rental and imported records; legacy recovery requires exact IDs.
+  sales_final_submitted_at?: string | null;
   delivery_floor: number;
   delivery_has_lift: boolean;
   delivery_stair_items: number | null;

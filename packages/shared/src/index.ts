@@ -2,6 +2,17 @@ export const SHARED_VERSION = "0.0.0" as const;
 
 export * from "./issue-tracker";
 
+/* Stair carry — moved out of `apps/web` 2026-08-29 so the SERVER can stamp
+   the fee onto the order. The Worker cannot import from the web app, which
+   is why the fee the customer signed for was written down nowhere. */
+export {
+  floorSurchargeRaw,
+  stairCarryCount,
+  stairCarryFee,
+  STAIR_CARRY_ADDON_KEY,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
+} from "./stair-carry";
+
 export {
   resolveSalesOrderRoute,
   NODE_W as ROUTE_NODE_W,
@@ -58,6 +69,7 @@ export {
   SUNDAY,
   expectedArrivalOf,
   arrivalFromReadyDate,
+  orderByFromDeliveryDate,
   isPurchasingCategory,
   isPurchasingNumberKey,
   productionWorkingDaysFor,
@@ -72,6 +84,9 @@ export {
   settingValueLabel,
   purchasingCategorySchema,
   purchasingSettingsResponseSchema,
+  purchasingCreateDestinationInput,
+  purchasingUpdateDestinationInput,
+  purchasingSetSupplierCollectionInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
@@ -81,8 +96,14 @@ export {
   type PurchasingProductionDays,
   type PurchasingSupplierRow,
   type PurchasingSettingChange,
+  type PurchasingDestinationSetting,
+  type PurchasingSupplierCollectionSetting,
+  type PurchasingDeliveryPartnerSetting,
   type PurchasingSettings,
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
+  type PurchasingUpdateDestinationInput,
+  type PurchasingSetSupplierCollectionInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
@@ -369,6 +390,17 @@ export {
   pwpDiscoverResponseSchema,
   type PwpDiscoverDto,
   type PwpDiscoverResponse,
+  // 2026-08-24 — the FIRST supplier-creation door the portal has ever had.
+  // Purchasing still owns the record; this is the shared contract for it.
+  supplierCreateInput,
+  supplierSlug,
+  type SupplierCreateInput,
+  // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
+  // that quoted it; the supplier_id slot stays the routing truth.
+  skuSupplierOfferSchema,
+  skuSupplierOfferUpsertInput,
+  type SkuSupplierOfferDto,
+  type SkuSupplierOfferUpsertInput,
 } from "./schemas/catalog";
 
 // 0219 — Order Entry config (payment methods + form fields).
@@ -451,6 +483,7 @@ export {
   // Q5 (0318) — the supplier's promised READY date, the third answer body.
   recordReadyDateInput,
   recordSendInput,
+  confirmPoSentInput,
   // PO Revisions (0364) — a sent PO keeps its number and mints a version.
   revisePoInput,
   setMessageTemplateInput,
@@ -462,7 +495,6 @@ export {
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
-  adjustStockInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -496,7 +528,6 @@ export {
   type AttachDoInput,
   type ReceivePoWithDoInput,
   type OfficeReceiveInput,
-  type AdjustStockInput,
   type AbandonOrderInput,
   type WarehousePickInput,
   type RecheckStockInput,
@@ -611,7 +642,9 @@ export {
   opsStockRefurbishInputSchema,
   opsStockRefurbishCompleteInputSchema,
   opsStockUpdateConditionInputSchema,
-  opsStockCreateInputSchema,
+  opsStockSetSiteInputSchema,
+  opsStockSetHolderInputSchema,
+  opsStockSetOwnershipInputSchema,
   opsStockItemSchema,
   opsStockListResponseSchema,
   opsReorderPointInputSchema,
@@ -657,7 +690,9 @@ export {
   type OpsStockRefurbishInput,
   type OpsStockRefurbishCompleteInput,
   type OpsStockUpdateConditionInput,
-  type OpsStockCreateInput,
+  type OpsStockSetSiteInput,
+  type OpsStockSetHolderInput,
+  type OpsStockSetOwnershipInput,
   type OpsStockItem,
   type OpsStockListResponse,
 } from "./schemas/ops-stock";
@@ -1070,6 +1105,14 @@ export {
   customerResolutionMeaning,
   isCustomerResolution,
   type CustomerResolution,
+  // Layer ④ · in what ORDER the goods move (Loo, 2026-08-05 · 0409)
+  CARRES_EXECUTIONS,
+  CARRES_EXECUTION_KEYS,
+  CARRES_EXECUTION_MEANING,
+  carresExecutionLabel,
+  carresExecutionMeaning,
+  isCarresExecution,
+  type CarresExecution,
 } from "./supplier-claim";
 
 // R6 · The warehouse files its own receiving — a queued call to R1's engine
@@ -1103,6 +1146,55 @@ export {
   type WarehouseSubmitReceiptInput,
   type WarehouseReceiptReturnInput,
 } from "./schemas/warehouse";
+
+// 0366 · WAREHOUSE UNIT AUTHORITY — the ONE availability arithmetic, and the
+// lifecycle outcome that `ended` must never erase. The SQL half lives in
+// migration 0366 (`public.unit_availability`, `public.unit_lifecycle_outcome`).
+export {
+  UNIT_AVAILABILITY,
+  UNIT_AVAILABILITY_LABEL,
+  UNIT_LIFECYCLE_OUTCOMES,
+  UNIT_LIFECYCLE_OUTCOME_LABEL,
+  UNIT_OWNERSHIPS,
+  UNIT_OWNERSHIP_LABEL,
+  unitAvailability,
+  isUnitAvailable,
+  isUnitBindable,
+  unitLifecycleOutcome,
+  type UnitAvailability,
+  type UnitLifecycleOutcome,
+  type UnitOwnership,
+  type SkuAvailability,
+} from "./unit-availability";
+
+// CARD-2026-08-20-stock-register · THE STOCK REGISTER — the one current listing
+// of controlled Units. Pure: it READS 0366's availability and never re-derives
+// it. The `Changed` scopes read the append-only physical lineage (0373's
+// `stock_unit_register_v`), never `updated_at`.
+export {
+  ATTENTION_REASONS,
+  ATTENTION_REASON_LABEL,
+  CHANGED_SCOPES,
+  CHANGED_SCOPE_LABEL,
+  EMPTY_RAIL_SELECTION,
+  NO_CATALOG_KEY,
+  NO_CATALOG_LABEL,
+  applyRailSelection,
+  availabilityLabel,
+  categoryKeyOf,
+  changedWithin,
+  hasAttention,
+  isCurrentUnit,
+  isRailFiltered,
+  matchesRegisterQuery,
+  registerSummaryLine,
+  summariseRegister,
+  type AttentionReason,
+  type ChangedScope,
+  type StockRailSelection,
+  type StockRegisterTotals,
+  type StockRegisterUnit,
+} from "./stock-register";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
@@ -1161,12 +1253,23 @@ export {
   type PartnerWarningKey,
 } from "./partner-delivery-rules";
 export {
+  latestWarehouseReadyDate,
+  partnerJourneyCalendar,
+  type JourneyChain,
+  type JourneyChainInput,
+  type JourneyRegionRule,
+  type PartnerJourneyCalendar,
+} from "./partner-journey";
+export {
   partnerDeliveryRulesSchema,
   setPartnerDeliveryRulesInput,
+  journeyRegionRuleSchema,
+  setPartnerJourneyCalendarInput,
   partnerBookingWarningSchema,
   partnerBookingCheckResponseSchema,
   type PartnerDeliveryRulesWire,
   type SetPartnerDeliveryRulesInput,
+  type SetPartnerJourneyCalendarInput,
   type PartnerBookingWarningWire,
   type PartnerBookingCheckResponse,
 } from "./schemas/delivery-partner-rules";
@@ -1601,6 +1704,10 @@ export type { ModelDefaultFreeGifts } from "./domain";
 // (`pwpRuleFromRow`) is surfaced top-level here too (mirrors sofaComboFromRow).
 export {
   resolvePwp,
+  // The CROSS-ORDER counterpart: a saved voucher is redeemed on a later order
+  // that need not contain the trigger, so `resolvePwp` cannot judge it. Shared
+  // for the same honest-pricing reason - POS and server must agree.
+  voucherCoversLine,
   parsePwpTargets,
   type PwpRule as PwpRuleEngine,
   type PwpLineInput,
@@ -1703,6 +1810,7 @@ export {
 export {
   lineReadiness,
   readinessCounts,
+  unitsShortWords,
   type LineReadiness,
   type LineReadinessInput,
 } from "./line-readiness";
@@ -1880,6 +1988,36 @@ export {
   type DeliveryOrderAttemptFact,
   type DeliveryHandoverKind,
 } from "./delivery-order-status";
+// DELIVERY WORK's own status ladder — the OPERATION's progress, deliberately a
+// different vocabulary from the document's (owner correction 2026-08-24).
+// `Created` belongs to the Register and may never appear on the workspace.
+export {
+  deliveryWorkStatusOf,
+  DELIVERY_WORK_STATUS_LABEL,
+  type DeliveryWorkStatus,
+  type DeliveryWorkStatusKind,
+  type DeliveryWorkStatusInput,
+} from "./delivery-work-status";
+// THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
+// travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes
+// nothing" claim; Sales keeps the commercial promise, Delivery the arrangement.
+export {
+  deliveryScopeLegSchema,
+  deliveryScopeRefSchema,
+  assignLogisticsInputSchema,
+  saveDeliveryArrangementInputSchema,
+  isLogisticsChange,
+  changeLogisticsReasonLabel,
+  CHANGE_LOGISTICS_REASONS,
+  CHANGE_LOGISTICS_REASON_KEYS,
+  DEFAULT_KV_LOGISTICS,
+  type DeliveryScopeRef,
+  type AssignLogisticsInput,
+  type SaveDeliveryArrangementInput,
+  type DeliveryArrangementRow,
+  type DeliveryArrangementEventRow,
+  type ChangeLogisticsReasonKey,
+} from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
   DELIVERY_HANDOVER_KINDS,
@@ -1925,6 +2063,8 @@ export {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
   DEMAND_PURPOSE_VALUES,
+  RETIRED_DEMAND_PURPOSE_LABELS,
+  demandPurposeLabelOf,
   isDemandPurpose,
   poPurposeLabelOf,
   type DemandPurpose,
@@ -1993,12 +2133,137 @@ export {
 export {
   MANUAL_PURCHASE_WORDS,
   MANUAL_PURCHASE_STATUS_WORDS,
+  MANUAL_PURCHASE_APPROVAL_WORDS,
+  MANUAL_PURCHASE_RAIL,
+  MANUAL_PURCHASE_RAIL_CLEAR,
+  MANUAL_PURCHASE_HISTORY_WORDS,
+  manualPurchaseHistoryRecord,
+  manualPurchaseApproverLine,
+  manualPurchaseApprovalOf,
   manualPurchaseStatusOf,
+  manualPurchaseNotOrdered,
+  manualPurchaseOrderByOf,
+  manualPurchaseOrderByLine,
+  manualPurchaseLeadDayFacts,
+  manualPurchaseTimingOf,
+  manualPurchaseRailFacts,
+  manualPurchaseRailModel,
+  manualPurchaseWorkOrder,
+  manualPurchaseWorkItems,
+  manualPurchaseLineRemainingOf,
+  manualPurchasePoSummary,
+  manualPurchaseItemsSummary,
+  manualPurchaseSupplierSummary,
+  manualPurchaseDeliverToSummary,
+  manualPurchaseForOf,
+  manualPurchaseSelectable,
+  manualPurchaseIssueGroupCount,
+  manualPurchaseIssueSentence,
   stillNeededOf,
+  type ManualPurchaseApprovalKind,
   type ManualPurchaseStatus,
   type ManualPurchaseStatusInput,
   type ManualPurchaseStatusKind,
+  type ManualPurchaseWorkKey,
+  type ManualPurchaseTimingState,
+  type ManualPurchaseSetupKey,
+  type ManualPurchaseWorkInput,
+  type ManualPurchaseRailFilter,
+  type ManualPurchaseRailFacts,
+  type ManualPurchaseRailModel,
+  type ManualPurchaseHistoryKind,
+  type ManualPurchaseHistoryEvent,
 } from "./manual-purchase";
+export {
+  PURCHASE_DEMAND_WORDS,
+  PURCHASE_DEMAND_STATES,
+  PURCHASE_DEMAND_TIMING_STATES,
+  PURCHASE_DEMAND_OWNER_DUTY,
+  isPurchaseDemandState,
+  isPurchaseDemandTimingState,
+  purchaseDemandStateWords,
+  purchaseDemandRailWords,
+  purchaseDemandBlockerOf,
+  purchaseDemandTimingOf,
+  purchaseDemandQuantities,
+  purchaseDemandHelpLine,
+  purchaseDemandCoverageLine,
+  groupPurchaseDemands,
+  filterPurchaseDemands,
+  purchaseDemandStateCounts,
+  purchaseDemandFooter,
+  purchaseDemandStateSchema,
+  purchaseDemandRowSchema,
+  purchaseDemandsResponseSchema,
+  soBatchAction,
+  soBatchPurchaseActionSchema,
+  type PurchaseDemandState,
+  type PurchaseDemandTimingState,
+  type PurchaseDemandBlockerState,
+  type PurchaseDemandBlockerInput,
+  type PurchaseDemandTimingInput,
+  type PurchaseDemandRow,
+  type PurchaseDemandItemGroup,
+  type PurchaseDemandVariantGroup,
+  type PurchaseDemandsResponse,
+  type SoBatchPurchaseAction,
+} from "./purchase-demands";
+export {
+  SO_BATCH_PURCHASE_WORDS,
+  SO_BATCH_RAIL,
+  SO_BATCH_RAIL_CLEAR,
+  soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
+  soBatchRailFacts,
+  soBatchRailModel,
+  type SoBatchProductCategory,
+  type SoBatchRailFilter,
+  type SoBatchRailFacts,
+  type SoBatchRailModel,
+  SO_BATCH_ORDER_STATUS_WORDS,
+  soBatchOrderStatusOf,
+  soBatchOrderRowSchema,
+  soBatchCellSummary,
+  soBatchOrderSelection,
+  soBatchPurchaseResponseSchema,
+  type SoBatchOrderStatus,
+  type SoBatchOrderPoFact,
+  type SoBatchOrderLineFact,
+  type SoBatchOrderRow,
+  type SoBatchCellSummary,
+  type SoBatchPurchaseResponse,
+  isSelectableForBuying,
+  defaultAllocations,
+  setDestination,
+  splitAllocation,
+  validateAllocations,
+  documentPartitionKey,
+  composeDocumentLines,
+  groupSelectionsIntoDocuments,
+  soBatchSelectionSummary,
+  destinationAllocationSchema,
+  soBatchSelectionSchema,
+  purchasingDestinationSchema,
+  type PurchasingDestination,
+  type DestinationAllocation,
+  type SoBatchSelection,
+  type SoBatchDocument,
+  type SoBatchDocumentLine,
+  type PoDocumentAllocation,
+  type PoDocumentLine,
+  type PoDocumentLines,
+  type PoLineSource,
+  type SoBatchSelectionSummary,
+  type AllocationCheck,
+} from "./so-batch-purchase";
+export {
+  PURCHASING_REFUSAL_CODES,
+  purchasingRefusal,
+  purchasingRefusalLine,
+  type PurchasingRefusal,
+  type PurchasingRefusalCode,
+  type PurchasingRefusalFacts,
+} from "./purchasing-refusals";
 export {
   IMPORT_ACCESSORY_KINDS,
   IMPORT_LEAD_DAYS_DEFAULT,
@@ -2631,3 +2896,5 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Purchase Orders — one evidence-derived Register state and Work vocabulary.
+export * from "./purchase-order-register";

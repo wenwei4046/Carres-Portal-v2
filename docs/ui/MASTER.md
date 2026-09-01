@@ -94,10 +94,11 @@ It surfaces important unresolved matters Jess did not ask about, but asks her on
 business decision that passes the Constitution's owner decision gate.
 
 This object/domain pass does not replace UI preflight. UI Dictionary/IA comes first; Carres
-semantics and ownership outrank external references; and actionable copy remains **WHO + ACTION +
-OBJECT + actual working day/date**, with WHO and source object rendered as structured context under
-the latest Owner Engine law rather than repeated in sentence text. The pass is a completeness check,
-not permission to build every capability or to write UI/application code in Plan mode.
+semantics and ownership outrank external references; and every action remains one structured
+contract: **owner context + short action + necessary object/recipient/result + actual working
+day/date**. Owner and source object render as structured context under the latest Owner Engine law;
+the sentence never repeats them when the surface already identifies them. The pass is a completeness
+check, not permission to build every capability or to write UI/application code in Plan mode.
 
 **OFFICIAL CARD NUMBERS ARE GOVERNANCE; BLUEPRINT PRECEDES BUILD HANDOFF.** The planner
 never invents an official Card number or status. The whole-domain audit is evidence, not a roadmap.
@@ -285,6 +286,54 @@ Blueprint, names the READY scope and closes; the later BUILD/DELIVERY lane decid
 | the live look | **`/ui`** — public, lazy, its own chunk, so a kit reference never rides the operator's bundle |
 | the enforcement | `pnpm --filter @carres/web lint` + the kit source scans |
 
+## §2.1 · NEW-STAFF OPERATING LANGUAGE — OWNER RULING 2026-08-20 · APPROVED / LOCKED
+
+**The system knows the process; staff confirm facts, perform the stated act and record the result.**
+No employee-facing surface may depend on experience, memory, WhatsApp history, an unwritten office
+habit or asking a long-serving employee what comes next. Any authorised cover must be able to resume
+from the current structured facts without reconstructing the story outside Carres.
+
+English is the one official language for business fields, records, search, reports and documents.
+Employee-facing facts, warnings, actions, validation, empty states and prepared messages use
+**Primary School Standard English**:
+
+- one sentence carries one fact or one act;
+- aim for no more than about 12 words where the governed business terms allow it;
+- start actions with common verbs such as `Send`, `Call`, `Ask`, `Check`, `Choose`, `Save`, `Upload`
+  or `Add`;
+- keep required business words such as `Purchase Order`, `Supplier`, `Deliver To`, `Unit ID`,
+  `Invoice`, `Credit Note`, `Claim` and `Consignment`, and explain an unfamiliar term on demand;
+- never use a vague instruction such as `Process`, `Handle`, `Proceed accordingly`, `Action
+  required`, `Resolve discrepancy` or `Follow up`;
+- show an actual date such as `18 Aug 2026`, not `ASAP`, `Today`, `Tomorrow`, `T−2` or a date the
+  employee must calculate;
+- an error states the failed fact and the act that fixes it; a button states what pressing it does.
+
+Optional `What does this mean?` help may explain the official English in Chinese or Bahasa Malaysia.
+That help never changes the authoritative field, record, search term, report, message or document.
+Prefer governed choices (`Yes / No`, `Full / Partial`, `Good / Damaged`) and prepared messages over
+free typing. Notes remain free text only where the business needs them and should offer a short
+sentence pattern.
+
+An action-capable surface separates the current fact from the act:
+
+```
+Supplier invoice is missing
+[YJ] Ask the supplier to send the invoice by 18 Aug 2026
+```
+
+The first line says what is true. The second line starts with the act and says the smallest required
+object, recipient, result and actual date that are not already clear from the row/card header.
+`[YJ]` is a structured owner chip, never sentence text. The action record separately carries its
+trigger, owner rule, resolved owner, completion fact, governed date, source object and cover evidence.
+My Work normally omits the current employee's chip; Team Work places identity in the owner group;
+cover and handover show the necessary owner context. A reference Register may show the fact only.
+It never grows a duplicate action merely to satisfy this display grammar.
+
+This law simplifies execution; it does not remove permission, approval or separation of duties.
+The system may guide every authorised cover through the same steps while still preventing a
+requester from approving their own exception and preventing Operations from performing Finance's act.
+
 **Frozen and not to be reopened:** the spacing scale is **8 steps** (`2 4 6 8 12 16 24 32`) ·
 **`font-bold` (700) is deleted into 600** · **Lucide's stroke stays 2.**
 
@@ -420,7 +469,7 @@ PARALLEL TRACKS      Sales Order (8)
 REFERENCE ONLY       Purchase Order · Supplier Claim
                        work is the first tab; the rest are Versions / History / Order Route
 ONE SCROLL           Goods Receipt · Purchase Return · Repair Order · Display Request ·
-                       Manual Purchase Request · the governed Consignment documents
+                       Manual Purchase · the governed Consignment documents
 ```
 **The test, and it is mechanical: would a staff member open this tab on an ordinary Tuesday?**
 Yes and it runs beside the others → reason one. No, but they would hunt for it when something
@@ -431,7 +480,8 @@ went wrong → reason two. Neither → it is a section in the scroll, not a tab.
 **the document the other party will actually receive**, redrawn as the left half is typed — which
 is the only way an operator can see what a supplier will read without printing it.
 ```
-SPLITS       PO · Consignment Order · Purchase Return · Repair Order · Supplier Claim
+SPLITS       PO · Consignment Order · Consignment Return · Consignment Sale Notice ·
+               Purchase Return · Repair Order · Supplier Claim
 NEVER        Goods Receipt · Display Request · Manual Purchase
 ```
 Receiving RECORDS what was counted; it composes nothing for anybody. A preview pane there spends
@@ -456,38 +506,36 @@ shipped code, and stated the opposite.)*
 
 ---
 
-# §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-20
+# §4.2 · MODULE NAVIGATION — CURRENT GRAMMAR SHIPPED PR #861; PURCHASING TREE APPROVED 2026-08-22
 
-### ONE PORTAL RAIL; A MODULE IS AN EXPANDABLE ROW
+### ONE PORTAL RAIL; MULTI-PAGE MODULES EXPAND, ONE-PAGE DESTINATIONS DO NOT
 
-PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: one
-module icon + name + chevron row, with its pages hanging from quiet rounded elbows. The existing
-`PortalSidebar` is the only left navigation surface: 232px expanded and 60px collapsed. A module
-never opens a second sidebar, flyout or duplicate tab strip.
+PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
+multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
+elbows. A destination with only one page is a direct icon + name row; it does not hide that page
+behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
+2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
-the entire tree without navigating. `Purchasing Home` and `My Purchasing Work` are direct rows;
-`REQUESTS`, `BUY`, `RECEIVE`, `PROBLEMS` and `CONSIGNMENT` are independent full-row accordion
-headers. More than one group may remain open. The active destination's group opens automatically
-and may not hide the active destination. Purchasing parent/group state is remembered per signed-in
-user.
+the entire tree without navigating. `BUY`, `RECEIVE`, `PROBLEMS` and `SHOWROOM` are independent
+full-row accordion headers. More than one group may remain open. The active destination's group
+opens automatically and may not hide the active destination. Purchasing parent/group state is
+remembered per signed-in user. Purchasing has no Home or module-specific Work destination: its
+Registers and central Work Engine already own those jobs.
 
 ```text
 Purchasing                                               ▾
-│  Purchasing Home
-│  My Purchasing Work
-│
-│  REQUESTS                                              ▸
 │  BUY                                                   ▾
-│  │  Purchase Demands
 │  │  SO Batch Purchase                         ← current
+│  │  Manual Purchase
 │  │  Purchase Orders
 │  RECEIVE                                               ▸
 │  PROBLEMS                                              ▸
-│  CONSIGNMENT                                           ▸
+│  SHOWROOM                                              ▸
 ```
 
-This is navigation only. The 200px `STATUS / WORK TO DO` rail belongs inside an individual Work
+This is navigation only. A page's own local filter rail belongs inside an individual Work
 Surface and never becomes a second module sidebar. A Purchasing Listing follows the Sales Orders
 Register shell; its compact Destination Header shows the current page word once, at the same
 size/weight, without a leading icon or `Purchasing ·` prefix. Formal Object Detail alone may use
@@ -500,9 +548,9 @@ the approved 50% work + 50% live-PDF surface.
 - **The complete map is present from day one.** An approved but unbuilt destination is a `<span>`
   with no href, outside the tab order, `aria-disabled`, and prints `Coming soon` using the existing
   two-line non-control treatment. It has no hover, active bar, count or fake page.
-- **Existing useful destinations remain reachable.** This tree may rename/reposition a real door,
-  but it may not replace a live page with an unbuilt row or delete the existing Purchasing Report
-  before its separate central-report consolidation.
+- **Existing useful capability remains reachable through its approved home.** A previous screen does
+  not earn a permanent door when its job is now a Register facet, central Work item, central Report,
+  in-context Catalog request or authoritative `purchase_demand` read.
 - **ALWAYS EXACTLY ONE VISIBLE ACTIVE INDICATION — APPROVED / LOCKED (the shared module
   active-indication law; Purchasing is not an exception to it).** The rail never says nothing about
   where the operator is standing, and never says it twice. The one indication moves with what is on
@@ -528,10 +576,9 @@ the approved 50% work + 50% live-PDF surface.
   Expanded/collapsed rail width keeps the existing `ops-sidebar-collapsed` law.
 - **A collapsed module icon opens a NAMED destination, never "the first live row".** A module's
   landing page is a capability in its own right and may not be a side effect of the order its rows
-  happen to sit in. Purchasing's 60px icon links to **`SO Batch Purchase`**
-  (`/operation?tab=purchase`) until `Purchasing Home` is built, at which point that page's own
-  approved scope may change the module landing destination. Jump To ordering is unaffected — it
-  lists pages, and a landing choice is not a page.
+  happen to sit in. Purchasing's 60px icon permanently links to **`SO Batch Purchase`**
+  (`/operation?tab=purchase`). Jump To ordering is unaffected — it lists pages, and a landing choice
+  is not a page.
 - **The active row is brought into view** without centring or animation. The brand/collapse area
   stays fixed at the top, the signed-in user stays fixed at the bottom, and only the middle
   destination region scrolls.
@@ -539,8 +586,8 @@ the approved 50% work + 50% live-PDF surface.
 
 *Current shared implementation: `apps/web/src/pages/portal/portal-nav.ts` ·
 `PortalSidebar.tsx` · `operation/PurchasingTabs.tsx` · `operation/StockTabs.tsx` ·
-`operation/components/ModuleHeader.tsx`. Purchasing's nested grouping is an approved target, not
-yet built.*
+`operation/components/ModuleHeader.tsx`. Purchasing's nested grouping is shared production grammar;
+the exact final destination map is the approved target in `docs/purchasing/MASTER.md`.*
 
 # §5 · The right rail
 
@@ -579,17 +626,19 @@ directory only and said so.*
   person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
   **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
   zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
-- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` are one
-  rota (`ops_po_duty`), auto-assigned through one rotation, resolved server-side.
-  `Not assigned` may appear ONLY when no assignable staff exists, and must then say where to
-  fix it. See `../purchasing/MASTER.md` §2.2 for the duty model itself — this file does not
-  restate it.
+- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
+  through the ONE Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1, owner ruling
+  2026-09-01): **Team is the one Duty settings door**, People owns eligibility only, and no
+  page reads a rota table or calculates a Duty for itself (the current `ops_po_duty` read is
+  legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
+  `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
+  fix it. This file does not restate the duty model.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
-  `../ERP-ARCHITECTURE.md` Law F. Only Team edits the duty rotation; People supplies active/access
-  and last-working-date facts. Dashboard, module Registers, object details, My Work, Team Work and
-  Quick Rail may change display density, but they may not query the rota, calculate an offset,
-  store local assignment or invent a fallback identity.
+  `../ERP-ARCHITECTURE.md` Law F.1. Only Team edits the duty rotation; People supplies
+  active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
+  Team Work and Quick Rail may change display density, but they may not query the rota, calculate
+  an offset, store local assignment or invent a fallback identity.
 - **Activity** previews recent append-only events and links to their objects; it does not replace
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind
@@ -617,6 +666,14 @@ directory only and said so.*
   do not repeat that group identity unless the row is shown outside the group. **The count words
   are `{n} actions to do · {n} late`** (owner ruling 2026-08-16, blueprint card §7 — supersedes
   this section's earlier `open · overdue` pair): every count says WHAT it counts.
+- **My Work is the default for every employee, including a manager** (Owner-approved Purchasing →
+  Receiving work model, 2026-08-29). Authority does not erase personal work. `Team Work` is the
+  explicit supervision view over the same set, never the manager's automatic landing replacement.
+- **Work stays in `My Work` / `Team Work`; a Register kit must not add a generic local
+  `WORK TO DO` rail panel.** Module rails contain only that Register's approved factual filters.
+  A future exception requires an explicit Owner ruling naming the action owner and write door; a
+  UI kit or page author may never infer one from available action data. SO Batch Purchase has no
+  local work panel.
 - A Current Action or Work row uses two visual lines when both fact and action are needed.
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
@@ -642,6 +699,57 @@ directory only and said so.*
 - Missing optional facts render the governed neutral empty value. A missing required fact that
   opens work renders the fact/problem plus its action; bare `Not given` or `Not recorded` must not
   impersonate an actionable warning.
+
+### HISTORY + REVISION THREE-RANK RECORD GRAMMAR — OWNER-APPROVED / LOCKED 2026-08-27
+
+History and Revisions are not database dumps. They are employee-facing records that must answer,
+in five seconds: **what happened · who did it · when · what important result was recorded.** A
+developer who knows the schema is not the acceptance reader; a new operator is.
+
+- Use **up to three visual lines**, in this fixed reading order. Omit an inapplicable third line;
+  never render an empty line merely to preserve height.
+  1. **What happened** — `text-body` (13), semibold, primary text.
+  2. **Who and when** — `text-meta` (12), regular, secondary text. Use structured actor identity:
+     real staff name + role + actual `fmtDate()` date/time.
+  3. **Important result/detail** — `text-label` (11) at `font-normal`, quieter but accessible.
+- Do not concatenate actor, role, action and raw fields into one sentence separated by dots. That
+  makes a schema-literate developer do the hierarchy work in their head and leaves a new operator
+  without a reading path.
+- **STAFF IDENTITY LAW — OWNER RULING 2026-08-27 (Jess), after the failed five-second walk.**
+  `Who did it?` is answered by a PERSON, never a permission. The first cold read failed on
+  `principal · Principal` — a role/account label repeated twice — and the ruling that closed it:
+  1. Every staff member uses an **individual authenticated account**. `Principal`, `Operation`
+     and `Finance` are permission roles, never staff names, and a shared role-labeled login is
+     not an actor.
+  2. Every Sales Order write stores the authenticated individual `user_id`; Revisions and
+     History resolve that id to the staff member's **real display name** from the authoritative
+     identity source. The UI never hardcodes an account→person mapping and never translates a
+     role into a person.
+  3. Approved display: `Jess · Principal · Thu, 27 Aug 12:30` · `Recorded by Jess · Thu, 27 Aug
+     12:30`. Forbidden display: `principal · Principal` · `Recorded by principal` ·
+     `Unknown user`.
+  4. `System` appears only when the event's own authoritative facts prove the portal, a
+     scheduled job or database automation acted — never inferred from a missing id.
+  5. An old record whose individual actor cannot be recovered — including one written by a
+     shared role login — says **`Staff identity not recorded`**. A person is never invented.
+- A Revision uses the same ranks but remains a complete-version door, not an event. Rev 1 says
+  `Original order`; a later approved/applied Revision names the governed change. Selecting a
+  Revision opens the complete read-only version and its document truth.
+
+```text
+Order created
+Jess · Principal · Mon, 24 Aug 11:16
+No deposit · Online order
+
+Original order
+Rev 1 · Current
+Recorded by Jess · Mon, 24 Aug 11:16
+```
+
+**Acceptance.** Give the record to a staff member who did not build the screen. Within five
+seconds they must answer what happened, who did it, when, and the important result. Failure to
+answer any applicable question means the record fails UI acceptance even when every stored field
+is technically present.
 
 ### ERP SHELL V1 — OWNER RULING 2026-08-13
 
@@ -739,7 +847,7 @@ own decision and its own card.**
 **TABS ARE AVOIDED BY DEFAULT — APPROVED / LOCKED.** Separate business jobs, owned records
 or destinations are separate portal-navigation entries and pages; they are never compressed
 into a module tab strip. Purchasing is the explicit reference: `SO Batch Purchase` · `Manual
-Purchase Requests` · `Purchase Orders` · `Goods Receipts` · `Supplier Claims` are individual
+Purchase` · `Purchase Orders` · `Receiving` · `Supplier Claims` are individual
 destinations inside its governed sidebar tree, with no Purchasing tabs and no substitute second
 navigation row.
 
@@ -850,9 +958,16 @@ row of pills. Header-column filters remain the direct per-column filter door; th
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
-permanent band. Left = truthful selected count + Clear. Right = only actions valid for that exact
-selection. A one-record action disappears for multi-selection rather than pretending to apply to
-many. Normal and selection states preserve the table's position and width.
+permanent band. Left = truthful selected count + Clear + the primary work action and any structured
+owner context it needs. Right = outputs such as Export, followed only by secondary actions valid for
+that exact selection. A one-record action disappears for multi-selection rather than pretending to
+apply to many. Normal and selection states preserve the table's position and width.
+
+On SO Batch Purchase, PO Duty ownership is shown only beside the selected `Issue PO` action as one
+compact initials avatar chip (`YJ`, or the current dated cover), with full identity and duty context
+in title/accessible name. There is no permanent PO Duty toolbar/rail block and no owner repetition
+on rows. The left-side order is summary · Clear · owner chip · `Issue PO`; `Export Excel` stays at
+the far right. The chip states work ownership; it does not imply that the current actor is the owner.
 
 **REGISTER EXPORT AND OVERFLOW ROUTING — APPROVED / LOCKED (Loo, 2026-08-11).** A Register uses
 one visible `Export ▾` control for its supported current-view outputs: Excel · PDF · Print. Output
@@ -885,6 +1000,25 @@ uses the governed Carres `NavRow` treatment: `rounded-control`; `blue-3` selecti
 straight 2px `blue-9` line inset on the left; slate hover for inactive rows. It is not a bordered
 card, not a module tab, not a foreign reference colour and not a newly invented rail variant.
 
+**LOCAL FILTER RAIL — READABLE SHELL — APPROVED / LOCKED, owner ruling 2026-08-27 (Purchasing
+Card 02-C).** The page-owned filter rail's shell, group and row grammar is the shared
+`FilterRail` / `FilterRailGroup` / `FilterRailRow` component (`workspace-rail.tsx`): 240px
+wide · 12px outer padding · 8px heading → first row · 20px between groups · 36px minimum row.
+A governed filter label is NEVER truncated and never hidden behind a hover or tooltip — it
+wraps onto a second line in the same body font at its natural height (≥ 48px), with the count
+still visible and right-aligned. The rail scrolls vertically as rows grow; it keeps its border
+against the Register; at narrower desktop widths the Register scrolls horizontally and the
+rail is never squeezed below 240px. The rail is navigation, not batch selection — it carries
+no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
+shell in their own cards, not as a side effect of someone else's.
+
+**LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
+one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
+to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The
+Register toolbar then carries `Show filters`. Reopening restores the same filters and the browser
+remembers the open/closed choice. Use the Portal sidebar's governed panel-left icon family and
+Carres control tokens, not a chevron, `X`, text link or a new visual language.
+
 **PORTAL NAVIGATION ACTIVE COLOUR — APPROVED / LOCKED.** The flame repoint applies to active
 navigation too: the current destination uses the governed blue selection treatment, never a
 red/flame active line or red rounded selection block. Flame remains the Carres brand mark;
@@ -916,9 +1050,18 @@ table** in the page Work Toolbar, selection bar or the relevant top popover; `Re
 belongs to Columns and never to the footer. Each Register MASTER owns its truthful summary
 vocabulary and arithmetic; the global template may not invent a KPI, status or unit.
 
-The table frame has an 8px outer gap above and an 8px outer gap below. The bottom gap is page
-breathing room outside the frame; the 32px footer remains inside it and never touches the browser
-edge. Available vertical space is filled with consecutive complete parent rows. There is no
+**REGISTER LISTING BOUNDARY — APPROVED / LOCKED, Owner correction 2026-08-31; overwrites the
+2026-08-29 four-sided-frame ruling.** A full `register/DataGrid` has **no enclosing outer border**
+around its Work Toolbar + table + fixed status footer. The visible structure stays inside the
+listing: the toolbar keeps its bottom divider, the table keeps its header/row/column grid lines,
+and the status footer keeps its top divider. Removing the outer rectangle must never remove those
+listing lines. A page may not add a wrapper border to recreate the obsolete frame. Embedded child
+tables retain only their separately governed child-table treatment. This ruling changes the shared
+Register engine, not one Sales Orders page override.
+
+The Register work surface has 8px breathing room above and below. The 32px footer remains part of
+the listing and never touches the browser edge. Available vertical space is filled with consecutive
+complete parent rows. There is no
 designed blank data region while more results exist; genuine empty space is allowed only when the
 complete current result set is shorter than the viewport. When another full governed row does not
 fit, show one fewer complete row rather than compressing the locked 38px parent-row height. This
@@ -944,7 +1087,7 @@ DataGrid-owned genuine-wide horizontal overflow · 1130 without another toolbar 
 column filters · Export · Columns · persistence · expansion all survive the migration.
 
 **The Sales Orders reference appearance follows the current Register Template:** 36px table
-header · 38px single-line parent rows · 32px fixed status footer · 8px outer frame gaps · flat
+header · 38px single-line parent rows · 32px fixed status footer · 8px work-surface gaps · flat
 zero-radius grid · faint structural dividers · no zebra. Frozen Carres typography tokens and
 the Register density law above own the text; older page-scoped 31/33/22px measurements no longer
 author this destination.
@@ -974,14 +1117,20 @@ compact destination header / work toolbar
 
 breathing gap
 
-┌─ light bordered Register ──────────────────────────────────────────────┐
-│ ▸ | SO No | Ordered | Customer Delivery | Customer | Delivery         │
-│   | Location | PO No | DO No                                          │
-└────────────────────────────────────────────────────────────────────────┘
+  ▸ | SO No | SO Date | Requested Delivery Date | Customer |
+    | Delivery Location | Showroom | PO No | DO No
 ```
 
+- **NO ENCLOSING REGISTER FRAME — Owner correction 2026-08-31; overwrites the 2026-08-29
+  four-sided-frame ruling.** Sales Orders inherits the shared Register engine's frameless outer
+  boundary. The Work Toolbar divider, table header/row/column grid and status-footer divider stay;
+  only the rectangle enclosing all three is absent. A page-local wrapper may not add it back.
+- **DATE DICTIONARY — Owner correction 2026-08-31.** `orders.placed_at` is labelled **`SO Date`**
+  everywhere in Sales Orders: Register, Order info, Order Route and field catalogs. `Ordered`
+  remains Purchasing's state/quantity word (`Ordered` · `Ordered Qty`) and must not label an SO
+  creation date.
 - Sales Orders is a truth Register, not Work and not a dashboard. No KPI-card preamble, no
-  borderless Linear-style continuous slab, and no giant card around the page.
+  giant card around the page.
 - The seven business columns above are the governed default and exact order. `▸` is chrome.
   There is no overall `Current`/status column. Content sets predetermined usable widths; staff do
   not resize to repair the default. Optional columns may cause grid-owned horizontal overflow and
@@ -1070,12 +1219,12 @@ breathing gap
   fixed by PR #788 and merged as `ebc8fb5d`. Deploy run `31790978222` repeated the authoritative
   gates and proved exact SHA `ebc8fb5d` in production. At normal desktop width the Register keeps
   the seven governed columns, page-header New Sales Order action, utility-only grid toolbar,
-  interaction-blue selection, amber missing Customer Delivery, location summaries, the approved
+  interaction-blue selection, amber missing Requested Delivery Date, location summaries, the approved
   six-column goods mini-table and filtered quantity footer with no permanent Reset layout. The
   persistent Object Header and `Order · Revisions · History · Order Route` navigation were verified
   across View and Edit. Order is read-first at document width; PDF remains behind Print; Revisions
   and History are separate views; Order Route shows per-goods `CURRENT` and a secondary Still owed
-  list. Edit keeps Customer Delivery read-only, retains the existing Proceed date writer, maps only
+  list. Edit keeps Requested Delivery Date read-only, retains the existing Proceed date writer, maps only
   existing address/access fields, and aligns Customer with Sales ownership beneath a full-width
   edit-scope notice. The same Object Route and Edit compositions remained usable with My Work open.
   This supersedes the earlier acceptance note's live PDF-canvas statement and closes the Sales Order
@@ -1084,7 +1233,7 @@ breathing gap
   review reopened the preceding closure. The final correction is PR #795, merged as
   `759d49efaee6c643bd9d8e1840cb991dee2b7015`; complete CI run `31804608716` passed and production
   deploy run `31805501074` converged that exact SHA. Authenticated normal and medium-desktop
-  acceptance proved the fact-first missing Customer Delivery presentation, concise locality,
+  acceptance proved the fact-first missing Requested Delivery Date presentation, concise locality,
   unchanged six-column goods mini-table, single-destination quantity suppression, equal Register
   and Object goods truth, the approved `Edit operational details | Order context` composition,
   governed Sales ownership, edit controls and URL state confined to Order Edit, safe dirty-navigation
@@ -1117,14 +1266,14 @@ its own tools, and nothing that is not needed is on screen.*
 │  ⊕ New Sales Order                        🔍    ⤓ Export ▾    ▥    │  45
 └────────────────────────────────────────────────────────────────────┘
      make a new thing  ←                      → how I look at this page
-┌────────────────────────────────────────────────────────────────────┐
-│ ▸ │ SO No   │ Ordered     │ Customer Delivery  │ Customer          │  36
-├───┼─────────┼─────────────┼────────────────────┼───────────────────┤
-│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26     │ LIM KUAN YANG     │  38
-│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure  │ CARD-1            │  38
-├───┴─────────┴─────────────┴────────────────────┴───────────────────┤
-│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44        │  32
-└────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ▸ │ SO No   │ SO Date     │ Requested Delivery Date │ Customer          │  36
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ ▸ │ SO-1319 │ Wed, 12 Aug │ Thu, 24 Sep 26          │ LIM KUAN YANG     │  38
+│ ▸ │ SO-1318 │ Tue, 11 Aug │ Customer not sure       │ CARD-1            │  38
+├───┼─────────┼─────────────┼─────────────────────────┼───────────────────┤
+│ 77 orders · Mattress 66 · Bedframe 36 · Sofa 15 · Pillow 44             │  32
+└─────────────────────────────────────────────────────────────────────────┘
    ── 8px ──
 ```
 
@@ -1216,6 +1365,23 @@ counters above the table; the 32px status footer carries the summary.
 
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
+
+**APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
+fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.
+
+- **The rail is not a KPI preamble.** §6.7 bans a card strip, a totals band and counters ABOVE the
+  table; the rail sits BESIDE it, and the 32px status footer still carries the summary. Nothing was
+  added above Row 3.
+- **The footer carries TWO numbers**, not one: `85 you can promise · 893 pieces you cannot`. A
+  `qty > 1` record can never be reserved (migration 0366), so a single number would either hide 893
+  real pieces or promise 893 that no Sales Order can name. When a Register's one summary number
+  would answer two different questions, it prints both and names them.
+- **Row 2 is unchanged** — Search · Export · Columns, no page-owned control in Row 1. The superseded
+  On hand page put its search box and an `Import sheet` button in the destination header, which §6.7
+  forbids by name; the replacement does not.
+- **There is no create button.** A Unit is born when a purchase order or consignment order is
+  confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
+  than filled with an `Add stock` control the Unit authority removed.
 
 # §7 · Approved Evolution
 

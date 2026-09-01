@@ -75,6 +75,8 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   cost: r.cost == null ? null : Number(r.cost),
   // 2026-05-17 — pass through SKU-level supplier ownership.
   supplierId: r.supplier_id,
+  // 0375 — the supplier's own item code rides the same pass-through.
+  supplierCode: r.supplier_code ?? null,
   discontinuedAt: r.discontinued_at,
   // 0170 — sell-side flag (default true to match the column default when a
   // legacy query didn't select it) + editable description.
@@ -805,8 +807,9 @@ export const orderChangeRequestFromRow = (r: DB.OrderChangeRequestRow): D.OrderC
 
 /**
  * orderInputToRpcPayload — converts the camelCase CreateOrderInput from the
- * web wizard into the snake_case jsonb shape that `public.create_order(jsonb)`
- * expects. Stays a pure function so it's testable without a Supabase client.
+ * web wizard into the snake_case jsonb shape accepted by the governed order
+ * birth wrappers. Stays a pure function so it's testable without a Supabase
+ * client. The underlying `create_order(jsonb)` primitive is not a client door.
  *
  * `dealerId` is added by the API layer from the verified JWT — the input
  * schema deliberately doesn't include it (cross-dealer posts are forbidden).

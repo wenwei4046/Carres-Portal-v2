@@ -292,7 +292,13 @@ describe("PUT /api/operation/orders/:id/control", () => {
    removal takes working tests with it. */
 /** Per-table mock: routes each `.from(table)` to its own result, is thenable so
  *  `await select().eq()` resolves, and captures insert/upsert rows. */
-function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
+function tableSb(
+  tables: Record<string, { data?: unknown; error?: unknown }>,
+  // 0366 — governed doors return through `rpc`, so a test that exercises one
+  // says what the door answered. Absent, every door answers `null`, which is
+  // what "nothing was bound / nothing matched" looks like on the wire.
+  rpcResults: Record<string, { data?: unknown; error?: unknown }> = {},
+) {
   const captured: {
     inserts: { table: string; rows: unknown }[];
     upserts: { table: string; rows: unknown }[];
@@ -329,7 +335,8 @@ function tableSb(tables: Record<string, { data?: unknown; error?: unknown }>) {
   const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   const rpc = vi.fn((name: string, args: Record<string, unknown>) => {
     rpcCalls.push({ name, args });
-    return Promise.resolve({ data: null, error: null });
+    const r = rpcResults[name] ?? {};
+    return Promise.resolve({ data: r.data ?? null, error: r.error ?? null });
   });
   return { from, rpc, captured, rpcCalls };
 }
@@ -379,7 +386,7 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
     expect(res.status).toBe(422);
   });
 
-  it("200 — claims the free unit (LOAN marker) + records the loan", async () => {
+  it("200 — claims the free unit through the binding door + records the loan", async () => {
     const sb = tableSb({
       orders: { data: { id: ORDER_ID, so: 1146 } },
       ops_stock_items: { data: { id: ITEM, sku: "Sofa L 3-Seater", condition: "exhibition" } },
@@ -395,7 +402,7 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
           notes: null,
         },
       },
-    });
+    }, { ops_stock_bind_units: { data: [ITEM] } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");
@@ -411,16 +418,23 @@ describe("POST /api/operation/orders/:id/loan-sofa", () => {
     const body = (await res.json()) as { loan: { status: string; item_sku: string } };
     expect(body.loan.status).toBe("on_loan");
     expect(body.loan.item_sku).toBe("Sofa L 3-Seater");
-    // The unit was claimed with a LOAN reserved_ref marker.
-    const claim = sb.captured.updates.find((u) => u.table === "ops_stock_items");
-    expect((claim!.patch as Record<string, unknown>).reserved_ref).toBe("LOAN SO-1146");
+    // 0366 — the unit was bound through THE governed door, with the LOAN
+    // marker as its reference. A raw `.update()` on the register would be
+    // refused by RLS in production, so this is not a style assertion.
+    const bind = sb.rpcCalls.find((r) => r.name === "ops_stock_bind_units");
+    expect(bind).toBeDefined();
+    expect(bind!.args.p_item_ids).toEqual([ITEM]);
+    expect(bind!.args.p_ref).toBe("LOAN SO-1146");
+    expect(sb.captured.updates.find((u) => u.table === "ops_stock_items")).toBeUndefined();
   });
 
   it("409 when the sofa is no longer free", async () => {
+    // 0366 — the door binds only free, uncontrolled, single units and returns
+    // an empty array when someone else got there first.
     const sb = tableSb({
       orders: { data: { id: ORDER_ID, so: 1146 } },
-      ops_stock_items: { data: null }, // the conditional update matched nothing
-    });
+      ops_stock_items: { data: null },
+    }, { ops_stock_bind_units: { data: [] } });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");

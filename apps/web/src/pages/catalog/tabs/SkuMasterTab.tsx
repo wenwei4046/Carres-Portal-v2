@@ -9,9 +9,10 @@ import type {
 import { activeSofaSizes, categoryHasSizeAxis, PRODUCT_CATEGORIES } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useDeleteCatalogSku, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
+import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
+import { SupplierOffersModal } from "../components/SupplierOffers";
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
@@ -49,11 +50,35 @@ const VISIBLE_CAP = 300;
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-const GRID_COLS = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 100px 110px 90px 90px";
-// Same tracks minus the 100px SIZE one — used when the active filter is a
-// category with no size axis (Service / Guarantee), where every SIZE cell would
-// either repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
-const GRID_COLS_NO_SIZE = "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 110px 110px 90px 90px";
+// ⛔ SUPPLIER LEFT THIS GRID — 2026-09-01 (YH, after Loo), and it is a
+// correction of the 2026-08-26 ruling that put it here. That ruling asked for
+// "supplier too, show supplier code too if possible so if supplier code entered
+// wrong can check from there as well", and the reason still stands — what
+// changed is that a COLUMN cannot serve it any more.
+//
+// Migration 0388 (2026-08-26, the same day) made a SKU remember EVERY supplier
+// that has quoted it. A cell can print one. So from the day the offers table
+// shipped, this column under-reported every dual-sourced SKU by construction:
+// it showed the slot and silently hid the alternates.
+//
+// The pair moved WHOLE into `SupplierOffersModal`, opened from the code chip —
+// one item code, one product name, click it for who supplies it and at what
+// cost. Nothing was dropped; a list simply does not fit a cell.
+//
+// The placement was never the problem: this grid renders one row per SKU, which
+// is right. HOUZS ERP paid for the same lesson from the other side —
+// `docs/modules/mrp.md`: "a Model or a Sales Order does not have suppliers,
+// each VARIANT does."
+//
+// COST still did not come with it — Loo dropped that column on 2026-07-06 and
+// nothing has reopened it.
+const GRID_COLS =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 90px 100px 100px 80px";
+// Same tracks minus the SIZE one — used when the active filter is a category
+// with no size axis (Service / Guarantee), where every SIZE cell would either
+// repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
+const GRID_COLS_NO_SIZE =
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px 100px 80px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -81,6 +106,14 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   const [category, setCategory] = useState<CatFilter>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  /* 2026-08-24 - filter by WHO supplies it. "all" | "none" (no supplier on
+   * the SKU) | a suppliers.id. Names come from the roster and are matched by
+   * the FK, never by text - the same identity rule the Suppliers tab lives by. */
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  /* The SKU whose supplier door is open. One modal for the whole grid, not one
+     per row - a mounted-per-row modal would fetch offers for every visible SKU. */
+  const [offersFor, setOffersFor] = useState<ProductSkuDto | null>(null);
+  const suppliersQ = useOperationSuppliers();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -126,6 +159,19 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
   // to the canonical SOFA_HEIGHTS when the pool is empty, so the sofa grid
   // variant only needs the pools field to be present.
   const sofaSizes = useMemo(() => activeSofaSizes(catalog.optionPools), [catalog.optionPools]);
+  /* 🟡 A CONTRADICTION LEFT STANDING, DELIBERATELY (2026-08-25).
+     The comment above says this variant "only needs the pools field to be
+     present", and `activeSofaSizes` returns the canonical SOFA_HEIGHTS when the
+     pool has no active rows — a fallback this gate can never reach, because it
+     also demands an active row. So on a database whose `sofa_size` pool is
+     empty, a sofa shows ONE price column and nothing says where the seat
+     heights went.
+     I changed this to `category === "sofa"` and reverted it: the empty-pool
+     behaviour is PINNED by "Sofa filter WITHOUT a pool keeps the normal grid",
+     and a pinned behaviour with no recorded reason is still somebody's
+     decision. The operator fix is to activate the sofa_size pool, which is
+     configuration the sizes deserve anyway. Raised for an owner ruling rather
+     than settled by whoever edited this file last. */
   const sofaSizeMode =
     category === "sofa" &&
     (catalog.optionPools ?? []).some((p) => p.pool === "sofa_size" && p.active);
@@ -151,6 +197,13 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
     return allRows
       .filter((r) => (category === "all" ? true : r.category === category))
       .filter((r) => (modelFilter === "all" ? true : r.sku.modelId === modelFilter))
+      .filter((r) =>
+        supplierFilter === "all"
+          ? true
+          : supplierFilter === "none"
+            ? r.sku.supplierId == null
+            : r.sku.supplierId === supplierFilter,
+      )
       .filter((r) => {
         if (!q) return true;
         return (
@@ -161,7 +214,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
         );
       })
       .sort((a, b) => a.sku.sku.localeCompare(b.sku.sku));
-  }, [allRows, category, modelFilter, search]);
+  }, [allRows, category, modelFilter, search, supplierFilter]);
 
   const visible = filtered.slice(0, VISIBLE_CAP);
   const overflow = filtered.length - visible.length;
@@ -246,6 +299,23 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            aria-label="Filter by supplier"
+            data-testid="sku-supplier-filter"
+            className={`${INPUT_CLS} w-44`}
+          >
+            <option value="all">All suppliers</option>
+            {/* "No supplier" is a real bucket, not an error state: service and
+                accessory SKUs legitimately carry none (0171). */}
+            <option value="none">No supplier</option>
+            {(suppliersQ.data?.suppliers ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
           <input
             type="search"
             value={search}
@@ -408,6 +478,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
             showSize={!sizelessMode}
+            onOpenSuppliers={() => setOffersFor(r.sku)}
           />
         ))}
       </div>
@@ -420,6 +491,20 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           optionPools={catalog.optionPools ?? []}
           sofaCombos={catalog.sofaCombos ?? []}
           onClose={() => setNewOpen(false)}
+        />
+      )}
+
+      {/* WHO SUPPLIES THIS SKU. One modal for the whole grid - the slot the next
+          PO goes to, and every supplier who has quoted it (0388). This is where
+          the `Supplier` column went on 2026-09-01: a cell can print one
+          supplier, and a SKU can have several. */}
+      {offersFor && (
+        <SupplierOffersModal
+          sku={offersFor}
+          suppliers={suppliersQ.data?.suppliers ?? []}
+          category={catalog.models.find((m) => m.id === offersFor.modelId)?.category ?? null}
+          heights={sofaSizes}
+          onClose={() => setOffersFor(null)}
         />
       )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
@@ -436,6 +521,7 @@ const SkuRowView = memo(function SkuRowView({
   sofaSizes,
   gridCols,
   showSize,
+  onOpenSuppliers,
 }: {
   row: FlatRow;
   /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
@@ -453,6 +539,12 @@ const SkuRowView = memo(function SkuRowView({
   /** false when the whole SIZE column is dropped (Service / Guarantee filter);
    *  the row must then omit its SIZE cell or every later cell shifts a track. */
   showSize: boolean;
+  /** Resolved through the roster by supplier_id; null = the SKU names no
+   *  supplier (legitimate for service/accessory, 0171). */
+  /** The roster, for the inline picker. The IDENTITY written is always
+   *  supplier_id; the name is only ever what the picker displays. */
+  /** Opens the one door that now holds supplier truth for this SKU. */
+  onOpenSuppliers: () => void;
 }) {
   const { sku, model, category, productName } = row;
   const priceEdit = inlineEdit && canEditPrices;
@@ -546,7 +638,18 @@ const SkuRowView = memo(function SkuRowView({
     />
   ) : (
     <div>
-      <CodeChip>{sku.sku}</CodeChip>
+      {/* THE DOOR. "one item code one product name, click on it, then a modal
+          that shows the 2 different suppliers and their cost" (YH, 2026-09-01).
+          The chip, not a new column - a column is what could not hold the list. */}
+      <button
+        type="button"
+        onClick={onOpenSuppliers}
+        aria-label={`Who supplies ${sku.sku}`}
+        data-testid={`sku-suppliers-door-${sku.sku}`}
+        className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 rounded-[3px]"
+      >
+        <CodeChip>{sku.sku}</CodeChip>
+      </button>
     </div>
   );
 
@@ -567,6 +670,12 @@ const SkuRowView = memo(function SkuRowView({
       {sku.description || <span className="text-base-400">—</span>}
     </div>
   );
+
+  /* 2026-08-26 (YH) — the same two supplier facts the Operations catalog
+     writes, editable here too: neither is money, so neither is 0175-locked and
+     the API leaves both ungated. The point of showing them on this door is
+     checking a keyed-in supplier code against the quotation without switching
+     pages — and a typo you can see is a typo you should be able to fix. */
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -592,8 +701,12 @@ const SkuRowView = memo(function SkuRowView({
   function commitPwpPrice(raw: string) {
     const trimmed = raw.trim();
     const val = trimmed === "" ? null : Number(trimmed);
-    if (val !== null && (!Number.isFinite(val) || val < 0)) {
-      toast.error("Enter a non-negative number (blank = not set)");
+    // 0 is NOT a price here — it is the same fact as blank. A 'pwp' reward is a
+    // discount (the server rejects <= 0) and a FREE reward is a 'promo' rule,
+    // which never reads this column at all. Accepting 0 stored a value that no
+    // rule could ever spend and that the till previewed as "RM 0.00".
+    if (val !== null && (!Number.isFinite(val) || val <= 0)) {
+      toast.error("Enter a price above 0, or leave it blank. A free reward is a 'promo' rule, not a PWP price of 0.");
       return;
     }
     if (val === (sku.pwpPrice ?? null)) return;
@@ -749,9 +862,9 @@ const SkuRowView = memo(function SkuRowView({
         {priceEdit ? (
           <input
             type="number"
-            min={0}
+            min={0.01}
             step="0.01"
-            defaultValue={sku.pwpPrice ?? ""}
+            defaultValue={sku.pwpPrice ? String(sku.pwpPrice) : ""}
             placeholder="—"
             onBlur={(e) => commitPwpPrice(e.target.value)}
             onKeyDown={(e) => {
@@ -760,7 +873,11 @@ const SkuRowView = memo(function SkuRowView({
             aria-label={`${sku.sku} PWP price`}
             className={`${INPUT_CLS} text-right t-num text-meta`}
           />
-        ) : sku.pwpPrice == null ? (
+        ) : sku.pwpPrice == null || sku.pwpPrice <= 0 ? (
+          // A stored 0 reads as "not set" for the same reason the Price column
+          // one cell over renders 0 as "price not set" — it is data that predates
+          // the input guard, and showing it as "RM 0.00" claims an offer the
+          // server will refuse.
           <span className="text-meta text-base-400 italic" title="No PWP price — this SKU cannot be a PWP reward">
             —
           </span>

@@ -226,23 +226,34 @@ cannot reach is a fact half the operators never get.
 
 ### Carres Examples
 
-**Purchasing → To Order** *(frozen 2026-08-01; `OperationToOrder.tsx`)* — the
+**Purchasing → SO Batch Purchase** *(owner rulings 2026-08-27, Cards 02-B and 02-C;
+`OperationToOrder.tsx` orchestrating `so-batch/SoBatchRegister.tsx`)* — the
 pattern's first page and the reference for the rest of the module.
 
 ```
-Navigator   PO Schedule (one row per upcoming PO day, rolling, Overdue on top)
-            Category (All · Mattress · Bedframe · Sofa · …)
-            + Create Purchase
-Toolbar     search · scope · `{n} selected` · `Issue {n} POs` · Updated hh:mm
-Grid        ☑ · Customer Delivery · SO No. · Customer · Model · Qty · PO No.
-Footer      `{n} orders` · Clear filters
+Navigator   TO ORDER (All not ordered)                       ← 240px FilterRail,
+            ORDER TIMING (Can order early ·                    labels wrap, never
+                          14 safety days left ·                truncate; no
+                          1–13 safety days left ·              checkboxes; one
+                          No safety days left ·                filter per section
+                          Not enough production days)
+            PRODUCT (All products · Mattress · Bedframe · Sofa)
+            SUPPLIER (All suppliers · actual names, alphabetical)
+            SETUP TO FIX (Production days not set — the whole section
+                          renders only when at least one affected SO exists)
+Toolbar     search · filter · sort · display · export
+Grid        ☑ · Status · Proceed Date · PO No · SO No · Customer ·
+            Delivery Location · Requested Delivery Date · Supplier ·
+            Deliver To · PO Delivery Date
+Footer      `{n} Sales Orders · {n} Partial · {n} Ordered`
 ```
 
 Business rules this example depends on, owned by
-`docs/purchasing/MASTER.md` and not by this file: the planning engine
-owns the schedule and operators own the purchase order · `Issue PO` is the one
-act that creates a purchase order · the engine's `Order By` never reaches the
-screen — it decides which navigator row a demand sits in.
+`docs/purchasing/MASTER.md` and not by this file: the one server planning
+engine owns the timing arithmetic and every rail category derives from it ·
+`Issue PO` is the one act that creates a purchase order · the engine's
+`Order By` drives the `ORDER TIMING` rows — it is a planned date, never an
+unlock date, and every timing row remains orderable.
 
 **Purchase Orders** · **Receiving** · **Claims** · **Payments** — the same
 pattern. Each is recorded here as it is built.
@@ -280,5 +291,6 @@ pattern. Each is recorded here as it is built.
 ### Carres Examples
 
 **Purchasing → Settings** — production working days, supplier work week,
-order-by buffer. A supplier × category with no number reads `Set a number` and
+Safety days (`Safety days · 14 working days` — `Extra time allowed for
+delays.`). A supplier × category with no number reads `Set a number` and
 is never defaulted.

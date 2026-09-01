@@ -52,6 +52,7 @@ import ModuleHeader from "./components/ModuleHeader";
  */
 
 type PurchasingPage =
+  | "purchase-demands"
   | "to-order"
   | "manual-purchase"
   | "purchase-orders"
@@ -63,14 +64,21 @@ type PurchasingPage =
 /** The page word printed after the nameplate. These are the SIDEBAR's own
  *  words (`portal-nav.ts`) — a page word is never invented here.
  *
- *  TWO WORDS FOLLOWED THE RAIL (Jess, 2026-08-20 —
- *  CARD-2026-08-20-purchasing-sidebar-groups): `Manual Purchase` became
- *  `Manual Purchase Requests` and `Receiving` became `Goods Receipts`, because
- *  the grouped rail now names the OBJECT each page holds. Only the words moved
- *  — every key, every `?tab=` value and every route is untouched. */
+ *  THE WORD FOLLOWED THE RAIL (Jess, 2026-08-22 —
+ *  CARD-2026-08-22-purchasing-01-final-sidebar-listing): the final rail calls
+ *  the internal buying record `Manual Purchase`, not `Manual Purchase
+ *  Requests`, because the operator's door is one buying record and not a
+ *  request. Only the word moved — every key, every `?tab=` value and every
+ *  route is untouched.
+ *
+ *  `Purchase Demands` and the Report word stay exactly as they are. That Card
+ *  retired their RAIL rows, not their pages: the routes remain reachable and a
+ *  page that still renders may not lose the word it prints. */
 const PAGE_WORD: Record<PurchasingPage, string> = {
+  /* Reachable by direct URL only since 2026-08-22 — no rail row, same word. */
+  "purchase-demands": "Purchase Demands",
   "to-order": "SO Batch Purchase",
-  "manual-purchase": "Manual Purchase Requests",
+  "manual-purchase": "Manual Purchase",
   "purchase-orders": "Purchase Orders",
   receiving: "Goods Receipts",
   claims: "Supplier Claims",
@@ -84,7 +92,9 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
   const tabParam = new URLSearchParams(location.search).get("tab");
   const active: PurchasingPage = onProcurement
     ? "purchase-orders"
-    : tabParam === "manual-purchase"
+    : tabParam === "purchase-demands"
+      ? "purchase-demands"
+      : tabParam === "manual-purchase"
       ? "manual-purchase"
       : tabParam === "receiving"
       ? "receiving"

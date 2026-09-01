@@ -1,7 +1,12 @@
-STATUS: QUEUED
+STATUS: SUPERSEDED — DO NOT EXECUTE
 DATE: 2026-08-18
 PR: pending
-IMPLEMENTATION: APPROVED — owner ruled every section with the architect 2026-08-18, build straight to production
+IMPLEMENTATION: SUPERSEDED — do not build from this historical Card
+
+> **Superseded by `PURCHASING — CARD 02 · REBUILD SO BATCH PURCHASE REGISTER AND COMPLETE THE
+> GUIDED PO ISSUE JOURNEY` (`CARD-2026-08-22-purchasing-02-so-batch-purchase.md`).** The canonical
+> business and UI truth is `docs/purchasing/MASTER.md`; this older Card remains only as execution
+> history and must not be started or used to restore the retired PO Schedule/category workspace.
 
 # SO BATCH PURCHASE — the buying grid becomes a hierarchy (one card)
 

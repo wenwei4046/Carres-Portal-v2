@@ -41,7 +41,9 @@ function validDraft(): WizardDraft {
       addressCity: "Bangsar",
       addressPostcode: "59000",
       addressUnknown: false,
-      buildingType: "",
+      /* Required since 2026-08-21 — a "fully filled valid draft" has to carry
+         one now, the same as a state or a postcode. */
+      buildingType: "Condo",
       billing: "",
       billingSame: true,
       billingLine1: "",
@@ -496,7 +498,7 @@ describe("step3DateValid — delivery date gate (2026-05-22, Loo)", () => {
     return d.toISOString().slice(0, 10);
   }
 
-  /* ⛔ OWNER RULING 2026-08-15 (Jess) — the Customer Delivery date is a
+  /* ⛔ OWNER RULING 2026-08-15 (Jess) — the Requested Delivery Date date is a
      PROMISE, and "Confirm later" is retired. A dateless draft is refused
      whatever the retired flag says, so the operator can never be sent to a
      customer who has already answered. */

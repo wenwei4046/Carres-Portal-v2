@@ -171,7 +171,7 @@ function fullOrderRow(over: Record<string, unknown> = {}) {
 }
 
 /** POST create mock — table-aware (salespersons validation + orders re-fetch)
- *  + create_order rpc capture. Every recompute table is dormant/empty. */
+ *  + final-submit create RPC capture. Every recompute table is dormant/empty. */
 function mockCreate(opts: { salespersonRow?: unknown | null; fetchedRow?: unknown }) {
   const rpcCalls: Array<{ name: string; args: { payload?: Record<string, unknown> } }> = [];
   function chain(table: string) {
@@ -200,7 +200,7 @@ function mockCreate(opts: { salespersonRow?: unknown | null; fetchedRow?: unknow
       }),
       rpc: async (name: string, args: { payload?: Record<string, unknown> }) => {
         rpcCalls.push({ name, args });
-        if (name === "create_order") return { data: { id: ORDER_ID }, error: null };
+        if (name === "create_order_from_sales_portal") return { data: { id: ORDER_ID }, error: null };
         return { data: null, error: null };
       },
       _rpcCalls: rpcCalls,
@@ -487,7 +487,7 @@ describe("GET /api/orders/:id — staff scoping", () => {
 // ---------------------------------------------------------------------------
 describe("POST /api/orders — staff scoping", () => {
   function payloadOf(sb: ReturnType<typeof mockCreate>) {
-    const call = sb._rpcCalls.find((r: { name: string }) => r.name === "create_order");
+    const call = sb._rpcCalls.find((r: { name: string }) => r.name === "create_order_from_sales_portal");
     return call?.args?.payload as Record<string, unknown> | undefined;
   }
 
@@ -585,7 +585,7 @@ describe("POST /api/orders — staff scoping", () => {
     const jwt = await makeJwt("salesperson", DEALER_A);
     const res = await postOrder(jwt, null, createBody({ salespersonId: SP_OTHER }));
     expect(res.status).toBe(201);
-    const created = m._rpcCalls.find((r: { name: string }) => r.name === "create_order");
+    const created = m._rpcCalls.find((r: { name: string }) => r.name === "create_order_from_sales_portal");
     expect(created?.args.payload?.salesperson_id).toBe(SP1);
     expect(created?.args.payload?.outlet_id).toBe(OUTLET_1);
   });

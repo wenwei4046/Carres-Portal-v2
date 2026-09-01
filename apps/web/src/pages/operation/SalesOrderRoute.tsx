@@ -401,8 +401,13 @@ function Node({
     node.title,
     ...node.lines.map(spellDates),
     ...node.requirements.map((r) => `${r.met ? "met" : "not met"}: ${spellDates(r.text)}`),
+    /* `Unassigned` is in COPY-STANDARD's Do NOT use column for this surface,
+       and it was not an edge case: the page supplies only two of the six owner
+       keys, so most nodes printed it. With no owner the action speaks alone. */
     node.action
-      ? `${person ? personLabel(person.name, person.email) : "Unassigned"}: ${node.action.label}`
+      ? person
+        ? `${personLabel(person.name, person.email)}: ${node.action.label}`
+        : node.action.label
       : null,
     actionContext ? spellDates(actionContext) : null,
   ]

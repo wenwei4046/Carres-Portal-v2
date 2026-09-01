@@ -33,8 +33,8 @@ import {
   History,
   ListTodo,
   CircleAlert,
-  CalendarDays,
   Library,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -81,6 +81,7 @@ export type PortalSection =
   | "Warehouse"
   | "Finance"
   | "Customer Care"
+  | "Suppliers"
   | "Master Data"
   | "Admin";
 
@@ -93,6 +94,7 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
   "Warehouse",
   "Finance",
   "Customer Care",
+  "Suppliers",
   "Master Data",
   "Admin",
 ];
@@ -122,9 +124,12 @@ export interface PortalModule {
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
-  { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
+  /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
+     PARTY the business deals with, not a reference list — the same kind of
+     thing Customer Care is. The page itself did not move; only its door. */
+  { section: "Suppliers", label: "Suppliers", icon: Truck },
   { section: "Master Data", label: "Master Data", icon: Library },
 ];
 
@@ -173,18 +178,19 @@ export interface PortalNavItem {
   section?: PortalSection;
   /** THE PURCHASING DRAWER this page hangs in (`purchasing-sidebar.ts`).
    *
-   *  ⭐ FIVE NAMED GROUPS INSIDE ONE MODULE (Jess, 2026-08-20 —
-   *  CARD-2026-08-20-purchasing-sidebar-groups). Purchasing holds eighteen
-   *  destinations, and a new hire cannot tell from a flat list which row holds
-   *  a request, a buying document, a receipt, a supplier problem or a
-   *  consignment paper. Grouping is PRESENTATION, exactly like `section`: the
-   *  page is not moved, renamed or re-addressed by the drawer drawn around it,
-   *  and `visibleItems` still means "the PAGES this role may open", which is
-   *  what `JumpTo` composes from.
+   *  ⭐ FOUR NAMED GROUPS INSIDE ONE MODULE (Jess, 2026-08-22 —
+   *  CARD-2026-08-22-purchasing-01-final-sidebar-listing). Purchasing holds
+   *  eleven destinations, and a new hire cannot tell from a flat list which
+   *  row holds a buying document, a receipt, a supplier problem or a showroom
+   *  paper. Grouping is PRESENTATION, exactly like `section`: the page is not
+   *  moved, renamed or re-addressed by the drawer drawn around it, and
+   *  `visibleItems` still means "the PAGES this role may open", which is what
+   *  `JumpTo` composes from.
    *
-   *  A page with no `pageGroup` is a DIRECT row at the module's own child
-   *  indent — `Purchasing Home`, `My Purchasing Work`, the trailing `Report`.
-   *  Only Purchasing uses this today; no other module's rail behaviour moves. */
+   *  EVERY Purchasing page hangs in a drawer — the module has no direct rows
+   *  left. A page with no `pageGroup` would fall back to the module's own
+   *  child indent; nothing uses that today, and no other module's rail
+   *  behaviour moves. */
   pageGroup?: PurchasingPageGroupKey;
 
   /** APPROVED, NOT BUILT (sidebar card §2). Renders as a NON-CONTROL saying
@@ -256,50 +262,47 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         path: "/operation/old-orders",
         section: "Sales",
       },
-      /* ⭐ THE PURCHASING MAP — FIVE NAMED GROUPS INSIDE THE MODULE ROW
-       * (Jess, 2026-08-20 — CARD-2026-08-20-purchasing-sidebar-groups; the
-       * approved tree is `docs/purchasing/MASTER.md` §1).
+      /* ⭐ THE FINAL PURCHASING MAP — FOUR NAMED GROUPS, ELEVEN PAGES
+       * (Jess, 2026-08-22 — CARD-2026-08-22-purchasing-01-final-sidebar-listing;
+       * the approved tree is `docs/purchasing/MASTER.md` §4).
        *
-       * The shipped module accordion (CARD-2026-08-19-sidebar-expandable-modules)
-       * HOLDS and is EXTENDED, never rebuilt: the
-       * `Purchasing` row still expands and its pages still hang off rounded
-       * elbows. What broke at eighteen destinations was the flat list — a new
-       * hire could not tell which row held a request, a buying document, a
-       * receipt, a supplier problem or a consignment paper. `pageGroup` hangs
-       * each page in one of five drawers (`purchasing-sidebar.ts`), and the
-       * operator opens the one their job lives in.
+       * The module accordion and its drawer grammar HOLD — only the contents
+       * changed. The earlier eighteen-row rail carried a Blueprint the owner
+       * rejected, and every row it lost was a destination the business does
+       * not have:
+       *
+       *   `Purchasing Home`        registers and central reports already own
+       *                            the useful summary
+       *   `My Purchasing Work`     the shared My Work / Team Work engine owns
+       *                            all action truth
+       *   REQUESTS (the group)     a blocked buy opens an IN-CONTEXT governed
+       *                            supplier/SKU request to Catalog and returns
+       *                            to the same buy — it is not a destination
+       *   `Purchase Demands`       `purchase_demand` is hidden canonical truth,
+       *                            not a page an operator is sent to
+       *   `Consignment Overview`   the Stock Register reports supplier-owned
+       *   `Consignment Receipts`   Units, and `Goods Receipts` is the ONE
+       *                            physical receipt engine
+       *   `Report` + its hairline  reports are central / Register exports
+       *
+       * `Manual Purchase Requests` became `Manual Purchase` and moved into BUY:
+       * the final operator door is one internal buying record, not a request.
+       * CONSIGNMENT became SHOWROOM, because the drawer holds bought display
+       * goods as well as supplier-owned ones.
        *
        * THE ORDER IN THIS ARRAY IS THE ORDER ON SCREEN. A group takes the
        * position of its FIRST member, so a drawer cannot reshuffle unless this
-       * list reshuffles first.
-       *
-       * TWO WORDS CHANGED AND NO ADDRESS DID:
-       *   `Manual Purchase` → `Manual Purchase Requests`
-       *   `Receiving`       → `Goods Receipts`
-       * Both keep their key and their `?tab=` value — this renamed the DOOR,
-       * not the room. The Destination Header follows the rail word, because
-       * the rail is where a page word is decided (`PurchasingTabs.tsx`).
+       * list reshuffles first. No address moved in this change.
        *
        * NO SETTINGS ROW (Jess, 2026-08-19): the header gear is the ONE
        * Settings entry. An unbuilt entry is a NON-CONTROL printing `Coming
        * soon`; it goes live in ITS OWN page's PR by exactly two edits — drop
        * `soon`, and the row becomes a link. */
-      { key: "purchasing-home", label: "Purchasing Home", icon: LayoutDashboard, soon: true, section: "Purchasing" },
-      { key: "purchasing-work", label: "My Purchasing Work", icon: ListTodo, soon: true, section: "Purchasing" },
-
-      /* REQUESTS — someone ASKS, before a ringgit is committed. Manual
-       * Purchase is the live one, and it is a REQUEST: the buyer still turns
-       * it into a PO. */
-      { key: "new-supplier-requests", label: "New Supplier Requests", icon: Truck, soon: true, section: "Purchasing", pageGroup: "purchasing-requests" },
-      { key: "new-sku-requests", label: "New SKU Requests", icon: Boxes, soon: true, section: "Purchasing", pageGroup: "purchasing-requests" },
-      { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-requests" },
-      { key: "manual-purchase", label: "Manual Purchase Requests", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-requests" },
 
       /* BUY — the committing documents. `SO Batch Purchase` answers to BOTH
        * its entrances: the `?tab=purchase` door the rail links to, and the
        * `/operation/to-order` path an in-page link still uses. Two entrances,
        * ONE active destination — the rail may never light twice. */
-      { key: "purchase-demands", label: "Purchase Demands", icon: ClipboardList, soon: true, section: "Purchasing", pageGroup: "purchasing-buy" },
       {
         key: "purchase",
         label: "SO Batch Purchase",
@@ -308,6 +311,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         section: "Purchasing",
         pageGroup: "purchasing-buy",
       },
+      { key: "manual-purchase", label: "Manual Purchase", icon: ClipboardList, section: "Purchasing", pageGroup: "purchasing-buy" },
       {
         // `operation:procurement` counts POs in the Pickup-action bucket —
         // this is the page that bucket belongs to.
@@ -322,7 +326,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
 
       /* RECEIVE — one page today, and it still earns its own drawer: the
        * receipt is its own step in the operator's day, and the drawer is where
-       * the rest of receiving (returns to warehouse, put-away) will land. */
+       * the rest of receiving (returns to warehouse, put-away) will land. It
+       * receives purchased AND consignment goods — there is no second receipt
+       * engine (`docs/purchasing/MASTER.md` §4). */
       { key: "receiving", label: "Goods Receipts", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
@@ -330,17 +336,15 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       { key: "purchase-returns", label: "Purchase Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
       { key: "repair-orders", label: "Repair Orders", icon: ArrowUpRight, soon: true, section: "Purchasing", pageGroup: "purchasing-problems" },
 
-      /* CONSIGNMENT — the separate book. Goods on a Carres floor that Carres
-       * has not bought; it never mixes with the buying documents above. */
-      { key: "consignment-overview", label: "Consignment Overview", icon: LayoutGrid, soon: true, section: "Purchasing", pageGroup: "purchasing-consignment" },
-      { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-consignment" },
-      { key: "consignment-receipts", label: "Consignment Receipts", icon: BadgeCheck, soon: true, section: "Purchasing", pageGroup: "purchasing-consignment" },
-      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-consignment" },
-      { key: "consignment-sale-notices", label: "Consignment Sale Notices", icon: ScrollText, soon: true, section: "Purchasing", pageGroup: "purchasing-consignment" },
+      /* SHOWROOM — the goods standing on a Carres floor. Some Carres bought
+       * (Display Requests), some the supplier still owns (the consignment
+       * papers); one drawer, because the operator's question is the same one:
+       * what is on display, and whose is it. */
+      { key: "display-requests", label: "Display Requests", icon: Store, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      { key: "consignment-orders", label: "Consignment Orders", icon: ArrowDownLeft, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      { key: "consignment-returns", label: "Consignment Returns", icon: Undo2, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
+      { key: "consignment-sale-notices", label: "Consignment Sale Notices", icon: ScrollText, soon: true, section: "Purchasing", pageGroup: "purchasing-showroom" },
 
-      // Report is a PORTAL page, not the module's own — it sits below the
-      // hairline, in no drawer, until central Report consolidation.
-      { key: "purchasing-report", label: "Report", icon: BarChart3, dividerAbove: true, section: "Purchasing" },
       // Delivery (T11, Jess 2026-07-27) — **the ONE new menu item in the whole
       // build plan**; every other line upgrades an existing door, and its place
       // in the rail is the one the queue index draws (Orders · Purchasing ·
@@ -348,27 +352,17 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      /* THE DELIVERY MODULE'S PAGES (owner-approved 2026-08-19, carried into
-       * CARD-2026-08-19-sidebar-expandable-modules from the delivery-rail card
-       * it replaced). `Delivery Work` IS the existing Delivery page — keyed
-       * and routed exactly as today; only its door moved under the module row
-       * and it wears the governed name. The other five are approved and
-       * unbuilt, so they are non-controls printing `Coming soon`, and Report
-       * sits below its hairline. NO Settings row: the header gear is the one
-       * Settings entry (Jess, 2026-08-19). */
-      { key: "delivery", label: "Delivery Work", icon: Route, section: "Delivery" },
+      /* THE DELIVERY MODULE'S PAGES — TWO, and both of them open
+       * Owner ruling 2026-08-24: arrangement and formal DO truth share one
+       * Delivery listing. A one-page destination is a direct row, not a
+       * chevron that reveals one child of the same name. The historical DO
+       * object path remains a valid deep link and lights this same row. */
       {
-        key: "delivery-orders",
-        label: "Delivery Orders",
-        icon: PackageCheck,
-        path: "/operation/delivery-orders",
-        section: "Delivery",
+        key: "delivery",
+        label: "Delivery",
+        icon: Route,
+        activeFor: ["tab:delivery", "path:/operation/delivery-orders"],
       },
-      { key: "delivery-schedule", label: "Schedule", icon: CalendarDays, soon: true, section: "Delivery" },
-      { key: "delivery-history", label: "Delivery History", icon: History, soon: true, section: "Delivery" },
-      { key: "delivery-exceptions", label: "Exceptions", icon: CircleAlert, soon: true, section: "Delivery" },
-      { key: "delivery-partners", label: "Partners", icon: Network, soon: true, section: "Delivery" },
-      { key: "delivery-report", label: "Report", icon: BarChart3, soon: true, dividerAbove: true, section: "Delivery" },
       /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
        * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
        * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
@@ -376,13 +370,19 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
        * printing `Coming soon` until their own PRs. The blueprint keeps
        * Reports and Settings central: NO Report row, NO Settings row here.
-       * The three live rows keep K0's learned order (On hand · Ready stock ·
+       * The three live rows keep K0's learned order (Stock · Ready stock ·
        * In & out) — the rail never reshuffles under an operator; when Ready
-       * stock folds into On hand Views (blueprint item 13.7) its row dies in
+       * stock folds into Stock Views (blueprint item 13.7) its row dies in
        * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
        * "Movements" stay banned UI words; the goods pool is still `Stock` on
        * any page — `Warehouse` is the MODULE heading, not the pool word. */
-      { key: "stock", label: "On hand", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1, and
+       * Stock MASTER §2 rejects `On hand` and `Stock Units` as the master-list
+       * name by name. `On hand` described a QUANTITY on a shelf; the page now
+       * lists exact Units and answers which one, where, who has it and whether
+       * it can be used. The `?tab=` address is unchanged, so no bookmark and no
+       * learned rail position moves. */
+      { key: "stock", label: "Stock", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
       { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
       { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
@@ -396,7 +396,10 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // money there is buying cost, isolated from POS selling). The selling
       // Product & Maintenance lives in the Admin area below.
       { key: "op-catalog", label: "Catalog", icon: Calculator, section: "Master Data" },
-      { key: "suppliers", label: "Suppliers", icon: Truck, section: "Master Data" },
+      /* The roster stays exactly the page it was; `?tab=suppliers` is
+         unchanged, so every bookmark and deep link still lands. */
+      { key: "suppliers", label: "Suppliers", icon: Truck, section: "Suppliers" },
+      { key: "supplier-items", label: "Supplier items", icon: Boxes, section: "Suppliers" },
       {
         key: "service-notes",
         label: "Service Cases",
@@ -533,6 +536,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // The principal trace-only Orders page is gone (Loo 2026-07-16) — Admin
       // "Orders" jumps straight to the Operations order control grid.
       { key: "orders", label: "Sales Orders", icon: ClipboardList, path: "/operation/orders" },
+      // YH, 2026-08-24 — the lead-time floor (earliest a store may sell) is a
+      // principal-level decision, but its only editor lived under Operations
+      // Settings. `role === "principal"` already grants edit there (checkDuty
+      // short-circuits on role, never a duty — 0260), so this needs no new
+      // page, no new API: same pattern as "Sales Orders" above, a path-driven
+      // jump straight into the operations-owned surface it actually edits.
+      {
+        key: "purchasing-settings",
+        label: "Purchasing settings",
+        icon: SlidersHorizontal,
+        path: "/operation/settings/purchasing",
+      },
       // Loo 2026-07-19 — two separate doors: "Dealers" = external resellers,
       // "Showrooms" = the stores Carres owns. Same page, filtered by
       // `dealers.channel`.

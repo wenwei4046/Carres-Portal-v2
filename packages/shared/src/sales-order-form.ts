@@ -41,6 +41,18 @@ export const BUILDING_TYPE_OPTIONS = [
   "Other",
 ] as const;
 
+/** ⭐ THE TWO ANSWERS TO `Lift available?` (Jess, 2026-08-26).
+ *
+ *  The POS has always offered these two words as a pill pair; the Sales Order
+ *  object page asked the same fact as an unlabelled tickbox, where an unticked
+ *  box read as both "no lift" and "nobody said". The words move here so the two
+ *  surfaces cannot drift apart again — the same reason the race, gender and
+ *  relationship choices live in this file.
+ *
+ *  ORDER IS DELIBERATE: `No lift` first, because it is the stored default
+ *  (`draft.hasLift = false`) and the answer that costs the customer money. */
+export const LIFT_OPTIONS = ["No lift", "Has lift"] as const;
+
 /** Emergency-contact relationships the POS offers. `__OTHER__` is the escape
  *  hatch the wizard renders as a free-text box; it is a UI token and never a
  *  stored value — what reaches the column is the typed words. */

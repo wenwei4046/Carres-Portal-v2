@@ -59,7 +59,7 @@ function renderAt(path: string) {
 const module_ = (slug: string) => screen.getByTestId(`nav-module-${slug}`);
 const child = (key: string) => screen.getByTestId(`nav-child-${key}`);
 const group_ = (key: string) => screen.getByTestId(`nav-group-${key}`);
-const drawerKey = (userId: string) => `carres:portal-sidebar:purchasing:v1:${userId}`;
+const drawerKey = (userId: string) => `carres:portal-sidebar:purchasing:v2:${userId}`;
 
 beforeEach(() => {
   mockRole = "operation";
@@ -72,7 +72,13 @@ describe("PortalSidebar — role visibility", () => {
   it("operation sees Operations only — no Finance / Admin", () => {
     renderAt("/operation");
     expect(module_("purchasing")).toBeInTheDocument();
-    expect(module_("master-data")).toBeInTheDocument();
+    /* 2026-08-21 — Suppliers left Master Data for its own module, so Master
+       Data holds ONE page (Catalog) and renders as a PLAIN row: a module is an
+       expandable parent, and there is nothing to expand into. The rule is
+       `pages.length > 1` in buildNavBlocks; this asserts the row is present,
+       not what shape it takes. */
+    expect(child("op-catalog")).toBeInTheDocument();
+    expect(module_("suppliers")).toBeInTheDocument();
     // The selling catalog is principal-only, by area.
     expect(screen.queryByText("Product & Maintenance")).not.toBeInTheDocument();
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
@@ -94,7 +100,13 @@ describe("PortalSidebar — role visibility", () => {
     expect(screen.getByText("Operations")).toBeInTheDocument();
     expect(screen.getAllByText("Finance").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Admin")).toBeInTheDocument();
-    expect(module_("master-data")).toBeInTheDocument();
+    /* 2026-08-21 — Suppliers left Master Data for its own module, so Master
+       Data holds ONE page (Catalog) and renders as a PLAIN row: a module is an
+       expandable parent, and there is nothing to expand into. The rule is
+       `pages.length > 1` in buildNavBlocks; this asserts the row is present,
+       not what shape it takes. */
+    expect(child("op-catalog")).toBeInTheDocument();
+    expect(module_("suppliers")).toBeInTheDocument();
     // Inactive areas are collapsed → their items are hidden until clicked.
     expect(screen.queryByText("AR · Receivables")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
@@ -120,10 +132,12 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     for (const [slug, name] of [
       ["sales", "Sales"],
       ["purchasing", "Purchasing"],
-      ["delivery", "Delivery"],
       ["warehouse", "Warehouse"],
       ["customer-care", "Customer Care"],
-      ["master-data", "Master Data"],
+      /* Master Data dropped off this list on 2026-08-21: with Suppliers gone
+         it carries one page, and a one-page section is a plain row by design.
+         Suppliers takes its place — two pages, so a real module. */
+      ["suppliers", "Suppliers"],
     ] as const) {
       const row = module_(slug);
       expect(row.tagName).toBe("BUTTON");
@@ -167,8 +181,8 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
 });
 
 /**
- * ONE MODULE OPEN AT A TIME — thirteen purchasing pages and six delivery
- * pages cannot stack, and the module you are standing in is the open one.
+ * ONE MODULE OPEN AT A TIME — eleven purchasing pages and a Warehouse
+ * module cannot stack, and the module you are standing in is the open one.
  */
 describe("the accordion", () => {
   it("the module holding the current page is open on a direct URL load", () => {
@@ -237,23 +251,20 @@ describe("the accordion", () => {
  * the exact defect the drawing exists to avoid.
  */
 describe("the elbow connectors", () => {
-  /* DELIVERY IS THE FLAT MODULE NOW. Purchasing grew a nested level under
-   * CARD-2026-08-20, so the one-level contract is proved on the module that
-   * still has one level — seven pages, Report under its hairline, which is the
-   * exact shape Purchasing used to have. Purchasing's own nesting is proved in
-   * its own describe below. */
+  /* Sales stays a two-page module, so it proves the one-level elbow grammar.
+   * Delivery is now one direct page and correctly carries no elbow. */
   it("every child row carries its own elbow", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const elbows = group.querySelectorAll("[data-testid^='nav-elbow-']");
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(2);
     expect(elbows.length).toBe(rows.length);
   });
 
   it("every elbow turns at its own row's middle", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     for (const el of group.querySelectorAll<HTMLElement>("[data-testid^='nav-elbow-']")) {
       // Capped at the row's centre; the number is only what it reaches UP by.
       expect(el.style.height).toMatch(/^calc\(50% \+ \d+px\)$/);
@@ -265,15 +276,17 @@ describe("the elbow connectors", () => {
    * past the group. Every child but the last carries the trunk on to the next
    * one; the last carries none, so the drawing simply stops there. */
   it("the trunk stops at the last child — it carries on from every other", () => {
-    renderAt("/operation?tab=delivery");
-    const group = screen.getByTestId("nav-children-delivery");
+    renderAt("/operation/orders");
+    const group = screen.getByTestId("nav-children-sales");
     const rows = group.querySelectorAll("[data-testid^='nav-child-']");
     const trunks = group.querySelectorAll("[data-testid^='nav-trunk-']");
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(2);
     expect(trunks.length).toBe(rows.length - 1);
-    // Report is last, and nothing hangs below it.
-    expect(screen.getByTestId("nav-elbow-delivery-report")).toBeInTheDocument();
-    expect(screen.queryByTestId("nav-trunk-delivery-report")).not.toBeInTheDocument();
+    // `Old Orders` is last, and nothing hangs below it.
+    expect(screen.getByTestId("nav-elbow-old-orders")).toBeInTheDocument();
+    expect(screen.queryByTestId("nav-trunk-old-orders")).not.toBeInTheDocument();
+    // ...and the row above it DOES carry the line on.
+    expect(screen.getByTestId("nav-trunk-orders")).toBeInTheDocument();
   });
 
   it("a selected child still shows the elbow it hangs from", () => {
@@ -283,8 +296,8 @@ describe("the elbow connectors", () => {
   });
 
   it("the trunk hangs from the module ICON's centre, and the elbow turns into the row", () => {
-    renderAt("/operation?tab=delivery");
-    const elbow = screen.getByTestId("nav-elbow-delivery-schedule");
+    renderAt("/operation/orders");
+    const elbow = screen.getByTestId("nav-elbow-old-orders");
     // px-3.5 (14) + half a 16px icon = 22; the 1px line is centred on it.
     expect(elbow.style.left).toBe("21.5px");
     expect(elbow.style.width).toBe("11px");
@@ -292,9 +305,9 @@ describe("the elbow connectors", () => {
   });
 
   it("a child is decoration-free for a screen reader — the elbow is aria-hidden", () => {
-    renderAt("/operation?tab=delivery");
+    renderAt("/operation/orders");
     expect(
-      screen.getByTestId("nav-elbow-delivery-schedule").getAttribute("aria-hidden"),
+      screen.getByTestId("nav-elbow-old-orders").getAttribute("aria-hidden"),
     ).toBe("true");
   });
 });
@@ -366,9 +379,10 @@ describe("the active page — governed blue, never flame", () => {
   });
 
   it("an inactive child carries no selection colour, and reads one weight lighter", () => {
-    renderAt("/operation?tab=receiving");
-    // `Report` is the sibling that is always on screen — it hangs in no drawer.
-    const row = child("purchasing-report");
+    renderAt("/operation?tab=purchase");
+    // A sibling inside the drawer the route forced open — `Report` left the
+    // rail on 2026-08-22, so the inactive row is proved on a live BUY page.
+    const row = child("purchase-orders");
     expect(row.className).not.toContain("bg-kit-blue-3");
     expect(row.className).toContain("font-normal");
     expect(row.querySelector(".bg-kit-blue-9")).toBeNull();
@@ -522,39 +536,111 @@ describe("PortalSidebar — the Sales Order cutover's two doors", () => {
 });
 
 /**
- * ⭐ THE PURCHASING MAP — FIVE NAMED DRAWERS INSIDE ONE MODULE
- * (Jess, 2026-08-20 — CARD-2026-08-20-purchasing-sidebar-groups).
+ * ⭐ THE FINAL PURCHASING MAP — FOUR DRAWERS, ELEVEN PAGES
+ * (Jess, 2026-08-22 — CARD-2026-08-22-purchasing-01-final-sidebar-listing;
+ * the approved tree is `docs/purchasing/MASTER.md` §4).
  *
- * PR #861's module accordion is EXTENDED, never rebuilt. What changed is that
- * eighteen destinations stopped being scannable as one flat list: a new hire
- * could not tell which row held a request, a buying document, a receipt, a
- * supplier problem or a consignment paper. Now the module opens onto two
- * direct rows, five named drawers and Report.
+ * The module accordion and its drawer grammar are EXTENDED, never rebuilt —
+ * only the CONTENTS changed. The eighteen-row rail carried an earlier
+ * Blueprint the owner rejected: a Home nobody needs, a module Work page the
+ * shared Work Engine already owns, request pages that are in-context Catalog
+ * governance, a hidden demand record dressed as a destination, and a Report
+ * row that belongs to central Reports. The module now opens onto four drawers
+ * and nothing else — no direct row above them, no Report and no hairline.
  */
 describe("PortalSidebar — the Purchasing map", () => {
-  it("opens onto two direct rows, five drawers and Report — nothing else", () => {
+  it("opens onto exactly four drawers — no direct row, no Report, no hairline", () => {
     renderAt("/operation?tab=purchase");
     const tree = screen.getByTestId("nav-children-purchasing");
     const rows = Array.from(tree.children)
-      // Report's hairline is a bare rule with no words of its own.
       .filter((row) => (row.textContent ?? "").trim() !== "")
       .map((row) => {
         const groupButton = row.querySelector("[data-testid^='nav-group-']");
         if (groupButton) return groupButton.textContent?.trim();
         return row.textContent?.replace("Coming soon", "").trim();
       });
+    expect(rows).toEqual(["BUY", "RECEIVE", "PROBLEMS", "SHOWROOM"]);
+    // Every top-level row IS a drawer — nothing hangs beside them.
+    expect(tree.querySelectorAll("[data-testid^='nav-group-purchasing-']")).toHaveLength(4);
+    // Reports moved to the central Reports area, so the rule above them went too.
+    expect(tree.querySelector(".border-t")).toBeNull();
+  });
+
+  it("eleven pages in the approved order, and not a twelfth", () => {
+    renderAt("/operation?tab=purchase");
+    for (const key of [
+      "purchasing-buy",
+      "purchasing-receive",
+      "purchasing-problems",
+      "purchasing-showroom",
+    ]) {
+      const row = group_(key);
+      if (row.getAttribute("aria-expanded") === "false") fireEvent.click(row);
+    }
+    const tree = screen.getByTestId("nav-children-purchasing");
+    const rows = Array.from(tree.querySelectorAll("[data-testid^='nav-child-']")).map(
+      (el) => el.textContent?.replace("Coming soon", "").trim(),
+    );
     expect(rows).toEqual([
+      "SO Batch Purchase",
+      "Manual Purchase",
+      "Purchase Orders",
+      "Goods Receipts",
+      "Supplier Claims",
+      "Purchase Returns",
+      "Repair Orders",
+      "Display Requests",
+      "Consignment Orders",
+      "Consignment Returns",
+      "Consignment Sale Notices",
+    ]);
+  });
+
+  /* THE EIGHT ROWS THE OWNER DELETED. Each one was a destination the rail
+   * offered and the business does not have; a rail that still offers them
+   * sends an operator to a page nobody owns. */
+  it("every retired row is gone from the whole rail, in every drawer", () => {
+    renderAt("/operation?tab=purchase");
+    for (const key of [
+      "purchasing-buy",
+      "purchasing-receive",
+      "purchasing-problems",
+      "purchasing-showroom",
+    ]) {
+      const row = group_(key);
+      if (row.getAttribute("aria-expanded") === "false") fireEvent.click(row);
+    }
+    for (const key of [
+      "purchasing-home",
+      "purchasing-work",
+      "new-supplier-requests",
+      "new-sku-requests",
+      "purchase-demands",
+      "consignment-overview",
+      "consignment-receipts",
+      "purchasing-report",
+    ]) {
+      expect(screen.queryByTestId(`nav-child-${key}`), key).not.toBeInTheDocument();
+    }
+    for (const word of [
       "Purchasing Home",
       "My Purchasing Work",
+      "New Supplier Requests",
+      "New SKU Requests",
+      "Purchase Demands",
+      "Consignment Overview",
+      "Consignment Receipts",
+      "Manual Purchase Requests",
       "REQUESTS",
-      "BUY",
-      "RECEIVE",
-      "PROBLEMS",
       "CONSIGNMENT",
       "Report",
-    ]);
-    // Report is a PORTAL page, not the module's own — it keeps its hairline.
-    expect(tree.querySelector(".border-t")).not.toBeNull();
+    ]) {
+      expect(screen.queryByText(word), word).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("nav-group-purchasing-requests")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("nav-group-purchasing-consignment"),
+    ).not.toBeInTheDocument();
   });
 
   it("fills the open drawer with its own approved pages, in order", () => {
@@ -564,17 +650,18 @@ describe("PortalSidebar — the Purchasing map", () => {
         .getByTestId("nav-group-children-purchasing-buy")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Purchase Demands", "SO Batch Purchase", "Purchase Orders"]);
+    expect(rows).toEqual(["SO Batch Purchase", "Manual Purchase", "Purchase Orders"]);
   });
 
-  it("the two renames are live, and the old words appear nowhere", () => {
+  it("the rail word is `Manual Purchase`, in BUY, and the old word is gone", () => {
     renderAt("/operation?tab=receiving");
     expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
     expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
-    fireEvent.click(group_("purchasing-requests"));
-    expect(screen.getByText("Manual Purchase Requests")).toBeInTheDocument();
-    expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
+    fireEvent.click(group_("purchasing-buy"));
+    const buy = screen.getByTestId("nav-group-children-purchasing-buy");
+    expect(within(buy).getByText("Manual Purchase")).toBeInTheDocument();
+    expect(screen.queryByText("Manual Purchase Requests")).not.toBeInTheDocument();
     expect(screen.queryByText("To Order")).not.toBeInTheDocument();
     expect(screen.queryByText("Claims")).not.toBeInTheDocument();
   });
@@ -585,10 +672,9 @@ describe("PortalSidebar — the Purchasing map", () => {
     expect(row.tagName).toBe("A");
     expect(row.getAttribute("href")).toBe("/operation?tab=receiving");
     expect(row.textContent).not.toContain("Coming soon");
-    expect(child("purchasing-report")).toHaveAttribute(
-      "href",
-      "/operation?tab=purchasing-report",
-    );
+    // ...and so is the live row in a drawer the operator opened by hand.
+    fireEvent.click(group_("purchasing-problems"));
+    expect(child("claims")).toHaveAttribute("href", "/operation?tab=claims");
   });
 
   it("`Purchase Orders` still links to its nested path, not to a ?tab=", () => {
@@ -598,12 +684,14 @@ describe("PortalSidebar — the Purchasing map", () => {
 
   it("an unbuilt row is NOT a control — no href, not focusable, says why", () => {
     renderAt("/operation?tab=purchase");
-    fireEvent.click(group_("purchasing-consignment"));
+    fireEvent.click(group_("purchasing-problems"));
+    fireEvent.click(group_("purchasing-showroom"));
     for (const key of [
-      "purchasing-home",
-      "purchasing-work",
-      "purchase-demands",
-      "consignment-overview",
+      "purchase-returns",
+      "repair-orders",
+      "display-requests",
+      "consignment-orders",
+      "consignment-returns",
       "consignment-sale-notices",
     ]) {
       const row = child(key);
@@ -637,8 +725,8 @@ describe("PortalSidebar — the Purchasing map", () => {
 
 /**
  * THE PURCHASING ROW IS A DRAWER HANDLE, NOT A DOOR. Clicking it reveals the
- * map and leaves the URL where it was — with eighteen destinations, the
- * operator clicks this row to LOOK far more often than to travel.
+ * map and leaves the URL where it was — with eleven destinations in four
+ * drawers, the operator clicks this row to LOOK far more often than to travel.
  */
 describe("PortalSidebar — the Purchasing parent toggles without navigating", () => {
   it("a click changes the tree and does NOT change the URL", () => {
@@ -715,6 +803,48 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     expect(child("claims").className).toContain("bg-kit-blue-3");
   });
 
+  /* MANUAL PURCHASE — the BUY drawer's second row since 2026-08-22. Its rail
+   * row must be a real control on its unchanged address, BUY must open by
+   * itself, and exactly one thing may be lit. */
+  it("Manual Purchase is a real link on its unchanged address", () => {
+    renderAt("/operation?tab=manual-purchase");
+    const row = child("manual-purchase");
+    expect(row.tagName).toBe("A");
+    expect(row.getAttribute("href")).toBe("/operation?tab=manual-purchase");
+    expect(row.textContent).not.toContain("Coming soon");
+    expect(row.getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("arriving at Manual Purchase opens Purchasing + BUY and lights ONE row", () => {
+    renderAt("/operation?tab=manual-purchase");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("true");
+    expect(child("manual-purchase").className).toContain("bg-kit-blue-3");
+    // Its drawer siblings stay dark.
+    expect(child("purchase").className).not.toContain("bg-kit-blue-3");
+    expect(child("purchase-orders").className).not.toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(group_("purchasing-buy").className).not.toContain("bg-kit-blue-3");
+    const lit = screen
+      .getByTestId("nav-children-purchasing")
+      .querySelectorAll(".bg-kit-blue-3");
+    expect(lit.length).toBe(1);
+  });
+
+  /* GOODS RECEIPTS — the one-page drawer. RECEIVE must force itself open. */
+  it("arriving at Goods Receipts opens Purchasing + RECEIVE and lights ONE row", () => {
+    renderAt("/operation?tab=receiving");
+    expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
+    expect(child("receiving").className).toContain("bg-kit-blue-3");
+    expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
+    expect(group_("purchasing-receive").className).not.toContain("bg-kit-blue-3");
+    const lit = screen
+      .getByTestId("nav-children-purchasing")
+      .querySelectorAll(".bg-kit-blue-3");
+    expect(lit.length).toBe(1);
+  });
+
   /* BOTH ENTRANCES, ONE DESTINATION. `/operation/to-order` is still a live
    * in-page link; it may not light a second row. */
   it("/operation/to-order opens Purchasing + BUY and selects only SO Batch Purchase", () => {
@@ -731,7 +861,7 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
 });
 
 /**
- * FIVE DRAWERS, EACH OPENING ALONE. A buyer works out of two of them all day,
+ * FOUR DRAWERS, EACH OPENING ALONE. A buyer works out of two of them all day,
  * and a rail that keeps shutting one behind their back is a rail that gets
  * fought.
  */
@@ -739,11 +869,10 @@ describe("PortalSidebar — the Purchasing drawers", () => {
   it("each drawer is a full-width button with its own aria-expanded", () => {
     renderAt("/operation?tab=purchase");
     for (const key of [
-      "purchasing-requests",
       "purchasing-buy",
       "purchasing-receive",
       "purchasing-problems",
-      "purchasing-consignment",
+      "purchasing-showroom",
     ]) {
       const row = group_(key);
       expect(row.tagName, key).toBe("BUTTON");
@@ -766,7 +895,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
     fireEvent.click(group_("purchasing-problems"));
     expect(screen.getByText("SO Batch Purchase")).toBeVisible();
     expect(screen.getByText("Supplier Claims")).toBeVisible();
-    fireEvent.click(group_("purchasing-consignment"));
+    fireEvent.click(group_("purchasing-showroom"));
     expect(screen.getByText("SO Batch Purchase")).toBeVisible();
     expect(screen.getByText("Supplier Claims")).toBeVisible();
     expect(screen.getByText("Consignment Returns")).toBeVisible();
@@ -800,7 +929,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
   it("the drawer's children hang one level deeper, off their own trunk", () => {
     renderAt("/operation?tab=purchase");
     const nested = screen.getByTestId("nav-elbow-purchase");
-    const topLevel = screen.getByTestId("nav-elbow-purchasing-report");
+    const topLevel = screen.getByTestId("nav-elbow-purchasing-showroom");
     // The module's own trunk stays on the icon's centre (21.5px); the drawer's
     // children hang from the drawer word's left edge, further right.
     expect(topLevel.style.left).toBe("21.5px");
@@ -816,9 +945,14 @@ describe("PortalSidebar — the Purchasing drawers", () => {
     expect(elbow.style.borderBottomLeftRadius).toBe("9px");
     // The module trunk carries on past the whole drawer to reach the next row.
     expect(screen.getByTestId("nav-trunk-purchasing-buy")).toBeInTheDocument();
-    // CONSIGNMENT is the last drawer, but Report hangs below it — so it does
-    // carry the trunk on; Report itself is the row that ends the line.
-    expect(screen.queryByTestId("nav-trunk-purchasing-report")).not.toBeInTheDocument();
+    // FOUR drawers → four elbows → THREE trunks. SHOWROOM is the last row in
+    // the module now that Report has left, so it is the row that ends the line.
+    expect(screen.queryByTestId("nav-trunk-purchasing-showroom")).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("nav-children-purchasing").querySelectorAll(
+        "[data-testid^='nav-trunk-purchasing-']",
+      ),
+    ).toHaveLength(3);
   });
 
   /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD, NOT WHERE ROW ORDER PUTS IT
@@ -829,7 +963,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
     try {
       renderAt("/operation?tab=receiving");
       const icon = screen.getByTitle("Purchasing") as HTMLAnchorElement;
-      // NOT `Manual Purchase Requests`, which is the first live row now.
+      // Named, never derived: the landing page does not move when row order does.
       expect(icon).toHaveAttribute("href", "/operation?tab=purchase");
       // Standing on Goods Receipts still lights the module's one icon.
       expect(icon.className).toContain("bg-kit-blue-3");
@@ -847,7 +981,8 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       expect(screen.queryByTestId("nav-group-purchasing-buy")).not.toBeInTheDocument();
       expect(screen.queryByText("BUY")).not.toBeInTheDocument();
       expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
-      expect(screen.queryByText("Purchasing Home")).not.toBeInTheDocument();
+      expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
+      expect(screen.queryByText("SHOWROOM")).not.toBeInTheDocument();
     } finally {
       localStorage.removeItem("ops-sidebar-collapsed");
     }
@@ -875,18 +1010,18 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
     mockUserId = "user-a";
     localStorage.setItem(
       drawerKey("user-a"),
-      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-consignment"] }),
+      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-showroom"] }),
     );
     renderAt("/operation");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
-    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-showroom").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-buy").getAttribute("aria-expanded")).toBe("false");
   });
 
   it("user B does not inherit user A's open drawers", () => {
     localStorage.setItem(
       drawerKey("user-a"),
-      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-consignment"] }),
+      JSON.stringify({ moduleOpen: true, openGroups: ["purchasing-showroom"] }),
     );
     mockUserId = "user-b";
     renderAt("/operation");
@@ -951,12 +1086,12 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
       drawerKey("user-a"),
       JSON.stringify({
         moduleOpen: true,
-        openGroups: ["purchasing-consignment", "purchasing-problems"],
+        openGroups: ["purchasing-showroom", "purchasing-problems"],
       }),
     );
     mockUserId = "user-a";
     const view = renderAt("/operation?tab=receiving");
-    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("true");
+    expect(group_("purchasing-showroom").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-problems").getAttribute("aria-expanded")).toBe("true");
 
     // Same mounted component — only the signed-in user changes.
@@ -969,7 +1104,7 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
     );
 
     // A's drawers did not travel.
-    expect(group_("purchasing-consignment").getAttribute("aria-expanded")).toBe("false");
+    expect(group_("purchasing-showroom").getAttribute("aria-expanded")).toBe("false");
     expect(group_("purchasing-problems").getAttribute("aria-expanded")).toBe("false");
     // ...and B is still shown the page B is standing on.
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
@@ -987,56 +1122,39 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
 });
 
 /**
- * THE DELIVERY MODULE (owner-approved 2026-08-19, carried into this card from
- * the delivery-rail card it replaced).
+ * THE DELIVERY MODULE — TWO PAGES, BOTH OF THEM OPEN
+ * (CARD-2026-08-21-delivery-01-sidebar, owner ruling 2026-08-21).
+ *
+ * This OVERWRITES the seven-row list of 2026-08-19. Five of those rows —
+ * Schedule, Delivery History, Exceptions, Partners, Report — were readable,
+ * countable and dead, and a rail that refuses five of its seven clicks teaches
+ * an operator to stop trusting the rail. The capabilities are not retired
+ * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
+ * simply not NAVIGATION until they are pages.
  */
-describe("PortalSidebar — the Delivery module's pages", () => {
-  it("lists the seven approved pages, in order, with Report under its hairline", () => {
-    renderAt("/operation?tab=delivery");
-    const rows = Array.from(
-      screen
-        .getByTestId("nav-children-delivery")
-        .querySelectorAll("[data-testid^='nav-child-']"),
-    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual([
-      "Delivery Work",
-      "Delivery Orders",
-      "Schedule",
-      "Delivery History",
-      "Exceptions",
-      "Partners",
-      "Report",
-    ]);
-  });
-
-  it("keeps Delivery Orders under Delivery", () => {
-    renderAt("/operation/delivery-orders");
-    const group = screen.getByTestId("nav-children-delivery");
-    expect(group.contains(child("delivery-orders"))).toBe(true);
-    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
-  });
-
-  it("`Delivery Work` is the existing page — same key, same route", () => {
+describe("PortalSidebar — Delivery is one page", () => {
+  it("shows one plain Delivery door instead of a parent with two children", () => {
     renderAt("/operation?tab=delivery");
     const row = child("delivery");
     expect(row.tagName).toBe("A");
     expect(row).toHaveAttribute("href", "/operation?tab=delivery");
     expect(row.className).toContain("bg-kit-blue-3");
+    expect(row).toHaveTextContent("Delivery");
+    expect(screen.queryByTestId("nav-module-delivery")).toBeNull();
+    expect(screen.queryByTestId("nav-child-delivery-orders")).toBeNull();
   });
 
-  it("the four middle pages and Report are non-controls saying `Coming soon`", () => {
+  it("does not show retired Delivery destinations", () => {
     renderAt("/operation?tab=delivery");
     for (const key of [
+      "delivery-orders",
       "delivery-schedule",
       "delivery-history",
       "delivery-exceptions",
       "delivery-partners",
       "delivery-report",
     ]) {
-      const row = child(key);
-      expect(row.tagName).toBe("SPAN");
-      expect(row.getAttribute("aria-disabled")).toBe("true");
-      expect(row.textContent).toContain("Coming soon");
+      expect(screen.queryByTestId(`nav-child-${key}`)).toBeNull();
     }
   });
 });
@@ -1058,10 +1176,27 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
     }
   });
 
-  it("no bare `Stock` row survives — the module is Warehouse", () => {
+  /* UPDATED 2026-08-21 — CARD-2026-08-20-stock-register.
+   *
+   * The ruling this test was written for still stands: the MODULE is called
+   * `Warehouse`, and K0's single merged `Stock` module row is gone for good.
+   * What changed is that `Stock` is now the name of a CHILD PAGE — the Warehouse
+   * master list, replacing `On hand` (ERP-ARCHITECTURE §2.1 and Stock MASTER §2
+   * both spell the tree `Warehouse → Stock · Ready stock · In & out · Transfers
+   * · Counts`).
+   *
+   * The old assertion banned the WORD anywhere in the rail, which was always
+   * wider than the ruling it enforced. It now checks the thing that was actually
+   * ruled: no MODULE row says Stock, and the module row says Warehouse. */
+  it("no bare `Stock` MODULE row survives — the module is Warehouse, Stock is its page", () => {
     renderAt("/operation?tab=stock-onhand");
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
     expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
+    // `Stock` exists exactly once, and it is a CHILD.
+    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Stock");
+    const moduleRows = Array.from(
+      document.querySelectorAll("[data-testid^='nav-module-']"),
+    ).map((el) => el.textContent?.trim());
+    expect(moduleRows).not.toContain("Stock");
   });
 
   it("the blueprint keeps Reports and Settings central — neither joins the module", () => {
@@ -1071,7 +1206,9 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["On hand", "Ready stock", "In & out", "Transfers", "Counts"]);
+    /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1. The learned
+     * ORDER is untouched: the rail never reshuffles under an operator. */
+    expect(rows).toEqual(["Stock", "Ready stock", "In & out", "Transfers", "Counts"]);
   });
 });
 

@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-query";
 import {
   type AbandonOrderInput,
-  type AdjustStockInput,
   type AssignPartnerInput,
   type AssignPickupPartnerInput,
   type AttachDoInput,
@@ -29,6 +28,7 @@ import {
   type SkuImportRow,
   type SkuImportResult,
   type StockEtaImportRow,
+  type ManualPurchaseHistoryEvent,
   type AppendMissingLinesInput,
   type AppendMissingLinesResult,
   type StorageFeeImportRow,
@@ -228,10 +228,13 @@ import {
   type PoReportResponse,
   // P1 (0303) — Purchasing → Settings.
   type PurchasingSettingsResponse,
+  type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
+  type PurchasingUpdateDestinationInput,
+  type PurchasingSetSupplierCollectionInput,
   // 0244/0245 — HR commission portal (GET /api/hr/report + config writes).
   type CommissionReport,
   type CommissionStaff,
@@ -292,6 +295,13 @@ import {
   type WarehouseReceiptLine,
   type WarehouseReceiptRow,
   type WarehouseSubmitReceiptInput,
+  type StockRegisterUnit,
+  // 0379 — Delivery's own arrangement (owner correction 2026-08-24).
+  type DeliveryArrangementRow,
+  type DeliveryArrangementEventRow,
+  type AssignLogisticsInput,
+  type SaveDeliveryArrangementInput,
+  type SupplierCreateInput,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -1128,6 +1138,12 @@ export function useUnproceedOrder(
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* THE OFFICE READS THE SAME ORDER THROUGH ITS OWN KEY (2026-08-29).
+         Add-ons are now written from `/operation/orders/so/:id` as well as
+         from the POS, and both surfaces must show the change at once — a
+         shared writer that refreshes one caller’s cache and not the other’s
+         is how two screens start disagreeing about what was sold. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1291,6 +1307,19 @@ export function useAddOrderLines(
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* ⭐ THE OFFICE READS THIS ORDER THROUGH ITS OWN KEY (YH, 2026-09-01 —
+         "ensure numbers and generated SO are correct").
+         `["orders"]` does not reach `["operation","orders",id]`: React Query
+         matches a key by PREFIX, and the office key does not start with
+         `orders`. So the Sales Order workspace never refetched after a service
+         was added — the operator pressed `Add`, the panel closed, and the
+         Goods table, the document preview and the Money total all went on
+         showing the order without it until the page was reloaded.
+         `useEditOrderAddon` and `useRemoveOrderAddon` both invalidate this key
+         and both point AT THIS HOOK in their comments — "see
+         `useAddOrderLines`. Both surfaces refresh, or they disagree." The
+         comment described a rule this hook never followed. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -1336,6 +1365,31 @@ export function useEditOrderAddon(orderId: string) {
       qc.setQueryData(qk.order(orderId), order);
       await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
       void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* The office reads this order through its own key — see
+         `useAddOrderLines`. Both surfaces refresh, or they disagree. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
+  });
+}
+
+/** 0395 — takes back a service picked by MISTAKE (YH, 2026-08-28). A sibling
+ *  of `useEditOrderAddon`, not a mode of it: `edit_order_addon` refuses any qty
+ *  below 1 and any decrease, so "remove" could not be expressed through it at
+ *  all. Same place lane, same gates; the up-sell law is untouched, because a
+ *  misclick and a downsell are different acts. */
+export function useRemoveOrderAddon(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation<Order, ApiError, { addonId: string }>({
+    mutationFn: ({ addonId }) =>
+      apiFetch<Order>(`/api/orders/${orderId}/addons/${addonId}/remove`, {
+        method: "POST",
+      }),
+    onSuccess: async (order) => {
+      qc.setQueryData(qk.order(orderId), order);
+      await qc.invalidateQueries({ queryKey: qk.order(orderId), exact: true });
+      void qc.invalidateQueries({ queryKey: ["orders"] });
+      /* Both surfaces refresh, or they disagree — same reason as the edit hook. */
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
     },
   });
 }
@@ -2713,6 +2767,11 @@ export interface DeliveryPartnerRow {
   blackout_dates?: string[] | null;
   daily_capacity?: number | null;
   booking_lead_days?: number | null;
+  /** Delivery Card 03 (0411) — the carrier's own journey calendar. OPTIONAL for
+   *  the same older-Worker degrade reason: absence = "not recorded" = silence. */
+  pickup_days?: number[] | null;
+  journey_regions?: unknown;
+  surcharge_areas?: string[] | null;
 }
 export interface DeliveryPartnersListResponse {
   partners: DeliveryPartnerRow[];
@@ -2725,6 +2784,10 @@ export interface DeliveryPartnersListResponse {
 export interface SupplierRow {
   id: string;
   name: string;
+  /** The STORED identity slug (0032 — keys SUPPLIER_SOP, unique in prod). A
+   *  supplier can be renamed while this stays: `Ohana` still carries `hookka`.
+   *  Optional so a browser on this build against an older Worker still parses. */
+  slug?: string | null;
   kind: "own_logistics" | "factory_pickup";
   cat_covered: string[];
   lead_time: string | null;
@@ -2835,6 +2898,13 @@ export interface operationOrderListRow {
      *  browser on this build against an older Worker reads it as absent and
      *  falls back the same way. */
     label?: string | null;
+    /** 2026-08-24 (OTHER GOODS TALLY) — the catalog's own category word,
+     *  resolved server-side through `skuCategories` (the ONE category reader,
+     *  Law D), exactly as the DETAIL route has served it since PR 885. `null`
+     *  = asked, the catalog holds no such SKU. Optional: an older Worker
+     *  sends nothing, the classifiers fall through to the SKU parser, and the
+     *  footer behaves exactly as it did before this field existed. */
+    category?: string | null;
   }[];
   /** C5 (2026-07-27) — the money truth. `orders.paid` is the only figure a
    *  live payment path writes; with the add-on sum below and the line prices
@@ -2862,6 +2932,17 @@ export interface operationOrderListRow {
   /** Purchase-order identities linked by purchase_orders.so / so_refs. */
   po_numbers?: string[];
   delivery_partner_id: string | null;
+  /**
+   * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey
+   * (`orders.delivery_stops`, migration 0156). Delivery Work renders ONE ROW
+   * PER LEG, because leg 1 reaching the named JB warehouse is not the event the
+   * Singapore customer is waiting for. `null`/absent or a single stop means
+   * single-leg and the order is one scope — which is every live order today
+   * (measured 2026-08-21: 0 of 90 open orders carry a chain). Optional, so a
+   * browser on this build against an older Worker simply reads every order as
+   * single-leg instead of crashing.
+   */
+  delivery_stops?: DeliveryStop[] | null;
   /** Migration 0147 (item h, 2026-05-23) — order-level LP request/accept/reject
    *  state. Set by `operation_confirm_proceed_request_v3` when Operation
    *  picks an LP at Accept Proceed; the LP then accepts (partner_accepted_at)
@@ -2895,6 +2976,11 @@ export interface operationOrderListRow {
    */
   customer_email?: string | null;
   customer_billing?: string | null;
+  /** 0230 — the customer ticked "Billing address same as delivery". The
+   *  billing COLUMN is only meaningful when this is false; when it is true the
+   *  billing address IS the delivery address and `customer_billing` is empty
+   *  by design, not unrecorded. */
+  customer_billing_same?: boolean;
   customer_emergency?: string | null;
   customer_address_line1?: string | null;
   customer_address_line2?: string | null;
@@ -2904,6 +2990,13 @@ export interface operationOrderListRow {
   building_type?: string | null;
   delivery_floor?: number | null;
   delivery_has_lift?: boolean | null;
+  /** 2026-08-24 POS PARITY - the till asks for these at creation (0200
+   *  demographics + 0104 stair carry); the register now lists them so the
+   *  office can read back what the customer was asked. */
+  customer_race?: string | null;
+  customer_gender?: string | null;
+  customer_birthday?: string | null;
+  delivery_stair_items?: number | null;
   channel?: string | null;
   invoice_no?: string | null;
   invoiced_at?: string | null;
@@ -2934,6 +3027,13 @@ export interface operationOrderListRow {
 
 export interface SalesOrderExpansionResponse {
   defaultDeliverTo: string | null;
+  /**
+   * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has
+   * it, from Stock's own record. Optional: a browser on this build against an
+   * older Worker reads it as absent and the expansion prints its governed
+   * absence rather than a place nobody recorded.
+   */
+  place?: Array<{ unitCode: string; siteName: string | null; holderName: string | null }>;
   lines: Array<{
     lineId: string;
     sku: string;
@@ -3145,14 +3245,31 @@ export interface operationOrderDetailLine {
   category?: string | null;
 }
 export interface operationOrderDetailAddon {
+  /** The row’s own id — what `POST /orders/:id/addons/:addonId/edit` needs. */
+  id: string;
   addon_key: string;
   qty: number;
   unit_price: number;
+  /** 0242 — the per-unit size picks for a sized service (dispose-mattress,
+   *  dispose-bedframe …). `null` for a service that has no size list. */
+  attrs: { sizes?: string[]; size?: string } | null;
 }
 export interface operationOrderDetailHistoryRow {
   text: string;
   by_role: string | null;
   occurred_at: string;
+  /** The audit identity the event recorded (0387 stamps it on new writes).
+   *  Optional: an older Worker does not send it. */
+  by_user_id?: string | null;
+  /** The resolved real staff/salesperson name — resolved SERVER-SIDE from the
+   *  authoritative identity tables, never in the browser. */
+  actor?: string | null;
+  /** The server's truthful classification of who acted. `system` only when the
+   *  event's own facts prove automation; the browser never infers it from a
+   *  null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
+  /** The structured half of the event — reason/note/changed/revision. */
+  metadata?: unknown;
 }
 export interface operationOrderDetailWarehouse {
   id: string;
@@ -3162,8 +3279,13 @@ export interface operationOrderDetailWarehouse {
 export interface operationOrderDetailStockBalance {
   sku: string;
   warehouse_id: string;
+  /** 0366 — physically at this Site, from the unit register. NOT what may be
+   *  promised: a unit in repair counts here and can be offered to nobody. */
   qty: number;
   reserved: number;
+  /** 0366 — THE number that answers whether these goods can be promised.
+   *  Never compute it as `qty - reserved`. */
+  available: number;
 }
 export interface operationOrderDetailPoLine {
   id: string;
@@ -3307,6 +3429,24 @@ export interface operationPoListRow {
     destination_id?: string | null;
     /** Purchasing's own internal note; never printed on the PO. */
     ops_remark?: string | null;
+    /** Manual Purchase lineage: demand → request header. */
+    demand_id?: string | null;
+    /** 0382 governed customer-order allocation for this exact PO line. */
+    sources?: {
+      po_id: string;
+      po_line_id: string;
+      order_id: string;
+      order_line_id: string | null;
+      so: number | null;
+      qty: number;
+    }[];
+    /** Exact governed lineage for this line, including Manual Purchase. */
+    governed_sources?: Array<{
+      kind: "sales_order" | "manual_purchase";
+      reference: string;
+      /** Null preserves a legacy source link whose exact allocation is unknown. */
+      qty: number | null;
+    }>;
     /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
      *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
      *  the sales order. Derived server-side; a quantity no SO claims comes
@@ -3331,11 +3471,23 @@ export interface operationPoListRow {
    *  MORE THAN ONE expected arrival (promise-ledger history, 0306), so the
    *  listing marks it `(revised)`. OPTIONAL — older Worker degrades to false. */
   eta_revised?: boolean;
-  /** What LEFT Carres for this supplier (0312), newest first. */
+  /** What LEFT Carres for this supplier (0312), newest first — and since 0377,
+   *  WHAT KIND of leaving it was. `external_open` is communication history and
+   *  completes nothing; `confirmed_sent` is the operator's statement that the
+   *  PDF actually reached the supplier, with the exact version it was.
+   *  The three newer fields are OPTIONAL so a browser on this build against an
+   *  older Worker degrades instead of crashing. */
   sends?: {
     channel: string;
     note: string | null;
     sent_at: string;
+    kind?: "external_open" | "confirmed_sent" | null;
+    recipient?: string | null;
+    po_version?: number | null;
+    sent_by?: string | null;
+    sent_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
     po_revisions: { rev_no: number } | null;
   }[];
   /** The supplier-date field's own history (0306 ledger, newest first) —
@@ -3364,11 +3516,18 @@ export interface operationPoListRow {
   /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
    *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
   urgency?: "critical" | "urgent" | "normal" | null;
+  /** Governed document sources, never inferred from display-only SO mirrors. */
+  sources?: Array<{
+    kind: "sales_order" | "manual_purchase";
+    reference: string;
+  }>;
 }
 export interface operationPosListResponse {
   pos: operationPoListRow[];
   /** The active destination registry (0307) — the per-line picker's options. */
   destinations?: { id: string; name: string; is_default: boolean }[];
+  /** Every destination referenced by these POs, including closed history. */
+  referencedDestinations?: { id: string; name: string; is_default: boolean }[];
   /** ONE company-wide supplier-message draft (0312). */
   messageTemplate?: string | null;
 }
@@ -3437,17 +3596,13 @@ export interface operationRecheckStockResponse {
   warehouseId: string | null;
   shortages: { sku: string; short: number }[];
 }
-export interface operationAdjustStockResponse {
-  sku: string;
-  warehouse_id: string;
-  qty: number;
-  reserved: number;
-}
 /** Phase 4.5 Chunk 2 (T18/T21) — `GET /api/operation/stock-alerts` row shape.
- *  RPC `operation_stock_alerts()` returns rows where `(qty - reserved) <
+ *  RPC `operation_stock_alerts()` returns rows where `available <
  *  low_threshold`. The dashboard tile slices the top-3 by shortage; the
  *  warehouse page (Sprint D follow-up) drives a red-dot indicator off the
- *  count. `effective = qty - reserved`; `shortage = low_threshold - effective`. */
+ *  count. 0366: `effective` is the unit register's `available` — NOT
+ *  qty − reserved, which counted a unit in repair as sellable;
+ *  `shortage = low_threshold - effective`. */
 export interface operationStockAlertRow {
   sku: string;
   warehouse_id: string;
@@ -3683,6 +3838,13 @@ export interface SupplierClaimListRow {
   customer_resolution: string | null;
   customer_resolution_note: string | null;
   customer_resolution_at: string | null;
+  /** Layer ④ (0409) — in what ORDER the goods move. Independent of layer ③:
+   *  `replace` is the promise, and `Replace First` / `Collect First` are two
+   *  ways of keeping it that leave Carres holding a different number of units
+   *  until the collection happens. */
+  carres_execution: string | null;
+  carres_execution_note: string | null;
+  carres_execution_at: string | null;
   /** Does the PO line still owe us units? Read for late claims only; null =
    *  could not tell (the line was deleted), which counts as still pending. */
   line_pending: boolean | null;
@@ -3701,16 +3863,21 @@ export interface SupplierClaimsResponse {
 
 export function useOperationSupplierClaims(
   status: "open" | "closed" | "all",
+  poIdOrOpts?: string | Partial<UseQueryOptions<SupplierClaimsResponse>>,
   opts?: Partial<UseQueryOptions<SupplierClaimsResponse>>,
 ) {
+  const poId = typeof poIdOrOpts === "string" ? poIdOrOpts : null;
+  const options = typeof poIdOrOpts === "string" ? opts : poIdOrOpts;
   return useQuery({
-    queryKey: qk.operation.supplierClaims(status),
+    queryKey: [...qk.operation.supplierClaims(status), poId ?? "all-pos"] as const,
     queryFn: () =>
       apiFetch<SupplierClaimsResponse>(
-        `/api/operation/supplier-claims?status=${status}`,
+        `/api/operation/supplier-claims?status=${status}${
+          poId ? `&poId=${encodeURIComponent(poId)}` : ""
+        }`,
       ),
     staleTime: 30_000,
-    ...opts,
+    ...options,
   });
 }
 
@@ -3829,6 +3996,33 @@ export function useSupplierClaimCustomerResolutionMutation(
 ) {
   return useSupplierClaimMove<{ customer_resolution: string; note?: string }>(
     (id) => `/api/operation/supplier-claims/${id}/customer-resolution`,
+    opts,
+  );
+}
+
+/**
+ * Layer ④ — in what ORDER the goods move (Loo, 2026-08-05 · migration 0409).
+ *
+ * A SEPARATE axis from the customer's resolution, not a narrowing of it:
+ * `replace` is the promise, and `Replace First` / `Collect First` are two ways
+ * of keeping it that leave Carres holding a different number of units until the
+ * collection happens.
+ *
+ * Same shape as the resolution above on purpose — not gated on the supplier's
+ * answer, re-recordable while the claim is open, refused once it is closed. It
+ * moves no stock either, so it invalidates nothing but the claim list.
+ */
+export function useSupplierClaimCarresExecutionMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; carres_execution: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ carres_execution: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/carres-execution`,
     opts,
   );
 }
@@ -4091,6 +4285,128 @@ export function useOperationSuppliers(
 }
 
 /**
+ * ⭐ useCreateSupplier — POST /api/operation/suppliers (2026-08-24).
+ *
+ * The portal's FIRST supplier-creation door. Before this, a new factory was an
+ * engineering task: someone opened the SQL editor. Principal-only, which is not
+ * a new rule — `suppliers_principal_write` (0002) has always said so; there was
+ * simply nothing to call.
+ *
+ * Invalidates the suppliers list so the picker that opened this shows the new
+ * name without a reload — the whole point is that the keyer never leaves the
+ * SKU they were in the middle of writing.
+ */
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SupplierCreateInput) =>
+      apiFetch<{ supplier: SupplierRow }>(
+        "/api/operation/suppliers",
+        catalogJson("POST", input),
+      ),
+    onSuccess: ({ supplier }) => {
+      /* ⭐ PUT IT IN THE LIST BEFORE THE REFETCH LANDS. The caller selects the
+         new supplier the instant it exists, and a <select> whose value matches
+         no option renders BLANK — so an invalidate alone would flash "nothing
+         selected" over a supplier that was created successfully. Seeding the
+         cache makes the option exist in the same paint as the selection.
+         Sorted by name because the list route orders that way; the invalidate
+         still runs, so the server's answer remains the one that survives. */
+      qc.setQueryData<SuppliersListResponse>(qk.operation.suppliers(), (prev) =>
+        prev
+          ? {
+              suppliers: [...prev.suppliers, supplier].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              ),
+            }
+          : { suppliers: [supplier] },
+      );
+      qc.invalidateQueries({ queryKey: qk.operation.suppliers() });
+    },
+  });
+}
+
+/** 0388 — dual-sourcing's recording half. The SKU's supplier SLOT stays the
+ *  routing truth; these record what each supplier QUOTED for the piece. */
+export interface SkuSupplierOfferRow {
+  supplierId: string;
+  supplierName: string | null;
+  supplierCode: string | null;
+  price: number | null;
+  pwpPrice: number | null;
+  /** 0389 — the supplier's quote per sofa seat height ({size → RM}, the 0204
+   *  shape). Null = not quoted by height. */
+  pricesBySize: Record<string, number> | null;
+  updatedAt: string;
+}
+
+export function useSkuSupplierOffers(skuId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", skuId],
+    queryFn: () =>
+      apiFetch<{ offers: SkuSupplierOfferRow[] }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+      ),
+    /* Fetched ONLY while the row's offers strip is open — a register of 500
+       SKUs must not make 500 of these on load. */
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Every offer in one read — the Supplier Items view joins these against the
+ *  catalog bundle exactly as it joins the slot. */
+export function useAllSkuSupplierOffers() {
+  return useQuery({
+    queryKey: ["sku-supplier-offers", "all"],
+    queryFn: () =>
+      apiFetch<{ offers: Array<{ skuId: string; supplierId: string; supplierCode: string | null }> }>(
+        "/api/catalog/supplier-offers",
+      ),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpsertSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, ...input }: {
+      skuId: string;
+      supplierId: string;
+      supplierCode?: string | null;
+      price?: number | null;
+      pwpPrice?: number | null;
+      /* Absent = leave the stored map alone (and keep the payload free of a
+         column an un-migrated database would refuse — the 0375 lesson). */
+      pricesBySize?: Record<string, number> | null;
+    }) =>
+      apiFetch<{ offer: SkuSupplierOfferRow }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers`,
+        catalogJson("PUT", input),
+      ),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
+  });
+}
+
+export function useDeleteSkuSupplierOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skuId, supplierId }: { skuId: string; supplierId: string }) =>
+      apiFetch<{ ok: true }>(
+        `/api/catalog/skus/${encodeURIComponent(skuId)}/supplier-offers/${encodeURIComponent(supplierId)}`,
+        catalogJson("DELETE"),
+      ),
+    onSuccess: () =>
+      /* The prefix, so BOTH the per-SKU strip and the all-offers list (the
+         Supplier Items join) refresh from one write. */
+      qc.invalidateQueries({ queryKey: ["sku-supplier-offers"] }),
+  });
+}
+
+/**
  * usePurchaseToday — GET /api/operation/purchase/today (the Procurement MRP
  * cockpit). Read-only: assembles live demand + supply, runs the net-requirements
  * engine, and returns the delivery bundles to raise + a per-supplier buy list +
@@ -4171,6 +4487,11 @@ export interface PurchaseRequestRow {
   refused_at: string | null;
   refused_by: string | null;
   refuse_reason: string | null;
+  /** Card 04 — the STRUCTURED For fact, per purpose; null on other
+   *  purposes and on pre-0401 history. */
+  for_service_case_id: string | null;
+  for_staff_user_id: string | null;
+  for_subsidiary_name: string | null;
   created_by: string | null;
   created_at: string;
 }
@@ -4180,6 +4501,8 @@ export interface PurchaseRequestLineRow {
   request_id: string;
   sku: string;
   supplier_id: string | null;
+  /** The line's governed Purchasing destination (register read, Card 04). */
+  destination_id?: string | null;
   qty: number;
   approved_qty: number | null;
   issued_qty: number;
@@ -4192,27 +4515,132 @@ export interface PurchaseRequestLineRow {
   /** Derived by the server from the linked PO's posted receipt (the
    *  Observation Law) — never a button anywhere. */
   received?: boolean;
+  /** The CATALOG's category for this line's SKU (`product_models.category`,
+   *  Card 03) — the rail's `PRODUCT` authority, never SKU-text inference.
+   *  `null` when Catalog has no category for the SKU. */
+  category?: string | null;
+  /** Card 04 — the ONE item-label arithmetic's answer (`railItemLabel`
+   *  over the Catalog model name); falls back to the SKU when Catalog has
+   *  no model words. */
+  item_label?: string;
+  /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
+   *  plus the demand's own po_id), never an inference. */
+  po_ids?: string[];
+  /** Card 06 — the SERVER date projection (the browser performs no
+   *  working-day arithmetic): the line's effective Delivery Date, its
+   *  derived Order By (null is a real answer, never a guessed one), and the
+   *  exact missing Settings facts the rail/setup lens names. */
+  delivery_date?: string | null;
+  order_by?: string | null;
+  production_days_missing?: boolean;
+  transit_days_missing?: boolean;
 }
 
 export interface ManualPurchaseRegisterPayload {
   requests: PurchaseRequestRow[];
   lines: PurchaseRequestLineRow[];
+  /** Every PO the lines' lineage names — id → the actual po_no — plus the
+   *  Card 06 issuance-completion fact: whether the CURRENT version has
+   *  confirmed-sent evidence (`po_sends`, 0378). */
+  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  /** The linked Service Cases behind `for_service_case_id`. */
+  serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
+  /** Card 03 §3 — who actually decides `Need approval`: the resolved
+   *  `ops_manager` duty holder(s), by name. */
+  approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
+  /** Card 04 — PO Duty, shown ONLY beside a selection's issue action. */
+  currentPoDuty: { userId: string; name: string } | null;
+  actingPoDuty: { userId: string; name: string } | null;
+  poDutyUnavailable: boolean;
+  mayIssue: boolean;
+  /** Card 06 — the Malaysia calendar date the timing lens compares against,
+   *  and whether the server date plan could be loaded at all. */
+  todayIso?: string;
+  planUnavailable?: boolean;
 }
 
 export interface ManualPurchaseDetailPayload {
   request: PurchaseRequestRow;
+  /** The linked Service Case's readable identity, when the purpose names one. */
+  serviceCaseNo: string | null;
+  /** Card 05 §3.2 — the real individual who raised it, resolved server-side;
+   *  `null` when the record was written by a shared account and the reader
+   *  states `Staff identity not recorded`. A person is never invented. */
+  requested_by_name: string | null;
   /** `unit_cost` is present ONLY for the approver — the same screen renders
    *  for both roles, minus the money, never a permission error. */
   lines: Array<PurchaseRequestLineRow & { unit_cost?: number | null }>;
+  /** Card 05 §3.6 — the EXACT linked documents' facts, read from each PO and
+   *  its promise ledger, never inferred from SKU/supplier/date matching. */
+  pos: Array<{
+    id: string;
+    po_no: string;
+    placed_at: string | null;
+    po_delivery_date: string | null;
+    /** Non-null ONLY when the promise ledger proves the supplier changed
+     *  the date; absent change reads `Same as PO`. */
+    supplier_delivery_date: string | null;
+    ordered_qty: number;
+  }>;
+  /** Card 05 §3.7 — stored-fact events only; words live in the shared
+   *  `manualPurchaseHistoryRecord` arithmetic. */
+  history: ManualPurchaseHistoryEvent[];
   destinations: Array<{ id: string; name: string }>;
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
+  /** Card 03 §3 — the real action owner's name on the object too. */
+  approvers: Array<{ id: string; name: string | null }>;
   canApprove: boolean;
+  /** Card 06 — the same server date plan the Register reads. */
+  todayIso?: string;
+  planUnavailable?: boolean;
+}
+
+/** Card 06 §3 — one line of the create form's server date plan. */
+export interface ManualPurchasePlanLine {
+  sku: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  category: string | null;
+  productionDays: number | null;
+  transitDays: number | null;
+  /** `expectedArrivalOf` from the preview Proceed Date — null is a real
+   *  answer (missing Catalog relationship or Settings), never a guess. */
+  arrival: string | null;
+}
+
+export interface ManualPurchasePlanPayload {
+  /** The server's Malaysia date — the read-only Proceed Date preview. */
+  proceedDate: string;
+  lines: ManualPurchasePlanLine[];
+  /** The latest line arrival — proposed ONLY when every asked SKU resolves
+   *  and has complete Settings. */
+  deliveryDateDefault: string | null;
+  planUnavailable: boolean;
+}
+
+/**
+ * The create form's date plan (Card 06 §3) — the SERVER proposes Delivery
+ * Date and names missing lead facts; the browser never guesses a date. A
+ * POST only because live SKUs carry free text (`Leg 4"`); it reads, creates
+ * nothing and reserves nothing.
+ */
+export function useManualPurchasePlan(skus: string[]) {
+  const sorted = [...skus].sort();
+  return useQuery<ManualPurchasePlanPayload, ApiError>({
+    queryKey: ["operation", "purchasing", "requests", "plan", sorted.join("|")],
+    queryFn: () =>
+      apiFetch<ManualPurchasePlanPayload>(
+        "/api/operation/purchasing/requests/plan",
+        { method: "POST", body: JSON.stringify({ skus: sorted }) },
+      ),
+    staleTime: 30_000,
+  });
 }
 
 export function useManualPurchaseDetail(id: string | null) {
@@ -4233,7 +4661,6 @@ export function useIssuePurchaseRequests() {
     mutationFn: (input: {
       requestIds: string[];
       together: boolean;
-      partners?: Record<string, string> | null;
     }) =>
       apiFetch<{ poIds: string[]; documents: number }>(
         "/api/operation/purchasing/requests/issue",
@@ -4285,9 +4712,25 @@ export function useCreatePurchaseRequest() {
       purpose: string;
       destinationId: string;
       requiredBy?: string | null;
-      why: string;
+      /** Card 04: ONLY `other_purchase` answers `What is this for?`. */
+      why?: string | null;
+      /** The structured For fact, required on its own purpose (Card 04). */
+      serviceCaseId?: string | null;
+      staffUserId?: string | null;
+      subsidiaryName?: string | null;
+      /** ⭐ THE WHOLE REQUEST IN ONE CALL (0410). Sending the lines here makes
+       *  the header and every line ONE database transaction, so a bad line can
+       *  no longer leave a committed header behind. Optional because `0410` is
+       *  applied by hand: the route falls back to the header-only door until
+       *  it is, and the caller need not know which. */
+      lines?: Array<{
+        sku: string;
+        qty: number;
+        requiredBy?: string | null;
+        note?: string | null;
+      }>;
     }) =>
-      apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
+      apiFetch<{ id: string; req_no: string; approval_required: boolean; line_ids?: string[] }>(
         "/api/operation/purchasing/requests",
         { method: "POST", body: JSON.stringify(body) },
       ),
@@ -4296,6 +4739,19 @@ export function useCreatePurchaseRequest() {
   });
 }
 
+/**
+ * ⚠️ NO CALLER SINCE 0410 (2026-09-01), AND KEPT ON PURPOSE.
+ *
+ * The create form used this in a loop and now sends its lines with the header
+ * in one transaction, so nothing calls this today. It is NOT deleted, because
+ * the route behind it — `POST /purchasing/requests/:id/lines` — is a different
+ * act with its own live authority: adding a line to a request that already
+ * exists. That door has no screen yet; when it gets one, this is what it calls.
+ *
+ * Recorded rather than assumed: if that screen is ruled out, this and its route
+ * go together, in one change. A dead export beside a live endpoint is a
+ * carry-forward, not a tidy-up.
+ */
 export function useCreatePurchaseRequestLine() {
   const qc = useQueryClient();
   return useMutation({
@@ -4533,6 +4989,63 @@ export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
 }
 
+export function useCreatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PurchasingCreateDestinationInput) =>
+      apiFetch<PurchasingSettingsResponse>("/api/operation/purchasing/settings/destinations", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useUpdatePurchasingDestination() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      destinationId,
+      ...input
+    }: PurchasingUpdateDestinationInput & { destinationId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/destinations/${encodeURIComponent(destinationId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+    },
+  });
+}
+
+export function useSetPurchasingSupplierCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      supplierId,
+      ...input
+    }: PurchasingSetSupplierCollectionInput & { supplierId: string }) =>
+      apiFetch<PurchasingSettingsResponse>(
+        `/api/operation/purchasing/settings/supplier-collection/${encodeURIComponent(supplierId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(qk.operation.purchasingSettings(), data);
+      void qc.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+      void qc.invalidateQueries({ queryKey: ["to-order", "pick-items"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "manual-purchase"] });
+    },
+  });
+}
+
 /** Purchase §6 · Snooze PO — defer a whole supplier's PO planning until
  *  `until` (ISO). Sending a past `until` clears the snooze (wake). */
 export function usePurchaseSnoozeSupplier() {
@@ -4612,6 +5125,13 @@ export interface SalesOrderRevisionRow {
   snapshot: SalesOrderSnapshot;
   created_at: string;
   created_by: string | null;
+  /** CARD 2026-08-27 — the recorder's real display name, resolved server-side
+   *  from the authoritative identity tables (`created_by` stays the audit
+   *  identity). Optional: an older Worker does not send it. */
+  created_by_name?: string | null;
+  /** Server-side classification of the recorder; the browser never infers
+   *  `system` from a null id. Optional: an older Worker does not send it. */
+  actor_kind?: "human" | "system" | "missing";
   /** CARD 1 (0340) — who asked: staff_correction | customer_change. NULL on
    *  Rev 1 (the original) and on pre-0340 rows — history is never guessed. */
   change_type?: "staff_correction" | "customer_change" | null;
@@ -5221,7 +5741,7 @@ export function useDecideSalesOrderAmendment(
 export interface SubmitAmendmentInput {
   proposed: AmendmentProposal;
   reason: string;
-  /** 0354 — `Amend date (from customer)`. Omitted by the goods proposal. */
+  /** 0354 — `Requested date (from customer)`. Omitted by the goods proposal. */
   customerAskedOn?: string | null;
 }
 
@@ -5259,6 +5779,11 @@ export interface SaveRevisionLineInput {
   sku: string;
   qty: number;
   unit_price: number;
+  /** The line's CONFIGURATION (sofa fabric, bedframe colour/gap, the cascade
+   *  payload Create-PO reads). Honoured by the CREATE door only (migration
+   *  0374) — the SAVE door keeps a line's attrs by matching on `id`. Absent
+   *  stays NULL rather than becoming `{}`. */
+  attrs?: Record<string, unknown>;
 }
 export interface SaveRevisionInput {
   header?: Record<string, unknown>;
@@ -5413,6 +5938,38 @@ export interface operationPoUnitRow {
 }
 export interface operationPoUnitsResponse {
   units: operationPoUnitRow[];
+}
+export interface OperationPoRevisionRow {
+  id: string;
+  rev_no: number;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  snapshot: Record<string, unknown>;
+  actor_name: string | null;
+}
+export interface OperationPoHistoryRow {
+  id: string;
+  text: string;
+  by_role: string | null;
+  by_user_id: string | null;
+  occurred_at: string;
+  actor_name: string | null;
+}
+export interface OperationPoAuditResponse {
+  revisions: OperationPoRevisionRow[];
+  history: OperationPoHistoryRow[];
+}
+export function useOperationPoAudit(poId: string | null) {
+  return useQuery<OperationPoAuditResponse>({
+    queryKey: ["operation", "pos", poId ?? "", "audit"] as const,
+    queryFn: () =>
+      apiFetch<OperationPoAuditResponse>(
+        `/api/operation/pos/${encodeURIComponent(poId ?? "")}/audit`,
+      ),
+    enabled: !!poId,
+    staleTime: 30_000,
+  });
 }
 export function useOperationPoUnits(
   poId: string | null,
@@ -5851,7 +6408,7 @@ export interface DeliveryOrderRow {
     customer_name: string | null;
     customer_address_city?: string | null;
     customer_address_state?: string | null;
-    /** The SO's customer promise — the register's `Customer Delivery` column
+    /** The SO's customer promise — the register's `Requested Delivery Date` column
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
@@ -5877,6 +6434,128 @@ export interface DeliveryOrdersRegisterPayload {
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
 }
+/**
+ * THE STOCK REGISTER — the one current listing of controlled Units
+ * (CARD-2026-08-20-stock-register). Read-only: reservation is the Sales Order's
+ * door and this page has no mutation of its own.
+ */
+export interface StockRegisterPayload {
+  units: StockRegisterUnit[];
+  total: number;
+}
+
+export function useStockRegister() {
+  return useQuery<StockRegisterPayload, ApiError>({
+    queryKey: ["operation", "stock-register"],
+    queryFn: () => apiFetch<StockRegisterPayload>("/api/ops/stock/register"),
+    staleTime: 30_000,
+  });
+}
+
+export interface StockUnitEvent {
+  id: string;
+  event: string;
+  fromValue: string | null;
+  toValue: string | null;
+  note: string | null;
+  eventAt: string;
+}
+
+export interface StockUnitPayload {
+  unit: StockRegisterUnit;
+  events: StockUnitEvent[];
+}
+
+/** One Unit, by its PERMANENT Carres Unit ID — the thing on the label. */
+export function useStockUnit(unitCode: string | undefined) {
+  return useQuery<StockUnitPayload, ApiError>({
+    queryKey: ["operation", "stock-unit", unitCode ?? ""],
+    queryFn: () => apiFetch<StockUnitPayload>(`/api/ops/stock/register/${encodeURIComponent(unitCode as string)}`),
+    enabled: Boolean(unitCode),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * DELIVERY'S OWN ARRANGEMENTS (0379) — every scope's carrier, agreed day and
+ * window, in one read. The workspace joins them by `${order_id}#${leg}`.
+ */
+export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
+
+export interface DeliveryArrangementsPayload {
+  arrangements: DeliveryArrangementRow[];
+}
+
+export function useDeliveryArrangements() {
+  return useQuery<DeliveryArrangementsPayload, ApiError>({
+    queryKey: ["operation", "delivery-arrangements"],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementsPayload>("/api/operation/delivery-arrangements"),
+    staleTime: 30_000,
+  });
+}
+
+/** One scope, plus its carrier history and the read-only Sales facts. */
+export interface DeliveryArrangementDetail {
+  order: Record<string, unknown> & {
+    id: string;
+    so: number;
+    customer_name: string | null;
+    customer_phone: string | null;
+    delivery_date: string | null;
+    delivery_date_tbd: boolean | null;
+    do_number: string | null;
+    order_lines: Array<{ id: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }>;
+  };
+  arrangement: DeliveryArrangementRow | null;
+  history: DeliveryArrangementEventRow[];
+}
+
+export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
+  return useQuery<DeliveryArrangementDetail, ApiError>({
+    queryKey: ["operation", "delivery-arrangement", orderId ?? "", leg],
+    queryFn: () =>
+      apiFetch<DeliveryArrangementDetail>(
+        `/api/operation/delivery-arrangements/${orderId}?leg=${leg}`,
+      ),
+    enabled: Boolean(orderId),
+    staleTime: 10_000,
+  });
+}
+
+/** ASSIGN LOGISTICS — one partner onto one or many scopes, atomically. */
+export function useAssignLogistics() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AssignLogisticsInput) =>
+      apiFetch<{ assigned: number; partner: string }>(
+        "/api/operation/delivery-arrangements/assign",
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
+  });
+}
+
+/** SAVE DELIVERY — the Edit Delivery form for ONE scope. */
+export function useSaveDeliveryArrangement(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveDeliveryArrangementInput) =>
+      apiFetch<{ arrangement: DeliveryArrangementRow }>(
+        `/api/operation/delivery-arrangements/${orderId}?leg=${leg}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
+  });
+}
+
 export function useDeliveryOrdersRegister(opts?: { orderId?: string; enabled?: boolean }) {
   const scope = opts?.orderId ?? "all";
   return useQuery<DeliveryOrdersRegisterPayload, ApiError>({
@@ -6816,11 +7495,18 @@ export function useRecheckStockMutation(
  * browser. Both routes are retired and both RPCs are revoked from every browser
  * role (migration 0339).
  *
- * `purchasing_issue_pos_batch(jsonb)` is now the ONLY authority that may create
- * a Purchase Order. Its one caller is Batch Purchase's
- * `POST /api/operation/purchase/to-order/issue`.
- * There is deliberately no replacement hook: a hook is a door, and this card
- * exists to leave exactly one. */
+ * ONE CREATION AUTHORITY, GOVERNED CALLERS.
+ * `purchasing_issue_pos_batch(jsonb)` is the only authority that may create a
+ * Purchase Order. It is reached through the governed operator journeys — SO
+ * Batch Purchase (`POST /api/operation/purchase/to-order/issue-batch`) and
+ * Manual Purchase (its own approved issue route) — and through nothing else.
+ *
+ * (Corrected 2026-08-23. This comment named `POST …/to-order/issue` as the one
+ * caller; that route is RETIRED — CARD-2026-08-22-purchasing-02 deleted it —
+ * and Manual Purchase was always a second governed caller of the same RPC.)
+ *
+ * There is deliberately no replacement hook: a hook is a door, and the card
+ * that removed the extra authorities exists to leave only governed ones. */
 
 /**
  * Chase-event log (Jess 2026-07-23) — Purchase cockpit's ② Chase button now
@@ -7159,33 +7845,9 @@ export function useReassignPoWarehouseMutation(
   });
 }
 
-/** Manual stock adjustment (positive=inbound, negative=damage/loss). Writes a
- *  stock_movements row + audit_log entry. */
-export function useAdjustStockMutation(
-  opts?: Partial<
-    UseMutationOptions<operationAdjustStockResponse, ApiError, AdjustStockInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationAdjustStockResponse, ApiError, AdjustStockInput>({
-    mutationFn: (input) =>
-      apiFetch<operationAdjustStockResponse>("/api/operation/warehouse/adjust", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0366 — `useAdjustStockMutation` IS GONE, with POST /api/operation/warehouse/
+// adjust and the `operation_adjust_stock` RPC behind it. Stock is counted from
+// the exact Units; there is no door that moves a total without naming one.
 
 // ---------------------------------------------------------------------------
 // Phase 5 — Finance hooks (queries + mutations)
@@ -9073,16 +9735,32 @@ export function useOfferModelCompartments() {
     mutationFn: async ({
       modelId,
       compartmentIds,
+      supplierId,
+      supplierCodes,
     }: {
       modelId: string;
       compartmentIds: string[];
+      /* An explicit pick wins outright (2026-08-26) — the server's one
+       * precedence is explicit → sibling inherit → category cover, so every
+       * compartment in the batch lands on the supplier the keyer chose. */
+      supplierId?: string;
+      /* ⭐ The supplier's own code per compartment (2026-08-24), keyed by
+       * compartmentId. This loop already sends one request per compartment, so
+       * a per-piece code costs nothing extra: it rides the request that
+       * compartment was making anyway. An absent entry sends nothing, which
+       * the server reads as "leave the existing code alone". */
+      supplierCodes?: Record<string, string>;
     }) => {
       const failed: { compartmentId: string; message: string }[] = [];
       for (const compartmentId of compartmentIds) {
         try {
+          const code = supplierCodes?.[compartmentId]?.trim();
           await apiFetch<{ modelSofaCompartment: ModelSofaCompartmentDto }>(
             `/api/catalog/models/${modelId}/compartments/${compartmentId}`,
-            catalogJson("PUT", {}),
+            catalogJson("PUT", {
+              ...(supplierId ? { supplierId } : {}),
+              ...(code ? { supplierCode: code } : {}),
+            }),
           );
         } catch (e) {
           failed.push({

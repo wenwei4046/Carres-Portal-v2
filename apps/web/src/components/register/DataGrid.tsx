@@ -184,7 +184,33 @@ export type DataGridProps<T> = {
   toolbarStart?: ReactNode;
   /** Outputs valid ONLY for the exact selection — MASTER.md:588. The label
    *  receives the count so the button prints the truthful number. */
-  selectionActions?: Array<{ label: (n: number) => string; onClick: (rows: never[]) => void }>;
+  selectionActions?: Array<{
+    label: (n: number) => string;
+    onClick: (rows: never[]) => void;
+    /**
+     * Which selection sizes this action is valid for. Owner ruling 2026-08-24:
+     * `Edit Delivery` opens ONE scope, so it must not offer itself for three —
+     * an action that cannot mean anything for the current selection should not
+     * be there to be clicked. Absent = always shown (every existing caller).
+     */
+    visible?: (n: number) => boolean;
+    /** `output` keeps the printer glyph; `write` is a governed action. */
+    kind?: "output" | "write";
+  }>;
+  /**
+   * The selection bar's own count sentence. The engine's default says
+   * `N selected`, which is true and says nothing about WHAT. A page that knows
+   * its unit passes it — `1 delivery scope selected` (owner ruling 2026-08-24).
+   */
+  selectionSummary?: (n: number) => string;
+  /** Page-owned primary action beside the selection summary and Clear.
+   *  Use this for structured ownership beside the governed work action;
+   *  outputs remain separated at the toolbar's right edge. */
+  selectionPrimary?: ReactNode;
+  /** Hover/title on the disclosure chevron — what OPENS, not the mechanic. */
+  expandTitle?: string;
+  /** Hide the built-in Excel pill on the selection bar. */
+  hideSelectionExport?: boolean;
   toolbarEnd?: ReactNode;
   /** Fixed informational footer. Receives the filtered result and, when
       present, the selected rows that remain in that result. */
@@ -211,8 +237,15 @@ export type DataGridProps<T> = {
    *
    * The FIRST data column is pinned, not a named one: the engine does not know
    * what a `SO No` is, and the identity column is whatever the page put first.
+   *
+   * ⭐ CARD 02-B EXTENSION (2026-08-27): `{ columnKey }` names the identity
+   * explicitly, for a Register whose approved column order does not put the
+   * identity first. At rest the sheet reads in the approved order; once it
+   * scrolls, the NAMED column pins directly after the control gutter and the
+   * intervening columns slide beneath it. `true` keeps the original
+   * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean;
+  stickyIdentity?: boolean | { columnKey: string };
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -237,6 +270,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
+    /** Per-row test id for the disclosure chevron. */
+    testId?: (row: T) => string;
   };
   /**
    * First-class multi-select (Commander 2026-06-19). Prepends a synthetic
@@ -250,7 +285,29 @@ export type DataGridProps<T> = {
     /** Toggle all visible rows. `keys` = the keys currently shown; `allSelected`
         = whether they are all already selected (so the parent clears vs selects). */
     onToggleAll: (keys: string[], allSelected: boolean) => void;
+    /**
+     * Which rows may be selected at all (SO Batch Purchase, 2026-08-22).
+     *
+     * Some registers list rows that CANNOT take the bulk act — a buying line
+     * whose supplier is unresolved has no purchase order to make. Offering the
+     * tick there offers an act that fails, and a page-local overlay could not
+     * fix the header checkbox or row-click, which both live in here. Omitted =
+     * every row is selectable, exactly as before.
+     */
+    isSelectable?: (row: never) => boolean;
+    /**
+     * ⭐ CARD 02-B (2026-08-27): a row whose checkbox stands for a SET of
+     * child records renders indeterminate when only part of that set is
+     * selected — the browser checkbox's own third state, set the same way the
+     * header checkbox already sets it. Omitted = never indeterminate, which
+     * keeps every existing caller byte-identical.
+     */
+    isIndeterminate?: (row: never) => boolean;
+    /** Per-row test id for the checkbox. */
+    testId?: (row: never) => string;
   };
+  /** Per-row test id for the whole `<tr>`. */
+  rowTestId?: (row: T) => string;
   /**
    * STAGE 1 engine extension (Law 13, with `chooserGroup`): the order the
    * grouped Columns chooser lists its sections in. Groups not named here
@@ -379,6 +436,7 @@ function DataGridInner<T>({
   onRowClick,
   rowStyle,
   onSelectionChange,
+  rowTestId,
   onFilteredRowsChange,
   onSearchChange,
   appearance = "default",
@@ -386,6 +444,10 @@ function DataGridInner<T>({
   toolbarStart,
   toolbarEnd,
   selectionActions,
+  selectionSummary,
+  selectionPrimary,
+  expandTitle,
+  hideSelectionExport,
   statusSummary,
   outputActions,
   focusSearchNonce,
@@ -783,12 +845,24 @@ function DataGridInner<T>({
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
+    const identityKey =
+      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
     let left = 0;
     for (const col of visibleColumns) {
-      m.set(col.key, left);
-      left += Number(layout.widths[col.key] ?? col.width ?? 140);
-      // Stop AFTER the first real data column — the identity, not the record.
-      if (!col.key.startsWith("__")) break;
+      if (col.key.startsWith("__")) {
+        // The control gutter always pins, at cumulative offsets.
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        continue;
+      }
+      if (identityKey == null || col.key === identityKey) {
+        // The identity: the first data column, or the NAMED one — pinned
+        // directly after the gutter, so a scrolled sheet slides the columns
+        // before it underneath. If the named column is hidden, only the
+        // gutter pins: a wrong identity is worse than none.
+        m.set(col.key, left);
+        break;
+      }
     }
     return m;
   }, [stickyIdentity, visibleColumns, layout.widths]);
@@ -994,6 +1068,17 @@ function DataGridInner<T>({
   const selectedVisibleRows = useMemo(() => {
     if (!selectable || selectable.selectedKeys.size === 0) return [];
     return sortedRows.filter((r) => selectable.selectedKeys.has(rowKey(r)));
+  }, [selectable, sortedRows, rowKey]);
+
+  /* A parent row may truthfully represent selected child work without being
+     fully checked. Such an indeterminate row still owns the selected toolbar:
+     hiding the only action until every child is ticked makes a valid partial
+     selection impossible to complete. */
+  const selectedOrIndeterminateVisibleRows = useMemo(() => {
+    if (!selectable) return [];
+    return sortedRows.filter((r) =>
+      selectable.selectedKeys.has(rowKey(r)) || selectable.isIndeterminate?.(r as never) === true,
+    );
   }, [selectable, sortedRows, rowKey]);
 
   // ── Group rendering ───────────────────────────────────────────────
@@ -1350,7 +1435,7 @@ function DataGridInner<T>({
     return (
       <Fragment key={`f-${key}-${idx}`}>
         <tr
-          data-testid={isReference ? "grid-parent-row" : undefined}
+          data-testid={rowTestId?.(row) ?? (isReference ? "grid-parent-row" : undefined)}
           className={`${styles.tr} ${selectedKey === key ? styles.trSelected : ""}`}
           style={{
             ...rowStyle?.(row),
@@ -1364,7 +1449,9 @@ function DataGridInner<T>({
           onClick={() => {
             setSelectedKey(key);
             if (onRowClick) onRowClick(row);
-            else if (selectable) selectable.onToggle(key);
+            else if (selectable && (selectable.isSelectable?.(row as never) ?? true)) {
+              selectable.onToggle(key);
+            }
           }}
           onDoubleClick={() => onRowDoubleClick?.(row)}
           onContextMenu={(e) => {
@@ -1389,7 +1476,14 @@ function DataGridInner<T>({
                   <input
                     type="checkbox"
                     aria-label="Select row"
+                    data-testid={selectable.testId?.(row as never)}
                     checked={selectable.selectedKeys.has(key)}
+                    disabled={!(selectable.isSelectable?.(row as never) ?? true)}
+                    /* A parent-of-children checkbox's third state — set via the
+                       ref exactly as the header checkbox sets its own. */
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectable.isIndeterminate?.(row as never) ?? false;
+                    }}
                     onChange={() => selectable.onToggle(key)}
                   />
                 </td>
@@ -1405,6 +1499,19 @@ function DataGridInner<T>({
                   <button
                     type="button"
                     aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                    data-testid={expandable.testId?.(row)}
+                    /* The disclosure has to ANNOUNCE its state, not only its
+                       label: a screen reader lands on the chevron and must be
+                       told whether the goods below it are already open. One
+                       attribute in the ENGINE gives every register the same
+                       answer — a page-local disclosure could not (Law 13). */
+                    aria-expanded={isExpanded}
+                    /* ⭐ THE HOVER SAYS WHAT OPENS (owner correction
+                       2026-08-24). A disclosure whose only label is "Expand
+                       row" tells the operator the mechanic and not the
+                       content. Pages that carry something other than goods
+                       pass their own word. */
+                    title={expandTitle ?? "Show items"}
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleExpand(expandKey);
@@ -1414,8 +1521,19 @@ function DataGridInner<T>({
                       border: 0,
                       padding: 0,
                       cursor: "pointer",
-                      color: "var(--c-burnt)",
-                      fontSize: 12,
+                      /* ⭐ A DISCLOSURE IS CHROME, NOT AN ALARM — owner
+                         correction 2026-08-24 on a production screenshot.
+                         This was `var(--c-burnt)`: a 12px RED triangle in the
+                         leftmost gutter of every row, which is the portal's
+                         danger ink spent on a control that means "there is
+                         more here". Red down a whole column reads as ninety
+                         problems. Neutral grey is what a chevron is for, and
+                         fixing it in the ENGINE fixes every register at once
+                         rather than teaching one page a private colour.
+                         `--fg-muted` is the module's own base-500 alias — a
+                         token the sheet already speaks, not a new literal. */
+                      color: "var(--fg-muted)",
+                      fontSize: 14,
                       lineHeight: 1,
                       display: "inline-block",
                       transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
@@ -1476,16 +1594,20 @@ function DataGridInner<T>({
 
   return (
     <div
-      className={`${styles.root} ${embedded ? styles.rootEmbedded : ""} ${
-        isReference ? styles.rootReference : ""
-      }`}
+      className={[
+        styles.root,
+        embedded ? styles.rootEmbedded : null,
+        isReference ? styles.rootReference : null,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws
           mandate), then the caller's actions, then Export + Columns pinned
           right (LAWS 3 + 4). */}
-      {!(selectable && selectedVisibleRows.length > 0) ? (
+      {!(selectable && selectedOrIndeterminateVisibleRows.length > 0) ? (
       <div className={styles.toolbar} data-testid={isReference ? "work-toolbar" : undefined}>
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
@@ -1720,7 +1842,14 @@ function DataGridInner<T>({
       </div>
       ) : (
         <div className={`${styles.toolbar} ${styles.selectionBar}`} data-testid="selection-bar">
-          <span className={styles.selectionCount}>{selectedVisibleRows.length} selected</span>
+          <span className={styles.selectionCount}>
+            {/* The page names its own unit when it has one: `3 delivery scopes
+                selected` beats `3 selected`, which is true and says nothing
+                about what three of. */}
+            {selectionSummary
+              ? selectionSummary(selectedOrIndeterminateVisibleRows.length)
+              : `${selectedOrIndeterminateVisibleRows.length} selected`}
+          </span>
           <button
             type="button"
             className={styles.tbarBtn}
@@ -1728,27 +1857,42 @@ function DataGridInner<T>({
           >
             Clear
           </button>
-          <button
-            type="button"
-            className={styles.toolbarPill}
-            onClick={() => {
-              void exportRows(selectedVisibleRows);
-            }}
-          >
-            <Download size={14} strokeWidth={1.75} aria-hidden />
-            <span>Export Excel ({selectedVisibleRows.length})</span>
-          </button>
-          {(selectionActions ?? []).map((a) => (
+          {selectionPrimary}
+          <div className={styles.toolbarSpacer} />
+          {!hideSelectionExport && (
             <button
-              key={a.label(0)}
               type="button"
               className={styles.toolbarPill}
-              onClick={() => a.onClick(selectedVisibleRows as never[])}
+              onClick={() => {
+                void exportRows(selectedOrIndeterminateVisibleRows);
+              }}
             >
-              <Printer size={14} strokeWidth={1.75} aria-hidden />
-              <span>{a.label(selectedVisibleRows.length)}</span>
+              <Download size={14} strokeWidth={1.75} aria-hidden />
+              <span>Export Excel ({selectedOrIndeterminateVisibleRows.length})</span>
             </button>
-          ))}
+          )}
+          {(selectionActions ?? [])
+            /* ⭐ AN ACTION THAT CANNOT MEAN ANYTHING FOR THIS SELECTION IS NOT
+               OFFERED (owner ruling 2026-08-24). `Edit Delivery` opens one
+               scope; showing it beside three ticked rows invites a click whose
+               only possible answer is a refusal. */
+            .filter((a) => (a.visible ? a.visible(selectedOrIndeterminateVisibleRows.length) : true))
+            .map((a) => (
+              <button
+                key={a.label(0)}
+                type="button"
+                className={styles.toolbarPill}
+                data-testid={`selection-action-${a.label(1).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                onClick={() => a.onClick(selectedOrIndeterminateVisibleRows as never[])}
+              >
+                {/* A printer on `Assign logistics` would be a lie about what
+                    the button does. Only an OUTPUT keeps the printer glyph. */}
+                {a.kind === "write" ? null : (
+                  <Printer size={14} strokeWidth={1.75} aria-hidden />
+                )}
+                <span>{a.label(selectedOrIndeterminateVisibleRows.length)}</span>
+              </button>
+            ))}
         </div>
       )}
 
@@ -1803,7 +1947,12 @@ function DataGridInner<T>({
                 const isSorted = layout.sort?.key === col.key;
                 const arrow = isSorted ? (layout.sort!.dir === "asc" ? "A" : "V") : "";
                 if (col.key === "__select__" && selectable) {
-                  const keys = sortedRows.map(rowKey);
+                  /* Select-all means "every row that CAN be selected". A header
+                     box that stays indeterminate forever because three rows can
+                     never be ticked is a control that lies about its own state. */
+                  const keys = sortedRows
+                    .filter((r) => selectable.isSelectable?.(r as never) ?? true)
+                    .map(rowKey);
                   const allSel = keys.length > 0 && keys.every((k) => selectable.selectedKeys.has(k));
                   const someSel = !allSel && keys.some((k) => selectable.selectedKeys.has(k));
                   return (

@@ -94,7 +94,8 @@ const styles = StyleSheet.create({
   colNo: { width: mm(7) },
   colSo: { width: mm(20) },
   colUnit: { width: mm(26) },
-  colQty: { width: mm(16), textAlign: "right", paddingRight: mm(5) },
+  colDestination: { width: mm(35), paddingRight: mm(3) },
+  colQty: { width: mm(13), textAlign: "right", paddingRight: mm(3) },
   row: { flexDirection: "row", paddingVertical: mm(2), paddingHorizontal: mm(2) },
   rowHair: { borderBottomWidth: 0.3, borderBottomColor: HAIR },
   cellNo: { fontSize: 7, color: GREY, width: mm(7), textAlign: "right", paddingRight: mm(1.5), lineHeight: 1 },
@@ -103,7 +104,9 @@ const styles = StyleSheet.create({
   desc: { flex: 1, paddingRight: mm(3) },
   descMain: { fontSize: 7.5, fontWeight: 600, lineHeight: 1 },
   descSub: { fontSize: 7, color: GREY, marginTop: mm(0.8), paddingLeft: mm(2), lineHeight: 1.2 },
-  cellQty: { fontSize: 7.5, width: mm(16), textAlign: "right", paddingRight: mm(5), lineHeight: 1 },
+  cellDestination: { fontSize: 7, width: mm(35), paddingRight: mm(3), lineHeight: 1.2 },
+  destinationAddress: { fontSize: 6.5, color: GREY, marginTop: mm(0.5), lineHeight: 1.15 },
+  cellQty: { fontSize: 7.5, width: mm(13), textAlign: "right", paddingRight: mm(3), lineHeight: 1 },
 
   // ── sofa layout drawing (direction contract, unchanged) ──
   layout: { marginTop: mm(4), paddingHorizontal: mm(4) },
@@ -161,21 +164,49 @@ function isChaise(code: string): boolean {
 }
 
 export function PoTemplate(data: PoTemplateData) {
-  const { po_number, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
+  const { po_number, version, issue_date, supplier, destination, delivery_instructions, eta_date, so_refs, issued_by, lines } = data;
+  /* 0378 — the document's own identity. A supplier holding two papers with one
+     number and no version cannot tell which to build from, so Version 1 prints
+     too. (`Version 1 prints nothing` is the internal REVISIONS PANEL's rule —
+     `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */
+  const versionLabel = `Version ${version ?? 1}`;
 
-  // Per-line SO attribution exists only when the PO covers ONE sales order.
-  const soLabel = so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
+  /**
+   * ⭐ PER-LINE SO ATTRIBUTION, FROM THE LINE'S OWN LINEAGE (0382).
+   *
+   * This used to print only when the whole purchase order covered exactly ONE
+   * sales order, because the schema kept `so_refs` on the DOCUMENT and nothing
+   * per line. Every bulk purchase order therefore printed a blank `SO NO`
+   * column — the one column that tells the factory whose goods these are.
+   *
+   * A line serving three customers prints all three, with the quantity beside
+   * each, because ten mattresses on one line are not interchangeable once they
+   * are promised to three people. The document-level fallback stays for the
+   * purchase orders raised before 0382, which have no lineage to read.
+   */
+  const soCell = (line: PoTemplateData["lines"][number]): string => {
+    const src = (line.sources ?? []).filter((s) => s.so != null);
+    if (src.length === 1) return `SO-${src[0]!.so}`;
+    if (src.length > 1) return src.map((s) => `SO-${s.so} × ${s.qty}`).join("\n");
+    return so_refs && so_refs.length === 1 ? `SO-${so_refs[0]}` : "";
+  };
   // Bulk PO (several sales orders) closes with a TOTAL row; a one-customer
   // PO does not (one set per page makes a total meaningless).
   const isBulk = (so_refs?.length ?? 0) > 1;
   const totalQty = lines.reduce((s, l) => s + Number(l.qty), 0);
   const groups = sofaGroups(lines);
+  const effectiveDestinations = lines.map((line) => line.destination ?? destination);
+  const uniqueDestinations = [...new Map(
+    effectiveDestinations.map((item) => [`${item.name}\u0000${item.address}`, item]),
+  ).values()];
+  const multipleDestinations = uniqueDestinations.length > 1;
 
   // No SO No row here — a bulk PO can carry dozens; the table's SO NO
   // column is the one home (owner round, 2026-08-09). `Deliver by` is the
   // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
     ["PO No", po_number],
+    ["Version", versionLabel.replace("Version ", "")],
     ["Issued", niceDate(issue_date)],
     ["Deliver by", niceDate(eta_date), true],
   ];
@@ -206,6 +237,9 @@ export function PoTemplate(data: PoTemplateData) {
                   <View style={styles.docBlock}>
                     <Text style={styles.docNumber}>{po_number}</Text>
                     <Text style={styles.docTitle}>PURCHASE ORDER</Text>
+                    {/* The identity a supplier reads at a glance, on the same
+                        line the number lives on. */}
+                    <Text style={styles.docTitle}>{versionLabel}</Text>
                   </View>
                 </View>
                 <View style={styles.headerRule} />
@@ -216,7 +250,9 @@ export function PoTemplate(data: PoTemplateData) {
                   <Text style={styles.legalLine}>
                     {CARRES_COMPANY.legalName} · SSM {CARRES_COMPANY.regNo}
                   </Text>
-                  <Text style={{ fontSize: 9, fontWeight: 700 }}>PURCHASE ORDER · {po_number}</Text>
+                  <Text style={{ fontSize: 9, fontWeight: 700 }}>
+                    PURCHASE ORDER · {po_number} · {versionLabel}
+                  </Text>
                 </View>
                 <View style={styles.headerRule} />
               </View>
@@ -224,10 +260,9 @@ export function PoTemplate(data: PoTemplateData) {
           }
         />
 
-        {/* ── section 2, THREE columns (owner 2026-08-09, restoring the old
-            law's deliver-to-at-section-2): who supplies · where it goes ·
-            when it's due — the supplier's 3-second sweep in one row. One PO,
-            ONE destination (a line needing another address is another PO). ── */}
+        {/* ── section 2, THREE columns: who supplies · where every line goes ·
+            when it is due. A multi-destination PO names every governed address
+            here and repeats each line's effective destination in the table. ── */}
         <View style={styles.cards}>
           {/* Content decides the widths: the two ADDRESS blocks flex and
               wrap; only the details column (fixed facts) is fixed. The
@@ -244,8 +279,22 @@ export function PoTemplate(data: PoTemplateData) {
           <View style={{ flex: 1.1, paddingRight: mm(5) }}>
             <Text style={styles.blockLabel}>Deliver To</Text>
             <View style={{ marginTop: mm(1.5) }}>
-              <Text style={[styles.stackValue, { fontWeight: 600 }]}>{destination.name}</Text>
-              <Text style={styles.stackValue}>{destination.address}</Text>
+              {multipleDestinations ? (
+                <>
+                  <Text style={[styles.stackValue, { fontWeight: 700 }]}>Multiple destinations</Text>
+                  {uniqueDestinations.map((item) => (
+                    <View key={`${item.name}-${item.address}`} style={{ marginTop: mm(1) }}>
+                      <Text style={[styles.stackValue, { fontWeight: 600 }]}>{item.name}</Text>
+                      <Text style={styles.stackValue}>{item.address}</Text>
+                    </View>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.stackValue, { fontWeight: 600 }]}>{uniqueDestinations[0]?.name ?? destination.name}</Text>
+                  <Text style={styles.stackValue}>{uniqueDestinations[0]?.address ?? destination.address}</Text>
+                </>
+              )}
               {delivery_instructions ? <Text style={styles.deliverNote}>{delivery_instructions}</Text> : null}
             </View>
           </View>
@@ -272,6 +321,7 @@ export function PoTemplate(data: PoTemplateData) {
           <Text style={[styles.th, styles.colSo]}>SO No</Text>
           <Text style={[styles.th, styles.colUnit]}>Item ID</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
+          <Text style={[styles.th, styles.colDestination]}>Deliver To</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
         </View>
         {lines.map((line, idx) => {
@@ -281,10 +331,11 @@ export function PoTemplate(data: PoTemplateData) {
           if (a.gap) bits.push(`Gap ${a.gap}`);
           if (a.fabric_name) bits.push(`Fabric ${a.fabric_name}`);
           const showVariant = line.description && line.description !== line.sku;
+          const lineDestination = line.destination ?? destination;
           return (
             <View key={`${line.sku}-${idx}`} wrap={false} style={[styles.row, styles.rowHair]}>
               <Text style={styles.cellNo}>{idx + 1}</Text>
-              <Text style={styles.cellSo}>{soLabel}</Text>
+              <Text style={styles.cellSo}>{soCell(line)}</Text>
               <Text style={styles.cellUnit}>
                 {line.unit_codes && line.unit_codes.length > 0 ? line.unit_codes.join("\n") : "—"}
               </Text>
@@ -294,6 +345,10 @@ export function PoTemplate(data: PoTemplateData) {
                   {showVariant ? ` — ${line.description}` : ""}
                 </Text>
                 {bits.length > 0 ? <Text style={styles.descSub}>{bits.join(" · ")}</Text> : null}
+              </View>
+              <View style={styles.cellDestination}>
+                <Text>{lineDestination.name}</Text>
+                <Text style={styles.destinationAddress}>{lineDestination.address}</Text>
               </View>
               <Text style={line.qty > 1 ? [styles.cellQty, { fontWeight: 700 }] : styles.cellQty}>
                 {line.qty}
@@ -312,6 +367,7 @@ export function PoTemplate(data: PoTemplateData) {
             <View style={styles.desc}>
               <Text style={[styles.descMain, { fontWeight: 700, textAlign: "right" }]}>TOTAL</Text>
             </View>
+            <Text style={styles.cellDestination}> </Text>
             <Text style={[styles.cellQty, { fontWeight: 700 }]}>{totalQty}</Text>
           </View>
         ) : null}

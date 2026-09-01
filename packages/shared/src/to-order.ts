@@ -59,7 +59,7 @@ export const TO_ORDER_WORDS = {
   //    Preferred Delivery · SO No. · Model · Qty · PO No. Category is NOT a
   //    column (the left panel already said it) and Customer is not either
   //    (Loo: noise). PO No. rightmost = "did today's order happen". ───────
-  colPreferred: "Customer Delivery",
+  colPreferred: "Requested Delivery Date",
   colSoNo: "SO No.",
   colModel: "Model",
   colQty: "Qty",
@@ -232,23 +232,39 @@ export const TO_ORDER_WORDS = {
    */
   reason: "Reason",
   /**
-   * The six. **FIVE of them can be recorded and one cannot**, and the split is
-   * the database's, not this file's: `purchase_demands.purpose` has a CHECK
-   * holding exactly `ready_stock` · `display` · `office` · `warranty` ·
-   * `spare_parts` — 0323 opened four, and 0359 admitted `spare_parts` on the
-   * Manual Purchase ruling (Jess, 2026-08-18).
-   *
+   * THE APPROVED PURPOSE VOCABULARY — owner ruling 2026-08-28 (Purchasing
+   * Card 03; widened by Card 04, 2026-08-29). Exactly six creatable
+   * purposes; the doors (0399/0401: `purchasing_create_request` /
+   * `purchasing_create_demand`) admit exactly these values and refuse
+   * everything else — a retired value included — by name
+   * (`unknown_purpose`). Management is included under
+   * `Internal Staff Purchase`; there is no `Management Purchase`. Only
+   * `Other Purchase` asks — and must answer — `What is this for?`.
+   */
+  reasonReadyStock: "Ready Stock",
+  reasonShowroomDisplay: "Showroom Display",
+  reasonServiceCase: "Service Case",
+  reasonInternalStaffPurchase: "Internal Staff Purchase",
+  reasonSubsidiaryPurchase: "Subsidiary Purchase",
+  reasonOtherPurchase: "Other Purchase",
+  /**
+   * THE RETIRED FOUR — history's own words, never offered again (Card 03).
+   * Rows stored before the 2026-08-28 ruling keep printing the word they were
+   * actually asked as: an office-supplies buy was never a staff purchase, and
+   * relabelling old rows into the new vocabulary is the false mapping the
+   * Card bans. `RETIRED_DEMAND_PURPOSE_LABELS` below is their one home.
+   */
+  reasonDisplay: "Display",
+  reasonWarranty: "Warranty",
+  reasonSpareParts: "Spare Parts",
+  reasonOffice: "Office",
+  /**
    * `reasonOther` still has NO value to be stored as and is NOT offered — see
    * `DEMAND_PURPOSES`, which is the list a control may render. It stays here
    * because it is a ruled word a later card may need; a word with no home in
    * the store is a word the server refuses by name, which is exactly the
    * failure 0322 paid for on the pool's reasons.
    */
-  reasonReadyStock: "Ready Stock",
-  reasonDisplay: "Display",
-  reasonWarranty: "Warranty",
-  reasonSpareParts: "Spare Parts",
-  reasonOffice: "Office",
   reasonOther: "Other…",
   /** The customer lane's auto-stamp (0361) — never offered in a picker; a PO
    *  born from sales orders says so itself. */
@@ -463,29 +479,60 @@ export const TO_ORDER_WORDS = {
  * ── The Source a typed demand may carry (card P15, Loo 2026-08-04) ──────────
  *
  * **THE MIRROR OF A DATABASE LIST, NOT A MENU SOMEBODY CHOSE.** The values are
- * `purchase_demands.purpose`'s CHECK, and the write door
- * (`purchasing_create_demand`, opened by 0323, widened by 0359) names the same
- * five. Three places must agree — the CHECK, the function's own gate, and this
- * — and 0322 is why: when the pool's reasons lived in four places and only two
- * were widened, every dropdown offered a word the server refused by name.
+ * the ones the write doors admit (`purchasing_create_request` /
+ * `purchasing_create_demand`, gates re-ruled by 0399 to the owner-approved
+ * five, Card 03 2026-08-28; widened to six by 0401, Card 04 2026-08-29).
+ * Three places must agree — the doors, the API enums, and this — and 0322 is
+ * why: when the pool's reasons lived in four places and only two were
+ * widened, every dropdown offered a word the server refused by name. The
+ * CHECKs are deliberately WIDER than this list: they also hold the retired
+ * history values no door accepts any more.
  *
  * This array is therefore the ONLY list a control may render.
- * `Other…` is a ruled WORD in `TO_ORDER_WORDS` and is deliberately not
- * here: neither has ever had a value to be stored as, and inventing one would
- * be a screen ruling on a business question ("other" than what?).
+ * `Other Purchase` (Card 04) is the ruled catch-all with a value of its own,
+ * and it is the ONE purpose that asks — and must answer —
+ * `What is this for?`; the bare `Other…` word above remains a word with no
+ * stored value.
  *
- * THE ORDER IS THE DISPLAY ORDER and it is the frequency order, not the
- * CHECK's: Ready Stock is what almost every typed demand is, so it leads and
- * is the default; the other three are the exceptions this field exists to tell
- * apart.
+ * THE ORDER IS THE DISPLAY ORDER — the owner-approved order (Cards 03/04).
+ * Ready Stock is what almost every typed demand is, so it leads and is the
+ * default; the other five are the exceptions this field exists to tell apart.
  */
 export const DEMAND_PURPOSES = [
   { value: "ready_stock", label: TO_ORDER_WORDS.reasonReadyStock },
-  { value: "display", label: TO_ORDER_WORDS.reasonDisplay },
-  { value: "warranty", label: TO_ORDER_WORDS.reasonWarranty },
-  { value: "office", label: TO_ORDER_WORDS.reasonOffice },
-  { value: "spare_parts", label: TO_ORDER_WORDS.reasonSpareParts },
+  { value: "showroom_display", label: TO_ORDER_WORDS.reasonShowroomDisplay },
+  { value: "service_case", label: TO_ORDER_WORDS.reasonServiceCase },
+  { value: "internal_staff_purchase", label: TO_ORDER_WORDS.reasonInternalStaffPurchase },
+  { value: "subsidiary_purchase", label: TO_ORDER_WORDS.reasonSubsidiaryPurchase },
+  { value: "other_purchase", label: TO_ORDER_WORDS.reasonOtherPurchase },
 ] as const;
+
+/**
+ * THE RETIRED VALUES — readable on history, creatable never (Card 03,
+ * 2026-08-28). The doors refuse them by name; the Register and object keep
+ * printing the word each row was actually asked as. NOT part of
+ * `DEMAND_PURPOSES`, so no control can offer one.
+ */
+export const RETIRED_DEMAND_PURPOSE_LABELS: Record<string, string> = {
+  display: TO_ORDER_WORDS.reasonDisplay,
+  warranty: TO_ORDER_WORDS.reasonWarranty,
+  office: TO_ORDER_WORDS.reasonOffice,
+  spare_parts: TO_ORDER_WORDS.reasonSpareParts,
+};
+
+/**
+ * What a stored demand/request purpose prints as — approved and retired
+ * values both answer; anything else is `null` (the caller decides what
+ * nothing looks like). ONE label arithmetic for every surface (Law D).
+ */
+export function demandPurposeLabelOf(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return (
+    DEMAND_PURPOSES.find((p) => p.value === v)?.label ??
+    RETIRED_DEMAND_PURPOSE_LABELS[v] ??
+    null
+  );
+}
 
 export type DemandPurpose = (typeof DEMAND_PURPOSES)[number]["value"];
 
@@ -501,15 +548,16 @@ export function isDemandPurpose(v: unknown): v is DemandPurpose {
 
 /**
  * What a PO's `purpose` (0361) prints as — the `Need for` fact on the PO
- * surfaces. `customer_sales` is the customer lane's auto-stamp; the five typed
- * purposes reuse the demand labels above (one dictionary, Law D). NULL — every
- * PO issued before 0361, deliberately not backfilled — prints nothing, and the
- * caller decides what nothing looks like.
+ * surfaces. `customer_sales` is the customer lane's auto-stamp; typed
+ * purposes — approved and retired alike — reuse the one demand-label
+ * arithmetic above (Law D). NULL — every PO issued before 0361, deliberately
+ * not backfilled — prints nothing, and the caller decides what nothing looks
+ * like.
  */
 export function poPurposeLabelOf(v: string | null | undefined): string | null {
   if (!v) return null;
   if (v === "customer_sales") return TO_ORDER_WORDS.reasonCustomerSales;
-  return DEMAND_PURPOSES.find((p) => p.value === v)?.label ?? null;
+  return demandPurposeLabelOf(v);
 }
 
 /**
@@ -1220,6 +1268,16 @@ export interface ToOrderBuild {
    * joins the pool. Nothing is lost when it moves; the allocation moved.
    */
   fullyOnPo?: boolean;
+  /**
+   * Card 02-A — the engine's own timing facts, off the SAME bundle that
+   * produced this build's `arriveBy`. `orderBy` is the bundle's `raiseBy` (a
+   * bed set gates on its earlier leg on purpose) and `readyIfOrderedToday` is
+   * the bundle's `promiseIfOrderedToday` (the set is done when its last member
+   * is). They are CARRIED so the SO Batch rail can classify order timing
+   * without a second working-day arithmetic anywhere.
+   */
+  orderBy?: IsoDate | null;
+  readyIfOrderedToday?: IsoDate | null;
 }
 
 export interface ToOrderRow {
@@ -1758,6 +1816,10 @@ export function buildToOrder(input: BuildToOrderInput): ToOrderProposal[] {
           coveredByOpenPoPos: namePos(
             members.flatMap((m) => poRefsByLine.get(m.lineId) ?? []),
           ),
+          // Card 02-A — the bundle's own dates, never recomputed here.
+          orderBy: bundleByLine.get(members[0]!.lineId)?.raiseBy ?? null,
+          readyIfOrderedToday:
+            bundleByLine.get(members[0]!.lineId)?.promiseIfOrderedToday ?? null,
         });
       }
 

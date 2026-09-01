@@ -1,7 +1,7 @@
-STATUS: QUEUED — DEPENDS ON WAREHOUSE UNIT AUTHORITY FOUNDATION
+STATUS: EXECUTED 2026-08-21 — migration 0373; docs/stock/MASTER.md §12.2-§12.4 carries the measured evidence
 CARD: WAREHOUSE 2
 DATE: 2026-08-20
-PR: pending
+PR: see docs/stock/MASTER.md §12.2
 IMPLEMENTATION: APPROVED — Warehouse Blueprint persisted in docs/stock/MASTER.md
 and owner instructed 2026-08-20 to open the first two build Cards.
 

@@ -54,7 +54,14 @@
  * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
+import { unitsShortWords } from "./line-readiness";
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
+/* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
+   were re-implemented inline here while this file's own comment claimed it
+   asked the shared one. They agreed, which is the condition Law D names: two
+   implementations that merely happen to match. */
+import { paymentApprovalOpensGate, pendingPaymentApproval } from "./delivery-payment-approval";
+import { openFinanceExceptions } from "./finance-exception";
 import { fmtMoney } from "./money-format";
 import type { AllocationUnit, SalesOrderAllocation } from "./sales-order-allocation";
 import { normalizeSkuKey } from "./sku-code";
@@ -287,7 +294,7 @@ export interface SalesOrderRouteInput {
     id: string;
     so: number;
     customerName: string | null;
-    /** `orders.placed_at` — printed as `Ordered:`. */
+    /** `orders.placed_at` — printed as `SO Date:`. */
     placedAt: string | null;
     /** The customer's promise — printed as `Customer requested:`. */
     deliveryDate: string | null;
@@ -621,7 +628,7 @@ function purchaseChain(
         ownerKey: "purchasing",
         label: "Confirm ready date",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
         },
       },
       door: open(po.id, poHref(po.id)),
@@ -642,7 +649,7 @@ function purchaseChain(
         ownerKey: "receiving",
         label: "Check in",
         context: {
-          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Factory ready", po.expectedReadyDate) ?? dated("Customer Delivery", customerDelivery) ?? "Arrival date not recorded"}`,
+          detail: `${po.id} · ${units(slice.qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Estimated ready", po.expectedReadyDate) ?? dated("Requested Delivery Date", customerDelivery) ?? "Arrival date not recorded"}`,
         },
       },
       door: record ? open(record.recordNo, receivingHref(record.id)) : null,
@@ -669,7 +676,7 @@ function unassignedChain(
         ownerKey: "purchasing",
         label: "Issue PO",
         context: {
-          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+          detail: `${line.label} · ${units(qty)} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
         },
       },
       door: open("Purchasing", purchasingHref),
@@ -707,12 +714,12 @@ function stockDraft(
     complete: allReady,
     lines: allReady
       ? [`${units(line.committedQty)} ready`, codes || null, destination]
-      : [`${readyQty} of ${line.committedQty} Units ready`, "Waiting for purchase"],
+      : unitsShortWords(readyQty, line.committedQty),
     action: {
       ownerKey: "stock",
       label: "Create the Units",
       context: {
-        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${dated("Customer Delivery", customerDelivery) ?? "Customer Delivery date not recorded"}`,
+        detail: `${line.label} · ${units(Math.max(0, line.committedQty - readyQty))} · ${destination ?? "Carres Warehouse"} · ${dated("Requested Delivery Date", customerDelivery) ?? "Requested Delivery Date not recorded"}`,
       },
     },
     door: open("Stock", stockHref),
@@ -735,7 +742,7 @@ function logisticsDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "delivery",
       label: "Assign logistics",
       context: {
-        detail: dated("Customer Delivery", input.order.deliveryDate) ?? "Customer Delivery date not recorded",
+        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -757,7 +764,7 @@ function deliveryDateDraft(input: SalesOrderRouteInput): NodeDraft {
       ownerKey: "sales",
       label: "Confirm delivery date",
       context: {
-        detail: dated("Customer Delivery", input.order.deliveryDate) ?? "Customer Delivery date not recorded",
+        detail: dated("Requested Delivery Date", input.order.deliveryDate) ?? "Requested Delivery Date not recorded",
       },
     },
     door: open("Delivery", deliveryHref(input.order.id)),
@@ -778,7 +785,7 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
     ownerKey: "payment",
     label: "Collect",
     context: {
-      detail: dated("Collect before Customer Delivery", input.order.deliveryDate) ?? "Collection date not recorded",
+      detail: dated("Collect before Requested Delivery Date", input.order.deliveryDate) ?? "Collection date not recorded",
     },
   };
   if (!input.money.known) {
@@ -801,8 +808,8 @@ function moneyDraft(input: SalesOrderRouteInput): NodeDraft {
       door: payments,
     };
   }
-  const approved = input.paymentApprovals.some((a) => a.status === "approved");
-  const pending = input.paymentApprovals.some((a) => a.status === "pending");
+  const approved = paymentApprovalOpensGate(input.paymentApprovals);
+  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
   return {
     id: "money",
     kind: "money",
@@ -934,7 +941,7 @@ function goodsRequirement(
  * `collect`, and the truck goes regardless.
  */
 function financeExceptionRequirement(input: SalesOrderRouteInput): GateRequirement {
-  const openOnes = input.financeExceptions.filter((e) => e.status === "open");
+  const openOnes = openFinanceExceptions(input.financeExceptions);
   if (openOnes.length === 0) {
     return { id: "finance-exception", met: true, text: "No Finance hold" };
   }
@@ -965,7 +972,7 @@ function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
   if (input.money.outstanding <= 0) {
     return { id: "money", met: true, text: "Money in full" };
   }
-  const approved = input.paymentApprovals.some((a) => a.status === "approved");
+  const approved = paymentApprovalOpensGate(input.paymentApprovals);
   if (approved) {
     return {
       id: "money",
@@ -973,7 +980,7 @@ function moneyRequirement(input: SalesOrderRouteInput): GateRequirement {
       text: "COD approved — collect before unloading",
     };
   }
-  const pending = input.paymentApprovals.some((a) => a.status === "pending");
+  const pending = pendingPaymentApproval(input.paymentApprovals) !== null;
   return {
     id: "money",
     met: false,
@@ -1256,7 +1263,7 @@ export function resolveSalesOrderRoute(input: SalesOrderRouteInput): SalesOrderR
     kind: "sales-order",
     title: "SALES ORDER",
     complete: true,
-    lines: [soNumber, dated("Ordered", input.order.placedAt)],
+    lines: [soNumber, dated("SO Date", input.order.placedAt)],
     /* Order Route already sits inside this Sales Order object. A door back to
        the same object is circular navigation, not useful evidence (§0.1). */
     door: null,

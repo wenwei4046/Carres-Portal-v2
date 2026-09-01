@@ -1704,6 +1704,72 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
     expect(rows[0]?.variant).toBe("King");
   });
 
+  // 2026-08-24 — an explicit supplierId overrides the category-cover
+  // auto-resolve. Two suppliers can both cover mattress; without this a
+  // keyer had no way to say a batch is Hookka's rather than whichever
+  // supplier's cat_covered[] happened to sort first.
+  it("an explicit supplierId is accepted (the schema no longer .strict()-rejects it)", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [{ id: "00000000-0000-0000-0000-00000000bb33" }],
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000ff01" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { generated: number };
+    expect(body.generated).toBe(1);
+  });
+
+  it("an explicit supplierId that resolves to no row is 404, distinct from the 422 no-supplier-for-category path", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: {
+            category: "mattress",
+            model_key: "carres-classic",
+            allowed_options: { sizes: ["Queen"] },
+          },
+          // No supplier row at all — the override path's own lookup fails.
+          suppliers: null,
+          product_skus__list: [],
+        },
+        records,
+      }),
+    );
+    const jwt = await makeJwt("operation", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000dead" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
   it("expands raw bed-size codes to full-name variants (K→King, SS→Super Single)", async () => {
     const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
     vi.mocked(userClient).mockReturnValue(
@@ -1742,6 +1808,170 @@ describe("POST /api/catalog/models/:id/generate-skus (idempotent skip)", () => {
       expect.objectContaining({ sku: "LUMI-CLASSIC-K", variant: "King" }),
       expect.objectContaining({ sku: "LUMI-CLASSIC-SS", variant: "Super Single" }),
     ]);
+  });
+
+  /* ⭐ THE SUPPLIER'S OWN CODE ON A GENERATED BATCH (2026-08-24).
+   *
+   * A quotation names the SUPPLIER's code, never Carres' SKU, and it usually
+   * lists a different one per size — so one shared box would have written the
+   * same wrong code onto every row. Batch default, per-piece override. */
+  function generateSkusMock(records: { table: string; op: "insert" | "update"; body: unknown }[]) {
+    vi.mocked(userClient).mockReturnValue(
+      scriptedSb({
+        reads: {
+          product_models: { category: "mattress", model_key: "lumi-classic", allowed_options: {} },
+          suppliers: { id: "00000000-0000-0000-0000-00000000ff01" },
+          product_skus__list: [],
+        },
+        inserted: [
+          { id: "00000000-0000-0000-0000-00000000bb41" },
+          { id: "00000000-0000-0000-0000-00000000bb42" },
+        ],
+        records,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
+    );
+  }
+
+  async function generate(body: unknown) {
+    const jwt = await makeJwt("operation", null);
+    return app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/generate-skus`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("writes ONE batch code onto every generated row", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCode: "  HK-390  " });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    // Trimmed — a code with the keyer's stray spaces will not match a quotation.
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ lets ONE piece override the batch, keyed by the variant the caller sent", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      // Keyed by the RAW variant. `K` becomes `King` on the way in, so a map
+      // keyed by the canonical name would silently never match.
+      supplierCodes: { K: "HK-390-KING" },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      supplier_code: string;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", supplier_code: "HK-390-KING" }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", supplier_code: "HK-390" }),
+    ]);
+  });
+
+  it("falls back to the batch when a piece's box was left blank", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      supplierCode: "HK-390",
+      supplierCodes: { K: "   " },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { supplier_code: string }[];
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390", "HK-390"]);
+  });
+
+  it("⭐ names the column NOT AT ALL when nobody typed a code", async () => {
+    /* The deploy-order hazard `catalog.skus-supplier-code.test.ts` documents:
+       PostgREST refuses an INSERT naming a column that does not exist, so an
+       always-present `supplier_code: null` would take out SKU GENERATION rather
+       than just the new field. Absent stays byte-identical to pre-feature. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"] });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("supplier_code");
+  });
+
+  it("keeps every row of one batch agreeing about its keys", async () => {
+    /* A bulk insert whose objects disagree about which columns they name is its
+       own hazard — so one piece carrying a code puts the key on ALL of them,
+       null where nothing was typed. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], supplierCodes: { K: "HK-390-KING" } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("supplier_code");
+    expect(rows.map((r) => r.supplier_code)).toEqual(["HK-390-KING", null]);
+  });
+
+  /* ⭐ A QUOTATION PRICES EACH SIZE DIFFERENTLY (2026-08-25). The measured
+     case: Hookka's Cody bedframe is K 550 · Q 425 · S 395 · SS 407.50, and one
+     batch price wrote the wrong number on every generated row. Same contract
+     as supplierCodes: keyed by the RAW variant, own entry wins, absent falls
+     back to the batch price. */
+  it("⭐ prices each variant from its own entry, falling back to the batch", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      prices: { SS: 407.5 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as {
+      sku: string;
+      price: number;
+    }[];
+    expect(rows).toEqual([
+      expect.objectContaining({ sku: "LUMI-CLASSIC-K", price: 550 }),
+      expect.objectContaining({ sku: "LUMI-CLASSIC-SS", price: 407.5 }),
+    ]);
+  });
+
+  it("keeps an explicit per-variant 0 — deliberately unpriced at that size", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550, prices: { SS: 0 } });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as { price: number }[];
+    expect(rows.map((r) => r.price)).toEqual([550, 0]);
+  });
+
+  it("⭐ seeds pwp_price per variant, NULL where unset, the key on EVERY row", async () => {
+    /* The 0186 server law: pwp <= 0 means NOT SET, stored as NULL — never as a
+       zero that half-reads as a price. And rows of one bulk insert must agree
+       about their columns, so the key rides every row once any row has one. */
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({
+      variants: ["K", "SS"],
+      price: 550,
+      pwpPrices: { K: 495 },
+    });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).toHaveProperty("pwp_price");
+    expect(rows.map((r) => r.pwp_price)).toEqual([495, null]);
+  });
+
+  it("names pwp_price NOT AT ALL when nobody set one", async () => {
+    const records: { table: string; op: "insert" | "update"; body: unknown }[] = [];
+    generateSkusMock(records);
+    const res = await generate({ variants: ["K", "SS"], price: 550 });
+    expect(res.status).toBe(200);
+    const rows = records.find((r) => r.op === "insert")?.body as Record<string, unknown>[];
+    for (const row of rows) expect(row).not.toHaveProperty("pwp_price");
   });
 
   // Loo 2026-07-21 — adding a size to an EXISTING model unions it into
@@ -2824,7 +3054,7 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
           product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
           sofa_compartments: [COMP_ROW],
           product_skus: [], // model has no existing sku → no own supplier
-          suppliers: [{ id: "sup-covers-sofa" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }],
         },
         writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
       }),
@@ -2844,7 +3074,144 @@ describe("0178 — sofa compartments (pool + per-model offered)", () => {
     // fixture carries 250) is deliberately IGNORED (Loo 2026-07-20): prices
     // live in SKU Master only — legacy pool prices must never leak onto a
     // fresh model's SKUs.
-    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-covers-sofa", price: 0, pos_active: true });
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa2", price: 0, pos_active: true });
+  });
+
+  /* ⭐ AN EXPLICIT PICK BEATS THE SIBLING (YH, 2026-08-26). The old rule let
+     a sibling SKU's supplier overrule the keyer's pick — written when "one
+     model, one supplier" was an invariant. Dual-sourcing ended it: adding
+     Xammar compartments with Hookka Industries PICKED silently wrote Ohana.
+     A fork the keyer chose is a decision; a swap they did not see is a
+     defect. One precedence now, shared with generate-skus:
+     explicit → sibling inherit → category cover. */
+  it("PUT — sibling supplier EXISTS, caller picks a different one → the PICK wins", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          // A sibling already supplied by Ohana — the OLD rule would inherit it.
+          product_skus: [{ supplier_id: "00000000-0000-0000-0000-00000000aaa1" }],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000fff1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ROW.id, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ROW.id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ supplierId: "00000000-0000-0000-0000-00000000fff1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    // The keyer's pick, not the sibling's Ohana.
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000fff1" });
+  });
+
+  // 2026-08-24 — the ONE ambiguous case: a model's first compartment, no
+  // sibling sku's supplier to inherit yet. An explicit supplierId must win
+  // over the category-cover guess, or a keyer has no way to say a brand-new
+  // sofa's compartments are Hookka's rather than whichever supplier's
+  // cat_covered[] happened to sort first.
+  it("PUT — no model-own supplier, caller passes supplierId → the OVERRIDE wins, not the category cover", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [], // no existing sku → no own supplier to inherit
+          // The category-cover fallback WOULD pick this one — proving the
+          // override actually short-circuits it, not merely ignored.
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }, { id: "00000000-0000-0000-0000-00000000ffa1" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa1" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "00000000-0000-0000-0000-00000000ffa1" });
+  });
+
+  it("PUT — a supplierId that resolves to no row is 404, not a silent fall-through to Auto", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "BOOQIT", category: "sofa", name: "Booqit" }],
+          sofa_compartments: [COMP_ROW],
+          product_skus: [],
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa2" }], // real supplier exists — just not this id
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null, supplierId: "00000000-0000-0000-0000-00000000ffa9" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("not_found");
+  });
+
+  /* REWRITTEN 2026-08-26. This test used to pin the OPPOSITE — the sibling
+     beating an explicit pick — from the era when "one model, one supplier" was
+     an invariant. Dual-sourcing ended that era, and in production the old rule
+     silently swapped a keyer's PICKED Hookka Industries for Ohana. What
+     survives of the old rule is exactly this: with NO explicit pick, the
+     sibling's supplier is still inherited — the model's own answer beats the
+     category-cover guess. */
+  it("PUT — no explicit pick → the sibling's supplier is inherited, not the category cover", async () => {
+    const recorded: AdminCall[] = [];
+    vi.mocked(userClient).mockReturnValue(
+      buildWriteSb({
+        recorded,
+        reads: {
+          product_models: [{ id: MODEL_ID_LIVE, model_key: "OHANA", category: "sofa", name: "Ohana" }],
+          sofa_compartments: [COMP_ROW],
+          // The model already has a real supplier'd sku.
+          product_skus: [{ model_id: MODEL_ID_LIVE, supplier_id: "sup-ohana" }],
+          // The cover fallback WOULD pick this one — proving inherit wins.
+          suppliers: [{ id: "00000000-0000-0000-0000-00000000ffa3" }],
+        },
+        writeReturn: { model_id: MODEL_ID_LIVE, compartment_id: COMP_ID, price_override: null, sort_order: 0 },
+      }),
+    );
+    const jwt = await makeJwt("principal", null);
+    const res = await app.fetch(
+      new Request(`http://t/api/catalog/models/${MODEL_ID_LIVE}/compartments/${COMP_ID}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ priceOverride: null }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const skuUpsert = recorded.find((r) => r.op === "upsert" && r.table === "product_skus");
+    expect(skuUpsert?.payload).toMatchObject({ supplier_id: "sup-ohana" });
   });
 
   it("PUT — re-offer of a LIVE row preserves price AND pos_active (no clobber of a manual OFF)", async () => {

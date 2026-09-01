@@ -194,7 +194,7 @@ describe("Order Route — the nodes", () => {
 
   it("spells a date through the one date format and never ships a bare ISO string", () => {
     draw();
-    expect(nodeEl("sales-order")).toHaveTextContent("Ordered: Wed, 12 Aug");
+    expect(nodeEl("sales-order")).toHaveTextContent("SO Date: Wed, 12 Aug");
     expect(nodeEl("sales-order")).not.toHaveTextContent("2026-08-12");
   });
 
@@ -222,7 +222,7 @@ describe("Order Route — the nodes", () => {
     expect(action).toHaveTextContent("Confirm ready date");
     expect(action).toHaveClass("text-label");
     expect(context).toHaveTextContent(
-      "PO-2048 · 3 Units · Carres Warehouse · Customer Delivery: Thu, 24 Sep",
+      "PO-2048 · 3 Units · Carres Warehouse · Requested Delivery Date: Thu, 24 Sep",
     );
     expect(context).not.toHaveTextContent(/Due:|No due date|Next Action|Priority/i);
     expect(context).toHaveClass("text-label", "text-base-600");
@@ -335,7 +335,7 @@ describe("Order Route — accessibility", () => {
     const supplier = nodeEl("PO-2048:supplier");
     expect(supplier).toHaveAttribute("tabindex", "0");
     expect(supplier.getAttribute("aria-label")).toBe(
-      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Customer Delivery: Thu, 24 Sep",
+      "SUPPLIER — Ready date not confirmed — Yu Jun: Confirm ready date — PO-2048 · 3 Units · Carres Warehouse · Requested Delivery Date: Thu, 24 Sep",
     );
     expect(supplier).toHaveAttribute("aria-current", "step");
   });

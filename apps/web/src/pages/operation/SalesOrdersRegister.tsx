@@ -63,7 +63,7 @@ import {
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import GoodsMiniTable, { categoryWord, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -352,13 +352,6 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
-  const categoryOf = (line: (typeof lines)[number]) => {
-    const fromAttrs = typeof line.attrs?.category === "string" ? line.attrs.category : "";
-    const fromSku = line.sku.includes(":") ? line.sku.split(":", 1)[0] : "";
-    const classified = lineClass(line.sku);
-    const classifiedLabel = classified === "acc" ? "Accessory" : classified === "unknown" ? "Other goods" : classified;
-    return categoryWord(fromAttrs || fromSku || classifiedLabel);
-  };
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
     const facts = lineConfigBits(attrs);
@@ -391,7 +384,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       return {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
-        category: categoryOf(line),
+        category: goodsCategoryOf(line),
         unitIds: fact?.unitIds ?? [],
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the
@@ -571,12 +564,15 @@ export default function SalesOrdersRegister() {
     (r: RegisterRow): DataGridContextMenuItem[] => [
       { label: "View", onClick: () => openWorkspace(r) },
       { label: "Edit", onClick: () => openWorkspace(r) },
-      { label: "Preview PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
+      /* ONE ACT, ONE NAME (YH, 2026-08-28). `Preview PDF` sat here calling
+         `openSalesOrderPdf(r.id, r.so)` — byte-identical to the line below
+         it. Two menu rows, one behaviour, so the reader was asked to choose
+         between names that could not differ. The MASTER's locked menu had
+         meant them as separate acts (a preview door and a document output);
+         the implementation never built the first. Retiring the duplicate
+         label loses no capability. If Carres later wants a real preview act,
+         it is a BUILD, not a restoration of this line. */
       { label: "Print PDF", onClick: () => void openSalesOrderPdf(r.id, r.so) },
-      {
-        label: "Copy to new Sales Order",
-        onClick: () => navigate(`/operation/orders/so/new?copyFrom=${r.id}`),
-      },
       /* The MASTER's locked menu ends with the one destructive entry, alone
          below a divider so it is never reached by a slipped click. */
       { divider: true },
@@ -613,7 +609,7 @@ export default function SalesOrdersRegister() {
         />
       )}
 
-      {/* 8px outer frame gap — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
+      {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
         {isError || deliveryOrdersQuery.isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
@@ -736,12 +732,58 @@ const FOOTER_WORDS = [
   "Mattress protector",
   "Topper",
   "Footrest",
+  // A line the ORDER or the CATALOG says is an accessory, whose TYPE nothing
+  // recognises. Already a ruled word — the SO document's own fallback prints it
+  // (`categoryWord`) — so the footer saying `Other goods` over the same line
+  // was the register disagreeing with the document it summarises.
+  "Accessory",
   "Service",
   "Other goods",
 ] as const;
 
-function footerWord(sku: string): (typeof FOOTER_WORDS)[number] {
+/**
+ * ⭐ THE FOOTER READS THE SAME LADDER AS THE DOCUMENT (2026-08-24).
+ *
+ * Jess: "Other goods 44 — the number doesn't tally." It didn't, and the
+ * arithmetic was never the problem: this classifier read the SKU TEXT ALONE
+ * while the SO detail reads recorded `attrs.category`, then the catalog, then
+ * the SKU. A product the document names `MATTRESS` counted here as
+ * `Other goods`, so the footer's number could not be reproduced from the
+ * open orders. Same ladder now, then the footer's own dictionary mapping —
+ * the recognised accessory TYPE where one exists, the ruled word `Accessory`
+ * where only the category is known, `Other goods` ONLY for a line neither the
+ * order, the catalog, nor the classifier recognises. That word now means what
+ * it says: genuinely unclassified goods — a data-quality fact, not a
+ * classifier gap.
+ *
+ * A recorded category outside this footer's vocabulary (e.g. `guarantee`)
+ * falls through to the SKU path unchanged — the footer prints ONLY the words
+ * above, by construction, and inventing a new word here would be writing
+ * dictionary. numbers are QUANTITIES (`line.qty`), not row counts — unchanged.
+ */
+function footerWord(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  category?: string | null;
+}): (typeof FOOTER_WORDS)[number] {
+  const sku = line.sku;
   if (lineKind(sku) === "service") return "Service";
+  const recorded = (
+    (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
+    (typeof line.category === "string" ? line.category : "")
+  )
+    .trim()
+    .toLowerCase();
+  if (recorded === "mattress") return "Mattress";
+  if (recorded === "bedframe") return "Bedframe";
+  if (recorded === "sofa") return "Sofa";
+  if (recorded === "service") return "Service";
+  if (recorded === "accessory") {
+    const short = accShort(sku);
+    return (FOOTER_WORDS as readonly string[]).includes(short)
+      ? (short as (typeof FOOTER_WORDS)[number])
+      : "Accessory";
+  }
   const cls = lineClass(sku);
   if (cls === "mattress") return "Mattress";
   if (cls === "bedframe") return "Bedframe";
@@ -765,7 +807,7 @@ function RegisterResultSummary({
   const counts = new Map<string, number>();
   for (const row of scope) {
     for (const line of row.o.order_lines ?? []) {
-      counts.set(footerWord(line.sku), (counts.get(footerWord(line.sku)) ?? 0) + Number(line.qty || 0));
+      counts.set(footerWord(line), (counts.get(footerWord(line)) ?? 0) + Number(line.qty || 0));
     }
     for (const addon of row.o.order_addons ?? []) {
       counts.set("Service", (counts.get("Service") ?? 0) + Number(addon.qty || 0));
@@ -777,9 +819,25 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  const parts = FOOTER_WORDS.filter((label) => (counts.get(label) ?? 0) > 0).map(
-    (label) => `${label} ${counts.get(label)}`,
-  );
+  /* ⛔ `Other goods` IS COUNTED AND NOT PRINTED — YH, 2026-08-27.
+     This OVERWRITES `COPY-STANDARD.md`'s "never dropped from the count", which
+     ruled the word must always appear.
+
+     What the word actually reports is a CATALOG GAP: a line nothing recognises,
+     because its SKU has no catalog row (or its category has no word here — a
+     `guarantee` item is catalogued correctly and still lands in this bucket,
+     since the footer's vocabulary has five of the catalog's six categories).
+     Neither is a fact about the customer's goods, which is what the rest of
+     this tally is, and neither is actionable from a register footer.
+
+     🟡 THE HONEST COST, stated rather than hidden: the printed numbers no
+     longer add up to the order's item count. The bucket is still computed —
+     `footerWord` is untouched and the count is still available to anything
+     that asks — so this is a display decision, reversible by deleting one
+     line, and it destroys no data. */
+  const parts = FOOTER_WORDS.filter(
+    (label) => label !== "Other goods" && (counts.get(label) ?? 0) > 0,
+  ).map((label) => `${label} ${counts.get(label)}`);
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */

@@ -18,6 +18,9 @@ const setNumber = vi.fn();
 const setPoDays = vi.fn();
 const setProduction = vi.fn();
 const setWorkWeek = vi.fn();
+const createDestination = vi.fn();
+const updateDestination = vi.fn();
+const setSupplierCollection = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -32,6 +35,9 @@ vi.mock("@/lib/queries", async () => {
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
+    useCreatePurchasingDestination: () => mutation(createDestination),
+    useUpdatePurchasingDestination: () => mutation(updateDestination),
+    useSetPurchasingSupplierCollection: () => mutation(setSupplierCollection),
   };
 });
 
@@ -46,6 +52,8 @@ function wrap(node: React.ReactNode) {
 
 const NICE = "11111111-0000-0000-0000-000000000001";
 const OHANA = "22222222-0000-0000-0000-000000000002";
+const KLANG = "33333333-0000-0000-0000-000000000003";
+const NETS = "66666666-0000-0000-0000-000000000006";
 
 function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSettingsResponse {
   return {
@@ -62,6 +70,41 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
       { supplierId: OHANA, category: "bedframe", workingDays: 7 },
       { supplierId: OHANA, category: "sofa", workingDays: 14 },
     ],
+    destinations: [
+      {
+        id: KLANG,
+        name: "Carres Klang",
+        address: "Lot 12, Klang",
+        isDefault: true,
+        active: true,
+        warehouseLinked: true,
+      },
+      {
+        id: "44444444-0000-0000-0000-000000000004",
+        name: "AL Sungai Buloh",
+        address: "Sungai Buloh",
+        isDefault: false,
+        active: true,
+        warehouseLinked: false,
+      },
+      {
+        id: "55555555-0000-0000-0000-000000000005",
+        name: "Ohana",
+        address: null,
+        isDefault: false,
+        active: true,
+        warehouseLinked: false,
+      },
+    ],
+    supplierCollections: [
+      {
+        supplierId: NICE,
+        supplierName: "Nice Future",
+        destinationId: KLANG,
+        partnerId: NETS,
+      },
+    ],
+    deliveryPartners: [{ id: NETS, name: "NETS" }],
     lastChanges: [
       {
         settingKey: "production_days",
@@ -84,9 +127,79 @@ beforeEach(() => {
   setProduction.mockResolvedValue(settings());
   setNumber.mockResolvedValue(settings());
   setPoDays.mockResolvedValue(settings());
+  createDestination.mockResolvedValue(settings());
+  updateDestination.mockResolvedValue(settings());
+  setSupplierCollection.mockResolvedValue(settings());
 });
 
 describe("Purchasing → Settings", () => {
+  it("introduces Settings as the owner of destinations and ordering rules", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    expect(
+      screen.getByText(
+        "The settings the ordering engine reads. Change one here and SO Batch Purchase uses it the same day.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/The numbers the ordering engine reads/)).not.toBeInTheDocument();
+  });
+
+  it("lists AL and Ohana from the shared Deliver To master data", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("deliver-to-settings");
+    expect(within(section).getByText("AL Sungai Buloh")).toBeInTheDocument();
+    expect(within(section).getByText("Ohana")).toBeInTheDocument();
+    expect(within(section).getByText("Address not set")).toBeInTheDocument();
+  });
+
+  it("keeps the factory collector and destination in Settings, not Issue review", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-collection-settings");
+    expect(within(section).getByText("Nice Future")).toBeInTheDocument();
+    expect(within(section).getByLabelText("Collector for Nice Future")).toHaveValue(NETS);
+    expect(within(section).getByLabelText("Deliver To for Nice Future")).toHaveValue(KLANG);
+    expect(within(section).getByText("NETS collects from Nice Future and delivers to Carres Klang.")).toBeInTheDocument();
+  });
+
+  it("saves one complete supplier collection rule", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("supplier-collection-settings");
+    fireEvent.change(within(section).getByLabelText("Deliver To for Nice Future"), {
+      target: { value: "44444444-0000-0000-0000-000000000004" },
+    });
+    fireEvent.click(within(section).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(setSupplierCollection).toHaveBeenCalledWith({
+        supplierId: NICE,
+        destinationId: "44444444-0000-0000-0000-000000000004",
+        partnerId: NETS,
+      }),
+    );
+  });
+
+  it("adds a future Deliver To from Settings", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    fireEvent.click(screen.getByRole("button", { name: "Add Deliver To" }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Yard" } });
+    fireEvent.change(screen.getByLabelText("Address"), {
+      target: { value: "12 Jalan Baru" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(createDestination).toHaveBeenCalledWith({
+        name: "New Yard",
+        address: "12 Jalan Baru",
+      }),
+    );
+  });
+
+  it("does not let the current default be unchecked without choosing another", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const section = screen.getByTestId("deliver-to-settings");
+    fireEvent.click(within(section).getAllByRole("button", { name: "Edit" })[0]);
+    expect(within(section).getByLabelText("Default")).toBeDisabled();
+  });
+
   it("shows the sofa at 14 working days — the one number this card changes", () => {
     render(wrap(<OperationPurchasingSettings />));
     expect(screen.getByTestId("production-days-sofa")).toHaveValue(14);
@@ -150,11 +263,19 @@ describe("Purchasing → Settings", () => {
 
   it("saves one of the single numbers by key", async () => {
     render(wrap(<OperationPurchasingSettings />));
-    fireEvent.change(screen.getByTestId("order-by-buffer"), { target: { value: "10" } });
-    fireEvent.click(screen.getByTestId("order-by-buffer-save"));
+    fireEvent.change(screen.getByTestId("safety-days"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("safety-days-save"));
     await waitFor(() =>
       expect(setNumber).toHaveBeenCalledWith({ key: "order_by_buffer_days", value: 10 }),
     );
+  });
+
+  it("the buffer wears its approved name — `Safety days`, never `buffer` (Card 02-A)", () => {
+    render(wrap(<OperationPurchasingSettings />));
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Safety days");
+    expect(text).toContain("Extra time allowed for delays.");
+    expect(text.toLowerCase()).not.toContain("buffer");
   });
 
   it("a reader who may not edit sees the numbers and no Save", () => {
@@ -184,7 +305,7 @@ describe("Purchasing → Settings", () => {
     }
     // And the words that MUST be there, spelt as the standards spell them.
     expect(text).toContain("Production working days");
-    expect(text).toContain("Order-by buffer");
+    expect(text).toContain("Safety days");
     expect(text).toContain("PO days");
     expect(text).toContain("Supplier work week");
     expect(text).toContain("Earliest date a store may sell");

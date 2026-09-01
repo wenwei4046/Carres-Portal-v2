@@ -17,7 +17,8 @@
     "seed:lp-test-user": "tsx scripts/seed-lp-test-user.ts",
     "seed:test-users": "tsx scripts/seed-test-users.ts",
     "seed:e2e-fixtures": "supabase db query --linked --file scripts/seed-e2e-fixtures.sql",
-    "reset:e2e-state": "tsx scripts/reset-e2e-state.ts"
+    "reset:e2e-state": "tsx scripts/reset-e2e-state.ts",
+    "backfill:stair-carry": "tsx scripts/backfill-stair-carry.ts"
   },
   "engines": {
     "node": ">=20",

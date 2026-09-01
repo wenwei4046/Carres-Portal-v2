@@ -56,10 +56,15 @@ beforeEach(() => {
 describe("the trio", () => {
   it("shows exactly the three fields the ruling names", () => {
     draw();
-    expect(screen.getByText("Amend date (from customer)")).toBeTruthy();
-    expect(screen.getByText("Amended delivery date")).toBeTruthy();
-    expect(screen.getByLabelText(/amend reason/i)).toBeTruthy();
-    expect(screen.getByText("creates a Revision · needs approval")).toBeTruthy();
+    expect(screen.getByText("Requested date (from customer)")).toBeTruthy();
+    expect(screen.getByText("New delivery date")).toBeTruthy();
+    expect(screen.getByLabelText(/reason for change/i)).toBeTruthy();
+    /* ⛔ `creates a Revision · needs approval` is no longer INSIDE the form —
+       the trio moved into a modal on 2026-08-27 and the governed note became
+       that modal's description, so it is read on opening rather than as a
+       footnote beside the button that commits it. The string is asserted where
+       it now lives, in `SalesOrderWorkspace.ui-contract.test.ts`. */
+    expect(screen.queryByText("creates a Revision · needs approval")).toBeNull();
   });
 
   it("refuses to submit without a moved date AND a reason", () => {
@@ -68,7 +73,7 @@ describe("the trio", () => {
     expect(send.disabled).toBe(true);
 
     /* A reason alone is not a change. */
-    fireEvent.change(screen.getByLabelText(/amend reason/i), {
+    fireEvent.change(screen.getByLabelText(/reason for change/i), {
       target: { value: "Customer moving house" },
     });
     expect((screen.getByTestId("amend-delivery-date-submit") as HTMLButtonElement).disabled).toBe(
@@ -80,7 +85,7 @@ describe("the trio", () => {
   it("submits the new date and the reason through the amendment lane", () => {
     draw();
     const picked = pickDayOfThisMonth("so-amend-new-date", 24);
-    fireEvent.change(screen.getByLabelText(/amend reason/i), {
+    fireEvent.change(screen.getByLabelText(/reason for change/i), {
       target: { value: "Customer moving house" },
     });
     const send = screen.getByTestId("amend-delivery-date-submit") as HTMLButtonElement;

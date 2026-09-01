@@ -15,7 +15,6 @@ import {
   moneyText,
   MUTED_ABSENCES,
   NO_DATE_YET,
-  NOT_GIVEN,
   NOT_RECORDED,
   REGISTER_FIELDS,
 } from "./sales-order-columns";
@@ -53,7 +52,7 @@ const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow
   }) as operationOrderListRow;
 
 describe("the default row is the owner's EIGHT, in the owner's order", () => {
-  it("SO No · Ordered · Customer Delivery · Customer · Delivery Location · Showroom · PO No · DO No", () => {
+  it("SO No · Ordered · Requested Delivery Date · Customer · Delivery Location · Showroom · PO No · DO No", () => {
     expect(DEFAULT_COLUMNS).toEqual([
       "so",
       "ordered",
@@ -87,11 +86,16 @@ describe("the default row is the owner's EIGHT, in the owner's order", () => {
 
   /* An absence is quieter than a fact — the page mutes exactly these two and
      never `No delivery date`, which heads a governed two-line action. */
-  it("mutes `Not recorded` and `Not given`, and only those", () => {
+  /* ONE ABSENCE WORD (YH, 2026-08-29). This used to pin TWO — `Not given` for
+     a customer fact, `Not recorded` for a Carres one. Same table, two spellings
+     of empty, and the difference was invisible to the operator reading it. The
+     surviving invariant is that an absence is MUTED and a real value is not;
+     the count of spellings was never the point. */
+  it("mutes the absence word, and only it", () => {
     expect(MUTED_ABSENCES.has(NOT_RECORDED)).toBe(true);
-    expect(MUTED_ABSENCES.has(NOT_GIVEN)).toBe(true);
     expect(MUTED_ABSENCES.has(NO_DATE_YET)).toBe(false);
-    expect(MUTED_ABSENCES.size).toBe(2);
+    // ONE word now, so ONE muted string (YH, 2026-08-29).
+    expect(MUTED_ABSENCES.size).toBe(1);
   });
 });
 describe("FIX 2 · Current is a DOCUMENT pointer", () => {
@@ -162,5 +166,159 @@ describe("a blank never carries two meanings", () => {
       order({ order_lines: [{ sku: "X", qty: 1, unit_price: 0 }] }),
     );
     expect(moneyText(unpriced.balance)).toBe("No price yet");
+  });
+});
+
+/**
+ * POS PARITY COLUMNS (2026-08-24) — race · gender · birthday · stair carry.
+ *
+ * The till asks for all four at SO creation (0200 demographics, 0104 stair
+ * carry) and the DETAIL route always served them — but the register's list
+ * never carried them, so a fact the customer was asked for could not be read
+ * back on the one screen the office browses. Added as ordinary optional
+ * columns: OFF by default (no `on:`), in the chooser like every other, so the
+ * owner-ruled default view is untouched.
+ */
+describe("POS parity columns — the register can show what the till asked", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+
+  it("all four exist, in their honest groups, hidden by default", () => {
+    for (const k of ["race", "gender", "birthday"]) {
+      expect(byKey(k)).toBeTruthy();
+      expect(byKey(k).group).toBe("Customer");
+      expect(byKey(k).on).toBeUndefined(); // default OFF — the ruled view holds
+    }
+    // Stair carry is a DELIVERY fact — it sits with Floor and Lift, where the
+    // operator planning the trip looks, not under Customer.
+    expect(byKey("stair_items").group).toBe("Delivery");
+    expect(byKey("stair_items").on).toBeUndefined();
+  });
+
+  it("values render; absence renders the dictionary word, never a blank", () => {
+    const r = buildRegisterRow(
+      order({
+        customer_race: "Chinese",
+        customer_gender: "F",
+        customer_birthday: "1990-04-12",
+        delivery_stair_items: 3,
+      }),
+    );
+    expect(byKey("race").text(r)).toBe("Chinese");
+    expect(byKey("gender").text(r)).toBe("F");
+    expect(byKey("birthday").text(r)).toBe("1990-04-12");
+    expect(byKey("stair_items").text(r)).toBe("3");
+
+    const bare = buildRegisterRow(order({}));
+    expect(byKey("race").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("gender").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("birthday").text(bare)).toBe(NOT_RECORDED);
+    expect(byKey("stair_items").text(bare)).toBe(NOT_RECORDED);
+  });
+
+  it("ZERO stair items is a recorded fact, not an absence", () => {
+    // `0` means "asked, and the answer was none" — rendering it as NOT_RECORDED
+    // would erase a real answer. Only null/undefined is absence.
+    const r = buildRegisterRow(order({ delivery_stair_items: 0 }));
+    expect(byKey("stair_items").text(r)).toBe("0");
+  });
+});
+
+/**
+ * ONE STORED COLUMN, THREE PRINTED CELLS.
+ *
+ * `customer_emergency` joins name, phone and relationship into one string. The
+ * register printed that string raw, so a cell read `mei . 019-7378283 . Spouse`
+ * - the dot-separated schema dump COPY-STANDARD bans, and three facts an
+ * operator could neither filter nor sort apart.
+ *
+ * `RegisterField.text` is the ONE string that is printed, filtered, sorted AND
+ * exported, so a second line is not available and would not help: three facts
+ * want three columns.
+ */
+describe("Emergency contact is three columns, not one crammed cell", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+  const withEmergency = (v: string | null) =>
+    buildRegisterRow(order({ customer_emergency: v }));
+
+  it("splits a composed value into name, phone and relationship", () => {
+    const r = withEmergency("mei · 019-7378283 · Spouse");
+    expect(byKey("emergency").text(r)).toBe("mei");
+    expect(byKey("emergency_phone").text(r)).toBe("019-7378283");
+    expect(byKey("emergency_relationship").text(r)).toBe("Spouse");
+  });
+
+  it("no cell still carries the joined string", () => {
+    const r = withEmergency("mei · 019-7378283 · Spouse");
+    for (const key of ["emergency", "emergency_phone", "emergency_relationship"]) {
+      expect(byKey(key).text(r)).not.toContain("019-7378283 · Spouse");
+    }
+  });
+
+  it("an absent contact reads as words in all three", () => {
+    const r = withEmergency(null);
+    expect(byKey("emergency").text(r)).toBe("Not recorded");
+    expect(byKey("emergency_phone").text(r)).toBe("Not recorded");
+    expect(byKey("emergency_relationship").text(r)).toBe("Not recorded");
+  });
+
+  it("a legacy string nobody composed is kept WHOLE, never chopped", () => {
+    // `parseEmergencyContact` puts anything it did not write into `name`, so an
+    // imported note survives intact instead of losing its tail to a split.
+    const r = withEmergency("call the son first, he answers");
+    expect(byKey("emergency").text(r)).toBe("call the son first, he answers");
+    expect(byKey("emergency_phone").text(r)).toBe("Not recorded");
+  });
+
+  it("a relationship containing the separator keeps its tail", () => {
+    const r = withEmergency("Ali · 012-3456789 · Friend · from work");
+    expect(byKey("emergency_relationship").text(r)).toBe("Friend · from work");
+  });
+});
+
+/**
+ * "SAME AS DELIVERY" IS AN ANSWER, NOT A BLANK.
+ *
+ * `customer_billing` is empty by design whenever the customer ticked
+ * `Billing address same as delivery`. The column printed `Not recorded` on
+ * every one of those orders - which reads as "nobody asked" when the truth is
+ * "asked, and the answer was: the same address".
+ */
+describe("Billing address reads the same-as-delivery flag", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+  const bill = (over: Partial<operationOrderListRow>) =>
+    byKey("billing").text(buildRegisterRow(order(over)));
+
+  it("prints the delivery address when billing is the same", () => {
+    expect(
+      bill({
+        customer_billing_same: true,
+        customer_billing: null,
+        customer_address: "12 Jalan Ampang, 50450 Kuala Lumpur",
+      }),
+    ).toBe("12 Jalan Ampang, 50450 Kuala Lumpur");
+  });
+
+  it("prints the separate billing address when it is NOT the same", () => {
+    expect(
+      bill({
+        customer_billing_same: false,
+        customer_billing: "8 Jalan Bangsar, 59100 Kuala Lumpur",
+        customer_address: "12 Jalan Ampang, 50450 Kuala Lumpur",
+      }),
+    ).toBe("8 Jalan Bangsar, 59100 Kuala Lumpur");
+  });
+
+  it("still reads as absent when the flag is set and there is no address either", () => {
+    // The governed `Address not given yet` case - nothing IS recorded, so the
+    // honest cell says so rather than inheriting a blank and calling it an answer.
+    expect(bill({ customer_billing_same: true, customer_billing: null, customer_address: null }))
+      .toBe("Not recorded");
+  });
+
+  it("an older Worker that never sends the flag keeps the old reading", () => {
+    // `customer_billing_same` is optional on the wire; absent must not be read
+    // as `true` and silently swap in a delivery address nobody asked for.
+    expect(bill({ customer_billing: null, customer_address: "12 Jalan Ampang" }))
+      .toBe("Not recorded");
   });
 });

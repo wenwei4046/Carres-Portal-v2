@@ -194,9 +194,9 @@ export default function DeliveryOrderPage() {
         <button
           type="button"
           className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
-          onClick={() => navigate("/operation/delivery-orders")}
+          onClick={() => navigate("/operation?tab=delivery")}
         >
-          Back to Delivery Orders
+          Back to Delivery
         </button>
       </div>
     );
@@ -212,8 +212,8 @@ export default function DeliveryOrderPage() {
       <SalesOrderTabs
         identity={d.do_number}
         customer={`SO-${order.so} · ${customer}`}
-        backTo="/operation/delivery-orders"
-        backLabel="Delivery Orders"
+        backTo="/operation?tab=delivery"
+        backLabel="Delivery"
         docTitle={`${d.do_number} — Carres`}
         right={
           <button
@@ -386,7 +386,9 @@ export default function DeliveryOrderPage() {
                       </span>
                     ) : (
                       <span className="shrink-0 rounded-full border border-base-200 px-1.5 text-[9px] font-semibold text-base-500">
-                        {i.ownerDuty ?? "No owner yet"}
+                        {/* A duty word, or a resolved person without an ops
+                            account (a salesperson) — never a blank accusation. */}
+                        {i.ownerDuty ?? i.ownerName ?? "No owner yet"}
                       </span>
                     )}
                     <span className="min-w-0">

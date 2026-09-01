@@ -1,12 +1,16 @@
 import { Hono, type Context } from "hono";
 import {
   isOpsManager,
+  purchasingCreateDestinationInput,
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
+  purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
+  purchasingUpdateDestinationInput,
 } from "@carres/shared";
+import { z } from "zod";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { myDuties } from "../../lib/duties";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
@@ -22,6 +26,8 @@ import type { AppEnv } from "../../types";
  *   PUT  /po-days           the weekdays POs are sent on
  *   PUT  /production-days   one supplier × category (null clears it)
  *   PUT  /work-week         one supplier's working week
+ *   POST /destinations      one future Deliver To
+ *   PUT  /destinations/:id  its name, address, availability or default state
  *
  * The tab is manager-only. `canEdit` in the GET decides what RENDERS; the
  * SECURITY DEFINER RPCs re-gate in SQL, which is the actual protection — the
@@ -129,5 +135,70 @@ purchasingSettingsRouter.put("/work-week", requireOperationOrPrincipal, async (c
   }
   return respondWithSettings(c);
 });
+
+purchasingSettingsRouter.post("/destinations", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingCreateDestinationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_create_destination", {
+    p_name: parsed.data.name,
+    p_address: parsed.data.address,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return respondWithSettings(c);
+});
+
+purchasingSettingsRouter.put(
+  "/destinations/:destinationId",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const destinationId = z.string().uuid().safeParse(c.req.param("destinationId"));
+    if (!destinationId.success) {
+      return c.json({ error: "invalid_destination", message: "Invalid Deliver To." }, 422);
+    }
+    const parsed = await parseJsonBody(c, purchasingUpdateDestinationInput);
+    if (!parsed.ok) return c.json(parsed.body, parsed.status);
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { error } = await sb.rpc("purchasing_update_destination", {
+      p_destination_id: destinationId.data,
+      p_name: parsed.data.name,
+      p_address: parsed.data.address,
+      p_active: parsed.data.active,
+      p_is_default: parsed.data.isDefault,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return respondWithSettings(c);
+  },
+);
+
+purchasingSettingsRouter.put(
+  "/supplier-collection/:supplierId",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const supplierId = z.string().uuid().safeParse(c.req.param("supplierId"));
+    if (!supplierId.success) {
+      return c.json({ error: "invalid_supplier", message: "Invalid supplier." }, 422);
+    }
+    const parsed = await parseJsonBody(c, purchasingSetSupplierCollectionInput);
+    if (!parsed.ok) return c.json(parsed.body, parsed.status);
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { error } = await sb.rpc("purchasing_set_supplier_collection", {
+      p_supplier_id: supplierId.data,
+      p_destination_id: parsed.data.destinationId,
+      p_partner_id: parsed.data.partnerId,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return respondWithSettings(c);
+  },
+);
 
 export default purchasingSettingsRouter;

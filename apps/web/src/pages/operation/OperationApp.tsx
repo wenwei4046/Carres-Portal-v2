@@ -31,7 +31,6 @@ import OperationDashboard from "./OperationDashboard";
 // named in the cutover card — revert + redeploy the previous Pages build.
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
-import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import DeliveryOrderPage from "./DeliveryOrderPage";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
@@ -39,6 +38,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
+import EditDelivery from "./EditDelivery";
 import OperationPayments from "./OperationPayments";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
@@ -65,6 +65,7 @@ import { CATALOG_TAB_PARAM } from "@/pages/catalog/catalog-tabs";
 import OperationStock from "./OperationStock";
 import OperationAllOrders from "./OperationAllOrders";
 import OperationSuppliers from "./OperationSuppliers";
+import OperationSupplierItems from "./OperationSupplierItems";
 // 2026-05-20 — Phase A · AutoCount integration tabs.
 import OperationImport from "./OperationImport";
 import OperationInbox from "./OperationInbox";
@@ -76,7 +77,8 @@ import OperationOpsReady from "./OperationOpsReady";
 import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
-import OperationStockOnHand from "./OperationStockOnHand";
+import WarehouseStockRegister from "./WarehouseStockRegister";
+import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
@@ -162,12 +164,23 @@ export default function OperationApp() {
   // scrolls like a normal page.
   const isDeliveryOrdersRegisterUrl =
     location.pathname === "/operation/delivery-orders";
+  /* EDIT DELIVERY (2026-08-24) draws its own 50px Destination Header, so the
+     slim global bar must stand down — the SAME rule Delivery Work needed and
+     Manual Purchase needed before it. A page that draws a header joins this
+     list in the PR that gives it one. */
+  const isEditDeliveryUrl = location.pathname.startsWith("/operation/delivery/edit");
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
   const isUrlDriven =
     isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
+    /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
+       GlobalTopBar suppression on day one but NOT this gate, so the URL fell
+       through to the `?tab=` branch and rendered an empty main pane — found on
+       the production walk, invisible to a component test that never mounts the
+       router. A new route joins BOTH lists in the same commit. */
+    isEditDeliveryUrl ||
     isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
@@ -310,10 +323,21 @@ export default function OperationApp() {
             two, so the module tab bar is the only chrome). */}
         {!isOrdersUrl &&
           !isDeliveryOrdersUrl &&
+          !isEditDeliveryUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
+          /* CARD-2026-08-22-purchasing-02 — SO Batch Purchase draws the
+             Purchasing Destination Header itself, so the slim global bar would
+             be a second top row. */
           tab !== "purchase" &&
+          /* CARD-2026-08-21-delivery-02 — the SAME defect Manual Purchase
+             shipped with, caught on the production walk: Delivery Work draws
+             its own 50px Destination Header (which embeds TopBarIcons), so the
+             slim bar put a second Jump to, a second bell reading 59, a second
+             Help and a second gear on one screen. `Delivery Orders` never had
+             it because it is a real route and is suppressed above. */
+          tab !== "delivery" &&
           tab !== "manual-purchase" &&
           tab !== "receiving" &&
           tab !== "claims" &&
@@ -366,8 +390,15 @@ export default function OperationApp() {
             {/* The Delivery Orders register + the DO object page (blueprint
                 card 2026-08-16). `:doId` accepts the row id or the document
                 number itself, so `DO-…` anywhere in the portal is a door. */}
-            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
+            <Route
+              path="delivery-orders"
+              element={<Navigate to="/operation?tab=delivery" replace />}
+            />
             <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
+            {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
+                the thing printed on the supplier label and the thing 0366
+                promised never changes and is never reused. */}
+            <Route path="stock/unit/:unitCode" element={<WarehouseUnitDetail />} />
             {/* STAGE 1 — the workspace route the register's rows open.
                 STAGE 2 — `so/new` is the office birth door ([+ New Sales
                 Order]); static `new` outranks `:orderId`. Declared before
@@ -376,6 +407,13 @@ export default function OperationApp() {
             {/* The one Settings Workspace. Reached only from the Page Header
                 gear's launcher — never a tab, nav item or Work Toolbar action. */}
             <Route path="settings/*" element={<SettingsWorkspace />} />
+            {/* EDIT DELIVERY (owner ruling 2026-08-24) — Delivery's own
+                full-screen surface, and where a Delivery Work row now opens.
+                `?leg=` names the Journey leg; absent means the whole-order
+                scope. It is a REAL route, so the shell suppresses its slim top
+                bar the same way it does for every other page that draws its own
+                Destination Header. */}
+            <Route path="delivery/edit/:orderId" element={<EditDelivery />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />
@@ -445,9 +483,19 @@ export default function OperationApp() {
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
             {tab === "rental" && <OperationRental />}
-            {/* Purchasing → To Order — the Planning Workspace, rebuilt from
-                the Golden Template 2026-07-31 (docs/03-page-patterns.md). */}
+            {/* Purchasing → SO Batch Purchase — the buying Register and the
+                guided PO issue journey (CARD-2026-08-22-purchasing-02). */}
             {tab === "purchase" && <OperationToOrder />}
+            {/* CARD-2026-08-22-purchasing-02 — `Purchase Demands` was never a
+                destination. `purchase_demand` is hidden canonical truth
+                (`docs/purchasing/MASTER.md` §4), and its useful capability —
+                the six states, the blockers, the coverage arithmetic — now
+                lives inside SO Batch Purchase. The old address REDIRECTS
+                rather than 404s: a bookmark an operator saved must land
+                somewhere that answers the same question. */}
+            {tab === "purchase-demands" && (
+              <Navigate to="/operation?tab=purchase" replace />
+            )}
             {/* Purchasing → Manual Purchase — the typed request lane
                 (CARD-2026-08-18-manual-purchase). */}
             {tab === "manual-purchase" && <OperationManualPurchase />}
@@ -466,12 +514,19 @@ export default function OperationApp() {
               ))}
             {tab === "op-catalog" && <OperationCatalogPage />}
             {/* Jess redesign step 3 — unified per-unit Stock On Hand list. */}
-            {tab === "stock-onhand" && <OperationStockOnHand />}
+            {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
+                On hand surface. Same `?tab=` address, new page. */}
+            {tab === "stock-onhand" && <WarehouseStockRegister />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}
+            {/* 0375 — the supplier's own item code, joined to ours. A separate
+                DESTINATION rather than a tab inside the roster: the roster is
+                about parties, this is about items, and the sidebar already
+                gives a module more than one page. */}
+            {tab === "supplier-items" && <OperationSupplierItems />}
             {/* 2026-05-20 — Phase A · AutoCount integration */}
             {tab === "ops-import" && <OperationImport />}
             {tab === "ops-inbox" && <OperationInbox />}

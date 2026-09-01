@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { POOL_USE_REASONS, POOL_USE_NOTE_MAX } from "../pool-usage";
+import {
+  UNIT_AVAILABILITY,
+  UNIT_LIFECYCLE_OUTCOMES,
+  UNIT_OWNERSHIPS,
+} from "../unit-availability";
 import { STOCK_HEALTH_STATES } from "../stock-health";
 
 /**
@@ -152,22 +157,41 @@ export const opsStockUpdateConditionInputSchema = z.object({
 });
 export type OpsStockUpdateConditionInput = z.infer<typeof opsStockUpdateConditionInputSchema>;
 
-/** POST /api/ops/stock — book in a new unit (or N identical units) at the
- *  warehouse (GRN-in / "+ Add stock"). Jess 2026-06-29: operation needs to add
- *  newly-arrived stock without a SQL run. status limited to free|reserved (you
- *  receive physical, available stock; sold/voided are lifecycle states). */
-export const opsStockCreateInputSchema = z.object({
-  sku: z.string().trim().min(1),
-  condition: opsStockConditionSchema.default("new"),
-  status: z.enum(["free", "reserved"]).default("free"),
-  reservedRef: z.string().trim().optional(),
-  supplier: z.string().trim().optional(),
-  poNo: z.string().trim().optional(),
-  sourceRef: z.string().trim().optional(),
-  qty: z.coerce.number().int().min(1).max(200).default(1),
-  warehouseId: z.string().uuid().optional(),
+/**
+ * 0366 — "+ Add stock" IS GONE, and so is DELETE /:itemId.
+ *
+ * A Unit is BORN when a PO or Consignment Order is confirmed (Card §2), and it
+ * is never deleted — its lifecycle ends, and the identity survives. A generic
+ * Add stock / Remove stock door is named in the rejected words (Stock MASTER
+ * §2) precisely because it creates inventory nobody ordered and destroys
+ * identities the supplier has already labelled.
+ *
+ * The one remaining book-in path is the Klang ready-stock SHEET import, and it
+ * now goes through the governed `ops_stock_book_in_units` RPC.
+ */
+
+/** POST /api/ops/stock/:itemId/site — the governed WHERE change. */
+export const opsStockSetSiteInputSchema = z.object({
+  warehouseId: z.string().uuid(),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
 });
-export type OpsStockCreateInput = z.infer<typeof opsStockCreateInputSchema>;
+export type OpsStockSetSiteInput = z.infer<typeof opsStockSetSiteInputSchema>;
+
+/** POST /api/ops/stock/:itemId/holder — the governed WHO HAS IT change.
+ *  `null` hands the Unit back to nobody in particular (its Site holds it). */
+export const opsStockSetHolderInputSchema = z.object({
+  partyCode: z.string().trim().min(1).nullable(),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
+});
+export type OpsStockSetHolderInput = z.infer<typeof opsStockSetHolderInputSchema>;
+
+/** POST /api/ops/stock/:itemId/ownership — Purchasing's correction. */
+export const opsStockSetOwnershipInputSchema = z.object({
+  ownership: z.enum(UNIT_OWNERSHIPS),
+  supplier: z.string().trim().min(1).nullish(),
+  note: z.string().trim().max(POOL_USE_NOTE_MAX).nullish(),
+});
+export type OpsStockSetOwnershipInput = z.infer<typeof opsStockSetOwnershipInputSchema>;
 
 /** Row returned by /api/ops/stock GET endpoints (filtered subsets). */
 export const opsStockItemSchema = z.object({
@@ -205,6 +229,15 @@ export const opsStockItemSchema = z.object({
   // Only /inventory asks today (the On hand rail is its only reader), so the
   // field is optional as well as nullable.
   category: z.string().nullable().optional(),
+  // 0366 — the authoritative Unit facts. `availability` and `lifecycleOutcome`
+  // are DERIVED by the one arithmetic (unit-availability.ts / SQL
+  // `unit_availability`), never stored and never recomputed on the client.
+  ownership: z.enum(UNIT_OWNERSHIPS).default("carres_owned").optional(),
+  holderPartyId: z.string().uuid().nullable().optional(),
+  holderPartyName: z.string().nullable().optional(),
+  lastVerifiedAt: z.string().nullable().optional(),
+  availability: z.enum(UNIT_AVAILABILITY).optional(),
+  lifecycleOutcome: z.enum(UNIT_LIFECYCLE_OUTCOMES).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

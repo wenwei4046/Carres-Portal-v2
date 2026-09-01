@@ -4,6 +4,12 @@
 > **Date:** 14 Aug 2026  
 > **Decision surface:** the complete cross-module Workspace: `Dashboard = what I need to know` and `Work = what someone needs to do`.
 
+> **Approved slice, 29 Aug 2026:** Purchasing → Receiving → formal GRN → Claim / Return actions
+> execute in their owner modules and project into one `My Work` / `Team Work` set. Module Register
+> rails do not copy those actions into local `WORK TO DO` panels. Normal duty, dated cover and actual
+> actor remain distinct. This slice is current law in `docs/purchasing/MASTER.md` and
+> `docs/ERP-ARCHITECTURE.md`. The rest of this Workspace/Dashboard proposal remains unapproved.
+
 ## 0. Decision record
 
 ### Already approved / locked
@@ -15,7 +21,7 @@
 - Office, Warehouse, and Delivery calendars are distinct. A due date without a named calendar is unfinished.
 - The right rail is 200px navigation, not a second place to act.
 - Red has one job: late / act now. Blue marks the current thing or primary action.
-- Sales Order is a truth Register, not a work queue. Delivery is currently a view of Orders' delivery track. Other modules retain their own records and write doors.
+- Sales Order is a truth Register, not a work queue. Delivery owns the delivery arrangement, the Delivery Order document, handover and proof (owner ruling 2026-08-24); Sales owns the customer promise. Other modules retain their own records and write doors.
 - The approved system-led presentation law is the baseline. Object and owner are structured fields;
   the semantic lines do not duplicate them:
 
@@ -138,7 +144,7 @@ System defects, missing server stamps, and failed automation belong in operation
 
 | Work | Why it exists | Owner / actor | Object / recipient | Required result / closure | Due / next / door |
 |---|---|---|---|---|---|
-| `Delay planning` | Latest supplier date exceeds Customer Delivery | Sales Order / order PIC | SO / internal decision | Decision records whether promise can still be met | 2 Office working days from stored detection; if no, opens logistics new-date action; open SO delay region |
+| `Delay planning` | Latest supplier date exceeds Requested Delivery Date | Sales Order / order PIC | SO / internal decision | Decision records whether promise can still be met | 2 Office working days from stored detection; if no, opens logistics new-date action; open SO delay region |
 | `Case owner decision required` | Supplier cannot fulfil and a customer-order decision is needed | Sales Order / case owner only | SO + affected item | Governed decision recorded | Due rule is **UNKNOWN in authority**; cannot enter Work until defined; open affected SO issue |
 | Sales Order amendment management decision | Staff requests an order change | Sales Order / management duty | amendment + SO / requester | approve or reject with reason | Due rule is **UNKNOWN**; opens owner confirmations or atomic apply; open amendment |
 | Amendment owner confirmation | Approved change affects another owner | affected owner module / resolved duty | amendment + affected object | owner confirms executable or refuses with reason | Due rules are **UNKNOWN per consequence**; closes into atomic apply or returns to management; deep-link to owner consequence |
@@ -179,11 +185,11 @@ Receiving must not create a generic `Check in` row merely because a PO has outst
 
 ### 3.5 Delivery
 
-The current Delivery page is a read-only view and the actions are presently owned by Orders. The architecture says Delivery owns carrier, trip derivation, and proof; this inconsistency must be reconciled before Workspace freezes final owner keys. Until then use the existing action source, not a second definition.
+RECONCILED (owner rulings 2026-08-24 / 2026-09-01): Delivery owns the arrangement (`ops_delivery_arrangements`), the Delivery Order document, handover and proof; Sales Orders owns the customer promise and the money gate; the SYSTEM issues the DO (no Issue action exists). The action rows below predate that reconciliation — where an owner column reads `current Orders engine`, the final owner key is the Delivery ownership rule through the Shared Work Engine; `Issue delivery order` is no longer a Work action; `Deliver today` is displayed as `Deliver on {weekday, date}`; the money gate requires outstanding = 0 (2026-09-01, absolute), not only "no Finance exception". Final keys follow `docs/delivery/MASTER.md`.
 
 | Work | Why it exists | Current action owner / actor | Object / recipient | Required result / closure | Due / next / door |
 |---|---|---|---|---|---|
-| `Assign logistics` | Order needs delivery and none is chosen | current Orders engine / order PIC | SO / internal | logistics company recorded | 3 Office working days before Customer Delivery; next booking call; open delivery region |
+| `Assign logistics` | Order needs delivery and none is chosen | current Orders engine / order PIC | SO / internal | logistics company recorded | 3 Office working days before Requested Delivery Date; next booking call; open delivery region |
 | `Call {logistics} — confirm delivery date` | Logistics chosen; customer-confirmed date + slot absent | current Orders engine / order PIC | SO / logistics | customer-confirmed date and slot recorded | configured Office working days before date; next DO; open booking region |
 | `Call {logistics} — arrange new delivery date` | Delay decision says promise cannot be met | Sales Order / order PIC | SO / logistics | new customer-confirmed date and slot | same Office working day; next DO; open delay/booking region |
 | `Issue delivery order` | booking exists, goods ready, and no Finance exception | current Orders engine / order PIC | SO / system document | governed DO exists | before delivery run; next Deliver today; open DO door |
@@ -326,19 +332,19 @@ My Work  12     Team Work 38                                    Search
 ────────────────────────────────────────────────────────────────────────────
 Overdue 3   Today 5   Upcoming 4   Blocked 1                     Filters
 ──────────────────────────────────────┬─────────────────────────────────────
-WORK LIST                              │ ACTION CONTEXT
-                                      │
-PO-2051 · Expected Arrival not recorded│ PO-2051 · Ohana
-[YJ] Call Ohana — confirm ready date   │ Required result
-                                      │ Latest ready date + outcome
-Overdue 2 working days · Purchasing    │
-                                      │ Why this exists
-SO-1300 · Customer Delivery changed    │ Ready date was not recorded…
-[KY] Confirm delivery consequence      │
-                                      │ Due · owner · blocker
-Today · Delivery                       │
-                                      │ [Open purchase order]
-…                                     │
+WORK LIST                                    │ ACTION CONTEXT
+                                             │
+PO-2051 · Expected Arrival not recorded      │ PO-2051 · Ohana
+[YJ] Call Ohana — confirm ready date         │ Required result
+                                             │ Latest ready date + outcome
+Overdue 2 working days · Purchasing          │
+                                             │ Why this exists
+SO-1300 · Requested Delivery Date changed    │ Ready date was not recorded…
+[KY] Confirm delivery consequence            │
+                                             │ Due · owner · blocker
+Today · Delivery                             │
+                                             │ [Open purchase order]
+…                                            │
 ──────────────────────────────────────┴─────────────────────────────────────
 12 open · 3 overdue · Updated 10:42
 ```
@@ -484,7 +490,7 @@ OPERATING FLOW
 └──────────────────────────────────────┴───────────────────────────────────┘
 
 RECENT MATERIAL CHANGE
-10:31  PO-2051 expected arrival moved beyond Customer Delivery       Open →
+10:31  PO-2051 expected arrival moved beyond Requested Delivery Date       Open →
 09:48  Finance opened payment exception on SO-1300                   Open →
 ```
 
@@ -697,7 +703,7 @@ identity in the grouping header and repeats it per row only for an exception.
 | Sidebar badges are module-specific counters | no single Work entry or cross-module meaning | Workspace nav: Dashboard + Work; Work badge = my overdue | 🟡 adapt |
 | Team panel shows PO duty only | approved GRN row is unbuilt; cover is not shown cross-module | Team remains rota home; add governed GRN/cover view | 🟡 complete approved evolution |
 | Sales Order actions default to PIC | conflicts with Purchasing duty ownership for Purchasing actions | each owner projection supplies task owner | 🔴 correct boundary |
-| Delivery actions defined in Orders while architecture says Delivery owns delivery acts | owner contradiction | reconcile module authority before final action keys | 🔴 governance blocker |
+| Delivery actions defined in Orders while architecture says Delivery owns delivery acts | RESOLVED — owner rulings 2026-08-24 / 2026-09-01: Delivery owns arrangement/DO/handover/proof; Sales owns promise + gate | final action keys follow `docs/delivery/MASTER.md` and the Shared Work Engine | ✅ reconciled |
 | Payment `Collect` closes at zero outstanding, but new rule says Operation ends at receipt submission and Finance verifies | one action currently spans two owners/results | split submission from verification/exception | 🔴 governance blocker |
 | Failed delivery records exception but no next action | Work would strand the journey | define reason→next action map, owner, due, closure | 🔴 engine gap |
 | Claims has resolution UI but no action wiring/due | hidden work found only by opening rows | owner engine emits resolution action after rules are complete | 🔴 engine gap |
@@ -947,34 +953,34 @@ The last cross-link appears only when Today is non-zero. Empty-state art is not 
 ```text
 ┌ Workspace │ Dashboard  Work                                      🔔  ?  ⚙ ┐
 ├────────────────────────────────────────────────────────────────────────────┤
-│ Fri 14 Aug · Business day                                Updated 10:42     │
-│                                                                            │
-│ MANAGEMENT EXCEPTIONS                                                      │
-│ ┌──────────────────────┬──────────────────────┬──────────────────────────┐ │
-│ │ Broken commitments 3 │ Duty coverage 1      │ Work health 2            │ │
-│ │ 2 delivery · 1 goods │ GRN duty covered     │ 1 no owner · 1 failed    │ │
-│ │ Open affected work → │ Open Team Work →     │ Open Work health →       │ │
-│ └──────────────────────┴──────────────────────┴──────────────────────────┘ │
-│                                                                            │
-│ CUSTOMER COMMITMENTS                            CASH REQUIRING ATTENTION    │
-│ ┌────────────────────────────────────┐          ┌────────────────────────┐ │
-│ │ Next 7 business days          18   │          │ Collectable  RM …      │ │
-│ │ On track 14 · At risk 3 · Broken 1 │          │ Finance exceptions 2   │ │
-│ │ versus prior 7 days   At risk +1   │          │ 30+ days          RM … │ │
-│ │ Open Sales Orders / Delivery →     │          │ Open Payment →         │ │
-│ └────────────────────────────────────┘          └────────────────────────┘ │
-│                                                                            │
-│ GOODS FLOW                                      WORKLOAD HEALTH             │
-│ ┌────────────────────────────────────┐          ┌────────────────────────┐ │
-│ │ To buy 12 · Arrival missing 4      │          │ Overdue 9              │ │
-│ │ Supplier late 3 · Held stock 1     │          │ Today 24 · Blocked 3   │ │
-│ │ Open Purchasing / Receiving →      │          │ No owner / cover 1     │ │
-│ └────────────────────────────────────┘          │ Open Team Work →       │ │
-│                                                 └────────────────────────┘ │
-│                                                                            │
-│ RECENT MATERIAL CHANGE                                                     │
-│ 10:31  PO-2051 arrival moved beyond Customer Delivery       Open PO →      │
-│ 09:48  SO-1300 payment exception opened by Finance          Open SO →      │
+│ Fri 14 Aug · Business day                                Updated 10:42   │
+│                                                                          │
+│ MANAGEMENT EXCEPTIONS                                                    │
+│ ┌──────────────────────┬──────────────────────┬──────────────────────────│
+│ │ Broken commitments 3 │ Duty coverage 1      │ Work health 2            │
+│ │ 2 delivery · 1 goods │ GRN duty covered     │ 1 no owner · 1 failed    │
+│ │ Open affected work → │ Open Team Work →     │ Open Work health →       │
+│ └──────────────────────┴──────────────────────┴──────────────────────────│
+│                                                                          │
+│ CUSTOMER COMMITMENTS                            CASH REQUIRING ATTENTION │
+│ ┌────────────────────────────────────┐          ┌────────────────────────│
+│ │ Next 7 business days          18   │          │ Collectable  RM …      │
+│ │ On track 14 · At risk 3 · Broken 1 │          │ Finance exceptions 2   │
+│ │ versus prior 7 days   At risk +1   │          │ 30+ days          RM … │
+│ │ Open Sales Orders / Delivery →     │          │ Open Payment →         │
+│ └────────────────────────────────────┘          └────────────────────────│
+│                                                                          │
+│ GOODS FLOW                                      WORKLOAD HEALTH          │
+│ ┌────────────────────────────────────┐          ┌────────────────────────│
+│ │ To buy 12 · Arrival missing 4      │          │ Overdue 9              │
+│ │ Supplier late 3 · Held stock 1     │          │ Today 24 · Blocked 3   │
+│ │ Open Purchasing / Receiving →      │          │ No owner / cover 1     │
+│ └────────────────────────────────────┘          │ Open Team Work →       │
+│                                                 └────────────────────────│
+│                                                                          │
+│ RECENT MATERIAL CHANGE                                                   │
+│ 10:31  PO-2051 arrival moved beyond Requested Delivery Date       Open PO│
+│ 09:48  SO-1300 payment exception opened by Finance          Open SO →    │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 

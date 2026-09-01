@@ -153,24 +153,50 @@ export type PoTemplateData = {
   // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;
   po_id: string;
+  /**
+   * 0378 — which version of this document the factory is being handed. It
+   * PRINTS, including Version 1: a supplier holding two papers with one number
+   * and no version cannot tell which one to build from, and "an unrevised PO is
+   * just the PO" is a rule for the internal panel, not for paper that leaves
+   * the building. The confirmation hands this same number back, so what Carres
+   * records is by construction what the operator rendered.
+   */
+  version: number;
   issue_date: string;
   supplier: { name: string; address: string | null; contact: string | null };
   destination: { name: string; address: string };
   delivery_instructions: string | null;
   eta_date: string | null;
-  /** PO-level sales-order refs (route-added beside the RPC payload). */
+  /** PO-level sales-order refs, from the document authority (0383). */
   so_refs?: number[] | null;
-  /** Audit name for the footer; null until the portal records an issuer. */
+  /**
+   * Who at Carres issued this purchase order — `audit_log`'s own actor, read by
+   * `purchasing_po_document` (0383). It was hard-coded `null` in the route
+   * until then, so the footer named nobody.
+   */
   issued_by?: string | null;
   lines: Array<{
     sku: string;
     description: string;
     qty: number;
     unit: string;
+    /** Effective governed destination for this goods line. Older document
+     * payloads may omit it, in which case the PO-level destination applies. */
+    destination?: { name: string; address: string } | null;
     attrs?: Record<string, unknown> | null;
-    /** ops_stock_items.unit_code (0153) — minted at PO-open; the Item ID
-     *  column the old law RESERVED is now fed by this. */
+    /** ops_stock_items.unit_code — minted at PO-open under the locked
+     *  `U1-000-001` identity (0381); the Item ID column is fed by this. */
     unit_codes?: string[] | null;
+    /**
+     * ⭐ WHICH CUSTOMER ORDER EACH UNIT ON THIS LINE IS FOR (`po_line_sources`,
+     * 0382).
+     *
+     * A bulk purchase order aggregates one SKU across three customers, so the
+     * `SO NO` column had nothing to print and printed blank — a supplier
+     * delivering ten mattresses could not tell Carres whose they were, and
+     * neither could Carres. One entry per source order, summing to `qty`.
+     */
+    sources?: Array<{ so: number | null; qty: number }> | null;
   }>;
   terms: string | null;
 };

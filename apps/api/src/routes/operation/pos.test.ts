@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
 import app from "../../index";
@@ -81,27 +84,56 @@ describe("GET /api/operation/pos", () => {
     promises: Record<string, unknown>[] = [],
     orderRows: Record<string, unknown>[] = [],
     skuRows: Record<string, unknown>[] = [],
+    lineage: {
+      poLineSources?: Record<string, unknown>[];
+      demands?: Record<string, unknown>[];
+      requests?: Record<string, unknown>[];
+      sends?: Record<string, unknown>[];
+      referencedDestinations?: Record<string, unknown>[];
+      onPoLineRange?: (phase: "start" | "end") => void;
+    } = {},
   ) {
     const eq = vi.fn().mockReturnThis();
     const order = vi.fn().mockReturnThis();
-    const limit = vi.fn().mockResolvedValue({ data: rows, error: null });
-    const select = vi.fn(() => ({ eq, order, limit }));
+    const range = vi.fn((from: number, to: number) => Promise.resolve({
+      data: rows.slice(from, to + 1),
+      error: null,
+    }));
+    const select = vi.fn(() => ({ eq, order, range }));
 
-    const promiseOrder = vi.fn().mockResolvedValue({ data: promises, error: null });
-    const promiseIn = vi.fn(() => ({ order: promiseOrder }));
+    // Every Register enrichment now owns both protections: a small `.in(…)`
+    // batch and complete range pages. This chain mimics that PostgREST shape.
+    const paged = (
+      data: Record<string, unknown>[],
+      onRange?: (phase: "start" | "end") => void,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const builder: any = {};
+      builder.order = vi.fn(() => builder);
+      builder.range = vi.fn(async (from: number, to: number) => {
+        onRange?.("start");
+        if (onRange) await new Promise((resolve) => setTimeout(resolve, 0));
+        const result = { data: data.slice(from, to + 1), error: null };
+        onRange?.("end");
+        return result;
+      });
+      return builder;
+    };
+
+    const promiseIn = vi.fn(() => paged(promises));
     const promiseSelect = vi.fn(() => ({ in: promiseIn }));
 
-    const ordersIn = vi.fn().mockResolvedValue({ data: orderRows, error: null });
+    const ordersIn = vi.fn(() => paged(orderRows));
     const ordersSelect = vi.fn(() => ({ in: ordersIn }));
 
-    const skusIn = vi.fn().mockResolvedValue({ data: skuRows, error: null });
+    const skusIn = vi.fn(() => paged(skuRows));
     const skusSelect = vi.fn(() => ({ in: skusIn }));
 
     // 0311's destination registry rides the list so the per-line picker has
     // its options without a second call.
     // 0312: the sends read + the settings singleton (message template).
-    const sendsOrder = vi.fn().mockResolvedValue({ data: [], error: null });
-    const sendsIn = vi.fn(() => ({ order: sendsOrder }));
+    const sendsPaged = paged(lineage.sends ?? []);
+    const sendsIn = vi.fn(() => sendsPaged);
     const sendsSelect = vi.fn(() => ({ in: sendsIn }));
 
     const tmplSingle = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -111,13 +143,28 @@ describe("GET /api/operation/pos", () => {
     const destOrder2 = vi.fn().mockResolvedValue({ data: [], error: null });
     const destOrder1 = vi.fn(() => ({ order: destOrder2 }));
     const destEq = vi.fn(() => ({ order: destOrder1 }));
-    const destSelect = vi.fn(() => ({ eq: destEq }));
+    const destinationHistoryIn = vi.fn(() => paged(lineage.referencedDestinations ?? []));
+    const destSelect = vi.fn(() => ({ eq: destEq, in: destinationHistoryIn }));
 
     // The Excel-row derivation reads the covered SOs' own lines (Jess,
     // 2026-08-02): one grid row per SO × SKU, carrying the salesperson's
     // remark. Empty here — the rows fall back to one per PO line.
-    const solIn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const solIn = vi.fn(() => paged([]));
     const solSelect = vi.fn(() => ({ in: solIn }));
+
+    const lineRows = rows.flatMap((po) => po.purchase_order_lines.map((line) => ({
+      ...line,
+      po_id: po.id,
+    })));
+    const poLinesIn = vi.fn(() => paged(lineRows, lineage.onPoLineRange));
+    const poLinesSelect = vi.fn(() => ({ in: poLinesIn }));
+
+    const lineageIn = vi.fn(() => paged(lineage.poLineSources ?? []));
+    const lineageSelect = vi.fn(() => ({ in: lineageIn }));
+    const demandIn = vi.fn(() => paged(lineage.demands ?? []));
+    const demandSelect = vi.fn(() => ({ in: demandIn }));
+    const requestIn = vi.fn(() => paged(lineage.requests ?? []));
+    const requestSelect = vi.fn(() => ({ in: requestIn }));
 
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
@@ -125,6 +172,10 @@ describe("GET /api/operation/pos", () => {
         if (table === "orders") return { select: ordersSelect };
         if (table === "product_skus") return { select: skusSelect };
         if (table === "order_lines") return { select: solSelect };
+        if (table === "purchase_order_lines") return { select: poLinesSelect };
+        if (table === "po_line_sources") return { select: lineageSelect };
+        if (table === "purchase_demands") return { select: demandSelect };
+        if (table === "purchase_requests") return { select: requestSelect };
         if (table === "purchasing_destinations") return { select: destSelect };
         if (table === "po_sends") return { select: sendsSelect };
         if (table === "purchasing_settings") return { select: tmplSelect };
@@ -132,11 +183,11 @@ describe("GET /api/operation/pos", () => {
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return { eq, order, limit, promiseIn, promiseSelect, ordersIn, skusIn };
+    return { eq, order, range, promiseIn, promiseSelect, ordersIn, skusIn, sendsRange: sendsPaged.range };
   }
 
   it("returns POs for operation with default 'all' status", async () => {
-    const { order, limit } = mockPosList([PO_ROW]);
+    const { order, range } = mockPosList([PO_ROW]);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
       new Request("http://t/api/operation/pos", {
@@ -149,7 +200,180 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos).toHaveLength(1);
     expect(body.pos[0]?.id).toBe("PO-2030");
     expect(order).toHaveBeenCalledWith("placed_at", { ascending: false });
-    expect(limit).toHaveBeenCalledWith(200);
+    expect(range).toHaveBeenCalledWith(0, 999);
+  });
+
+  it("pages the complete PO register beyond the first PostgREST response", async () => {
+    const rows = Array.from({ length: 1_001 }, (_, index) => ({
+      ...PO_ROW,
+      id: `PO-${String(index + 1).padStart(5, "0")}`,
+      purchase_order_lines: [],
+    }));
+    const { range } = mockPosList(rows);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ id: string }> };
+    expect(body.pos).toHaveLength(1_001);
+    expect(range).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(range).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it("pages every send so current-version evidence cannot disappear at row 1001", async () => {
+    const sends = Array.from({ length: 1_001 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(index).padStart(12, "0")}`,
+      po_id: "PO-2030",
+      channel: "whatsapp",
+      note: null,
+      sent_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      kind: index === 1_000 ? "confirmed_sent" : "external_open",
+      recipient: index === 1_000 ? "Hooka Purchasing Group" : null,
+      po_version: index === 1_000 ? 1 : null,
+      sent_by: null,
+      duty_user_id: null,
+      acting_user_id: null,
+      po_revisions: null,
+    }));
+    const { sendsRange } = mockPosList([PO_ROW], [], [], [], { sends });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pos: Array<{ sends: Array<{ kind: string }> }> };
+    expect(body.pos[0]?.sends).toHaveLength(1_001);
+    expect(body.pos[0]?.sends.some((send) => send.kind === "confirmed_sent")).toBe(true);
+    expect(sendsRange).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(sendsRange).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it("uses bounded parallel batches for a large register enrichment", async () => {
+    let active = 0;
+    let maximum = 0;
+    const rows = Array.from({ length: 81 }, (_, index) => ({
+      ...PO_ROW,
+      id: `PO-${String(index + 1).padStart(5, "0")}`,
+    }));
+    mockPosList(rows, [], [], [], {
+      onPoLineRange: (phase) => {
+        active += phase === "start" ? 1 : -1;
+        maximum = Math.max(maximum, active);
+      },
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(maximum).toBeGreaterThan(1);
+    expect(maximum).toBeLessThanOrEqual(4);
+  });
+
+  it("returns governed SO and Manual Purchase lineage instead of guessing from display fields", async () => {
+    const row = {
+      ...PO_ROW,
+      so: null,
+      so_refs: null,
+      purchase_order_lines: [
+        { ...PO_ROW.purchase_order_lines[0], demand_id: "demand-1" },
+      ],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      poLineSources: [
+        {
+          po_id: "PO-2030",
+          po_line_id: "line-a",
+          order_id: "order-1",
+          order_line_id: "order-line-1",
+          so: 4001,
+          qty: 1,
+        },
+      ],
+      demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
+      requests: [{ id: "request-1", req_no: "PR-20260828-0042" }],
+    });
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pos: Array<{
+        sources: Array<{ kind: string; reference: string }>;
+        purchase_order_lines: Array<{
+          sources: Array<{ so: number; qty: number }>;
+          governed_sources: Array<{ kind: string; reference: string; qty: number | null }>;
+        }>;
+      }>;
+    };
+    expect(body.pos[0]?.sources).toEqual([
+      { kind: "sales_order", reference: "SO-4001" },
+      { kind: "manual_purchase", reference: "PR-20260828-0042" },
+    ]);
+    expect(body.pos[0]?.purchase_order_lines[0]?.sources).toEqual([
+      expect.objectContaining({ so: 4001, qty: 1 }),
+    ]);
+    expect(body.pos[0]?.purchase_order_lines[0]).toEqual(expect.objectContaining({
+      governed_sources: [
+        { kind: "sales_order", reference: "SO-4001", qty: 1 },
+        { kind: "manual_purchase", reference: "PR-20260828-0042", qty: 1 },
+      ],
+    }));
+    expect(
+      body.pos[0]?.purchase_order_lines[0]?.governed_sources.reduce(
+        (sum, source) => sum + (source.qty ?? 0),
+        0,
+      ),
+    ).toBe(2);
+  });
+
+  it("returns a closed destination name when a historical PO still references it", async () => {
+    const row = {
+      ...PO_ROW,
+      destination_id: "destination-closed",
+      purchase_order_lines: [{
+        ...PO_ROW.purchase_order_lines[0],
+        destination_id: "destination-closed",
+      }],
+    };
+    mockPosList([row as unknown as typeof PO_ROW], [], [], [], {
+      referencedDestinations: [{
+        id: "destination-closed",
+        name: "Old Partner Warehouse",
+        is_default: false,
+      }],
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      referencedDestinations: Array<{ id: string; name: string }>;
+    };
+    expect(body.referencedDestinations).toContainEqual({
+      id: "destination-closed",
+      name: "Old Partner Warehouse",
+      is_default: false,
+    });
   });
 
   // ── P3 (0306) · what the supplier last told us, and what it was ABOUT ──────
@@ -453,6 +677,57 @@ describe("GET /api/operation/pos/:id/source-orders", () => {
     );
     expect(res.status).toBe(403);
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/operation/pos/:id/audit", () => {
+  it("returns complete revisions and history with real staff names", async () => {
+    const tables: Record<string, Record<string, unknown>[]> = {
+      po_revisions: [
+        {
+          id: "rev-1",
+          rev_no: 1,
+          reason: "Deliver To changed",
+          created_by: "user-1",
+          created_at: "2026-08-28T09:00:00Z",
+          snapshot: { version: 1 },
+        },
+      ],
+      po_history: [
+        {
+          id: "hist-1",
+          text: "Purchase order revised to Version 2",
+          by_role: "operation",
+          by_user_id: "user-1",
+          occurred_at: "2026-08-28T09:00:00Z",
+        },
+      ],
+      app_users: [{ id: "user-1", name: "Yee Jean", email: "yj@carres.com" }],
+    };
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+        chain.select = vi.fn(() => chain);
+        chain.eq = vi.fn(() => chain);
+        chain.in = vi.fn().mockResolvedValue({ data: tables[table] ?? [], error: null });
+        chain.order = vi.fn().mockResolvedValue({ data: tables[table] ?? [], error: null });
+        return chain;
+      }),
+    } as never);
+
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2030/audit", {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      revisions: Array<{ actor_name: string | null }>;
+      history: Array<{ actor_name: string | null }>;
+    };
+    expect(body.revisions[0]?.actor_name).toBe("Yee Jean");
+    expect(body.history[0]?.actor_name).toBe("Yee Jean");
   });
 });
 
@@ -1123,7 +1398,7 @@ describe("POST /api/operation/pos/:id/reassign-warehouse", () => {
 //     prior IN-list filter to a single-value .eq()).
 //   - purchase_orders (v2-style coverage filter on legacy fallback): only
 //     open POs gate orders. Received/cancelled don't count.
-//   - order_lines + stock_balances: same as before.
+//   - order_lines + stock_sku_availability (0366): same as before.
 describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
   function mockShortageQueries(opts: {
     // v3-S4.6: thread rows. Each row tagged with operation_stage + po_id so
@@ -1140,7 +1415,15 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
     // and assert the route narrows the input set BEFORE this fetch. Lines
     // without order_id always pass through (preserves existing tests).
     orderLines?: { sku: string; qty: number; order_id?: string }[];
-    stockBalances?: { sku: string; qty: number; reserved: number }[];
+    stockBalances?: {
+      sku: string;
+      qty: number;
+      reserved: number;
+      /** 0366 — exact Units a Sales Order can BIND. Defaults to qty − reserved. */
+      available?: number;
+      /** 0368 — available + bulk pieces on the floor; what replenishment asks. */
+      sellable?: number;
+    }[];
     pos?: { status: string; so: number | null; so_refs: number[] | null }[];
   }) {
     const fromImpl = vi.fn((table: string) => {
@@ -1218,9 +1501,22 @@ describe("GET /api/operation/pos/awaiting-stock-shortage", () => {
             );
           });
           break;
-        case "stock_balances":
+        case "stock_sku_availability":
+          // 0366 — the shortage feed reads the unit register's ONE availability
+          // authority, not `stock_balances`. Fixtures still describe a site as
+          // {qty, reserved} because that is what the scenarios are about; the
+          // view's `available` is derived here exactly as the register derives
+          // it, so a test that wants a controlled unit sets `available` itself.
           // No filter on this query — the .select() chain itself awaits.
-          chain.select = vi.fn(() => promise(opts.stockBalances ?? []));
+          chain.select = vi.fn(() =>
+            promise(
+              (opts.stockBalances ?? []).map((b) => ({
+                sku: b.sku,
+                // 0368 — this feed decides what to BUY, so it reads `sellable`.
+                sellable: b.sellable ?? b.available ?? b.qty - b.reserved,
+              })),
+            ),
+          );
           break;
         case "purchase_orders":
           // v3-S2.1: route calls `.eq("status", "open")` to grab POs that
@@ -2223,5 +2519,198 @@ describe("POST /api/operation/pos/:id/ready-date", () => {
     );
     const passedJwt = vi.mocked(userClient).mock.calls[0]?.[1];
     expect(passedJwt).toBe(jwt);
+  });
+});
+
+
+/**
+ * CONFIRMED OUTBOUND EVIDENCE (0377; CARD-2026-08-22-purchasing-02 §7.4).
+ *
+ * The whole point of this block: an app that OPENED is not a PDF that ARRIVED.
+ */
+describe("POST /api/operation/pos/:id/confirm-sent", () => {
+  const PO_ID = "PO-2041";
+
+  function mockRpc(result: unknown = { po_id: PO_ID, po_version: 2 }, error: unknown = null) {
+    const rpc = vi.fn().mockResolvedValue({ data: result, error });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    return rpc;
+  }
+
+  async function post(body: unknown, role = "operation") {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/confirm-sent`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("records channel, recipient, version and note through the governed RPC", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp",
+      recipient: "Hooka Purchasing Group",
+      poVersion: 2,
+      note: "Sent with the Unit list",
+    });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_confirm_po_sent", {
+      p_po_id: PO_ID,
+      p_expected_version: 2,
+      p_channel: "whatsapp",
+      p_recipient: "Hooka Purchasing Group",
+      p_note: "Sent with the Unit list",
+    });
+  });
+
+  /**
+   * ⭐ 0378 — the caller DECLARES the version it rendered.
+   *
+   * 0377 had SQL read the newest version instead, reasoning that a caller able
+   * to name one could lie. That was backwards: send Version 1, let another
+   * session revise to Version 2, confirm — and Carres recorded Version 2 as
+   * shared while the supplier held Version 1. Declaring is not trusting; SQL
+   * locks, compares, refuses, and still stores only its own read.
+   */
+  it("a confirmation with NO version is refused", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "email", recipient: "buy@hooka.my" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a version that is not a positive whole number is refused", async () => {
+    const rpc = mockRpc();
+    for (const bad of [0, -1, 1.5, "2", null]) {
+      const res = await post({ channel: "email", recipient: "buy@hooka.my", poVersion: bad });
+      expect(res.status, JSON.stringify(bad)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the declared version reaches SQL as the EXPECTED version, not as the stored one", async () => {
+    const rpc = mockRpc();
+    await post({ channel: "email", recipient: "buy@hooka.my", poVersion: 1 });
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args.p_expected_version).toBe(1);
+    // There is no argument that could SET the stored version.
+    expect(Object.keys(args)).not.toContain("p_version");
+    expect(Object.keys(args)).not.toContain("p_po_version");
+  });
+
+  it("viewing Version 1 while the database holds Version 2 is refused, in two lines", async () => {
+    mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version: saw 1, current is 2",
+      details: "stale_po_version",
+    });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code?: string; message?: string; action?: string };
+    expect(body.code).toBe("stale_po_version");
+    // The approved fact/fix pair (`docs/purchasing/MASTER.md` §8.3).
+    expect(body.message).toBe("Purchase order changed");
+    expect(body.action).toBe("Open the latest PDF and send it again.");
+  });
+
+  it("a stale confirmation writes NOTHING — the refusal is the whole outcome", async () => {
+    const rpc = mockRpc(null, {
+      code: "P0001",
+      message: "stale_po_version",
+      details: "stale_po_version",
+    });
+    await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    // One call, and it raised. No second call could have written a row.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]![0]).toBe("purchasing_confirm_po_sent");
+  });
+
+  it("declaring the version that IS current records it", async () => {
+    const rpc = mockRpc({ po_id: PO_ID, po_version: 2 });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 2 });
+    expect(res.status).toBe(200);
+    expect((rpc.mock.calls[0]![1] as Record<string, unknown>).p_expected_version).toBe(2);
+    const body = (await res.json()) as { result?: { po_version?: number } };
+    expect(body.result?.po_version).toBe(2);
+  });
+
+  it("refuses a blank recipient — `sent` must say to whom", async () => {
+    const rpc = mockRpc();
+    for (const recipient of ["", "   "]) {
+      const res = await post({ channel: "whatsapp", recipient, poVersion: 1 });
+      expect(res.status, JSON.stringify(recipient)).toBe(422);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a channel nobody governs", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "carrier pigeon", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown field rather than silently dropping it", async () => {
+    const rpc = mockRpc();
+    const res = await post({
+      channel: "whatsapp", recipient: "Hooka", poVersion: 1, sentAt: "2026-08-24",
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("a caller who does not hold PO duty is refused by SQL, not by the screen", async () => {
+    mockRpc(null, { code: "P0001", message: "not_po_duty", details: "not_po_duty" });
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("a dealer never reaches the door", async () => {
+    const rpc = mockRpc();
+    const res = await post({ channel: "whatsapp", recipient: "Hooka", poVersion: 1 }, "dealer");
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("opening an app records an OPEN, and completes nothing", () => {
+  it("`/sends` still exists and still takes only channel and note", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2041/sends", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "whatsapp" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_send", {
+      p_po_id: "PO-2041",
+      p_channel: "whatsapp",
+      p_note: null,
+    });
+    // It carries NO recipient — an open cannot name who received anything.
+    const args = rpc.mock.calls[0]![1] as Record<string, unknown>;
+    expect(args).not.toHaveProperty("p_recipient");
+  });
+
+  it("the two doors are DIFFERENT functions — an open can never mint evidence", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, "pos.ts"), "utf8");
+    expect(src).toContain("purchasing_record_send");
+    expect(src).toContain("purchasing_confirm_po_sent");
+    // The open door does not touch the evidence function, and vice versa.
+    const openBlock = src.slice(src.indexOf('post("/:id/sends"'), src.indexOf('post("/:id/confirm-sent"'));
+    expect(openBlock).not.toContain("purchasing_confirm_po_sent");
   });
 });

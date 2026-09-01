@@ -25,6 +25,12 @@ export const SKU_EXPORT_COLUMNS = [
   "variant_kind",
   "price",
   "cost",
+  // 2026-08-24 — pwp_price + supplier_code join the round-trip: both are
+  // importable, so an export → edit → re-import must carry them or the
+  // re-import would OMIT the keys and silently preserve stale values the
+  // keyer thought they had replaced.
+  "pwp_price",
+  "supplier_code",
   "description",
   "pos_active",
   "sku",
@@ -58,6 +64,10 @@ export function buildSkuExportCsv(rows: ExportSkuRow[]): string {
       variant_kind: sku.variantKind,
       price: sku.price > 0 ? sku.price : "",
       cost: sku.cost ?? "",
+      // A stored 0 exports BLANK exactly like price: 0 means "not set" under
+      // the 0186 law, and the importer refuses a literal 0 cell.
+      pwp_price: sku.pwpPrice && sku.pwpPrice > 0 ? sku.pwpPrice : "",
+      supplier_code: sku.supplierCode ?? "",
       description: sku.description ?? "",
       pos_active: sku.posActive === false ? "no" : "yes",
       sku: sku.sku,

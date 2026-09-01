@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { PoTemplate } from "./po-template";
+import type { PoTemplateData } from "./types";
 
 // PO-PDF-STANDARD guard (2026-08-02). A render test only sees the branches its
 // fixture reaches; a SOURCE scan holds every branch of the template to the
@@ -20,6 +23,13 @@ const SRC = readFileSync(
 // comments fails on the very sentence explaining why the rule exists.
 const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
+function renderedText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(renderedText).join(" ");
+  if (!isValidElement(node)) return "";
+  return renderedText((node as ReactElement<{ children?: ReactNode }>).props.children);
+}
+
 describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
   it("never mentions money — no price, no total, no RM, no currency", () => {
     expect(CODE).not.toMatch(/unit_price|line_total|grand_total|currency|formatMoney/);
@@ -27,9 +37,35 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
     expect(CODE).not.toMatch(/fabric_surcharge/);
   });
 
+  /**
+   * ⭐ 0378 — THE DOCUMENT PRINTS ITS OWN VERSION, INCLUDING VERSION 1.
+   *
+   * A supplier holding two papers with one number and no version cannot tell
+   * which to build from. (`Version 1 prints nothing` is the internal REVISIONS
+   * PANEL's rule — `docs/COPY-STANDARD.md` — and this is paper that leaves the
+   * building; the panel rule is untouched.)
+   */
+  it("prints its version, and takes it from the document payload", () => {
+    expect(SRC).toContain("versionLabel");
+    expect(SRC).toMatch(/Version \$\{version \?\? 1\}/);
+    // It comes off the official payload, not from a prop somebody could pass.
+    expect(SRC).toMatch(/const \{ po_number, version,/);
+    // It appears on the first-page identity block AND the continuation header.
+    expect(SRC).toMatch(/docTitle[^\n]*>\{versionLabel\}/);
+    expect(SRC).toContain("{versionLabel}");
+    // And as its own PO DETAILS row.
+    expect(SRC).toMatch(/\["Version",/);
+  });
+
+  it("never invents a version — a payload without one reads Version 1", () => {
+    // `version ?? 1` and nothing else; no counting, no lookup, no default prop.
+    expect(CODE).not.toMatch(/version\s*\+\+|version\s*\+\s*1/);
+  });
+
   it("carries the Law's fixed strings", () => {
     for (const s of [
       "Deliver by",
+      "Version",
       "PURCHASE ORDER",
       "Computer-generated document · No signature required.",
       "SO No",
@@ -47,5 +83,79 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
 
   it("items never split across pages — every row is wrap={false}", () => {
     expect(SRC).toMatch(/wrap=\{false\}/);
+  });
+});
+
+/**
+ * ⭐ THE DOCUMENT CARRIES THE FACTS IT CLAIMS
+ * (0382 · 0383; CARD-2026-08-22-purchasing-02 closure §6 · §7).
+ *
+ * `SO NO` and `Item ID` were columns with nothing behind them: the schema kept
+ * `so_refs` on the DOCUMENT, so every bulk purchase order printed a blank
+ * customer column, and the route hard-coded the issuer to `null`.
+ */
+describe("po-template prints the lineage and the issuer it is given", () => {
+  it("prints every line's governed destination on a multi-destination PO", () => {
+    const data: PoTemplateData = {
+      po_number: "PO-9801",
+      po_id: "PO-9801",
+      version: 2,
+      issue_date: "2026-08-28",
+      supplier: { name: "Ohana", address: "Muar", contact: null },
+      destination: { name: "Carres Klang", address: "Klang address" },
+      delivery_instructions: null,
+      eta_date: "2026-09-05",
+      issued_by: "Yee Jin",
+      lines: [
+        {
+          sku: "CODY-Q",
+          description: "Cody Queen",
+          qty: 1,
+          unit: "pc",
+          destination: { name: "Carres Klang", address: "Klang address" },
+        },
+        {
+          sku: "JAGER-K",
+          description: "Jager King",
+          qty: 1,
+          unit: "pc",
+          destination: { name: "Partner Penang", address: "Penang address" },
+        },
+      ],
+      terms: null,
+    };
+
+    const text = renderedText(PoTemplate(data));
+    expect(text).toContain("Multiple destinations");
+    expect(text).toContain("Carres Klang");
+    expect(text).toContain("Partner Penang");
+    expect(text).toContain("Penang address");
+  });
+
+  it("reads SO NO from the LINE's own sources, not only the document", () => {
+    /* The old rule — print the SO only when the whole PO covers exactly one —
+       is now the fallback for purchase orders raised before 0382. */
+    expect(SRC).toContain("const soCell =");
+    expect(SRC).toMatch(/line\.sources/);
+    expect(SRC).toMatch(/soCell\(line\)/);
+    /* A line serving several customers prints each with its quantity: ten
+       mattresses are not interchangeable once three people are promised them. */
+    expect(SRC).toMatch(/SO-\$\{s\.so\} × \$\{s\.qty\}/);
+    /* And the document-level fallback survives for the older documents. */
+    expect(SRC).toMatch(/so_refs && so_refs\.length === 1/);
+  });
+
+  it("still fills Item ID from the units the issue actually minted", () => {
+    expect(SRC).toMatch(/line\.unit_codes/);
+    /* An em dash, not an empty cell — a blank column reads as a defect. */
+    expect(SRC).toMatch(/unit_codes\.join\("\\n"\) : "—"/);
+  });
+
+  it("names the issuer when the document authority carries one", () => {
+    expect(SRC).toMatch(/issued_by \? ` · Issued by \$\{issued_by\}`/);
+  });
+
+  it("prints the supplier's own address, because a formal document names both parties", () => {
+    expect(SRC).toMatch(/supplier\.address \?/);
   });
 });

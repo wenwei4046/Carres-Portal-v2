@@ -13,8 +13,10 @@
  * queries. It writes nothing, and it holds no rules of its own:
  *
  *   WHAT is open   ← `openActionsOf` — the same signal mapping the Orders list runs
- *   WHO + WHEN     ← Card 9's `workItemsForOrder` (PIC · one clock per key ·
- *                    working-days-late over a due that never moves)
+ *   WHO + WHEN     ← Card 9's `workItemsForOrder` — the owner resolved per
+ *                    RULE (§0.1 Action Owner Engine, 2026-08-27: PO-duty
+ *                    holder · salesperson · PIC) · one clock per key ·
+ *                    working-days-late over a due that never moves
  *
  * OVERDUE is `workingDaysLate > 0` — Card 9's own arithmetic, not a second
  * comparison against today. One derived fact, one arithmetic (ERP-ARCHITECTURE
@@ -23,6 +25,10 @@
 import { useMemo } from "react";
 import {
   deliveryQueueLeads,
+  manualPurchaseLineRemainingOf,
+  manualPurchaseOrderByOf,
+  manualPurchaseStatusOf,
+  manualPurchaseWorkItems,
   myHolidaySet,
   orderActionLine,
   workItemsForOrder,
@@ -33,7 +39,9 @@ import { displayCustomerName } from "@/lib/customer-name";
 import { personLabel } from "@/lib/staff-avatar";
 import {
   useDeliveryPartners,
+  useManualPurchaseRegister,
   useOperationOrders,
+  useOperationPoDuty,
   useOperationStaff,
   useOperationStock,
   usePurchasingSettings,
@@ -52,6 +60,9 @@ export interface WorkRow extends WorkItem {
   /** The party-named row line — the SAME words the Orders list prints. */
   line: string;
   customer: string | null;
+  /** The RESOLVED owner's account id (§0.1 Action Owner Engine, 2026-08-27):
+   *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
+   *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
 }
 
@@ -76,6 +87,15 @@ export function useOpenWorkSet(): OpenWorkSet {
   const stockQ = useOperationStock();
   const partnersQ = useDeliveryPartners();
   const settingsQ = usePurchasingSettings();
+  // Card 06 §7 — the Manual Purchase module supplies its two governed
+  // actions (`Approve {MPR}` · `Issue the purchase order for {MPR}`) from
+  // its own register read; Work composes, stores nothing, and exposes no
+  // manual Done.
+  const manualQ = useManualPurchaseRegister();
+  // §0.1 Action Owner Engine (2026-08-27) — Purchasing's order-track work
+  // resolves to the month's PO-duty holder. Fails soft exactly as the duty
+  // hook always has: dormant layer → no holder → the duty word stands.
+  const poDutyQ = useOperationPoDuty();
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -101,6 +121,15 @@ export function useOpenWorkSet(): OpenWorkSet {
     return m;
   }, [stockQ.data]);
 
+  const poDuty = useMemo(() => {
+    const holder = poDutyQ.data?.holder;
+    if (!holder) return null;
+    return {
+      userId: holder.userId,
+      name: personLabel(holder.name, holder.email),
+    };
+  }, [poDutyQ.data]);
+
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const queueLeads = useMemo(
     () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
@@ -116,8 +145,9 @@ export function useOpenWorkSet(): OpenWorkSet {
       const ovl = ovlOf(o);
       const ownerId = ownerOf(o);
       const ownerMember = ownerId ? staffById.get(ownerId) : undefined;
-      // Blueprint card §7 — the two composed Work facts + the Assign-logistics
-      // due anchor (the EARLIEST PO's issue day; stock-source: the order day).
+      // The composed Work facts (blueprint card §7 + §0.1 row 1) + the
+      // Assign-logistics due anchor (the EARLIEST PO's issue day;
+      // stock-source: the order day).
       const poIssueDays = (o.order_supplier_threads ?? [])
         .map((t) => t.purchase_orders?.placed_at ?? null)
         .filter((d): d is string => Boolean(d))
@@ -128,6 +158,16 @@ export function useOpenWorkSet(): OpenWorkSet {
           orderId: o.id,
           so: o.so,
           picName: ownerMember ? personLabel(ownerMember.name, ownerMember.email) : null,
+          picUserId: ownerId,
+          poDuty,
+          salespersonName: o.salespersons?.name ?? null,
+          // §0.1 row 1 — the 3 nobody asked, never the 8 who answered "not
+          // yet" (owner ruling 2026-08-15), and never a finished order.
+          askDeliveryDate:
+            !o.delivery_date &&
+            !o.delivery_date_tbd &&
+            o.status !== "delivered" &&
+            !o.delivered_at,
           promisedDateIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
           confirmedDateIso: ovl?.confirmed_date ?? null,
           deliveredAtIso: o.delivered_at ?? null,
@@ -161,18 +201,104 @@ export function useOpenWorkSet(): OpenWorkSet {
              item is composed, so the Work row, the Quick Rail peek and the
              action sentence above all name the customer identically. */
           customer: displayCustomerName(o.customer_name) ?? null,
-          ownerId,
+          /* The RESOLVED owner's account (2026-08-27) — the PO-duty holder
+             for Purchasing's work, else the PIC; never the PIC borrowed for
+             another rule's item. */
+          ownerId: it.ownerUserId,
         });
       }
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today,
+    holidayOpts, queueLeads, today, poDuty,
   ]);
 
+  /* ── The Manual Purchase actions (Card 06 §7) ──────────────────────────
+     Approval work belongs to the configured real approver; issuance to the
+     month's NORMAL PO Duty holder (Team Work groups by them). Both are due
+     no later than the request's server-derived Order By and deep-link the
+     exact MPR. Completion is the stored decision / the current PO version's
+     confirmed-sent evidence — read here, never inferred. */
+  const manualItems = useMemo(() => {
+    const data = manualQ.data;
+    // A partial payload composes nothing rather than crashing the set.
+    if (!data?.requests) return [] as WorkRow[];
+    const approverRaw =
+      (data.approvers ?? []).find((a) => (a.name ?? "").trim() !== "") ?? null;
+    const approver = approverRaw
+      ? { userId: approverRaw.id, name: approverRaw.name }
+      : null;
+    const sentByPo = new Map((data.pos ?? []).map((p) => [p.id, p.sent === true]));
+    const linesByReq = new Map<string, typeof data.lines>();
+    for (const l of data.lines ?? []) {
+      const list = linesByReq.get(l.request_id) ?? [];
+      list.push(l);
+      linesByReq.set(l.request_id, list);
+    }
+    const mpToday = data.todayIso ?? today;
+    const out: WorkRow[] = [];
+    for (const r of data.requests) {
+      const lines = linesByReq.get(r.id) ?? [];
+      const live = lines.filter((l) => l.cancelled_at === null);
+      const status = manualPurchaseStatusOf({
+        approvalRequired: r.approval_required,
+        approvedAt: r.approved_at,
+        refusedAt: r.refused_at,
+        refuseReason: r.refuse_reason,
+        lines: lines.map((l) => ({
+          qty: l.qty,
+          issuedQty: l.issued_qty,
+          remainingQty: l.remaining_qty,
+          cancelledAt: l.cancelled_at,
+          poId: l.po_id,
+          received: l.received,
+        })),
+      });
+      const linkedPoIds = [
+        ...new Set(
+          live.flatMap((l) => l.po_ids ?? (l.po_id ? [l.po_id] : [])),
+        ),
+      ];
+      const workItems = manualPurchaseWorkItems(
+        {
+          requestId: r.id,
+          reqNo: r.req_no,
+          status: status.kind,
+          remainingQty: live.reduce(
+            (n, l) =>
+              n +
+              manualPurchaseLineRemainingOf({
+                qty: l.qty,
+                approvedQty: l.approved_qty,
+                issuedQty: l.issued_qty,
+              }),
+            0,
+          ),
+          orderBy: manualPurchaseOrderByOf(live.map((l) => l.order_by ?? null)),
+          hasPos: linkedPoIds.length > 0,
+          posAllSent:
+            linkedPoIds.length > 0 &&
+            linkedPoIds.every((id) => sentByPo.get(id) === true),
+        },
+        { approver, poDuty },
+        mpToday,
+        holidayOpts,
+      );
+      for (const it of workItems) {
+        out.push({ ...it, line: it.action, customer: null, ownerId: it.ownerUserId });
+      }
+    }
+    return out;
+  }, [manualQ.data, poDuty, holidayOpts, today]);
+
+  const allItems = useMemo(
+    () => [...items, ...manualItems],
+    [items, manualItems],
+  );
+
   return {
-    items,
+    items: allItems,
     staff,
     staffById,
     loading: ordersQ.isLoading || staffQ.isLoading,
