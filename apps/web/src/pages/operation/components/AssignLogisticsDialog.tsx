@@ -30,10 +30,13 @@ import {
   CHANGE_LOGISTICS_REASONS,
   DEFAULT_KV_LOGISTICS,
   isLogisticsChange,
+  latestWarehouseReadyDate,
+  partnerJourneyCalendar,
   type AssignLogisticsInput,
 } from "@carres/shared";
-import { useAssignLogistics, useDeliveryPartners } from "@/lib/queries";
-import { REGION_CARRIER, regionForAddress } from "@/lib/region";
+import { fmtDate } from "@/lib/fmt-date";
+import { useAssignLogistics, useDeliveryPartners, type DeliveryPartnerRow } from "@/lib/queries";
+import { detectState, REGION_CARRIER, regionForAddress } from "@/lib/region";
 import type { DeliveryScopeRow } from "../delivery-work";
 
 /** Every visible word (COPY-STANDARD). */
@@ -57,7 +60,53 @@ export const AL_WORDS = {
     n === 1
       ? "1 of these already has a logistics partner. Changing it is recorded with your reason."
       : `${n} of these already have a logistics partner. Changing them is recorded with your reason.`,
+  /* Delivery Card 03 (0411, MASTER §5.1) — the ONE backward calculation,
+     shown as a fact. It informs; it never blocks. */
+  readyBy: "Latest Carres Warehouse ready date",
+  pickupOn: (partner: string, d: string) => `${partner} picks up from KL on ${d}`,
+  surcharge: (partner: string, areas: string) =>
+    `${partner} may charge extra for: ${areas}`,
 } as const;
+
+/** journey_regions key for a scope's address — state-level, because TEOW's
+ *  Melaka and JB weeks differ. null = no governed region ⇒ silence. */
+export function journeyRegionKeyFor(address: string | null | undefined): string | null {
+  const state = detectState(address ?? "");
+  if (state === "Melaka") return "Melaka";
+  if (state === "Johor") return "JB";
+  return null;
+}
+
+/** The computed chain lines for the chosen partner over the selected scopes.
+ *  A scope with no region, no date or no partner calendar contributes nothing
+ *  (absence stays silent — the 0283/T7 law). */
+export function readyByLines(
+  scopes: DeliveryScopeRow[],
+  partner: DeliveryPartnerRow | undefined,
+): { so: number; pickupDay: string; readyBy: string }[] {
+  if (!partner) return [];
+  const calendar = partnerJourneyCalendar(partner);
+  if (!calendar.pickupDays) return [];
+  const out: { so: number; pickupDay: string; readyBy: string }[] = [];
+  for (const s of scopes) {
+    const address =
+      s.o.customer_address ??
+      [s.o.customer_address_line1, s.o.customer_address_city, s.o.customer_address_state]
+        .filter(Boolean)
+        .join(", ");
+    const region = journeyRegionKeyFor(address);
+    const date = s.confirmedIso ?? s.customerDeliveryIso;
+    if (!region || !date) continue;
+    const chain = latestWarehouseReadyDate({
+      customerDateIso: date,
+      region,
+      calendar,
+    });
+    if (chain.kind !== "chain") continue;
+    out.push({ so: s.so, pickupDay: chain.pickupDay, readyBy: chain.warehouseReadyBy });
+  }
+  return out;
+}
 
 /**
  * Which partners may carry EVERY selected scope.
@@ -132,6 +181,14 @@ export default function AssignLogisticsDialog({
   const [note, setNote] = useState<string>("");
 
   const chosen = partnerId ?? defaultPartnerFor(scopes, candidates);
+  const chosenRow = useMemo(
+    () => partners.find((p) => p.id === chosen),
+    [partners, chosen],
+  );
+  /* Delivery Card 03 — the backward-calculation facts for the chosen carrier.
+     Empty arrays render nothing: absence stays silent. */
+  const ready = useMemo(() => readyByLines(scopes, chosenRow), [scopes, chosenRow]);
+  const surchargeAreas = chosenRow?.surcharge_areas ?? [];
 
   /* How many of these would be REPLACED rather than filled in. The same
      predicate the server runs, so the dialog cannot ask for something the
@@ -209,6 +266,27 @@ export default function AssignLogisticsDialog({
           {candidates.length === 0 && (
             <p className="text-meta text-kit-amber-11" data-testid="assign-logistics-no-partners">
               {AL_WORDS.noPartners}
+            </p>
+          )}
+
+          {ready.length > 0 && chosenRow && (
+            <div
+              className="rounded-control bg-kit-slate-3 px-2 py-1.5 text-meta text-kit-slate-11"
+              data-testid="assign-logistics-ready-by"
+            >
+              {ready.map((r) => (
+                <p key={r.so}>
+                  {scopes.length > 1 ? `SO ${r.so} · ` : ""}
+                  {AL_WORDS.pickupOn(chosenRow.name, fmtDate(r.pickupDay))} —{" "}
+                  {AL_WORDS.readyBy}: <span className="font-semibold">{fmtDate(r.readyBy)}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {ready.length > 0 && surchargeAreas.length > 0 && chosenRow && (
+            <p className="text-meta text-kit-amber-11" data-testid="assign-logistics-surcharge">
+              {AL_WORDS.surcharge(chosenRow.name, surchargeAreas.join(", "))}
             </p>
           )}
 
