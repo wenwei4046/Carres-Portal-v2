@@ -609,3 +609,38 @@ describe("POST /:orderId/reply-proof/sign-upload — the reply evidence door (Ca
     expect(res.status).toBe(403);
   });
 });
+
+describe("POST /:orderId/message-prepared — preparation is activity, never confirmation (0412)", () => {
+  const prepared = (body: unknown, path = `/${ORDER_A}/message-prepared?leg=0`, role = "operation") =>
+    call(path, role, { method: "POST", body: JSON.stringify(body) });
+
+  function mockRpc() {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    return rpc;
+  }
+
+  it("records through the one SQL door with the exact scope", async () => {
+    const rpc = mockRpc();
+    const res = await prepared({ partnerId: NETS }, `/${ORDER_A}/message-prepared?leg=2`);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_arrangement_message_prepared", {
+      p_order_id: ORDER_A,
+      p_leg: 2,
+      p_partner_id: NETS,
+    });
+  });
+
+  it("422s a junk partner id before any call", async () => {
+    const rpc = mockRpc();
+    const res = await prepared({ partnerId: "nope" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("403s a dealer", async () => {
+    mockRpc();
+    const res = await prepared({ partnerId: NETS }, undefined, "dealer");
+    expect(res.status).toBe(403);
+  });
+});

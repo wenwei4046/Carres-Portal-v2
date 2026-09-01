@@ -120,6 +120,9 @@ export const ED = {
   noLift: "No lift",
   loadFailed: "That delivery could not be loaded",
   condoOnly: "Condo deliveries need a driver and vehicle before the day.",
+  condoRegistration: "Condominium registration",
+  condoRegistrationHint:
+    "What the building's management needs before the truck may enter — permit reference, registered time, in their words.",
   /** Delivery Card 05 — the chase door and the real reply evidence. */
   askPartner: (name: string) => `Ask ${name} for the delivery date`,
   copyMessage: "Copy message",
@@ -228,6 +231,7 @@ export default function EditDelivery() {
       replyProofPath: arrangement?.reply_proof_path ?? null,
       driverName: arrangement?.driver_name ?? null,
       vehicle: arrangement?.vehicle ?? null,
+      condoRegistration: arrangement?.condo_registration ?? null,
     });
   }, [detailQ.data, arrangement]);
 
@@ -264,14 +268,24 @@ export default function EditDelivery() {
           : null,
     });
   }, [order]);
+  /* Preparation is an ACTIVITY fact (0412) — recorded quietly; a failed
+     record must never block the operator mid-chase. It confirms nothing. */
+  const recordPrepared = useCallback(() => {
+    if (!orderId || !form.partnerId) return;
+    void apiFetch(
+      `/api/operation/delivery-arrangements/${encodeURIComponent(orderId)}/message-prepared?leg=${leg}`,
+      { method: "POST", body: JSON.stringify({ partnerId: form.partnerId }) },
+    ).catch(() => undefined);
+  }, [orderId, leg, form.partnerId]);
   const copyChase = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(chaseMessage);
       toast.success(ED.copied);
+      recordPrepared();
     } catch {
       toast.error("Could not copy — select the text and copy it yourself");
     }
-  }, [chaseMessage]);
+  }, [chaseMessage, recordPrepared]);
 
   /* ── Delivery Card 05: the REAL reply evidence — an upload, not a typed path. */
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -611,6 +625,7 @@ export default function EditDelivery() {
                       href={chosenPartner.whatsapp_group_url}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={recordPrepared}
                       data-testid="edit-delivery-open-whatsapp"
                     >
                       {ED.openGroup}
@@ -731,6 +746,16 @@ export default function EditDelivery() {
                     data-testid="edit-delivery-vehicle"
                   />
                 </Field>
+                <div className="col-span-2">
+                  <Field label={ED.condoRegistration} hint={ED.condoRegistrationHint}>
+                    <textarea
+                      className="min-h-16 rounded-control border border-kit-slate-6 bg-white px-2 py-1 text-body text-kit-slate-12"
+                      value={form.condoRegistration ?? ""}
+                      onChange={(e) => set("condoRegistration", e.target.value || null)}
+                      data-testid="edit-delivery-condo-registration"
+                    />
+                  </Field>
+                </div>
               </div>
             )}
           </section>

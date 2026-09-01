@@ -54,7 +54,7 @@ const deliveryArrangementsRouter = new Hono<AppEnv>();
 
 const ARRANGEMENT_SELECT =
   "id, order_id, leg, partner_id, confirmed_date, confirmed_time, expected_arrival, " +
-  "logistics_note, reply_proof_path, driver_name, vehicle, updated_at, updated_by, " +
+  "logistics_note, reply_proof_path, driver_name, vehicle, condo_registration, updated_at, updated_by, " +
   "delivery_partners(id, name)";
 
 type ArrangementRecord = {
@@ -69,6 +69,7 @@ type ArrangementRecord = {
   reply_proof_path: string | null;
   driver_name: string | null;
   vehicle: string | null;
+  condo_registration?: string | null;
   updated_at: string;
   updated_by: string | null;
   delivery_partners?: { id: string; name: string } | null;
@@ -89,6 +90,7 @@ const shape = (r: ArrangementRecord) => ({
   reply_proof_path: r.reply_proof_path,
   driver_name: r.driver_name,
   vehicle: r.vehicle,
+  condo_registration: r.condo_registration ?? null,
   updated_at: r.updated_at,
   updated_by: r.updated_by,
 });
@@ -577,6 +579,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
         reply_proof_path: input.replyProofPath ?? null,
         driver_name: input.driverName ?? null,
         vehicle: input.vehicle ?? null,
+        condo_registration: input.condoRegistration ?? null,
         updated_at: new Date().toISOString(),
         updated_by: userId,
       },
@@ -678,6 +681,52 @@ deliveryArrangementsRouter.post(
       return c.json({ error: "sign_upload_failed", message: signErr.message }, 500);
     }
     return c.json({ token: data.token, path: data.path });
+  },
+);
+
+/**
+ * POST /:orderId/message-prepared?leg= — Delivery Card 05's deferred half (0412).
+ *
+ * Preparation is an ACTIVITY fact: the operator copied/opened the prepared
+ * WhatsApp message for a partner. The SQL door appends the arrangement event
+ * and the order_history line together and writes NO arrangement field —
+ * prepared, copied, opened or sent never means confirmed (MASTER §2/§13).
+ */
+deliveryArrangementsRouter.post(
+  "/:orderId/message-prepared",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const orderId = c.req.param("orderId");
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+    const leg = Number(c.req.query("leg") ?? "0") || 0;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+    }
+    const partnerId = (body as { partnerId?: unknown })?.partnerId;
+    if (typeof partnerId !== "string" || !/^[0-9a-f-]{36}$/i.test(partnerId)) {
+      return c.json(
+        { error: "invalid_input", message: "partnerId must be a logistics partner id" },
+        422,
+      );
+    }
+
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { error } = await sb.rpc("delivery_arrangement_message_prepared", {
+      p_order_id: orderId,
+      p_leg: leg,
+      p_partner_id: partnerId,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json({ recorded: true });
   },
 );
 

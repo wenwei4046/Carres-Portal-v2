@@ -131,6 +131,10 @@ export const saveDeliveryArrangementInputSchema = z.object({
   /** Condo trips only; the building needs a name and a plate in advance. */
   driverName: z.string().trim().max(120).nullish(),
   vehicle: z.string().trim().max(60).nullish(),
+  /** Condo trips only (0412): what the building's management requires before
+   *  the truck may enter — permit reference, registered window, in the
+   *  building's own words. A Delivery-owned arrangement fact. */
+  condoRegistration: z.string().trim().max(2000).nullish(),
   /** Required when the save CHANGES an existing partner. */
   reason: z.enum(CHANGE_LOGISTICS_REASON_KEYS).nullish(),
 });
@@ -150,6 +154,8 @@ export interface DeliveryArrangementRow {
   reply_proof_path: string | null;
   driver_name: string | null;
   vehicle: string | null;
+  /** 0412 — optional so an older Worker degrades to "not recorded". */
+  condo_registration?: string | null;
   updated_at: string;
   updated_by: string | null;
 }
