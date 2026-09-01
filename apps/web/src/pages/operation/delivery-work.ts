@@ -571,16 +571,17 @@ export interface RailItem {
  */
 export const NEAR_TERM_DAYS = 7;
 
-/** The next `NEAR_TERM_DAYS` calendar dates from `todayIso`, inclusive. */
+/** The next `NEAR_TERM_DAYS` Delivery operating dates, excluding Sunday. */
 export function nearTermDates(todayIso: string, days = NEAR_TERM_DAYS): string[] {
   const out: string[] = [];
   const [y, m, d] = todayIso.slice(0, 10).split("-").map(Number);
-  for (let i = 0; i < days; i += 1) {
+  const wanted = Math.max(0, Math.trunc(days));
+  for (let i = 0; out.length < wanted; i += 1) {
     /* UTC arithmetic on a bare date: adding a day must never be a timezone
        question, and `Date.UTC` is the one place in this file that touches a
        clock-shaped API without asking what time it is. */
     const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + i));
-    out.push(t.toISOString().slice(0, 10));
+    if (t.getUTCDay() !== 0) out.push(t.toISOString().slice(0, 10));
   }
   return out;
 }

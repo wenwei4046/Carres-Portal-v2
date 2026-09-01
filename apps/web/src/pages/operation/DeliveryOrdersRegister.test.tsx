@@ -77,7 +77,7 @@ function mount(
   const locations: string[] = [];
   function LocationTap() {
     const loc = useLocation();
-    locations.push(loc.pathname);
+    locations.push(`${loc.pathname}${loc.search}`);
     return null;
   }
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -238,6 +238,21 @@ describe("DeliveryOrdersRegister", () => {
     const { locations } = mount([doRow()]);
     fireEvent.click(screen.getByText("DO-180826-3035"));
     expect(locations.at(-1)).toBe("/operation/delivery-orders/DO-180826-3035");
+  });
+
+  it("the source SO opens its Sales Order and its exact Order Route", () => {
+    const { locations } = mount([doRow()]);
+    fireEvent.click(screen.getByText("SO-1322"));
+    expect(locations.at(-1)).toBe(
+      "/operation/orders/so/00000000-0000-0000-0000-0000000a0001",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Order Route for SO-1322" }),
+    );
+    expect(locations.at(-1)).toBe(
+      "/operation/orders/so/00000000-0000-0000-0000-0000000a0001?route=1",
+    );
   });
 
   it("the register offers no create, issue, release or approve control", () => {

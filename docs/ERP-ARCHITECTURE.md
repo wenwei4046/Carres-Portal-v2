@@ -258,11 +258,10 @@ SUPPLY CHAIN
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
-│   ├── Stock
-│   ├── Ready stock
-│   ├── In & out
-│   ├── Transfers
-│   └── Counts
+│   ├── Dashboard
+│   ├── Inbound
+│   ├── Inventory
+│   └── Outbound
 └── Delivery
 
 FINANCE
@@ -288,10 +287,17 @@ a second settings home. `Old Orders` is a temporary cutover door and is not part
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
 
+**Warehouse placement — owner ruling 2026-09-01.** Inventory is the one current Unit Register.
+Ready Stock is a saved eligible-Unit view shared with Sales, not a destination or second pool;
+Transfer projects into origin Outbound, destination Inbound and Inventory History; `Counts &
+Adjustments` is one Inventory control view. The former `Stock · Ready stock · In & out · Transfers
+· Counts` Warehouse subtree is superseded.
+
 **`Receiving` is the exact Purchasing destination/workspace word** (owner correction 2026-08-29).
 It names the physical operation. The supplier provides the delivery date and Supplier DO; Carres
 creates the Goods Receipt and numbered GRN only after physical receiving. Neither document word
-replaces the navigation word, and `Goods Receipts` is retired as navigation.
+replaces the navigation word, and `Goods Receipts` is retired as navigation. The internal
+letters `GRN` remain banned from navigation and staff-facing status copy.
 
 **This is navigation, not workflow.** How the operator moves between these pages — which one
 feeds which — is the module MASTER's, and it changes when the business changes.
@@ -552,24 +558,43 @@ Delivery · Service Case · Finance.
 > the Unit through observed facts and governed actions, never a generic operator-facing
 > quarantine status.
 
-**ONE PHYSICAL CHAIN — OWNER RULING 2026-09-01.** Receiving proves what arrived; Stock owns each
-Unit's one current `Where` and `Who has it`; Delivery states which exact Units must reach the
-customer; Warehouse Outbound proves which exact Units were handed to Logistics. These modules
-read the same `Unit ID + Source Document + Handover facts`. They do not copy quantities into
-parallel ledgers. One authoritative physical event is written once and projected wherever it is
-needed.
+### 3.5.1 · CROSS-MODULE UNIT RECONCILIATION — OWNER-APPROVED / LOCKED 2026-09-01
 
-Every source presents a derived control block:
+One authoritative physical event is written once and projected wherever it is needed; modules
+never copy quantities into parallel ledgers.
+
+Receiving, Stock/Warehouse and Delivery do not tally by retyping quantities into three modules.
+They reconcile through the same source-document scope, permanent Carres Unit IDs for traceable
+goods, quantity lines for governed interchangeable goods, and append-only physical events.
 
 ```
-Inbound:  Expected Units = Received Units + Not received Units
-Outbound: Required Units = Handed over Units + Not handed over Units
-Delivery Journey leg: Collected Units and Arrived Units reconcile separately
-Stock Count: Portal Units versus physically scanned Units produces Difference
+Receiving proves what physically arrived
+→ Stock states where each received Unit is and who has it
+→ Delivery states which exact Units the customer journey requires
+→ Warehouse Outbound proves which exact Units were handed over
 ```
 
-Each Unit can have only one current `Who has it`. A partial handover moves only the scanned Units;
-the remaining Units keep their previous holder and the original dated Warehouse work stays open.
+The shared reconciliation equations are projections, never stored replacement totals:
+
+```
+PO/Consignment scope: expected = cumulatively received + not yet received
+DO/Outbound scope:     required = handed over + not handed over
+Open Delivery leg:     collected = arrived + still with the recorded journey holder
+                       + explicitly returned/exception-routed
+Stock Count:           Portal Units versus physically scanned Units produces Difference
+```
+
+Every result drills to exact Unit IDs where Unit identity is governed. A partial event changes only
+the affected Units. A scheduled collection, expected arrival or whole-document status never moves
+physical authority. The owning event does: Receiving posts arrival; Warehouse records physical
+handover; Logistics records its receipt and arrival; Stock derives current `Who has it` from those
+facts. If two parties record different quantities, both original facts remain and the difference
+creates `Needs checking`; neither side overwrites the other to make the totals match.
+
+The lineage is always clickable: `SO → DO → Outbound handover → Unit IDs → Logistics receipt →
+customer arrival proof`, and `PO/Consignment Order → Receiving Session/GRN → Unit IDs → Inventory`.
+Each module may show the shared reconciliation block read-only, but only the owning door may create
+or correct its event.
 
 ---
 

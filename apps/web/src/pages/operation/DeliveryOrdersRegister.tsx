@@ -177,20 +177,35 @@ export default function DeliveryOrdersRegister() {
       {
         key: "so",
         label: "SO No",
-        width: 90,
+        width: 110,
         sortable: true,
         chooserGroup: "Document",
         accessor: (r) => (
-          <button
-            type="button"
-            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-              navigate(`/operation/orders/so/${r.orderId}`);
-            }}
-          >
-            SO-{r.so}
-          </button>
+          <span className="block min-w-0">
+            <button
+              type="button"
+              className="block font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`);
+              }}
+            >
+              SO-{r.so}
+            </button>
+            <button
+              type="button"
+              aria-label={`Open Order Route for SO-${r.so}`}
+              className="block text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(
+                  `/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`,
+                );
+              }}
+            >
+              Order Route
+            </button>
+          </span>
         ),
         searchValue: (r) => `SO-${r.so} ${r.so}`,
         filterValue: (r) => `SO-${r.so}`,
@@ -320,7 +335,15 @@ export default function DeliveryOrdersRegister() {
 
   const contextMenu = (r: DoRegisterRow): DataGridContextMenuItem[] => [
     { label: "View", onClick: () => openDeliveryOrder(r) },
-    { label: "Open SO-" + r.so, onClick: () => navigate(`/operation/orders/so/${r.orderId}`) },
+    {
+      label: "Open SO-" + r.so,
+      onClick: () => navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
+    },
+    {
+      label: "Open Order Route",
+      onClick: () =>
+        navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+    },
   ];
 
   return (

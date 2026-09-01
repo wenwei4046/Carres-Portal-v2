@@ -58,6 +58,8 @@ import {
   type SofaLoansResponse,
   type SalesOrderAllocation,
   type DeliveryAttemptRow,
+  type DeliveryAttemptRecordInput,
+  type DeliveryWarehouseScheduleEvent,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -6224,6 +6226,7 @@ export function useAttachDoMutation(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
       // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
@@ -6495,6 +6498,18 @@ export function useDeliveryArrangements() {
   });
 }
 
+/** Delivery's read-only event feed for the shared Warehouse Schedule. */
+export function useDeliveryWarehouseSchedule() {
+  return useQuery<{ events: DeliveryWarehouseScheduleEvent[] }, ApiError>({
+    queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+    queryFn: () =>
+      apiFetch<{ events: DeliveryWarehouseScheduleEvent[] }>(
+        "/api/operation/delivery-arrangements/warehouse-schedule",
+      ),
+    staleTime: 30_000,
+  });
+}
+
 /** One scope, plus its carrier history and the read-only Sales facts. */
 export interface DeliveryArrangementDetail {
   order: Record<string, unknown> & {
@@ -6632,6 +6647,51 @@ export function useDeliveryOrder(idOrNumber: string | null) {
         `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}`,
       ),
     enabled: Boolean(idOrNumber),
+  });
+}
+
+/** Stock's one authoritative allocation read, consumed by Delivery only to
+ * name the exact Units in a partial/failed result. */
+export function useOrderAllocation(orderId: string, enabled = true) {
+  return useQuery<{ allocation: SalesOrderAllocation }, ApiError>({
+    queryKey: ["operation", "orders", orderId, "allocation"],
+    queryFn: () =>
+      apiFetch<{ allocation: SalesOrderAllocation }>(
+        `/api/operation/orders/${encodeURIComponent(orderId)}/allocation`,
+      ),
+    enabled: Boolean(orderId) && enabled,
+  });
+}
+
+/** Partial/failed Delivery Result. The server RPC remains the one writer for
+ * the append-only result and every resulting Unit transition. */
+export function useRecordDeliveryAttempt(
+  orderId: string,
+  opts?: Partial<
+    UseMutationOptions<unknown, ApiError, DeliveryAttemptRecordInput>
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, DeliveryAttemptRecordInput>({
+    mutationFn: (input) =>
+      apiFetch<unknown>(
+        `/api/operation/orders/${encodeURIComponent(orderId)}/delivery-attempt`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({
+        queryKey: ["operation", "orders", orderId, "allocation"],
+      });
+      await qc.invalidateQueries({ queryKey: ["operation", "stock-register"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
+      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

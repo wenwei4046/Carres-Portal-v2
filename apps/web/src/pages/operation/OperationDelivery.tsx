@@ -27,7 +27,7 @@
  * ```
  * ┌──────────────────────────────────────────────────────────────────────────┐
  * │ Delivery                                             🔔 ❓ ⚙  (50px)      │
- * ├──────────── 200px ──────────────┬────────────────────────────────────────┤
+ * ├──────────── 240px ──────────────┬────────────────────────────────────────┤
  * │ DELIVERY DATE                   │ Search              Filters  Columns   │
  * │   No confirmed date        88   ├────────────────────────────────────────┤
  * │   Overdue                  1   │ ▸ SO-1322 · customer · dates …         │
@@ -40,8 +40,8 @@
  *
  * ── THE RAIL IS PAGE-OWNED FILTERING, NOT NAVIGATION ────────────────────────
  *
- * The same 200px `RailGroup`/`RailItem` recipe Purchase Orders, Goods Receipts
- * and Purchase Demands already wear (`docs/ui/MASTER.md` — LOCAL RAIL ACTIVE
+ * The governed 240px `RailGroup`/`RailItem` recipe used by Register pages and
+ * Purchase Demands (`docs/ui/MASTER.md` — LOCAL RAIL ACTIVE
  * ROW). Both groups are independent toggle sets and they COMBINE: picking
  * `Fri, 21 Aug` and `NETS` asks one question, not two. Each group's counts are
  * computed over the rows the OTHER group has already narrowed, so a count is
@@ -299,6 +299,7 @@ function ScopeExpansion({ row }: { row: DeliveryScopeRow }) {
 }
 
 export default function OperationDelivery() {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const ordersQ = useOperationOrders();
@@ -404,6 +405,11 @@ export default function OperationDelivery() {
     (r: DeliveryScopeRow) => navigate(`/operation/orders/so/${r.orderId}`),
     [navigate],
   );
+  const openOrderRoute = useCallback(
+    (r: DeliveryScopeRow) =>
+      navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+    [navigate],
+  );
 
   /**
    * ⭐ DOUBLE-CLICK OPENS EDIT DELIVERY, NEVER THE SALES ORDER.
@@ -476,6 +482,17 @@ export default function OperationDelivery() {
               }}
             >
               SO-{r.so}
+            </button>
+            <button
+              type="button"
+              aria-label={`Open Order Route for SO-${r.so}`}
+              className="block text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                openOrderRoute(r);
+              }}
+            >
+              Order Route
             </button>
             {r.refs.length > 0 ? (
               <span className="ml-1.5 text-kit-slate-11">{r.refs.join(" · ")}</span>
@@ -709,7 +726,7 @@ export default function OperationDelivery() {
         filterValue: (r) => r.o.customer_address ?? DW.notGiven,
       },
     ],
-    [navigate, openOrder],
+    [navigate, openOrder, openOrderRoute],
   );
 
   const contextMenu = useCallback(
@@ -717,6 +734,7 @@ export default function OperationDelivery() {
       { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
       { divider: true },
       { label: `Open SO-${r.so}`, onClick: () => openOrder(r) },
+      { label: "Open Order Route", onClick: () => openOrderRoute(r) },
       ...(r.doNumber
         ? [
             {
@@ -727,7 +745,7 @@ export default function OperationDelivery() {
           ]
         : []),
     ],
-    [navigate, openOrder, openEditDelivery],
+    [navigate, openOrder, openOrderRoute, openEditDelivery],
   );
 
   const isError = ordersQ.isError || docsQ.isError;
@@ -740,10 +758,22 @@ export default function OperationDelivery() {
         word={DW.page}
         docTitle={DW.docTitle}
         destinationHeader
+        right={
+          <button
+            type="button"
+            className="xl:hidden h-8 rounded-control border border-kit-slate-6 bg-white px-3 text-body font-medium text-kit-slate-11 hover:bg-hovertint"
+            aria-controls="delivery-work-rail"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            {filtersOpen ? "Hide filters" : "Show filters"}
+          </button>
+        }
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside
-          className="flex w-[200px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3"
+          id="delivery-work-rail"
+          className={`${filtersOpen ? "flex" : "hidden"} xl:flex w-[240px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3`}
           data-testid="delivery-work-rail"
         >
           <RailGroup title={DW.railDate}>

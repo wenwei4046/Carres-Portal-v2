@@ -205,6 +205,20 @@ Each Delivery Journey leg reconciles its own `Collected` and `Arrived` Unit fact
 journey therefore completes neither leg, nor the whole journey, from a count recorded on the
 other leg.
 
+**DELIVERY-TO-OUTBOUND RECONCILIATION — owner-approved 2026-09-01.** The DO owns the exact required
+goods scope; Warehouse Outbound reads that scope and does not re-create it. For each DO and each
+separate journey leg, the shared read-only tally prints `Required · Handed over · Not handed over`
+and drills to the same Unit IDs. A partial handover changes only the scanned Units: handed-over
+Units move to the evidence-backed journey holder; Units not handed over remain with their last
+confirmed holder and retain the original dated Warehouse work.
+
+Logistics receipt remains its own counterparty fact. If Warehouse says two Units were handed over
+and Logistics confirms only one, the Portal preserves both results, identifies the exact unmatched
+Unit and creates `Needs checking`; it never marks the whole DO collected or edits either event to
+force agreement. The clickable chain is `SO → DO → Outbound handover → Unit IDs → Logistics
+receipt → customer arrival proof`. The shared contract is defined once in
+`../ERP-ARCHITECTURE.md` §3.5.1.
+
 One personal login may hold Warehouse, Logistics or both duties and switch between **Warehouse
 Work** and **Logistics Work** without logging out. Every event records person, company and active
 duty. No shared company login is allowed. Even when one authorised person performs both sides, the
@@ -685,6 +699,58 @@ or approval. Every uploaded file names the event it proves.
 Future Partner APIs use authenticated Partner scope, assignment checks, idempotency, original
 external reference, received time, governed state transitions, proof rules and append-only audit.
 They call the same business actions and never write a derived status directly.
+
+### WAREHOUSE SCHEDULE AND PARTNER PROJECTION — controller lock 2026-09-01
+
+**Warehouse Schedule is shared dated goods visibility, not Work.** It may read Delivery facts but
+must not become a local queue, invent an owner/action, or write an arrangement, date, handover or
+proof. The stable read contract is one row per **assigned exact Unit** and Delivery scope
+`(order_id, leg)`, carrying only:
+
+- the permanent Carres Unit ID from Stock's allocation;
+- the exact Delivery collection appointment as **Customer delivery pickup** on its real Warehouse
+  event date (Warehouse Mon–Sat), and a separate **Customer handover** event when governed — never
+  the Sales promise as a substitute;
+- **Operations ready by**, derived one Office Mon–Fri working day before pickup; a Saturday pickup
+  remains Saturday while readiness normally reads Friday;
+- actual collection and actual customer arrival from their append-only event timestamps — never
+  the time a user later entered the record;
+- the assigned Logistics Partner, Delivery Order number and source Sales Order;
+- admitted handover/delivery evidence and doors to the exact Delivery scope, DO and source order.
+
+The read feed is `/api/operation/delivery-arrangements/warehouse-schedule`. The current whole-order
+implementation uses Delivery's confirmed appointment, the formal DO, Stock's exact Unit allocation,
+Warehouse location and append-only handover/proof facts. It deliberately omits Journey legs because
+the current allocation read does not bind one exact Unit to one split-trip DO. Absence stays absence:
+a consumer prints **Not recorded** or omits the row; it may not copy a PO ETA or attach an order-level
+Unit to an arbitrary split DO. That gap is completed only by extending Delivery's one arrangement/DO
+contract and Stock's one Unit allocation contract — never by a Warehouse writer.
+
+The same feed admits a Warehouse login only when its token is bound to a Warehouse, then keeps only
+exact Units whose Stock location is that Warehouse. The external **Handover** projection therefore
+shows only that Warehouse's assigned **Customer delivery pickup** rows: Unit, From Location, customer
+destination within permission, Logistics Partner, appointment/window, driver/vehicle, DO, collection
+fact and whether admitted evidence exists. It carries no price, payment, commercial term or internal
+note. A Transfer collection may join the same Warehouse projection only from Stock's exact Transfer
+object; Delivery does not create a second transfer record.
+
+Warehouse may record only the physical handover through the one governed handover writer. This PR's
+feed is read-only; an external Handover control must extend that same writer's Warehouse assignment
+gate, never add a route that writes the fact itself. Warehouse cannot edit the DO, customer promise,
+arrangement, price, payment or delivery proof. **DO No** means an outbound customer Delivery Order.
+Inbound Warehouse receiving stays under its PO/CO source and the document label **Supplier DO No.**;
+those facts never enter this outbound feed.
+
+The Logistics Partner boundary is the same projection narrowed by authenticated assignment. A
+Partner sees only its assigned delivery/transfer rows and only the customer, handling and evidence
+fields admitted for that act. Unrelated customers, Stock, money, commercial terms and internal
+notes never cross that boundary. Signed evidence upload/view doors recheck the exact assigned
+scope; knowing a storage path is not permission.
+
+Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence and
+before confirmed arrival. A future booked Delivery, assigned Partner or confirmed customer date does
+not make goods On the way. Delivery exposes the append-only collection/arrival facts; Stock owns the
+resulting custody and visibility word and Delivery never writes or stores it.
 
 ## 14 · Current versus intentional future
 

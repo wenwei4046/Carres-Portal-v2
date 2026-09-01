@@ -40,13 +40,13 @@ import { dataUrlToBlob } from "../../dealer/new-order/draft";
 const ALLOWED_MIMES = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_SIZE = 10 * 1024 * 1024;
 interface Props {
-  order: operationOrderDetailOrder;
-  warehouse: operationOrderDetailWarehouse | null;
-  lines: operationOrderDetailLine[];
+  order: Pick<operationOrderDetailOrder, "id" | "so" | "do_number">;
+  warehouse: Pick<operationOrderDetailWarehouse, "name"> | null;
+  lines: Array<Pick<operationOrderDetailLine, "qty">>;
   onClose: () => void;
 }
 
-function totalItems(lines: operationOrderDetailLine[]): number {
+function totalItems(lines: Array<Pick<operationOrderDetailLine, "qty">>): number {
   return lines.reduce((s, l) => s + Number(l.qty || 0), 0);
 }
 
@@ -63,7 +63,9 @@ function totalItems(lines: operationOrderDetailLine[]): number {
  * so it falls back to the same locked scheme with the same stable seed: the
  * same order always yields the same number.
  */
-function deliveryOrderNumber(order: operationOrderDetailOrder): string {
+function deliveryOrderNumber(
+  order: Pick<operationOrderDetailOrder, "id" | "do_number">,
+): string {
   const existing = (order.do_number ?? "").trim();
   if (existing) return existing;
   return docNumber({
