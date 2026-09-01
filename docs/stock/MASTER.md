@@ -1,6 +1,7 @@
 # STOCK / WAREHOUSE — MASTER
 
-> **APPROVED / LOCKED — owner-reviewed 2026-08-20; duty continuity amended 2026-09-01.**
+> **APPROVED / LOCKED — owner-reviewed 2026-08-20; navigation, daily work and duty continuity
+> amended 2026-09-01.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
 
@@ -29,13 +30,17 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse destinations are **Stock · Ready stock · In & out · Transfers · Counts**.
+Warehouse has four operator destinations: **Dashboard · Inbound · Inventory · Outbound**.
 
-- Stock: every currently controlled Unit.
-- Ready stock: exact Units currently eligible for a new customer promise.
-- In & out: append-only physical events.
-- Transfers: Site-to-Site movement and handover.
-- Counts: dated physical counts and Unit-level differences.
+- Dashboard: dated read-only projection of Warehouse work and exceptions; never a second truth.
+- Inbound: physical goods expected at and received into a governed Site.
+- Inventory: the one current Unit authority, including Ready Stock and Counts & Adjustments views.
+- Outbound: dated physical work for Units that must leave a governed Site.
+
+Ready Stock is one shared eligible-Unit view of Inventory. Operations reaches it through Warehouse
+Inventory; Sales reaches the same authority through `Sales → Ready Stock`. It is not another stock
+table or a fifth Warehouse destination. Counts, differences and Adjustment requests remain one
+`Counts & Adjustments` control view within Inventory, not three separate pages.
 
 Reports, Settings, Work, Quick Rail and Calendar keep their shared Shell homes. Receiving,
 Purchasing, Delivery, Payments and Service Cases keep their own doors.
@@ -44,7 +49,7 @@ Approved operator words include **Where · Who has it · Carres Owned · Supplie
 Report issue · Count again**.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
-Inventory, Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
+Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
 Next Action, Priority, Edit, Delete, Add stock, Remove stock or Mark done. Shared copy remains
 governed by the Copy Standard.
 
@@ -157,19 +162,73 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Stock is the one current list. Its left rail filters the same authority by All stock, Attention,
-Availability, Site or Where, Ownership, Catalog category, and Changed today, this week or this
-month. Time choices are filters, not Work dates.
+Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
+actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
+`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
+Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
+it into a misleading current-day bucket.
 
-Ready stock groups eligible Units by Catalog product and Site and expands to exact IDs. Sales enters
-its own Choose Unit door; Stock has no second reservation editor.
+Dashboard projects those dated facts across Inbound, Inventory, Outbound and the shared Work
+Engine. It may drill into the source object but cannot complete or edit another module's record.
 
-In & out shows actual time, Unit, event, From, To, handled by, source and evidence. Transfers
-provides Register, Detail, mobile collection and arrival. Counts provides Register, mobile scan
-workspace and difference surface.
+Inbound groups actual expected-arrival and receipt work by governed date. It shows clickable source
+document number and date, Supplier, destination, quantity, exact Units where already assigned,
+linked SO No and SO date where applicable, expected arrival and the concrete receiving action.
+Receiving remains the receipt authority.
+
+Inventory is the one current list. Its left rail filters the same Unit authority:
+
+```
+STOCK                         WHO HAS IT               OWNERSHIP
+All Stock                     NETS Warehouse           Carres Owned
+Reserved for Sales Orders     NETS Delivery            Supplier Consignment
+Ready Stock                   PJ Showroom
+Showroom Display              Other outlets            CONTROL
+Service Case                                            Counts & Adjustments
+Needs checking                                          History
+```
+
+Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
+Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
+Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
+Unit, recorded holder/Site, finding, resolved owner/avatar, actual date and concrete action. It never
+uses a vague `Attention` label. Ready Stock groups eligible Units by Catalog product and Site and
+expands to exact IDs. Sales uses `Choose Ready Unit`; Operations uses `Make available for sale` only
+after the Unit passes eligibility. Stock owns neither reservation nor release from an SO.
+
+`Counts & Adjustments` contains scheduled counts, submitted counts, differences, recount,
+investigation, Adjustment request, COO approval, completion and reversal in one control surface.
+The first count is blind. Difference is evidence requiring comparison and recount; it is not an
+automatic Adjustment.
+
+Outbound is a dated Warehouse work page, not a document, second DO or inventory-event register. It
+brings together every governed reason physical goods leave a Site: customer DO, Site transfer,
+Supplier Return, send for repair, Internal Staff Purchase and Subsidiary Purchase. The source module
+continues to own why the movement exists; Outbound tells the assigned NETS Warehouse operator what
+must physically be checked, packed and handed over on each actual date.
+
+An Outbound row shows `Handover date · source document · destination · exact Units · Work · resolved
+operator`. Customer work also shows clickable DO No, SO No and SO date. Transfer, Supplier Return
+and Repair work shows its own clickable governed document. Detail shows Unit ID, product, From → To,
+current `Who has it`, condition, required packages, evidence and handover result.
+
+The NETS operator journey is:
+
+1. Sign in with their own email and open the actual work date.
+2. Open the source DO, Transfer, Supplier Return or Repair record and scan every exact Unit ID.
+3. Check product, visible condition, required components and packaging; then pack where required.
+4. If an observable problem exists, use `Report a problem` with the governed evidence. The operator
+   cannot substitute a Unit, change the source order or guess a business outcome.
+5. Hand the Unit to the named receiving party and submit minimum scan/photo/handover evidence.
+6. Only the completed physical handover changes `Who has it`; a scheduled plan alone never moves
+   authority from NETS Warehouse to NETS Delivery, showroom, supplier or repair partner.
+
+Delivery owns customer DO, journey, Logistics Partner and customer-delivery proof. Stock owns the
+Unit's current holder and physical history. Purchasing owns Supplier Return and supplier decision.
+Service Case owns the repair need and resolution. Outbound stores no duplicate business status.
 
 Unit Detail is titled by Unit ID and product. It shows Where, Who has it, ownership, condition,
-availability, reservation, last verified, one current attention item, connected records, evidence,
+availability, reservation, last verified, one current `Needs checking` fact, connected records, evidence,
 history and permitted actions. There is no generic Edit, status selector or Delete.
 
 - NETS Warehouse opens dated Work, scans receipt, Count and handover, and supplies evidence.
@@ -190,16 +249,16 @@ Warehouse uses the one shared Work Engine. Owner and cover are structured metada
 text. The business object has no fake universal Owner. Labels tell a new operator the concrete act;
 completion is an authoritative fact, never Mark done.
 
-Every Work row has an actual weekday and date; appointments also have time. Today, This week,
-This month and Upcoming are view or group labels only. Without a governed real date, the action
-contract is incomplete and cannot enter Work.
+Every Work row has an actual weekday and date; appointments also have time. Warehouse work is never
+grouped under `Today`, `Tomorrow`, `Upcoming` or a generic `Overdue` heading. Without a governed real
+date, the action contract is incomplete and cannot enter Work.
 
 - current year: Tue, 18 Aug;
 - non-current year: Fri, 1 Jan 2027;
 - with time: Tue, 18 Aug · 10:42 AM;
 - standalone formal reports, audit evidence and cross-year ranges show the year.
 
-The Stock rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
+The Inventory rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
 arrival, return, inspection, repair, supplier collection and month-end commitments.
 
 Warehouse does not create another rota. It consumes the one approved PO Duty / GRN Duty rotation
