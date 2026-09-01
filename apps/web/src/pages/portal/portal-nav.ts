@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  ArrowLeftRight,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -120,6 +119,14 @@ export interface PortalModule {
   label: string;
   icon: LucideIcon;
 }
+
+/** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
+ *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
+ *  `Inventory` is the one current Unit Register and the module's landing page
+ *  until `Dashboard` is built, at which point that page's own approved scope
+ *  may change this destination (Stock MASTER §7: the daily journey OPENS on
+ *  Dashboard). */
+export const WAREHOUSE_LANDING_KEY = "stock";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
@@ -363,30 +370,38 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: Route,
         activeFor: ["tab:delivery", "path:/operation/delivery-orders"],
       },
-      /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
-       * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
-       * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
-       * row becomes the module's pages in the rail. The three built pages keep
-       * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
-       * printing `Coming soon` until their own PRs. The blueprint keeps
-       * Reports and Settings central: NO Report row, NO Settings row here.
-       * The three live rows keep K0's learned order (Stock · Ready stock ·
-       * In & out) — the rail never reshuffles under an operator; when Ready
-       * stock folds into Stock Views (blueprint item 13.7) its row dies in
-       * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
-       * "Movements" stay banned UI words; the goods pool is still `Stock` on
-       * any page — `Warehouse` is the MODULE heading, not the pool word. */
-      /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1, and
-       * Stock MASTER §2 rejects `On hand` and `Stock Units` as the master-list
-       * name by name. `On hand` described a QUANTITY on a shelf; the page now
-       * lists exact Units and answers which one, where, who has it and whether
-       * it can be used. The `?tab=` address is unchanged, so no bookmark and no
-       * learned rail position moves. */
-      { key: "stock", label: "Stock", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
-      { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
-      { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
-      { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
-      { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
+      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner-approved Blueprint,
+       * 2026-09-01 — Stock MASTER §2, ERP-ARCHITECTURE §2.1;
+       * CARD-2026-09-01-warehouse-01-sidebar): `Dashboard · Inbound ·
+       * Inventory · Outbound`. The former `Stock · Ready stock · In & out ·
+       * Transfers · Counts` subtree is superseded by that ruling. `Inventory`
+       * is the one current Unit Register — the SAME page the `Stock` row
+       * opened; the `?tab=stock-onhand` address is unchanged, so no bookmark
+       * moves. COPY-STANDARD unbanned `Inventory` for exactly this destination
+       * on 2026-09-01. The unbuilt three print `Coming soon` and go live in
+       * their own pages' PRs; the rail never reshuffles after that.
+       * Reports and Settings stay central: NO Report row, NO Settings row.
+       *
+       * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
+       * `?tab=movements`) until their capabilities are relocated — reorder
+       * points/urgent restock and the event history are named next scopes in
+       * Stock MASTER §13; a direct URL still lands. */
+      {
+        key: "wh-dashboard",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        soon: true,
+        section: "Warehouse",
+      },
+      { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, soon: true, section: "Warehouse" },
+      { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      {
+        key: "wh-outbound",
+        label: "Outbound",
+        icon: ArrowUpRight,
+        soon: true,
+        section: "Warehouse",
+      },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.

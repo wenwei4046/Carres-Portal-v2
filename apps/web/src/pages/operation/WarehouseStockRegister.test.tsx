@@ -9,7 +9,7 @@ import type { StockRegisterUnit } from "@carres/shared";
  * THE STOCK REGISTER — CARD-2026-08-20-stock-register §6.
  *
  * These tests are the card's verification list, not a coverage exercise: the
- * destination says Stock, every count derives from the Unit authority, the rail
+ * destination says Inventory, every count derives from the Unit authority, the rail
  * sections combine and clear, ended Units stay out of the default view, and the
  * old `On hand` wording is gone from the operator surface.
  */
@@ -88,11 +88,15 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("the destination is Stock", () => {
-  it("names the page Stock, and the old On hand wording is gone", async () => {
+describe("the destination is Inventory", () => {
+  /* Owner-approved Blueprint 2026-09-01 (Stock MASTER §2): the Warehouse
+   * master Register is `Inventory`; `Stock` and `On hand` are gone as the
+   * page word. CARD-2026-09-01-warehouse-01-sidebar. */
+  it("names the page Inventory, and the old Stock / On hand wording is gone", async () => {
     renderRegister();
     const header = await screen.findByTestId("stock-register-destination-header");
-    expect(within(header).getByText("Stock")).toBeInTheDocument();
+    expect(within(header).getByText("Inventory")).toBeInTheDocument();
+    expect(within(header).queryByText(/^Stock$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/On hand/i)).not.toBeInTheDocument();
   });
 
