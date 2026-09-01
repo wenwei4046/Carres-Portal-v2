@@ -375,14 +375,28 @@ export default function EditDelivery() {
                 {ED.salesHeading}
               </h2>
               {order ? (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/operation/orders/so/${order.id}`)}
-                  data-testid="edit-delivery-open-sales-order"
-                  className="inline-flex items-center gap-1 text-meta font-medium text-blue-700 underline-offset-2 hover:underline"
-                >
-                  {ED.openSalesOrder} <ExternalLink size={12} strokeWidth={2} />
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/operation/orders/so/${order.id}`)}
+                    data-testid="edit-delivery-open-sales-order"
+                    className="inline-flex items-center gap-1 text-meta font-medium text-blue-700 underline-offset-2 hover:underline"
+                  >
+                    {ED.openSalesOrder} <ExternalLink size={12} strokeWidth={2} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/operation/orders/so/${encodeURIComponent(order.id)}?route=1`,
+                      )
+                    }
+                    data-testid="edit-delivery-open-order-route"
+                    className="inline-flex items-center gap-1 text-meta font-medium text-blue-700 underline-offset-2 hover:underline"
+                  >
+                    Open Order Route <ExternalLink size={12} strokeWidth={2} />
+                  </button>
+                </div>
               ) : null}
             </div>
             {/* READ-ONLY, and there is no input for any of it. Wrong facts are

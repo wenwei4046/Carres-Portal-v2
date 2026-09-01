@@ -24,6 +24,8 @@ import { useDeliveryOrder, useDeliveryPhotos } from "@/lib/queries";
 import { personInitials, avatarColor } from "@/lib/staff-avatar";
 import SalesOrderTabs from "./SalesOrderTabs";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
+import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
+import DeliveryResultAction from "./components/DeliveryResultAction";
 
 /**
  * THE DELIVERY ORDER OBJECT PAGE — read-only facts + doors
@@ -206,6 +208,14 @@ export default function DeliveryOrderPage() {
   const onLoan = (data?.loans ?? []).filter((l) => l.status === "on_loan");
   const returnedLoans = (data?.loans ?? []).filter((l) => l.status === "returned");
   const photoRows = photos.data?.photos ?? [];
+  const logisticsReceived = (data?.handoverEvents ?? []).some(
+    (event) => event.kind === "received_by_logistics",
+  );
+  const mayRecordResult =
+    logisticsReceived &&
+    !d.voided_at &&
+    (data?.attempts ?? []).length === 0 &&
+    (!d.trip_groups || d.trip_groups.length === 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -216,15 +226,25 @@ export default function DeliveryOrderPage() {
         backLabel="Delivery"
         docTitle={`${d.do_number} — Carres`}
         right={
-          <button
-            type="button"
-            data-testid="do-print"
-            onClick={() => void openPdf()}
-            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-base-300 bg-white px-2.5 text-meta font-medium text-base-700 hover:bg-base-50"
-            title="Reprint carries the same number — the paper the customer signed stays reproducible"
-          >
-            <Printer size={14} /> Print
-          </button>
+          <>
+            <WarehouseHandoverBlock
+              doNumber={d.do_number}
+              logisticsName={d.logistics_partner}
+              headerAction
+            />
+            {mayRecordResult ? (
+              <DeliveryResultAction order={order} lines={tripLines} />
+            ) : null}
+            <button
+              type="button"
+              data-testid="do-print"
+              onClick={() => void openPdf()}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-base-300 bg-white px-2.5 text-meta font-medium text-base-700 hover:bg-base-50"
+              title="Reprint carries the same number — the paper the customer signed stays reproducible"
+            >
+              <Printer size={14} /> Print
+            </button>
+          </>
         }
       />
 
@@ -322,14 +342,28 @@ export default function DeliveryOrderPage() {
 
           {/* SOURCE SALES ORDER — the door */}
           <Panel title="Source Sales Order">
-            <button
-              type="button"
-              data-testid="do-open-so"
-              className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation/orders/so/${order.id}`)}
-            >
-              Open SO-{order.so} →
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                data-testid="do-open-so"
+                className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={() => navigate(`/operation/orders/so/${order.id}`)}
+              >
+                Open SO-{order.so} →
+              </button>
+              <button
+                type="button"
+                data-testid="do-open-order-route"
+                className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={() =>
+                  navigate(
+                    `/operation/orders/so/${encodeURIComponent(order.id)}?route=1`,
+                  )
+                }
+              >
+                Open Order Route →
+              </button>
+            </div>
           </Panel>
 
           {/* DELIVERY STATUS */}

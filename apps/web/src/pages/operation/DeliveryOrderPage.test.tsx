@@ -24,6 +24,7 @@ let detailState: {
 
 const useDeliveryOrderSpy = vi.fn((..._args: unknown[]) => detailState);
 const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] }, isLoading: false }));
+const recordHandoverMutate = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -31,6 +32,7 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     useDeliveryOrder: (...args: unknown[]) => useDeliveryOrderSpy(...args),
     useDeliveryPhotos: () => useDeliveryPhotosSpy(),
+    useRecordHandoverEvent: () => ({ mutate: recordHandoverMutate, isPending: false }),
   };
 });
 
@@ -105,7 +107,7 @@ function mount(data: DeliveryOrderDetailPayload) {
   const locations: string[] = [];
   function LocationTap() {
     const loc = useLocation();
-    locations.push(loc.pathname);
+    locations.push(`${loc.pathname}${loc.search}`);
     return null;
   }
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -128,6 +130,7 @@ function mount(data: DeliveryOrderDetailPayload) {
 
 beforeEach(() => {
   useDeliveryOrderSpy.mockClear();
+  recordHandoverMutate.mockClear();
 });
 
 describe("DeliveryOrderPage", () => {
@@ -210,6 +213,14 @@ describe("DeliveryOrderPage", () => {
     );
   });
 
+  it("the Source Sales Order block opens the exact Order Route", () => {
+    const { locations } = mount(payload());
+    fireEvent.click(screen.getByTestId("do-open-order-route"));
+    expect(locations.at(-1)).toBe(
+      "/operation/orders/so/00000000-0000-0000-0000-0000000a0001?route=1",
+    );
+  });
+
   it("a split trip shows only its groups' lines, with the scope sentence", () => {
     mount(payload({ trip_groups: ["bed"] }));
     expect(screen.getByText("Jager Super Single")).toBeTruthy();
@@ -241,6 +252,97 @@ describe("DeliveryOrderPage", () => {
     expect(screen.getAllByText(/Vehicle: WXY 1234/).length).toBeGreaterThan(0);
     // Still read-only: the facts add no input and no button.
     expect(document.querySelectorAll("input, textarea, select").length).toBe(0);
+  });
+
+  it("puts the next warehouse handover action in the DO object header", () => {
+    mount(payload());
+    expect(
+      screen.getByTestId("do-object-primary-action"),
+    ).toHaveTextContent("Mark ready for handover");
+  });
+
+  it("offers no handover writer after all three facts are recorded", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+        },
+      ),
+    );
+    expect(screen.queryByTestId("do-object-primary-action")).toBeNull();
+  });
+
+  it("offers Record Delivery Result after logistics receipt", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+        },
+      ),
+    );
+    const action = screen.getByTestId("do-result-primary-action");
+    expect(action).toHaveTextContent("Record Delivery Result");
+    fireEvent.click(action);
+    expect(screen.getByRole("button", { name: "Delivered" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Partially Delivered" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Failed" })).toBeInTheDocument();
+  });
+
+  it("offers no result writer after an attempt is recorded", () => {
+    mount(
+      payload(
+        {},
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+          attempts: [
+            {
+              do_number: "DO-180826-3035",
+              result: "failed",
+              reason_key: "customer_unreachable",
+              recorded_at: "2026-08-20T09:00:00Z",
+            },
+          ],
+        },
+      ),
+    );
+    expect(screen.queryByTestId("do-result-primary-action")).toBeNull();
+  });
+
+  it("offers no order-wide result writer on a split Delivery Order", () => {
+    mount(
+      payload(
+        { trip_groups: ["bed"] },
+        {
+          handoverEvents: [
+            handoverEvent("ready_for_handover"),
+            handoverEvent("handed_over"),
+            handoverEvent("received_by_logistics"),
+          ],
+        },
+      ),
+    );
+    expect(screen.queryByTestId("do-result-primary-action")).toBeNull();
+  });
+
+  it("offers no handover writer on a cancelled document", () => {
+    mount(payload({ voided_at: "2026-08-19T02:00:00Z", void_reason: "rescheduled" }));
+    expect(screen.queryByTestId("do-object-primary-action")).toBeNull();
   });
 
   it("a received-not-yet-resulted document reads Out for delivery; handed over alone does not", () => {
