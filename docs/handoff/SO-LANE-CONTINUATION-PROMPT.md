@@ -146,16 +146,21 @@ Read these before proposing anything — several were argued and settled.
 - **Do not propose a backfill.** `CLAUDE.md` §6 — every row today is test data.
 - **Do not invent customer-facing words.** Two open items are blocked on a ruled
   sentence and must stay blocked rather than be guessed.
-- ⚠️ **`main` is RED on the web suite — 10 `os-card-*` tests — and it is not
-  yours.** They span **two** files, not one: `OrderStatusPage.test.tsx` and
-  `BdOrdersBoard.test.tsx` (both POS/BD). Verify by stashing before you debug,
-  then leave them to that lane.
-  **Do not re-run the search.** Seven causes are already ruled out by the lane
-  that owns them: card markup, `laneOf`, `sameMonth`, the query mock's
-  completeness, fake-timer ordering, the global setup restoring real timers, and
-  the PIN gate. No code path was found that would empty that list, so the open
-  question is **"stale tests or broken site?"** — which needs one human page load
-  of POS My Orders and the BD board, not another grep.
+- ✅ **The 10 `os-card-*` failures are CLOSED — they were the calendar.**
+  On 2026-08-31 the web suite was red with 10 failures across
+  `OrderStatusPage.test.tsx` and `BdOrdersBoard.test.tsx`, and the owning lane
+  ruled out seven causes (card markup, `laneOf`, `sameMonth`, the query mock,
+  fake-timer ordering, the global setup restoring real timers, the PIN gate)
+  without finding a code path. On 2026-09-01 the same suite passes
+  **3639/3639**, unchanged.
+  The eighth candidate was the date. Nothing was fixed; the month rolled over.
+  **So the answer to "stale tests or broken site?" is stale tests** — no page
+  load needed, and no grep either. What is still owed to the POS lane is a
+  *fixture* that does not depend on today, which is their call to make.
+  ⚠️ The general lesson outlives the incident: **a red suite here may be red
+  because of the date.** Before debugging a failure you did not cause, check
+  whether it reproduces — and note that this one would have "fixed itself"
+  overnight and taught nobody anything.
 
 ## 6 · EXACT NEXT STEP
 
@@ -205,4 +210,5 @@ lines and contains `REFUTATION ROUND`, and open the PR. Docs only, no gate risk.
 ---
 
 *Written 2026-08-31, §2/§5/banner re-measured 2026-09-01 at `origin/main` =
-`57ceb227`. Status lines decay fast in this repo — measure, do not recite.*
+`c35adc60`. Status lines decay fast in this repo — measure, do not recite. §5
+is the proof: it was true for one day.*
