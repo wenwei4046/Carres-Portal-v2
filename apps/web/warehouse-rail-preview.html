@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Mulish:wght@300;400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <title>Warehouse rail · CARD 01 preview</title>
+  </head>
+  <body>
+    <!--
+      DEV ONLY. `vite build` emits index.html's graph and nothing else, so this
+      page and its entry cannot reach production. It renders the REAL
+      PortalSidebar over a seeded operation session, because the live rail is
+      behind a login: CARD-2026-09-01-warehouse-01-sidebar owes its walk —
+      the four approved Warehouse destinations, one live door, three
+      `Coming soon` non-controls.
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/dev/warehouse-rail-preview.tsx"></script>
+  </body>
+</html>
