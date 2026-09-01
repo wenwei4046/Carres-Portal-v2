@@ -232,7 +232,7 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // On hand is Warehouse's first live page — the rail navigated there.
+    // Inventory is Warehouse's first live page — the rail navigated there.
     expect(child("stock").className).toContain("bg-kit-blue-3");
   });
 
@@ -1186,56 +1186,68 @@ describe("PortalSidebar — Delivery is one page", () => {
   });
 });
 
-describe("PortalSidebar — the Warehouse module's pages", () => {
-  it("the three built pages are doors keeping their `?tab=` addresses", () => {
-    renderAt("/operation?tab=stock-onhand");
-    expect(child("stock")).toHaveAttribute("href", "/operation?tab=stock-onhand");
-    expect(child("stock-plan")).toHaveAttribute("href", "/operation?tab=stock-plan");
-    expect(child("movements")).toHaveAttribute("href", "/operation?tab=movements");
-  });
-
-  it("Transfers and Counts print `Coming soon` and are NOT controls", () => {
-    renderAt("/operation?tab=stock-onhand");
-    for (const key of ["transfers", "counts"]) {
-      const row = child(key);
-      expect(row.tagName).toBe("SPAN");
-      expect(row.getAttribute("aria-disabled")).toBe("true");
-    }
-  });
-
-  /* UPDATED 2026-08-21 — CARD-2026-08-20-stock-register.
-   *
-   * The ruling this test was written for still stands: the MODULE is called
-   * `Warehouse`, and K0's single merged `Stock` module row is gone for good.
-   * What changed is that `Stock` is now the name of a CHILD PAGE — the Warehouse
-   * master list, replacing `On hand` (ERP-ARCHITECTURE §2.1 and Stock MASTER §2
-   * both spell the tree `Warehouse → Stock · Ready stock · In & out · Transfers
-   * · Counts`).
-   *
-   * The old assertion banned the WORD anywhere in the rail, which was always
-   * wider than the ruling it enforced. It now checks the thing that was actually
-   * ruled: no MODULE row says Stock, and the module row says Warehouse. */
-  it("no bare `Stock` MODULE row survives — the module is Warehouse, Stock is its page", () => {
-    renderAt("/operation?tab=stock-onhand");
-    expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
-    // `Stock` exists exactly once, and it is a CHILD.
-    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Stock");
-    const moduleRows = Array.from(
-      document.querySelectorAll("[data-testid^='nav-module-']"),
-    ).map((el) => el.textContent?.trim());
-    expect(moduleRows).not.toContain("Stock");
-  });
-
-  it("the blueprint keeps Reports and Settings central — neither joins the module", () => {
+describe("PortalSidebar — the Warehouse module's four destinations", () => {
+  /* THE MAP IS FOUR DESTINATIONS (owner-approved Blueprint 2026-09-01 —
+   * Stock MASTER §2, ERP-ARCHITECTURE §2.1; CARD-2026-09-01-warehouse-01-
+   * sidebar). The former `Stock · Ready stock · In & out · Transfers · Counts`
+   * subtree is superseded; the complete approved map shows from day one and
+   * never reshuffles after this. */
+  it("the map is Dashboard · Inbound · Inventory · Outbound, in that order", () => {
     renderAt("/operation?tab=stock-onhand");
     const rows = Array.from(
       screen
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1. The learned
-     * ORDER is untouched: the rail never reshuffles under an operator. */
-    expect(rows).toEqual(["Stock", "Ready stock", "In & out", "Transfers", "Counts"]);
+    expect(rows).toEqual(["Dashboard", "Inbound", "Inventory", "Outbound"]);
+  });
+
+  it("Inventory is the one live door and keeps the `?tab=stock-onhand` address", () => {
+    renderAt("/operation?tab=stock-onhand");
+    expect(child("stock")).toHaveAttribute("href", "/operation?tab=stock-onhand");
+    expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
+  });
+
+  it("Dashboard, Inbound and Outbound print `Coming soon` and are NOT controls", () => {
+    renderAt("/operation?tab=stock-onhand");
+    for (const key of ["wh-dashboard", "wh-inbound", "wh-outbound"]) {
+      const row = child(key);
+      expect(row.tagName).toBe("SPAN");
+      expect(row.getAttribute("aria-disabled")).toBe("true");
+      expect(within(row).getByText("Coming soon")).toBeInTheDocument();
+    }
+  });
+
+  /* The superseded subtree is GONE from the rail. The pages behind
+   * `?tab=stock-plan` and `?tab=movements` keep their routes until their
+   * capabilities are relocated (Stock MASTER §13) — de-navigated, not
+   * deleted. */
+  it("the superseded rows are gone — Stock, Ready stock, In & out, Transfers, Counts", () => {
+    renderAt("/operation?tab=stock-onhand");
+    for (const key of ["stock-plan", "movements", "transfers", "counts"]) {
+      expect(screen.queryByTestId(`nav-child-${key}`)).toBeNull();
+    }
+    const railWords = Array.from(
+      document.querySelectorAll("[data-testid^='nav-child-'], [data-testid^='nav-module-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    for (const retired of ["Stock", "Ready stock", "In & out", "Transfers", "Counts"]) {
+      expect(railWords).not.toContain(retired);
+    }
+    expect(within(module_("warehouse")).getByText("Warehouse")).toBeInTheDocument();
+  });
+
+  /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
+   * Warehouse names `Inventory` as its landing until Dashboard is built. */
+  it("the collapsed Warehouse icon links to Inventory, and lights on a Warehouse page", () => {
+    localStorage.setItem("ops-sidebar-collapsed", "1");
+    try {
+      renderAt("/operation?tab=stock-onhand");
+      const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
+      expect(icon).toHaveAttribute("href", "/operation?tab=stock-onhand");
+      expect(icon.className).toContain("bg-kit-blue-3");
+    } finally {
+      localStorage.removeItem("ops-sidebar-collapsed");
+    }
   });
 });
 

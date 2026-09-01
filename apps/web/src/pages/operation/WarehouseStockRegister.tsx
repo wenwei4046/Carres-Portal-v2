@@ -33,10 +33,14 @@ import ModuleHeader from "./components/ModuleHeader";
  * THE STOCK REGISTER — Warehouse's one current listing of controlled Units.
  * CARD-2026-08-20-stock-register · Stock MASTER §7 · UI MASTER §6.7.
  *
- * ── THE DESTINATION IS `Stock` ──────────────────────────────────────────────
- * Not `On hand`, not `Stock Units` (Card §1, Stock MASTER §2 rejects both by
- * name). `On hand` described a QUANTITY on a shelf; this page lists exact Units
- * and answers "which one, where, who has it, can it be used".
+ * ── THE DESTINATION IS `Inventory` ──────────────────────────────────────────
+ * The owner-approved 2026-09-01 Blueprint names the Warehouse master Register
+ * `Inventory` (Stock MASTER §2; COPY-STANDARD unbanned the word for exactly
+ * this destination). Not `On hand`, not `Stock Units` — `On hand` described a
+ * QUANTITY on a shelf; this page lists exact Units and answers "which one,
+ * where, who has it, can it be used". The `?tab=stock-onhand` address is
+ * unchanged (CARD-2026-09-01-warehouse-01-sidebar renamed the door, not the
+ * page).
  *
  * ── READ-ONLY, DELIBERATELY ─────────────────────────────────────────────────
  * There is no row editor, no status selector, no Add stock, no Delete and no
@@ -380,8 +384,8 @@ export default function WarehouseStockRegister() {
     <div className="flex min-h-0 flex-1 flex-col">
       <ModuleHeader
         testId="stock-register-destination-header"
-        word="Stock"
-        docTitle="Stock · Warehouse — Carres"
+        word="Inventory"
+        docTitle="Inventory · Warehouse — Carres"
         destinationHeader
       />
       <div className="flex min-h-0 flex-1 gap-4 p-2" data-testid="stock-register">
@@ -537,7 +541,7 @@ export default function WarehouseStockRegister() {
               columns={columns}
               storageKey="carres.warehouse.stockRegister.v1"
               rowKey={(u) => u.id}
-              exportName="Stock"
+              exportName="Inventory"
               searchPlaceholder="Unit ID, product, PO, SO or supplier…"
               isLoading={isLoading}
               onSearchChange={setSearch}

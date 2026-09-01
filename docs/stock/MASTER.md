@@ -1697,6 +1697,22 @@ that is the next Warehouse scope.**
 own confirmation copy, permission surface and evidence rule; wiring them half-way would put five
 buttons on screen whose refusals nobody had designed. They are the scope after the relocation.
 
+### 13.5 · BUILT — the four destinations in the rail (CARD 01, PR #1045)
+
+`CARD-2026-09-01-warehouse-01-sidebar` shipped the §2 map: the Warehouse module rows are
+**Dashboard · Inbound · Inventory · Outbound**, complete from day one. `Inventory` is the one
+live door — the same Unit Register page, key and `?tab=stock-onhand` address unchanged, its
+destination header/docTitle/export renamed to the rail's word. Dashboard, Inbound and Outbound
+print `Coming soon` as non-controls and go live in their own pages' PRs. The collapsed 60px
+icon opens the NAMED landing (`WAREHOUSE_LANDING_KEY` = Inventory) until Dashboard exists.
+
+The superseded `Stock · Ready stock · In & out · Transfers · Counts` rows left the rail.
+**De-navigated, not deleted:** `?tab=stock-plan` (reorder points K1 · urgent restock K3 · pool
+usage K4) and `?tab=movements` (event history) keep their routes until their capabilities
+relocate — replenishment to Purchasing/Settings under this Blueprint, the history into Unit
+History/Inventory. Those relocations join the `OperationStockOnHand` debt above as the named
+next scopes. Production proof rides the PR's deploy record.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
