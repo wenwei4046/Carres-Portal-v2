@@ -4,6 +4,20 @@ Paste everything below the line into a fresh session. It is self-contained.
 **Re-measure before trusting any status line in it** — this document was true at
 `origin/main` = `57ceb227`, and this repo moves several times a day.
 
+> **THIS FILE IS A SNAPSHOT, AND `docs/handoff/` HOLDS EXACTLY ONE OF THEM.**
+> Its sections do not age at the same rate:
+>
+> | Section | Shelf life |
+> |---|---|
+> | §2 status · §6 exact next step | **days** — re-measure or delete |
+> | §3 decisions · §4 constraints · §5 what to avoid | months — these are why the file exists |
+>
+> **When this lane's mission changes, OVERWRITE this file — never add a second
+> one beside it.** The finished prompt moves to `docs/archive/`, which
+> `CLAUDE.md` Law 1 excludes from authority. Two live prompts in one folder means
+> a fresh session cannot tell which one rules, and Law 5 asks the opposite
+> question: can the project have one file fewer?
+
 ---
 
 CARRES PORTAL v2 — SALES ORDER LANE, CONTINUOUS BUILD
