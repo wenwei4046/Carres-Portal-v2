@@ -205,8 +205,8 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // On hand is Warehouse's first live page — the rail navigated there.
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    // Schedule is Warehouse's landing Register — the rail navigated there.
+    expect(child("warehouse-schedule").className).toContain("bg-kit-blue-3");
   });
 
   it("clicking the open module closes it again", () => {
@@ -233,7 +233,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    expect(child("warehouse-schedule").className).toContain("bg-kit-blue-3");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -1160,15 +1160,19 @@ describe("PortalSidebar — Delivery is one page", () => {
 });
 
 describe("PortalSidebar — the Warehouse module's pages", () => {
-  it("the three built pages are doors keeping their `?tab=` addresses", () => {
+  it("Stock is the one built Warehouse register", () => {
     renderAt("/operation?tab=stock-onhand");
     expect(child("stock")).toHaveAttribute("href", "/operation?tab=stock-onhand");
-    expect(child("stock-plan")).toHaveAttribute("href", "/operation?tab=stock-plan");
-    expect(child("movements")).toHaveAttribute("href", "/operation?tab=movements");
+    expect(screen.queryByTestId("nav-child-stock-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-child-movements")).not.toBeInTheDocument();
   });
 
-  it("Transfers and Counts print `Coming soon` and are NOT controls", () => {
+  it("Schedule is the landing Register; Transfers and Counts remain honest Blueprint rows", () => {
     renderAt("/operation?tab=stock-onhand");
+    expect(child("warehouse-schedule")).toHaveAttribute(
+      "href",
+      "/operation?tab=warehouse-schedule",
+    );
     for (const key of ["transfers", "counts"]) {
       const row = child(key);
       expect(row.tagName).toBe("SPAN");
@@ -1182,8 +1186,7 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
    * `Warehouse`, and K0's single merged `Stock` module row is gone for good.
    * What changed is that `Stock` is now the name of a CHILD PAGE — the Warehouse
    * master list, replacing `On hand` (ERP-ARCHITECTURE §2.1 and Stock MASTER §2
-   * both spell the tree `Warehouse → Stock · Ready stock · In & out · Transfers
-   * · Counts`).
+   * now spell the tree `Warehouse → Stock · Transfers · Counts`).
    *
    * The old assertion banned the WORD anywhere in the rail, which was always
    * wider than the ruling it enforced. It now checks the thing that was actually
@@ -1208,7 +1211,7 @@ describe("PortalSidebar — the Warehouse module's pages", () => {
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
     /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1. The learned
      * ORDER is untouched: the rail never reshuffles under an operator. */
-    expect(rows).toEqual(["Stock", "Ready stock", "In & out", "Transfers", "Counts"]);
+    expect(rows).toEqual(["Schedule", "Stock", "Transfers", "Counts"]);
   });
 });
 

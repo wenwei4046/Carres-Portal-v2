@@ -76,6 +76,33 @@ beforeEach(() => {
 });
 
 describe("ReorderStockCard", () => {
+  it("edits reorder point and lead days as Stock master data in Settings", async () => {
+    vi.mocked(apiFetch).mockImplementation((async (_path: string, init?: RequestInit) => {
+      if (init?.method === "PUT") return { sku: MP_K, reorderPoint: 250, leadDays: 75 };
+      return payload({ canEdit: true });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any);
+    render(wrap(<ReorderStockCard settingsOnly />));
+
+    expect(await screen.findByText("Reorder points and lead days")).toBeInTheDocument();
+    expect(screen.queryByTestId("reorder-alert-count")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(`reorder-edit-${MP_K}`));
+    fireEvent.change(screen.getByTestId(`reorder-input-${MP_K}`), { target: { value: "250" } });
+    fireEvent.change(screen.getByTestId(`lead-days-input-${MP_K}`), { target: { value: "75" } });
+    fireEvent.click(screen.getByTestId(`reorder-save-${MP_K}`));
+
+    await waitFor(() => {
+      const put = vi.mocked(apiFetch).mock.calls.find(([, init]) =>
+        (init as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(JSON.parse((put![1] as RequestInit).body as string)).toMatchObject({
+        sku: MP_K,
+        reorderPoint: 250,
+        leadDays: 75,
+      });
+    });
+  });
+
   it("says Reorder stock while units are still on the shelf", async () => {
     vi.mocked(apiFetch).mockResolvedValue(payload());
     render(wrap(<ReorderStockCard />));

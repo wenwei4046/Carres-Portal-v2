@@ -114,6 +114,53 @@ describe("stock_unit_register_v — governed display names", () => {
     expect(sql).toMatch(/revoke all on public\.stock_unit_register_v from authenticated, anon/i);
     expect(sql).toMatch(/grant select on public\.stock_unit_register_v to authenticated/i);
   });
+
+  it("projects next movement from official PO and Delivery reads only", () => {
+    const migrationsUrl = new URL("../../../../../supabase/migrations/", import.meta.url);
+    const definingMigration = readdirSync(migrationsUrl)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .reverse()
+      .find((name) =>
+        readFileSync(new URL(name, migrationsUrl), "utf8").includes(
+          "create or replace view public.stock_unit_register_v",
+        ),
+      );
+    expect(definingMigration).toBeTruthy();
+    const sql = readFileSync(new URL(definingMigration!, migrationsUrl), "utf8");
+
+    expect(sql).toMatch(/left join public\.purchase_orders\s+po\s+on\s+po\.id\s*=\s*v\.po_no/i);
+    expect(sql).toMatch(/from public\.ops_delivery_orders\s+d/i);
+    expect(sql).toMatch(/d\.voided_at\s+is\s+null/i);
+    expect(sql).toMatch(/when v\.status = 'transferred' then null/i);
+    expect(sql).not.toMatch(/insert\s+into\s+public\.(?:purchase_orders|ops_delivery_orders|ops_stock_items)/i);
+  });
+});
+
+describe("warehouse_schedule_v — read-only owner projection", () => {
+  it("projects PO promise, Receiving and exact DO collection evidence without a writer", () => {
+    const migrationsUrl = new URL("../../../../../supabase/migrations/", import.meta.url);
+    const definingMigration = readdirSync(migrationsUrl)
+      .filter((name) => name.endsWith(".sql"))
+      .sort()
+      .reverse()
+      .find((name) => readFileSync(new URL(name, migrationsUrl), "utf8").includes(
+        "create or replace view public.warehouse_schedule_v",
+      ));
+
+    expect(definingMigration).toBeTruthy();
+    const sql = readFileSync(new URL(definingMigration!, migrationsUrl), "utf8");
+    expect(sql).toMatch(/from public\.po_supplier_promises/i);
+    expect(sql).toMatch(/from public\.warehouse_receipts/i);
+    expect(sql).toMatch(/from public\.ops_delivery_orders/i);
+    expect(sql).toMatch(/from public\.delivery_handover_events/i);
+    expect(sql).toContain("Customer delivery pickup");
+    expect(sql).toContain("Customer handover");
+    expect(sql).toContain("No collection evidence yet");
+    expect(sql).toMatch(/revoke all on public\.warehouse_schedule_v from authenticated, anon/i);
+    expect(sql).toMatch(/grant select on public\.warehouse_schedule_v to authenticated/i);
+    expect(sql).not.toMatch(/insert\s+into|update\s+public\.|delete\s+from/i);
+  });
 });
 
 /** A row exactly as `stock_unit_register_v` returns it (shape taken from the
@@ -144,6 +191,10 @@ function viewRow(over: Record<string, unknown> = {}) {
     lifecycle_outcome: "active",
     last_event_at: null,
     last_event: null,
+    next_movement_kind: "none",
+    next_movement_location: null,
+    next_movement_ref: null,
+    move_date: null,
     ...over,
   };
 }
@@ -158,6 +209,7 @@ function buildSb(opts: SbOpts = {}) {
   const tables: string[] = [];
   const orders: { col: string; asc: boolean }[] = [];
   const eqs: { col: string; val: unknown }[] = [];
+  const ranges: { kind: "gte" | "lte"; col: string; val: unknown }[] = [];
 
   function chain(rows: unknown[], single?: unknown | null) {
     const c: Record<string, unknown> = {};
@@ -171,6 +223,14 @@ function buildSb(opts: SbOpts = {}) {
       return c;
     };
     c.limit = () => c;
+    c.gte = (col: string, val: unknown) => {
+      ranges.push({ kind: "gte", col, val });
+      return c;
+    };
+    c.lte = (col: string, val: unknown) => {
+      ranges.push({ kind: "lte", col, val });
+      return c;
+    };
     c.maybeSingle = () => Promise.resolve({ data: single ?? null, error: null });
     c.then = (res: (v: unknown) => unknown) => res({ data: rows, error: null });
     return c;
@@ -183,8 +243,61 @@ function buildSb(opts: SbOpts = {}) {
       return chain(opts.rows ?? [], opts.single);
     },
   };
-  return { sb, tables, orders, eqs };
+  return { sb, tables, orders, eqs, ranges };
 }
+
+describe("GET /schedule — Warehouse's read-only landing Register", () => {
+  it("reads the governed projection and derives Office readiness without querying an owner table", async () => {
+    const { sb, tables, ranges } = buildSb({
+      rows: [{
+        id: "delivery-pickup:do-1",
+        event_date: "2026-09-05",
+        event_label: "Customer delivery pickup",
+        unit_codes: ["U1-000-001"],
+        units_count: 1,
+        from_location: "Carres Klang Warehouse",
+        to_location: "To customer",
+        company: "NETS Logistics",
+        source_ref: "DO-050926-0001",
+        source_path: "/operation/delivery-orders/DO-050926-0001",
+        timing_label: "Expected · 9:00 AM",
+        evidence_label: "No collection evidence yet",
+      }],
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/schedule?from=2026-08-31&to=2026-09-05",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: Array<Record<string, unknown>> };
+    expect(body.rows[0]).toMatchObject({
+      date: "2026-09-05",
+      event: "Customer delivery pickup",
+      operationsReadyBy: "2026-09-04",
+      source: "DO-050926-0001",
+    });
+    expect(tables).toEqual(["warehouse_schedule_v"]);
+    expect(ranges).toEqual([
+      { kind: "gte", col: "event_date", val: "2026-08-31" },
+      { kind: "lte", col: "event_date", val: "2026-09-05" },
+    ]);
+  });
+
+  it("refuses a malformed calendar range before reading any facts", async () => {
+    const { sb, tables } = buildSb();
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.request(
+      "/api/ops/stock/schedule?from=bad&to=2026-09-05",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(tables).toEqual([]);
+  });
+});
 
 describe("GET /register — the one current listing", () => {
   it("reads the governed view, and nothing else", async () => {
@@ -238,6 +351,32 @@ describe("GET /register — the one current listing", () => {
     // Not recorded stays null — never a plausible-looking default.
     expect(body.units[0].holderName).toBeNull();
     expect(body.units[0].lastEventAt).toBeNull();
+  });
+
+  it("passes official next-movement facts through without querying their owners", async () => {
+    const { sb, tables } = buildSb({
+      rows: [viewRow({
+        next_movement_kind: "supplier_arrival",
+        next_movement_location: "Carres Klang Warehouse",
+        next_movement_ref: "PO/26-1",
+        move_date: "2026-09-04",
+      })],
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const body = (await res.json()) as { units: Record<string, unknown>[] };
+    expect(body.units[0]).toMatchObject({
+      nextMovementKind: "supplier_arrival",
+      nextMovementLocation: "Carres Klang Warehouse",
+      nextMovementRef: "PO/26-1",
+      moveDate: "2026-09-04",
+    });
+    expect(tables).toEqual(["stock_unit_register_v"]);
   });
 
   it("refuses a caller who is not operations", async () => {

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import OperationStockPlan, { PurchasingReplenishmentPlan } from "./OperationStockPlan";
-import type { OpsStockPlanResponse, OpsStockPlanRow, StockRegisterUnit } from "@carres/shared";
+import type { OpsStockPlanResponse, OpsStockPlanRow } from "@carres/shared";
 
 /**
  * Ready stock plan — card K2.
@@ -98,6 +98,7 @@ function renderReadyStock() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation?tab=stock-plan"]}>
         <OperationStockPlan />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -107,65 +108,22 @@ beforeEach(() => {
   vi.mocked(apiFetch).mockReset();
 });
 
-describe("Ready stock is the exact eligible Unit view", () => {
-  it("lists only canonical available exact Units and never the monthly replenishment plan", async () => {
-    const ready = unit({ id: "ready", unitCode: "U1-000-001" });
-    const bulk = unit({ id: "bulk", unitCode: "bulk-record", qty: 25 });
-    const reserved = unit({
-      id: "reserved",
-      unitCode: "U1-000-002",
-      availability: "reserved",
-      status: "reserved",
-    });
-    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
-      if (path.startsWith("/api/ops/stock/register")) {
-        return { units: [ready, bulk, reserved], total: 3 } as never;
-      }
-      throw new Error(`Ready stock must not read ${path}`);
-    });
-
+describe("the retired Ready stock address", () => {
+  it("redirects into Stock's Available to sell filter and renders no second register", async () => {
     renderReadyStock();
-
-    const header = await screen.findByTestId("ready-stock-destination-header");
-    expect(header).toHaveTextContent("Ready stock");
-    expect(screen.getAllByRole("button", { name: "Jump to" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Alerts" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Help" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Settings" })).toHaveLength(1);
-    expect(await screen.findByText("U1-000-001")).toBeInTheDocument();
-    expect(screen.queryByText("bulk-record")).not.toBeInTheDocument();
-    expect(screen.queryByText("U1-000-002")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand&availability=available",
+    );
+    expect(screen.queryByTestId("ready-stock-destination-header")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Plan month")).not.toBeInTheDocument();
     expect(screen.queryByTestId("plan-grid")).not.toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 });
 
-function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }): StockRegisterUnit {
-  return {
-    sku: "BF03-Jager-K",
-    category: "bedframe",
-    warehouseId: "wh-klang",
-    siteName: "Carres Klang Warehouse",
-    holderPartyId: null,
-    holderName: null,
-    ownership: "carres_owned",
-    supplier: "Ohana",
-    poNo: "PO/2508-116",
-    status: "free",
-    condition: "new",
-    needsRepair: false,
-    holdReason: null,
-    reservedRef: null,
-    soldOrderId: null,
-    qty: 1,
-    dateIn: "2026-08-01",
-    lastVerifiedAt: null,
-    availability: "available",
-    lifecycleOutcome: "active",
-    lastEventAt: null,
-    lastEvent: null,
-    ...p,
-  };
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-probe">{location.pathname}{location.search}</output>;
 }
 
 /**

@@ -14,10 +14,7 @@
  * exists to remove (Architecture Law D).
  */
 
-import {
-  UNIT_AVAILABILITY_LABEL,
-  type UnitAvailability,
-} from "./unit-availability";
+import { type UnitAvailability } from "./unit-availability";
 
 /** One row of `public.stock_unit_register_v` (migration 0373), camel-cased. */
 export interface StockRegisterUnit {
@@ -49,6 +46,42 @@ export interface StockRegisterUnit {
    *  lineage ledger began — an honest fact, not a missing one. */
   lastEventAt: string | null;
   lastEvent: string | null;
+  /** Read-only projection of the official Transfer, Delivery, PO or problem source. */
+  nextMovementKind?: NextMovementKind | null;
+  nextMovementLocation?: string | null;
+  nextMovementRef?: string | null;
+  moveDate?: string | null;
+}
+
+export type NextMovementKind =
+  | "none"
+  | "transfer"
+  | "customer_delivery"
+  | "supplier_arrival"
+  | "problem_block";
+
+export function nextMovementLabel(
+  movement: Pick<
+    StockRegisterUnit,
+    "nextMovementKind" | "nextMovementLocation" | "nextMovementRef"
+  >,
+): string {
+  const location = movement.nextMovementLocation;
+  const ref = movement.nextMovementRef;
+  switch (movement.nextMovementKind) {
+    case "none":
+      return "No movement planned";
+    case "transfer":
+      return location && ref ? `To ${location} · ${ref}` : "—";
+    case "customer_delivery":
+      return ref ? `To customer · ${ref}` : "—";
+    case "supplier_arrival":
+      return location && ref ? `To ${location} · ${ref}` : "—";
+    case "problem_block":
+      return "No movement until this problem is fixed";
+    default:
+      return "—";
+  }
 }
 
 /**
@@ -61,6 +94,11 @@ export interface StockRegisterUnit {
  */
 export function isCurrentUnit(u: Pick<StockRegisterUnit, "availability">): boolean {
   return u.availability !== "ended";
+}
+
+/** Quantity-controlled records are pieces, not one invented physical Unit. */
+export function exactUnitRecords(units: StockRegisterUnit[]): StockRegisterUnit[] {
+  return units.filter((unit) => unit.qty === 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,53 +170,33 @@ export function changedWithin(
 // Attention — only reasons whose FACT exists
 // ---------------------------------------------------------------------------
 
-/**
- * ⚠ MEASURED ON PRODUCTION 2026-08-21, AND THE MEASUREMENT DECIDED THIS LIST.
- *
- * Card §3 names nine Attention reasons: waiting inspection · cannot find · Unit
- * ID issue · Site differs · damaged · components missing · returned not checked ·
- * evidence incomplete · not recently verified.
- *
- * FIVE have no fact to read. There is no "cannot find" flag, no components
- * manifest, no evidence-completeness fact, no Unit-ID-issue record, and only one
- * Site exists so nothing can differ from it. A chip reading a column nobody
- * writes puts a number on screen that means nothing — worse than its absence.
- *
- * TWO more are measurable but flag EVERYTHING, which is the same as flagging
- * nothing:
- *   last_verified_at IS NULL   136 of 136 — the column shipped hours earlier
- *   holder_party_id  IS NULL   136 of 136 — no door populates it yet
- *
- * So the built list is the reasons that are both REAL and DISCRIMINATING today.
- * The other seven are recorded as an explicit gap in docs/stock/MASTER.md, with
- * the fact each one waits for, rather than drawn as controls that cannot tell an
- * operator anything.
- */
+/** Attention names observed facts held by condition or the governed hold reason. */
 export const ATTENTION_REASONS = [
-  "on_hold",
-  "in_repair",
-  "damaged",
-  "no_source",
+  "damage_reported",
+  "cannot_find",
+  "parts_missing",
+  "returned_check",
 ] as const;
 export type AttentionReason = (typeof ATTENTION_REASONS)[number];
 
 export const ATTENTION_REASON_LABEL: Record<AttentionReason, string> = {
-  on_hold: "Waiting inspection",
-  in_repair: "In repair",
-  damaged: "Damaged",
-  no_source: "No purchase order",
+  damage_reported: "Damage reported",
+  cannot_find: "Unit cannot be found",
+  parts_missing: "Parts missing",
+  returned_check: "Returned — check before sale",
 };
 
 export function hasAttention(u: StockRegisterUnit, reason: AttentionReason): boolean {
+  const held = (u.holdReason ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   switch (reason) {
-    case "on_hold":
-      return u.holdReason != null;
-    case "in_repair":
-      return u.needsRepair;
-    case "damaged":
-      return u.condition === "damaged";
-    case "no_source":
-      return !u.poNo;
+    case "damage_reported":
+      return u.condition === "damaged" || held.includes("damage");
+    case "cannot_find":
+      return held === "cannot_find" || held === "unit_not_found" || held === "missing_unit";
+    case "parts_missing":
+      return held === "parts_missing" || held === "components_missing" || held === "missing_component";
+    case "returned_check":
+      return held === "returned" || held === "returned_check" || held === "return_check";
   }
 }
 
@@ -305,9 +323,29 @@ export function registerSummaryLine(t: StockRegisterTotals, ofTotal: number): st
     : `${head} · ${promise}`;
 }
 
-/** Availability label for the rail and the column. The VALUE stays `reserved`;
- *  `Reserved / sold` is the operator's word and lives only at this boundary
- *  (owner ruling 2026-08-20). */
+/** Stock's approved screen words. The governed availability VALUE is unchanged. */
 export function availabilityLabel(a: UnitAvailability): string {
-  return UNIT_AVAILABILITY_LABEL[a];
+  switch (a) {
+    case "available":
+      return "Available to sell";
+    case "reserved":
+      return "Reserved for customer";
+    case "incoming":
+      return "Ordered — not received";
+    case "in_transit":
+      return "On the way";
+    case "not_available":
+      return "Cannot sell";
+    case "ended":
+      return "Delivered / history";
+  }
+}
+
+/** A blocked Unit names only an observed, governed reason; raw values stay hidden. */
+export function stockAvailabilityLabel(unit: StockRegisterUnit): string {
+  if (unit.availability !== "not_available") return availabilityLabel(unit.availability);
+  const reason = ATTENTION_REASONS.find((candidate) => hasAttention(unit, candidate));
+  return reason
+    ? `Cannot sell — ${ATTENTION_REASON_LABEL[reason]}`
+    : "Cannot sell — reason not recorded";
 }

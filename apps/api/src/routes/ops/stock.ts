@@ -40,6 +40,8 @@ import {
   type PoolUseReason,
   unitAvailability,
   unitLifecycleOutcome,
+  warehouseOperationsReadyBy,
+  type WarehouseScheduleRow,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
@@ -163,6 +165,50 @@ opsStockRouter.get("/inventory", requireOperationOrPrincipal, async (c) => {
 // THE STOCK REGISTER — CARD-2026-08-20-stock-register
 // =====================================================================
 
+/** Warehouse landing: one read-only projection over each owning record. */
+opsStockRouter.get("/schedule", requireOperationOrPrincipal, async (c) => {
+  const from = c.req.query("from") ?? "";
+  const to = c.req.query("to") ?? "";
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (!iso.test(from) || !iso.test(to) || from > to) {
+    return c.json({ error: "invalid_input", message: "A valid schedule date range is required" }, 400);
+  }
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("warehouse_schedule_v")
+    .select(
+      "id, event_date, event_label, unit_codes, units_count, from_location, to_location, " +
+        "company, source_ref, source_path, timing_label, evidence_label",
+    )
+    .gte("event_date", from)
+    .lte("event_date", to)
+    .order("event_date", { ascending: true });
+  if (error) throw mapErr(error);
+
+  const rows = (data ?? []).map((record) => {
+    const row = record as unknown as Record<string, unknown>;
+    const date = row.event_date as string;
+    return {
+      id: row.id as string,
+      date,
+      event: row.event_label as string,
+      unitCodes: Array.isArray(row.unit_codes) ? row.unit_codes.map(String) : [],
+      units: Number(row.units_count ?? 0),
+      from: (row.from_location as string | null) ?? null,
+      to: (row.to_location as string | null) ?? null,
+      company: (row.company as string | null) ?? null,
+      source: row.source_ref as string,
+      sourcePath: row.source_path as string,
+      timing: row.timing_label as string,
+      operationsReadyBy: warehouseOperationsReadyBy(date),
+      evidence: (row.evidence_label as string | null) ?? null,
+    } satisfies WarehouseScheduleRow;
+  });
+
+  return c.json({ rows });
+});
+
 /**
  * GET /register — the one current listing of controlled Units.
  *
@@ -198,7 +244,8 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
       "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
         "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
         "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
-        "availability, lifecycle_outcome, last_event_at, last_event",
+        "availability, lifecycle_outcome, last_event_at, last_event, next_movement_kind, " +
+        "next_movement_location, next_movement_ref, move_date",
     )
     .order("unit_code", { ascending: true });
   if (error) throw mapErr(error);
@@ -230,6 +277,10 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
       lifecycleOutcome: row.lifecycle_outcome as string,
       lastEventAt: (row.last_event_at as string | null) ?? null,
       lastEvent: (row.last_event as string | null) ?? null,
+      nextMovementKind: (row.next_movement_kind as StockRegisterUnit["nextMovementKind"]) ?? null,
+      nextMovementLocation: (row.next_movement_location as string | null) ?? null,
+      nextMovementRef: (row.next_movement_ref as string | null) ?? null,
+      moveDate: (row.move_date as string | null) ?? null,
     } satisfies StockRegisterUnit;
   });
 
@@ -260,7 +311,8 @@ opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c)
       "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
         "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
         "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
-        "availability, lifecycle_outcome, last_event_at, last_event",
+        "availability, lifecycle_outcome, last_event_at, last_event, next_movement_kind, " +
+        "next_movement_location, next_movement_ref, move_date",
     )
     .eq("unit_code", unitCode)
     .maybeSingle();
@@ -293,6 +345,10 @@ opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c)
     lifecycleOutcome: row.lifecycle_outcome as string,
     lastEventAt: (row.last_event_at as string | null) ?? null,
     lastEvent: (row.last_event as string | null) ?? null,
+    nextMovementKind: (row.next_movement_kind as StockRegisterUnit["nextMovementKind"]) ?? null,
+    nextMovementLocation: (row.next_movement_location as string | null) ?? null,
+    nextMovementRef: (row.next_movement_ref as string | null) ?? null,
+    moveDate: (row.move_date as string | null) ?? null,
   } satisfies StockRegisterUnit;
 
   const { data: evRows, error: evErr } = await sb

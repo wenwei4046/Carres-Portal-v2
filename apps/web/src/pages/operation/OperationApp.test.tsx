@@ -79,6 +79,9 @@ vi.mock("./WarehouseUnitDetail", () => ({
 vi.mock("./WarehouseStockRegister", () => ({
   default: () => <div data-testid="stock-register-destination-header">stock</div>,
 }));
+vi.mock("./WarehouseSchedule", () => ({
+  default: () => <div data-testid="warehouse-schedule-destination-header">schedule</div>,
+}));
 vi.mock("./OperationStockPlan", () => ({
   default: () => <div data-testid="ready-stock-destination-header">ready-stock</div>,
 }));
@@ -318,15 +321,34 @@ describe("OperationApp — an exact Stock Unit mounts at its permanent URL", () 
 });
 
 describe("OperationApp — Warehouse registers own the only Destination Header", () => {
+  it("mounts Schedule as the Warehouse landing Register without duplicate chrome", () => {
+    renderApp("/operation?tab=warehouse-schedule");
+    expect(screen.getByTestId("warehouse-schedule-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("retires the old In & out bookmark into Stock", () => {
+    renderApp("/operation?tab=movements");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand",
+    );
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("movements-stub")).not.toBeInTheDocument();
+  });
+
   it("Stock mounts its Destination Header and the global utility row stands down", () => {
     renderApp("/operation?tab=stock-onhand");
     expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 
-  it("Ready stock mounts its Destination Header and the global utility row stands down", () => {
+  it("retires the old Ready stock bookmark into Stock's Available to sell filter", () => {
     renderApp("/operation?tab=stock-plan");
-    expect(screen.getByTestId("ready-stock-destination-header")).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand&availability=available",
+    );
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("ready-stock-destination-header")).not.toBeInTheDocument();
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 });

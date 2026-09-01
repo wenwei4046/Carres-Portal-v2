@@ -16,10 +16,12 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
+import StockSettings from "./StockSettings";
 
 const SECTIONS = [
   { slug: "sales-orders", group: "Sales Orders", label: "Sales Order Settings" },
   { slug: "purchasing", group: "Purchasing", label: "Purchasing Settings" },
+  { slug: "stock", group: "Warehouse", label: "Stock Settings" },
   { slug: "issue-tracker", group: "Issue Tracker", label: "Issue Tracker Settings" },
 ] as const;
 
@@ -51,6 +53,7 @@ export default function SettingsWorkspace() {
           <Route index element={<Navigate to="sales-orders" replace />} />
           <Route path="sales-orders" element={<SalesOrderSettings />} />
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
+          <Route path="stock" element={<StockSettings />} />
           <Route path="issue-tracker" element={<IssueTrackerSettings />} />
         </Routes>
       </div>

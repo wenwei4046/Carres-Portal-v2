@@ -3,6 +3,8 @@
 > **APPROVED / LOCKED — owner-reviewed 2026-08-20.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
+> **Master-control correction 2026-09-01:** Warehouse navigation is Schedule · Stock · Transfers · Counts;
+> availability and event history are inside Stock and Unit Detail, never standalone pages.
 
 ## 1 · Mission and ownership
 
@@ -16,7 +18,7 @@ another 3PL or a future Carres-operated warehouse.
 | Fact | Owner |
 |---|---|
 | PO, Consignment Order, supplier promise/claim and commercial reason | Purchasing |
-| Unit ID, Where, Who has it, condition, availability and physical history | Stock / Warehouse |
+| Unit ID, Location, Held by, item condition, availability and physical history | Stock / Warehouse |
 | receiving session and receipt evidence | Receiving |
 | exact Unit promised, reservation and release decision | Sales Order |
 | journey, carrier handover and proof | Delivery |
@@ -29,18 +31,21 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse destinations are **Stock · Ready stock · In & out · Transfers · Counts**.
+Warehouse destinations are **Schedule · Stock · Transfers · Counts**.
 
-- Stock: every currently controlled Unit.
-- Ready stock: exact Units currently eligible for a new customer promise.
-- In & out: append-only physical events.
+- Schedule: Warehouse landing; a flat, date-grouped view of governed warehouse events.
+- Stock: every currently controlled exact Unit, with Last moved and a History filter over physical events.
 - Transfers: Site-to-Site movement and handover.
 - Counts: dated physical counts and Unit-level differences.
+
+The former standalone **In & out** destination is retired. Cross-Unit event finding belongs inside
+Stock; one Unit's append-only evidence belongs in Unit Detail **History**. Neither is a second event
+truth.
 
 Reports, Settings, Work, Quick Rail and Calendar keep their shared Shell homes. Receiving,
 Purchasing, Delivery, Payments and Service Cases keep their own doors.
 
-Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
+Approved operator words include **Location · Held by · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
@@ -66,11 +71,11 @@ the same text ID to the physical Unit at the showroom. Future supplier labelling
 only a carrier for the same Unit ID. A wrong or unreadable label starts a controlled issue, never a
 second Unit. Replacement labels keep the original ID and full evidence.
 
-Every active Unit has Catalog identity, source order, ownership, **Where**, **Who has it**,
+Every active Unit has Catalog identity, source order, ownership, **Location**, **Held by**,
 condition, calculated availability, reservation connection, last verified date, evidence and
 append-only history.
 
-| Where | Who has it |
+| Location | Held by |
 |---|---|
 | Carres Klang Warehouse | NETS Warehouse |
 | On the way to PJ Showroom | NETS Delivery |
@@ -80,7 +85,7 @@ append-only history.
 
 NETS is not a Site. Site, operating party and role are separate. Independently saleable or
 replaceable modules each have a Unit ID; pure shipping packages are children of their Unit.
-Missing required modules, components or packages prevents Ready stock eligibility.
+Missing required modules, components or packages prevents **Available to sell** eligibility.
 
 ## 4 · Availability, reservation and replenishment
 
@@ -89,11 +94,11 @@ page or integration maintains another available quantity.
 
 | Facts | Result |
 |---|---|
-| received, inspected, complete, unreserved and uncontrolled | Available |
-| bound by Sales Order | Reserved / sold |
-| ordered but not received | Incoming |
-| between confirmed handovers | In transit |
-| issue, inspection, repair, missing component or other control | Not available |
+| received, condition recorded, complete, unreserved and uncontrolled | Available to sell |
+| bound by Sales Order | Reserved for customer |
+| ordered but not received | Ordered — not received |
+| between confirmed handovers | On the way |
+| issue, condition not checked, repair, missing component or other control | Cannot sell — {observed reason} |
 | customer accepted or lifecycle ended | Delivered / history |
 
 Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
@@ -105,7 +110,9 @@ Sales Order owns choosing, binding, changing and releasing the exact promised Un
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.
 
-Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
+**Available to sell** is the Availability filter over exact Units satisfying every eligibility rule.
+Its count is derived from those rows and every result remains an exact Unit ID; Sales and Purchasing
+may read the count and deep-link to this filter but cannot store a second quantity.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,
 and Sales Order displays promise risk. General replenishment is a Purchasing decision.
@@ -120,8 +127,8 @@ receipt preserves received Units and leaves the remainder Incoming. Unexpected U
 investigated, never added through a shortcut.
 
 Showrooms are formal Sites. Staff scan arrival and departure, report observations and perform dated
-counts. A reserved display Unit remains at its Site but leaves Ready stock. Display start and last
-condition check are visible. No governed Position or slot exists now; reconsider when three to four
+counts. A reserved display Unit remains at its Site but leaves Available to sell. Display start and
+the last observed condition result are visible. No governed Position or slot exists now; reconsider when three to four
 outlets or measured finding time proves Site alone inadequate.
 
 Delivery works backward from the customer date using governed calendars, cut-offs and transit.
@@ -150,7 +157,7 @@ problem, unsafe, supplier or destination refused, or another observed problem. T
 the consequence, requests reason-specific evidence, protects the Unit and raises Work. Staff do not
 guess Hold or Quarantine.
 
-Inspection records an actual result and permits only governed paths: restore eligibility, dated
+An observed condition result permits only governed paths: restore eligibility, dated
 repair, Purchasing decision, supplier collection, Count again, approved Site correction or proposed
 write-off. Generic Close issue is invalid.
 
@@ -169,18 +176,46 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
+Schedule is Warehouse's landing page, not a Work queue. It is one flat, date-grouped DataGrid with
+**Date · Event · Units · From · To · Company · Source · Expected/actual · Operations ready by ·
+Evidence**. The Warehouse calendar is Monday–Saturday. **Operations ready by** is calculated under
+the Office Monday–Friday calendar: a Saturday physical event normally requires Friday readiness,
+while the event remains on Saturday. It projects
+PO/CO promise, Receiving actual/result, Supplier Claim promise/collection, Transfer
+collection/arrival, Count and Delivery collection/customer handover. Every row deep-links to the
+owning object. A date with no rows says **No warehouse event planned**. Current production has no
+honest unified read model for these owner facts. PR #1005 adds the read-only PO promise,
+expected/actual Receiving, exact DO collection appointment/evidence and customer-handover arms;
+Claim/Return collection, Transfer collection/arrival and Count remain named projection gaps until
+their owners store a governed event date. A future booking stays **Expected**. Delivery pickup
+becomes **Collected** only after the exact DO carries `handed_over` evidence; a date alone never
+means **On the way**. Dashboard, Calendar and My Work/Team Work do not stand in for Schedule.
+
 Stock is the one current list. Its left rail filters the same authority by All stock, Attention,
-Availability, Site or Where, Ownership, Catalog category, and Changed today, this week or this
+Availability, Location, Ownership, Catalog category, and Changed today, this week or this
 month. Time choices are filters, not Work dates.
 
-Ready stock groups eligible Units by Catalog product and Site and expands to exact IDs. Sales enters
-its own Choose Unit door; Stock has no second reservation editor.
+Available to sell is an Availability filter on this same Register. Sales enters its own Choose Unit
+door; Stock has no second listing, grouped page, quantity or reservation editor.
 
-In & out shows actual time, Unit, event, From, To, handled by, source and evidence. Transfers
+The Register's fixed business columns are **Unit ID · Product · Availability · Location · Held by ·
+Item condition · Last moved · Next movement · Move date · Work**. Location is the physical place,
+or the partner place while in transit. Held by is the operating party physically responsible; it is
+not ownership and never names an arbitrary staff member. Work is blank unless the shared Work
+authority joins a genuine action; Stock never fabricates a Warehouse-duty avatar.
+
+Next movement is a read-only projection of its official owner. It says **No movement planned**,
+**To {Location} · {Transfer No}**, **To customer · {DO No}**, **To {Location} · {PO No}**, or
+**No movement until this problem is fixed**. A missing source stays blank. Transfer remains blank
+until its governed source is built; Stock never guesses it or creates a Receiving, Delivery,
+Purchasing or Transfer writer.
+
+Stock's Last moved field and History filter show cross-Unit physical changes; Unit Detail History
+shows actual time, event, From, To, actual actor, source and evidence for one Unit. Transfers
 provides Register, Detail, mobile collection and arrival. Counts provides Register, mobile scan
 workspace and difference surface.
 
-Unit Detail is titled by Unit ID and product. It shows Where, Who has it, ownership, condition,
+Unit Detail is titled by Unit ID and product. It shows Location, Held by, ownership, item condition,
 availability, reservation, last verified, one current attention item, connected records, evidence,
 history and permitted actions. There is no generic Edit, status selector or Delete.
 
@@ -208,6 +243,12 @@ contract is incomplete and cannot enter Work.
 
 The Stock rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
 arrival, return, inspection, repair, supplier collection and month-end commitments.
+
+Warehouse work ownership waits on one governed **Warehouse duty** in Team, with normal holder,
+dated cover and actual actor kept separate. Current production has no honest Warehouse-duty roster:
+until that People/Team seam exists, management/Work health says **Duty not set**. Reference-only
+Stock rows show no avatar; only a genuine Work row may show its actor beside **Check this Unit and
+record its condition**.
 
 ## 9 · Month-end Stock Confirmation
 
@@ -256,6 +297,11 @@ Carres Portal is the minimum control plane. NETS receives narrow mobile Work, sc
 outcome and evidence surfaces, not the full ERP. Optional APIs may propose events but cannot
 overwrite Unit truth. Offline scans remain visibly Not submitted and non-authoritative until
 submission; actual and submitted times are separate.
+
+Partner access is a separate governed row-scope seam: a partner may see only assigned rows, Units,
+Locations and events, and may submit only admitted physical evidence. Costs, margins, payment,
+unrelated parties and internal notes are excluded. Current production has no complete partner RLS
+read model for this promise, so it remains a named gap rather than a broad role assumption.
 
 The model never hard-codes NETS. Site, operating party, role, permission, calendar and evidence
 remain separate. Current scope rejects unproven heavy-WMS bin, rack, put-away, pick-wave, forklift
@@ -457,12 +503,10 @@ no bookmark and no learned rail position moved.
 | No dead controls, generic editor or second reservation door | the page is read-only | test asserts no Reserve/Release/Edit/Delete/Add stock/Adjust/Mark done control exists |
 | Current/non-current year formatting | the ONE governed formatter, `fmtDate` | — |
 
-**THE FOOTER PRINTS TWO NUMBERS, AND THAT IS THE POINT.** `85 you can promise · 893 pieces you
-cannot`. §12.1 established that a `qty > 1` record can never be reserved; a Register that printed
-one number would either hide 893 real pillows or promise 893 that no Sales Order can name. The row
-itself repeats the warning inline — *"555 pieces in one record — cannot be promised individually"* —
-which is the one permitted inline second line, and it earns it. This keeps the open owner question
-in §12.1 visible on the screen where it matters instead of buried in a document.
+**THE FOOTER NAMES EXACT UNIT RECORDS.** A `qty > 1` record is a governed quantity of pieces, not
+one physical Unit and not hundreds of invented Unit rows. Stock therefore excludes
+those quantity records from their Unit counts. Their existing data and writers remain intact while
+their governed quantity-controlled surface is resolved separately.
 
 **Date spelling — a deliberate deference.** Card §4 spells time `Tue, 18 Aug · 10:42 AM`; the
 portal's one governed formatter spells it `Tue, 18 Aug 10:42`. `fmt-date.ts` records that three
@@ -470,15 +514,15 @@ page-local formatters were deleted for disagreeing with it, so the Register uses
 Changing the spelling is a one-line change in that file for whoever wants it — and it must happen
 THERE, for every page at once, never here.
 
-### 12.3 · The rail is drawn from facts that exist — and five are missing
+### 12.3 · The rail is drawn from observed facts
 
-Card §3 names nine Attention reasons. **Four shipped; five have no fact to read**, and inventing a
-chip that reads a column nobody writes would put a number on screen that means nothing.
+The four governed filters read condition/hold facts already stored on the Unit. A chip that reads a
+column nobody writes would put a number on screen that means nothing, so the remaining candidates
+stay named gaps.
 
 | Reason | State | What it waits for |
 |---|---|---|
-| waiting inspection · damaged · in repair · no purchase order | **BUILT** | — |
-| cannot find | not built | a "cannot find" observation — Issues/Counts card (§6) |
+| Damage reported · Unit cannot be found · Parts missing · Returned — check before sale | **BUILT when the matching governed condition/hold reason exists** | — |
 | Unit ID issue | not built | the governed relabel/issue record (§3) |
 | Site differs | not built | a second Site, and Counts (§6). One Site exists today |
 | components missing | not built | a components manifest — Receiving's scan surface (§5) |
@@ -487,10 +531,10 @@ chip that reads a column nobody writes would put a number on screen that means n
 Two more reasons are measurable but were deliberately NOT shipped as chips because they flag
 **136 of 136 Units**, which is the same as flagging nothing: `last_verified_at IS NULL` (the column
 shipped hours earlier) and `holder_party_id IS NULL` (no door populates it yet). They become useful
-the moment Counts and the handover doors write them. `Who has it` is still shown as a COLUMN, and
+the moment Counts and the handover doors write them. `Held by` is still shown as a COLUMN, and
 reads **Not recorded** rather than inventing a holder.
 
-`Where` and `Ownership` render only when the data holds more than one value — one Site and no
+`Location` and `Ownership` render only when the data holds more than one value — one Site and no
 consignment Unit exist today, and a filter offering one choice is not a filter
 (`03-page-patterns.md:149`). Each section appears by itself when a second value arrives; no code
 changes.
@@ -502,18 +546,16 @@ words rather than showing three empty filters that look broken.
 ### 12.4 · Still not built
 
 The superseded planning-page meaning of Ready stock, generic Held stock or Quarantine, and the
-claim-only issue route remain superseded. Transfers (PR #860), Counts, month-end, Ready stock as
-eligible Units, Showroom Sites, the partner mobile surfaces and the reports in §11 remain
+claim-only issue route remain superseded. Transfers (PR #860), Counts, month-end, Showroom Sites,
+the partner mobile surfaces and the reports in §11 remain
 **APPROVED TARGET / NOT BUILT**.
 
 **`OperationStockOnHand.tsx` IS DE-ROUTED, NOT DELETED, AND THE REASON IS A DEPENDENCY.** No
-operator can reach it. It is kept because TWO capabilities still live only there:
-`ReorderStockCard` (the K1 reorder points, migration 0286 — the one door where a reorder point and
-lead days are set) and `ImportStockDialog` (the Klg Warehouse sheet import). Deleting the file would
-destroy both without replacing them, and an existing useful capability defaults to KEEP. Their
-homes are **Ready stock** (reorder points) and **Settings/Maintenance** (the sheet import) — a
-relocation this card's scope excluded. **The file dies in the PR that gives those two a home, and
-that is the next Warehouse scope.**
+operator can reach it. It is kept because `ImportStockDialog` (the Klg Warehouse sheet import)
+still lives only there. Reorder points and lead days now live in **Settings → Stock**, using the
+existing K1 read/write authority unchanged; monthly and urgent buying work remains Purchasing's.
+Deleting the legacy file before the import receives a governed home would still destroy a useful
+capability. **The file dies in the PR that gives that import a home.**
 
 0366's five governed doors that could legitimately live on Unit Detail — `ops_stock_set_site` ·
 `set_holder` · `set_ownership` · `verify_unit` · `set_condition` — are **NOT wired**. Each needs its
@@ -522,8 +564,8 @@ buttons on screen whose refusals nobody had designed. They are the scope after t
 
 ### 12.5 · IN BUILD / NOT PRODUCTION-VERIFIED — the Warehouse P0 cutover (PR #1005)
 
-Stock and Ready stock each draw one 50px Destination Header; the Operation shell stands its
-separate global utility row down for both addresses. Stock now uses the shared 240px `FilterRail`,
+Stock draws one 50px Destination Header; the Operation shell stands its separate global utility
+row down. Stock now uses the shared 240px `FilterRail`,
 `FilterRailGroup` and `FilterRailRow` grammar. The rail keeps its width while the Register scrolls,
 can be hidden from its panel-left control, and returns from the Register toolbar.
 
@@ -531,10 +573,12 @@ A failed `stock_unit_register_v` read is a problem state, never an empty stock f
 the rail and Register until a retry succeeds, so it cannot print `All stock 0`, `Nothing needs
 attention`, zero availability or a zero footer from an unread authority.
 
-For the seven-day cutover, **Ready stock is the honest exact-Unit fallback**: it reads the same Unit
-authority and lists only `Available` records whose quantity is exactly one. The approved Catalog
-product + Site grouping and expansion to exact IDs remains the next Ready stock presentation card;
-no rollup becomes a second availability fact while it waits.
+The retired **Ready stock** bookmark redirects to Stock's **Available to sell** filter. That filter
+reads the canonical availability answer over exact Units; it has no separate page, grouping or
+stored quantity.
+
+The standalone **In & out** rail door is retired. Its old bookmark redirects to Stock; Last moved,
+the Changed/History filters and Unit Detail History consume the same append-only event authority.
 
 The superseded monthly ordering cycle is retained, with its data and writers unchanged, under the
 code name **Purchasing Replenishment Plan**. Its future operator home is Purchasing and its page word
@@ -547,10 +591,31 @@ migration is rebased to the then-current repository tail (`0410` is the present 
 main already owns `0409`), all gates pass on the resulting ancestry, and real roles prove the exact
 deploy SHA at desktop and genuine sub-1280 widths.
 
+### 12.6 · IN BUILD / NOT PRODUCTION-VERIFIED — Warehouse Schedule
+
+PR #1005 makes **Schedule** the first live Warehouse rail page and supplies one Destination Header,
+one date-grouped Register and no enclosing outer frame. Empty weekdays remain visible from Monday
+through Saturday. Every governed event row links to its owning PO, Receiving session/GRN or DO;
+Schedule has no mutation, local queue or duplicate Work completion.
+
+The read model depends on PR #1000's exact supplier-answer and formal Receiving outcomes. It counts
+physical pieces, but lists only real Unit IDs; Receiving `extra` evidence never mints Stock identity.
+The DO pickup arm shows Units, From Location, **To customer**, Logistics Partner, DO,
+Expected/Collected time, readiness date and evidence. Future DO bookings remain Expected and only a
+`handed_over` event permits Collected. Claim/Return collection, Transfer collection/arrival and Count
+do not yet have governed schedule dates in current main and therefore remain absent by design; if an
+owner later stores such a date and no Schedule row appears, that is a projection defect.
+
+External Warehouse Incoming/Receipts remains **PARTIAL**. The independent mobile target is
+**Schedule · Receive goods · Stock · Handover · Counts**, row-scoped to the assigned Location and
+operating party. Unmatched physical goods may appear only after the owning intake seam supplies them,
+as **Not available — order not matched** in the configured Hold area. PR #1005 does not create that
+writer or declare NETS cutover ready. A real Warehouse-account desktop/mobile role walk is required.
+
 ## 13 · Resolved contradictions and plan state
 
-Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to
-eligible Units; warehouse-only scope to all governed Sites and journeys; rollup to Unit authority;
+Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to the
+Available to sell filter; warehouse-only scope to all governed Sites and journeys; rollup to Unit authority;
 bulk sofa to Unit identity; Quarantine to observable issue and automatic control; Receiving-only
 supplier fault to Receiving and Service entrances; NETS-as-place to Site/operator separation;
 one movement status to collection, transit and arrival; bulk reservation to Sales Order exact-Unit
@@ -565,18 +630,20 @@ measured need, and assumed external cutover.
 upstream/downstream owners.
 
 **APPROVED TARGET / NOT BUILT:** the rest of this Warehouse operating model and its UI — the
-remaining destinations in §2 (Ready stock as eligible Units, Transfers, Counts), the journeys in §5,
+remaining destinations in §2 (Transfers, Counts), the unprojected Schedule owner sources in §12.6,
+the journeys in §5,
 Issues/Counts/correction in §6, month-end in §9 and the reports in §11.
 
 **BUILT / VERIFIED:** the Unit authority foundation in §12.1 — one permanent identity, one
 availability arithmetic, one governed door per fact, and no ungoverned write path left on the
 register — and the **Stock Register** in §12.2, which replaced On hand as the Warehouse master list
-and is backed only by that authority.
+and is backed only by that authority. **IN BUILD / NOT PRODUCTION-VERIFIED:** Schedule's shared-shell
+page and present-source read projection in PR #1005 (§12.6).
 
 **NAMED GAPS, NOT SILENT ONES:** the five Attention reasons with no fact behind them (§12.3), the
-two that flag every Unit until Counts and the handover doors write them (§12.3), and the two
-capabilities still stranded on the de-routed On hand page (§12.4). Each names the fact or the card
-it waits for.
+two that flag every Unit until Counts and the handover doors write them (§12.3), the missing Team
+Warehouse-duty authority (§8), and the sheet import still stranded on the de-routed On hand page
+(§12.4). Each names the fact or the card it waits for.
 
 **PRODUCTION-VERIFIED 2026-08-21.** There are TWO questions here and only one of them expires.
 Conflating them is what made the first version of this closure wrong:

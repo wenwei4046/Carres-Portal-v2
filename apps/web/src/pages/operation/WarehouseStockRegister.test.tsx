@@ -54,7 +54,18 @@ const UNITS: StockRegisterUnit[] = [
   unit({ id: "1", unitCode: "id-aaa111111" }),
   unit({ id: "2", unitCode: "id-bbb222222", sku: "Essential Memory Pillow(L)", qty: 555, category: null }),
   unit({ id: "3", unitCode: "id-ccc333333", availability: "reserved", status: "reserved", reservedRef: "SO-1319" }),
-  unit({ id: "4", unitCode: "id-ddd444444", availability: "incoming", status: "incoming", poNo: null }),
+  unit({
+    id: "4",
+    unitCode: "id-ddd444444",
+    availability: "incoming",
+    status: "incoming",
+    poNo: "PO/26-1",
+    category: null,
+    nextMovementKind: "supplier_arrival",
+    nextMovementLocation: "Carres Klang Warehouse",
+    nextMovementRef: "PO/26-1",
+    moveDate: "2026-09-04",
+  }),
   unit({ id: "5", unitCode: "id-eee555555", availability: "ended", status: "sold", lifecycleOutcome: "delivered" }),
 ];
 
@@ -66,11 +77,11 @@ async function renderLoaded() {
   return r;
 }
 
-function renderRegister() {
+function renderRegister(initialEntry = "/operation?tab=stock-onhand") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/stock"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <WarehouseStockRegister />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -100,6 +111,27 @@ describe("the destination is Stock", () => {
     expect(screen.queryByText(/On hand/i)).not.toBeInTheDocument();
   });
 
+  it("uses the final governed Stock columns", async () => {
+    await renderLoaded();
+    for (const label of [
+      "Unit ID",
+      "Product",
+      "Availability",
+      "Location",
+      "Held by",
+      "Item condition",
+      "Last moved",
+      "Next movement",
+      "Move date",
+      "Work",
+    ]) {
+      expect(screen.getByRole("columnheader", { name: new RegExp(label, "i") })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("columnheader", { name: "Where" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Who has it" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Current attention" })).not.toBeInTheDocument();
+  });
+
   it("reads the Unit authority endpoint, never a stored total", async () => {
     renderRegister();
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled());
@@ -126,27 +158,32 @@ describe("the default view is current Units (Card §1)", () => {
   });
 });
 
-describe("every number derives from the Unit authority (Card §6)", () => {
-  it("the footer separates what can be promised from what cannot", async () => {
+describe("every number derives from exact Units in the authority (Card §6)", () => {
+  it("the footer names exact Unit records and their promisable subset", async () => {
     renderRegister();
-    // 4 current Units; 1 bindable exact Unit; 555 bulk pieces that no Sales
-    // Order can name, because 0366 forbids a qty > 1 record being reserved.
-    expect(
-      await screen.findByText("4 Units · 1 you can promise · 555 pieces you cannot"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("3 Units · 1 you can promise")).toBeInTheDocument();
   });
 
-  it("warns on the row itself that a bulk record is not one promisable Unit", async () => {
+  it("does not force a quantity-controlled accessory record into a fake Unit row", async () => {
     renderRegister();
-    expect(
-      await screen.findByText(/555 pieces in one record — cannot be promised individually/),
-    ).toBeInTheDocument();
+    await screen.findByText("id-aaa111111");
+    expect(screen.queryByText("id-bbb222222")).not.toBeInTheDocument();
+    expect(screen.queryByText(/555 pieces in one record/)).not.toBeInTheDocument();
   });
 
-  it("shows Reserved / sold as the operator's word for a bound Unit", async () => {
+  it("uses the approved availability words for bound and incoming Units", async () => {
     renderRegister();
     await screen.findByText("id-ccc333333");
-    expect(screen.getAllByText("Reserved / sold").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Reserved for customer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ordered — not received").length).toBeGreaterThan(0);
+  });
+
+  it("shows the official next movement and date without inventing Work", async () => {
+    renderRegister();
+    await screen.findByText("id-ddd444444");
+    expect(screen.getByText("To Carres Klang Warehouse · PO/26-1")).toBeInTheDocument();
+    expect(screen.getByText(/Fri, 4 Sep/)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /warehouse/i })).not.toBeInTheDocument();
   });
 });
 
@@ -166,7 +203,7 @@ describe("the rail filters the same authority (Card §3)", () => {
   it("narrows to one availability and the footer follows", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
-    fireEvent.click(within(rail).getByRole("button", { name: /^Incoming/ }));
+    fireEvent.click(within(rail).getByRole("button", { name: /^Ordered — not received/ }));
     await waitFor(() => expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument());
     expect(screen.getByText("id-ddd444444")).toBeInTheDocument();
   });
@@ -174,7 +211,7 @@ describe("the rail filters the same authority (Card §3)", () => {
   it("All stock clears every filter", async () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
-    fireEvent.click(within(rail).getByRole("button", { name: /^Incoming/ }));
+    fireEvent.click(within(rail).getByRole("button", { name: /^Ordered — not received/ }));
     await waitFor(() => expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument());
     fireEvent.click(within(rail).getByTestId("rail-all-stock"));
     expect(await screen.findByText("id-aaa111111")).toBeInTheDocument();
@@ -197,7 +234,7 @@ describe("the rail filters the same authority (Card §3)", () => {
     await renderLoaded();
     const rail = screen.getByTestId("stock-rail");
     // A filter offering one choice is not a filter (03-page-patterns.md:149).
-    expect(within(rail).queryByText("Where")).not.toBeInTheDocument();
+    expect(within(rail).queryByText("Location")).not.toBeInTheDocument();
     expect(within(rail).queryByText("Ownership")).not.toBeInTheDocument();
   });
 });
@@ -213,11 +250,31 @@ describe("a failed authority read never becomes stock facts", () => {
     renderRegister();
 
     expect(await screen.findByText("Stock could not be loaded")).toBeInTheDocument();
+    expect(
+      screen.getByText("Try again. If it still fails, ask the system owner to check the Stock Register."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("missing site_name")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     expect(screen.queryByTestId("stock-rail")).not.toBeInTheDocument();
     expect(screen.queryByText(/All stock\s*0/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Nothing needs attention")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-toolbar")).not.toBeInTheDocument();
+  });
+});
+
+describe("Available to sell is a Stock filter, not a second page", () => {
+  it("deep-links to the canonical exact-Unit subset inside the one Register", async () => {
+    renderRegister("/operation?tab=stock-onhand&availability=available");
+
+    expect(await screen.findByText("id-aaa111111")).toBeInTheDocument();
+    expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
+    expect(screen.queryByText("id-ddd444444")).not.toBeInTheDocument();
+    expect(screen.queryByText("id-bbb222222")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Available to sell 1" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.queryByText("Ready stock")).not.toBeInTheDocument();
   });
 });
 

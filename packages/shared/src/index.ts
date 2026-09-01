@@ -1175,10 +1175,13 @@ export {
   availabilityLabel,
   categoryKeyOf,
   changedWithin,
+  exactUnitRecords,
   hasAttention,
   isCurrentUnit,
   isRailFiltered,
   matchesRegisterQuery,
+  nextMovementLabel,
+  stockAvailabilityLabel,
   registerSummaryLine,
   summariseRegister,
   type AttentionReason,
@@ -1186,7 +1189,15 @@ export {
   type StockRailSelection,
   type StockRegisterTotals,
   type StockRegisterUnit,
+  type NextMovementKind,
 } from "./stock-register";
+
+export {
+  warehouseOperationsReadyBy,
+  warehouseScheduleRowsForWeek,
+  warehouseWeekDays,
+  type WarehouseScheduleRow,
+} from "./warehouse-schedule";
 
 // R4 · Problem stock is quarantined — on hold · returned · written off
 export {
