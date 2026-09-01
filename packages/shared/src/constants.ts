@@ -137,3 +137,24 @@ export const SIZELESS_CATEGORIES = ["service", "guarantee"] as const;
 export function categoryHasSizeAxis(category: string | undefined | null): boolean {
   return !!category && !(SIZELESS_CATEGORIES as readonly string[]).includes(category);
 }
+
+/**
+ * THE INSTALMENT TERMS CARRES OFFERS.
+ *
+ * ⚠️ NOBODY WROTE DOWN WHY IT IS 6 AND 12 (measured 2026-09-01). There is no
+ * ruling from Jess, Chai or Loo anywhere in this repository. The database
+ * CHECK (`0007`) says `{6, 12}` and its header explains only why the COLUMN
+ * exists — "the wizard already collects these three fields" — so the constraint
+ * copied a hardcoded pair of buttons in `Step3SignaturePayment.tsx` and that is
+ * the whole provenance.
+ *
+ * ⛔ AND THE "6/12" IN THE DOCS IS A DATE. `Jess 2026-07-19 … shipped 6/12`,
+ * `the 6/12 ops overhaul`, `on prod since 6/12` — every one of those is 12 June
+ * or 6 December, not a month count. Anyone grepping for a ruling will find them
+ * and should not believe them.
+ *
+ * So this is the recorded truth and not a decided one. Adding 24 or 36 is a
+ * business ruling plus a migration, not an edit here.
+ */
+export const INSTALMENT_MONTHS = [6, 12] as const;
+export type InstalmentMonths = (typeof INSTALMENT_MONTHS)[number];

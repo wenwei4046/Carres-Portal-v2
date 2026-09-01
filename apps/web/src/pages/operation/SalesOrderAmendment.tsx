@@ -31,6 +31,8 @@ import DatePicker from "@/components/kit/DatePicker";
 import Modal from "@/components/kit/Modal";
 import Textarea from "@/components/kit/Textarea";
 import Input from "@/components/kit/Input";
+import Select from "@/components/kit/Select";
+import { INSTALMENT_MONTHS } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
@@ -313,13 +315,28 @@ export default function SalesOrderAmendment({
               value={deliveryDate}
               onChange={setDeliveryDate}
             />
-            <Input
+            {/* ⭐ A TERM THAT CANNOT BE OFFERED CANNOT BE TYPED (YH,
+                2026-09-01). This was a free number box: any integer went in,
+                survived every layer, and failed on the database CHECK at the
+                PRINCIPAL's Approve press — raw constraint text, on the screen
+                of the one person who cannot fix it, after the customer had
+                already been told the change was going in.
+                A picker, like the POS has always had, so there is no wrong
+                value to type. The API refuses the same set for a caller that
+                is not this screen, and `0007`'s CHECK stays the last line.
+                The options come from `INSTALMENT_MONTHS` — the one list — so
+                a term can never be offered here that the schema refuses.
+                `No instalment` is the null: the amendment can also take the
+                plan OFF, which a number box could only express as a blank. */}
+            <Select
               id="amd-installment-months"
               label="Instalment months"
-              type="number"
-              min={0}
-              value={installmentMonths == null ? "" : String(installmentMonths)}
-              onChange={(e) => setInstallmentMonths(e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0))}
+              value={installmentMonths == null ? "none" : String(installmentMonths)}
+              onValueChange={(v) => setInstallmentMonths(v === "none" ? null : Number(v))}
+              options={[
+                { value: "none", label: "No instalment" },
+                ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: `${m} months` })),
+              ]}
             />
           </div>
           <label className="flex items-center gap-2 text-body text-base-700">

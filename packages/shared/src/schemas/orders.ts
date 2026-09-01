@@ -2,6 +2,24 @@ import { z } from "zod";
 import { MAX_DELIVERY_FLOOR } from "../constants";
 
 /**
+ * ⭐ THE INSTALMENT TERM, WRITTEN ONCE (YH, 2026-09-01).
+ *
+ * This union was typed out inline in three places in this file, and a FOURTH
+ * door — the amendment route — declared its own weaker rule instead
+ * (`z.number().int().min(0)`). So a proposal of 9 months passed every layer
+ * above the database and failed at the principal's Approve press, on the
+ * `0007` CHECK, as raw constraint text on her screen.
+ *
+ * One schema now, imported by every door. `INSTALMENT_MONTHS` is the list it
+ * is built from and the list the pickers render, so a term cannot be offered
+ * on screen that the schema refuses — `instalment-months.test.ts` pins the two
+ * together rather than trusting the next reader to keep them level.
+ */
+export const installmentMonthsField = z
+  .union([z.literal(6), z.literal(12)])
+  .nullable();
+
+/**
  * Single Order schema with optional rels. Lists return arrays of orders without
  * lines/addons/history; the detail endpoint populates them via PostgREST nested
  * fetch. One schema, one type — aligns 1:1 with `domain.Order`.
@@ -120,7 +138,7 @@ export const orderSchema = z.object({
   // the historical trio. Widened from the old enum; existing values parse.
   paymentMethod: z.string().max(40).nullable(),
   approvalCode: z.string().nullable(),
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  installmentMonths: installmentMonthsField,
   /** 0219 — POS entry extras: payment follow-up answers (e.g.
    *  { payment: { bank: "Maybank" } }) + custom form-field values
    *  ({ fields: {...} }). Optional so pre-0219 responses still parse. */
@@ -263,7 +281,7 @@ export const createOrderInputSchema = z.object({
   approvalCode: z.string().nullable(),
   /** Installment plan months. Only valid when paymentMethod === "installment".
    *  RPC re-checks the cross-field rule and rejects with 22023. */
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+  installmentMonths: installmentMonthsField,
   /** Attribution dealer for an order an INTERNAL role (principal/operation/
    *  finance/bd) places ON BEHALF OF a dealer it picks. Additive + optional: a
    *  dealer/salesperson/showroom omits it — the API uses their JWT dealer and
@@ -427,7 +445,7 @@ export const rawCreateOrderInputSchema = z.object({
   // you have it"): a phone/backfill order creates fine with none of these.
   paymentMethod: z.string().trim().min(1).max(40).nullable().optional(),
   approvalCode: z.string().trim().nullable().optional(),
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable().optional(),
+  installmentMonths: installmentMonthsField.optional(),
   signaturePath: z.string().min(1).nullable().optional(),
   paymentSlipPath: z.string().min(1).nullable().optional(),
   termsAccepted: z.boolean().optional(),
