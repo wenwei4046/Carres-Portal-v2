@@ -867,6 +867,46 @@ Card destination.
 Sales Order owns reservation; Delivery owns journey proof; Finance consumes physical events for
 valuation without editing location; Reports remain read-only projections.
 
+### 12.2 Inbound and Receiving-to-Inventory handoff
+
+**CURRENT CARRES →** PO/Consignment expected arrivals and Receiving/GRN exist, but legacy Stock
+Add, import or quantity mutation can act as a contradictory second receipt door.
+
+**2990 / MATURE ERP LESSON →** keep 2990's GRN-linked inbound movement, source document, actual
+date and received/not-received/issue visibility. Mature systems confirm that receipt acceptance and
+subsequent inventory control are separate responsibilities. Reject optional Rack/Bin placement in
+Carres Receiving, a second Warehouse Stock In action and automatic saleability immediately after
+posting.
+
+**RULING → ADAPT + IMPROVE + REJECT.** Receiving/GRN is the one normal physical receipt door. Every
+governed Unit records `Received`, `Received with issue`, `Rejected/not delivered` or the applicable
+observable receipt result. Warehouse Add Stock, direct import into physical Stock and NETS
+Rack/Bin/Zone placement are rejected; receipt never makes a Unit Ready Stock without eligibility.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** PO, Consignment, Return, Transfer or Repair supplies expected
+Units and actual work date; NETS Warehouse opens the linked Receiving Session; the individually
+identified operator scans and checks each Unit; accepted GRN facts project into Inventory. Normal
+received Units show actual Site/holder and are tested for eligibility; issue Units enter `Needs
+checking`; rejected/not-delivered Units do not enter physical Stock; partial receipt preserves both
+the accepted Units and outstanding expected Units; unknown or wrong-Site Units enter investigation.
+
+**OPERATOR JOURNEY →** open Inbound on the actual date; read source and exact expected Units; choose
+`Open Receiving Session`; scan each Unit and record only the observed result/evidence; submit the
+session; read the resulting Received/Not yet received/With issue tally. No operator repeats the
+receipt through Inventory.
+
+**UI / PAGE / OBJECT PLACEMENT →** Inbound defaults are `Expected arrival · Source · Supplier/source
+party · Destination · SO No · SO date · PO No · PO date · Expected · Received · Not yet received ·
+With issue · Work`. Inbound is the dated work/progress Register; Receiving Session is the only
+submit door; Inventory has no Add Stock action. Unit Detail links Receiving Session, GRN,
+individual receiver, actual date and evidence. No NETS internal Rack, Bin, Zone or placement task
+appears.
+
+**CROSS-MODULE CONNECTION →** Purchasing owns PO/Consignment and supplier promise; Receiving owns
+receipt; Stock owns the accepted Unit/holder/condition/eligibility; Supplier Claim receives product,
+quantity or damage consequence; Sales Order reads availability risk; Finance uses GRN and physical
+facts to verify Supplier Invoice.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
