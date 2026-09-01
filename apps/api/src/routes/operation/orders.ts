@@ -12,6 +12,7 @@ import {
   type DeliveryPaymentApproval,
   confirmProceedRequestInputSchema,
   ListOperationOrdersQuery,
+  MAX_DELIVERY_FLOOR,
   recheckStockInput,
   reselectPartnerInput,
   deliveryQueueLeads,
@@ -859,7 +860,24 @@ const revisionHeaderInput = z
     customer_emergency: z.string().nullable().optional(),
     customer_billing: z.string().nullable().optional(),
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-    delivery_floor: z.number().int().min(0).optional(),
+    /* ⭐ THE OFFICE DOOR ENFORCES THE FLOOR CARRES ACTUALLY CARRIES TO (YH,
+       2026-09-01 — audit F-8).
+       Two numbers, two jobs, both correct: `MAX_DELIVERY_FLOOR` is 3 because
+       Carres does not stair-carry above the 3rd floor (a policy-locked upper
+       bound, `constants.ts:1-5`), and `floor_config.free_up_to_floor` is 2
+       because floors 1 and 2 carry no charge — so charging begins at the 3rd
+       and stops there too.
+       The POS clamps to 3 and the shared schema caps at 3
+       (`schemas/orders.ts:242`, `:420`, `:747`). THIS door had no ceiling at
+       all, so an office-keyed order could store floor 7: a number no shop
+       floor can produce, promising a carry nobody performs, on a job Carres
+       has said it will not do.
+       ⛔ THE FLOOR OF THE RANGE STAYS 0, deliberately. The POS asks `min(1)`
+       because a customer standing in a shop has a floor; the office inherits
+       orders where nobody recorded one, and 0 is how "ground, or nobody said"
+       already reads in this column. Raising it to 1 here would refuse a save
+       of a row this door did not create. */
+    delivery_floor: z.number().int().min(0).max(MAX_DELIVERY_FLOOR).optional(),
     delivery_has_lift: z.boolean().optional(),
     /**
      * 0354 — the rest of what the Sales Portal asks. The object page's form IS

@@ -2689,6 +2689,50 @@ describe("POST /api/operation/orders (create)", () => {
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalled();
   });
+
+  /* ⭐ THE OFFICE DOOR CARRIES THE SAME CEILING AS EVERY OTHER SURFACE (YH,
+     2026-09-01 — audit F-8).
+     `MAX_DELIVERY_FLOOR` is 3 because Carres does not stair-carry above the
+     3rd floor. The POS clamps to it, the shared schema caps at it, and this
+     door had no upper bound at all — so an office-keyed order could store a
+     floor no shop floor can produce, promising a carry nobody performs. */
+  async function saveFloor(floor: number) {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { delivery_floor: floor } }),
+      }),
+      env,
+    );
+    return { res, rpc };
+  }
+
+  it("refuses a floor above the one Carres carries to, and writes nothing", async () => {
+    const { res, rpc } = await saveFloor(7);
+    /* 422 — the shape is right and the VALUE is refused, which is what this
+       door already answers for every other out-of-range field. */
+    expect(res.status).toBe(422);
+    expect(rpc, "refused before the RPC, not by it").not.toHaveBeenCalled();
+  });
+
+  it("still accepts the top floor Carres does carry to", async () => {
+    const { res } = await saveFloor(3);
+    expect(res.status).toBe(201);
+  });
+
+  /* ⛔ AND 0 STAYS LEGAL HERE. The POS asks `min(1)` because a customer
+     standing in a shop has a floor; the office inherits orders where nobody
+     recorded one, and 0 is how "ground, or nobody said" already reads in this
+     column. Refusing it would block a save of a row this door did not create. */
+  it("still accepts 0 — the office inherits orders with no floor recorded", async () => {
+    const { res } = await saveFloor(0);
+    expect(res.status).toBe(201);
+  });
 });
 
 /**
