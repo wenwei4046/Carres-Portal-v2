@@ -82,8 +82,52 @@ async function restamp(
   return { ok: true, fee: recompute.fee };
 }
 
-/** The header keys whose movement changes the fee. A save that touches none of
- *  them cannot move it, so it does not pay for a read and an RPC round-trip. */
+/**
+ * ⭐ AFTER A LINE WRITE, ALWAYS (YH, 2026-09-01 — the one 🔴 on the open list,
+ * and live money in shipped code).
+ *
+ * The fee is `count × floors × rate`, and `count` is CLAMPED to the number of
+ * items on the order. So the GOODS are the fourth input, and they never arrive
+ * through a header patch — they arrive through `add_order_lines` and
+ * `replace_order_lines`.
+ *
+ * Sell 3 items to a 3rd floor with no lift and the order stamps a fee for 3.
+ * Remove one and the stored charge stays priced for 3 while every screen
+ * recomputes 2. One order, two numbers, and the stored one is what the customer
+ * is billed.
+ *
+ * ⛔ NO PREDICATE HERE, deliberately. `touchesStairInputs` reads a header patch
+ * to decide whether a round-trip is worth paying for; a line door has no header
+ * to read and a line write ALWAYS moves the count, so there is nothing to test.
+ *
+ * ⛔ AND IT NEVER FAILS THE WRITE, like every other caller. The lines are
+ * already committed and the change request already decided; throwing here would
+ * tell the operator their edit was lost when it was not. A stale fee is the
+ * state we were in before this existed — a lost edit is not.
+ *
+ * FOUR DOORS CALL THIS: the two direct place-lane writers and the two
+ * change-request APPROVE paths that write lines. It is a function rather than
+ * four pasted blocks because a fifth line door is how this bug comes back.
+ */
+export async function restampAfterLineWrite(
+  sb: SupabaseClient,
+  orderId: string,
+): Promise<void> {
+  const restamp = await restampStairCarry(sb, orderId);
+  if (!restamp.ok) {
+    console.error("stair carry re-stamp failed", { orderId, reason: restamp.reason });
+  }
+}
+
+/**
+ * The header keys whose movement changes the fee. A save that touches none of
+ * them cannot move it, so it does not pay for a read and an RPC round-trip.
+ *
+ * ⚠️ THESE ARE ONLY THREE OF THE FOUR INPUTS, and that was the bug. The item
+ * count is the fourth and it does not travel in a header patch — see
+ * `restampAfterLineWrite` above. This predicate stays exactly what its name
+ * says: the HEADER test.
+ */
 export const STAIR_INPUT_KEYS = [
   "delivery_floor",
   "delivery_has_lift",

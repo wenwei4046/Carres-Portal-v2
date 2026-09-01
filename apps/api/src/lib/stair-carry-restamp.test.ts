@@ -1,5 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
-import { restampStairCarry, touchesStairInputs } from "./stair-carry-restamp";
+import {
+  restampAfterLineWrite,
+  restampStairCarry,
+  touchesStairInputs,
+} from "./stair-carry-restamp";
 
 /**
  * A STAIR FEE FOLLOWS THE FLOOR THAT CHANGED (owner ruling YH, 2026-08-29).
@@ -153,5 +160,103 @@ describe("restampStairCarry — the fee is priced from the SAVED row", () => {
   it("REPORTS when the order is gone", async () => {
     const r = await restampStairCarry(sb({ order: null }), ORDER);
     expect(r).toEqual({ ok: false, reason: "order not found" });
+  });
+});
+
+/**
+ * ⭐ THE GOODS ARE THE FOURTH INPUT (YH, 2026-09-01 — the one 🔴 on the open
+ * list, and live money in shipped code).
+ *
+ * The fee is `count × floors × rate` and `count` is CLAMPED to the number of
+ * items on the order, so the goods price it as surely as the floor does. But
+ * they never arrive through a header patch, and only the three header fields
+ * re-stamped — so removing an item from a clamped order left the stored charge
+ * priced for the old count while every screen recomputed the new one.
+ *
+ * These pin the ARITHMETIC moving with the goods, and the promise that a line
+ * write is never failed by a fee.
+ */
+describe("the stair fee follows the GOODS, not only the floor", () => {
+  /* THE CLAMPED ORDER, which is the whole case. The customer asked for 3
+     items carried up, so `delivery_stair_items` is 3 — and `stairCarryCount`
+     clamps that to however many items the order actually holds. An unset count
+     means NONE (YH, 2026-08-27), so a null here would price zero and prove
+     nothing. */
+  const at3rdNoLift = (items: number) => ({
+    delivery_floor: 3,
+    delivery_has_lift: false,
+    delivery_stair_items: 3,
+    order_lines: Array.from({ length: items }, () => ({ qty: 1 })),
+  });
+
+  it("re-prices when an item leaves a clamped order", async () => {
+    /* 3 items, 3rd floor, free to 2F, RM 50 per floor per item.
+       One floor above free × 3 items × RM 50 = RM 150. */
+    const three: Array<{ name: string; args: unknown }> = [];
+    await restampAfterLineWrite(sb({ order: at3rdNoLift(3), calls: three }), ORDER);
+    expect((three[0].args as { p_fee: number }).p_fee).toBe(150);
+
+    /* Take one item off. The stored fee MUST fall to RM 100 — before this it
+       stayed at 150 while the screen said 100. */
+    const two: Array<{ name: string; args: unknown }> = [];
+    await restampAfterLineWrite(sb({ order: at3rdNoLift(2), calls: two }), ORDER);
+    expect(two[0].name).toBe("order_stamp_stair_carry");
+    expect((two[0].args as { p_fee: number }).p_fee).toBe(100);
+  });
+
+  it("stamps zero when the last chargeable item leaves", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    await restampAfterLineWrite(sb({ order: at3rdNoLift(0), calls }), ORDER);
+    expect((calls[0].args as { p_fee: number }).p_fee).toBe(0);
+  });
+
+  it("never throws over a committed line write, even when the stamp refuses", async () => {
+    /* The lines are already written and the change request already decided.
+       Throwing here would report a lost edit that was not lost. */
+    await expect(
+      restampAfterLineWrite(sb({ order: at3rdNoLift(2), rpcError: { message: "nope" } }), ORDER),
+    ).resolves.toBeUndefined();
+  });
+
+  it("never throws when the order cannot be read at all", async () => {
+    await expect(
+      restampAfterLineWrite(sb({ order: null }), ORDER),
+    ).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * EVERY DOOR THAT WRITES LINES RE-STAMPS, and a fifth one has to as well.
+ *
+ * This is a SOURCE SCAN because the alternative is four route integration
+ * tests that each prove the same one line is present. It pins the pairing that
+ * matters: a call to `add_order_lines` or `replace_order_lines` is followed by
+ * a re-stamp before the route answers. A new line door added without one fails
+ * here, which is the only way this defect does not come back.
+ */
+describe("no line-writing door ships without a re-stamp", () => {
+  const routes = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../routes/orders.ts"),
+    "utf8",
+  );
+
+  it("pairs every add/replace RPC with a re-stamp", () => {
+    const writers = routes.match(/sb\.rpc\("(add_order_lines|replace_order_lines)"/g) ?? [];
+    const restamps = routes.match(/await restampAfterLineWrite\(sb, id\);/g) ?? [];
+    expect(writers.length, "the four known line doors").toBe(4);
+    expect(restamps.length, "one re-stamp per line door").toBe(writers.length);
+  });
+
+  it("does not re-stamp after doors that write no lines", () => {
+    /* `reject_order_change_request` and `edit_order_addon` sit in the same
+       decide handler and move no line count — a re-stamp there would be a
+       round-trip for nothing, and `edit_order_addon` is refused on the four
+       server-computed keys anyway. */
+    for (const rpc of ["reject_order_change_request", "edit_order_addon"]) {
+      const at = routes.indexOf(`sb.rpc("${rpc}"`);
+      expect(at, `${rpc} is still called`).toBeGreaterThan(-1);
+      const after = routes.slice(at, routes.indexOf("fetchAndShapeOrder", at));
+      expect(after, `${rpc} must not re-stamp`).not.toContain("restampAfterLineWrite");
+    }
   });
 });
