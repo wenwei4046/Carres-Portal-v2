@@ -1,49 +1,61 @@
 import { describe, expect, it } from "vitest";
 import { INSTALMENT_MONTHS } from "./constants";
-import { installmentMonthsField } from "./schemas/orders";
+import { installmentMonthsField, createOrderInputSchema } from "./schemas/orders";
 
 /**
- * THE TERMS ON SCREEN AND THE TERMS THE SCHEMA ACCEPTS ARE ONE LIST.
+ * AN OFFER AND A LIMIT ARE DIFFERENT FACTS (YH, 2026-09-01).
  *
- * The union was typed out inline in three places and a FOURTH door — the
- * amendment route — declared its own weaker rule, `z.number().int().min(0)`.
- * So a proposal of 9 months passed every layer above the database and failed
- * on `0007`'s CHECK at the PRINCIPAL's Approve press, as raw constraint text,
- * on the screen of the one person who could not fix it.
+ * `INSTALMENT_MONTHS` is what the POS OFFERS — the standard plans a
+ * salesperson taps. `installmentMonthsField` is what the system will HOLD.
+ * They were the same thing until today, and collapsing them is what produced
+ * the failure the ruling came from: a proposal of 9 months saved, travelled
+ * through every layer, and died on `0007`'s CHECK at the PRINCIPAL's Approve
+ * press — the shop's button list refusing a decision she had already made.
  *
- * `INSTALMENT_MONTHS` is what the pickers render and `installmentMonthsField`
- * is what every door parses. These pin them level, because the failure mode is
- * silent in both directions: a term offered that the schema refuses is a dead
- * button, and a term the schema accepts that no picker offers is a value only a
- * curl can produce.
- *
- * ⚠️ 6 AND 12 ARE NOT A RECORDED DECISION. Nobody wrote down why. Measured
- * 2026-09-01: no ruling from Jess, Chai or Loo anywhere in the repository, and
- * `0007`'s own header explains only why the COLUMN exists. Every "6/12" in the
- * docs beside their names is a DATE — 12 June, 6 December — not a month count.
- * This test pins the layers to each other, never the business rule to 6 and 12.
+ * ⚠️ 6 AND 12 WERE NEVER A RECORDED DECISION. Measured 2026-09-01: no ruling
+ * from Jess, Chai or Loo anywhere in the repository, and `0007`'s own header
+ * explains only why the COLUMN exists. Every "6/12" in the docs beside their
+ * names is a DATE — 12 June, 6 December — not a month count.
  */
-describe("instalment months — one list, every door", () => {
-  it("accepts every term the pickers offer", () => {
-    for (const m of INSTALMENT_MONTHS) {
+describe("instalment months — what is offered, and what is accepted", () => {
+  it("accepts any whole number of months, one or more", () => {
+    for (const m of [1, 3, 6, 9, 12, 18, 24, 36, 60]) {
       expect(installmentMonthsField.safeParse(m).success, `${m} months`).toBe(true);
     }
   });
 
-  it("accepts null — an order with no instalment plan, and an amendment taking one off", () => {
+  it("accepts null — no instalment, and how an amendment takes a plan off", () => {
     expect(installmentMonthsField.safeParse(null).success).toBe(true);
   });
 
-  it("refuses a term no picker offers, which is the defect this closes", () => {
-    for (const m of [0, 1, 5, 9, 24, 36, -6]) {
+  it("refuses the two values that cannot mean a plan, and any fraction", () => {
+    for (const m of [0, -6, 1.5]) {
       expect(installmentMonthsField.safeParse(m).success, `${m} months`).toBe(false);
     }
   });
 
-  it("offers nothing the schema would refuse", () => {
-    /* The other direction. A term added to the list without the schema is a
-       button that dies at the database. */
-    const offered = INSTALMENT_MONTHS.filter((m) => !installmentMonthsField.safeParse(m).success);
-    expect(offered, "every offered term parses").toEqual([]);
+  it("still accepts every plan the POS offers", () => {
+    /* The offered list must remain a subset of what the system holds, or a
+       button on the shop floor dies at the database. */
+    for (const m of INSTALMENT_MONTHS) {
+      expect(installmentMonthsField.safeParse(m).success, `offered ${m}`).toBe(true);
+    }
+  });
+
+  /* ⛔ AND THE CREATE DOOR IS DELIBERATELY NARROWER. `create_order` (0230:85)
+     raises `installment_months must be 6 or 12` on its own, so a create schema
+     that accepted 9 would only move the failure one layer deeper — which is
+     exactly the shape this whole change removes from the amendment door. */
+  it("keeps the create door at the offered plans, because the RPC refuses the rest", () => {
+    const base = {
+      customerName: "Kong Chai Yin",
+      lines: [{ sku: "B1201S-K", qty: 1, unitPrice: 1890 }],
+    } as Record<string, unknown>;
+    const with9 = createOrderInputSchema.safeParse({
+      ...base,
+      paymentMethod: "installment",
+      installmentMonths: 9,
+    });
+    expect(with9.success, "9 months is not a POS plan").toBe(false);
   });
 });
