@@ -609,12 +609,43 @@ Reports cover Stock by Site, product, ownership and availability; Showroom; stal
 receipt, Transfer and Count; partner evidence; current issues; corrections and adjustments; and
 month-end versions. Reports are read-only. Export never becomes authority.
 
-Central Settings owns Sites, external operators and roles, Stock calendar, month-end and Count
-rules, issue reasons, evidence rules, Unit ID rules, permissions and approval limits. The shared
-**Team** duty door remains the one place to view or correct PO Duty, GRN Duty and buddy/cover; the
-governed People/account record supplies active status, access and last working date. Warehouse
-Settings must not copy either rota or employment truth. Settings never edits a Unit, reservation,
-event or report.
+The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
+Dashboard, panel or object menu may create a second Settings door. The page sections are `Sites &
+operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence ·
+Unit ID · Permissions & approvals · External partners`. Settings governs rules/master data only; it
+never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
+
+- **Sites & operators:** maintain governed Site name/type, active/closed dates, operating
+  organisation and permitted receiving/Count/handover acts. Every external person has individual
+  email, name/avatar, organisation, Site/role scope and active dates. Shared company credentials are
+  invalid. Carres does not configure NETS internal Zone, Rack, Bin, forklift or pick wave.
+- **Warehouse calendar:** maintain the six-day working week, weekly closure, public/partner closed
+  dates, receiving/collection cut-offs and Count-submission rule. Every module consumes its computed
+  actual weekday/date; staff do not calculate the next working day.
+- **Stock Count:** maintain participating Sites, monthly/cycle rule, scope, blind first Count,
+  Count-again and evidence requirements, physical-person assignment mechanism and `current GRN
+  Duty` investigation rule. `Match all`, automatic difference Adjustment and complete-with-skipped-
+  scope are invalid settings.
+- **Month-end:** maintain final calendar day at 11:59 PM, the permitted two-calendar-day Count
+  window and the submission-date rule over the Warehouse calendar. Each month's record, actual
+  Count, submission and version remain Month-end facts, never settings.
+- **Problems & evidence:** maintain only observable reason choices and their minimum scan/photo/
+  receiver/factual-note evidence. Quarantine, Hold, Claim, write-off, compensation or replacement
+  are downstream outcomes and cannot become observer reasons.
+- **Unit ID:** maintain format, governed product scope, supplier-label requirement, duplicate
+  prevention, replacement-label rule and never-reuse law. Settings cannot rename an existing Unit;
+  label error enters `Report a problem`.
+- **Permissions & approvals:** capability follows role/duty, never a hard-coded email. NETS
+  Warehouse, NETS Delivery, Showroom, GRN Duty, PO Duty, Sales, Purchasing, Finance and COO receive
+  only the actions stated in §10. The COO governs approval limits; a permission never overrides
+  segregation or evidence.
+- **External partners:** maintain organisation, warehouse/delivery roles, governed Sites, calendar,
+  allowed actions, evidence requirements and active dates. No rule hard-codes NETS, so another 3PL
+  or a future Carres-operated warehouse uses the same Unit/Receiving/Inventory/Outbound model.
+
+The shared **Team** duty door remains the one place to view or correct PO Duty, GRN Duty and
+buddy/cover. The governed **People** record supplies active status, access and last working date.
+Warehouse Settings links to those homes and must not copy either rota or employment truth.
 
 Carres Portal is the minimum control plane. NETS receives narrow mobile Work, scan, observable
 outcome and evidence surfaces, not the full ERP. Optional APIs may propose events but cannot
