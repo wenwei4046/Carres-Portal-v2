@@ -759,9 +759,23 @@ export function Block({
  * `text-strong`, so one card still reads as one thing.
  */
 function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
+  /* ⭐ ONE COLOUR FOR EVERY HEADING ON THE PAGE (YH, 2026-09-01 — "card
+     headers should have the same color").
+     They did not. A card title was `text-base-900` in the mono face; a
+     subsection heading was `text-base-600` in the UI face — so on one card the
+     reader met two different kinds of heading and had to work out from the
+     shade whether the second one was a section or a field label. The `Services`
+     label that used to sit inside `Goods` was a third shade again.
+     THE COLOUR IS THE CARD TITLE'S OWN, and no new token is added. The accent
+     is deliberately NOT used: `01-design-tokens.md` §2.2 spends blue once per
+     screen and the tab underline already holds it, so a blue heading here would
+     be the second spend and the current thing would stop standing out.
+     THE HIERARCHY MOVES TO SIZE, which is where it belongs. Same face, same
+     tracking, same colour, one step down in size — a subsection reads as a
+     smaller instance of the same thing rather than as a different species. */
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-label font-semibold text-base-600 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-base-900 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
@@ -2391,10 +2405,21 @@ export default function SalesOrderWorkspace() {
             />
           </div>
         )}
-        {/* Merged from the retired `Sales ownership` card (Jess,
-            2026-08-26). The WORD is locked, so it survives as the
-            subsection's name; only the card border is gone. */}
-        <SubHead>Sales ownership</SubHead>
+      </Block>
+
+      {/* ⭐ SALES OWNERSHIP IS ITS OWN CARD AGAIN (YH, 2026-09-01).
+          It was merged into `Order info` on 2026-08-26 when Jess asked for
+          fewer, fuller cards, and it kept its locked word as a subsection
+          heading. It comes back out as a card because it is a different KIND
+          of fact from the rest of that card: `Order info` is what the customer
+          asked for — dates, floors, a lift — and this is who inside Carres
+          gets paid for it. One card, one topic, and the merge law is served by
+          the card being SMALL rather than by it being hidden inside a bigger
+          one.
+          The WORD is unchanged and still locked (COPY-STANDARD:1427). It reads
+          as a card title now, which is the same string in the same face —
+          `Block` uppercases every title, so nothing about the word moved. */}
+      <Block title="Sales ownership">
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-dealer" label="Dealer"
@@ -2471,6 +2496,7 @@ export default function SalesOrderWorkspace() {
         )}
 
       </Block>
+
 
 
 
