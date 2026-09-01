@@ -4,7 +4,7 @@ Paste everything below the line into a fresh session. It is self-contained.
 **Re-measure before trusting any status line in it** — this document was true at
 `origin/main` = `57ceb227`, and this repo moves several times a day.
 
-> **THIS FILE IS A SNAPSHOT, AND `docs/handoff/` HOLDS EXACTLY ONE OF THEM.**
+> **THIS FILE IS A SNAPSHOT, AND IT IS THE SALES ORDER LANE'S ONLY ONE.**
 > Its sections do not age at the same rate:
 >
 > | Section | Shelf life |
@@ -13,10 +13,17 @@ Paste everything below the line into a fresh session. It is self-contained.
 > | §3 decisions · §4 constraints · §5 what to avoid | months — these are why the file exists |
 >
 > **When this lane's mission changes, OVERWRITE this file — never add a second
-> one beside it.** The finished prompt moves to `docs/archive/`, which
-> `CLAUDE.md` Law 1 excludes from authority. Two live prompts in one folder means
-> a fresh session cannot tell which one rules, and Law 5 asks the opposite
+> SO-lane prompt beside it.** The finished one moves to `docs/archive/`, which
+> `CLAUDE.md` Law 1 excludes from authority. Two live prompts *for one lane*
+> means a fresh session cannot tell which rules, and Law 5 asks the opposite
 > question: can the project have one file fewer?
+>
+> ℹ️ **`docs/handoff/` itself is shared, and this file does not govern it.**
+> `CARRES-CONTINUOUS-BUILD-HANDOFF.md` is the project-wide starter and is a
+> different scope, not a duplicate — read it first, then this. Where the two
+> disagree on a *number*, neither wins: re-measure. (It calls the field audit 578
+> lines; `main` carries 680 and the corrected copy 818. That is what a stale
+> status line looks like, in someone else's file this time.)
 
 ---
 
@@ -35,19 +42,35 @@ That was audited in full on 2026-08-28. The audit is
 `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` — 103 rows in render order, plus its own
 correction pass. **Your job is the open items in it, not a re-audit.**
 
-## 2 · CURRENT STATUS — verified 2026-08-31, re-verify before use
+## 2 · CURRENT STATUS — measured 2026-09-01, re-measure before use
 
-Everything below is **merged and live in production** unless marked otherwise.
+⛔ **MERGED IS NOT APPLIED. Do not read this table as "live."**
+Every row below is on `origin/main`. Whether the *database* has it is a separate
+question with a separate answer, because §4 is true: migrations here are applied
+BY HAND in the Supabase SQL editor, and a hand-applied migration leaves **no row
+in the tracker**.
 
-| Shipped | What it does |
-|---|---|
-| `0391` | Office create requires a Proceed date; a blank one may be filled in ONCE, then locks |
-| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move |
-| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded |
-| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database |
-| — | ~20 banned words removed across Workspace, Revisions ledger and Order Route |
-| — | Revisions/History gained loading + error guards (a 403 used to render as "No revisions recorded") |
-| — | The Order Route asks the shared money predicates instead of re-deciding them |
+Measured against the tracker on 2026-09-01: **not one migration this lane wrote
+appears in it** — `0391`, `0393`, `0394`, `0395`, `0406` are all absent, and so
+are `0387`–`0389` and `0405` from neighbouring lanes. Everything else in the
+same window (`0376`–`0404`) is present. So absence here is the tracker's normal
+behaviour for hand-applied work, **not evidence of a missing migration** — and
+equally, not evidence of a present one. The tracker cannot answer this. Ask the
+database directly, with the probes in the last column.
+
+| Shipped | What it does | Applied? — ask the DB, not the tracker |
+|---|---|---|
+| `0391` | Office create requires a Proceed date; a blank one may be filled in ONCE, then locks | **Likely yes** — YH exercised the refusal on the site |
+| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move | **Likely yes** — the fee reached the MONEY card and a payment door |
+| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded | **Likely yes** — removal was clicked and held. Probe: `select to_regprocedure('public.remove_order_addon(uuid,uuid)')` |
+| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database | ⚠️ **UNVERIFIED, and this is the one that matters.** Only the UI half was ever exercised — the SQL half cannot be reached from the screen *because* the UI hides the button. Probe: `select public.addon_is_server_computed('STAIR_CARRY')` — an error means the guard is not there and the doubling bug is still open in the database |
+| — | ~20 banned words removed across Workspace, Revisions ledger and Order Route | code only, no migration |
+| — | Revisions/History gained loading + error guards (a 403 used to render as "No revisions recorded") | code only, no migration |
+| — | The Order Route asks the shared money predicates instead of re-deciding them | code only, no migration |
+
+**`0406` is the live risk in this table.** Its own header says a hidden button is
+not a rule; if the migration never ran, that sentence describes the current
+production state. One `select` settles it. Run it before anything else in §6.
 
 **Three owner rulings are LAW in `docs/orders/MASTER.md`** (YH, 2026-08-28):
 stair carry is money the customer owes · a date never recorded is not a date that
@@ -123,10 +146,16 @@ Read these before proposing anything — several were argued and settled.
 - **Do not propose a backfill.** `CLAUDE.md` §6 — every row today is test data.
 - **Do not invent customer-facing words.** Two open items are blocked on a ruled
   sentence and must stay blocked rather than be guessed.
-- ⚠️ **`apps/web/src/pages/dealer/pos/OrderStatusPage.test.tsx` fails on clean
-  `main`** and is **not** yours. It is date-dependent (cards filtered relative to
-  today), so CI may be red for a reason unrelated to your change. Verify by
-  stashing before you debug it, and leave it to the POS lane.
+- ⚠️ **`main` is RED on the web suite — 10 `os-card-*` tests — and it is not
+  yours.** They span **two** files, not one: `OrderStatusPage.test.tsx` and
+  `BdOrdersBoard.test.tsx` (both POS/BD). Verify by stashing before you debug,
+  then leave them to that lane.
+  **Do not re-run the search.** Seven causes are already ruled out by the lane
+  that owns them: card markup, `laneOf`, `sameMonth`, the query mock's
+  completeness, fake-timer ordering, the global setup restoring real timers, and
+  the PIN gate. No code path was found that would empty that list, so the open
+  question is **"stale tests or broken site?"** — which needs one human page load
+  of POS My Orders and the BD board, not another grep.
 
 ## 6 · EXACT NEXT STEP
 
@@ -175,5 +204,5 @@ lines and contains `REFUTATION ROUND`, and open the PR. Docs only, no gate risk.
 
 ---
 
-*Written 2026-08-31 at `origin/main` = `57ceb227`. Status lines decay fast in this
-repo — measure, do not recite.*
+*Written 2026-08-31, §2/§5/banner re-measured 2026-09-01 at `origin/main` =
+`57ceb227`. Status lines decay fast in this repo — measure, do not recite.*
