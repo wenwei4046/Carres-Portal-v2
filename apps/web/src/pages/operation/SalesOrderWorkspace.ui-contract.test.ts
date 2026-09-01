@@ -11,6 +11,10 @@ const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8"
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
+const route = readFileSync(
+  join(here, "../../../../../packages/shared/src/sales-order-route.ts"),
+  "utf8",
+);
 /* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
    surfaces ask for must offer the same answers, so the list lives in shared and
    BOTH files are read here — a POS that stopped importing it would pass its own
@@ -702,5 +706,110 @@ describe("Sales Order record grammar contract", () => {
     expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
     expect(workspace).toContain("onViewRevision={setViewRev}");
     expect(workspace).toContain('disabled={mode === "oldrev"}');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ONE FORM, ONE GRAMMAR (YH, 2026-09-01)
+
+   Three separate reports about the same page, and they turn out to be one
+   complaint: the Order screen was drawn in two grammars and the reader had to
+   learn by trial which shapes accept typing.
+
+   These are SOURCE SCANS, like the alignment pin above, for the same reason —
+   jsdom computes no layout, so a render test cannot see that two boxes wear
+   different skins, and mounting this 3,100-line workspace to prove a border is
+   the wrong price. Each assertion names the ONE token a later edit would flip
+   back, and each has an inverted half so the old shape cannot return quietly.
+   ═════════════════════════════════════════════════════════════════════════ */
+describe("Sales Order object page — one form grammar", () => {
+  it("draws a recorded answer in the same box as the question that would ask it", () => {
+    /* `Fact` is the page's read-only field. It must render through the kit's
+       own frame and the kit's own control skin — the point is that there is
+       ONE skin and this shares it, so a change to the control travels here
+       instead of leaving a second, drifting copy behind. */
+    expect(workspace).toContain('import FieldFrame from "@/components/kit/FieldFrame"');
+    expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
+    expect(workspace).toContain('data-kit="readonly-field"');
+    expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
+    /* Announced as what it is drawn as. A box that looks typable and reads to
+       a screen reader as loose text is the same defect in the other channel. */
+    expect(workspace).toContain('role="textbox"');
+    expect(workspace).toContain("aria-readonly");
+    /* THE OLD SHAPE: a bare micro-label with body text under it, no box. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">{label}</div>');
+  });
+
+  it("prints a service by its name and never by its database key", () => {
+    /* The Goods table printed `a.addon_key` in the Item column — the raw key,
+       where every goods row prints a product name — while `SalesOrderAddons`
+       eighty pixels below printed the catalog name for the same row from the
+       same bundle. One record, two names, and the key was the one on top.
+       ONE map, read by both, so they cannot disagree again (Law D). */
+    expect(workspace).toContain("const addonNameByKey = useMemo(");
+    expect(workspace).toContain("addonNameByKey.get(a.addon_key) ?? a.addon_key");
+    /* The service row now wears the goods row's own cells: the CJK face on the
+       item, and the second line where a goods row already puts its config. */
+    expect(workspace).toContain("cjkClassName(serviceName)");
+    /* THE OLD SHAPE: the key rendered straight into the Item cell. */
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">{a.addon_key}</td>');
+    /* COPY-STANDARD:1679 — `Not recorded` is the ONE absence word, and the
+       bare `—` the service row used sits in that row's `Do NOT use` column. */
+    expect(workspace).not.toContain('<td className="py-1.5">—</td>');
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
+  });
+
+  it("boxes the three money amounts without giving Money a door", () => {
+    /* The last bare label-over-value pair on the page. `Fact` is read-only by
+       construction, so this is a SHAPE change and Law B is untouched — the
+       Money card still summarises and still writes nothing. */
+    for (const amount of ["Total", "Paid", "Outstanding"]) {
+      expect(workspace).toContain(`label="${amount}"`);
+    }
+    /* Colour and size survive INSIDE the box: red while owed (owner ruling
+       2026-08-15), one `text-strong` on all three (YH, 2026-08-28). */
+    expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"');
+    expect(workspace).toContain('data-testid="money-outstanding"');
+    /* THE OLD SHAPE: three loose amounts packed left on a flex row. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">Total</div>');
+    expect(workspace).not.toContain("flex flex-wrap items-baseline gap-x-8 gap-y-3");
+  });
+
+  it("says how many Units are ready instead of the word the dictionary refuses", () => {
+    /* COPY-STANDARD:1755 puts `Not allocated` in its `Do NOT use` column. The
+       registered answer is the count and then what is being waited on, and it
+       is written ONCE in shared so the Goods table, the Order Route STOCK node
+       and the register expansion cannot drift into three spellings. */
+    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    /* The rendered STRING is gone; the governance comment recording WHY it
+       went stays, which is why this pins the quoted literal. */
+    expect(workspace).not.toContain('"Not allocated"');
+    expect(route).toContain("unitsShortWords(readyQty, line.committedQty)");
+    expect(route).not.toContain("Waiting for purchase");
+    /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
+       the Unit ID cell printed a shortage while the read was still in flight. */
+    expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
+  });
+
+  it("puts the salesperson door beside the salesperson, not in a row of its own", () => {
+    /* The page's own grammar: `Change delivery date` sits under the date it
+       moves. The ownership door now sits under the name it moves, in the same
+       quiet text shape, and the lane below keeps only the request panel —
+       which is truth and does deserve its rule. */
+    expect(workspace).toContain("inlineTrigger={false}");
+    expect(workspace).toContain("openSignal={attributionSignal}");
+    expect(workspace).toContain("setAttributionSignal((n) => n + 1)");
+    expect(workspace).toContain("Change salesperson");
+    /* GATE 3's rule is imported, never re-typed — one rule, one place. */
+    expect(workspace).toContain("useCanChangeSalesOwnership");
+    expect(attribution).toContain("export function useCanChangeSalesOwnership()");
+    /* THE OLD SHAPE: a hairline drawn across the lane whether or not anything
+       is in it, which is what gave one button a section of its own. */
+    expect(attribution).not.toContain(
+      '<div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="attribution-lane">',
+    );
+    expect(attribution).toContain(
+      'className={request ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}',
+    );
   });
 });

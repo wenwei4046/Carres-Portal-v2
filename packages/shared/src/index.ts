@@ -1799,6 +1799,7 @@ export {
 export {
   lineReadiness,
   readinessCounts,
+  unitsShortWords,
   type LineReadiness,
   type LineReadinessInput,
 } from "./line-readiness";

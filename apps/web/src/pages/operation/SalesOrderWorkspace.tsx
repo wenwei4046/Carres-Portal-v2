@@ -69,6 +69,7 @@ import {
   resolveSalesOrderRoute,
   supplierClaimStatusLabel,
   myHolidaySet,
+  unitsShortWords,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -79,6 +80,8 @@ import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
+import FieldFrame from "@/components/kit/FieldFrame";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
@@ -123,7 +126,7 @@ import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendDeliveryDate from "./SalesOrderAmendDeliveryDate";
 import SalesOrderAmendment from "./SalesOrderAmendment";
-import SalesOrderAttribution from "./SalesOrderAttribution";
+import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
@@ -909,12 +912,49 @@ function PaymentApprovalBlock({
   );
 }
 
+/**
+ * A RECORDED ANSWER WEARS THE BOX THE QUESTION WOULD HAVE WORN (YH,
+ * 2026-09-01 — measured on `/operation/orders/so`).
+ *
+ * Every question on this page is a box: `Full name`, `Floor (Max is 3rd
+ * Floor)`, `Lift available?`. An answer that was already recorded, or that this
+ * surface may not move, was a bare label with a line of text under it — so ONE
+ * form carried TWO grammars and the reader learnt which shapes accept typing by
+ * trying them. The frame is constant now; what differs is the CONTROL. A
+ * read-only field has no caret, no focus ring and no hover, so it still reads
+ * as an answer rather than as an invitation, and the page stops looking like
+ * two forms stapled together.
+ *
+ * ⛔ NOT an `<input readOnly>`. Several values here are rendered NODES, not
+ * strings — the amber `No delivery date` chip, and anything wearing `<Money>` —
+ * and an input can hold only a string, so boxing them through one would throw
+ * away the exact fact the chip exists to carry. This borrows the kit's own
+ * `CONTROL_BASE` + resting hairline instead, so there is still ONE control skin
+ * in the app and this shares it rather than copying it. The one deliberate
+ * departure is HEIGHT: `min-h-8` in place of the control's fixed `h-8`, because
+ * an address or a long customer name is an answer that must be readable, and a
+ * fixed-height box would clip it.
+ *
+ * `role="textbox"` + `aria-readonly` is what a screen reader is told, so the
+ * announced grammar matches the drawn one. `aria-label` carries the name
+ * because `<label for>` binds only to real form controls.
+ */
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+  const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
-    <div className="min-w-0">
-      <div className="text-label text-base-500">{label}</div>
-      <div className="text-body text-base-900 mt-0.5 break-words">{value}</div>
-    </div>
+    <FieldFrame id={id} label={label}>
+      <div
+        id={id}
+        role="textbox"
+        aria-readonly
+        aria-label={label}
+        data-kit="readonly-field"
+        data-testid={id}
+        className={`${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
+      >
+        {value}
+      </div>
+    </FieldFrame>
   );
 }
 
@@ -994,6 +1034,10 @@ export default function SalesOrderWorkspace() {
   /* Bumped by `More actions → Propose a change to the customer`. A counter, not
      a boolean, so the menu item still works after the modal was cancelled. */
   const [amendSignal, setAmendSignal] = useState(0);
+  /* The `Change salesperson` door lives beside the Salesperson it changes; the
+     modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
+  const [attributionSignal, setAttributionSignal] = useState(0);
+  const canChangeSalesOwnership = useCanChangeSalesOwnership();
   const [amendDateOpen, setAmendDateOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
@@ -1051,6 +1095,13 @@ export default function SalesOrderWorkspace() {
     }
     return out;
   }, [catalogQ.data]);
+  /** addon key -> what the CATALOG calls it. `SalesOrderAddons` reads the same
+   *  bundle for the same purpose, so the Goods table and the Services list
+   *  under it can never print two different names for one row (Law D). */
+  const addonNameByKey = useMemo(
+    () => new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name])),
+    [catalogQ.data],
+  );
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
@@ -2127,33 +2178,53 @@ export default function SalesOrderWorkspace() {
             which is what read as "alignment wrong". One size on all three
             fixes the alignment and the fallback strings at the same time.
             Colour still separates them: Outstanding is red while owed. */}
-        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
-          <div>
-            <div className="text-label text-base-500">Total</div>
-            <div className="text-strong text-base-900" data-testid="money-total">
-              {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-base-500">Paid</div>
-            <div className="text-strong text-base-700" data-testid="money-paid">
-              <Money value={money.paid} />
-            </div>
-          </div>
+        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
+            last bare label-over-value pair on the page — the shape the rest of
+            the card stopped using when `Fact` took the kit's control skin. A
+            reader scanning down met boxes, boxes, boxes and then three loose
+            numbers, which reads as a different kind of thing rather than as
+            three answers this surface may not change.
+            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
+            door, and nothing here writes. The three-across grid is the same one
+            `Order info` and `Customer` use, so the amounts line up with every
+            other answer instead of packing left on a flex row.
+            Colour survives INSIDE the box: Outstanding is still red while any
+            of it is owed (owner ruling 2026-08-15), and all three keep
+            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
+            untouched. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Fact
+            label="Total"
+            value={
+              <span className="text-strong text-base-900" data-testid="money-total">
+                {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
+              </span>
+            }
+          />
+          <Fact
+            label="Paid"
+            value={
+              <span className="text-strong text-base-700" data-testid="money-paid">
+                <Money value={money.paid} />
+              </span>
+            }
+          />
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
               CUSTOMER owes HQ). It is the most-read number on the page
               (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
               (owner ruling 2026-08-15) — the colour carries that on its own,
               at the same size as its two neighbours. */}
-          <div>
-            <div className="text-label text-base-500">Outstanding</div>
-            <div
-              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-              data-testid="money-outstanding"
-            >
-              {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-            </div>
-          </div>
+          <Fact
+            label="Outstanding"
+            value={
+              <span
+                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+                data-testid="money-outstanding"
+              >
+                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+              </span>
+            }
+          />
         </div>
         {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
             SUMMARISES money and may never gain a form for it — so the one thing
@@ -2423,8 +2494,29 @@ export default function SalesOrderWorkspace() {
               <div data-pos-field="outlet">
                 <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
               </div>
+              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
+                  `Change salesperson` had a rule and a right-aligned row of its
+                  own under this grid — a separator, 12px of padding and a full
+                  row, introducing ONE button. It reads as a section, so the eye
+                  stops at it, and it separated the verb from the fact the verb
+                  acts on.
+                  It is the same shape `Change delivery date` already uses under
+                  `Requested Delivery Date`: a quiet text door under the answer
+                  it changes, which is where somebody looking at the wrong
+                  salesperson already has their eye. `useCanChangeSalesOwnership`
+                  is GATE 3's rule, imported rather than re-typed. */}
               <div data-pos-field="salesperson">
                 <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
+                  <button
+                    type="button"
+                    onClick={() => setAttributionSignal((n) => n + 1)}
+                    data-testid="attribution-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Change salesperson
+                  </button>
+                )}
               </div>
             </div>
             {/* An OLD revision is a photograph — it carries no lane. */}
@@ -2439,6 +2531,8 @@ export default function SalesOrderWorkspace() {
                 salespersonOptions={realSpOptions}
                 outletOptions={realOutletOptions}
                 dealerOptions={dealerOptions}
+                inlineTrigger={false}
+                openSignal={attributionSignal}
                 onApplied={() => {
                   void revisionsQ.refetch();
                   void baseQ.refetch();
@@ -2554,7 +2648,37 @@ export default function SalesOrderWorkspace() {
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
                     <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
+                    {/* ⭐ THE SHORT-LINE WORDS ARE RULED, AND `Not allocated`
+                        IS NOT ONE OF THEM (YH, 2026-09-01).
+                        `COPY-STANDARD.md`:1755 lists `Not allocated` in its
+                        `Do NOT use` column beside `No stock` and `Units not
+                        created yet`; the registered answer is the COUNT and
+                        then what is being waited on. `unitsShortWords` is that
+                        sentence, written once in shared, so this cell, the
+                        Order Route's STOCK node and the register expansion
+                        cannot drift into three spellings of one fact.
+                        A LOAD IS NOT A SHORTAGE. The Deliver To cell beside
+                        this one has always said `Loading…` while the expansion
+                        is in flight; this one did not, so a slow read printed
+                        `Not allocated` on a fully allocated line. Same guard,
+                        same word, same column behaviour. */}
+                    <td className="py-1.5 pr-3 font-mono text-meta">
+                      {goodsTruthQ.isLoading && !truth ? (
+                        "Loading…"
+                      ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
+                        truth.unitIds.join(" · ")
+                      ) : (
+                        (() => {
+                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          return (
+                            <>
+                              <div>{count}</div>
+                              <div className="mt-0.5 text-base-600">{waiting}</div>
+                            </>
+                          );
+                        })()
+                      )}
+                    </td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
                     <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
@@ -2567,16 +2691,45 @@ export default function SalesOrderWorkspace() {
                   </tr>
                   );
                 })}
-                {(detailQ.data?.addons ?? []).map((a, i) => (
+                {/* ⭐ A SERVICE ROW IS A GOODS ROW (YH, 2026-09-01). The two
+                    halves of this one table were written apart and read apart:
+                    a service printed `dispose-mattress` in the ITEM column —
+                    the raw database key, in the body face, where the goods rows
+                    print a product NAME — while `SalesOrderAddons` eighty
+                    pixels below printed `Mattress disposal` for the same row off
+                    the same catalog. One record, two names, and the key was the
+                    one the operator had to read.
+                    The cells now carry the goods rows' own classes (mono for
+                    the two identifier columns, `cjkClassName` on the item so a
+                    Chinese service name gets the same face a Chinese product
+                    gets) and the second line under the item is where a goods row
+                    already puts its configuration, so the SIZE of a sized
+                    service lands there instead of being dropped.
+                    The two cells a service can never fill read `Not recorded`,
+                    which is the ONE registered absence word
+                    (`COPY-STANDARD.md`:1679, YH 2026-08-29). They printed a bare
+                    `—`, which that same row lists in its `Do NOT use` column —
+                    so the service half of this table was BOTH the odd one out
+                    and off-dictionary. `Not recorded` is also what the goods
+                    rows already print in `Deliver To`, so the column now reads
+                    one way down its whole length. */}
+                {(detailQ.data?.addons ?? []).map((a, i) => {
+                  const serviceName = addonNameByKey.get(a.addon_key) ?? a.addon_key;
+                  const size = a.attrs?.size ?? null;
+                  return (
                   <tr key={`a-${i}`} className="border-t border-kit-slate-5">
                     <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
-                    <td className="py-1.5 pr-3">—</td>
+                    <td className="py-1.5 pr-3 font-mono text-meta">Not recorded</td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
-                    <td className="py-1.5 pr-3">{a.addon_key}</td>
-                    <td className="py-1.5">—</td>
+                    <td className={`py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
+                      <div>{serviceName}</div>
+                      {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
+                    </td>
+                    <td className="py-1.5">Not recorded</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
