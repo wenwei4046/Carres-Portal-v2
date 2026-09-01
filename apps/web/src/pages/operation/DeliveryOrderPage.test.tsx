@@ -107,7 +107,7 @@ function mount(data: DeliveryOrderDetailPayload) {
   const locations: string[] = [];
   function LocationTap() {
     const loc = useLocation();
-    locations.push(loc.pathname);
+    locations.push(`${loc.pathname}${loc.search}`);
     return null;
   }
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -210,6 +210,14 @@ describe("DeliveryOrderPage", () => {
     fireEvent.click(screen.getByTestId("do-open-so"));
     expect(locations.at(-1)).toBe(
       "/operation/orders/so/00000000-0000-0000-0000-0000000a0001",
+    );
+  });
+
+  it("the Source Sales Order block opens the exact Order Route", () => {
+    const { locations } = mount(payload());
+    fireEvent.click(screen.getByTestId("do-open-order-route"));
+    expect(locations.at(-1)).toBe(
+      "/operation/orders/so/00000000-0000-0000-0000-0000000a0001?route=1",
     );
   });
 

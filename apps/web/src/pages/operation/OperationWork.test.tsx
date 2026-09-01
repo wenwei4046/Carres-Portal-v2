@@ -441,7 +441,7 @@ describe("OperationWork — a duty row belongs to its duty, not to the order's o
     ) as HTMLElement;
     expect(row).toBeTruthy();
     fireEvent.click(row);
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/a");
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/old-orders?order=a");
   });
 
   it("delivery-photo work keeps the exact existing upload writer reachable", () => {
@@ -460,7 +460,9 @@ describe("OperationWork — a duty row belongs to its duty, not to the order's o
     };
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
     fireEvent.click(screen.getByTestId("work-row-SO-1207-upload_delivery_photo"));
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/photo-order");
+    expect(navigateSpy).toHaveBeenCalledWith(
+      "/operation/old-orders?order=photo-order",
+    );
   });
 
   it("Finance's exception stays out of the salesperson's My Work", () => {

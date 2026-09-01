@@ -137,6 +137,12 @@ describe("the ownership boundary", () => {
     expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/order-a");
   });
 
+  it("opens the exact Sales Order Route without copying its facts or writers", () => {
+    wrap();
+    fireEvent.click(screen.getByTestId("edit-delivery-open-order-route"));
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/order-a?route=1");
+  });
+
   it("never offers Issue, Release or Approve", () => {
     wrap();
     for (const word of [/^Issue$/i, /Release/i, /Approve/i, /New DO/i]) {

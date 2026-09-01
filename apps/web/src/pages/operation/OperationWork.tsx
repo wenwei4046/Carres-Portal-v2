@@ -55,6 +55,10 @@ const DELIVERY_ORDER_ACTIONS = new Set([
   "deliver_today",
   "issue_delivery_order",
 ]);
+const SALES_ORDER_ROUTE_ACTIONS = new Set([
+  "collect_loan_item",
+  "upload_delivery_photo",
+]);
 
 const TONE_DOT: Record<string, string> = {
   danger: "bg-danger",
@@ -222,6 +226,10 @@ export default function OperationWork() {
           ? `/operation/delivery-orders/${encodeURIComponent(i.deliveryDoNumber)}`
           : `/operation/delivery/edit/${encodeURIComponent(i.orderId)}`,
       );
+      return;
+    }
+    if (SALES_ORDER_ROUTE_ACTIONS.has(i.ruleKey)) {
+      navigate(`/operation/old-orders?order=${encodeURIComponent(i.orderId)}`);
       return;
     }
     navigate(`/operation/orders/so/${i.orderId}`);

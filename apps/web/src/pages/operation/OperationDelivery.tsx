@@ -405,6 +405,11 @@ export default function OperationDelivery() {
     (r: DeliveryScopeRow) => navigate(`/operation/orders/so/${r.orderId}`),
     [navigate],
   );
+  const openOrderRoute = useCallback(
+    (r: DeliveryScopeRow) =>
+      navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}?route=1`),
+    [navigate],
+  );
 
   /**
    * ⭐ DOUBLE-CLICK OPENS EDIT DELIVERY, NEVER THE SALES ORDER.
@@ -477,6 +482,17 @@ export default function OperationDelivery() {
               }}
             >
               SO-{r.so}
+            </button>
+            <button
+              type="button"
+              aria-label={`Open Order Route for SO-${r.so}`}
+              className="block text-label font-medium text-blue-700 underline-offset-2 hover:underline"
+              onClick={(event) => {
+                event.stopPropagation();
+                openOrderRoute(r);
+              }}
+            >
+              Order Route
             </button>
             {r.refs.length > 0 ? (
               <span className="ml-1.5 text-kit-slate-11">{r.refs.join(" · ")}</span>
@@ -710,7 +726,7 @@ export default function OperationDelivery() {
         filterValue: (r) => r.o.customer_address ?? DW.notGiven,
       },
     ],
-    [navigate, openOrder],
+    [navigate, openOrder, openOrderRoute],
   );
 
   const contextMenu = useCallback(
@@ -718,6 +734,7 @@ export default function OperationDelivery() {
       { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
       { divider: true },
       { label: `Open SO-${r.so}`, onClick: () => openOrder(r) },
+      { label: "Open Order Route", onClick: () => openOrderRoute(r) },
       ...(r.doNumber
         ? [
             {
@@ -728,7 +745,7 @@ export default function OperationDelivery() {
           ]
         : []),
     ],
-    [navigate, openOrder, openEditDelivery],
+    [navigate, openOrder, openOrderRoute, openEditDelivery],
   );
 
   const isError = ordersQ.isError || docsQ.isError;

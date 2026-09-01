@@ -10,8 +10,9 @@
 
 - Add behavior tests in `apps/web/src/pages/operation/OperationWork.test.tsx` for Delivery arrangement actions and DO-backed result actions.
 - Extend the composed work row with the existing active DO number.
-- Route arrangement actions to `/operation/delivery/edit/:orderId` and DO-backed execution actions to `/operation/delivery-orders/:doNumber`; retain Sales-owned actions on the Sales Order.
-- Keep delivery-photo and loan-collection Work rows on the existing Sales Order writers until those governed controls are mounted on the DO object; never turn a Work row into a read-only dead end.
+- Route arrangement actions to `/operation/delivery/edit/:orderId` and DO-backed execution actions to `/operation/delivery-orders/:doNumber`; retain actions owned by other modules on their existing governed object.
+- Deep-link delivery-photo and loan-collection Work rows to the exact existing Sales Order drawer writer at `/operation/old-orders?order=:orderId`; the photo remains Delivery evidence and loan custody remains Stock-owned. The read-only Order Route stays available from Delivery surfaces, but a Work row must never land on a projection that cannot complete its named action.
+- Keep the Delivery register, Delivery Orders register, arrangement and DO object linked to the exact source Sales Order and its `?route=1` Order Route projection without copying either owner's facts or writers.
 - Run the focused Work tests and typecheck the affected package.
 
 ## Task 2: Delivery Order work surface

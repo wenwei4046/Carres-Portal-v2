@@ -612,6 +612,12 @@ describe("the interaction contract", () => {
     expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/b");
   });
 
+  it("the delivery scope row exposes a keyboard and touch-safe exact Order Route door", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Order Route for SO-1323" }));
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/b?route=1");
+  });
+
   it("DO No still opens the Delivery Order", () => {
     wrap(<OperationDelivery />);
     fireEvent.click(screen.getByText("DO-180826-3035"));
