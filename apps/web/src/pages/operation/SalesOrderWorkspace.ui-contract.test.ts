@@ -8,6 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
+const addons = readFileSync(join(here, "SalesOrderAddons.tsx"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
@@ -814,6 +815,32 @@ describe("Sales Order object page — one form grammar", () => {
     /* The POS half of the same rule, so the parity is asserted and not
        assumed: both surfaces reach the one shared clamp. */
     expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
+  });
+
+  it("keeps a service to ONE row, carrying its own doors", () => {
+    /* A service was printed TWICE: as a row in the Goods table, and again in a
+       `Services` list below that repeated its name, its size, its quantity and
+       its price purely so it could hold two buttons. One record, two places —
+       and with a second service on the order the operator had to match them by
+       eye to know which row a `Remove` belonged to.
+       The doors live in the row now. The list is gone. */
+    expect(workspace).toContain("ServiceRowActions");
+    expect(addons).toContain("export function ServiceRowActions(");
+    /* THE LIST AND ITS HEADING: gone from the panel entirely. */
+    expect(addons).not.toContain('<span className="text-label text-base-500">Services</span>');
+    expect(addons).not.toContain("so-addons-empty");
+    /* ⛔ NOT A SEVENTH COLUMN — §0.1 locks the table at six, and the document
+       preview prints from the same six. The header row is unchanged. */
+    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
+      expect(workspace).toContain(`>${label}</th>`);
+    }
+    expect(workspace).not.toContain(">Actions</th>");
+    /* The one act the table cannot perform — adding a service that is not
+       there yet — is what the panel keeps, and the POS-parity attribute rides
+       THAT rather than a hidden span with nothing behind it. */
+    expect(workspace).toContain('data-pos-field="orderAddons"');
+    expect(addons).toContain('data-testid="so-addon-open"');
+    expect(addons).toContain("Add a service");
   });
 
   it("puts the salesperson door beside the salesperson, not in a row of its own", () => {

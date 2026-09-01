@@ -61,14 +61,123 @@ function asDraftAddon(a: AddonDto): DraftAddon {
 const requiresSize = (a: AddonDto) => addonRequiresSize(asDraftAddon(a));
 const sizesFor = (a: AddonDto) => addonSizeOptions(asDraftAddon(a));
 
-export default function SalesOrderAddons({
+/**
+ * ⭐ THE ROW'S OWN DOORS, IN THE ROW (YH, 2026-09-01).
+ *
+ * A service used to be printed TWICE: once as a row in the Goods table, and
+ * again eighty pixels below in a `Services` list that repeated its name, its
+ * size, its quantity and its price purely so it could carry two buttons —
+ *
+ *     Dispose old mattress · Queen
+ *     ×1 · RM 80.00      [ Add one more ]  [ Remove ]
+ *
+ * — every fact of which the table above already stated. One record, two
+ * places, and the operator had to match them by eye to be sure which row the
+ * `Remove` belonged to. The doors live in the row they act on now, which is
+ * also the only reading of "one record, one owner" that survives a second
+ * service being added.
+ *
+ * ⛔ NOT A SEVENTH COLUMN. `docs/orders/MASTER.md` §0.1 locks the Goods table
+ * at six columns, and the document preview beside it prints from the same six.
+ * The doors ride the ITEM cell as a quiet line under the name — which is
+ * exactly where a goods row already puts its own configuration, so the two row
+ * kinds keep the same shape.
+ *
+ * Every gate below is the one this file already applied; nothing was widened.
+ */
+export function ServiceRowActions({
   orderId,
-  addons,
+  row,
   catalogAddons,
   status,
 }: {
   orderId: string;
-  addons: operationOrderDetailAddon[];
+  row: operationOrderDetailAddon;
+  catalogAddons: AddonDto[];
+  status: string | null;
+}) {
+  const byKey = useMemo(
+    () => new Map(catalogAddons.map((a) => [a.key, a])),
+    [catalogAddons],
+  );
+  const editAddon = useEditOrderAddon(orderId);
+  const removeAddon = useRemoveOrderAddon(orderId);
+  const inPlaceLane = status === "place";
+  /* ⛔ NOT ON A COMPUTED FEE (2026-08-31). `0393` made the stair carry the
+     fourth server-computed key and never added itself to `0258`'s refusal
+     list, so a `Stair carry` row shipped with a live `Add one more` and ONE
+     CLICK doubled a fee nobody quoted. `0406` refuses it in the database;
+     this declines to offer the door. The delivery trio is computed the same
+     way — nobody picked those rows, so nobody can misclick them. */
+  const editable = inPlaceLane && !SERVER_EXCLUSIVE_ADDON_KEYS.has(row.addon_key);
+  if (!editable) return null;
+
+  const meta = byKey.get(row.addon_key);
+  const nextQty = row.qty + 1;
+  /* A sized service needs one size per unit, so growing the qty grows the
+     list — repeat the size already sold rather than asking again for a service
+     the customer already chose. */
+  const sizes = row.attrs?.sizes ?? [];
+  const grown =
+    meta && addonRequiresSize(asDraftAddon(meta)) && sizes.length > 0
+      ? [...sizes, sizes[sizes.length - 1]!]
+      : null;
+
+  return (
+    <span
+      className="mt-0.5 flex flex-wrap items-center gap-x-2"
+      data-testid={`so-addon-row-${row.addon_key}`}
+    >
+      {/* ⭐ NO MINUS, BUT A REMOVE (YH, 2026-08-28). `edit_order_addon` refuses
+          a DECREASE as `downsell_blocked`, so there is no minus — a control
+          that always fails is worse than no control. Taking the row back
+          entirely is a different act: it is undoing a pick that should never
+          have happened, and before `0395` there was no path to it from any
+          surface — the only correction for a misclicked service was cancelling
+          the whole order. `Remove` is the ruled word (COPY-STANDARD:926). */}
+      <button
+        type="button"
+        data-testid={`so-addon-more-${row.addon_key}`}
+        disabled={editAddon.isPending}
+        onClick={() =>
+          editAddon.mutate({
+            addonId: row.id,
+            input: {
+              qty: nextQty,
+              ...(grown ? { attrs: { sizes: grown, size: grown.join(" · ") } } : {}),
+            },
+          })
+        }
+        className="rounded-control px-1 text-meta text-kit-blue-11 hover:bg-hovertint disabled:opacity-50"
+      >
+        Add one more
+      </button>
+      <button
+        type="button"
+        data-testid={`so-addon-remove-${row.addon_key}`}
+        disabled={removeAddon.isPending}
+        onClick={() => removeAddon.mutate({ addonId: row.id })}
+        className="rounded-control px-1 text-meta text-danger hover:bg-hovertint disabled:opacity-50"
+      >
+        Remove
+      </button>
+    </span>
+  );
+}
+
+/**
+ * ⭐ WHAT IS LEFT HERE IS THE ADD DOOR (YH, 2026-09-01). The `Services`
+ * heading, the list that repeated the table, and the per-row buttons are gone —
+ * the rows are the table's rows and their doors moved into them
+ * (`ServiceRowActions`). This is the one control the table cannot hold: adding
+ * a row that does not exist yet.
+ */
+export default function SalesOrderAddons({
+  orderId,
+  catalogAddons,
+  status,
+}: {
+  orderId: string;
   catalogAddons: AddonDto[];
   /** The order's lane. Only `place` may be edited directly — see the gate note. */
   status: string | null;
@@ -93,9 +202,6 @@ export default function SalesOrderAddons({
     },
     onError: (e) => setError(e.message),
   });
-  const editAddon = useEditOrderAddon(orderId);
-  const removeAddon = useRemoveOrderAddon(orderId);
-
   const inPlaceLane = status === "place";
   const chosen = pickKey ? byKey.get(pickKey) : undefined;
   const needsSize = chosen ? requiresSize(chosen) : false;
@@ -117,120 +223,24 @@ export default function SalesOrderAddons({
     });
   }
 
-  function addOne(row: operationOrderDetailAddon) {
-    const meta = byKey.get(row.addon_key);
-    const nextQty = row.qty + 1;
-    /* A sized service needs one size per unit, so growing the qty grows the
-       list — repeat the size already sold rather than asking again for a
-       service the customer already chose. */
-    const sizes = row.attrs?.sizes ?? [];
-    const grown = meta && requiresSize(meta) && sizes.length > 0
-      ? [...sizes, sizes[sizes.length - 1]!]
-      : null;
-    editAddon.mutate({
-      addonId: row.id,
-      input: {
-        qty: nextQty,
-        ...(grown ? { attrs: { sizes: grown, size: grown.join(" · ") } } : {}),
-      },
-    });
-  }
 
   return (
-    <div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="so-addons">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-label text-base-500">Services</span>
-        {inPlaceLane && !picking && offerable.length > 0 && (
-          <Button
-            size="sm"
-            variant="neutral"
-            data-testid="so-addon-open"
-            onClick={() => setPicking(true)}
-          >
-            <Plus size={14} /> Add a service
-          </Button>
-        )}
-      </div>
-
-      {addons.length === 0 && (
-        <p className="mt-1 text-meta text-base-500" data-testid="so-addons-empty">
-          No services on this order
-        </p>
-      )}
-
-      {addons.length > 0 && (
-        <ul className="mt-1 flex flex-col gap-1">
-          {addons.map((a) => {
-            const meta = byKey.get(a.addon_key);
-            const size = a.attrs?.size ?? null;
-            return (
-              <li
-                key={a.id}
-                className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"
-                data-testid={`so-addon-row-${a.addon_key}`}
-              >
-                <span className="text-body text-base-900">
-                  {meta?.name ?? a.addon_key}
-                  {size && <span className="text-meta text-base-600"> · {size}</span>}
-                </span>
-                <span className="flex items-baseline gap-3">
-                  <span className="tabular-nums text-body text-base-700">
-                    ×{a.qty} · {rm(a.unit_price * a.qty)}
-                  </span>
-                  {inPlaceLane && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key) && (
-                    /* ⛔ NOT ON A COMPUTED FEE (2026-08-31). This condition
-                       used to be `inPlaceLane` alone, and the Remove button
-                       twenty lines below was the only one of the pair that
-                       checked the key — so a `Stair carry` row shipped with a
-                       live `Add one more`, and ONE CLICK doubled a fee nobody
-                       quoted. `0393` made the stair carry the fourth
-                       server-computed key and never added itself to `0258`'s
-                       refusal list, so the database let it through too.
-                       `0406` now refuses it there; this stops offering it here.
-
-                       ⭐ NO MINUS, BUT A REMOVE (YH, 2026-08-28).
-                       `edit_order_addon` still refuses a DECREASE as
-                       `downsell_blocked`, so there is no minus — a control that
-                       always fails is worse than no control, and that rule is
-                       unchanged.
-
-                       Taking the row back entirely is a different act. It is
-                       not a downsell; it is undoing a pick that should never
-                       have happened, and before 0395 there was no path to it
-                       from any surface — the only correction for a misclicked
-                       service was cancelling the whole order. */
-                    <button
-                      type="button"
-                      data-testid={`so-addon-more-${a.addon_key}`}
-                      disabled={editAddon.isPending}
-                      onClick={() => addOne(a)}
-                      className="rounded-control px-2 py-0.5 text-meta text-kit-blue-11 hover:bg-hovertint disabled:opacity-50"
-                    >
-                      Add one more
-                    </button>
-                  )}
-                  {inPlaceLane && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key) && (
-                    /* Hidden on the four SERVER-EXCLUSIVE keys — the delivery
-                       trio and the stair carry are computed from the order's
-                       own facts, so nobody picked them and nobody can misclick
-                       them. The RPC refuses those rows too; this just does not
-                       offer a door that would 422. `Remove` is the ruled word
-                       (COPY-STANDARD:926). */
-                    <button
-                      type="button"
-                      data-testid={`so-addon-remove-${a.addon_key}`}
-                      disabled={removeAddon.isPending}
-                      onClick={() => removeAddon.mutate({ addonId: a.id })}
-                      className="rounded-control px-2 py-0.5 text-meta text-danger hover:bg-hovertint disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+    <div className="mt-3" data-testid="so-addons">
+      {/* ⭐ ONE BUTTON, NO SECTION (YH, 2026-09-01). This was a `Services`
+          heading with a rule above it and a list under it that restated every
+          row of the table eight lines up. The rows belong to the table and
+          their doors moved into them; what is left is the act the table cannot
+          perform — adding a service that is not there yet. It sits under the
+          table it adds to, in the same shape create mode's `Add line` uses. */}
+      {inPlaceLane && !picking && offerable.length > 0 && (
+        <Button
+          size="sm"
+          variant="neutral"
+          data-testid="so-addon-open"
+          onClick={() => setPicking(true)}
+        >
+          <Plus size={14} /> Add a service
+        </Button>
       )}
 
       {picking && (

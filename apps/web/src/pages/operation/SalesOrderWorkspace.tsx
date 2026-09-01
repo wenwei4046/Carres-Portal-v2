@@ -92,7 +92,7 @@ import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
-import SalesOrderAddons from "./SalesOrderAddons";
+import SalesOrderAddons, { ServiceRowActions } from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
@@ -2739,9 +2739,30 @@ export default function SalesOrderWorkspace() {
                     <td className="py-1.5 pr-3 font-mono text-meta">Not recorded</td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
+                    {/* ⭐ THE ROW CARRIES ITS OWN DOORS (YH, 2026-09-01). A
+                        service was printed twice — here, and again in a
+                        `Services` list below that repeated its name, size,
+                        quantity and price purely so it could hold two buttons.
+                        One record, two places, and with a second service on the
+                        order the operator had to match them by eye to know
+                        which row a `Remove` belonged to.
+                        ⛔ NOT A SEVENTH COLUMN: `docs/orders/MASTER.md` §0.1
+                        locks this table at six, and the document preview prints
+                        from the same six. The doors ride the ITEM cell as a
+                        quiet line under the name — which is where a goods row
+                        already puts its own configuration, so both row kinds
+                        keep one shape. */}
                     <td className={`py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
                       <div>{serviceName}</div>
                       {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
+                      {mode === "object" && orderId && (
+                        <ServiceRowActions
+                          orderId={orderId}
+                          row={a}
+                          catalogAddons={catalogQ.data?.addons ?? []}
+                          status={order?.status ?? null}
+                        />
+                      )}
                     </td>
                     <td className="py-1.5">Not recorded</td>
                   </tr>
@@ -2752,12 +2773,17 @@ export default function SalesOrderWorkspace() {
           </div>
         )}
         {/* An OLD revision is a photograph and a draft has no order to write
-            to — the door belongs to the live object only. */}
+            to — the door belongs to the live object only.
+            ⭐ THE ATTRIBUTE STILL RIDES A REAL CONTROL. It was once a hidden
+            `<span>` carrying this exact string with nothing behind it, so the
+            page passed a POS-parity completeness test it did not meet while the
+            office rang the shop to add a disposal service. What is left in
+            `SalesOrderAddons` is the one act the table cannot perform — adding
+            a service that is not there yet — and the attribute rides that. */}
         {mode === "object" && orderId && (
           <div data-pos-field="orderAddons">
             <SalesOrderAddons
               orderId={orderId}
-              addons={detailQ.data?.addons ?? []}
               catalogAddons={catalogQ.data?.addons ?? []}
               status={order?.status ?? null}
             />
