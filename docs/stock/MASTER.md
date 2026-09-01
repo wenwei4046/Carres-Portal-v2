@@ -202,6 +202,34 @@ outbound handover, external-holder truth, return handover and inspection. Suppli
 requires Purchasing authority and actual handover. Write-off approval and physical disposal are
 separate facts. Ended Units leave the default view but remain searchable in Delivered / history.
 
+### Unit lifecycle outcomes
+
+`Ended` may exist only as an internal availability grouping. It is not a sufficient operator,
+report or History label. Inventory Detail and every history/report surface preserve the distinct
+authoritative outcome:
+
+| Lifecycle outcome | Authoritative completion fact | Inventory presentation |
+|---|---|---|
+| Delivered | Delivery records customer arrival/acceptance and required proof | Delivered to customer |
+| Returned to supplier | actual supplier collection/handover is accepted | Returned to supplier |
+| Written off | COO approves the governed Stock Adjustment | Written off |
+| Disposed | authorised disposal has both approval and disposal evidence | Disposed |
+| Voided/cancelled before receipt | the source is cancelled and no physical receipt ever occurred | Never received · Source cancelled |
+| Returned by customer | Receiving proves the Unit is physically back under Carres control | the actual current holder and `Check required` |
+| Sent for repair | actual handover to the repair partner is accepted | `Who has it = {Repair partner}` |
+| Returned from repair | Receiving proves return to the warehouse/showroom and inspection occurs | the current Inventory availability/condition |
+
+Closing a Service Case does not end a Unit. Closing a Supplier Claim does not prove supplier
+collection. An expected-source cancellation cannot remove a Unit that was already received. Only
+an accepted physical receipt/handover/arrival event or a governed approved Adjustment changes the
+Unit's physical or lifecycle truth.
+
+Every outcome remains searchable by Unit ID and preserves the linked SO, PO, DO, Transfer, Return,
+Repair, Claim or Adjustment number; actual date/time; individually identified actor/avatar;
+evidence; previous holder; new holder where applicable; and append-only event history. Availability
+reports may group these outcomes for totals, but every total drills to Units and shows the actual
+outcome rather than `Ended`.
+
 ## 6 · Issues, Counts and correction
 
 Anyone who observes a Unit may Report issue. Reasons are observable: damaged, product different,
