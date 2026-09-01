@@ -791,6 +791,31 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
   });
 
+  it("enforces the stair-carry ceiling it has always printed", () => {
+    /* THE DEFECT: the hint has read `0 to 5` since it was written and the box
+       accepted 99. The POS stepper stops at the item count
+       (`StairCarryFields.tsx`), so the office could save a count no shop floor
+       could quote, while the working line on the same card priced the clamped
+       five — one card, two answers, and the saved one was the wrong one.
+       `stairCarryCount` is the clamp the FEE already runs and the SERVER
+       stamps with. Imported, never re-typed: a second copy of a ceiling is how
+       these two surfaces drifted apart the first time. */
+    expect(workspace).toContain("stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)");
+    expect(workspace).toContain("max={stair?.itemsTotal}");
+    /* THE OLD SHAPE: a lower clamp only, so anything above the item count
+       went straight through. */
+    expect(workspace).not.toContain(
+      'e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),',
+    );
+    /* NO CEILING WITHOUT A COUNT — until the catalog answers, the item total
+       is unknown, and a guessed ceiling would silently cut a correct answer.
+       The floor at zero still applies. */
+    expect(workspace).toContain("Math.max(0, Number(e.target.value) || 0)");
+    /* The POS half of the same rule, so the parity is asserted and not
+       assumed: both surfaces reach the one shared clamp. */
+    expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
+  });
+
   it("puts the salesperson door beside the salesperson, not in a row of its own", () => {
     /* The page's own grammar: `Change delivery date` sits under the date it
        moves. The ownership door now sits under the name it moves, in the same
