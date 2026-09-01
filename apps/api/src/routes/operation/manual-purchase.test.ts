@@ -1667,26 +1667,32 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
-  /* ⛔ MERGED IS NOT APPLIED. Migrations here are applied BY HAND, so this
-     build can reach production before `0410` exists. PostgREST answers a
-     missing function with PGRST202; Postgres with 42883. Either means "the
-     migration has not run", never "this request is bad". */
+  /* ⛔ MERGED IS NOT APPLIED — AND DEGRADING IS NOT DROPPING.
+     ⭐ RE-PINNED THE SAME DAY IT WAS WRITTEN (YH, 2026-09-01). The original
+     assertion here was that a missing `0410` falls back to the header-only
+     door and returns 200, on the reasoning that a create form which 404s for a
+     day is worse than one that degrades. The reasoning was right and what it
+     pinned was wrong: the header-only door cannot write lines, the browser is
+     the only caller and always sends them, so that 200 meant an EMPTY request
+     and a form that ticked every line as created. An approver could approve a
+     purchase with no items and it would read `Ready to order` for ever.
+     A 404 is found in one second. An empty approved purchase is found weeks
+     later by somebody wondering why nothing arrived. The test now pins the
+     refusal, and pins that NOTHING was written behind it. */
   for (const code of ["PGRST202", "42883"]) {
-    it(`degrades to the header-only door when 0410 is not applied yet (${code})`, async () => {
-      const rpc = vi
-        .fn()
-        .mockResolvedValueOnce({ data: null, error: { code, message: "not found" } })
-        .mockResolvedValueOnce({
-          data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
-          error: null,
-        });
+    it(`refuses in words when 0410 is not applied yet, and writes nothing (${code})`, async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code, message: "not found" } });
       const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
-      /* The operator keeps working. */
-      expect(res.status).toBe(200);
-      expect(rpc.mock.calls.map((c) => c[0])).toEqual([
-        "purchasing_create_request_with_lines",
-        "purchasing_create_request",
-      ]);
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as Record<string, string>;
+      expect(body.code).toBe("migration_not_applied");
+      /* It says what happened and who fixes it — never a bare code. */
+      expect(body.message).toBeTruthy();
+      expect(body.action).toContain("0410");
+      /* ⛔ AND IT DOES NOT QUIETLY TRY THE HEADER-ONLY DOOR. One call, one
+         refusal; a second call here would be the dropped-lines bug again. */
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
     });
   }
 
