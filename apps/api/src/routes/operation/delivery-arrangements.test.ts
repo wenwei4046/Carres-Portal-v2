@@ -536,3 +536,76 @@ describe("PUT /:orderId — Save Delivery", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("POST /:orderId/reply-proof/sign-upload — the reply evidence door (Card 05)", () => {
+  const sign = (
+    body: unknown,
+    path = `/${ORDER_A}/reply-proof/sign-upload?leg=0`,
+    role = "operation",
+  ) => call(path, role, { method: "POST", body: JSON.stringify(body) });
+
+  function mockStorage() {
+    const createSignedUploadUrl = vi.fn().mockImplementation((p: string) =>
+      Promise.resolve({ data: { token: "t1", path: p }, error: null }),
+    );
+    vi.mocked(adminClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUploadUrl }) },
+    } as never);
+    return createSignedUploadUrl;
+  }
+
+  it("signs an upload under the arrangement's own key", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; path: string };
+    expect(body.token).toBe("t1");
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^arrangement/${ORDER_A}/0/.+-reply\\.png$`)),
+    );
+  });
+
+  it("keys a Journey leg's proof under its own leg", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign(
+      { mimeType: "image/jpeg", sizeBytes: 1000 },
+      `/${ORDER_A}/reply-proof/sign-upload?leg=2`,
+    );
+    expect(res.status).toBe(200);
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^arrangement/${ORDER_A}/2/.+-reply\\.jpg$`)),
+    );
+  });
+
+  it("refuses a non-photo mime in words, before any storage call", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign({ mimeType: "application/pdf", sizeBytes: 1000 });
+    expect(res.status).toBe(422);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("404s a junk order id without touching the database", async () => {
+    const { from } = mockSb([]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 }, "/not-a-uuid/reply-proof/sign-upload");
+    expect(res.status).toBe(404);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("404s an order that does not exist", async () => {
+    mockSb([{ data: null }]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 });
+    expect(res.status).toBe(404);
+  });
+
+  it("403s a dealer", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 }, undefined, "dealer");
+    expect(res.status).toBe(403);
+  });
+});

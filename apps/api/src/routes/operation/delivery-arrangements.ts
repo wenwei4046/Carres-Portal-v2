@@ -3,6 +3,7 @@ import {
   assignLogisticsInputSchema,
   deliveryWarehouseScheduleEvents,
   saveDeliveryArrangementInputSchema,
+  signHandoverProofUploadInput,
   isLogisticsChange,
   type DeliveryScopeRef,
 } from "@carres/shared";
@@ -608,5 +609,76 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   return c.json({ arrangement: shape(saved as unknown as ArrangementRecord) });
 });
+
+/**
+ * POST /:orderId/reply-proof/sign-upload?leg= — Delivery Card 05.
+ *
+ * The partner's ACTUAL reply (a WhatsApp screenshot) is the evidence the
+ * arrangement law demands: prepared, copied, opened or sent never means
+ * confirmed (`docs/delivery/MASTER.md` §2). This door signs an upload into the
+ * private proof bucket under the arrangement's own key; the saved
+ * `reply_proof_path` then rides `Save Delivery` like every other field. Same
+ * photo family and limits as the handover proof (0363's door).
+ */
+deliveryArrangementsRouter.post(
+  "/:orderId/reply-proof/sign-upload",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const orderId = c.req.param("orderId");
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+    const leg = Number(c.req.query("leg") ?? "0") || 0;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+    }
+    const parsed = signHandoverProofUploadInput.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return c.json(
+        {
+          error: "invalid_input",
+          message: issue?.message ?? "invalid input",
+          field: issue?.path.join(".") ?? "unknown",
+        },
+        422,
+      );
+    }
+
+    const { data: order, error } = await sb
+      .from("orders")
+      .select("id")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    if (!order) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+
+    const ext =
+      parsed.data.mimeType === "image/png"
+        ? "png"
+        : parsed.data.mimeType === "image/webp"
+          ? "webp"
+          : "jpg";
+    const path = `arrangement/${orderId}/${leg}/${crypto.randomUUID()}-reply.${ext}`;
+    const admin = adminClient(c.env);
+    const { data, error: signErr } = await admin.storage
+      .from("proof-of-delivery")
+      .createSignedUploadUrl(path);
+    if (signErr) {
+      return c.json({ error: "sign_upload_failed", message: signErr.message }, 500);
+    }
+    return c.json({ token: data.token, path: data.path });
+  },
+);
 
 export default deliveryArrangementsRouter;

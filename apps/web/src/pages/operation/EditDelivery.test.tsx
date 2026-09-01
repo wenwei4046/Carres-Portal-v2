@@ -37,7 +37,7 @@ vi.mock("@/lib/queries", async () => {
     useDeliveryPartners: () => ({
       data: {
         partners: [
-          { id: "p-nets", name: "NETS" },
+          { id: "p-nets", name: "NETS", whatsapp_group_url: "https://chat.whatsapp.com/nets" },
           { id: "p-al", name: "AL" },
         ],
       },
@@ -255,5 +255,51 @@ describe("the way back", () => {
     wrap();
     fireEvent.click(screen.getByTestId("edit-delivery-back"));
     expect(navigateSpy).toHaveBeenCalledWith("/operation?tab=delivery");
+  });
+});
+
+describe("the chase door (Delivery Card 05)", () => {
+  it("shows the prepared message once a partner is chosen, and says sending is not confirmation", () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("edit-delivery-partner"), {
+      target: { value: "p-nets" },
+    });
+    const block = screen.getByTestId("edit-delivery-chase");
+    expect(within(block).getByText("Ask NETS for the delivery date")).toBeTruthy();
+    const msg = screen.getByTestId("edit-delivery-chase-message").textContent ?? "";
+    expect(msg).toContain("SO-1322");
+    expect(msg).toContain("Customer asked:");
+    expect(msg).toContain("Please confirm the delivery date and time.");
+    // The law, on screen: prepared/copied/opened/sent never means confirmed.
+    expect(within(block).getByText(/Sending is not confirmation/)).toBeTruthy();
+    // The group door goes straight to the partner's own WhatsApp group.
+    expect(
+      screen.getByTestId("edit-delivery-open-whatsapp").getAttribute("href"),
+    ).toBe("https://chat.whatsapp.com/nets");
+  });
+
+  it("says so when the partner has no WhatsApp group saved, instead of a dead door", () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("edit-delivery-partner"), {
+      target: { value: "p-al" },
+    });
+    expect(screen.queryByTestId("edit-delivery-open-whatsapp")).toBeNull();
+    expect(screen.getByText("No WhatsApp group saved for this partner")).toBeTruthy();
+  });
+
+  it("shows no chase block while no partner is chosen", () => {
+    wrap();
+    expect(screen.queryByTestId("edit-delivery-chase")).toBeNull();
+  });
+});
+
+describe("the reply proof is an UPLOAD, not a typed path (Delivery Card 05)", () => {
+  it("offers a file picker and no free-text path input", () => {
+    wrap();
+    const upload = screen.getByTestId("edit-delivery-proof-upload");
+    expect(upload.getAttribute("type")).toBe("file");
+    expect(upload.getAttribute("accept")).toContain("image/jpeg");
+    // The old text input bound to the path is gone.
+    expect(screen.getByTestId("edit-delivery-proof").querySelector("input[type='text']")).toBeNull();
   });
 });

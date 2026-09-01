@@ -66,6 +66,9 @@ import {
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
+import { apiFetch } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+import { lineName } from "./sales-order-facts";
 import {
   useDeliveryArrangement,
   useDeliveryPartners,
@@ -117,7 +120,45 @@ export const ED = {
   noLift: "No lift",
   loadFailed: "That delivery could not be loaded",
   condoOnly: "Condo deliveries need a driver and vehicle before the day.",
+  /** Delivery Card 05 — the chase door and the real reply evidence. */
+  askPartner: (name: string) => `Ask ${name} for the delivery date`,
+  copyMessage: "Copy message",
+  copied: "Message copied",
+  openGroup: "Open WhatsApp group",
+  groupNotSet: "No WhatsApp group saved for this partner",
+  sentIsNotConfirmed:
+    "Sending is not confirmation. Record the date only after the partner replies, and upload the reply below.",
+  uploadReply: "Upload reply screenshot",
+  replaceReply: "Replace screenshot",
+  replySaved: "Reply screenshot attached — Save Delivery keeps it",
+  uploadFailed: "The screenshot could not be uploaded",
+  uploadWrongType: "Use a JPG, PNG or WEBP screenshot",
+  uploadTooLarge: "That screenshot is too large (max 10 MB)",
 } as const;
+
+/**
+ * The prepared WhatsApp message — plain facts, primary-school English, and
+ * NOTHING that reads as a confirmation (`docs/delivery/MASTER.md` §2: prepared,
+ * copied, opened or sent never means confirmed). Pure and exported for its test.
+ */
+export function chaseMessageFor(input: {
+  so: number | null;
+  customer: string | null;
+  address: string | null;
+  building: string | null;
+  goods: string[];
+  requestedDate: string | null; // already formatted, or null
+}): string {
+  const lines = [
+    `SO-${input.so ?? "?"} · ${input.customer ?? ""}`.trim(),
+    input.address ?? "",
+    input.building ? `Building: ${input.building}` : "",
+    input.goods.length > 0 ? `Goods: ${input.goods.join(", ")}` : "",
+    input.requestedDate ? `Customer asked: ${input.requestedDate}` : "Customer date not given yet",
+    "Please confirm the delivery date and time.",
+  ];
+  return lines.filter(Boolean).join("\n");
+}
 
 /** A printed fact, quiet when it is an absence (the register's own rule). */
 function Fact({ label, value }: { label: string; value: string | null }) {
@@ -196,6 +237,78 @@ export default function EditDelivery() {
       value: SaveDeliveryArrangementInput[K],
     ) => setForm((f) => ({ ...f, [key]: value })),
     [],
+  );
+
+  /* ── Delivery Card 05: the chase door — prepared words, never confirmation. */
+  const chosenPartner = useMemo(
+    () => partners.find((p) => p.id === form.partnerId) ?? null,
+    [partners, form.partnerId],
+  );
+  const chaseMessage = useMemo(() => {
+    if (!order) return "";
+    return chaseMessageFor({
+      so: (order.so as number | null) ?? null,
+      customer: displayCustomerName((order.customer_name as string | null) ?? "") || null,
+      address:
+        ((order.customer_address as string | null) ??
+          [order.customer_address_city, order.customer_address_state]
+            .filter(Boolean)
+            .join(", ")) || null,
+      building:
+        ((order as { building_type?: string | null }).building_type as string | null) ?? null,
+      goods: (order.order_lines ?? []).map((l) => lineName({ sku: l.sku })),
+      requestedDate: order.delivery_date_tbd
+        ? null
+        : order.delivery_date
+          ? fmtDate(order.delivery_date)
+          : null,
+    });
+  }, [order]);
+  const copyChase = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(chaseMessage);
+      toast.success(ED.copied);
+    } catch {
+      toast.error("Could not copy — select the text and copy it yourself");
+    }
+  }, [chaseMessage]);
+
+  /* ── Delivery Card 05: the REAL reply evidence — an upload, not a typed path. */
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const uploadReply = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUploadError(null);
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || !orderId) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        setUploadError(ED.uploadWrongType);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadError(ED.uploadTooLarge);
+        return;
+      }
+      setUploadBusy(true);
+      try {
+        const sign = await apiFetch<{ token: string; path: string }>(
+          `/api/operation/delivery-arrangements/${encodeURIComponent(orderId)}/reply-proof/sign-upload?leg=${leg}`,
+          { method: "POST", body: JSON.stringify({ mimeType: file.type, sizeBytes: file.size }) },
+        );
+        const { error } = await supabase.storage
+          .from("proof-of-delivery")
+          .uploadToSignedUrl(sign.path, sign.token, file);
+        if (error) throw new Error(error.message);
+        set("replyProofPath", sign.path);
+        toast.success(ED.replySaved);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : ED.uploadFailed);
+      } finally {
+        setUploadBusy(false);
+      }
+    },
+    [orderId, leg, set],
   );
 
   const partnerName = useMemo(
@@ -469,6 +582,47 @@ export default function EditDelivery() {
               </select>
             </Field>
 
+            {chosenPartner && (
+              <div
+                className="flex flex-col gap-2 rounded-control border border-kit-slate-5 bg-white p-3"
+                data-testid="edit-delivery-chase"
+              >
+                <span className="text-meta font-semibold text-kit-slate-12">
+                  {ED.askPartner(chosenPartner.name)}
+                </span>
+                <pre
+                  className="whitespace-pre-wrap font-sans text-meta text-kit-slate-11"
+                  data-testid="edit-delivery-chase-message"
+                >
+                  {chaseMessage}
+                </pre>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+                    onClick={copyChase}
+                    data-testid="edit-delivery-copy-message"
+                  >
+                    {ED.copyMessage}
+                  </button>
+                  {chosenPartner.whatsapp_group_url ? (
+                    <a
+                      className="inline-flex h-7 items-center rounded-control border border-kit-slate-6 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+                      href={chosenPartner.whatsapp_group_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid="edit-delivery-open-whatsapp"
+                    >
+                      {ED.openGroup}
+                    </a>
+                  ) : (
+                    <span className="text-label text-kit-slate-9">{ED.groupNotSet}</span>
+                  )}
+                </div>
+                <span className="text-label text-kit-amber-11">{ED.sentIsNotConfirmed}</span>
+              </div>
+            )}
+
             {needsReason && (
               <Field label={ED.reason}>
                 <select
@@ -516,13 +670,36 @@ export default function EditDelivery() {
                 />
               </Field>
               <Field label={ED.proof}>
-                <input
-                  className={INPUT}
-                  placeholder={ED.notRecorded}
-                  value={form.replyProofPath ?? ""}
-                  onChange={(e) => set("replyProofPath", e.target.value || null)}
-                  data-testid="edit-delivery-proof"
-                />
+                <div className="flex flex-col gap-1" data-testid="edit-delivery-proof">
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex h-7 cursor-pointer items-center rounded-control border border-kit-slate-6 bg-white px-3 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3">
+                      {form.replyProofPath ? ED.replaceReply : ED.uploadReply}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={uploadReply}
+                        disabled={uploadBusy}
+                        data-testid="edit-delivery-proof-upload"
+                      />
+                    </label>
+                    {form.replyProofPath ? (
+                      <span
+                        className="text-label text-kit-slate-11"
+                        data-testid="edit-delivery-proof-path"
+                      >
+                        {form.replyProofPath.split("/").pop()}
+                      </span>
+                    ) : (
+                      <span className="text-label text-kit-slate-9">{ED.notRecorded}</span>
+                    )}
+                  </div>
+                  {uploadError && (
+                    <span className="text-label text-danger" data-testid="edit-delivery-proof-error">
+                      {uploadError}
+                    </span>
+                  )}
+                </div>
               </Field>
             </div>
 
