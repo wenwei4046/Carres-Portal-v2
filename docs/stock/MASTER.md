@@ -204,10 +204,44 @@ An individually signed-in NETS operator sees only permitted physical work: recei
 or Count again, check and pack, hand over, Report a problem and upload evidence. NETS cannot see
 purchase cost, Supplier Invoice, customer payment, Adjustment approval or unrelated staff work.
 
-Inbound groups actual expected-arrival and receipt work by governed date. It shows clickable source
-document number and date, Supplier, destination, quantity, exact Units where already assigned,
-linked SO No and SO date where applicable, expected arrival and the concrete receiving action.
-Receiving remains the receipt authority.
+Inbound is the dated projection of physical goods expected to enter Carres control. It answers what
+should arrive, what Receiving proved arrived, what has not yet arrived and what Warehouse must do;
+it is not a second Receiving form. It covers Purchase Order, Consignment Order, Customer Return,
+Site-transfer arrival, supplier replacement and a Unit returning from repair while preserving each
+source object's own authority.
+
+For the selected actual date, the Register defaults are:
+
+```
+Expected arrival · Source · Supplier/source party · Destination ·
+Expected · Received · Not yet received · Work
+```
+
+`Source` is the clickable PO, Consignment Order, Return, Transfer, replacement or Repair record.
+When customer demand is connected, the row also shows `SO No · SO date`; PO-backed work shows
+`PO No · PO date`. The Workspace shows the same document identity, expected/received/not-yet-
+received tally, `With issue` as a subset of received goods, and the governed Unit IDs. The one
+action door is `Open Receiving Session`; Inbound cannot submit or post a receipt.
+
+An individually signed-in NETS operator uses Receiving to scan each actual Unit and record Received,
+Received with issue, rejected/not delivered or another governed receipt outcome. After the GRN is
+posted, Inbound updates from that authority:
+
+- received acceptable Unit → Inventory at the actual receiving Site/current holder;
+- received with issue → Inventory under `Needs checking`, never Ready Stock;
+- not yet received → remains in Inbound;
+- the supplier/PO consequence routes to Purchasing; Warehouse does not guess a replacement date.
+
+When the expected date passes with no Receiving result, Inbound must not accuse the supplier of
+being late. It states `Expected arrival was {actual date}` and `No Receiving result was submitted`,
+then routes the dated action `Check whether these {n} Units arrived at {Site}` to the current GRN
+Duty. The investigation resolves to one evidence-backed path: complete Receiving if goods arrived;
+Purchasing contacts the supplier if they did not; Purchasing records a formally changed promise;
+or Receiving records the actual Site and `Needs checking` handles a wrong-Site result.
+
+The expected row remains under its original actual date with `{n} not done` until an authoritative
+result exists. Inbound never moves it into `Today`, silently changes its date or treats a planned
+arrival as physical Stock.
 
 Inventory is the one current list. Its left rail filters the same Unit authority:
 
