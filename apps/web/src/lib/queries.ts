@@ -59,6 +59,7 @@ import {
   type SalesOrderAllocation,
   type DeliveryAttemptRow,
   type DeliveryAttemptRecordInput,
+  type DeliveryWarehouseScheduleEvent,
   type AutocountImportInput,
   type AutocountImportResponse,
   type SpecialAddonDto,
@@ -6451,6 +6452,18 @@ export function useDeliveryArrangements() {
     queryKey: ["operation", "delivery-arrangements"],
     queryFn: () =>
       apiFetch<DeliveryArrangementsPayload>("/api/operation/delivery-arrangements"),
+    staleTime: 30_000,
+  });
+}
+
+/** Delivery's read-only event feed for the shared Warehouse Schedule. */
+export function useDeliveryWarehouseSchedule() {
+  return useQuery<{ events: DeliveryWarehouseScheduleEvent[] }, ApiError>({
+    queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+    queryFn: () =>
+      apiFetch<{ events: DeliveryWarehouseScheduleEvent[] }>(
+        "/api/operation/delivery-arrangements/warehouse-schedule",
+      ),
     staleTime: 30_000,
   });
 }

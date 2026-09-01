@@ -34,8 +34,11 @@ const ORDER_B = "00000000-0000-0000-0000-0000000a0002";
 const NETS = "00000000-0000-0000-0000-0000000b0001";
 const AL = "00000000-0000-0000-0000-0000000b0002";
 
-async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
+async function makeJwt(role: string, warehouseId?: string) {
+  return new SignJWT({
+    email: `${role}@x`,
+    app_metadata: { role, ...(warehouseId ? { warehouse_id: warehouseId } : {}) },
+  })
     .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
     .setSubject("11111111-1111-1111-1111-000000000001")
     .setIssuedAt()
@@ -92,8 +95,8 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
   return { from, inserts, upserts };
 }
 
-async function call(path: string, role: string, init?: RequestInit) {
-  const jwt = await makeJwt(role);
+async function call(path: string, role: string, init?: RequestInit, warehouseId?: string) {
+  const jwt = await makeJwt(role, warehouseId);
   return app.fetch(
     new Request(`http://t/api/operation/delivery-arrangements${path}`, {
       ...init,
@@ -252,6 +255,175 @@ describe("POST /assign — one partner onto one or many scopes", () => {
     mockSb([]);
     const res = await assign({ scopes: [{ orderId: ORDER_A, leg: 0 }], partnerId: NETS }, "supplier");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
+  it("projects one assigned exact Unit onto the real Saturday pickup with Friday readiness", async () => {
+    const { inserts, upserts } = mockSb([
+      {
+        data: [{
+          id: "arr-1",
+          order_id: ORDER_A,
+          leg: 0,
+          partner_id: NETS,
+          confirmed_date: "2026-09-05",
+          confirmed_time: "Morning (9am–12pm)",
+          expected_arrival: "11:00:00",
+          logistics_note: null,
+          reply_proof_path: "arrangements/arr-1/reply.jpg",
+          driver_name: "Ahmad",
+          vehicle: "VAN-7",
+          updated_at: "2026-09-01T00:00:00Z",
+          updated_by: "user-1",
+          delivery_partners: { id: NETS, name: "NETS" },
+        }],
+      },
+      {
+        data: [{
+          id: ORDER_A,
+          so: 1322,
+          customer_address: "12 Jalan Meru, Klang",
+          delivered_at: null,
+          do_file_path: null,
+          pod_signature_url: null,
+        }],
+      },
+      {
+        data: [{
+          id: "do-1",
+          order_id: ORDER_A,
+          do_number: "DO-010926-1322",
+          trip_groups: null,
+          voided_at: null,
+        }],
+      },
+      {
+        data: [{
+          unit_code: "CAR-000123",
+          warehouse_id: "wh-1",
+          reserved_ref: "SO-1322",
+          sold_order_id: null,
+        }],
+      },
+      { data: [] },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    expect(body.events).toHaveLength(2);
+    expect(body.events[0]).toMatchObject({
+      title: "Customer delivery pickup",
+      unitId: "CAR-000123",
+      eventDate: "2026-09-05",
+      operationsReadyBy: "2026-09-04",
+      fromLocation: "Carres Klang",
+      toCustomer: "12 Jalan Meru, Klang",
+      logisticsPartner: "NETS",
+      driverName: "Ahmad",
+      vehicle: "VAN-7",
+      doNumber: "DO-010926-1322",
+      actualCollectionAt: null,
+      hasEvidence: false,
+      custody: null,
+      deliveryOrderHref: "/operation/delivery-orders/DO-010926-1322",
+    });
+    expect(body.events[1]).toMatchObject({
+      title: "Customer handover",
+      eventDate: "2026-09-05",
+      unitId: "CAR-000123",
+    });
+    expect(inserts).toEqual([]);
+    expect(upserts).toEqual([]);
+  });
+
+  it("does not expose the internal Warehouse feed to a Partner role", async () => {
+    mockSb([]);
+    const res = await call("/warehouse-schedule", "partner");
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a Warehouse login read only exact Units physically assigned to its own Warehouse", async () => {
+    mockSb([
+      {
+        data: [{
+          id: "arr-1",
+          order_id: ORDER_A,
+          leg: 0,
+          partner_id: NETS,
+          confirmed_date: "2026-09-05",
+          confirmed_time: "Morning (9am–12pm)",
+          expected_arrival: "11:00:00",
+          logistics_note: "internal note must not ride the projection",
+          reply_proof_path: null,
+          driver_name: "Ahmad",
+          vehicle: "VAN-7",
+          updated_at: "2026-09-01T00:00:00Z",
+          updated_by: "user-1",
+          delivery_partners: { id: NETS, name: "NETS" },
+        }],
+      },
+      {
+        data: [{
+          id: ORDER_A,
+          so: 1322,
+          customer_address: "12 Jalan Meru, Klang",
+          delivered_at: null,
+          do_file_path: null,
+          pod_signature_url: null,
+        }],
+      },
+      {
+        data: [{
+          id: "do-1",
+          order_id: ORDER_A,
+          do_number: "DO-010926-1322",
+          trip_groups: null,
+          voided_at: null,
+        }],
+      },
+      {
+        data: [
+          {
+            unit_code: "CAR-OWN-001",
+            warehouse_id: "wh-own",
+            reserved_ref: "SO-1322",
+            sold_order_id: null,
+          },
+          {
+            unit_code: "CAR-OTHER-002",
+            warehouse_id: "wh-other",
+            reserved_ref: "SO-1322",
+            sold_order_id: null,
+          },
+        ],
+      },
+      { data: [] },
+      {
+        data: [
+          { id: "wh-own", name: "Own Warehouse" },
+          { id: "wh-other", name: "Other Warehouse" },
+        ],
+      },
+      { data: [] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "warehouse", undefined, "wh-own");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    expect(body.events).toHaveLength(2);
+    expect(new Set(body.events.map((event) => event.unitId))).toEqual(
+      new Set(["CAR-OWN-001"]),
+    );
+    for (const event of body.events) {
+      expect(event).toMatchObject({ driverName: "Ahmad", vehicle: "VAN-7" });
+      expect(event).not.toHaveProperty("logisticsNote");
+      expect(event).not.toHaveProperty("price");
+      expect(event).not.toHaveProperty("payment");
+    }
   });
 });
 
