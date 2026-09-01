@@ -7,6 +7,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
+import { purchasingRefusal } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -1445,6 +1446,150 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
   });
 });
 
+/**
+ * EVERY REFUSAL ON THIS DOOR ARRIVES WITH WORDS (YH, 2026-09-01).
+ *
+ * Four throw sites on `POST /issue` were bare `c.json({ error, code })` while
+ * their neighbours ten lines away already used `refuse()`. A bare body carries
+ * no `message` and no `action`, so the browser fell through to the honest
+ * fallback — "The Portal refused this purchase order. Tell IT the message on
+ * screen." — for the TWO COMMONEST outcomes of this door. Nothing was broken
+ * and nothing was said.
+ *
+ * These tests assert the CONTRACT, not the spelling: every refusal carries a
+ * message and an action, and neither is the fallback. `purchasing-refusals.ts`
+ * owns the words and its own suite pins their shape, so a ruled reword changes
+ * one file and passes here untouched.
+ */
+describe("POST /purchasing/requests/issue — a refusal says what is wrong and what to do", () => {
+  const FALLBACK = purchasingRefusal("__not_a_code__");
+
+  function sbWith(
+    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
+    rpc: ReturnType<typeof vi.fn>,
+  ) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(over.requests ?? REQUESTS, { filterInBy: "id" });
+          case "purchase_demands":
+            return tableStub(over.lines ?? LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub(
+              over.skus ?? [
+                { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+                { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+              ],
+            );
+          case "suppliers":
+            return tableStub([{ id: SUP, kind: "own_logistics" }]);
+          case "warehouses":
+            return tableStub([
+              { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => {
+        if (fn === "purchasing_actor_may_issue") return Promise.resolve({ data: true, error: null });
+        return rpc(fn, args);
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function issueAgainst(
+    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
+    body: unknown,
+  ) {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: [] }, error: null });
+    vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc, body: (await res.json()) as Record<string, string> };
+  }
+
+  /** The whole contract in one place: a code, words, and NOT the fallback. */
+  function expectSpoken(payload: Record<string, string>, code: string) {
+    expect(payload.code, "the code still travels").toBe(code);
+    expect(payload.message, `${code} has a fact`).toBeTruthy();
+    expect(payload.action, `${code} has an act`).toBeTruthy();
+    expect(payload.message, `${code} is not the fallback`).not.toBe(FALLBACK.wrong);
+    expect(payload.action, `${code} is not the fallback`).not.toBe(FALLBACK.todo);
+  }
+
+  it("names a Manual Purchase that is no longer on the list", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      { requests: [REQUESTS[0]] },
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(404);
+    expectSpoken(body, "unknown_request");
+    expect(rpc, "nothing was created").not.toHaveBeenCalled();
+  });
+
+  /* ⭐ ONE CODE CANNOT SAY TWO THINGS. `not_ready_to_order` used to cover BOTH
+     "nobody has approved this yet" and "somebody refused this" — opposite
+     facts with opposite next acts. The route separates them; these two tests
+     are what stop them being folded back together. */
+  it("separates a Manual Purchase nobody has approved yet", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      {
+        requests: [
+          { ...REQUESTS[0], approved_at: null, refused_at: null, approval_required: true },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "not_ready_to_order");
+    expect(body.requestId, "the row is named so the operator can find it").toBe(REQ_A);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("separates a Manual Purchase somebody refused", async () => {
+    const { res, body } = await issueAgainst(
+      { requests: [{ ...REQUESTS[0], refused_at: "2026-08-30T02:00:00Z" }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "request_refused");
+    /* The two are genuinely different sentences, not one word reused. */
+    expect(body.message).not.toBe(purchasingRefusal("not_ready_to_order").wrong);
+  });
+
+  it("names an issue with nothing left to buy on it", async () => {
+    const { res, body } = await issueAgainst(
+      { lines: [{ ...LINES[0], approved_qty: 2, issued_qty: 2 }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "nothing_to_issue");
+  });
+
+  it("names the SKU whose supplier the catalog does not hold", async () => {
+    const { res, body } = await issueAgainst(
+      {
+        lines: [LINES[0]],
+        skus: [{ sku: "5539-2NA", supplier_id: null, cost: 850, product_models: { category: "sofa" } }],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "unresolved_supplier");
+    /* The sentence names the SKU rather than saying "an item". */
+    expect(body.message).toContain("5539-2NA");
+  });
+});
 
 /**
  * A MANUAL PURCHASE ARRIVES WHOLE, OR NOT AT ALL (0410, YH 2026-09-01).

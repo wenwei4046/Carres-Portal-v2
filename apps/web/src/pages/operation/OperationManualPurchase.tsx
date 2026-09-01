@@ -448,7 +448,15 @@ export default function OperationManualPurchase() {
   /* ── SELECTION (Card 04) — only `Ready to order` remainder may be ticked;
      PO Duty exists on this page ONLY beside a live selection. ─────────── */
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [issueError, setIssueError] = useState<string | null>(null);
+  /* ⭐ A REFUSAL IS TWO LINES HERE TOO (YH, 2026-09-01). This held ONE
+     string, built by joining `message` and `action` with a space — so the fact
+     and the act ran together into a single red sentence, on the one surface in
+     this file that was not already using `TwoLines`. The object page eighty
+     lines down has held the pair since it was written; the Register simply
+     never did. Same shape, same component, no new one. */
+  const [issueError, setIssueError] = useState<{ wrong: string; todo: string } | null>(
+    null,
+  );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
   const selectedRows = useMemo(
@@ -465,7 +473,13 @@ export default function OperationManualPurchase() {
     const ids = selectedRows.map((r) => r.id);
     if (ids.length === 0) return;
     if (ids.length > 20) {
-      setIssueError("Select at most 20 requests for one issue.");
+      /* The one cap this door enforces in the browser. It is a refusal like
+         any other, so it wears the refusal shape rather than a lone sentence
+         invented at the throw site. */
+      setIssueError({
+        wrong: "One issue can carry 20 Manual Purchases at most.",
+        todo: `Untick ${ids.length - 20} of them, then issue again.`,
+      });
       return;
     }
     try {
@@ -480,9 +494,10 @@ export default function OperationManualPurchase() {
       const body = (e as { body?: { message?: string; action?: string; code?: string } })
         .body;
       const fallback = purchasingRefusal(body?.code);
-      setIssueError(
-        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
-      );
+      setIssueError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
     }
   }
 
@@ -1009,10 +1024,17 @@ export default function OperationManualPurchase() {
               </span>
             </div>
           ) : null}
-          {issueError && selectedRows.length > 0 ? (
-            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-issue-selected-error">
-              {issueError}
-            </p>
+          {/* ⭐ A REFUSAL OUTLIVES THE SELECTION THAT CAUSED IT (YH,
+              2026-09-01). This was gated on `selectedRows.length > 0`, and the
+              refusal that most needs reading is the one where the rows go away:
+              somebody else issued the request, the refetch drops it from the
+              list, the selection empties — and the sentence explaining all of
+              that disappeared in the same tick. The operator saw a list that
+              had quietly changed and no reason for it. */}
+          {issueError ? (
+            <div className="mt-1" data-testid="mp-issue-selected-error">
+              <TwoLines wrong={issueError.wrong} todo={issueError.todo} />
+            </div>
           ) : null}
         </div>
 

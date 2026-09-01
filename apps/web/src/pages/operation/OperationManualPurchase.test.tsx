@@ -1246,6 +1246,66 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     expect(err).toHaveTextContent("You do not hold PO duty today.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
+
+  /* ⭐ TWO LINES MEANS TWO LINES (YH, 2026-09-01).
+     The two assertions above pass on a SINGLE joined sentence, which is what
+     this surface actually rendered — `${message} ${action}` with a space —
+     because `toHaveTextContent` reads the whole subtree. The object page
+     eighty lines over has used `TwoLines` since it was written; the Register
+     never did. These two pin the shape and the lifetime that the text
+     assertions cannot see. */
+  it("draws the fact and the act as two lines, not one joined sentence", async () => {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "not_ready_to_order",
+              message: "One Manual Purchase has not been approved yet.",
+              action: "Ask its approver to Approve it, then issue again.",
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respond(url));
+    });
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    const lines = err.firstElementChild!;
+    expect(lines.children).toHaveLength(2);
+    expect(lines.children[0]).toHaveTextContent("One Manual Purchase has not been approved yet.");
+    expect(lines.children[1]).toHaveTextContent("Ask its approver to Approve it, then issue again.");
+  });
+
+  it("keeps the refusal on screen after the selection it names goes away", async () => {
+    /* The refusal that MOST needs reading is the one where the rows vanish —
+       somebody else issued the request, the list refetches without it, the
+       selection empties. The message used to disappear in that same tick, so
+       the operator saw a changed list and no reason for it. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "unknown_request",
+              message: "One Manual Purchase on this list is no longer there.",
+              action: "Reload the page, then tick the ones that are left and issue again.",
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respond(url));
+    });
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    await screen.findByTestId("mp-issue-selected-error");
+    /* Untick — the same emptying the refetch would have caused. */
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    expect(screen.getByTestId("mp-issue-selected-error")).toHaveTextContent(
+      "One Manual Purchase on this list is no longer there.",
+    );
+  });
 });
 
 
