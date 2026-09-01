@@ -275,12 +275,19 @@ without reopening it with Loo.
    screen, two numbers** — ownership Law D, and the exact defect the stair Card
    was opened to close. Fix: make the line-writing paths re-stamp too.
 
-2. **`SO Date` is unregistered and contradicts the dictionary.** Commit
-   `11e11ca2` renamed `Ordered` → `SO Date` on five surfaces with no
-   COPY-STANDARD entry, and the table at `COPY-STANDARD:1756` still rules
-   `Ordered: {date}` for that exact fact. Shipped code breaks the dictionary it
-   is ruled by. Register `SO Date` against `orders.placed_at` and retire the old
-   row — or revert the rename. YH decides which.
+2. ~~**`SO Date` is unregistered and contradicts the dictionary.**~~ **CLOSED
+   2026-09-01 — YH ruled REGISTER, not revert.** `SO Date` is now a `Use
+   exactly` row in `docs/COPY-STANDARD.md`, and the Order Route table that
+   ruled `Ordered: {date}` for the same fact prints `SO Date: {date}` with it.
+   `Ordered` and `Ordered Qty` stay Purchasing's words, which is the reason the
+   tie broke this way: a Purchase Order is *Ordered* when it reaches the
+   factory, and one word for two modules' facts on one operator's screen is how
+   a header stops being trusted.
+   **The reading lesson, kept because it is the reusable part:** the rename
+   shipped on five surfaces and nothing anywhere checked it against the
+   dictionary, so the contradiction survived five days in plain sight. No gate
+   reads COPY-STANDARD. Until one does, a rename is only as good as the person
+   who remembers this file exists.
 
 3. **The instalment-months 500.** `orders_installment_months_chk` allows
    NULL/6/12 and nothing above the database knows. A proposal of 9 saves fine and

@@ -1593,6 +1593,7 @@ rewording.
 | The footer's category tally | the governed words only — `Mattress · Bedframe · Sofa · Pillow · Mattress protector · Topper · Footrest · Service` | any raw SKU word, and above all `M.P` — the AutoCount sheet's abbreviation. ⛔ **`Other goods` is COUNTED BUT NO LONGER PRINTED here** (YH, 2026-08-27) — this overwrites the earlier "never dropped from the count". The word reports a CATALOG GAP (a line with no catalog row, or a catalogued `guarantee` item, since this vocabulary covers five of the catalog's six categories), which is not a fact about the customer's goods and is not actionable from a register footer. 🟡 The printed numbers therefore no longer sum to the order's item count; `footerWord` is untouched and still computes the bucket |
 | Copy this order into a new one, from the object page | **`Copy to new Sales Order`** | Duplicate · Clone · New from this |
 | The object MONEY card's door to the collections desk | **`Open this order in Payments`** | View payments · Go to Payments · Collect |
+| The day the Sales Order was taken — register column, Order info, Order Route, field catalog | **`SO Date`** | `Ordered` · `Ordered Qty` · Order date · Placed · Created · Taken on. **REGISTERED 2026-09-01 (YH), five days after the screens started printing it.** `11e11ca2` renamed this fact on five surfaces and never wrote it down here, so the dictionary went on saying `Ordered: {date}` while every screen said `SO Date` — the exact drift Law 1 exists to stop, and it survived because nothing checks a rename against this file. **Why `SO Date` wins the tie:** `Ordered` is Purchasing's word. A Purchase Order is *Ordered* when it goes to the factory, and `Ordered Qty` is a purchasing column on the same operator's screen — one word for two modules' facts is how an operator learns to distrust the header. Sales Orders name their own fact after their own document. The row above under THE ORDER ROUTE WORDS moves with it: the Route node prints `SO Date: {date}`. |
 | Payments' chip for that scope | **`Sales Order SO-{n}`** | Filtered by order · Order scope |
 | Order Route, a promise with no trip arranged | **`Customer date {date} · Delivery not arranged`** | `Promised this day, no date yet` — retired 2026-08-15: it named a day and denied it in one line |
 | Order Route, no promise at all | **`No delivery date`** | any second spelling — this is the same governed value the Register prints |
@@ -1795,7 +1796,7 @@ inside the object already open, so it has no circular `Open SO-{n} →` action.
 
 | Fact | Prints |
 |---|---|
-| The day the order was taken | **`Ordered: {date}`** |
+| The day the order was taken | **`SO Date: {date}`** |
 | The day the customer asked for | **`Customer requested: {date}`** |
 | The day the delivery is due | **`Due: {date}`** |
 | The day the Purchase Order was issued | **`Issued: {date}`** |
