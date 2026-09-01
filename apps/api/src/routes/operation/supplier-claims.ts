@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
+  CARRES_EXECUTION_KEYS,
   CUSTOMER_RESOLUTION_KEYS,
   HELD_STOCK_STATUS,
   STOCK_HOLD_OUTCOME_KEYS,
@@ -40,8 +41,17 @@ import type { AppEnv } from "../../types";
  * doing for the customer?" and is a SECOND decision beside the item's outcome,
  * never a replacement for it — the customer can cancel AND the mattress be
  * destroyed, and a single list would force the operator to record only one of
- * the two. It derives no consequence: consequences are f(Resolution, Execution)
- * and Carres Execution is frozen-but-unbuilt (Loo, 2026-08-05).
+ * the two.
+ *
+ * Layer ④ adds the ORDER OF EVENTS (0409) and completes Loo's model. `Carres
+ * Execution` answers "in what order do the goods actually move?" — a third
+ * independent axis, because `replace` is a promise and `Replace First` /
+ * `Collect First` are two ways of keeping it that leave Carres holding a
+ * different number of units. Both arguments of f(Resolution, Execution) now
+ * exist, so the consequence is computable for the first time; WHICH stock,
+ * finance and demand moves each pair produces is still unruled and is not
+ * guessed here. Purchase Returns (§9.6) and Repair Orders (§9.7) were frozen on
+ * exactly this missing argument.
  *
  *   GET  /                — the queue (status filter, names, who owes next)
  *   GET  /:id/photos      — signed URLs for that claim's evidence
@@ -50,6 +60,7 @@ import type { AppEnv } from "../../types";
  *   POST /:id/close       — settle it (refuses unless both sides are on file)
  *   POST /:id/hold-resolve — R4: what happened to the quarantined units
  *   POST /:id/customer-resolution — layer ③: what we are doing for the customer
+ *   POST /:id/carres-execution    — layer ④: in what order the goods move
  *
  * Role: operation + principal, on every route. `supplier_claims` RLS admits
  * every internal role (principal/operation/finance/bd) for SELECT; this
@@ -134,7 +145,7 @@ supplierClaimsRouter.get("/", async (c) => {
     let q = sb
       .from("supplier_claims")
       .select(
-        "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at",
+        "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
       )
       .order("reported_at", { ascending: false })
       .order("id", { ascending: false });
@@ -519,6 +530,50 @@ supplierClaimsRouter.post("/:id/customer-resolution", async (c) => {
     {
       p_claim_id: c.req.param("id"),
       p_resolution: parsed.data.customer_resolution,
+      p_note: parsed.data.note ?? null,
+    },
+  );
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/**
+ * Layer ④ — in what ORDER the goods move (0409).
+ *
+ * The last of Loo's four layers, ruled 2026-08-05 alongside layer ③ and left
+ * frozen until now. It is a SEPARATE axis from the customer's resolution, not a
+ * narrowing of it: `replace` is a promise, and `Replace First` and
+ * `Collect First` are two ways of keeping it that leave Carres holding a
+ * different number of units for as long as the collection takes.
+ *
+ * Deliberately shaped exactly like the customer-resolution route above — same
+ * gate, same optional note, same enum-from-shared. Two layers recorded through
+ * two doors that behave differently is how they start disagreeing about who may
+ * record what.
+ *
+ * **It still derives no consequence.** f(Resolution, Execution) is computable
+ * for the first time, but which stock, finance and demand moves each pair
+ * produces is unruled, and this route is not where that gets guessed.
+ */
+const carresExecutionSchema = z.object({
+  carres_execution: z.enum(CARRES_EXECUTION_KEYS),
+  note: noteSchema,
+});
+
+supplierClaimsRouter.post("/:id/carres-execution", async (c) => {
+  gate(c);
+  const parsed = await parseJsonBody(c, carresExecutionSchema);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc(
+    "supplier_claim_record_carres_execution",
+    {
+      p_claim_id: c.req.param("id"),
+      p_execution: parsed.data.carres_execution,
       p_note: parsed.data.note ?? null,
     },
   );

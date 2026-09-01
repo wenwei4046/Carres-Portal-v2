@@ -313,10 +313,15 @@ export function responseNeedsNote(response: string | null | undefined): boolean 
 // ── And what this module must NOT do ────────────────────────────────────────
 // **Consequences are `f(Resolution, Execution)`, never `f(Resolution)`** (Loo's
 // law 5). Carres Execution — `Return to Supplier · Collect Defective Item ·
-// Replace First · Collect First · Exchange on Collection` — is frozen and NOT
-// built, so nothing here derives a Stock, Finance or Demand consequence. A
-// screen may only show what is true right now, and with Execution unknown,
-// none of those three is yet known at all.
+// Replace First · Collect First · Exchange on Collection` — is BUILT as of
+// 2026-09-01 (`CARRES_EXECUTIONS` below, migration 0409), so both arguments now
+// exist and the consequence is computable for the first time.
+//
+// **It is still not computed here, and that is not lag.** Which stock, finance
+// and demand moves each (Resolution, Execution) pair produces has never been
+// ruled — the freeze was on the missing argument, and lifting it does not
+// license guessing the function. Nothing in this module derives a consequence
+// until that ruling exists.
 
 export type CustomerResolution =
   | "replace"
@@ -369,6 +374,118 @@ export function customerResolutionMeaning(
 ): string | null {
   return isCustomerResolution(key)
     ? CUSTOMER_RESOLUTION_MEANING[key as CustomerResolution]
+    : null;
+}
+
+// ── Carres Execution · in what ORDER do the goods actually move? ─────────────
+//
+// The fourth and last layer of Loo's claim model (ruled 2026-08-05, built
+// 2026-09-01). Layer ③ above says what the customer GETS; this says how the
+// goods get there — and the two are different questions with different answers:
+// *replace* is a promise, `Replace First` and `Collect First` are two ways of
+// keeping it that leave Carres holding a different number of units for a week.
+//
+// **The vocabulary is Loo's, transcribed, not invented.** It sat in this file's
+// own header as prose from 0324 onward and in no dictionary, which is the exact
+// failure COPY-STANDARD's "Claims decision words" section was written to stop:
+// a word that has been ruled and is not written down is a word the next chat
+// re-invents. It is now registered there like any other locked string.
+//
+// ── Why `Return to Supplier` is here AND an Item Outcome, and is not a bug ───
+// It reads like a duplicate of `STOCK_HOLD_OUTCOMES`'s `returned_to_supplier`
+// and it is not, for the same reason `Repair` sits on both the supplier's
+// answer list and the customer's resolution list. The Item Outcome is a fact
+// about the UNIT — where it physically ended up. This is a fact about the
+// CHOREOGRAPHY — that there is no customer leg at all, which is what makes it
+// the fifth option rather than four. They are allowed to disagree: a claim may
+// execute `Collect First` and still end with the unit written off.
+//
+// ── What this layer STILL does not do ───────────────────────────────────────
+// **It derives no consequence yet.** `f(Resolution, Execution)` is now
+// computable for the first time — both arguments finally exist — but WHICH
+// stock, finance and demand moves each pair produces is not ruled, and a screen
+// that guessed would be wrong with a screen's authority. This layer makes the
+// consequence card POSSIBLE; it does not pre-empt it. Purchase Returns (§9.6)
+// and Repair Orders (§9.7) are the documents that consume it, and both were
+// frozen on exactly this missing argument.
+//
+// ── And it is NOT cross-validated against layer ③ — RULED, YH 2026-09-01 ────
+// `Replace First` with `no_replacement_required` is incoherent, and the
+// database admits it on purpose. This was put to the owner as an open question
+// and he ruled for the flexibility: **do not add the guard.** Two reasons he
+// accepted, both of which a later chat must answer before reversing it:
+//
+//   1. A CHECK across the two would COLLAPSE two layers Loo's model exists to
+//      keep apart. The moment answering one narrows the other, they are no
+//      longer two questions.
+//   2. It would refuse a real event. The van is already out collecting; the
+//      office records `Collect First` because it is happening, while the
+//      customer has not yet settled what they want. A matched-pair rule makes
+//      an operator type a false answer to record a true one — the failure this
+//      repo keeps finding whenever two things that move on different days are
+//      tied together.
+//
+// 0324 set the same precedent for layer ③. A consequence engine may revisit
+// this, because f(Resolution, Execution) only becomes computable once both are
+// on file; until that function is ruled, nothing derives from either.
+
+export type CarresExecution =
+  | "return_to_supplier"
+  | "collect_defective_item"
+  | "replace_first"
+  | "collect_first"
+  | "exchange_on_collection";
+
+export const CARRES_EXECUTIONS = [
+  { key: "return_to_supplier", label: "Return to Supplier" },
+  { key: "collect_defective_item", label: "Collect Defective Item" },
+  { key: "replace_first", label: "Replace First" },
+  { key: "collect_first", label: "Collect First" },
+  { key: "exchange_on_collection", label: "Exchange on Collection" },
+] as const satisfies readonly CaseOption<CarresExecution>[];
+
+export const CARRES_EXECUTION_KEYS = CARRES_EXECUTIONS.map((e) => e.key) as [
+  CarresExecution,
+  ...CarresExecution[],
+];
+
+export function carresExecutionLabel(key: string | null | undefined): string {
+  if (!key) return "—";
+  return CARRES_EXECUTIONS.find((e) => e.key === key)?.label ?? key;
+}
+
+export function isCarresExecution(key: string | null | undefined): boolean {
+  return !!key && CARRES_EXECUTIONS.some((e) => e.key === key);
+}
+
+/**
+ * One line under each option, so a new hire can tell the five apart.
+ *
+ * **A DEFINITION, never a consequence** — the same law layer ③'s meanings
+ * carry. Each line says which goods move and in what ORDER, and stops before
+ * saying what that does to stock, to money or to the outstanding quantity.
+ * Those are the consequence card's to rule, and naming one here would be a
+ * guess wearing a screen's authority.
+ *
+ * The order words are capitalised (`BEFORE`, `one visit`) because the order IS
+ * the decision: `Replace First` and `Collect First` differ in nothing else, and
+ * an operator who misreads which is which sends a van to the wrong address.
+ *
+ * COPY-STANDARD, "The Claims decision words" — locked strings like any label.
+ */
+export const CARRES_EXECUTION_MEANING: Record<CarresExecution, string> = {
+  return_to_supplier: "The item goes back to the supplier. Nothing goes to the customer.",
+  collect_defective_item: "Carres collects the item from the customer. Nothing goes out.",
+  replace_first: "The new item goes out BEFORE the old one is collected.",
+  collect_first: "The old item comes back BEFORE the new one goes out.",
+  exchange_on_collection: "Both change hands in one visit.",
+};
+
+export function carresExecutionMeaning(
+  key: string | null | undefined,
+): string | null {
+  return isCarresExecution(key)
+    ? CARRES_EXECUTION_MEANING[key as CarresExecution]
     : null;
 }
 
@@ -637,6 +754,12 @@ export interface SupplierClaimRow {
   customer_resolution: CustomerResolution | null;
   customer_resolution_note: string | null;
   customer_resolution_at: string | null;
+  // Layer ④ — in what ORDER the goods move (0409). Independent of ③: the same
+  // `replace` can be executed five ways, and two of them leave Carres holding a
+  // different number of units.
+  carres_execution: CarresExecution | null;
+  carres_execution_note: string | null;
+  carres_execution_at: string | null;
 }
 
 /** The one-line sentence a claim row shows — "3 units · Damaged · MS01-K".
