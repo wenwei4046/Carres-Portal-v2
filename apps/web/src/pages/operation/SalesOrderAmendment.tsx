@@ -31,6 +31,8 @@ import DatePicker from "@/components/kit/DatePicker";
 import Modal from "@/components/kit/Modal";
 import Textarea from "@/components/kit/Textarea";
 import Input from "@/components/kit/Input";
+import Select from "@/components/kit/Select";
+import { INSTALMENT_MONTHS } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import { fmtDate } from "@/lib/fmt-date";
 import {
@@ -313,34 +315,33 @@ export default function SalesOrderAmendment({
               value={deliveryDate}
               onChange={setDeliveryDate}
             />
-            {/* ⭐ ANY WHOLE NUMBER OF MONTHS (YH, 2026-09-01, and it is a
-                ruling rather than a tidy-up).
-                A proposal of 9 used to save, travel through every layer, and
-                die on `0007`'s CHECK at the PRINCIPAL's Approve press — raw
+            {/* ⭐ A TERM THAT CANNOT BE OFFERED CANNOT BE TYPED (YH,
+                2026-09-01).
+                This was a free number box, and it is why the failure existed:
+                a proposal of 9 months saved, travelled through every layer, and
+                died on `0007`'s CHECK at the PRINCIPAL's Approve press — raw
                 constraint text on the screen of the person who had just decided
-                the change was fine. The 9 was not the mistake; refusing it was.
-                `0411` widens the database to any whole number of months, so a
-                number box is the honest control here: this door exists for a
-                NEGOTIATED term, and a picker of the shop's two standard plans
-                is exactly the thing that refused a decision the principal had
-                already made.
-                ⛔ `min={1}` — zero months is not a plan and a negative one is
-                not a number anybody meant. Blank is how "no instalment" is
-                said, and an amendment uses it to take a plan off.
-                ⛔ AND THE POS IS UNCHANGED. It still renders two buttons and
-                `create_order` still refuses anything else, because a shop sells
-                the standard plans. An offer and a limit are different facts. */}
-            <Input
+                the change was fine.
+                The owner's ruling: if the POS sells 6 and 12, keep 6 and 12,
+                and widen only if she can still hit that error. She cannot. A
+                picker of the same two plans makes the failure structurally
+                impossible rather than merely refused earlier — nobody can
+                propose a term nobody can enter. A migration widening the
+                database was written for this and withdrawn unapplied, because
+                it fixed a value that can no longer be typed.
+                The options come from `INSTALMENT_MONTHS`, the one list every
+                door is built from. `No instalment` is the null: an amendment
+                can also take the plan OFF, which a number box could only
+                express as a blank. */}
+            <Select
               id="amd-installment-months"
               label="Instalment months"
-              type="number"
-              min={1}
-              value={installmentMonths == null ? "" : String(installmentMonths)}
-              onChange={(e) =>
-                setInstallmentMonths(
-                  e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1),
-                )
-              }
+              value={installmentMonths == null ? "none" : String(installmentMonths)}
+              onValueChange={(v) => setInstallmentMonths(v === "none" ? null : Number(v))}
+              options={[
+                { value: "none", label: "No instalment" },
+                ...INSTALMENT_MONTHS.map((m) => ({ value: String(m), label: `${m} months` })),
+              ]}
             />
           </div>
           <label className="flex items-center gap-2 text-body text-base-700">

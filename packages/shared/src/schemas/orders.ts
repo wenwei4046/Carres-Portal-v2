@@ -2,29 +2,38 @@ import { z } from "zod";
 import { MAX_DELIVERY_FLOOR } from "../constants";
 
 /**
- * ⭐ WHAT THE SYSTEM ACCEPTS AS AN INSTALMENT TERM (YH, 2026-09-01).
+ * ⭐ THE INSTALMENT TERM, WRITTEN ONCE (YH, 2026-09-01).
  *
- * ANY WHOLE NUMBER OF MONTHS, ONE OR MORE. That is the owner's ruling, and it
- * came from a real failure: a proposal of 9 months saved, travelled through
- * every layer, and died on `0007`'s CHECK at the PRINCIPAL's Approve press —
- * raw constraint text on the screen of the person who had just decided the
- * change was fine. The 9 was not the mistake. Refusing it was.
+ * SIX OR TWELVE MONTHS, OR NONE — the terms Carres sells, enforced identically
+ * by every door.
  *
- * ⛔ THIS IS NOT `INSTALMENT_MONTHS`, and the two are deliberately different
- * things. That list is what the POS OFFERS — the standard plans a salesperson
- * taps. This is what the system will HOLD. An offer and a limit are not the
- * same fact, and collapsing them is what produced the failure above: the
- * database enforced the shop's button list on a negotiated amendment the
- * principal had already approved.
+ * ⚠️ THIS BRANCH BRIEFLY WIDENED IT TO ANY WHOLE NUMBER, AND THE OWNER
+ * REVERSED THAT. The reasoning is worth keeping, because it is why the shape
+ * below is the right one rather than a compromise.
  *
- * ⛔ AND `.min(1)`, NOT `.min(0)`. Zero months is not an instalment plan and
- * a negative one is not a number anybody meant. `null` is how "no instalment"
- * is said, and an amendment uses it to take a plan OFF.
+ * THE FAILURE. A proposal of 9 months saved, travelled through every layer,
+ * and died on `0007`'s CHECK at the PRINCIPAL's Approve press — raw constraint
+ * text on the screen of the person who had just decided the change was fine.
+ * The first reading was "the 9 was not the mistake, refusing it was", and the
+ * fix was to widen the database.
  *
- * The floor moves with `0411`, which widens the CHECK to match. A schema that
- * accepts what the database refuses is the defect this replaces, in reverse.
+ * THE OWNER'S ANSWER: if the POS sells 6 and 12, keep 6 and 12 — and widen
+ * only if Jess can still hit that error. She cannot. The error existed because
+ * the amendment form was a free NUMBER BOX while every other door enforced the
+ * pair; a term nobody can type is a term nobody can propose, so the amendment
+ * form is a picker of the same two plans and the failure is structurally
+ * impossible rather than merely refused earlier.
+ *
+ * That is why `0411` was written and then withdrawn unapplied: widening the
+ * database was a fix for a value that can no longer be entered.
+ *
+ * `INSTALMENT_MONTHS` is the list this is built from and the list the pickers
+ * render, so a term cannot be offered on screen that the schema refuses.
+ * `instalment-months.test.ts` pins the two together in both directions.
  */
-export const installmentMonthsField = z.number().int().min(1).nullable();
+export const installmentMonthsField = z
+  .union([z.literal(6), z.literal(12)])
+  .nullable();
 
 /**
  * Single Order schema with optional rels. Lists return arrays of orders without
@@ -287,13 +296,8 @@ export const createOrderInputSchema = z.object({
    *  schema accepts any non-empty string (null only for legacy/imported rows). */
   approvalCode: z.string().nullable(),
   /** Installment plan months. Only valid when paymentMethod === "installment".
-   *  RPC re-checks the cross-field rule and rejects with 22023.
-   *  ⛔ THE CREATE DOOR STILL TAKES ONLY THE OFFERED PLANS. `create_order`
-   *  (0230:85) raises `installment_months must be 6 or 12` on its own, and the
-   *  POS renders exactly two buttons — a wizard sells the standard plans. The
-   *  widened field is for the AMENDMENT door, where a negotiated term the
-   *  principal approves has to be able to land. */
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable(),
+   *  RPC re-checks the cross-field rule and rejects with 22023. */
+  installmentMonths: installmentMonthsField,
   /** Attribution dealer for an order an INTERNAL role (principal/operation/
    *  finance/bd) places ON BEHALF OF a dealer it picks. Additive + optional: a
    *  dealer/salesperson/showroom omits it — the API uses their JWT dealer and
@@ -457,11 +461,7 @@ export const rawCreateOrderInputSchema = z.object({
   // you have it"): a phone/backfill order creates fine with none of these.
   paymentMethod: z.string().trim().min(1).max(40).nullable().optional(),
   approvalCode: z.string().trim().nullable().optional(),
-  /** ⛔ A CREATE DOOR, so it takes only the OFFERED plans — `create_order`
-   *  (0230:85) raises on anything else, and a schema that accepts what the RPC
-   *  refuses just moves the failure one layer deeper, which is the defect the
-   *  amendment door had. */
-  installmentMonths: z.union([z.literal(6), z.literal(12)]).nullable().optional(),
+  installmentMonths: installmentMonthsField.optional(),
   signaturePath: z.string().min(1).nullable().optional(),
   paymentSlipPath: z.string().min(1).nullable().optional(),
   termsAccepted: z.boolean().optional(),
