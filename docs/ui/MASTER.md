@@ -633,6 +633,12 @@ directory only and said so.*
   legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
   `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
   fix it. This file does not restate the duty model.
+- **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
+  the resolved owner/avatar from the one Work Engine Action contract governed by
+  `../ERP-ARCHITECTURE.md` Law F.1. Only Team edits the duty rotation; People supplies
+  active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
+  Team Work and Quick Rail may change display density, but they may not query the rota, calculate
+  an offset, store local assignment or invent a fallback identity.
 - **Activity** previews recent append-only events and links to their objects; it does not replace
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind

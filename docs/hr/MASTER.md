@@ -70,6 +70,13 @@ against a real session.
 - **HR may disable a login**, because the only disable route was principal-only and offboarding
   could not offboard. **Offboarding is TWO shapes** — the PIN path already refuses an inactive
   salesperson.
+- **OFFBOARDING HAS AN EFFECTIVE DATE — owner ruling 2026-09-01.** The COO records the actual last
+  working date and disables access; this People/account fact is the one source consumed by shared
+  duty resolution. On the effective date, open and future duty-owned Work automatically resolves
+  among the remaining active staff, including two-person and one-person operation. Historical actor,
+  avatar, receipt, handover, approval and cover evidence remain unchanged. HR/People does not store
+  a second PO Duty, GRN Duty or Warehouse rota; that one duty model remains in
+  `../purchasing/MASTER.md` §2.2 and its one edit door remains Team.
 - **Checklists are a shared constant, not a config table.**
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff

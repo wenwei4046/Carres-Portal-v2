@@ -205,6 +205,20 @@ Each Delivery Journey leg reconciles its own `Collected` and `Arrived` Unit fact
 journey therefore completes neither leg, nor the whole journey, from a count recorded on the
 other leg.
 
+**DELIVERY-TO-OUTBOUND RECONCILIATION — owner-approved 2026-09-01.** The DO owns the exact required
+goods scope; Warehouse Outbound reads that scope and does not re-create it. For each DO and each
+separate journey leg, the shared read-only tally prints `Required · Handed over · Not handed over`
+and drills to the same Unit IDs. A partial handover changes only the scanned Units: handed-over
+Units move to the evidence-backed journey holder; Units not handed over remain with their last
+confirmed holder and retain the original dated Warehouse work.
+
+Logistics receipt remains its own counterparty fact. If Warehouse says two Units were handed over
+and Logistics confirms only one, the Portal preserves both results, identifies the exact unmatched
+Unit and creates `Needs checking`; it never marks the whole DO collected or edits either event to
+force agreement. The clickable chain is `SO → DO → Outbound handover → Unit IDs → Logistics
+receipt → customer arrival proof`. The shared contract is defined once in
+`../ERP-ARCHITECTURE.md` §3.5.1.
+
 One personal login may hold Warehouse, Logistics or both duties and switch between **Warehouse
 Work** and **Logistics Work** without logging out. Every event records person, company and active
 duty. No shared company login is allowed. Even when one authorised person performs both sides, the
