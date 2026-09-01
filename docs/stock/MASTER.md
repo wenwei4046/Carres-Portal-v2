@@ -117,6 +117,39 @@ counts. A reserved display Unit remains at its Site but leaves Ready stock. Disp
 condition check are visible. No governed Position or slot exists now; reconsider when three to four
 outlets or measured finding time proves Site alone inadequate.
 
+The `Showroom Display` Inventory view includes every physical sofa at PJ Showroom and future
+outlets: Carres Owned display, Supplier Consignment, sold/reserved display awaiting Delivery,
+waiting repair/change and waiting supplier collection. Its defaults are `Unit ID · Product · Site ·
+Ownership · Stock use · SO No · Display since · Last verified`. This is a filtered view of the one
+Unit Register, not a separate showroom spreadsheet.
+
+Showroom arrival and departure require two-sided physical evidence. A planned Transfer states exact
+Unit, From, To and actual expected date but changes no holder. NETS Delivery records collection;
+the individually signed-in showroom/outlet person scans arrival, checks Unit ID/product/visible
+condition and submits arrival evidence before `Who has it` becomes that Site. Departure similarly
+changes the holder only after the showroom person scans the handover to the actual recipient.
+
+The showroom date strip generates concrete arrival, Count, condition-check and handover work. A
+showroom/outlet person may scan arrival/departure, Count Units, Report a problem and view their
+Site's processing status. They cannot change ownership or supplier cost, create PO/Consignment
+Order, release an SO reservation, approve an Adjustment or close a Supplier Claim.
+
+When Sales Order chooses a display Unit, Inventory immediately reads `Reserved for Sales Orders ·
+{SO No}` while `Who has it` remains the showroom until actual collection. Delivery derives the
+showroom collection/customer dates; Outbound creates the dated check/pack/handover work; the
+showroom person scans the handover. Reservation is a customer promise, never a physical move.
+
+Showroom Count is blind and Unit-level. An equal total does not cancel mismatched identities: if
+the Portal says eight and the scan also finds eight but one governed Unit is missing and one
+unregistered Unit is present, both differences remain and must be investigated.
+
+A consignment Unit always retains `Supplier Consignment`, source Consignment Order and Supplier
+while Stock records its Site/holder and condition. A sale produces the Sales Order reservation and
+Purchasing's `Sold to Settle` consequence; Finance handles Supplier Invoice/settlement. Warehouse
+cannot change ownership or settlement price. Purchasing may authorise change, return or supplier
+collection, but that decision cannot remove the Unit from the showroom: Outbound handover and the
+actual recipient evidence must move it. Repair follows the same out-and-back physical truth.
+
 Delivery works backward from the customer date using governed calendars, cut-offs and transit.
 Warehouse consumes the calculated latest Carres Warehouse ready date and completes exact-Unit
 check, completeness, pack and handover facts; it never guesses the date.
