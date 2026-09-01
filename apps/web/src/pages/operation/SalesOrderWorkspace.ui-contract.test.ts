@@ -774,33 +774,32 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
   });
 
-  it("keeps 0362's approval door, moved under the amount it governs", () => {
-    /* ⛔ THE CAPABILITY IS NOT DELETED. `0362` is Jess's ruling of 2026-08-19,
-       written the day goods went out with the money uncollected: an owing
-       order delivers only against a RECORDED approval, never a verbal one.
-       Removing this door would leave Operation no governed way to ask, so what
-       changed is WHERE it lives — a bordered sub-block standing open on every
-       owing order became a quiet door under `Outstanding`, which is the shape
-       `Change delivery date` and `Change salesperson` already use. */
-    expect(workspace).toContain("function PaymentApprovalBlock(");
-    expect(workspace).toContain('data-testid="payment-approval-open"');
-    expect(workspace).toContain('data-testid="payment-approval-request-send"');
-    expect(workspace).toContain('data-testid="payment-approval-approve"');
-    /* Both words are locked (COPY-STANDARD:1575) and unchanged. */
-    expect(workspace).toContain("Delivery payment approval");
-    expect(workspace).toContain("Request payment approval");
-    /* A PENDING OR APPROVED RECORD IS TRUTH, NOT AN ACTION, so it still prints
-       without opening anything — hiding it would be "a hidden button is not a
-       rule" in its other direction: the rule invisible because the door shut. */
-    expect(workspace).toContain('data-testid="payment-approval-live"');
-    /* THE FORM IS BEHIND A DOOR, so the block's body is a Modal rather than a
-       bordered strip standing open on the card. */
-    const fn = workspace.indexOf("function PaymentApprovalBlock(");
-    const body = workspace.slice(fn, workspace.indexOf("function ", fn + 40));
-    expect(body, "the approval form lives in a Modal").toContain("<Modal");
-    expect(body, "and not in a standing bordered strip").not.toContain(
-      'className="mt-3 border-t border-kit-slate-5 pt-3"',
-    );
+  it("no longer offers the delivery payment approval door", () => {
+    /* ⭐ RE-PINNED ON AN OWNER INSTRUCTION, 2026-09-01. This asserted the
+       opposite this morning — that `0362`'s door survived, moved under
+       `Outstanding`. The owner has since instructed that the door be removed,
+       so the assertion is INVERTED rather than deleted: a quiet
+       reintroduction has to fail here.
+
+       WHAT THE REMOVAL MEANS, pinned so it cannot be read as a tidy-up.
+       `0362` made "money in full before delivery" the default and allowed one
+       exception, decided by the principal, which opened the Delivery Order as
+       COD. This was the only surface that could raise or decide one, so the
+       rule is now ABSOLUTE: `ops_delivery_orders_money_gate` still refuses a
+       Delivery Order while a Sales Order's goods money is outstanding, and
+       nothing can ask for the exception. An owing order is undeliverable
+       until it is paid. That is the intended effect.
+
+       AND NOTHING BELOW THE SCREEN WAS DROPPED. The record, both RPCs, the
+       API routes and the database trigger are untouched — an approval already
+       granted stays honoured, and putting the door back is a revert. */
+    expect(workspace).not.toContain("function PaymentApprovalBlock(");
+    expect(workspace).not.toContain("Request payment approval");
+    expect(workspace).not.toContain("useRequestPaymentApproval");
+    expect(workspace).not.toContain("useDecidePaymentApproval");
+    /* The money summary itself is unchanged and still read-only (Law B). */
+    expect(workspace).toContain('data-testid="money-outstanding"');
+    expect(workspace).not.toContain("Record payment");
   });
 
   it("boxes the three money amounts without giving Money a door", () => {

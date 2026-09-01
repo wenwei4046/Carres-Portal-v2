@@ -75,7 +75,6 @@ import {
   type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
-import Textarea from "@/components/kit/Textarea";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
@@ -96,14 +95,10 @@ import SalesOrderAddons, { ServiceRowActions } from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useAuth } from "@/lib/auth";
 import {
   useCatalog,
   useCreateSalesOrder,
   useCustomerTypeProbe,
-  useDecidePaymentApproval,
-  useDeliveryPaymentApprovals,
-  useRequestPaymentApproval,
   useOperationDealersRef,
   useOperationOrder,
   useOperationPoDuty,
@@ -779,219 +774,31 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
   );
 }
 
-/**
- * THE DELIVERY PAYMENT APPROVAL (0362, owner ruling 2026-08-19). Sales Order
- * OWNS this record, so its doors live here — this is not the Money summary
- * gaining a form (Law B): nothing here writes a payment or a price. Operation
- * or the salesperson RAISES the ask with a reason; the configured approver —
- * today Jess only — APPROVES or REFUSES with a reason. An APPROVED record
- * opens the DO money gate as COD: full balance by online transfer BEFORE
- * unloading, no cash. The server refuses every other role; the role check
- * here only hides doors a user cannot walk through.
- */
-function PaymentApprovalBlock({
-  orderId,
-  outstanding,
-}: {
-  orderId: string;
-  outstanding: number;
-}) {
-  const role = useAuth((s) => s.role);
-  const approvalsQuery = useDeliveryPaymentApprovals(orderId);
-  const request = useRequestPaymentApproval(orderId);
-  const decide = useDecidePaymentApproval(orderId);
-  const [asking, setAsking] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [decisionReason, setDecisionReason] = useState("");
+/* ⛔ THE DELIVERY PAYMENT APPROVAL DOOR IS REMOVED — owner instruction,
+   2026-09-01, and it changes what the business does rather than how a card
+   looks. Recorded here rather than deleted in silence.
 
-  const rows = approvalsQuery.data ?? [];
-  const approved = rows.find((r) => r.status === "approved") ?? null;
-  const pending = rows.find((r) => r.status === "pending") ?? null;
+   WHAT IT WAS. `0362` (Jess, 2026-08-19) made "money in full before delivery"
+   the default and allowed ONE exception: a recorded approval, decided by the
+   principal, which opened the Delivery Order as COD — the balance paid by
+   online transfer before unloading. This component was the only surface in the
+   product that could raise or decide one.
 
-  // Nothing owed and nothing ever asked → the block does not exist.
-  if (rows.length === 0 && outstanding <= 0) return null;
+   WHAT REMOVING IT MEANS, stated plainly because nobody should have to
+   rediscover it. The rule becomes ABSOLUTE: `ops_delivery_orders_money_gate`
+   (0362) still refuses to mint a Delivery Order while a Sales Order's goods
+   money is outstanding, and there is no longer any way to ask for the
+   exception. An owing order is undeliverable until it is paid. That is the
+   intended effect of this change, not a side effect of it.
 
-  const canRaise =
-    role === "operation" || role === "salesperson" || role === "principal";
-  /* The approver list is DATA (principal today; the delivery_payment_approver
-     duty later). The server is the boundary — showing the buttons to
-     principal only keeps the screen honest for everyone else today. */
-  const canDecide = role === "principal";
+   ⛔ THE RECORD, THE RPCs AND THE DATABASE GATE ARE UNTOUCHED.
+   `order_delivery_payment_approvals`, `delivery_payment_approval_request`,
+   `delivery_payment_approval_decide` and the trigger all remain, and so do
+   their API routes. Nothing is dropped and no migration is written, for two
+   reasons: an approval already granted stays honoured by the gate, and
+   restoring the door is a revert of this one commit rather than a rebuild.
 
-  /* ⭐ ONE LINE OF TRUTH, AND THE FORM BEHIND A DOOR (YH, 2026-09-01).
-     This was a bordered sub-block standing open at the foot of the Money card
-     on EVERY owing order — a heading, a state line and a button, for an act
-     that happens rarely. It is the same shape `Change delivery date` and the
-     amendment already shed on this page: the rare act moves behind a door
-     opened from the fact it changes, which here is `Outstanding`.
-     ⛔ WHAT DOES NOT MOVE IS THE TRUTH. A pending or approved record is a fact
-     about this order, not an action, so it still PRINTS — one quiet line under
-     the amount it governs. Hiding it behind the door would be the "a hidden
-     button is not a rule" defect in its other direction: the rule would be
-     invisible because the door was shut.
-     ⛔ AND THE CAPABILITY IS UNTOUCHED. `0362` is Jess's ruling of 2026-08-19,
-     written the day goods went out with the money uncollected: an owing order
-     may only be delivered against a RECORDED approval, never a verbal one.
-     Deleting this door would leave Operation no governed way to ask, so this
-     changes where it lives and nothing else. Both words are locked
-     (COPY-STANDARD:1575) and both are unchanged. */
-  const liveLine = approved
-    ? `COD approved — collect before unloading${approved.decided_at ? ` · ${fmtDate(approved.decided_at)}` : ""}`
-    : pending
-      ? `Waiting for decision${pending.requested_at ? ` · requested ${fmtDate(pending.requested_at)}` : ""}`
-      : rows[0]?.status === "refused"
-        ? `Refused${rows[0].decided_at ? ` · ${fmtDate(rows[0].decided_at)}` : ""}`
-        : null;
-  /* The door appears only for somebody who can walk through it: the approver
-     while a decision waits, the raiser while money is owed and nothing is
-     pending. The server is still the boundary — this only declines to offer a
-     door that would 422. */
-  const doorOpen =
-    (pending != null && canDecide) || (outstanding > 0 && pending == null && approved == null && canRaise);
-
-  return (
-    <div data-testid="payment-approval-block">
-      {liveLine && (
-        <p className="mt-1 text-meta text-base-600" data-testid="payment-approval-live">
-          {liveLine}
-        </p>
-      )}
-      {doorOpen && (
-        <button
-          type="button"
-          data-testid="payment-approval-open"
-          onClick={() => setFormOpen(true)}
-          className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-        >
-          Delivery payment approval
-        </button>
-      )}
-      <Modal
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        title="Delivery payment approval"
-        description="An approved record lets this order deliver COD: the full balance by online transfer before unloading."
-      >
-      {approved ? (
-        <div className="mt-1 text-body text-base-900" data-testid="payment-approval-approved">
-          COD approved — collect before unloading
-          {approved.decided_at ? ` · ${fmtDate(approved.decided_at)}` : ""}
-          {approved.decision_reason ? ` · ${approved.decision_reason}` : ""}
-        </div>
-      ) : pending ? (
-        <div className="mt-1" data-testid="payment-approval-pending">
-          <div className="text-body text-base-900">
-            Waiting for decision
-            {pending.requested_at ? ` · requested ${fmtDate(pending.requested_at)}` : ""}
-            {` · ${pending.request_reason}`}
-          </div>
-          {canDecide && (
-            <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
-              <Textarea
-                id="payment-approval-decision-reason"
-                label="Decision reason"
-                value={decisionReason}
-                rows={2}
-                onChange={(e) => setDecisionReason(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  data-testid="payment-approval-approve"
-                  disabled={decide.isPending || decisionReason.trim().length === 0}
-                  onClick={() =>
-                    decide.mutate(
-                      { id: pending.id, decision: "approved", reason: decisionReason.trim() },
-                      {
-                        onSuccess: () => setDecisionReason(""),
-                        onError: (e) => toast.error(e.message),
-                      },
-                    )
-                  }
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="neutral"
-                  data-testid="payment-approval-refuse"
-                  disabled={decide.isPending || decisionReason.trim().length === 0}
-                  onClick={() =>
-                    decide.mutate(
-                      { id: pending.id, decision: "refused", reason: decisionReason.trim() },
-                      {
-                        onSuccess: () => setDecisionReason(""),
-                        onError: (e) => toast.error(e.message),
-                      },
-                    )
-                  }
-                >
-                  Refuse
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : outstanding > 0 && canRaise ? (
-        asking ? (
-          <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
-            <Textarea
-              id="payment-approval-reason"
-              label="Reason"
-              value={reason}
-              rows={2}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                data-testid="payment-approval-request-send"
-                disabled={request.isPending || reason.trim().length === 0}
-                onClick={() =>
-                  request.mutate(
-                    { reason: reason.trim() },
-                    {
-                      onSuccess: () => {
-                        setReason("");
-                        setAsking(false);
-                      },
-                      onError: (e) => toast.error(e.message),
-                    },
-                  )
-                }
-              >
-                Send request
-              </Button>
-              <Button size="sm" variant="neutral" onClick={() => setAsking(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-1">
-            <Button
-              size="sm"
-              variant="neutral"
-              data-testid="payment-approval-request"
-              onClick={() => setAsking(true)}
-            >
-              Request payment approval
-            </Button>
-          </div>
-        )
-      ) : (
-        /* Refused history, nothing pending: state the last word. */
-        <div className="mt-1 text-body text-base-700">
-          {rows[0]?.status === "refused"
-            ? `Refused${rows[0].decided_at ? ` · ${fmtDate(rows[0].decided_at)}` : ""}${rows[0].decision_reason ? ` · ${rows[0].decision_reason}` : ""}`
-            : null}
-        </div>
-      )}
-      </Modal>
-    </div>
-  );
-}
+   If the exception is wanted again, this is where it goes back. */
 
 /**
  * A RECORDED ANSWER WEARS THE BOX THE QUESTION WOULD HAVE WORN (YH,
@@ -2319,33 +2126,17 @@ export default function SalesOrderWorkspace() {
               (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
               (owner ruling 2026-08-15) — the colour carries that on its own,
               at the same size as its two neighbours. */}
-          {/* ⭐ THE APPROVAL SITS UNDER THE AMOUNT IT GOVERNS (YH,
-              2026-09-01). `0362`'s door was a bordered sub-block at the foot of
-              the card, standing open on every owing order for an act that
-              happens rarely. It is the page's own grammar now — a quiet door
-              under the fact it acts on, exactly where `Change delivery date`
-              sits under the date and `Change salesperson` under the name — and
-              a live decision still prints as a line, because a pending or
-              approved record is truth, not an action. */}
-          <div>
-            <Fact
-              label="Outstanding"
-              value={
-                <span
-                  className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-                  data-testid="money-outstanding"
-                >
-                  {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-                </span>
-              }
-            />
-            {!isNew && order && (
-              <PaymentApprovalBlock
-                orderId={order.id}
-                outstanding={money.known ? money.outstanding : 0}
-              />
-            )}
-          </div>
+          <Fact
+            label="Outstanding"
+            value={
+              <span
+                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+                data-testid="money-outstanding"
+              >
+                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+              </span>
+            }
+          />
         </div>
       </Block>
 
