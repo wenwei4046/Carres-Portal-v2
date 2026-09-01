@@ -24,6 +24,7 @@ const responseMutate = vi.fn();
 const closeMutate = vi.fn();
 const holdMutate = vi.fn();
 const resolutionMutate = vi.fn();
+const executionMutate = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -42,6 +43,7 @@ vi.mock("@/lib/queries", async () => {
     useSupplierClaimCloseMutation: () => mutation(closeMutate),
     useSupplierClaimHoldResolveMutation: () => mutation(holdMutate),
     useSupplierClaimCustomerResolutionMutation: () => mutation(resolutionMutate),
+    useSupplierClaimCarresExecutionMutation: () => mutation(executionMutate),
   };
 });
 
@@ -84,6 +86,9 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
     customer_resolution: null,
     customer_resolution_note: null,
     customer_resolution_at: null,
+    carres_execution: null,
+    carres_execution_note: null,
+    carres_execution_at: null,
     line_pending: null,
     held_units: 0,
     hold_reason: null,
@@ -130,6 +135,8 @@ beforeEach(() => {
   holdMutate.mockReset();
   resolutionMutate.mockReset();
   resolutionMutate.mockResolvedValue({});
+  executionMutate.mockReset();
+  executionMutate.mockResolvedValue({});
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
   suppliersQuery.mockReturnValue({
     data: {

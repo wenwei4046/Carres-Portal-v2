@@ -4,10 +4,13 @@ import { useMemo, useState } from "react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
+  CARRES_EXECUTIONS,
   CUSTOMER_RESOLUTIONS,
   STOCK_HOLD_OUTCOMES,
   STOCK_HOLD_RESOLVE_PROBLEM_TEXT,
   SUPPLIER_CLAIM_RESPONSES,
+  carresExecutionLabel,
+  carresExecutionMeaning,
   claimCloseProblems,
   customerResolutionLabel,
   customerResolutionMeaning,
@@ -23,6 +26,7 @@ import {
 } from "@carres/shared";
 import {
   useOperationSupplierClaimPhotos,
+  useSupplierClaimCarresExecutionMutation,
   useSupplierClaimCloseMutation,
   useSupplierClaimCustomerResolutionMutation,
   useSupplierClaimHoldResolveMutation,
@@ -79,10 +83,13 @@ import { buildSupplierClaimMessage } from "@/lib/wa-templates";
  * rather than an omission:
  *
  *   1. **No consequence is shown.** Consequences are `f(Resolution, Execution)`
- *      and Carres Execution is frozen-but-unbuilt, so a Stock / Finance /
- *      Demand line computed from the resolution alone would be wrong by Loo's
- *      own law 5. The line under each option is a DEFINITION — what the option
- *      means for the customer — and it stops there.
+ *      and until 2026-09-01 the second argument did not exist, so a Stock /
+ *      Finance / Demand line computed from the resolution alone would have been
+ *      wrong by Loo's own law 5. The line under each option is a DEFINITION —
+ *      what the option means for the customer — and it stops there. **Layer ④
+ *      below now supplies that argument and the line still stops there**: the
+ *      pair is computable, the function is not ruled, and a screen may only
+ *      show what is true right now.
  *   2. **It is not gated on the supplier's answer.** A customer who cancels
  *      does not wait for the factory to reply. Same reasoning R4 used for the
  *      goods: tying two things that move on different days teaches people to
@@ -97,6 +104,34 @@ import { buildSupplierClaimMessage } from "@/lib/wa-templates";
  * and Loo's business law 2 explicitly contemplates Carres changing it — a
  * repair becomes a replacement the moment we decide the customer cannot wait.
  * Every change is written to `po_history` and the audit log by the RPC.
+ *
+ * ── Layer ④ · Carres Execution (Loo, 2026-08-05 · migration 0409) ───────────
+ *
+ * The last layer, ruled the same day as layer ③ and left frozen for four weeks.
+ * It answers *in what ORDER do the goods move?* and it is a THIRD independent
+ * axis, not a narrowing of the resolution: `Replace` is a promise, and
+ * `Replace First` and `Collect First` are two ways of keeping it. They differ
+ * in nothing the customer sees and in something Carres cannot ignore — under
+ * `Replace First` two units are committed to one customer until the collection
+ * happens.
+ *
+ * It sits directly under the resolution because that is the order Loo froze:
+ * what the customer GETS, then how the goods GET there. `Item Outcome` stays
+ * below both — it is a fact about the unit, not one of the four layers.
+ *
+ * **`Return to Supplier` is deliberately on this list AND on `Item Outcome`.**
+ * Not a duplicate, and settled by the same law COPY-STANDARD used for `Repair`
+ * appearing on two lists: the Item Outcome is where the unit physically ended
+ * up, this is the choreography — specifically, that there is no customer leg at
+ * all, which is what makes it the fifth option rather than four. They are
+ * allowed to disagree.
+ *
+ * **It is not cross-validated against layer ③, on purpose.** `Replace First`
+ * with `No Replacement Required` is incoherent and the database still admits
+ * it. Refusing the pair would collapse two layers the model keeps apart, and it
+ * would refuse a legitimate order of work: an operator records the choreography
+ * the warehouse is already running before the customer's resolution is final.
+ * The coherence question is real and belongs to whoever rules the consequences.
  */
 
 export default function SupplierClaimPanel({
@@ -116,6 +151,7 @@ export default function SupplierClaimPanel({
   const closeM = useSupplierClaimCloseMutation();
   const holdM = useSupplierClaimHoldResolveMutation();
   const resolutionM = useSupplierClaimCustomerResolutionMutation();
+  const executionM = useSupplierClaimCarresExecutionMutation();
 
   const asks = useMemo(() => requestedActionsFor(claim.claim_type), [claim.claim_type]);
   const [ask, setAsk] = useState<string>("");
@@ -132,6 +168,12 @@ export default function SupplierClaimPanel({
   );
   const [resolutionNote, setResolutionNote] = useState(
     claim.customer_resolution_note ?? "",
+  );
+  // Layer ④ — seeded the same way and for the same reason: the plan changes
+  // when the customer cannot wait, so it stays editable while the claim is open.
+  const [execution, setExecution] = useState<string>(claim.carres_execution ?? "");
+  const [executionNote, setExecutionNote] = useState(
+    claim.carres_execution_note ?? "",
   );
 
   const supplier = claim.supplier_name ?? "supplier";
@@ -193,6 +235,11 @@ export default function SupplierClaimPanel({
     resolution !== "" &&
     (resolution !== (claim.customer_resolution ?? "") ||
       resolutionNote.trim() !== (claim.customer_resolution_note ?? ""));
+
+  const executionChanged =
+    execution !== "" &&
+    (execution !== (claim.carres_execution ?? "") ||
+      executionNote.trim() !== (claim.carres_execution_note ?? ""));
 
   return (
     <div className="grid gap-5 md:grid-cols-2" data-testid={`claim-panel-${claim.claim_no}`}>
@@ -347,6 +394,129 @@ export default function SupplierClaimPanel({
               {resolutionM.isError && (
                 <div className="text-label text-danger">
                   {resolutionM.error?.message ?? "Couldn't save."}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ④ · in what ORDER the goods move — the last of Loo's four layers,
+            directly under the resolution because that is the order he froze:
+            what the customer GETS, then how the goods GET there. The item's own
+            outcome sits below both; it is a fact about the unit, not a layer. */}
+        <div className="mt-5" data-testid="claim-carres-execution">
+          <SectionTitle>Carres Execution</SectionTitle>
+
+          {claim.status === "closed" ? (
+            <div className="text-body text-base-800">
+              {claim.carres_execution ? (
+                <>
+                  <span className="font-semibold">
+                    {carresExecutionLabel(claim.carres_execution)}
+                  </span>
+                  {claim.carres_execution_at && (
+                    <span className="text-label text-base-500 ml-2">
+                      {fmtDate(claim.carres_execution_at)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-meta text-base-500">
+                  Nothing recorded — this claim closed without one.
+                </span>
+              )}
+              {claim.carres_execution_note && (
+                <div className="text-meta text-base-600 mt-1">
+                  {claim.carres_execution_note}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-meta text-base-500">
+                In what order do the goods move?
+              </div>
+
+              {/* NAMED, like the two groups above it — this panel now holds a
+                  third button reading `Return to Supplier`, and the other is an
+                  Item Outcome. One is the choreography, the other is where the
+                  unit ended up, and a screen reader needs the heading too. */}
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label="Carres Execution"
+                data-testid="carres-execution-options"
+              >
+                {CARRES_EXECUTIONS.map((e) => (
+                  <button
+                    key={e.key}
+                    type="button"
+                    onClick={() => setExecution(e.key)}
+                    aria-pressed={execution === e.key}
+                    className={`text-meta px-2.5 py-1 rounded border ${
+                      execution === e.key
+                        ? "bg-base-900 text-white border-base-900 font-semibold"
+                        : "bg-white text-base-700 border-base-200 hover:border-base-400"
+                    }`}
+                    data-testid={`carres-execution-${e.key}`}
+                  >
+                    {e.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Which goods move and in what order — never what follows from
+                  it. Both arguments of f(Resolution, Execution) exist now, but
+                  the function itself is unruled, so a stock, money or demand
+                  line here would be a guess wearing a screen's authority. */}
+              {execution && (
+                <div
+                  className="text-meta text-base-700"
+                  data-testid="carres-execution-meaning"
+                >
+                  {carresExecutionMeaning(execution)}
+                </div>
+              )}
+
+              {execution && (
+                <input
+                  value={executionNote}
+                  onChange={(e) => setExecutionNote(e.target.value)}
+                  maxLength={500}
+                  placeholder="Anything worth keeping (optional)"
+                  className="w-full text-meta rounded border border-base-200 px-2 py-1.5 focus:outline-none focus:border-base-400"
+                  data-testid="carres-execution-note"
+                />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!executionChanged || executionM.isPending}
+                  onClick={() =>
+                    void executionM.mutateAsync({
+                      claimId: claim.id,
+                      carres_execution: execution,
+                      note: executionNote.trim() || undefined,
+                    })
+                  }
+                  className="btn-primary text-meta py-1.5 px-3 disabled:opacity-40"
+                  data-testid="carres-execution-save"
+                >
+                  {executionM.isPending ? "Saving…" : "Save how the goods move"}
+                </button>
+                {claim.carres_execution_at && (
+                  <span
+                    className="text-label text-base-500"
+                    data-testid="carres-execution-recorded"
+                  >
+                    Recorded {fmtDate(claim.carres_execution_at)}
+                  </span>
+                )}
+              </div>
+              {executionM.isError && (
+                <div className="text-label text-danger">
+                  {executionM.error?.message ?? "Couldn't save."}
                 </div>
               )}
             </div>

@@ -948,3 +948,217 @@ describe("GET / carries the customer resolution", () => {
     expect(body.claims[0].customer_resolution_note).toBe("Customer cancelled");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ④ · Carres Execution (Loo, 2026-08-05 · migration 0409)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The business rules — the vocabulary, the stamp, the refusal on a closed
+// claim, that re-recording is allowed while it is open — all live in the RPC,
+// because `supplier_claims` is writable from nowhere else. What the ROUTER owes
+// is what these pin: the right RPC with the right arguments, an invented option
+// refused before a round-trip, the role gate, and the RPC's refusal intact.
+
+describe("POST /:id/carres-execution — the order the goods move in", () => {
+  it("records the execution through the RPC", async () => {
+    const sb = rpcClient({
+      data: { claim_no: "SC-1001", carres_execution: "replace_first" },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/carres-execution", {
+      carres_execution: "replace_first",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "supplier_claim_record_carres_execution",
+      { p_claim_id: "c1", p_execution: "replace_first", p_note: null },
+    );
+    // A user-JWT write. There is no service-role bypass on this desk.
+    expect(adminClient).not.toHaveBeenCalled();
+  });
+
+  it("carries the note when there is one", async () => {
+    const sb = rpcClient({ data: { carres_execution: "exchange_on_collection" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/carres-execution", {
+      carres_execution: "exchange_on_collection",
+      note: "Driver does both on the 12 Aug run",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith(
+      "supplier_claim_record_carres_execution",
+      {
+        p_claim_id: "c1",
+        p_execution: "exchange_on_collection",
+        p_note: "Driver does both on the 12 Aug run",
+      },
+    );
+  });
+
+  it("accepts all five of Loo's executions and nothing else", async () => {
+    for (const e of [
+      "return_to_supplier",
+      "collect_defective_item",
+      "replace_first",
+      "collect_first",
+      "exchange_on_collection",
+    ]) {
+      const sb = rpcClient({ data: { carres_execution: e } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/carres-execution", { carres_execution: e });
+      expect(res.status, e).toBe(200);
+    }
+  });
+
+  it("refuses a CUSTOMER resolution as an execution, without touching the database", async () => {
+    // Layer ③ answers what the customer GETS. Accepting one here would be two
+    // layers collapsing into one list — the thing Loo's model forbids.
+    for (const wrong of [
+      "replace",
+      "repair",
+      "accept_as_is",
+      "no_replacement_required",
+    ]) {
+      const sb = rpcClient({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/carres-execution", { carres_execution: wrong });
+      expect(res.status, wrong).toBe(422);
+      expect(sb.rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("refuses an ITEM outcome and a SUPPLIER answer the same way", async () => {
+    // `returned` / `written_off` are where the UNIT ended up and live on
+    // ops_stock_items; the supplier's words are not our decision either. Note
+    // `returned` is refused while `return_to_supplier` is accepted above —
+    // they are two different keys on two different lists on purpose.
+    for (const wrong of [
+      "returned",
+      "written_off",
+      "back_to_stock",
+      "reject",
+      "deliver_remaining",
+      "refund",
+    ]) {
+      const sb = rpcClient({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(userClient).mockReturnValue(sb as any);
+      const res = await post("c1/carres-execution", { carres_execution: wrong });
+      expect(res.status, wrong).toBe(422);
+      expect(sb.rpc).not.toHaveBeenCalled();
+    }
+  });
+
+  it("surfaces the RPC's refusal on a closed claim", async () => {
+    const sb = rpcClient({
+      error: {
+        code: "P0001",
+        details: "claim_closed",
+        message: "claim SC-1014 is already closed",
+      },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post("c1/carres-execution", {
+      carres_execution: "collect_first",
+    });
+    expect(res.status).toBe(422);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(((await res.json()) as any).code).toBe("claim_closed");
+  });
+
+  it("refuses a supplier, a partner and a dealer", async () => {
+    for (const role of ["supplier", "partner", "dealer"]) {
+      const res = await post(
+        "c1/carres-execution",
+        { carres_execution: "replace_first" },
+        role,
+      );
+      expect(res.status).toBe(403);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("moves no stock and derives no consequence — one RPC and nothing else", async () => {
+    // f(Resolution, Execution) is computable for the first time, and this route
+    // still computes nothing. A second RPC appearing here would mean somebody
+    // guessed the function.
+    const sb = rpcClient({ data: { carres_execution: "return_to_supplier" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    await post("c1/carres-execution", { carres_execution: "return_to_supplier" });
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc).not.toHaveBeenCalledWith(
+      "ops_stock_resolve_hold",
+      expect.anything(),
+    );
+  });
+});
+
+describe("GET / carries the Carres execution", () => {
+  it("selects the three layer-④ columns and returns them on the row", async () => {
+    // The queue is the ONLY read the panel has, so a column left out of the
+    // select is a decision the operator can record and then never see again —
+    // exactly the hazard the layer-③ test above pins, and the reason this one
+    // exists rather than trusting that the select was extended.
+    const selects: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const builder = (rows: unknown[]): any => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b: any = {
+        select: vi.fn((cols: string) => {
+          selects.push(cols);
+          return b;
+        }),
+        order: vi.fn(() => b),
+        limit: vi.fn(() => b),
+        range: vi.fn((from: number, to: number) => Promise.resolve({
+          data: rows.slice(from, to + 1),
+          error: null,
+        })),
+        in: vi.fn(() => b),
+        eq: vi.fn(() => b),
+        maybeSingle: vi.fn().mockResolvedValue({ data: rows[0] ?? null, error: null }),
+        then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: rows, error: null, count: rows.length }).then(res, rej),
+      };
+      return b;
+    };
+    const executed = {
+      ...CLAIM,
+      customer_resolution: "replace",
+      carres_execution: "collect_first",
+      carres_execution_note: "Van picks up before the new one ships",
+      carres_execution_at: "2026-09-01T09:00:00Z",
+    };
+    const sb = {
+      from: vi.fn((t: string) => (t === "supplier_claims" ? builder([executed]) : builder([]))),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(selects[0]).toContain("carres_execution");
+    expect(selects[0]).toContain("carres_execution_note");
+    expect(selects[0]).toContain("carres_execution_at");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.claims[0].carres_execution).toBe("collect_first");
+    expect(body.claims[0].carres_execution_note).toBe(
+      "Van picks up before the new one ships",
+    );
+    // Both layers survive the same read — one is not shadowing the other.
+    expect(body.claims[0].customer_resolution).toBe("replace");
+  });
+});
