@@ -401,7 +401,7 @@ checklist item. The list is closed; a new chat does not add a fifth:
 |---|---|
 | 1 | `Assign logistics` |
 | 2 | `Confirm delivery date` (row line: `Call {logistics} — confirm delivery date`) |
-| 3 | `Deliver today` |
+| 3 | `Deliver on {weekday, date}` (re-worded from `Deliver today` — the Delivery dictionary bans Today/Tomorrow; the actual weekday + date is printed) |
 | 4 | `Upload delivery photo` |
 
 **Only the words live here.** What each queue holds and when it goes late are TRIGGERS and
@@ -413,10 +413,11 @@ Every deadline is counted in **working days** (see the one definition above) —
 engine procurement uses. Lateness is written as the count
 tail, numbers up front: `5 · 2 late`.
 
-**`Issue delivery order` IS an action** (Jess 2026-07-27): once the customer's date is
-confirmed, the SYSTEM produces the document and the operator only presses the button —
-nobody authors a delivery order by hand. Card C7 builds it; the number is stamped at
-dispatch today, which is too late to hand to logistics, and C7 moves it.
+**`Issue Delivery Order` names the SYSTEM's act, not a button** (Jess 2026-08-16, overwriting
+the 2026-07-27 press-the-button half): the SYSTEM issues the document the moment its governed
+gate is met — nobody authors one by hand and **no surface carries an Issue, Release or Approve
+control**. The one governed manual door is `Request Delivery Order` (2026-08-19, the outstation
+trip's door — same single issuing path, same gates).
 
 **Delivery execution words — owner-approved 2026-08-14, final Blueprint wording.** Employee UI
 never uses `Release`; use `Issue Delivery Order`, `Ready to issue delivery order` or `Cannot issue
@@ -431,19 +432,20 @@ employee can be told what is required. Delivery schedule groups and due labels u
 weekday + date, never `Today` or `Tomorrow`. Never show generic `Contact Customer` or `Follow Up`;
 name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Address`.
 
-**Delivery Work status words — owner ruling 2026-08-24.** The DOCUMENT and the OPERATION have
+**Delivery status words — owner ruling 2026-08-24** (the workspace is the one `Delivery` page;
+`Delivery Work` is not a destination name). The DOCUMENT and the OPERATION have
 **two separate vocabularies**, and neither may borrow the other's words.
 
 ```
-Delivery Orders Register — the DOCUMENT's own life
+Delivery Order document — the DOCUMENT's own life
   Created · Out for delivery · Delivered · Delivery exception · Cancelled
 
-Delivery Work — the OPERATION's progress
+Delivery workspace `Delivery Status` — the OPERATION's progress
   Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
   Ready for handover · Out for delivery · Delivered · Failed Delivery
 ```
 
-⛔ **`Created` may never appear on Delivery Work.** It is a true fact about a piece of paper and a
+⛔ **`Created` may never appear on the Delivery workspace.** It is a true fact about a piece of paper and a
 useless one on a planning screen: two scopes reading `Created` can be a week of real work apart.
 The operational rung that replaces it is `Waiting for warehouse`, which names the owner instead of
 the document. Equally, the operational words may not appear in the Register — a register describes
@@ -452,7 +454,7 @@ documents.
 Banned as status words on either surface, because each names a mood rather than a fact:
 `Pending` · `In progress` · `Scheduled` · `Booked` · `Awaiting` · `Unscheduled` · `Not booked`.
 
-**Delivery Work rail and action words — owner ruling 2026-08-24.** The schedule rail's overdue
+**Delivery workspace rail and action words — owner ruling 2026-08-24.** The schedule rail's overdue
 bucket is **`Overdue`**, never `Date passed`; its group heading is `DELIVERY SCHEDULE`. The two
 governed actions on the workspace are **`Assign logistics`** (first carrier on a scope) and
 **`Change logistics`** (replacing one, which requires a governed reason and writes history) — never
@@ -573,8 +575,8 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Issue PO` · `Confirm ready date` | **→ defined once in the PURCHASING table below.** The Orders ladder DISPLAYS these two; it does not respell them. *(This row replaces the old `Send PO` entry — `Send PO` is retired, and so are `Prepare PO` and the Draft PO it produced.)* | | | |
 | `Assign logistics` | `Assign logistics` | `Assign logistics` | `{logistics} assigned` | `Every order has a logistics company.` |
 | `Confirm delivery date` | `Call {logistics} — confirm delivery date` | `Confirm booking` | `Delivery confirmed {date} · {slot}` | `0 calls to make · everything on track.` |
-| `Issue delivery order` | `Issue delivery order` | `Issue delivery order` | `Delivery order issued` | `Nothing waiting for a delivery order.` |
-| `Deliver today` | `Deliver today` | `Mark delivered` | `Delivered` | `No deliveries today.` |
+| *(retired 2026-08-16 — the SYSTEM issues the DO; no tile, no button)* | — | — | `Delivery order issued` (history line only) | `Nothing waiting for a delivery order.` |
+| `Deliver on {weekday, date}` | `Deliver on {weekday, date}` | `Record Delivery Result` | `Delivered` | `No deliveries on {weekday, date}.` |
 | `Upload delivery photo` | `Upload delivery photo` | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
 | `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics} — arrange new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
@@ -1184,12 +1186,11 @@ they would, and the word is wrong however similar the click feels.
 actions get their five strings here → only then does a screen change. A rename that arrives
 before the flow is a chat guessing on behalf of a business line that has not spoken.
 
-**Consequence of the Issue rule:** the SYSTEM writes the document; the human only presses
-the button. **`Issue delivery order` IS an action** (Jess ruled 2026-07-27): once the
-customer's date is confirmed, the operator presses one button and the document exists, ready
-to hand to logistics. Today `orders.do_number` is stamped by a DB trigger on the DISPATCH
-transition (0098) — a day too late to give logistics the paper they ask for the evening
-before. Card C7 moves the stamp to customer confirmation. Nobody ever authors a delivery
+**Consequence of the Issue rule:** the SYSTEM writes the document AND triggers the act (Jess
+2026-08-16, overwriting the 2026-07-27 press-the-button half): the moment the governed gate is
+met — customer date confirmed, goods ready, money in full — the document exists, ready to hand
+to logistics, with no button pressed anywhere. The one governed manual door is `Request
+Delivery Order` (the outstation trip's door, same path, same gates). Nobody ever authors a delivery
 order by hand.
 
 ### The On hand Category filter words (card 2026-08-19)
@@ -1737,12 +1738,13 @@ to point at one of them and be wrong about the others.
 | The agreed day is a Sunday | **`Date falls on a Sunday — pick another day`** | Invalid date · Not a working day |
 | The agreed day is a public holiday | **`Date falls on a public holiday — pick another day`** | Closed · Holiday · Not available |
 
-**⭐ MONEY LEFT THE GATE (owner ruling 2026-08-16, decision A — supersedes decision B).**
-Outstanding money does not block the delivery order; **an OPEN Finance exception is the ONE money
-blocker**, stated with its reason and its owner because Finance is the only party that can clear
-it. The retired `RM {amount} still to collect` gate requirement and the manager-release sentence
-went with the gate they described; the collect ACTION and its amount live on unchanged in the
-worklist. `docs/orders/MASTER.md` §8 carries the ruling.
+**⭐ MONEY IS A GATE REQUIREMENT, ABSOLUTE (owner rulings 2026-08-19 and 2026-09-01 — the
+2026-08-16 "money left the gate" decision A is overturned).** The gate's money line shows
+**`Money in full`** when outstanding = 0, and **`RM {amount} still to collect`** while any of it
+is owed; since 2026-09-01 there is no exception path, so no request sentence exists. **The OPEN
+Finance exception stays the SECOND, independent money line**, stated with its reason and its
+owner because Finance is the only party that can clear it. The collect ACTION and its amount
+live on unchanged in the worklist. `docs/orders/MASTER.md` §8 carries the ruling.
 
 **THE MISSING-FACT PHRASES — primary-school English, never a dash.** A node nobody has reached says
 what has not happened yet, in the plainest words available:

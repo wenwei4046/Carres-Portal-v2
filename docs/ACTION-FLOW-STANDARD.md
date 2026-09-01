@@ -196,8 +196,8 @@ open on the same record at the same time.
 ## Law 4 — display priority (which one shows first)
 
 ```
-1  Broken commitment or today's run
-     Deliver today · the failed-delivery follow-up · Upload delivery photo
+1  Broken commitment or the day's run
+     Deliver on {weekday, date} · the failed-delivery follow-up · Upload delivery photo
 2  The customer must be told something (through logistics — Carres does not
    phone about a delay, and never before the ready date is known)
      Call {logistics} — arrange new delivery date
@@ -205,7 +205,8 @@ open on the same record at the same time.
      Call {supplier} — confirm ready date
      Issue PO
 4  Delivery preparation
-     Assign logistics · Call {logistics} — confirm delivery date · Issue delivery order
+     Assign logistics · Call {logistics} — confirm delivery date
+     (the SYSTEM issues the delivery order — it is a gate event, not a Work action)
 5  Money
      Collect RM {amount} from {customer}
 ```

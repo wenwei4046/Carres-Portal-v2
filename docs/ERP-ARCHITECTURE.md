@@ -131,10 +131,39 @@ collect customer balance          → Payment ownership rule
 confirm delivery appointment      → Delivery ownership rule
 ```
 
-The rule resolves automatically. Staff do not assign routine work order by order. People owns the
-roster, duty and buddy/cover facts; the Work Engine applies them so absence changes who sees today's
-work without changing the underlying business record or rewriting its history. A manager may see or
-filter the resolved owner, but Work never creates a second assignment truth.
+The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
+employment/account eligibility facts only; **Team** is the ONE Duty settings door and owns PO Duty,
+GRN Duty, buddy/cover and effective-month COO override. The Shared Duty Resolver applies those
+facts so absence changes who sees today's work without changing the underlying business record or
+rewriting its history. A manager may see or filter the resolved owner, but Work never creates a
+second assignment truth.
+
+### Law F.1 · One Shared Duty Resolver
+
+**OWNER-APPROVED / LOCKED 2026-09-01.** No page, module or API reads a rota table or calculates a
+Duty holder for itself. The complete resolution chain is:
+
+```
+People — active staff, last working date, access and rotation-pool eligibility
+→ Team — PO Duty, GRN Duty, buddy/cover and effective-month COO override
+→ Shared Duty Resolver — date + active staff + leave/cover rules
+→ Work Engine — resolves the owner of each action from its Owner rule
+→ every Register, object, Dashboard, My Work, Team Work and Quick Rail
+```
+
+An action stores its `Owner rule`, trigger, completion fact, governed date and source object. The
+displayed owner/avatar is the resolver result, not a second stored `assigned_to`. A page may not
+read `ops_po_duty`, `ops_po_duty_cover`, a GRN rota or any equivalent table directly. It may not
+implement its own rotation arithmetic. Any Warehouse action or owner avatar that did not come from
+the shared Work Engine's resolved owner is an architecture violation, not an acceptable temporary
+integration.
+
+Automatic Duty resolution uses the eligible active Carres staff pool unless Team contains an
+effective override: three people resolve PO Duty, GRN Duty and a third buddy/cover; two people
+rotate PO and GRN; one person carries both; a last-working-date change removes the person and
+re-resolves open and future Work. Only zero eligible people produces `Not assigned`, with a direct
+door to People / Team. Capability remains separate: an authorised actor may perform an act without
+becoming its resolved owner, and history records normal owner, cover and actual actor separately.
 
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the
@@ -416,7 +445,11 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 > **What STAYS, and why it is not arbitrary:** the delivery BOOKING and the money GATE stay
 > with the order, because **both are promises to the customer, and the customer's promise is
 > what this module owns.** A booking is *"we told them Tuesday"*; the gate is *"we do not send
-> goods that are not paid for"*. Neither is a fact about a truck or a ledger.
+> goods that are not paid for"*. Neither is a fact about a truck or a ledger. **The operational
+> ARRANGEMENT — which Logistics Partner carries a scope, the confirmed operational date and
+> time, ETA, note, reply proof, driver/vehicle — is Delivery's own record**
+> (`ops_delivery_arrangements`, owner ruling 2026-08-24): the promise and the arrangement are
+> two facts with two owners, and neither module writes the other's.
 
 ---
 
@@ -467,6 +500,20 @@ amend it · void it · return a count for a re-check.
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
 
+**UNIT RECONCILIATION — OWNER RULING 2026-09-01.** Receiving never maintains a second stock
+quantity. It starts from the exact Source Document line and records one physical result for each
+expected Unit ID: `Received` · `Received with issue` · `Not received`. Posting the numbered GRN
+publishes those authoritative events. Stock derives the current Unit consequences; Purchasing
+reads the missing remainder. The control is derived, never re-keyed:
+
+```
+Expected Units = Received Units + Not received Units
+```
+
+A received Unit with an issue is physically present but controlled and unavailable. A Unit not
+received remains expected against the same source; neither result may be converted into Ready
+Stock by a manual tally.
+
 Supplier-consignment receipt preserves supplier ownership and creates no payable. Receiving
 is the one receipt engine; a separate Consignment Receipt page would duplicate the physical act.
 
@@ -505,20 +552,48 @@ Delivery · Service Case · Finance.
 > the Unit through observed facts and governed actions, never a generic operator-facing
 > quarantine status.
 
+**ONE PHYSICAL CHAIN — OWNER RULING 2026-09-01.** Receiving proves what arrived; Stock owns each
+Unit's one current `Where` and `Who has it`; Delivery states which exact Units must reach the
+customer; Warehouse Outbound proves which exact Units were handed to Logistics. These modules
+read the same `Unit ID + Source Document + Handover facts`. They do not copy quantities into
+parallel ledgers. One authoritative physical event is written once and projected wherever it is
+needed.
+
+Every source presents a derived control block:
+
+```
+Inbound:  Expected Units = Received Units + Not received Units
+Outbound: Required Units = Handed over Units + Not handed over Units
+Delivery Journey leg: Collected Units and Arrived Units reconcile separately
+Stock Count: Portal Units versus physically scanned Units produces Difference
+```
+
+Each Unit can have only one current `Who has it`. A partial handover moves only the scanned Units;
+the remaining Units keep their previous holder and the original dated Warehouse work stays open.
+
 ---
 
 ## 3.6 · DELIVERY
 
 **OWNS**
 - The **carrier**: who they are, their working days, closed dates, capacity, notice period,
-  geography and staging rules.
-- The **trip DERIVATION** — the trip is **not a record; it is a derived view** (§6.2, frozen):
+  geography, staging rules and **their own pickup/delivery weekday calendars** (owner ruling
+  2026-09-01 — TEOW's and TT's KL pickup days are Partner Settings facts, never staff memory).
+- The **arrangement** (`ops_delivery_arrangements`, owner ruling 2026-08-24): which Logistics
+  Partner carries a scope or Journey leg, the confirmed operational date and time, ETA, note,
+  the partner's actual reply proof and driver/vehicle.
+- The **Delivery Order document** and its lifecycle — issued by the SYSTEM through the one
+  governed path when the gate is met; no Issue/Release/Approve control exists anywhere.
+- The **Journey derivation**: the trip is **not a record; it is a derived view** (§6.2, frozen):
   confirmed bookings grouped by **carrier + delivery date**, including a split across trips.
-  Delivery owns the ONE derivation rule (Law D).
+  Delivery owns the ONE derivation rule (Law D), and for multi-leg journeys the ONE backward
+  calculation `customer date → latest partner-warehouse arrival → KL pickup day → latest Carres
+  Warehouse ready date`, which Warehouse and Purchasing consume through dated Work.
 - The **proof**: the delivery photo and the signed document.
 
-**ACTIONS** — assign a carrier · arrange a trip · issue the delivery order · record the
-delivery · upload the proof · maintain the carrier's rules.
+**ACTIONS** — assign or change a carrier · record the arrangement · record the delivery
+result · upload the proof · maintain the carrier's rules. (The SYSTEM issues the delivery
+order; `Request Delivery Order` is the one governed manual door.)
 
 **SUMMARISES** — the customer's promised date and confirmed booking · what the order contains ·
 whether money holds it.
@@ -778,9 +853,14 @@ table would be a record whose distinguishing fields Carres can never fill.
 **Every question a trip answers, the view answers:** capacity = count of confirmed bookings
 per carrier + day against `daily_capacity` (the calendar already computes exactly this) ·
 piggyback-vs-paid-urgent = whether another booking already holds that carrier + day · the
-WhatsApp manifest sent to the carrier = generated from the view. Multi-leg staging
-(HOUZS → Balakong → AL collects) needs no trip either: a warehouse-to-warehouse leg is a
-stock movement (Stock's record, §3.5); the final leg is the delivery (the booking).
+WhatsApp manifest sent to the carrier = generated from the view. Multi-leg journeys need no
+trip RECORD either, but the legs are **Delivery Journey legs, not stock movements** (owner
+ruling 2026-09-01, overwriting the 2026-08-06 "a warehouse-to-warehouse leg is a stock
+movement" half): a Singapore SO's KL → JB-partner-warehouse leg and its JB → customer leg each
+carry their own Logistics Partner, DO/scope, dates, handover and exact-Unit reconciliation
+(`../delivery/MASTER.md` §1.1, §8; `../stock/MASTER.md` §5). Stock still owns each Unit's
+current `Where`/`Who has it` along the way; an internal reposition that serves no customer
+Journey remains Stock's Transfer.
 
 **The upgrade clause:** the day a fact must attach to the VAN itself and to no order — a
 per-trip carrier cost, an own-fleet dispatch, a signed loading manifest — the trip becomes a

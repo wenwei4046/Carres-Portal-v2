@@ -21,7 +21,7 @@
 - Office, Warehouse, and Delivery calendars are distinct. A due date without a named calendar is unfinished.
 - The right rail is 200px navigation, not a second place to act.
 - Red has one job: late / act now. Blue marks the current thing or primary action.
-- Sales Order is a truth Register, not a work queue. Delivery is currently a view of Orders' delivery track. Other modules retain their own records and write doors.
+- Sales Order is a truth Register, not a work queue. Delivery owns the delivery arrangement, the Delivery Order document, handover and proof (owner ruling 2026-08-24); Sales owns the customer promise. Other modules retain their own records and write doors.
 - The approved system-led presentation law is the baseline. Object and owner are structured fields;
   the semantic lines do not duplicate them:
 
@@ -185,7 +185,7 @@ Receiving must not create a generic `Check in` row merely because a PO has outst
 
 ### 3.5 Delivery
 
-The current Delivery page is a read-only view and the actions are presently owned by Orders. The architecture says Delivery owns carrier, trip derivation, and proof; this inconsistency must be reconciled before Workspace freezes final owner keys. Until then use the existing action source, not a second definition.
+RECONCILED (owner rulings 2026-08-24 / 2026-09-01): Delivery owns the arrangement (`ops_delivery_arrangements`), the Delivery Order document, handover and proof; Sales Orders owns the customer promise and the money gate; the SYSTEM issues the DO (no Issue action exists). The action rows below predate that reconciliation — where an owner column reads `current Orders engine`, the final owner key is the Delivery ownership rule through the Shared Work Engine; `Issue delivery order` is no longer a Work action; `Deliver today` is displayed as `Deliver on {weekday, date}`; the money gate requires outstanding = 0 (2026-09-01, absolute), not only "no Finance exception". Final keys follow `docs/delivery/MASTER.md`.
 
 | Work | Why it exists | Current action owner / actor | Object / recipient | Required result / closure | Due / next / door |
 |---|---|---|---|---|---|
@@ -703,7 +703,7 @@ identity in the grouping header and repeats it per row only for an exception.
 | Sidebar badges are module-specific counters | no single Work entry or cross-module meaning | Workspace nav: Dashboard + Work; Work badge = my overdue | 🟡 adapt |
 | Team panel shows PO duty only | approved GRN row is unbuilt; cover is not shown cross-module | Team remains rota home; add governed GRN/cover view | 🟡 complete approved evolution |
 | Sales Order actions default to PIC | conflicts with Purchasing duty ownership for Purchasing actions | each owner projection supplies task owner | 🔴 correct boundary |
-| Delivery actions defined in Orders while architecture says Delivery owns delivery acts | owner contradiction | reconcile module authority before final action keys | 🔴 governance blocker |
+| Delivery actions defined in Orders while architecture says Delivery owns delivery acts | RESOLVED — owner rulings 2026-08-24 / 2026-09-01: Delivery owns arrangement/DO/handover/proof; Sales owns promise + gate | final action keys follow `docs/delivery/MASTER.md` and the Shared Work Engine | ✅ reconciled |
 | Payment `Collect` closes at zero outstanding, but new rule says Operation ends at receipt submission and Finance verifies | one action currently spans two owners/results | split submission from verification/exception | 🔴 governance blocker |
 | Failed delivery records exception but no next action | Work would strand the journey | define reason→next action map, owner, due, closure | 🔴 engine gap |
 | Claims has resolution UI but no action wiring/due | hidden work found only by opening rows | owner engine emits resolution action after rules are complete | 🔴 engine gap |

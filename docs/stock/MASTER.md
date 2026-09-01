@@ -197,6 +197,13 @@ Warehouse uses the one shared Work Engine. Owner and cover are structured metada
 text. The business object has no fake universal Owner. Labels tell a new operator the concrete act;
 completion is an authoritative fact, never Mark done.
 
+Warehouse Settings contains no Duty roster. Supplier/PO problems use `Current PO Duty`; receiving,
+persistent stock differences and adjustment requests use `Current GRN Duty`; adjustment approval
+uses `COO`; physical Count/recount and outbound handover use the assigned NETS individual; customer
+delivery problems use the Delivery ownership rule. Every displayed avatar is the Shared Work
+Engine's resolved owner. Stock pages do not save `assigned_to`, read a rota table or calculate PO /
+GRN Duty.
+
 Every Work row has an actual weekday and date; appointments also have time. Today, This week,
 This month and Upcoming are view or group labels only. Without a governed real date, the action
 contract is incomplete and cannot enter Work.
