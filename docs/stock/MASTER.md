@@ -1,7 +1,6 @@
 # STOCK / WAREHOUSE — MASTER
 
-> **APPROVED / LOCKED — owner-reviewed 2026-08-20; navigation, daily work and duty continuity
-> amended 2026-09-01.**
+> **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, 2026-09-01.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
 
@@ -1393,6 +1392,29 @@ Warehouse Settings owns Site/calendar/Count/evidence/partner permission; Purchas
 PO/Consignment; Receiving owns receipt; Delivery owns journey/arrival; Finance owns payment/
 settlement; COO governs approval limits and segregation.
 
+### 12.14 Complete reference-to-Carres capability matrix
+
+| Reference capability | Carres current equivalent / owner | Ruling | Why | Dependency / conflict result |
+|---|---|---|---|---|
+| 2990 Inventory totals, warehouse/batch drilldown and Stock Card | legacy Unit rows, rollups and history fragments / Stock | KEEP + ADAPT + IMPROVE | preserve finding power while exact Units remain authority | rollup is read-only; no negative Stock or rack ledger |
+| 2990 GRN inbound movement and rack choice | Receiving/GRN plus legacy Stock Add / Receiving, Stock | ADAPT + REJECT | one physical receipt door; no second Stock In or NETS placement model | Receiving posts; Inventory projects accepted results |
+| 2990 availability, reserve horizons and FIFO/batch logic | Ready Stock and reservation / Stock, Sales Order | ADAPT + IMPROVE | exact eligible Unit and set integrity fit Carres | Sales Order owns bind/release; no quantity-only promise |
+| Dynamics quality/quarantine and 2990 damage adjustment reason | issue/hold fragments / Stock, Claim, Service | ADAPT + REJECT | suspect Unit must stop use, but observer reports facts only | `Needs checking`; no generic Quarantine or instant write-off |
+| 2990 Stock Take snapshot, untouched/zero and variance | incomplete count controls / Stock | ADAPT + IMPROVE | blind exact-Unit Count and history protect physical truth | Difference precedes investigation/COO-approved Adjustment |
+| 2990 OUT movement and mature load verification | take-out/Delivery links / Stock, Delivery | ADAPT + IMPROVE | exact two-sided handover prevents digital/physical drift | Delivery owns DO/Journey; no wave/staging/shortage override |
+| 2990 paired Transfer OUT/IN and reversal | movement primitives / Stock | ADAPT + IMPROVE | origin, transport holder and destination are separate facts | projects into Outbound/Inbound/Inventory; no fifth page |
+| 2990 Delivery/Purchase Return documents | return states / Delivery, Purchasing, Service, Stock | ADAPT | commercial owner authorises; Stock proves physical return | every returned/repaired Unit is checked before availability |
+| Mature multi-location consignment control | showroom/supplier lists / Purchasing, Stock | KEEP + IMPROVE | ownership, Site, holder, reservation and settlement differ | one Unit Register; no showroom ledger or fabricated Position |
+| Mature period cut-off, Count reconciliation and versioning | no complete Month-end confirmation / Stock, Finance | ADAPT + IMPROVE | honest Count dates and immutable versions support Finance | ±2-day Count window; Finance acknowledges a version |
+| Mature worker-scoped work and actor history | page assignees/shared accounts / Work, Team, People | ADAPT + IMPROVE | automatic Duty resolution survives staffing change | 3/2/1 staff continuity; personal NETS identities |
+| 2990 ageing, ABC, turnover, availability and source drilldown | fragmented reports / Stock, Purchasing, Finance | KEEP + SPLIT | physical, buy and value decisions have different owners | exact-Unit drilldown; exports never write back |
+| Mature 3PL role/API/offline controls | partner/manual paths / Stock and owning event modules | ADAPT + RESTRICT | partner submits observed evidence; Portal keeps authority | future 3PL/Carres operation reuses the same contracts |
+
+No relevant 2990 capability is adopted because of terminology or layout alone. Carres explicitly
+rejects negative Stock, shortage override, duplicate quantity/rack ledgers, direct adjustment,
+instant Transfer, automatic returned-stock availability, broad external administration, and
+unmeasured pallet/license-plate/wave/labour/robotics complexity.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
@@ -1403,9 +1425,44 @@ These are not approved business law. They are gaps to re-measure before any buil
 three-tab IA, wording, Ready stock meaning, generic Held stock or Quarantine, rollup authority,
 bulk sofa identity and claim-only issue route are superseded.
 
-## 14 · Resolved contradictions and plan state
+## 14 · Whole-domain completion gate
 
-Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to
+### 14.1 Challenge of the original 14 findings
+
+| ID | Final challenge and ruling | Final class |
+|---|---|---|
+| G1 | Stock Add/import duplicates Receiving; retire it as a normal door and keep only governed migration/count correction paths. | authority consolidation gap; not a business contradiction |
+| G2 | `stock_balances` or page totals can diverge; every decision reads the Unit Register and derives rollups. | engineering/authority consolidation gap |
+| G3 | mixed bulk and Unit identity cannot reserve traceable furniture truthfully; every sofa/independently saleable module uses Unit ID, while governed interchangeable goods may use quantity scope. | approved model rule; implementation gap only |
+| G4 | legacy take-out quantity/event errors do not change business design; exact affected Units/quantity and append-only event must agree. | engineering correctness gap |
+| G5 | the old audit claimed internal location was required. Challenged and rejected: Carres does not operate NETS internal storage and currently governs Site + actual holder, not Zone/Rack/Bin. Add finer position only after measured multi-outlet/finding need. | not a current business gap; intentional rejection with future trigger |
+| G6 | Add/Remove is not a Count. Blind Count, Count again, Difference, investigation and approved Adjustment are the complete control. | approved target / not built |
+| G7 | generic reservation cannot prove customer promise; Sales Order binds/releases/substitutes the exact eligible Unit atomically. | integrity/authority consolidation gap |
+| G8 | one status cannot combine holder, Site, condition, availability, reservation and work; these remain separate facts over one event history. | engineering/authority consolidation gap |
+| G9 | Delivery selection without physical Warehouse handover lets digital state outrun reality; Outbound requires exact two-sided handover. | approved cross-module target / not built |
+| G10 | return state without return receipt/inspection leaves false holder and availability; Return/Repair uses new out-and-back events and check required. | approved lifecycle target / not built |
+| G11 | unknown import cannot become new/sellable/reserved truth; reject to review and never allocate through migration. | data-governance/engineering gap |
+| G12 | giant mixed UI and drifting copy are not business decisions; governed Shell/Register/Object Detail and four destinations consolidate presentation. | UI/engineering consolidation gap |
+| G13 | legacy Stock/Receiving/partner/PO write paths cannot coexist as authorities; each physical act has one owning door and forbidden external overwrite. | engineering/authority consolidation gap |
+| G14 | appointment/customer-date ownership was once contradictory. It is now resolved: Sales Order owns the customer promise; Delivery derives DO/Journey dates; Warehouse consumes dated Inbound/Outbound work and never owns the promise. | resolved cross-module authority; no Warehouse owner decision |
+
+### 14.2 Blueprint completeness result
+
+Coverage is complete across purpose/ownership; Unit creation and identity; acquisition reason;
+Inbound/Receiving; Inventory/Ready Stock/reservation; Showroom/Consignment; problems/condition;
+Count/Difference/Adjustment; Outbound/Delivery; Transfer; Return/Repair; lifecycle outcomes;
+morning-to-close dated Work; Duty/cover/offboarding; navigation/Register/Workspace/Object Detail;
+Quick Rail/Calendar; Settings; Reports/export; permissions/segregation; Month-end/Finance; NETS/3PL/
+offline/API boundaries; history/audit; cancellation/partial/concurrency consequences; and future
+Carres-operated warehouse compatibility.
+
+The former 11-task roadmap is research history, not current Blueprint authority and not a substitute
+for this coverage. No lifecycle or cross-module seam remains an unknown deferred blind spot;
+implementation may later be dependency-sliced only after a separate BUILD/DELIVERY takeover.
+
+### 14.3 Resolution classification
+
+Resolved: legacy tab shell to Warehouse destinations; On hand master list to Inventory; Ready stock planning to
 eligible Units; warehouse-only scope to all governed Sites and journeys; rollup to Unit authority;
 bulk sofa to Unit identity; Quarantine to observable issue and automatic control; Receiving-only
 supplier fault to Receiving and Service entrances; NETS-as-place to Site/operator separation;
@@ -1413,7 +1470,7 @@ one movement status to collection, transit and arrival; bulk reservation to Sale
 binding; missing month-end to Stock date, window, reconciliation and version; generic task to the
 shared Action contract; and hard-coded NETS to role-based partner/future-self-operation.
 
-Intentional rejects now: duplicate Warehouse Dashboard, second exception register, manual totals,
+Intentional rejects now: Dashboard as a second truth/KPI wall, second exception register, manual totals,
 negative stock, generic status editing, Position or slot at current scale, heavy WMS without
 measured need, and assumed external cutover.
 
@@ -1427,3 +1484,6 @@ upstream/downstream owners.
 **REAL GAP / CONTRADICTION:** none requiring an owner decision.
 
 **OWNER DECISIONS:** none unresolved.
+
+**PLAN MISSION COMPLETE.** The complete Warehouse operating model is approved and persisted. PLAN
+does not author Cards or choose implementation mechanics.
