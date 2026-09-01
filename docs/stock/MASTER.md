@@ -168,8 +168,41 @@ actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, 
 Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
 it into a misleading current-day bucket.
 
-Dashboard projects those dated facts across Inbound, Inventory, Outbound and the shared Work
-Engine. It may drill into the source object but cannot complete or edit another module's record.
+Dashboard is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
+from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
+an actual date, the page groups the one work set in business order:
+
+```
+INBOUND         expected arrival and receiving work
+INVENTORY       governed Count and Unit-control work
+NEEDS CHECKING  exact damage, missing Unit, mismatch and unresolved-difference work
+OUTBOUND        check, pack and handover work
+MONTH-END       count-window and Stock Confirmation work when applicable
+```
+
+Every row shows its source document/Unit identity, concrete fact, resolved owner avatar and plain
+action. Examples are `PO-2041 · 5 Units expected` / `Receive and check 5 Units`, `U-1005 was not
+found in the stock count` / `Find out why U-1005 did not match the count`, and `DO-1048 · SO-1318 ·
+2 Units` / `Check, pack and hand over 2 Units`. The source identity is clickable:
+
+- PO/Consignment arrival → its Receiving Session;
+- Unit or Count difference → Unit Detail or `Counts & Adjustments`;
+- DO handover → the Outbound work with linked Delivery Order;
+- Month-end requirement → the Month-end Stock Confirmation.
+
+Dashboard stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
+or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
+work. Completion occurs only when the authoritative source fact exists, after which the shared row
+updates everywhere.
+
+The COO view adds exception summaries over the same drillable facts: unresolved Stock differences,
+Adjustments awaiting COO approval, damaged Units requiring a decision and Month-end submissions not
+done. Every number expands to exact Units/documents, actual dates and resolved owners; a KPI with no
+drill-down is invalid.
+
+An individually signed-in NETS operator sees only permitted physical work: receive and check, Count
+or Count again, check and pack, hand over, Report a problem and upload evidence. NETS cannot see
+purchase cost, Supplier Invoice, customer payment, Adjustment approval or unrelated staff work.
 
 Inbound groups actual expected-arrival and receipt work by governed date. It shows clickable source
 document number and date, Supplier, destination, quantity, exact Units where already assigned,
