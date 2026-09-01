@@ -827,7 +827,47 @@ remain separate. Current scope rejects unproven heavy-WMS bin, rack, put-away, p
 and packing-station complexity. Zone, Rack or Bin may extend the same Unit model when measured need
 justifies it.
 
-## 12 · Current implementation reality — evidence, not law
+## 12 · 2990 and mature-ERP capability rulings
+
+These rulings are operating recommendations, not a product-copy matrix. 2990 is challenged together
+with current Carres. Useful capability is adopted into the governed Carres Shell/Register/Object
+Detail system; unsafe terminology, layout, authority or business rules are rejected.
+
+### 12.1 Inventory authority and stock finding
+
+**CURRENT CARRES →** Unit ID, On hand/Reserved/Free information, Ready Stock and PO/SO lineage
+exist, but legacy Unit rows, `stock_balances` totals and page calculations can disagree.
+
+**2990 / MATURE ERP LESSON →** keep 2990's product-to-warehouse/batch/movement drilldown,
+source-document Stock Card links and ageing/availability analysis. Mature serial systems confirm
+that totals must trace to physical Units. Reject 2990's signed-quantity centre, negative-stock or
+ship-despite-shortage behaviour, duplicate rack/bin quantities and accounting-led Warehouse view.
+
+**RULING → KEEP + ADAPT + IMPROVE + REJECT.** Keep Carres Unit ID; adapt progressive drilldown and
+source-linked history; improve every quantity into a derived projection of exact Units; reject
+editable totals, negative Stock and a second Rack/Bin ledger.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** Purchasing explains acquisition; Receiving proves the exact
+Units received; Inventory states current holder, Site, condition and Stock use; Sales Order binds
+an eligible Unit; accepted Outbound/Delivery handovers change holder; Count compares Portal truth
+with the physical Units. No page or integration may directly set an `Available` total.
+
+**OPERATOR JOURNEY →** open Inventory; search Unit ID, SKU, SO No, PO No or product; filter Stock,
+`Who has it` and ownership through the left rail; expand every total to exact Units; open Unit
+Detail for source, reservation, handover, problem and append-only history.
+
+**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Dashboard · Inbound ·
+Inventory · Outbound`. Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
+· SO No · SO date · PO No · PO date · Expected arrival · Last verified · Work`. Ready Stock is a
+saved view of the same authority; Sales and Operations read the same eligible Units with different
+permissions. History belongs in Unit Detail and the Inventory rail, not a second accounting Stock
+Card destination.
+
+**CROSS-MODULE CONNECTION →** Purchasing owns PO/Consignment reason; Receiving owns receipt;
+Sales Order owns reservation; Delivery owns journey proof; Finance consumes physical events for
+valuation without editing location; Reports remain read-only projections.
+
+## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
 page called Ready stock; ops_stock_items and stock_balances can diverge; bulk quantity rows, legacy
@@ -837,7 +877,7 @@ These are not approved business law. They are gaps to re-measure before any buil
 three-tab IA, wording, Ready stock meaning, generic Held stock or Quarantine, rollup authority,
 bulk sofa identity and claim-only issue route are superseded.
 
-## 13 · Resolved contradictions and plan state
+## 14 · Resolved contradictions and plan state
 
 Resolved: legacy tab shell to Warehouse destinations; On hand to Stock; Ready stock planning to
 eligible Units; warehouse-only scope to all governed Sites and journeys; rollup to Unit authority;
@@ -856,7 +896,7 @@ upstream/downstream owners.
 
 **APPROVED TARGET / NOT BUILT:** this complete Warehouse operating model and UI.
 
-**BUILT / VERIFIED:** only the implementation evidence in §12, to be re-measured before build.
+**BUILT / VERIFIED:** only the implementation evidence in §13, to be re-measured before build.
 
 **REAL GAP / CONTRADICTION:** none requiring an owner decision.
 
