@@ -66,6 +66,11 @@ vi.mock("@/lib/queries", () => ({
   /* 2026-08-24 - the New SKU modal now offers the portal's FIRST
    * supplier-creation door. This file renders that modal for the 0175
    * price-lock cases, so the hook has to exist here too. */
+  /* 0388's offers, which the supplier modal reads. Empty is the honest default
+     for a fixture: a SKU nobody has quoted yet still opens its door. */
+  useSkuSupplierOffers: () => ({ data: { offers: [] }, isLoading: false }),
+  useUpsertSkuSupplierOffer: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteSkuSupplierOffer: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateSupplier: () => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn().mockResolvedValue({ supplier: { id: "sup-new", name: "New" } }),
@@ -817,5 +822,54 @@ describe("SkuMasterTab — header and rows share ONE grid template", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guarantee & Service" }));
     const row = screen.getByTestId("sku-row-GRT-MATTRESS-15Y");
     expect(row.style.gridTemplateColumns).toBe(headerCols(container));
+  });
+});
+
+/**
+ * THE SUPPLIER COLUMN BECAME A DOOR - 2026-09-01 (YH, after Loo).
+ *
+ * The 2026-08-26 ruling put supplier + their code on this grid, and the reason
+ * still stands. What changed is that migration 0388 - the same day - made a SKU
+ * remember EVERY supplier that quoted it, and a cell can print one. From that
+ * day the column under-reported every dual-sourced SKU by construction.
+ *
+ * These tests exist because the cell it replaced had NONE. Forty-three tests in
+ * this file and not one touched the supplier cell, so removing it broke nothing
+ * and proved nothing.
+ */
+describe("Who supplies this SKU - the column became a door", () => {
+  it("no longer renders a Supplier cell or header", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    expect(screen.queryByTestId("sku-supplier-CLOUD-KING")).not.toBeInTheDocument();
+    expect(screen.queryByText("Supplier")).not.toBeInTheDocument();
+    // Column removal, not row removal - the same distinction the cost test draws.
+    expect(screen.getByTestId("sku-row-CLOUD-KING")).toBeInTheDocument();
+  });
+
+  it("the code chip is the door, and it is reachable by keyboard", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    const door = screen.getByTestId("sku-suppliers-door-CLOUD-KING");
+    expect(door.tagName).toBe("BUTTON");
+    // Named for a screen reader - "CLOUD-KING" alone does not say what it opens.
+    expect(door).toHaveAttribute("aria-label", "Who supplies CLOUD-KING");
+  });
+
+  it("opening it shows BOTH facts, and says which one moves the PO", () => {
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET])} />));
+    fireEvent.click(screen.getByTestId("sku-suppliers-door-CLOUD-KING"));
+    expect(screen.getByTestId("supplier-offers-modal-CLOUD-KING")).toBeInTheDocument();
+    // The SLOT - who the next PO is addressed to.
+    expect(screen.getByTestId("supplier-slot-CLOUD-KING")).toBeInTheDocument();
+    expect(screen.getByText(/next Purchase Order for this item goes here/i)).toBeInTheDocument();
+    // The OFFERS - who has quoted it. 0388 keeps these apart on purpose.
+    expect(screen.getByText(/Everyone who has quoted it/i)).toBeInTheDocument();
+  });
+
+  it("only ONE modal mounts, however many rows are on screen", () => {
+    // A modal per row would fetch offers for every visible SKU on first paint.
+    render(wrap(<SkuMasterTab catalog={makeCatalog([SKU_COST_SET, SKU_COST_NULL])} />));
+    expect(screen.queryAllByTestId(/^supplier-offers-modal-/)).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("sku-suppliers-door-CLOUD-KING"));
+    expect(screen.queryAllByTestId(/^supplier-offers-modal-/)).toHaveLength(1);
   });
 });

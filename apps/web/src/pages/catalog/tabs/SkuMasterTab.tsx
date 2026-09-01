@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useDeleteCatalogSku, useOperationSuppliers, usePatchCatalogModel, usePatchCatalogSku } from "@/lib/queries";
 import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CATEGORY_LABEL_SHORT, CodeChip } from "../components/atoms";
+import { SupplierOffersModal } from "../components/SupplierOffers";
 import { skuMargin } from "../margin";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
@@ -49,19 +50,35 @@ const VISIBLE_CAP = 300;
 // (PWP = the 0186 per-SKU PWP reward price, 2990s "PWP Price" column. The sofa
 // per-size grid variant deliberately has NO pwp column — a sofa's PWP price
 // lives on the matched COMBO (pwp_prices_by_height), never on component SKUs.)
-// 2026-08-26 (YH) — SUPPLIER joins them, name + their own code in one cell:
-// "show supplier too, show supplier code too if possible so if supplier code
-// entered wrong can check from there as well". It is the SAME pair the
-// Operations catalog edits, resolved through the roster by supplier_id and
-// never stored as text here (Law A/D). COST deliberately did NOT come with it —
-// Loo dropped that column on 2026-07-06 and nothing has reopened it.
+// ⛔ SUPPLIER LEFT THIS GRID — 2026-09-01 (YH, after Loo), and it is a
+// correction of the 2026-08-26 ruling that put it here. That ruling asked for
+// "supplier too, show supplier code too if possible so if supplier code entered
+// wrong can check from there as well", and the reason still stands — what
+// changed is that a COLUMN cannot serve it any more.
+//
+// Migration 0388 (2026-08-26, the same day) made a SKU remember EVERY supplier
+// that has quoted it. A cell can print one. So from the day the offers table
+// shipped, this column under-reported every dual-sourced SKU by construction:
+// it showed the slot and silently hid the alternates.
+//
+// The pair moved WHOLE into `SupplierOffersModal`, opened from the code chip —
+// one item code, one product name, click it for who supplies it and at what
+// cost. Nothing was dropped; a list simply does not fit a cell.
+//
+// The placement was never the problem: this grid renders one row per SKU, which
+// is right. HOUZS ERP paid for the same lesson from the other side —
+// `docs/modules/mrp.md`: "a Model or a Sales Order does not have suppliers,
+// each VARIANT does."
+//
+// COST still did not come with it — Loo dropped that column on 2026-07-06 and
+// nothing has reopened it.
 const GRID_COLS =
-  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 90px minmax(140px,1fr) 100px 100px 80px";
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 90px 100px 100px 80px";
 // Same tracks minus the SIZE one — used when the active filter is a category
 // with no size axis (Service / Guarantee), where every SIZE cell would either
 // repeat the CODE column or print an invoice sentence (Loo 2026-07-26).
 const GRID_COLS_NO_SIZE =
-  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px minmax(140px,1fr) 100px 100px 80px";
+  "32px 170px minmax(180px,1.4fr) minmax(120px,1fr) 100px 100px 100px 80px";
 
 type CatFilter = ProductCategory | "all";
 
@@ -93,14 +110,10 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
    * the SKU) | a suppliers.id. Names come from the roster and are matched by
    * the FK, never by text - the same identity rule the Suppliers tab lives by. */
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  /* The SKU whose supplier door is open. One modal for the whole grid, not one
+     per row - a mounted-per-row modal would fetch offers for every visible SKU. */
+  const [offersFor, setOffersFor] = useState<ProductSkuDto | null>(null);
   const suppliersQ = useOperationSuppliers();
-  /* The roster, keyed by id — the SKU stores `supplier_id` and the NAME is
-     always derived through this map, never held on the row (Law A/D). */
-  const supplierNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of suppliersQ.data?.suppliers ?? []) m.set(s.id, s.name);
-    return m;
-  }, [suppliersQ.data?.suppliers]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -441,7 +454,6 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
               <div className="label">Product</div>
               <div className="label">Category</div>
               {!sizelessMode && <div className="label">Size</div>}
-              <div className="label">Supplier</div>
               <div className="label text-right">Price</div>
               <div className="label text-right">PWP Price</div>
               <div className="label text-right">Margin</div>
@@ -466,8 +478,7 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
             sofaSizes={sofaSizeMode ? sofaSizes : null}
             gridCols={gridCols}
             showSize={!sizelessMode}
-            supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
-            suppliers={suppliersQ.data?.suppliers ?? []}
+            onOpenSuppliers={() => setOffersFor(r.sku)}
           />
         ))}
       </div>
@@ -480,6 +491,20 @@ export default function SkuMasterTab({ catalog }: { catalog: CatalogResponse }) 
           optionPools={catalog.optionPools ?? []}
           sofaCombos={catalog.sofaCombos ?? []}
           onClose={() => setNewOpen(false)}
+        />
+      )}
+
+      {/* WHO SUPPLIES THIS SKU. One modal for the whole grid - the slot the next
+          PO goes to, and every supplier who has quoted it (0388). This is where
+          the `Supplier` column went on 2026-09-01: a cell can print one
+          supplier, and a SKU can have several. */}
+      {offersFor && (
+        <SupplierOffersModal
+          sku={offersFor}
+          suppliers={suppliersQ.data?.suppliers ?? []}
+          category={catalog.models.find((m) => m.id === offersFor.modelId)?.category ?? null}
+          heights={sofaSizes}
+          onClose={() => setOffersFor(null)}
         />
       )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
@@ -496,8 +521,7 @@ const SkuRowView = memo(function SkuRowView({
   sofaSizes,
   gridCols,
   showSize,
-  supplierName,
-  suppliers,
+  onOpenSuppliers,
 }: {
   row: FlatRow;
   /** 0175 — true only for the principal; price/PWP cells stay read-only otherwise. */
@@ -517,10 +541,10 @@ const SkuRowView = memo(function SkuRowView({
   showSize: boolean;
   /** Resolved through the roster by supplier_id; null = the SKU names no
    *  supplier (legitimate for service/accessory, 0171). */
-  supplierName: string | null;
   /** The roster, for the inline picker. The IDENTITY written is always
    *  supplier_id; the name is only ever what the picker displays. */
-  suppliers: Array<{ id: string; name: string }>;
+  /** Opens the one door that now holds supplier truth for this SKU. */
+  onOpenSuppliers: () => void;
 }) {
   const { sku, model, category, productName } = row;
   const priceEdit = inlineEdit && canEditPrices;
@@ -614,7 +638,18 @@ const SkuRowView = memo(function SkuRowView({
     />
   ) : (
     <div>
-      <CodeChip>{sku.sku}</CodeChip>
+      {/* THE DOOR. "one item code one product name, click on it, then a modal
+          that shows the 2 different suppliers and their cost" (YH, 2026-09-01).
+          The chip, not a new column - a column is what could not hold the list. */}
+      <button
+        type="button"
+        onClick={onOpenSuppliers}
+        aria-label={`Who supplies ${sku.sku}`}
+        data-testid={`sku-suppliers-door-${sku.sku}`}
+        className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1 rounded-[3px]"
+      >
+        <CodeChip>{sku.sku}</CodeChip>
+      </button>
     </div>
   );
 
@@ -641,30 +676,6 @@ const SkuRowView = memo(function SkuRowView({
      the API leaves both ungated. The point of showing them on this door is
      checking a keyed-in supplier code against the quotation without switching
      pages — and a typo you can see is a typo you should be able to fix. */
-  function commitSupplier(nextId: string) {
-    const val = nextId || null;
-    if (val === (sku.supplierId ?? null)) return;
-    patch.mutate(
-      { id: sku.id, patch: { supplierId: val } },
-      {
-        onSuccess: () => toast.success(`${sku.sku} · supplier updated`),
-        onError: (e: unknown) =>
-          toast.error(e instanceof ApiError ? e.message : "Update failed"),
-      },
-    );
-  }
-  function commitSupplierCode(raw: string) {
-    const val = raw.trim() || null;
-    if (val === (sku.supplierCode ?? null)) return;
-    patch.mutate(
-      { id: sku.id, patch: { supplierCode: val } },
-      {
-        onSuccess: () => toast.success(`${sku.sku} · supplier code updated`),
-        onError: (e: unknown) =>
-          toast.error(e instanceof ApiError ? e.message : "Update failed"),
-      },
-    );
-  }
 
   function commitPrice(raw: string) {
     const trimmed = raw.trim();
@@ -823,46 +834,6 @@ const SkuRowView = memo(function SkuRowView({
         ) : (
           <div className="text-body text-base-700">{sizeless ? "—" : sku.variant || "—"}</div>
         ))}
-
-      {/* Supplier + THEIR code for it — one cell, because they are one fact
-          about one relationship and reading them apart is what made a wrong
-          code hard to spot. */}
-      <div data-testid={`sku-supplier-${sku.sku}`}>
-        {inlineEdit ? (
-          <div className="flex flex-col gap-1">
-            <select
-              defaultValue={sku.supplierId ?? ""}
-              onChange={(e) => commitSupplier(e.target.value)}
-              aria-label={`${sku.sku} supplier`}
-              className={`${INPUT_CLS} text-meta`}
-            >
-              <option value="">No supplier</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <input
-              defaultValue={sku.supplierCode ?? ""}
-              onBlur={(e) => commitSupplierCode(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              }}
-              placeholder="Their code"
-              aria-label={`${sku.sku} supplier code`}
-              className={`${INPUT_CLS} text-meta font-mono`}
-            />
-          </div>
-        ) : (
-          <div className="text-meta text-base-600 truncate" title={supplierName ?? ""}>
-            {supplierName || <span className="text-base-400">—</span>}
-            {sku.supplierCode ? (
-              <span className="text-base-400 font-mono"> · {sku.supplierCode}</span>
-            ) : null}
-          </div>
-        )}
-      </div>
 
       {/* Price */}
       <div className="text-right">
