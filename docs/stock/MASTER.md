@@ -609,6 +609,46 @@ Reports cover Stock by Site, product, ownership and availability; Showroom; stal
 receipt, Transfer and Count; partner evidence; current issues; corrections and adjustments; and
 month-end versions. Reports are read-only. Export never becomes authority.
 
+The shared Reports destination exposes the Warehouse catalogue, not repeated buttons on every
+page: `Current Stock · Ready Stock · Showroom Stock · Stock by Ownership · Receiving & Inbound ·
+Outbound & Handovers · Transfers · Stock Counts · Stock Differences & Adjustments · Problems &
+Condition · Month-end Stock Confirmations · Partner Evidence · Unit History`.
+
+- **Current/Ready/Showroom/Ownership:** expose exact Unit ID, Product, Stock use, Site, `Who has it`,
+  ownership, SO and source document, condition and last verified. Ready Stock also exposes earliest
+  handover and days available; every total drills to IDs. Showroom separates Carres Owned,
+  Consignment, Reserved/awaiting Delivery and `Needs checking`, plus last Count/condition check and
+  display since. A bare `Available Qty` is invalid.
+- **Receiving & Inbound:** expose source, Supplier/source party, expected arrival, actual received,
+  Expected/Received/Not yet received/With issue, Receiving Session/GRN, submitter and poster. Promise
+  provenance distinguishes supplier commitment from Carres estimate before lateness is attributed.
+- **Outbound/Handovers/Transfers:** expose actual date, DO/Transfer/Return/Repair and SO No, From,
+  To, Required/Handed over/Not handed over, individually identified parties and evidence. Partial
+  events stay Unit-level.
+- **Counts/Differences/Adjustments:** expose Count No, Site, Stock date, actual Count/submission,
+  counter, Portal/Counted/matched/difference IDs, first Count, Count again, investigation,
+  correction, Adjustment request, COO decision and reversal. A final adjusted total may not hide the
+  original Count or merge Difference with Adjustment.
+- **Problems & Condition:** expose observable problem, Unit, holder/Site, actual reported date,
+  reporter/evidence, affected SO/customer consequence, current Action/resolved owner, completion
+  fact and distinct physical outcome; `Closed` alone is not a reportable outcome.
+- **Month-end:** expose Stock date, version, Count/submission, confirmed Units, unresolved
+  differences, approved Adjustments, Finance acknowledgement and the version used for valuation.
+  Versions remain separate.
+- **Partner Evidence/Unit History:** expose individual actor as well as organisation, Site/journey,
+  scans, Count, handover/arrival, missing evidence and late submission, plus the Unit's append-only
+  event chain. An organisation name cannot hide who performed the act.
+
+Every export prints generation time/person, applied filters, Stock/report date, version, Unit-level
+rows and source document numbers. It is a fixed snapshot, cannot be uploaded to overwrite Portal
+truth and never becomes a second authority.
+
+Report visibility follows need: Sales receives Ready Stock and permitted showroom availability;
+NETS receives its authorised organisation/Site work/evidence; Purchasing receives Receiving,
+ownership, Consignment and supplier consequences; Finance receives Month-end/ownership/valuation
+facts; the COO receives all Warehouse reports and approval evidence. Cost, settlement, customer
+payment and unrelated-outlet information remain hidden where the role does not require them.
+
 The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
 Dashboard, panel or object menu may create a second Settings door. The page sections are `Sites &
 operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence ·
