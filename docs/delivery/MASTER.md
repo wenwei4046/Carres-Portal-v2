@@ -876,3 +876,27 @@ Warehouse Schedule feed and the narrow-layout rail control. Reverted before merg
 owner's takeover instruction: the `Delivery Status → Work` column rename and the
 hide-empty-rail-choices change. PR #999 is closed with a pointer; split-trip DOs still do not
 expose Delivery Result (order-scoped writers — a named follow-up, not an accident).
+
+**DEPLOYED 2026-09-01 — Delivery Card 04, PR #1046, main SHA
+`0c56739aa770f079acd0dbe86ee34c950e8de815`, production converged.** The REGION rail group
+(states by their own names · fixed EAST MALAYSIA and SINGAPORE sub-headings · leg 1 under
+Johor, leg 2 under Singapore · no `Other` bucket of any spelling) and the six-day generated
+date window (Sunday and Malaysian public holidays never offered; a genuinely recorded
+Sunday/holiday date still shows). The same PR persisted the East Malaysia boundary ruling into
+§15 and the shared 240px rail-recipe correction into §8.
+
+**DEPLOYED 2026-09-01 — Delivery Card 05, PR #1047, main SHA
+`6707a454cd494407aa23d6062521fa65a3f8a281`, production converged.** The chase door in Edit
+Delivery (`Ask {partner} for the delivery date` — prepared message · `Copy message` ·
+`Open WhatsApp group` to the partner's own group, honest absence when none is saved, the
+on-screen law *sending is not confirmation*) and the reply proof as a REAL upload through
+`POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
+bucket under `arrangement/{order}/{leg}/…`.
+
+**DEPLOYED 2026-09-01 — Delivery Card 06, PR #1048, main SHA
+`feec4618f053b183b8a66f94c884799db3051615`, production converged.** Migration `0412` was
+probed in a rolled-back production transaction, then applied as the exact file; the tracker
+tail reads `0412` and the column + door were measured live. Condominium registration is a
+Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy message` /
+`Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
+an activity fact that confirms nothing and moves no arrangement field.
