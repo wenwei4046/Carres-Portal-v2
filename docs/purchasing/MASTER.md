@@ -1278,6 +1278,28 @@ pack.
 commercial credit mismatch.
 **Connections:** Service Case authority, Goods Receipt, Unit, Purchase Return, Repair Order, Finance.
 
+**THE FOUR LAYERS ARE COMPLETE — APPROVED / LOCKED, owner ruling YH 2026-09-01 (migration 0409).**
+Loo's claim model (`Customer Problem → Supplier Response → Carres Resolution → Carres Execution`,
+ruled 2026-08-05) carried three built layers and one frozen. `Carres Execution` is now built —
+`Return to Supplier · Collect Defective Item · Replace First · Collect First · Exchange on
+Collection` — and it is the argument §9.6 and §9.7 were waiting on. Both remain unbuilt; this
+unfreezes them, it does not create them.
+
+**THE LAYERS ARE NOT CROSS-VALIDATED, AND THAT IS THE RULING (YH, 2026-09-01).** An incoherent
+pair — `Replace First` with `No Replacement Required` — is accepted by the database on purpose.
+**Flexibility wins over the guard**, for two reasons the owner accepted:
+
+1. A CHECK across the two would **collapse two layers the model exists to keep apart.** The moment
+   answering one narrows the other, they are no longer two questions.
+2. It would refuse a real event. The van is already out collecting; the office records
+   `Collect First` because it is happening, while the customer has not yet settled what they
+   want. A matched-pair rule would make an operator type a false answer to record a true one —
+   the failure this repo keeps finding whenever two things that move on different days are tied.
+
+**A consequence engine may revisit this**, because `f(Resolution, Execution)` becomes computable
+only once both are on file. Until that function is ruled, no surface derives a Stock, Finance or
+Demand consequence from either layer.
+
 ### 9.6 Purchase Returns
 
 **Purpose / source:** return Carres-owned purchased goods only after approved claim/outcome. No blank
