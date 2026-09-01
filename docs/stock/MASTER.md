@@ -994,6 +994,52 @@ supplier return; Delivery owns transport and handover investigation; Service Cas
 product service; Sales Order displays promise risk only; COO alone approves governed material
 Adjustment, write-off or unexplained major difference.
 
+### 12.5 Stock Count, Difference and Adjustment
+
+**CURRENT CARRES →** a Receiving count control is not a formal Stock Count. Legacy design lacks one
+complete Count object, blind first Count, Unit-level variance, Count again, investigation,
+approval and history; separate Stock Take/Difference/Adjustment pages or direct Add/Remove can
+fragment the same control journey.
+
+**2990 / MATURE ERP LESSON →** keep 2990's expected snapshot, untouched-versus-zero distinction,
+scoped count, actor/date, found/lost variance, terminal result and history. Dynamics/Odoo reinforce
+blind first Count, worker-scoped execution, scheduled cycle counts and supervisor variance review.
+Reject 2990 `Match All`, variant-flattened SKU totals, automatic quantity adjustment and posting to
+an ambiguous bucket.
+
+**RULING → ADAPT + IMPROVE + RESTRICT + REJECT.** Count snapshots the Portal Unit scope but hides
+the answer during the first physical pass. Unit identity, not equal aggregate quantity, determines
+match. Difference never automatically becomes Adjustment; ordinary operators cannot directly add
+or subtract Stock; skipped scope and casual mass match cannot complete a Count.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** Portal snapshots expected Unit IDs; an individually signed-
+in NETS Warehouse person blindly scans observed Units and explicitly closes the scope; Portal then
+reveals exact matched, missing, unexpected, holder/Site and condition differences; NETS performs a
+dated Unit-level Count again where required; current GRN Duty investigates Receiving, Transfer,
+Outbound, Delivery and Unit History. Evidence-backed source correction completes an explainable
+difference. Only a genuinely unresolved physical difference becomes an Adjustment Request, and
+only the COO may approve or reject it. Approval creates an append-only Unit correction while
+preserving snapshot, first Count, Count again, investigation and decision.
+
+**OPERATOR JOURNEY →** NETS opens the actual dated Count Work, scans every Unit without seeing the
+Portal answer, closes the governed scope and later rechecks only requested Units. GRN Duty compares
+both Counts with source documents and handovers, completes the missing authoritative event when one
+exists, or submits a reasoned Adjustment Request. COO reviews before, counted, recount, evidence and
+investigation, then approves or rejects; requester and approval control remain segregated.
+
+**UI / PAGE / OBJECT PLACEMENT →** `Inventory rail → CONTROL → Counts & Adjustments` is one page
+with saved views `Scheduled counts · Counting · Differences to check · Adjustment requested ·
+Completed`. Count Register defaults are `Count No · Site · Stock date · Actual count date ·
+Submitted date · Scope · Counter avatar · Portal Units · Counted Units · Differences · State ·
+Work`. Count Detail contains scope, first Count, Count again, exact Unit differences,
+investigation, correction, Adjustment request, COO decision, resulting Unit events and History.
+No ordinary-user plus/minus form exists.
+
+**CROSS-MODULE CONNECTION →** Stock owns Count/Difference/investigation and physical correction;
+Receiving and Delivery/Outbound supply missing receipt/handover facts; Purchasing handles supplier
+quantity/product consequence; Finance consumes approved results and the Month-end version; COO
+alone approves governed material or unexplained Adjustment.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
