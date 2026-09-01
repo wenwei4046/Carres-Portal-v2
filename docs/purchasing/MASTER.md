@@ -266,10 +266,12 @@ refused. Commercial approval remains separate and never follows from issue autho
 production-verified at `98ce4220d15cd81482aef05124dbec470c2ed87b` on 29 Aug 2026. A real
 `operation@carres.com` walk selected an eligible SO, saw the compact duty chip and active `Issue PO`
 action, and reached `Review Purchase Orders`; the preview was not issued.**
-`purchasing_po_actor()` is the ONE
-resolver. It reads the month's `ops_po_duty` holder and the dated `ops_po_duty_cover` window, and
-returns both people separately: the normal holder, because Team Work groups by them, and the acting
-cover. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
+`purchasing_po_actor()` is the production-verified **legacy module-local resolver**, not the final
+architecture authority. **OWNER RULING 2026-09-01 supersedes its ownership boundary:** it must
+converge behind ERP Architecture Law F.1's Shared Duty Resolver; no new Purchasing page or API may
+read `ops_po_duty` or `ops_po_duty_cover` directly. Until that convergence is built, its existing
+behaviour is implementation evidence only: it reads the month's duty holder and dated cover and
+returns normal holder and acting cover separately. `is_operations_superuser()` reads Principal or the governed `app_users` capability;
 application code never checks an email. `purchasing_actor_may_issue()` combines duty, dated cover
 and that capability, and is asked by SO Batch Purchase, Manual Purchase, the API issue routes, the
 creation authority `purchasing_issue_pos_batch`, and the evidence door
@@ -1430,7 +1432,8 @@ completion facts in the table above.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- PO Duty and GRN Duty rosters, buddy cover, governed Operations Superusers and working calendars;
+- a read-only door to Team's PO Duty / GRN Duty and buddy-cover settings; Purchasing Settings
+  stores no roster and performs no Duty calculation;
 - approval limits and Manual Purchase purposes;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock

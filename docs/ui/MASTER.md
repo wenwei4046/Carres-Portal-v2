@@ -626,11 +626,13 @@ directory only and said so.*
   person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
   **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
   zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
-- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` are one
-  rota (`ops_po_duty`), auto-assigned through one rotation, resolved server-side.
-  `Not assigned` may appear ONLY when no assignable staff exists, and must then say where to
-  fix it. See `../purchasing/MASTER.md` §2.2 for the duty model itself — this file does not
-  restate it.
+- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
+  through the ONE Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1, owner ruling
+  2026-09-01): **Team is the one Duty settings door**, People owns eligibility only, and no
+  page reads a rota table or calculates a Duty for itself (the current `ops_po_duty` read is
+  legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
+  `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
+  fix it. This file does not restate the duty model.
 - **Activity** previews recent append-only events and links to their objects; it does not replace
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind

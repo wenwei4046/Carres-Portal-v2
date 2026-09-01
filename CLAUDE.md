@@ -202,7 +202,7 @@ engineering mechanics. Clarify only when acting would risk crossing a business o
      authoritative sources conflict.
    A missing implementation is not an owner decision. A planner preference is not an owner
    decision. Example: if Blueprint/Money authority already permits planning/booking in parallel and
-   makes T−1 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
+   makes T−2 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
    AUTHORITY`**; it may not ask Jess whether an outstanding balance should block release.
 3. **WHOLE-DOMAIN AUDIT FIRST — AUDIT IS INPUT, NOT FINAL PLAN.** Complete the target domain
    capability and lifecycle pass, including
@@ -543,7 +543,7 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 |---|---|---|
 | **Orders** | the customer's order end to end — the list, the drawer, the action engine, delay planning, the money gate | [`docs/orders/MASTER.md`](docs/orders/MASTER.md) |
 | **Purchasing** | buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
-| **Delivery** | the delivery WORKSPACE — a view of Orders' delivery track | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
+| **Delivery** | the delivery WORKSPACE — it owns the arrangement, the Delivery Order document, handover and proof; Sales owns the promise | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
 | **Stock** | exact Unit · Where · Who has it · availability · physical history and month-end truth | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
 | **Payment** | the collections desk | [`docs/payment/MASTER.md`](docs/payment/MASTER.md) |
 | **Service** | customer complaints after delivery | [`docs/service/MASTER.md`](docs/service/MASTER.md) |

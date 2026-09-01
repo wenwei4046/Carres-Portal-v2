@@ -27,6 +27,34 @@ goods-location observations, the Delivery workspace and append-only history.
 Delivery never creates a second commercial-order, stock, money, Service or Guarantee editor. It
 records what happened and links the owner that must decide a remedy.
 
+### 1.1 · One Unit, one physical event chain
+
+**OWNER-APPROVED / LOCKED 2026-09-01.** Receiving, Stock / Warehouse and Delivery never keep
+independent quantity truth. They reconcile through the same `Unit ID + Source Document + Handover
+facts`:
+
+```
+Receiving  proves what physically arrived
+Stock      owns where each Unit is and who has it now
+Delivery   owns which exact Units must reach the customer
+Outbound   proves which exact Units were handed to the Logistics Partner
+```
+
+The event is recorded once by its owner and read by every connected surface. A module may display
+a derived count, risk or completion state; it may not ask an operator to re-enter the same
+quantity as a second truth.
+
+The connected evidence chain is always navigable:
+
+```
+Sales Order → Delivery Order → Outbound handover → exact Unit IDs
+→ Delivery collection → customer arrival proof
+```
+
+Receiving's parallel inbound chain is Source PO / Consignment / Return → Receiving Session →
+numbered GRN → exact Unit results → Stock consequences. Delivery reads Stock consequences; it
+does not post or correct a receipt.
+
 ### CONDITION-GATED SERVICE COLLECTION
 
 For a Service Case collection whose entitlement depends on item condition, Delivery may arrange
@@ -62,7 +90,7 @@ Current flow:
 
 ```
 goods may be arranged
-→ Issue Delivery Order
+→ the SYSTEM issues the Delivery Order when the governed gate is met
 → Klang Valley auto-assigns NETS
 → NETS contacts customer; NETS or Operations records arrangement
 → Warehouse prepares goods
@@ -94,11 +122,13 @@ problems and history.
   `Release → Issue Delivery Order` is unchanged and still binding). The one governed manual door is
   **`Request Delivery Order`** (owner ruling 2026-08-19) — the outstation trip's door, same single
   issuing path and same gates, merely not waiting for the booking-confirm trigger.
-- ⭐ **THE MONEY HALF IS RE-RULED 2026-08-19 (SUPERSEDING 2026-08-16):** **money in full before
-  delivery is the only default** — a DO issues only when **outstanding = 0, or an APPROVED
-  Delivery Payment Approval covers the order (COD: full balance by online transfer before
-  unloading, no cash), and no OPEN Finance exception holds it.** The 0362 approval record, the
-  0355 Finance exception and the COD terms are defined once in
+- ⭐ **THE MONEY HALF IS RE-RULED 2026-09-01 (SUPERSEDING 2026-08-19): money in full before
+  delivery is ABSOLUTE** — a DO issues only when **outstanding = 0 and no OPEN Finance
+  exception holds it.** The one exception door (Delivery Payment Approval) was removed from the
+  screen by owner instruction (PR #1031): nothing can request one any more, and an owing order
+  is undeliverable until it is paid. The 0362 gate still honours an approval granted before the
+  removal — history honoured, not a live path. The 0362 record and
+  the 0355 Finance exception are defined once in
   [`../orders/MASTER.md`](../orders/MASTER.md) §8, which owns the gate — Delivery READS it and may
   never write it. A DO issued under an approval **prints the COD instruction** on the document.
   Delivery remains the writer of the document and the owner of the carrier, the trip derivation
@@ -157,9 +187,23 @@ Need Preparation → Picking → Checking → Packing → Ready for Handover
 Ready for Handover is not handover. Handed Over is not Logistics receipt. Logistics receipt is not
 delivery. On return, a Logistics report never substitutes for the Warehouse's actual receipt.
 
-Handover records goods/quantity, both parties, actual receiver, time, vehicle when known and
-signature/photo/reply proof. A discrepancy creates investigation Work without overwriting either
-party's original fact.
+Handover records the exact required Unit IDs, each scanned Unit result, both parties, actual
+receiver, time, vehicle when known and signature/photo/reply proof. The derived Outbound control
+is:
+
+```
+Required Units = Handed over Units + Not handed over Units
+```
+
+A partial handover never marks the whole DO collected. Only the handed-over Units change `Who has
+it` from the Warehouse holder to the Logistics holder. Every Unit not handed over keeps its prior
+holder and its original dated Warehouse work remains open. Delivery shows the Journey risk but
+does not invent a replacement quantity or overwrite either party's original fact. A discrepancy
+creates investigation Work linked to the same Unit IDs and handover evidence.
+
+Each Delivery Journey leg reconciles its own `Collected` and `Arrived` Unit facts. A two-leg
+journey therefore completes neither leg, nor the whole journey, from a count recorded on the
+other leg.
 
 One personal login may hold Warehouse, Logistics or both duties and switch between **Warehouse
 Work** and **Logistics Work** without logging out. Every event records person, company and active
@@ -206,6 +250,26 @@ Waiting for Customer Reply.
 - **ETA** is Logistics' later estimated arrival and never rewrites the confirmed date/window.
 - All Delivery grouping and due displays use actual weekday + date, for example **Monday, 17 Aug
   2026**. Delivery UI does not group work as Today or Tomorrow.
+
+### 5.1 · Backward planning — Delivery owns the ONE calculation
+
+**OWNER-APPROVED / LOCKED 2026-09-01.** For every journey that rides a partner's own pickup or
+delivery weekdays — JB, Melaka, the two-leg Singapore journey and any partner with a governed
+calendar — Delivery owns the one backward calculation:
+
+```
+customer delivery date
+→ latest arrival at the partner warehouse (JB, where the journey has one)
+→ the partner's actual KL pickup day
+→ latest Carres Warehouse ready date
+```
+
+The calculation reads each partner's governed pickup/delivery calendar from Partner Settings
+(§11) — never a weekday a member of staff remembers. Warehouse and Purchasing CONSUME the
+calculated latest Carres Warehouse ready date through dated Work; they never recalculate it
+(the consuming half is already law in [`../stock/MASTER.md`](../stock/MASTER.md) §5). When
+Operations assigns TEOW or TT, Delivery computes the actual latest Warehouse-ready date from
+that partner's pickup weekdays and raises the dated Work that informs Warehouse and Purchasing.
 
 The current NETS portal presents only DO, customer, area, goods summary, requested date and special
 requirements, then simple fields for Confirmed Delivery Date, Time Window, ETA, contact result,
@@ -456,7 +520,13 @@ LEFT — read-only, from the Sales Order      LEFT — Delivery owns and edits t
   Building / floor / lift                     Expected arrival time
   Requested Delivery Date                           Logistics note · Actual reply proof
   Customer preferred time                     Driver / Vehicle — Condo only
+                                              Condominium registration details — Condo only
 ```
+
+Condominium registration is a Delivery-owned arrangement fact: the details the building's
+management requires before the truck may enter (driver name, vehicle plate, permit/registration
+reference and the registered time window, as the building demands them). It rides the same
+arrangement record and prints on the document where governed; it is never a Sales fact.
 
 A wrong Sales fact is corrected through the door **`Open Sales Order to change`**, never silently
 from Delivery: the save payload has no field for one, so it cannot be written from here even by a
@@ -474,7 +544,9 @@ Stock, Warehouse, Purchasing or Payment truth.
 Failed Delivery Reason · Goods · Proof Status · Recorded By`.
 
 **Exceptions defaults:** `Opened · Problem · DO No · Customer · Affected Goods · Goods Location ·
-Owner · Next Action · Due · Status`.
+Work · Status` — `Work` renders the shared two-line action contract (fact, then the concrete act
+with its actual weekday + date), with the resolved owner as avatar metadata; the generic labels
+`Owner`, `Next Action` and `Due` may not head a Delivery column.
 
 **Partners defaults:** `Logistics Partner · Service Area · Default Role · Contact Method · Portal
 Access · Capacity Status · Active · Confirmation Performance`.
@@ -520,6 +592,12 @@ Warehouse delay, Logistics reply, missing proof, overdue return and then routine
 From issue through arrangement, Warehouse preparation, handover, delivery day, result, proof and
 return, every row states one concrete next action and one owner.
 
+Delivery stores an action's Delivery ownership rule, never a copied staff assignment or Duty
+roster. Every owner avatar in Delivery, Dashboard, My Work and Team Work comes from the same Shared
+Work Engine resolved owner. Delivery may not read PO / GRN rota tables or independently calculate
+who is on Duty; linked Purchasing, Receiving and Warehouse action owners remain projections from
+their own rule through the shared resolver.
+
 On delivery day, Schedule/Work shows actual date/time, DO, customer, address, Partner, Warehouse,
 goods, special requirements and current progress. Missing ETA creates **Obtain Delivery ETA**.
 End-of-day control finds DOs without results, Delivered records without accepted proof, Failed
@@ -545,6 +623,13 @@ Central Delivery Settings uses readable summaries first and an explicit focused 
 owns audited/versioned:
 
 - default Logistics assignment by area/postcode and unresolved-address handling;
+- **per-Partner pickup and delivery weekday calendars and surcharge areas (owner ruling
+  2026-09-01)** — Partner Settings owns these facts; staff never memorise a pickup weekday.
+  Current governed calendars: **TEOW** — pickup from KL Monday/Wednesday/Friday · delivery to
+  Melaka Monday/Wednesday/Friday · delivery to JB Tuesday/Thursday/Saturday. **TT** — pickup
+  from KL Wednesday · JB only · additional charges may apply to Pontian, Kota Tinggi, Kulai
+  Tesco and Sedenak. §5.1's backward calculation reads these calendars; assigning such a
+  partner raises the dated Warehouse/Purchasing Work computed from them;
 - customer-contact responsibility and record-on-behalf policy;
 - per-Partner Portal/WhatsApp/email/API confirmation method, deadline, proof and rejection reasons;
 - Warehouse preparation, checking, handover and return requirements;
@@ -558,6 +643,9 @@ owns audited/versioned:
 
 Per-DO dates/Partner/ETA, single-event handling, personal Columns and personal Saved Views are not
 Settings. Historical objects retain the rule/version used when their event occurred.
+
+Delivery Settings contains no PO Duty, GRN Duty, Warehouse Duty or buddy-cover roster. Those facts
+exist only in Team; Delivery consumes their resolved action owner through the shared Work Engine.
 
 ## 12 · Reports
 
@@ -576,8 +664,9 @@ enter historical measures only and never become current work.
 
 Permissions separate view, record, record-on-behalf, review, correct, approve, configure and export.
 
-- Operations may issue, arrange, proxy-record, upload replies, assign after Cannot Deliver, manage
-  problems and request proof; it may not impersonate Warehouse or silently rewrite results.
+- Operations may arrange, proxy-record, upload replies, assign after Cannot Deliver, manage
+  problems and request proof; it does not issue the DO (the SYSTEM issues it, §3) and may not
+  impersonate Warehouse or silently rewrite results.
 - Delivery Manager additionally approves governed reassignment, exceptional proof, corrections,
   refusal closure and rule changes.
 - Warehouse roles see and record only preparation, handover and returns for their Warehouse.
@@ -632,15 +721,24 @@ Delivery have the meanings governed above. Rescheduled and Delivery Cancelled ar
 states. `Recorded on behalf of` always names the true Partner and Carres recorder.
 
 The Blueprint covers DO splits, multiple Warehouses/Partners/dates, NETS default/rejection,
-no-portal confirmation, customer arrangement, Warehouse preparation and handover, Logistics
-receipt, actual delivery and partial/failure results, proof review, goods custody and return,
-correction/audit, Work, Schedule, Quick Rail, Settings, Reports, permissions, Portal/API and every
+no-portal confirmation, customer arrangement, partner pickup/delivery calendars and the one
+backward date calculation, the two-leg Singapore Journey and exact-Unit reconciliation,
+Warehouse preparation and handover, Logistics receipt, actual delivery and partial/failure
+results, proof review, goods custody and return, correction/audit, Work and the Shared Duty
+Resolver, Schedule, Quick Rail, Settings, Reports, permissions, Portal/API and every
 cross-module owner. Automatic allocation, vehicle routing and customer self-scheduling are
 explicitly excluded from current truth rather than deferred blind spots.
 
-**PLAN MISSION COMPLETE.** The complete Blueprint has been owner-reviewed and no unresolved Owner
-Decision remains. This MASTER persists the approved operating model only. It does not authorise
-Cards, implementation sequencing, migration or build work.
+**PLAN MISSION COMPLETE — re-closed 2026-09-01** after the Delivery completion audit: the
+2026-09-01 owner rulings (one physical event chain §1.1/§4, Shared Duty Resolver §10/§11,
+backward planning §5.1, partner calendars §11, absolute money gate §3) are persisted and the
+contradicting older text in this MASTER, `../orders/MASTER.md`, `../payment/MASTER.md`,
+`../ERP-ARCHITECTURE.md`, `../COPY-STANDARD.md`, `../ACTION-FLOW-STANDARD.md`, `../ui/MASTER.md`
+and `../workspace/BLUEPRINT.md` is overwritten. One named coverage item awaits an owner
+statement of fact — the East Malaysia journey boundary (which partner carries, and where
+Carres' governed facts end); East Malaysia is not in current governed coverage until ruled.
+This MASTER persists the approved operating model only. It does not authorise Cards,
+implementation sequencing, migration or build work.
 
 ## 16 · Production closure — unified Delivery page
 
