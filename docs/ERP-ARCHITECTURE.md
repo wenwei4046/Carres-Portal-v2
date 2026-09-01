@@ -245,11 +245,10 @@ SUPPLY CHAIN
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
-│   ├── Stock
-│   ├── Ready stock
-│   ├── In & out
-│   ├── Transfers
-│   └── Counts
+│   ├── Dashboard
+│   ├── Inbound
+│   ├── Inventory
+│   └── Outbound
 └── Delivery
 
 FINANCE
@@ -274,6 +273,12 @@ This is the **ERP Shell V1 destination grammar**, owner-approved 2026-08-13. A m
 a second settings home. `Old Orders` is a temporary cutover door and is not part of permanent IA.
 The right Quick Rail is governed by `ui/MASTER.md`; it never adds duplicate module destinations or
 business truth.
+
+**Warehouse placement — owner ruling 2026-09-01.** Inventory is the one current Unit Register.
+Ready Stock is a saved eligible-Unit view shared with Sales, not a destination or second pool;
+Transfer projects into origin Outbound, destination Inbound and Inventory History; `Counts &
+Adjustments` is one Inventory control view. The former `Stock · Ready stock · In & out · Transfers
+· Counts` Warehouse subtree is superseded.
 
 **`Goods Receipts` is the exact Purchasing destination word.** It names the governed record
 operators need to find again; the work inside that destination is still receiving. The internal
