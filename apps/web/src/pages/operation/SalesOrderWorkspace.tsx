@@ -2374,35 +2374,52 @@ export default function SalesOrderWorkspace() {
                 )
               } />
           </div>
-          {/* ⭐ THE BLANK SAYS WHAT IT MEANS (YH, 2026-08-26). This was a bare
-              number box with `Empty = every item` underneath it — a rule the
-              reader had to hold in their head to interpret an empty cell. The
-              answer now sits IN the cell: an untouched field reads `All 5
-              items`, so nothing has to be remembered and the count it stands
-              for is on screen. Still null on the wire — 0104's column comment
-              rules that NULL means every item, and a number is never invented
-              here to avoid a blank. */}
           {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
-              then put a default value, rather than leaving it blank".
-              The default shown is the POS's OWN default for the same unset
-              field: every item on the order. The POS has never printed a blank
-              here, so an office cell that did was the two surfaces disagreeing
-              about one field again.
+              then put a default value, rather than leaving it blank". The
+              STORED value stays null until somebody types; this shows the
+              derived default and never writes one.
 
-              ⛔ NOT ZERO, and that is the one place this departs from the
-              literal ask. 0104 rules NULL = "dealer left it auto" = every
-              item, and the fee MULTIPLIES by that count — defaulting the box
-              to 0 would quietly reprice every stair-carry order to RM 0 while
-              looking like a formatting change. The STORED value stays null
-              until somebody types: this shows the derived default, it never
-              writes one. */}
+              ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
+              FIELD THAT NO LONGER EXISTED. They said an untouched box reads
+              `All 5 items` and that 0104's NULL means EVERY item, and warned
+              at length against defaulting to zero. Both were true when typed
+              on 2026-08-26/27 and were overturned HOURS later by YH's own
+              ruling that an unset count means NONE — which `stairCarryCount`
+              has implemented ever since, and which is why the box renders `0`.
+              A governance record that no longer describes its field is not
+              harmless: the next reader trusts it, and this one warned them off
+              the behaviour the code already had. Kept as a correction rather
+              than deleted, because the ruling it lost to is the point.
+
+              ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
+              The hint has said `0 to 5` since it was written and the box
+              accepted 99. The POS cannot produce that number — its stepper
+              stops at the item count — so an office-keyed order could hold a
+              count no shop floor could have quoted, while the working line
+              directly below priced the CLAMPED five. One card, two answers to
+              "how many items", and the saved one was the wrong one.
+              `stairCarryCount` is the same clamp the fee already runs and the
+              same one the server stamps with, imported rather than re-typed —
+              a second copy of a ceiling is how the two surfaces drifted in the
+              first place. `max` rides the input too, so the spinner and the
+              keyboard agree.
+              ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
+              is null and the item total is unknown — so the upper clamp is
+              simply not applied and the floor at zero still is. A guess at the
+              ceiling would be worse than no ceiling: it would silently cut a
+              number the operator typed correctly. Degrade, never abort. */}
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+            max={stair?.itemsTotal}
             hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
             value={String(draft.delivery_stair_items ?? 0)}
             onChange={(e) =>
               setField(
                 "delivery_stair_items",
-                e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),
+                e.target.value === ""
+                  ? null
+                  : stair
+                    ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
+                    : Math.max(0, Number(e.target.value) || 0),
               )
             } />
           {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
