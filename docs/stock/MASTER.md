@@ -949,6 +949,51 @@ Stock owns physical eligibility and `Make available for sale`; Sales Order owns 
 substitute; Delivery consumes the exact reserved Unit and dated readiness; Finance owns cost and
 ownership accounting without deciding sale availability.
 
+### 12.4 Observable problems and Needs checking
+
+**CURRENT CARRES →** legacy `Hold`, `Quarantine` and `Attention` wording does not explain what
+happened or what an inexperienced operator must do. Damage can be confused with immediate
+write-off; `Wrong position` invents an internal NETS location Carres does not record; Case/Claim
+state can be mistaken for physical Unit state.
+
+**2990 / MATURE ERP LESSON →** keep structured reason, factual note, actor/date and append-only
+correction history. Mature quality control confirms that suspect goods must immediately stop
+downstream use. Reject direct damage quantity adjustment, a general plus/minus form and a generic
+quality/quarantine object that competes with Carres Receiving, Stock, Claim and Service authority.
+
+**RULING → ADAPT + IMPROVE + REJECT.** An observed problem automatically removes the affected Unit
+from Ready Stock and blocks new reservation/handover while retaining its last confirmed holder.
+The Portal uses `Needs checking` plus the exact fact and action. It rejects `Attention`, `Hold`,
+`Quarantine`, automatic write-off and `Wrong position`; the correct fact is a holder/Site or
+handover mismatch.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** an authorised person reports only an observable reason:
+`Damaged · Not found · Unexpected Unit · Wrong Unit/product · Missing component · Label/Unit ID
+problem · Portal holder does not match the physical handover · Evidence not submitted`. Required
+scan/photo/receiver/factual note is captured. Portal applies the immediate control, creates the
+shared dated Action and routes the commercial/physical consequence to the governing owner. A later
+accepted inspection, handover, receipt, repair outcome or approved Adjustment completes the Action;
+there is no independent Mark done.
+
+**OPERATOR JOURNEY →** from Receiving, Inventory, Outbound, Showroom or Delivery choose `Report a
+problem`; scan/select the Unit; choose what was actually observed; provide the minimum evidence;
+read the plain consequence; then the individually identified NETS operator, current GRN Duty,
+current PO Duty, Delivery owner or COO receives the concrete action according to the shared Duty
+Resolver. The observer never guesses Claim, compensation, replacement, write-off or another final
+outcome.
+
+**UI / PAGE / OBJECT PLACEMENT →** Inventory rail uses `Needs checking`. Every row shows `Unit ID ·
+What happened · recorded Who has it · actual Site · reported date · reporter avatar · evidence ·
+resolved owner avatar · action · source document`. Unit Detail shows `Current control · Observed
+problem · Evidence · Work · Business consequence · Physical outcome · History`. Dashboard,
+Inventory, My Work and Team Work render the one Action; no second Problems Register is created.
+
+**CROSS-MODULE CONNECTION →** Stock owns physical availability, last confirmed holder and
+investigation fact; Receiving owns receipt observations; Purchasing owns Supplier Claim/exchange/
+supplier return; Delivery owns transport and handover investigation; Service Case owns customer or
+product service; Sales Order displays promise risk only; COO alone approves governed material
+Adjustment, write-off or unexplained major difference.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
