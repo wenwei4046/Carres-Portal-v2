@@ -1306,6 +1306,47 @@ consumes GRN Duty and individually identified NETS operators; Delivery consumes 
 owner rules; COO handles approvals and the genuine zero-staff exception rather than routine task
 assignment.
 
+### 12.12 Reports and analytical boundaries
+
+**CURRENT CARRES →** dashboard or Ready Stock/health/reorder totals can lack Unit drilldown; exports
+can be mistaken for new truth; Warehouse may expose Finance cost/margin or appear to decide buys;
+final Count/Adjustment totals can hide original difference and version.
+
+**2990 / MATURE ERP LESSON →** keep 2990 Incoming, reserved horizons, availability, ageing,
+warehouse/batch breakdown, ABC/dead-stock/turnover analysis and source-linked Stock Card drilldown.
+Mature ERP separates physical execution, replenishment decisions and financial valuation. Reject a
+Finance-led Warehouse centre, non-drillable KPI preamble, report-side mutation and uploadable export
+as authority.
+
+**RULING → KEEP + ADAPT + SPLIT + REJECT.** Every Warehouse total derives from and drills to exact
+Units/source documents. Warehouse owns physical ageing, holder, verification, Difference and Work
+load; Purchasing owns shortage/incoming/replenishment decision; Finance owns value, turnover, COGS
+and valuation. Reports are read-only evidence, never another write door.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** permission-filtered Reports project the Unit Register,
+Receiving, reservation, handover, Count/Adjustment and Month-end version. A user drills from an
+aggregate to exact Unit/document and completes the owning action there; the report neither changes
+Stock nor initiates an unapproved purchase. Every export is a generated fixed snapshot with date,
+person, filters, Stock/report date, version where applicable, source numbers and exact rows.
+
+**OPERATOR JOURNEY →** COO reads cross-Site unresolved differences, damaged Units, late evidence and
+Month-end approval facts and drills to owner/source. Operations reads current/Ready/Inbound/
+Outbound/Count physical facts without margin/settlement. Sales receives only permitted Ready/
+showroom availability. Finance consumes Month-end/ownership/valuation evidence without changing
+holder. NETS sees only authorised Site/journey work and evidence.
+
+**UI / PAGE / OBJECT PLACEMENT →** the single entry is `Page Header → Reports → Warehouse`; module
+pages do not repeat report buttons. Catalogue is `Current Stock · Ready Stock · Showroom Stock ·
+Stock by Ownership · Receiving & Inbound · Outbound & Handovers · Transfers · Stock Counts · Stock
+Differences & Adjustments · Problems & Condition · Month-end Stock Confirmations · Partner Evidence
+· Unit History`. Reports use the Register Template with filter rail and drill-through. Dashboard
+keeps dated work/exceptions ahead of analytical KPI bands.
+
+**CROSS-MODULE CONNECTION →** Stock supplies physical facts; Purchasing owns incoming/shortage/buy
+decision; Sales Order supplies reservation/demand; Receiving and Delivery supply actual events;
+Finance owns value/COGS/turnover and acknowledged Month-end version; COO consumes cross-module
+exception/approval evidence.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
