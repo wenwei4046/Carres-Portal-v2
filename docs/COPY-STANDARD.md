@@ -1278,7 +1278,10 @@ one list the operator has to choose which truth to record, i.e. has to lie.
 | `What happened to this item?` | under `Item Outcome` | Its twin. Two decisions, two questions, and a reader who can tell them apart without being told. |
 | `Save what we are doing` | the resolution's button | Parallel to `Save what happened` beside it — both name the record being written, not the thing decided. |
 | `Recorded {date}` | beside that button | A FACT: a resolution stays editable while the claim is open, so the screen says when the one on file was set. |
-| `Nothing recorded — this claim closed without one.` | closed claim, no resolution | A closed claim with a blank here is finished, not neglected. Never a bare `—`. |
+| `Nothing recorded — this claim closed without one.` | closed claim, no resolution | A closed claim with a blank here is finished, not neglected. Never a bare `—`. Now also the closed-claim line under `Carres Execution`, which can be blank for the same reason. |
+| `Carres Execution` | claim section + its picker | *In what order do the goods move?* **Live 2026-09-01** (layer ④, migration 0409) — Loo's fourth layer, ruled 2026-08-05 and unbuilt until then. |
+| `In what order do the goods move?` | under `Carres Execution` | The section's own question, so the picker never has to be guessed at — the third of the set beside `What are we doing for the customer?` and `What happened to this item?` |
+| `Save how the goods move` | the execution's button | The third of the family with `Save what we are doing` and `Save what happened` — all three name the record being written, never the thing decided. |
 
 **`Customer Resolution` — the four options, and the one line each carries.** The line is a
 DEFINITION, never a consequence: consequences are `f(Resolution, Execution)` and Carres
@@ -1321,6 +1324,43 @@ disagree, and preserving that disagreement is the whole reason the layers are ke
    more specific ruling. **Both stand.** They are two senses of one spelling, exactly as
    `Recovery` is: the verb is a record's move, the Item Outcome is a physical one, and neither
    may be renamed to avoid the other.
+
+**`Carres Execution` — the five, transcribed 2026-09-01 and built as layer ④ (migration 0409).**
+Loo ruled these on **2026-08-05**, the same day as the four resolutions above, and they sat in
+`packages/shared/src/supplier-claim.ts` as a prose comment and in no dictionary for four weeks —
+the same gap this section was written to close. **They are transcribed here, not invented.**
+
+Layer ③ says what the customer GETS. Layer ④ says how the goods GET there, and the test that
+keeps them apart is Loo's own: *can both be true at the same time?* Yes — `Replace` is a promise,
+and `Replace First` and `Collect First` are two ways of keeping it. They differ in nothing the
+customer sees and in something Carres cannot ignore: under `Replace First` two units are
+committed to one customer until the collection happens.
+
+| Option | The line under it |
+|---|---|
+| `Return to Supplier` | `The item goes back to the supplier. Nothing goes to the customer.` |
+| `Collect Defective Item` | `Carres collects the item from the customer. Nothing goes out.` |
+| `Replace First` | `The new item goes out BEFORE the old one is collected.` |
+| `Collect First` | `The old item comes back BEFORE the new one goes out.` |
+| `Exchange on Collection` | `Both change hands in one visit.` |
+
+The line is a **DEFINITION, never a consequence** — the same law the resolution lines carry. It
+names which goods move and in what order, and stops before saying what that does to stock, to
+money or to the outstanding quantity. `BEFORE` is capitalised because the order IS the decision:
+`Replace First` and `Collect First` differ in nothing else, and an operator who misreads which is
+which sends a van to the wrong address.
+
+> **A THIRD sense of `Return to Supplier`, and all three stand.** It is a locked VERB (a record
+> goes back to its author), an **Item Outcome** (where the unit physically ended up) and now a
+> **Carres Execution** (there is no customer leg at all — which is what makes it the fifth option
+> rather than four). The same settlement as `Repair` on two lists: they are allowed to disagree.
+> A claim may execute `Collect First` and still end with the unit written off.
+
+> **NO CONSEQUENCE IS ON SCREEN YET, and that is still the ruling.** Both arguments of
+> `f(Resolution, Execution)` finally exist, so the consequence is computable for the first time.
+> **Which** stock, finance and demand moves each pair produces has never been ruled, and the
+> freeze was on the missing argument — lifting it does not license guessing the function. A line
+> naming one would be a guess wearing a screen's authority.
 
 ### Receiving and supplier-exception words (locked 2026-07-27)
 

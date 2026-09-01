@@ -177,8 +177,18 @@ export default function SalesOrderAddons({
                   <span className="tabular-nums text-body text-base-700">
                     ×{a.qty} · {rm(a.unit_price * a.qty)}
                   </span>
-                  {inPlaceLane && (
-                    /* ⭐ NO MINUS, BUT A REMOVE (YH, 2026-08-28).
+                  {inPlaceLane && !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addon_key) && (
+                    /* ⛔ NOT ON A COMPUTED FEE (2026-08-31). This condition
+                       used to be `inPlaceLane` alone, and the Remove button
+                       twenty lines below was the only one of the pair that
+                       checked the key — so a `Stair carry` row shipped with a
+                       live `Add one more`, and ONE CLICK doubled a fee nobody
+                       quoted. `0393` made the stair carry the fourth
+                       server-computed key and never added itself to `0258`'s
+                       refusal list, so the database let it through too.
+                       `0406` now refuses it there; this stops offering it here.
+
+                       ⭐ NO MINUS, BUT A REMOVE (YH, 2026-08-28).
                        `edit_order_addon` still refuses a DECREASE as
                        `downsell_blocked`, so there is no minus — a control that
                        always fails is worse than no control, and that rule is

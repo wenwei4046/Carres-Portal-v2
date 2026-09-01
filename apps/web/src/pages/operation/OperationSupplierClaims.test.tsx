@@ -24,6 +24,7 @@ const responseMutate = vi.fn();
 const closeMutate = vi.fn();
 const holdMutate = vi.fn();
 const resolutionMutate = vi.fn();
+const executionMutate = vi.fn();
 
 function mutation(mutateAsync: ReturnType<typeof vi.fn>) {
   return { mutateAsync, isPending: false, isError: false, error: null };
@@ -42,6 +43,7 @@ vi.mock("@/lib/queries", async () => {
     useSupplierClaimCloseMutation: () => mutation(closeMutate),
     useSupplierClaimHoldResolveMutation: () => mutation(holdMutate),
     useSupplierClaimCustomerResolutionMutation: () => mutation(resolutionMutate),
+    useSupplierClaimCarresExecutionMutation: () => mutation(executionMutate),
   };
 });
 
@@ -84,6 +86,9 @@ function row(over: Partial<SupplierClaimListRow> = {}): SupplierClaimListRow {
     customer_resolution: null,
     customer_resolution_note: null,
     customer_resolution_at: null,
+    carres_execution: null,
+    carres_execution_note: null,
+    carres_execution_at: null,
     line_pending: null,
     held_units: 0,
     hold_reason: null,
@@ -130,6 +135,8 @@ beforeEach(() => {
   holdMutate.mockReset();
   resolutionMutate.mockReset();
   resolutionMutate.mockResolvedValue({});
+  executionMutate.mockReset();
+  executionMutate.mockResolvedValue({});
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
   suppliersQuery.mockReturnValue({
     data: {
@@ -1129,5 +1136,244 @@ describe("P20.6 · the empty Open queue", () => {
     expect(host).not.toBeNull();
     // A promise the kit cannot keep: a table cell cannot hold a sticky child.
     expect(box.className).not.toContain("sticky");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ④ · Carres Execution (Loo, 2026-08-05 · migration 0409)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The last of the four layers. These pin that it behaves like layer ③ — same
+// gate, same editability, same read-only close — and that it stays SEPARATE
+// from it, which is the whole reason it is a fourth field rather than four more
+// options on an existing picker.
+
+describe("OperationSupplierClaims — how the goods move (layer ④)", () => {
+  function openClaim(claim: SupplierClaimListRow) {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
+  }
+
+  it("offers Loo's five, under their own question", () => {
+    openClaim(row());
+    const panel = screen.getByTestId("claim-carres-execution");
+    expect(panel).toHaveTextContent("Carres Execution");
+    expect(panel).toHaveTextContent("In what order do the goods move?");
+    for (const key of [
+      "return_to_supplier",
+      "collect_defective_item",
+      "replace_first",
+      "collect_first",
+      "exchange_on_collection",
+    ]) {
+      expect(screen.getByTestId(`carres-execution-${key}`)).toBeInTheDocument();
+    }
+  });
+
+  it("records the execution, with its optional note", async () => {
+    openClaim(row());
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    fireEvent.change(screen.getByTestId("carres-execution-note"), {
+      target: { value: "Van picks up before the new one ships" },
+    });
+    fireEvent.click(screen.getByTestId("carres-execution-save"));
+    await waitFor(() => expect(executionMutate).toHaveBeenCalled());
+    expect(executionMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      carres_execution: "collect_first",
+      note: "Van picks up before the new one ships",
+    });
+  });
+
+  it("is a SEPARATE decision — recording one does not touch the other", async () => {
+    // Loo's test on screen: `Replace` is the promise and `Replace First` is one
+    // way of keeping it. Both are recorded, through two doors, and pressing one
+    // must never write the other.
+    openClaim(
+      row({
+        customer_resolution: "replace",
+        customer_resolution_at: "2026-09-01T08:00:00Z",
+      }),
+    );
+    fireEvent.click(screen.getByTestId("carres-execution-replace_first"));
+    fireEvent.click(screen.getByTestId("carres-execution-save"));
+    await waitFor(() => expect(executionMutate).toHaveBeenCalled());
+    expect(resolutionMutate).not.toHaveBeenCalled();
+    // …and the resolution already on file is still shown, not cleared.
+    expect(screen.getByTestId("customer-resolution-replace")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("explains the selected option in one line, and names no consequence", () => {
+    openClaim(row());
+    fireEvent.click(screen.getByTestId("carres-execution-replace_first"));
+    const guide = screen.getByTestId("carres-execution-meaning");
+    expect(guide).toHaveTextContent("BEFORE");
+    // Both arguments of f(Resolution, Execution) now exist and the function is
+    // still unruled, so nothing here may claim what happens to stock or money.
+    expect(guide).not.toHaveTextContent(/stock|refund|credit|outstanding/i);
+  });
+
+  it("the two order options do not read alike — the order IS the decision", () => {
+    openClaim(row());
+    fireEvent.click(screen.getByTestId("carres-execution-replace_first"));
+    const first = screen.getByTestId("carres-execution-meaning").textContent;
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    const second = screen.getByTestId("carres-execution-meaning").textContent;
+    // They differ in nothing else, so an operator who cannot tell the lines
+    // apart at a glance sends a van to the wrong address.
+    expect(first).not.toEqual(second);
+  });
+
+  it("does NOT wait for the supplier, or for the resolution", () => {
+    // Same reasoning layer ③ uses: tying two things that move on different days
+    // teaches people to record a false step to unlock a real one. The warehouse
+    // may already be running the choreography.
+    openClaim(row());
+    expect(screen.getByTestId("carres-execution-collect_first")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    expect(screen.getByTestId("carres-execution-save")).not.toBeDisabled();
+  });
+
+  it("has nothing to save until something changes, and stays editable while open", () => {
+    openClaim(
+      row({
+        carres_execution: "replace_first",
+        carres_execution_at: "2026-09-01T09:00:00Z",
+      }),
+    );
+    expect(screen.getByTestId("carres-execution-replace_first")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("carres-execution-save")).toBeDisabled();
+    expect(screen.getByTestId("carres-execution-recorded")).toHaveTextContent(
+      "Recorded",
+    );
+    // The plan changes when the customer cannot wait — the same allowance
+    // layer ③ carries.
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    expect(screen.getByTestId("carres-execution-save")).not.toBeDisabled();
+  });
+
+  it("a closed claim shows what was decided, read-only", () => {
+    openClaim(
+      row({
+        status: "closed",
+        requested_action: "replace",
+        requested_at: "2026-08-05T08:22:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-08-05T08:23:00Z",
+        closed_at: "2026-08-05T08:23:48Z",
+        carres_execution: "exchange_on_collection",
+        carres_execution_note: "Both on the 12 Aug run",
+        carres_execution_at: "2026-08-05T08:23:00Z",
+      }),
+    );
+    const panel = screen.getByTestId("claim-carres-execution");
+    expect(panel).toHaveTextContent("Exchange on Collection");
+    expect(panel).toHaveTextContent("Both on the 12 Aug run");
+    expect(screen.queryByTestId("carres-execution-save")).not.toBeInTheDocument();
+  });
+
+  it("a claim closed without one states the fact rather than showing a blank", () => {
+    // Every claim settled before 0409 is exactly this row. A blank would read
+    // as "nobody decided anything", which is not what happened.
+    openClaim(
+      row({
+        status: "closed",
+        requested_action: "replace",
+        requested_at: "2026-08-05T08:22:00Z",
+        supplier_response: "replacement",
+        responded_at: "2026-08-05T08:23:00Z",
+        closed_at: "2026-08-05T08:23:48Z",
+      }),
+    );
+    expect(screen.getByTestId("claim-carres-execution")).toHaveTextContent(
+      "Nothing recorded — this claim closed without one.",
+    );
+  });
+
+  it("keeps `Return to Supplier` apart from the item outcome beside it", () => {
+    // The one deliberate label overlap in the model: this list says
+    // `Return to Supplier` (the choreography) and Item Outcome says
+    // `Returned to supplier` (where the unit ended up), about seven lines
+    // apart. Both are ruled words. This pins that pressing one leaves the
+    // other alone — the axes are independent, so a unit can be collected
+    // first and still be written off.
+    openClaim(row({ held_units: 2, hold_reason: "damaged" }));
+    fireEvent.click(screen.getByTestId("carres-execution-return_to_supplier"));
+    expect(screen.getByTestId("carres-execution-return_to_supplier")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("hold-outcome-returned")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+});
+
+describe("the layers are NOT cross-validated — owner ruling, YH 2026-09-01", () => {
+  function openClaim(claim: SupplierClaimListRow) {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
+  }
+
+  it("offers all five executions even when layer ③ makes one of them nonsense", async () => {
+    // `No Replacement Required` means nothing more goes to the customer, so
+    // `Replace First` — send the new one out first — is incoherent beside it.
+    // The question was put to YH and he ruled for the FLEXIBILITY: no guard.
+    //
+    // Two reasons, and a chat that wants to add the guard must answer both:
+    //   1. Narrowing one list by the other collapses two layers Loo's model
+    //      exists to keep apart. They stop being two questions.
+    //   2. It refuses a real event. The van is already out collecting, so the
+    //      office records `Collect First` while the customer has not settled
+    //      what they want. A matched-pair rule makes an operator type a false
+    //      answer to record a true one.
+    openClaim(
+      row({
+        customer_resolution: "no_replacement_required",
+        customer_resolution_at: "2026-09-01T08:00:00Z",
+      }),
+    );
+    for (const key of [
+      "return_to_supplier",
+      "collect_defective_item",
+      "replace_first",
+      "collect_first",
+      "exchange_on_collection",
+    ]) {
+      expect(screen.getByTestId(`carres-execution-${key}`)).not.toBeDisabled();
+    }
+
+    // …and the incoherent pair actually SAVES. Offering a control that the
+    // server then refuses would be the UI inventing a second policy, which is
+    // the defect this repo keeps finding between two surfaces.
+    fireEvent.click(screen.getByTestId("carres-execution-replace_first"));
+    fireEvent.click(screen.getByTestId("carres-execution-save"));
+    await waitFor(() => expect(executionMutate).toHaveBeenCalled());
+    expect(executionMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      carres_execution: "replace_first",
+      note: undefined,
+    });
+  });
+
+  it("records an execution on a claim whose resolution is still blank", () => {
+    // The order-of-work case that made the ruling concrete: the choreography is
+    // already happening and the customer has decided nothing yet.
+    openClaim(row({ customer_resolution: null, customer_resolution_at: null }));
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    expect(screen.getByTestId("carres-execution-save")).not.toBeDisabled();
   });
 });
