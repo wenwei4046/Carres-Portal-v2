@@ -143,9 +143,42 @@ problem, unsafe, supplier or destination refused, or another observed problem. T
 the consequence, requests reason-specific evidence, protects the Unit and raises Work. Staff do not
 guess Hold or Quarantine.
 
+The report door is available on Unit Detail and the exact Receiving, Count, Inbound, Outbound,
+Showroom or Delivery surface where the observation occurs. NETS Warehouse, NETS Delivery,
+Showroom/outlet and authorised Carres staff use their individual identity. The form asks for Unit
+ID, `What did you see?`, governed Site/current holder context, required photo/evidence and a plain
+factual note. It never asks the observer to choose Quarantine, Hold, write-off, Supplier Claim,
+compensation, replacement or another business remedy.
+
+On submission, policy derives the immediate control rather than asking the observer to guess it.
+Where the observed fact affects suitability, the Unit leaves Ready Stock and cannot receive a new
+SO reservation; unsafe or incomplete goods cannot be handed over. An existing SO reservation stays
+linked but is shown at risk so Sales Order sees the consequence. `Who has it` never changes merely
+because a problem was reported; only evidence-backed handover/location facts move it.
+
+The full observed fact creates the one shared Action contract. For example, damage at NETS
+Warehouse routes `Check the damage and record the result by {actual date}` to the governed Carres
+owner; a Unit not found routes `Look for {Unit ID} at NETS Warehouse and scan it again by {actual
+date}` to the individually assigned counter, then persistent difference investigation to current
+GRN Duty. The row never stops at `Damaged`, `Not found`, `Wrong position`, `Review` or `Handle`.
+
+Wrong-Site comparison uses governed Sites only. It prints `Portal says {Site/holder}` and `Count
+found {actual Site}`, then checks the missing handover, wrong record, unauthorised movement or Count
+error. Carres records no NETS internal position, Zone, Rack or Bin. Product/label mismatch preserves
+the permanent Unit ID, supplier label and physical-product evidence; staff never mint a second ID to
+make the records appear consistent.
+
 Inspection records an actual result and permits only governed paths: restore eligibility, dated
 repair, Purchasing decision, supplier collection, Count again, approved Site correction or proposed
 write-off. Generic Close issue is invalid.
+
+Problem Detail follows the Object Detail Template: observed fact and Unit · actual date/Site ·
+reporter/avatar and evidence · automatic effect on availability/customer risk · current Action ·
+connected PO/GRN/SO/DO/Count/Service records · append-only History. A problem completes only from an
+authoritative fact: inspection restores eligibility; repair returns and passes inspection;
+Purchasing-owned supplier collection is physically completed; a correction is approved; or the COO
+approves write-off and separate physical-disposal proof later records disposal. Write-off approval
+and disposal are never one fact, and no generic `Close issue` may replace either.
 
 Counts are dated Site work. The first count hides the expected list. After submission, differences
 are per Unit. A repeat creates new evidence and says **Count these Units again**. Multiple
