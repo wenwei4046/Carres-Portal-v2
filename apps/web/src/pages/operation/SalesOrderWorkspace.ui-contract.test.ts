@@ -791,6 +791,59 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
   });
 
+  it("makes the stair-carry parity tag cover the field it names", () => {
+    /* THE DEFECT, AND IT IS THE SECOND TIME. `data-pos-field="stairCarry"`
+       wrapped the FLOOR box alone, while the registry field it stands for is
+       "Delivery access (floor / lift / stair carry)". The completeness check
+       below only asserts the attribute EXISTS in this file — it cannot see
+       what the attribute wraps — so it reported the field covered while
+       checking one box of three, and deleting `Lift available?` would still
+       have passed. `orderAddons` failed exactly this way once already, on a
+       hidden span with no control behind it.
+       This asserts the SPAN: everything from the tag to the next
+       `data-pos-field` must contain all three controls. */
+    /* The ATTRIBUTE, not the mention of it — the comment above the tag names
+       it in prose, and a plain `indexOf` would find that first. */
+    const attribute = /\n\s*data-pos-field="stairCarry"/;
+    const tag = attribute.exec(workspace);
+    expect(tag, "the tag exists as an attribute").not.toBeNull();
+    const from = tag!.index;
+    /* The span ends at the NEXT tag of any kind. Every remaining mention is a
+       real field, so a plain `indexOf` is enough once we are past this one. */
+    const next = workspace.indexOf('data-pos-field="', from + 30);
+    expect(next, "there is a following tag to bound the span").toBeGreaterThan(from);
+    const span = workspace.slice(from, next);
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"']) {
+      expect(span, `${id} sits inside the stairCarry tag`).toContain(id);
+    }
+    /* ⭐ AND NOTHING CLOSES THE TAG EARLY. Text order is not containment: a
+       `</div>` after the floor box would end the tag while leaving the other
+       two ids further down the file, and an order-only assertion passes on
+       that — measured, by breaking it on purpose. A source scan cannot read
+       the DOM, so it reads the one thing that decides nesting here: the tag's
+       div must not close before the last of its three controls. */
+    const toLift = workspace.slice(from, workspace.indexOf('id="so-lift"', from));
+    expect(toLift, "the stairCarry div is not closed before the lift").not.toContain("</div>");
+    /* Nothing moved on screen: the three fields keep the parent's own three
+       tracks rather than collapsing into one cell. */
+    expect(workspace).toContain("sm:col-span-3 sm:grid-cols-3");
+  });
+
+  it("never prints a database key on a customer's document", () => {
+    /* An OLD REVISION's PDF is a customer document. It built its own rows from
+       the stored snapshot and read `String(a.addon_key)`, so it printed
+       `dispose_mattress` where the live document prints `Mattress disposal` —
+       the live path was never wrong, because `base.addons` arrives labelled
+       from the server. */
+    expect(workspace).not.toContain("label: String(a.addon_key)");
+    expect(workspace).toContain("addonLabel: (key: string) => string");
+    expect(workspace).toContain("addonNameByKey.get(key) ?? key");
+    /* A REVISION IS A PHOTOGRAPH. Where the stored row carries its own label,
+       that is what the customer agreed to and that is what prints — the
+       catalog is asked only where the photograph is silent. */
+    expect(workspace).toContain('(a as { label?: unknown }).label === "string"');
+  });
+
   it("enforces the stair-carry ceiling it has always printed", () => {
     /* THE DEFECT: the hint has read `0 to 5` since it was written and the box
        accepted 99. The POS stepper stops at the item count
