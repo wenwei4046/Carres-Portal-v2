@@ -797,7 +797,16 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(block.textContent).toContain("may not be needed");
   });
 
-  it("ONE act, per-row result — a failed line keeps its row, retry reuses the header", async () => {
+  /* ⭐ RE-PINNED, NOT DELETED (0410, YH 2026-09-01).
+     This test's original title was "…retry reuses the header", and it asserted
+     that a second Send posts NO new header because the first one is already a
+     record. That was an accurate pin on the six-transaction shape — and the
+     committed-header-on-failure it pinned is exactly the defect `0410` closes.
+     The INTENT survives whole: one act, a per-row result, the workspace stays
+     open, and the operator can press Send again. What is re-pinned is the
+     opposite half — a refusal must now leave NOTHING behind, so a retry sends
+     the WHOLE request rather than resuming an orphan. */
+  it("ONE act, per-row result — a refusal leaves nothing, and retry re-sends the whole request", async () => {
     await openWorkspace();
     pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
@@ -806,16 +815,9 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     fireEvent.focus(document.getElementById("mp-item-1")!);
     fireEvent.click(pickRow("5539-CNR"));
 
-    // Header lands; line 1 lands; line 2 is refused with the server's words.
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests")) {
-        return Promise.resolve({ id: REQ1, req_no: "REQ-0009", approval_required: true });
-      }
-      if (init?.method === "POST" && url.includes("/lines")) {
-        const body = JSON.parse(String(init.body)) as { sku: string };
-        return body.sku === "5539-CNR"
-          ? Promise.reject(new Error("sku 5539-CNR has no supplier"))
-          : Promise.resolve({ id: "d1", supplier_id: "s1" });
+        return Promise.reject(new Error("sku 5539-CNR has no supplier"));
       }
       return Promise.resolve(respond(url));
     });
@@ -828,20 +830,37 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     // The workspace stayed open — something is left to answer for.
     expect(screen.getByTestId("manual-purchase-create")).toBeInTheDocument();
 
-    const headerPosts = () =>
+    const requestPosts = () =>
       apiFetch.mock.calls.filter(
         (c) =>
           (c[1] as RequestInit | undefined)?.method === "POST" &&
           String(c[0]).endsWith("/purchasing/requests"),
       );
-    const before = headerPosts().length;
+    const before = requestPosts().length;
+    expect(before).toBe(1);
 
-    // Retry posts ONLY the failed line — the header is a record now.
+    /* NOTHING was written, so there is no half-record to resume: pressing Send
+       again re-sends the whole request, header and all. Under the old shape
+       this count would NOT have moved, and that was the bug. */
     fireEvent.click(screen.getByTestId("mp-send"));
-    await waitFor(() => expect(screen.queryByTestId("mp-line-failed-1")).toBeTruthy());
-    expect(headerPosts().length).toBe(before);
+    await waitFor(() => expect(requestPosts().length).toBe(before + 1));
+
+    /* AND THE LINES RODE WITH IT — the loop of one-call-per-line is gone, so a
+       failure can no longer land some of them. */
+    const sent = JSON.parse(String((requestPosts()[0][1] as RequestInit).body)) as {
+      lines?: unknown[];
+    };
+    expect(sent.lines).toHaveLength(2);
+    expect(
+      apiFetch.mock.calls.filter((c) => String(c[0]).includes("/lines")),
+      "no per-line call is made any more",
+    ).toHaveLength(0);
   });
 
+  /* ⭐ RE-PINNED (0410). Same intent — the browser must never send a supplier,
+     because the database derives it from the catalog (Jess, 2026-08-03). Only
+     the ENVELOPE moved: the lines now ride inside the request POST instead of
+     one call each, so the assertion reads the same fact in its new place. */
   it("no supplier key rides the wire — the server derives it", async () => {
     await openWorkspace();
     pickDeliveryDate();
@@ -852,20 +871,27 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
       if (init?.method === "POST" && url.endsWith("/purchasing/requests")) {
         return Promise.resolve({ id: REQ1, req_no: "REQ-0009", approval_required: true });
       }
-      if (init?.method === "POST" && url.includes("/lines")) {
-        return Promise.resolve({ id: "d1", supplier_id: "s1" });
-      }
       return Promise.resolve(respond(url));
     });
 
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => {
-      const linePost = apiFetch.mock.calls.find((c) => String(c[0]).includes("/lines"));
-      expect(linePost).toBeTruthy();
-      const sent = JSON.parse(String((linePost![1] as RequestInit).body));
+      const post = apiFetch.mock.calls.find(
+        (c) =>
+          (c[1] as RequestInit | undefined)?.method === "POST" &&
+          String(c[0]).endsWith("/purchasing/requests"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body)) as {
+        lines: Array<Record<string, unknown>>;
+      };
       expect(sent).not.toHaveProperty("supplier");
       expect(sent).not.toHaveProperty("supplierId");
+      for (const line of sent.lines) {
+        expect(line).not.toHaveProperty("supplier");
+        expect(line).not.toHaveProperty("supplierId");
+      }
     });
   });
 });

@@ -4700,8 +4700,19 @@ export function useCreatePurchaseRequest() {
       serviceCaseId?: string | null;
       staffUserId?: string | null;
       subsidiaryName?: string | null;
+      /** ⭐ THE WHOLE REQUEST IN ONE CALL (0410). Sending the lines here makes
+       *  the header and every line ONE database transaction, so a bad line can
+       *  no longer leave a committed header behind. Optional because `0410` is
+       *  applied by hand: the route falls back to the header-only door until
+       *  it is, and the caller need not know which. */
+      lines?: Array<{
+        sku: string;
+        qty: number;
+        requiredBy?: string | null;
+        note?: string | null;
+      }>;
     }) =>
-      apiFetch<{ id: string; req_no: string; approval_required: boolean }>(
+      apiFetch<{ id: string; req_no: string; approval_required: boolean; line_ids?: string[] }>(
         "/api/operation/purchasing/requests",
         { method: "POST", body: JSON.stringify(body) },
       ),
@@ -4710,6 +4721,19 @@ export function useCreatePurchaseRequest() {
   });
 }
 
+/**
+ * ⚠️ NO CALLER SINCE 0410 (2026-09-01), AND KEPT ON PURPOSE.
+ *
+ * The create form used this in a loop and now sends its lines with the header
+ * in one transaction, so nothing calls this today. It is NOT deleted, because
+ * the route behind it — `POST /purchasing/requests/:id/lines` — is a different
+ * act with its own live authority: adding a line to a request that already
+ * exists. That door has no screen yet; when it gets one, this is what it calls.
+ *
+ * Recorded rather than assumed: if that screen is ruled out, this and its route
+ * go together, in one change. A dead export beside a live endpoint is a
+ * carry-forward, not a tidy-up.
+ */
 export function useCreatePurchaseRequestLine() {
   const qc = useQueryClient();
   return useMutation({

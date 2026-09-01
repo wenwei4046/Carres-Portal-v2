@@ -616,6 +616,20 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("tab=payments&so=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
+    /* ⭐ AND IT RIDES THE TITLE (YH, 2026-09-01) — a hairline and a whole row
+       at the foot of a card holding three numbers, to carry one link. The word
+       is locked (COPY-STANDARD:1595) and unchanged; the row is gone. Still a
+       navigator, never a writer: `headerSlot` admits a read-only door and
+       nothing that submits. */
+    expect(workspace).toContain('data-testid="workspace-open-payments"');
+    /* It rides the Money card's own heading now: the slot appears inside the
+       Money Block's props, not in a bordered strip at the foot of the card. */
+    const money = workspace.indexOf('title="Money"');
+    expect(money, "the Money block exists").toBeGreaterThan(-1);
+    expect(
+      workspace.slice(money, money + 900),
+      "the payments door rides the Money title",
+    ).toContain("headerSlot");
   });
 
   /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
@@ -760,6 +774,35 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
   });
 
+  it("keeps 0362's approval door, moved under the amount it governs", () => {
+    /* ⛔ THE CAPABILITY IS NOT DELETED. `0362` is Jess's ruling of 2026-08-19,
+       written the day goods went out with the money uncollected: an owing
+       order delivers only against a RECORDED approval, never a verbal one.
+       Removing this door would leave Operation no governed way to ask, so what
+       changed is WHERE it lives — a bordered sub-block standing open on every
+       owing order became a quiet door under `Outstanding`, which is the shape
+       `Change delivery date` and `Change salesperson` already use. */
+    expect(workspace).toContain("function PaymentApprovalBlock(");
+    expect(workspace).toContain('data-testid="payment-approval-open"');
+    expect(workspace).toContain('data-testid="payment-approval-request-send"');
+    expect(workspace).toContain('data-testid="payment-approval-approve"');
+    /* Both words are locked (COPY-STANDARD:1575) and unchanged. */
+    expect(workspace).toContain("Delivery payment approval");
+    expect(workspace).toContain("Request payment approval");
+    /* A PENDING OR APPROVED RECORD IS TRUTH, NOT AN ACTION, so it still prints
+       without opening anything — hiding it would be "a hidden button is not a
+       rule" in its other direction: the rule invisible because the door shut. */
+    expect(workspace).toContain('data-testid="payment-approval-live"');
+    /* THE FORM IS BEHIND A DOOR, so the block's body is a Modal rather than a
+       bordered strip standing open on the card. */
+    const fn = workspace.indexOf("function PaymentApprovalBlock(");
+    const body = workspace.slice(fn, workspace.indexOf("function ", fn + 40));
+    expect(body, "the approval form lives in a Modal").toContain("<Modal");
+    expect(body, "and not in a standing bordered strip").not.toContain(
+      'className="mt-3 border-t border-kit-slate-5 pt-3"',
+    );
+  });
+
   it("boxes the three money amounts without giving Money a door", () => {
     /* The last bare label-over-value pair on the page. `Fact` is read-only by
        construction, so this is a SHAPE change and Law B is untouched — the
@@ -790,6 +833,59 @@ describe("Sales Order object page — one form grammar", () => {
     /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
        the Unit ID cell printed a shortage while the read was still in flight. */
     expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
+  });
+
+  it("makes the stair-carry parity tag cover the field it names", () => {
+    /* THE DEFECT, AND IT IS THE SECOND TIME. `data-pos-field="stairCarry"`
+       wrapped the FLOOR box alone, while the registry field it stands for is
+       "Delivery access (floor / lift / stair carry)". The completeness check
+       below only asserts the attribute EXISTS in this file — it cannot see
+       what the attribute wraps — so it reported the field covered while
+       checking one box of three, and deleting `Lift available?` would still
+       have passed. `orderAddons` failed exactly this way once already, on a
+       hidden span with no control behind it.
+       This asserts the SPAN: everything from the tag to the next
+       `data-pos-field` must contain all three controls. */
+    /* The ATTRIBUTE, not the mention of it — the comment above the tag names
+       it in prose, and a plain `indexOf` would find that first. */
+    const attribute = /\n\s*data-pos-field="stairCarry"/;
+    const tag = attribute.exec(workspace);
+    expect(tag, "the tag exists as an attribute").not.toBeNull();
+    const from = tag!.index;
+    /* The span ends at the NEXT tag of any kind. Every remaining mention is a
+       real field, so a plain `indexOf` is enough once we are past this one. */
+    const next = workspace.indexOf('data-pos-field="', from + 30);
+    expect(next, "there is a following tag to bound the span").toBeGreaterThan(from);
+    const span = workspace.slice(from, next);
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"']) {
+      expect(span, `${id} sits inside the stairCarry tag`).toContain(id);
+    }
+    /* ⭐ AND NOTHING CLOSES THE TAG EARLY. Text order is not containment: a
+       `</div>` after the floor box would end the tag while leaving the other
+       two ids further down the file, and an order-only assertion passes on
+       that — measured, by breaking it on purpose. A source scan cannot read
+       the DOM, so it reads the one thing that decides nesting here: the tag's
+       div must not close before the last of its three controls. */
+    const toLift = workspace.slice(from, workspace.indexOf('id="so-lift"', from));
+    expect(toLift, "the stairCarry div is not closed before the lift").not.toContain("</div>");
+    /* Nothing moved on screen: the three fields keep the parent's own three
+       tracks rather than collapsing into one cell. */
+    expect(workspace).toContain("sm:col-span-3 sm:grid-cols-3");
+  });
+
+  it("never prints a database key on a customer's document", () => {
+    /* An OLD REVISION's PDF is a customer document. It built its own rows from
+       the stored snapshot and read `String(a.addon_key)`, so it printed
+       `dispose_mattress` where the live document prints `Mattress disposal` —
+       the live path was never wrong, because `base.addons` arrives labelled
+       from the server. */
+    expect(workspace).not.toContain("label: String(a.addon_key)");
+    expect(workspace).toContain("addonLabel: (key: string) => string");
+    expect(workspace).toContain("addonNameByKey.get(key) ?? key");
+    /* A REVISION IS A PHOTOGRAPH. Where the stored row carries its own label,
+       that is what the customer agreed to and that is what prints — the
+       catalog is asked only where the photograph is silent. */
+    expect(workspace).toContain('(a as { label?: unknown }).label === "string"');
   });
 
   it("enforces the stair-carry ceiling it has always printed", () => {

@@ -469,6 +469,13 @@ function draftTemplateData(
 function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
+  /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
+   *  `addons` mapping below — without this the printed document showed the
+   *  customer a database key. A FUNCTION, not a map, so the caller decides
+   *  what to do when the catalog has not answered: today it returns the key,
+   *  which is what this printed before, so a slow catalog degrades to the old
+   *  behaviour instead of printing a blank line on a document. */
+  addonLabel: (key: string) => string = (key) => key,
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -481,8 +488,22 @@ function snapshotTemplateData(
     attrs: (l.attrs as Record<string, unknown> | null) ?? null,
     category: baseBySku.get(l.sku)?.category ?? null,
   }));
+  /* ⭐ THE CUSTOMER'S DOCUMENT NEVER PRINTS A DATABASE KEY (YH, 2026-09-01).
+     This read `String(a.addon_key)`, so an OLD REVISION's PDF — a customer
+     document, printed and sent — carried `dispose_mattress` where the live
+     document carries `Mattress disposal`. The live path never had this bug:
+     `base.addons` arrives labelled from the server. Only the snapshot path,
+     which builds its own rows from the stored revision, spelled the key
+     straight onto paper.
+     ⛔ AND THE SNAPSHOT'S OWN WORD STILL WINS WHERE IT HAS ONE. A revision is
+     a photograph: if the stored row carried a label, that label is what the
+     customer agreed to and it prints, even if the catalog has since renamed
+     the service. The catalog is asked only where the photograph is silent. */
   const addons = (snap.addons ?? []).map((a) => ({
-    label: String(a.addon_key),
+    label:
+      (typeof (a as { label?: unknown }).label === "string"
+        ? ((a as { label?: string }).label ?? "").trim()
+        : "") || addonLabel(String(a.addon_key)),
     qty: Number(a.qty),
     unit_price: Number(a.unit_price),
     line_total: Number(a.qty) * Number(a.unit_price),
@@ -613,7 +634,17 @@ export function Block({
    *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
    *  fact the reader wants BEFORE reading the fields — is this a new customer or
    *  one we already have — is answered by the heading rather than by a row eight
-   *  fields down. It is a fact, never a control: nothing in here writes. */
+   *  fields down.
+   *
+   *  ⭐ AND A READ-ONLY DOOR MAY RIDE HERE TOO (YH, 2026-09-01). The original
+   *  rule read "a fact, never a control: nothing in here writes", and the
+   *  second half of that sentence is the part that matters. A door that only
+   *  NAVIGATES writes nothing — it is the Law C escape hatch, not a form — and
+   *  a whole bordered row at the bottom of a card to hold one link is the
+   *  "extra row for one control" this page has been removing all week.
+   *  ⛔ STILL NEVER A WRITER. Nothing mounted here may submit, decide, or
+   *  change a record; a control that writes belongs beside the fact it
+   *  changes, where the reader can see what it will move. */
   headerSlot?: React.ReactNode;
   /** ⭐ WHAT THIS BLOCK IS FOR, in the operator's words (2026-08-24).
    *
@@ -770,6 +801,7 @@ function PaymentApprovalBlock({
   const request = useRequestPaymentApproval(orderId);
   const decide = useDecidePaymentApproval(orderId);
   const [asking, setAsking] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
 
@@ -787,12 +819,60 @@ function PaymentApprovalBlock({
      principal only keeps the screen honest for everyone else today. */
   const canDecide = role === "principal";
 
+  /* ⭐ ONE LINE OF TRUTH, AND THE FORM BEHIND A DOOR (YH, 2026-09-01).
+     This was a bordered sub-block standing open at the foot of the Money card
+     on EVERY owing order — a heading, a state line and a button, for an act
+     that happens rarely. It is the same shape `Change delivery date` and the
+     amendment already shed on this page: the rare act moves behind a door
+     opened from the fact it changes, which here is `Outstanding`.
+     ⛔ WHAT DOES NOT MOVE IS THE TRUTH. A pending or approved record is a fact
+     about this order, not an action, so it still PRINTS — one quiet line under
+     the amount it governs. Hiding it behind the door would be the "a hidden
+     button is not a rule" defect in its other direction: the rule would be
+     invisible because the door was shut.
+     ⛔ AND THE CAPABILITY IS UNTOUCHED. `0362` is Jess's ruling of 2026-08-19,
+     written the day goods went out with the money uncollected: an owing order
+     may only be delivered against a RECORDED approval, never a verbal one.
+     Deleting this door would leave Operation no governed way to ask, so this
+     changes where it lives and nothing else. Both words are locked
+     (COPY-STANDARD:1575) and both are unchanged. */
+  const liveLine = approved
+    ? `COD approved — collect before unloading${approved.decided_at ? ` · ${fmtDate(approved.decided_at)}` : ""}`
+    : pending
+      ? `Waiting for decision${pending.requested_at ? ` · requested ${fmtDate(pending.requested_at)}` : ""}`
+      : rows[0]?.status === "refused"
+        ? `Refused${rows[0].decided_at ? ` · ${fmtDate(rows[0].decided_at)}` : ""}`
+        : null;
+  /* The door appears only for somebody who can walk through it: the approver
+     while a decision waits, the raiser while money is owed and nothing is
+     pending. The server is still the boundary — this only declines to offer a
+     door that would 422. */
+  const doorOpen =
+    (pending != null && canDecide) || (outstanding > 0 && pending == null && approved == null && canRaise);
+
   return (
-    <div
-      className="mt-3 border-t border-kit-slate-5 pt-3"
-      data-testid="payment-approval-block"
-    >
-      <div className="text-label text-base-500">Delivery payment approval</div>
+    <div data-testid="payment-approval-block">
+      {liveLine && (
+        <p className="mt-1 text-meta text-base-600" data-testid="payment-approval-live">
+          {liveLine}
+        </p>
+      )}
+      {doorOpen && (
+        <button
+          type="button"
+          data-testid="payment-approval-open"
+          onClick={() => setFormOpen(true)}
+          className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+        >
+          Delivery payment approval
+        </button>
+      )}
+      <Modal
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        title="Delivery payment approval"
+        description="An approved record lets this order deliver COD: the full balance by online transfer before unloading."
+      >
       {approved ? (
         <div className="mt-1 text-body text-base-900" data-testid="payment-approval-approved">
           COD approved — collect before unloading
@@ -908,6 +988,7 @@ function PaymentApprovalBlock({
             : null}
         </div>
       )}
+      </Modal>
     </div>
   );
 }
@@ -1352,9 +1433,12 @@ export default function SalesOrderWorkspace() {
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
-    if (mode === "oldrev" && viewedRevision) return snapshotTemplateData(viewedRevision.snapshot, base);
+    if (mode === "oldrev" && viewedRevision)
+      return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
+        addonNameByKey.get(key) ?? key,
+      );
     return debouncedDraftData;
-  }, [mode, viewedRevision, base, debouncedDraftData]);
+  }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
   const { setPane } = usePdfCanvases(templateData);
 
@@ -2167,7 +2251,28 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-      <Block title="Money">
+      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
+          Payments` had a hairline and a row of its own at the foot of the
+          card — a separator introducing one link, on a card whose entire
+          content is three numbers. The word is locked (COPY-STANDARD:1595) and
+          unchanged; only the row is gone. It still writes nothing: it
+          navigates to the desk that owns collection, already scoped to this
+          order, which is the one thing Law C lets a summary add. */}
+      <Block
+        title="Money"
+        headerSlot={
+          !isNew && order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
+            >
+              Open this order in Payments
+            </button>
+          ) : undefined
+        }
+      >
         {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
             2026-08-15 `Total large · Paid medium · Outstanding loudest`
             weighting). The weighting never reached the numerals anyway:
@@ -2214,43 +2319,34 @@ export default function SalesOrderWorkspace() {
               (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
               (owner ruling 2026-08-15) — the colour carries that on its own,
               at the same size as its two neighbours. */}
-          <Fact
-            label="Outstanding"
-            value={
-              <span
-                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-                data-testid="money-outstanding"
-              >
-                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-              </span>
-            }
-          />
-        </div>
-        {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
-            SUMMARISES money and may never gain a form for it — so the one thing
-            it adds is the way OUT, to the desk that owns collection, already
-            scoped to this order. Read-only: it navigates, it writes nothing. */}
-        {!isNew && order && (
-          <div className="mt-3 border-t border-kit-slate-5 pt-3">
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
-            >
-              Open this order in Payments
-            </button>
+          {/* ⭐ THE APPROVAL SITS UNDER THE AMOUNT IT GOVERNS (YH,
+              2026-09-01). `0362`'s door was a bordered sub-block at the foot of
+              the card, standing open on every owing order for an act that
+              happens rarely. It is the page's own grammar now — a quiet door
+              under the fact it acts on, exactly where `Change delivery date`
+              sits under the date and `Change salesperson` under the name — and
+              a live decision still prints as a line, because a pending or
+              approved record is truth, not an action. */}
+          <div>
+            <Fact
+              label="Outstanding"
+              value={
+                <span
+                  className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+                  data-testid="money-outstanding"
+                >
+                  {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+                </span>
+              }
+            />
+            {!isNew && order && (
+              <PaymentApprovalBlock
+                orderId={order.id}
+                outstanding={money.known ? money.outstanding : 0}
+              />
+            )}
           </div>
-        )}
-        {/* 0362 (owner ruling 2026-08-19) — the black-and-white door that lets
-            an owing order deliver COD. Sales Order OWNS this record; raising
-            and deciding are ITS doors, not a money form (Law B untouched). */}
-        {!isNew && order && (
-          <PaymentApprovalBlock
-            orderId={order.id}
-            outstanding={money.known ? money.outstanding : 0}
-          />
-        )}
+        </div>
       </Block>
 
       {/* ② ORDER INFO */}
@@ -2355,7 +2451,30 @@ export default function SalesOrderWorkspace() {
               </span>
             )}
           </div>
-          <div data-pos-field="stairCarry">
+          {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+              `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+              registry field it stands for is "Delivery access (floor / lift /
+              stair carry)" — three questions — and the other two sat outside
+              the tag entirely.
+              That is not cosmetic. The POS-parity contract test walks
+              `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+              this file; it cannot see WHAT the attribute wraps. So the test
+              reported "stair carry is covered" while checking one box of
+              three, and deleting `Lift available?` tomorrow would still pass.
+              THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+              on a hidden `<span>` with no control behind it, and the page
+              passed a completeness test it did not meet while the office rang
+              the shop to add a disposal service. The lesson was written into
+              the comment above that door and the same defect was live twelve
+              lines away.
+              A NESTED GRID, not a wrapper div: the three fields still sit on
+              the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
+              so nothing moves on screen — and they now read as the one topic
+              they are. */}
+          <div
+            data-pos-field="stairCarry"
+            className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+          >
             {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
                 The POS has clamped this since the wizard was written; this door
                 accepted any number, so an office-keyed order could promise a
@@ -2373,7 +2492,6 @@ export default function SalesOrderWorkspace() {
                   Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
                 )
               } />
-          </div>
           {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
               then put a default value, rather than leaving it blank". The
               STORED value stays null until somebody types; this shows the
@@ -2433,6 +2551,7 @@ export default function SalesOrderWorkspace() {
             value={draft.delivery_has_lift ? "Has lift" : "No lift"}
             onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
             options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+          </div>
         </div>
         {/* The three fields above, added up out loud — the POS's own sentence
             (`pos/StairCarryFields.tsx`), so the office reads the number the
