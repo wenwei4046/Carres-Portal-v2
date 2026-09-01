@@ -57,17 +57,18 @@ const manualPurchaseRouter = new Hono<AppEnv>();
  * they must refuse in the same words — `purchasingRefusal` is the one place
  * those words live.
  */
+function refusalBody(code: string, facts?: Parameters<typeof purchasingRefusal>[1]) {
+  const r = purchasingRefusal(code, facts);
+  return { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) };
+}
+
 function refuse(
   c: Context<AppEnv>,
   status: 400 | 403 | 404 | 409 | 422 | 500,
   code: string,
   facts?: Parameters<typeof purchasingRefusal>[1],
 ) {
-  const r = purchasingRefusal(code, facts);
-  return c.json(
-    { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) },
-    status,
-  );
+  return c.json(refusalBody(code, facts), status);
 }
 
 /** Today in Asia/Kuala_Lumpur (UTC+8, no DST) — the Malaysia calendar date
@@ -1189,14 +1190,36 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const m = mapPgError(reqErr);
     return c.json(m.body, m.status);
   }
+  /* ⭐ EVERY REFUSAL ON THIS DOOR TRAVELS WITH ITS WORDS (YH, 2026-09-01).
+     Four of the refusals below were bare `c.json({ error, code })` while their
+     neighbours ten lines away already used `refuse()`. A bare body carries no
+     `message` and no `action`, so `purchasingRefusal` fell through to its
+     honest fallback — "The Portal refused this purchase order. Tell IT the
+     message on screen." — and the TWO COMMONEST outcomes of this door, a
+     request somebody else already issued and a request nobody has approved
+     yet, both read to the operator as a system fault. Nothing was broken;
+     nothing was said.
+     `refuse()` is the same helper this file already uses for `cost_required`
+     and `pickup_partner_required`. It is not new machinery; four throw sites
+     were simply written without it. */
   if ((requests ?? []).length !== requestIds.length) {
-    return c.json({ error: "unknown_request", code: "unknown_request" }, 404);
+    return refuse(c, 404, "unknown_request");
   }
   for (const r of requests ?? []) {
-    const ready = r.refused_at === null && (!r.approval_required || r.approved_at !== null);
-    if (!ready) {
+    /* ⭐ ONE CODE CANNOT SAY TWO THINGS. `not_ready_to_order` covered BOTH
+       "nobody has approved this yet" and "somebody refused this", which are
+       opposite facts with opposite next acts — one is a wait on an approver,
+       the other is a row that must come off the list. The test is split so
+       each carries its own sentence. */
+    if (r.refused_at !== null) {
       return c.json(
-        { error: "not_ready_to_order", code: "not_ready_to_order", requestId: r.id },
+        { ...refusalBody("request_refused"), requestId: r.id },
+        409,
+      );
+    }
+    if (r.approval_required && r.approved_at === null) {
+      return c.json(
+        { ...refusalBody("not_ready_to_order"), requestId: r.id },
         409,
       );
     }
@@ -1229,7 +1252,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
-    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+    return refuse(c, 409, "nothing_to_issue");
   }
 
   // The catalog facts: supplier truth, cost, category (for the ETA).
@@ -1283,7 +1306,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const warehouse =
     (whRows ?? []).find((w) => /klang|klg/i.test((w.name as string) ?? "")) ??
     (whRows ?? [])[0];
-  if (!warehouse) return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
+  if (!warehouse) return refuse(c, 500, "no_warehouse");
 
   const reqById = new Map((requests ?? []).map((r) => [r.id as string, r]));
 
@@ -1300,10 +1323,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   for (const l of toIssue) {
     const cat = catalog.get(l.sku as string);
     if (!cat || !cat.supplierId) {
-      return c.json(
-        { error: "unresolved_supplier", code: "unresolved_supplier", sku: l.sku },
-        422,
-      );
+      return refuse(c, 422, "unresolved_supplier", { sku: l.sku as string });
     }
     if (cat.cost == null || cat.cost <= 0) {
       // The manual lane issues at catalog cost; a SKU without one is a
