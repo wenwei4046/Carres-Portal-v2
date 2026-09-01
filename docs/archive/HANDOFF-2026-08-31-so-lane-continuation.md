@@ -1,3 +1,9 @@
+> **SUPERSEDED 2026-09-01 — NOT AUTHORITY.** Everything still live in this file
+> was folded into `docs/handoff/CARRES-CONTINUOUS-BUILD-HANDOFF.md`, which is the
+> one live prompt. `CLAUDE.md` Law 1 excludes `docs/archive/` from authority: no
+> chat reads this as truth. Kept only so the reasoning behind the folded items is
+> not lost to a squashed history.
+
 # HANDOFF PROMPT — Sales Order lane, continuation from 31 Aug 2026
 
 Paste everything below the line into a fresh session. It is self-contained.
