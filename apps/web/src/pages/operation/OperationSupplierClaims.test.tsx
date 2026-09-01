@@ -1318,3 +1318,62 @@ describe("OperationSupplierClaims — how the goods move (layer ④)", () => {
     );
   });
 });
+
+describe("the layers are NOT cross-validated — owner ruling, YH 2026-09-01", () => {
+  function openClaim(claim: SupplierClaimListRow) {
+    claimsQuery.mockReturnValue(
+      ok({ claims: [claim], counts: { open: 1, closed: 0, all: 1 } }),
+    );
+    render(wrap(<OperationSupplierClaims />));
+    fireEvent.click(screen.getByTestId(`claim-open-${claim.claim_no}`));
+  }
+
+  it("offers all five executions even when layer ③ makes one of them nonsense", async () => {
+    // `No Replacement Required` means nothing more goes to the customer, so
+    // `Replace First` — send the new one out first — is incoherent beside it.
+    // The question was put to YH and he ruled for the FLEXIBILITY: no guard.
+    //
+    // Two reasons, and a chat that wants to add the guard must answer both:
+    //   1. Narrowing one list by the other collapses two layers Loo's model
+    //      exists to keep apart. They stop being two questions.
+    //   2. It refuses a real event. The van is already out collecting, so the
+    //      office records `Collect First` while the customer has not settled
+    //      what they want. A matched-pair rule makes an operator type a false
+    //      answer to record a true one.
+    openClaim(
+      row({
+        customer_resolution: "no_replacement_required",
+        customer_resolution_at: "2026-09-01T08:00:00Z",
+      }),
+    );
+    for (const key of [
+      "return_to_supplier",
+      "collect_defective_item",
+      "replace_first",
+      "collect_first",
+      "exchange_on_collection",
+    ]) {
+      expect(screen.getByTestId(`carres-execution-${key}`)).not.toBeDisabled();
+    }
+
+    // …and the incoherent pair actually SAVES. Offering a control that the
+    // server then refuses would be the UI inventing a second policy, which is
+    // the defect this repo keeps finding between two surfaces.
+    fireEvent.click(screen.getByTestId("carres-execution-replace_first"));
+    fireEvent.click(screen.getByTestId("carres-execution-save"));
+    await waitFor(() => expect(executionMutate).toHaveBeenCalled());
+    expect(executionMutate).toHaveBeenCalledWith({
+      claimId: "c1",
+      carres_execution: "replace_first",
+      note: undefined,
+    });
+  });
+
+  it("records an execution on a claim whose resolution is still blank", () => {
+    // The order-of-work case that made the ruling concrete: the choreography is
+    // already happening and the customer has decided nothing yet.
+    openClaim(row({ customer_resolution: null, customer_resolution_at: null }));
+    fireEvent.click(screen.getByTestId("carres-execution-collect_first"));
+    expect(screen.getByTestId("carres-execution-save")).not.toBeDisabled();
+  });
+});

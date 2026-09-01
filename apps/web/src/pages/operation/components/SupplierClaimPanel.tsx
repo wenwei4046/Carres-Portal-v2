@@ -126,12 +126,18 @@ import { buildSupplierClaimMessage } from "@/lib/wa-templates";
  * all, which is what makes it the fifth option rather than four. They are
  * allowed to disagree.
  *
- * **It is not cross-validated against layer ③, on purpose.** `Replace First`
- * with `No Replacement Required` is incoherent and the database still admits
- * it. Refusing the pair would collapse two layers the model keeps apart, and it
- * would refuse a legitimate order of work: an operator records the choreography
- * the warehouse is already running before the customer's resolution is final.
- * The coherence question is real and belongs to whoever rules the consequences.
+ * **It is not cross-validated against layer ③ — ruled by YH, 2026-09-01.**
+ * `Replace First` with `No Replacement Required` is incoherent and the database
+ * admits it on purpose. Put to the owner as an open question; he ruled for the
+ * flexibility. Refusing the pair would collapse two layers the model exists to
+ * keep apart, and it would refuse a real event — the van is already out
+ * collecting, so the office records `Collect First` while the customer has not
+ * yet settled what they want. A matched-pair rule makes an operator type a
+ * false answer to record a true one.
+ *
+ * **So the screen offers all five, always.** Narrowing the list by what layer ③
+ * says would be the UI inventing a policy the database does not hold, which is
+ * the defect this repo keeps finding between two surfaces.
  */
 
 export default function SupplierClaimPanel({

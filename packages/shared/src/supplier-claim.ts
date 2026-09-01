@@ -409,14 +409,25 @@ export function customerResolutionMeaning(
 // and Repair Orders (§9.7) are the documents that consume it, and both were
 // frozen on exactly this missing argument.
 //
-// ── And it is NOT cross-validated against layer ③, on purpose ───────────────
+// ── And it is NOT cross-validated against layer ③ — RULED, YH 2026-09-01 ────
 // `Replace First` with `no_replacement_required` is incoherent, and the
-// database still admits it. Refusing the pair would COLLAPSE two layers Loo's
-// model keeps apart, and it would refuse a legitimate order of work: an
-// operator records the choreography the warehouse is already executing before
-// the customer's resolution is final. 0324 set this precedent for layer ③ and
-// this follows it. The coherence question is real and belongs to whoever rules
-// the consequences — flagged, not silently decided.
+// database admits it on purpose. This was put to the owner as an open question
+// and he ruled for the flexibility: **do not add the guard.** Two reasons he
+// accepted, both of which a later chat must answer before reversing it:
+//
+//   1. A CHECK across the two would COLLAPSE two layers Loo's model exists to
+//      keep apart. The moment answering one narrows the other, they are no
+//      longer two questions.
+//   2. It would refuse a real event. The van is already out collecting; the
+//      office records `Collect First` because it is happening, while the
+//      customer has not yet settled what they want. A matched-pair rule makes
+//      an operator type a false answer to record a true one — the failure this
+//      repo keeps finding whenever two things that move on different days are
+//      tied together.
+//
+// 0324 set the same precedent for layer ③. A consequence engine may revisit
+// this, because f(Resolution, Execution) only becomes computable once both are
+// on file; until that function is ruled, nothing derives from either.
 
 export type CarresExecution =
   | "return_to_supplier"

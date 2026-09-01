@@ -62,8 +62,8 @@ items in it are the work; do not re-audit.**
 | Typecheck | clean | `pnpm -r typecheck` |
 | Lint | passes (Stage 1, warn-only) | `pnpm -r lint` |
 | Migration filenames | 418 validated | `node scripts/check-migrations.mjs` |
-| Migration tail, ALL branches | **0408** → next free is **0409** | the rename-safe command in §4 |
-| On `main` | `0393`–`0406`, plus `0398a` | `ls supabase/migrations` |
+| Migration tail, ALL branches | **0409** → next free is **0410** | the rename-safe command in §4 |
+| On `main` | `0393`–`0409`, plus `0398a` | `ls supabase/migrations` |
 | Production | **2 commits behind, deploys queued** | `EXPECTED_SHA=$(git rev-parse origin/main) node scripts/verify-production.mjs` |
 
 **On production lag:** all five surfaces agreed on `e70cac31` while `#1004`'s
@@ -83,6 +83,7 @@ were never a product bug — see §3.7. Do not go looking for them.
 | `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move |
 | `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded |
 | `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database |
+| `0409` | Layer ④ Carres Execution — in what ORDER the goods move. Completes Loo's four-layer claim model; **applied by YH 2026-09-01** |
 
 Plus, without a migration: the office add-on door (`SalesOrderAddons.tsx`) · the
 FK guard that stops a missing migration blocking a sale · one name for the
@@ -178,6 +179,16 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
     are orders created in the portal that missed their fee to a code bug, and the
     owner ruled directly on them. Not a contradiction; an over-generalisation.
 
+17. **The four claim layers are NOT cross-validated** (YH, 1 Sep). `Replace First`
+    with `No Replacement Required` is incoherent and the database accepts it, on
+    purpose. Two reasons, and both must be answered before anyone adds the guard:
+    a CHECK across the two would **collapse two layers Loo's model exists to keep
+    apart** — the moment one narrows the other they stop being two questions; and
+    it would **refuse a real event**, because the van is already out collecting
+    while the customer has not settled what they want, so a matched-pair rule
+    makes an operator type a false answer to record a true one. In
+    `docs/purchasing/MASTER.md` §9.5 and pinned by a test.
+
 ## 4 · CONSTRAINTS
 
 - **Migrations are applied BY HAND.** Code can reach production before its
@@ -240,20 +251,23 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 6 · OPEN WORK, in order
 
-1. **Layer ④ — Carres Execution.** YH approved building it (option (a), 30 Aug).
-   Largest item, and it unblocks **both** Purchase Returns and Repair Orders, two
-   `soon: true` destinations. Research it before writing anything; the ruling it
-   un-freezes is Loo's.
+**Closed since this file was written:** Layer ④ (Carres Execution) is BUILT —
+migration `0409`, applied by YH 2026-09-01. Loo's four-layer claim model is
+complete, and the argument Purchase Returns (§9.6) and Repair Orders (§9.7) were
+frozen on now exists. **Both are still unbuilt**; they are unfrozen, not
+delivered, and each is a register with its own numbering, PDFs, handover proof
+and custody moves. The audit's 818-line correction pass also landed, from
+another lane.
 
-2. **The audit's correction pass never landed on `main`.** `main` carries the
-   **680-line** first pass; the corrected **818-line** version is committed on
-   the merged branch `docs/so-audit-and-three-rulings` at `66e2d472`, carrying
-   `## 0-B` the refutation round, `## 10` child components, `## 11`
-   Route/Revisions/History and `## 12` the G-2b gate finding. Until it lands,
-   anyone reading the audit gets findings that were already refuted. Cherry-pick
-   `66e2d472`, verify 818 lines and `REFUTATION ROUND`, PR it. Docs only.
+**YH ruled while building it (2026-09-01): the layers are NOT cross-validated.**
+`Replace First` with `No Replacement Required` is incoherent and the database
+accepts it, deliberately — a guard would collapse two layers Loo's model keeps
+apart, and would refuse a real event (the van is already collecting; the
+customer has not settled what they want). Written into
+`docs/purchasing/MASTER.md` §9.5 and pinned by a test. **Do not add the guard**
+without reopening it with Loo.
 
-3. 🔴 **The stair fee goes stale when goods change** — a live money defect in
+1. 🔴 **The stair fee goes stale when goods change** — a live money defect in
    shipped code. `stairCarryFee` clamps on the order's item count, but
    `touchesStairInputs` watches only `delivery_floor`, `delivery_has_lift` and
    `delivery_stair_items`. Add or remove goods on a clamped order and the
@@ -261,27 +275,27 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
    screen, two numbers** — ownership Law D, and the exact defect the stair Card
    was opened to close. Fix: make the line-writing paths re-stamp too.
 
-4. **`SO Date` is unregistered and contradicts the dictionary.** Commit
+2. **`SO Date` is unregistered and contradicts the dictionary.** Commit
    `11e11ca2` renamed `Ordered` → `SO Date` on five surfaces with no
    COPY-STANDARD entry, and the table at `COPY-STANDARD:1756` still rules
    `Ordered: {date}` for that exact fact. Shipped code breaks the dictionary it
    is ruled by. Register `SO Date` against `orders.placed_at` and retire the old
    row — or revert the rename. YH decides which.
 
-5. **The instalment-months 500.** `orders_installment_months_chk` allows
+3. **The instalment-months 500.** `orders_installment_months_chk` allows
    NULL/6/12 and nothing above the database knows. A proposal of 9 saves fine and
    fails at the **principal's** Approve press with raw constraint text on screen.
    The bound is verified; the refusal **sentence** needs a ruled word from YH.
 
-6. **Migrations `0395`–`0406` are probably unapplied.** YH applied through `0394`
+4. **Migrations `0395`–`0406` are probably unapplied.** YH applied through `0394`
    by hand. `0395` is the one the office add-on door needs. Run the tracker query
    and apply what is missing.
 
-7. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
+5. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
    (dry run), `-- --apply` to write. **YH's to run** — it needs the service-role
    key and it changes money on existing orders.
 
-8. **Still open from the audit:** F-7 (`building_type` decides delivery slot
+6. **Still open from the audit:** F-7 (`building_type` decides delivery slot
    length, has no column and no constraint) · F-8 (floor bounds disagree across
    UI/API/DB) · F-11 (the promised date is guarded by one layer, not two) · F-12
    (`update_order` freezes six delivery fields after Proceed; the office door does
@@ -291,9 +305,15 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 7 · EXACT NEXT STEP
 
-Ask YH which item in §6 he is releasing, and recommend **① Layer ④** — he has
-already approved it and it unblocks two dead pages. If he releases nothing,
-stand by. **Do not invent work.**
+Ask YH which item in §6 he is releasing, and recommend **① the stale stair fee**
+— it is the only 🔴 on the list, it is a live money defect in code this lane
+shipped, and it is small. If he releases nothing, stand by. **Do not invent
+work.**
+
+Do NOT start Purchase Returns or Repair Orders on your own initiative just
+because Layer ④ unfroze them. Each is a full register — numbering, PDF issue,
+handover proof, custody moves, Finance credit reads — and §9.6/§9.7 are page
+blueprints, not build scopes. They need YH to release them.
 
 ---
 
