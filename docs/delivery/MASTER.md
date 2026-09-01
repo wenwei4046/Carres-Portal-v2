@@ -379,7 +379,7 @@ KPI cards do not precede the work/Register.
 
 ```
 SO / Ref · Customer · Requested Delivery Date · Delivery Location · Building · Logistics Partner ·
-Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
+Confirmed Delivery · Confirmed Time · Goods · DO No · Work
 ```
 
 `Requested Delivery Date` is the date the customer asked for, owned by Sales Orders. `Confirmed Delivery` and `Confirmed Time` are
@@ -464,7 +464,7 @@ is Delivery Orders and Delivery History.
 
 ```
 ☐ · ▸ · SO / Ref · Customer · Delivery Location · Building · Requested Delivery Date ·
-Confirmed Delivery · Confirmed Time · Logistics Partner · Goods · DO No · Delivery Status
+Confirmed Delivery · Confirmed Time · Logistics Partner · Goods · DO No · Work
 ```
 
 Date and time stay **separate columns**. `SO / Ref` is the sticky identity column and stays visible
@@ -492,7 +492,9 @@ reads `1 delivery scope selected` / `3 delivery scopes selected`, `Clear`, then 
 never the danger ink**, in the 32px control gutter, titled `Show delivery items`, carrying a correct
 `aria-expanded`. It is an ENGINE property, so every register wears it.
 
-**`Delivery Status` is the OPERATION's progress, not the document's** (owner ruling 2026-08-24):
+**`Work` is the exact action-column heading** (UI Dictionary control 2026-09-01; `Current Action`
+and `Delivery Status` are retired here). Its values remain the OPERATION's progress, not the
+document's:
 
 ```
 Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
@@ -756,7 +758,7 @@ in production and has been verified through an authenticated Operations session:
   facts;
 - the date rail uses **No confirmed date** and **Overdue**;
 - the listing keeps Requested Delivery Date separate from Confirmed Delivery and Confirmed Time, shows
-  Logistics Partner and Goods, and adds DO No and Delivery Status to the same row;
+  Logistics Partner and Goods, and adds DO No and Work to the same row;
 - expanding a row shows its product lines and the shared Stock facts Where, Who has it and Stock
   ETA without leaving Delivery;
 - clicking an issued DO opens the formal DO object; its back door returns to **Delivery**;
