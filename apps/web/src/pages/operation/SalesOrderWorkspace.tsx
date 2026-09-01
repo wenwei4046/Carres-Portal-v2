@@ -469,6 +469,13 @@ function draftTemplateData(
 function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
+  /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
+   *  `addons` mapping below — without this the printed document showed the
+   *  customer a database key. A FUNCTION, not a map, so the caller decides
+   *  what to do when the catalog has not answered: today it returns the key,
+   *  which is what this printed before, so a slow catalog degrades to the old
+   *  behaviour instead of printing a blank line on a document. */
+  addonLabel: (key: string) => string = (key) => key,
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -481,8 +488,22 @@ function snapshotTemplateData(
     attrs: (l.attrs as Record<string, unknown> | null) ?? null,
     category: baseBySku.get(l.sku)?.category ?? null,
   }));
+  /* ⭐ THE CUSTOMER'S DOCUMENT NEVER PRINTS A DATABASE KEY (YH, 2026-09-01).
+     This read `String(a.addon_key)`, so an OLD REVISION's PDF — a customer
+     document, printed and sent — carried `dispose_mattress` where the live
+     document carries `Mattress disposal`. The live path never had this bug:
+     `base.addons` arrives labelled from the server. Only the snapshot path,
+     which builds its own rows from the stored revision, spelled the key
+     straight onto paper.
+     ⛔ AND THE SNAPSHOT'S OWN WORD STILL WINS WHERE IT HAS ONE. A revision is
+     a photograph: if the stored row carried a label, that label is what the
+     customer agreed to and it prints, even if the catalog has since renamed
+     the service. The catalog is asked only where the photograph is silent. */
   const addons = (snap.addons ?? []).map((a) => ({
-    label: String(a.addon_key),
+    label:
+      (typeof (a as { label?: unknown }).label === "string"
+        ? ((a as { label?: string }).label ?? "").trim()
+        : "") || addonLabel(String(a.addon_key)),
     qty: Number(a.qty),
     unit_price: Number(a.unit_price),
     line_total: Number(a.qty) * Number(a.unit_price),
@@ -1352,9 +1373,12 @@ export default function SalesOrderWorkspace() {
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
-    if (mode === "oldrev" && viewedRevision) return snapshotTemplateData(viewedRevision.snapshot, base);
+    if (mode === "oldrev" && viewedRevision)
+      return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
+        addonNameByKey.get(key) ?? key,
+      );
     return debouncedDraftData;
-  }, [mode, viewedRevision, base, debouncedDraftData]);
+  }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
   const { setPane } = usePdfCanvases(templateData);
 
@@ -2355,7 +2379,30 @@ export default function SalesOrderWorkspace() {
               </span>
             )}
           </div>
-          <div data-pos-field="stairCarry">
+          {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+              `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+              registry field it stands for is "Delivery access (floor / lift /
+              stair carry)" — three questions — and the other two sat outside
+              the tag entirely.
+              That is not cosmetic. The POS-parity contract test walks
+              `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+              this file; it cannot see WHAT the attribute wraps. So the test
+              reported "stair carry is covered" while checking one box of
+              three, and deleting `Lift available?` tomorrow would still pass.
+              THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+              on a hidden `<span>` with no control behind it, and the page
+              passed a completeness test it did not meet while the office rang
+              the shop to add a disposal service. The lesson was written into
+              the comment above that door and the same defect was live twelve
+              lines away.
+              A NESTED GRID, not a wrapper div: the three fields still sit on
+              the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
+              so nothing moves on screen — and they now read as the one topic
+              they are. */}
+          <div
+            data-pos-field="stairCarry"
+            className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+          >
             {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
                 The POS has clamped this since the wizard was written; this door
                 accepted any number, so an office-keyed order could promise a
@@ -2373,7 +2420,6 @@ export default function SalesOrderWorkspace() {
                   Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
                 )
               } />
-          </div>
           {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
               then put a default value, rather than leaving it blank". The
               STORED value stays null until somebody types; this shows the
@@ -2433,6 +2479,7 @@ export default function SalesOrderWorkspace() {
             value={draft.delivery_has_lift ? "Has lift" : "No lift"}
             onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
             options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+          </div>
         </div>
         {/* The three fields above, added up out loud — the POS's own sentence
             (`pos/StairCarryFields.tsx`), so the office reads the number the

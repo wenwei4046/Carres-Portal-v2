@@ -1444,3 +1444,113 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
     expect((await res.json() as { documents: number }).documents).toBe(2);
   });
 });
+
+
+/**
+ * A MANUAL PURCHASE ARRIVES WHOLE, OR NOT AT ALL (0410, YH 2026-09-01).
+ *
+ * The create form used to POST the header, read back its id, then POST one
+ * line per line in a loop — six transactions for one act. A failure on line 3
+ * left a committed header holding two of five lines, on no screen and behind
+ * no door, and the Register listed it as a real request.
+ *
+ * These tests pin the ROUTE's half of the fix: lines that arrive with the
+ * header go to the one transactional door, and — because `0410` is applied by
+ * hand — a build that reaches production before the migration does must still
+ * be able to create a Manual Purchase.
+ */
+describe("POST /purchasing/requests — the whole request, or none of it", () => {
+  const HEADER = {
+    purpose: "ready_stock",
+    destinationId: DEST,
+    requiredBy: "2026-09-15",
+  };
+
+  async function post(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc };
+  }
+
+  it("sends header and lines to the ONE transactional door", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, lines: [{ sku: "5539-2NA", qty: 2 }, { sku: "5539-CNR", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [fn, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(fn).toBe("purchasing_create_request_with_lines");
+    expect(args.p_lines).toEqual([
+      { sku: "5539-2NA", qty: 2, required_by: null, remark: null },
+      { sku: "5539-CNR", qty: 1, required_by: null, remark: null },
+    ]);
+    /* ONE call. The per-line loop is what this replaces. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a request with no lines before it reaches the database", async () => {
+    /* An empty Manual Purchase is the orphan `0410` exists to delete. The
+       route refuses it on the schema, so no transaction is even opened; the
+       function refuses it again in SQL, because a screen is not a rule. */
+    const rpc = vi.fn();
+    const { res } = await post({ ...HEADER, lines: [] }, rpc);
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns a real refusal from the transactional door untouched", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "unknown sku NOPE", details: "unknown_sku" },
+    });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "NOPE", qty: 1 }] }, rpc);
+    expect(res.status).toBe(422);
+    /* It must NOT be mistaken for a missing migration and silently retried on
+       the old door — that is how a refusal would become a half-written row. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  /* ⛔ MERGED IS NOT APPLIED. Migrations here are applied BY HAND, so this
+     build can reach production before `0410` exists. PostgREST answers a
+     missing function with PGRST202; Postgres with 42883. Either means "the
+     migration has not run", never "this request is bad". */
+  for (const code of ["PGRST202", "42883"]) {
+    it(`degrades to the header-only door when 0410 is not applied yet (${code})`, async () => {
+      const rpc = vi
+        .fn()
+        .mockResolvedValueOnce({ data: null, error: { code, message: "not found" } })
+        .mockResolvedValueOnce({
+          data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
+          error: null,
+        });
+      const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+      /* The operator keeps working. */
+      expect(res.status).toBe(200);
+      expect(rpc.mock.calls.map((c) => c[0])).toEqual([
+        "purchasing_create_request_with_lines",
+        "purchasing_create_request",
+      ]);
+    });
+  }
+
+  it("still accepts a header with no lines at all, for a caller that sends none", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(HEADER, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request");
+  });
+});

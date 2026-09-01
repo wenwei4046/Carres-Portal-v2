@@ -911,6 +911,27 @@ const headerBody = z
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
+    /* ⭐ THE WHOLE REQUEST ARRIVES AT ONCE (0410, YH 2026-09-01). The form
+       used to POST the header, read back its id, then POST one line per line
+       in a loop — six transactions for one act. A failure on line 3 left a
+       committed header with two of five lines, on no screen and behind no
+       door. The lines ride the header now and `0410` writes them in ONE
+       database transaction.
+       OPTIONAL, and that is deliberate: `0410` is applied BY HAND, so a build
+       that reaches production before the migration does must still be able to
+       create a Manual Purchase. Absent, this route falls back to exactly the
+       behaviour it had — see the handler. */
+    lines: z
+      .array(
+        z.object({
+          sku: z.string().min(1),
+          qty: z.number().int().min(1),
+          requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+          note: z.string().max(500).nullish(),
+        }),
+      )
+      .min(1)
+      .optional(),
   })
   .superRefine((b, ctx) => {
     if (b.purpose === "other_purchase" && !(b.why ?? "").trim()) {
@@ -952,10 +973,11 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName } =
-    parsed.data;
+  const {
+    purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName, lines,
+  } = parsed.data;
 
-  const { data, error } = await sb.rpc("purchasing_create_request", {
+  const header = {
     p_purpose: purpose,
     p_destination_id: destinationId,
     p_why: (why ?? "").trim() || null,
@@ -963,7 +985,41 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     p_for_service_case_id: serviceCaseId ?? null,
     p_for_staff_user_id: staffUserId ?? null,
     p_for_subsidiary_name: (subsidiaryName ?? "").trim() || null,
-  });
+  };
+
+  /* ⭐ ONE TRANSACTION FOR ONE ACT (0410). When the caller sends its lines,
+     the whole request is written by `purchasing_create_request_with_lines`,
+     which calls the SAME two doors this route used to call one after another —
+     so every gate still runs, in its own body, and the only thing that changed
+     is that a refusal on line 3 now takes the header with it. */
+  if (lines && lines.length > 0) {
+    const { data, error } = await sb.rpc("purchasing_create_request_with_lines", {
+      ...header,
+      p_lines: lines.map((l) => ({
+        sku: l.sku,
+        qty: l.qty,
+        required_by: l.requiredBy ?? null,
+        remark: (l.note ?? "").trim() || null,
+      })),
+    });
+    if (!error) return c.json(data);
+
+    /* ⛔ MERGED IS NOT APPLIED. `0410` is applied by hand, so this build can
+       reach production before the function exists. PostgREST answers a missing
+       function with `PGRST202`; Postgres itself with `42883`. Either one means
+       "the migration has not run", NOT "this request is bad" — so the route
+       degrades to the header-only door it has always had, and the operator
+       keeps working. Every OTHER error is a real refusal and is returned.
+       This branch dies the day `0410` is applied everywhere; it is cheap, and
+       the alternative is a create form that 404s for a day. */
+    const code = String((error as { code?: string }).code ?? "");
+    if (code !== "PGRST202" && code !== "42883") {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+  }
+
+  const { data, error } = await sb.rpc("purchasing_create_request", header);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

@@ -63,7 +63,6 @@ import { fmtDate } from "@/lib/fmt-date";
 import {
   useAlreadyOnPo,
   useCreatePurchaseRequest,
-  useCreatePurchaseRequestLine,
   useDecidePurchaseRequest,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
@@ -1268,8 +1267,14 @@ function CreateRequestWorkspace({
   const [lines, setLines] = useState<LineDraft[]>(() => [blankLine()]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  /** The header, once created, is a record — retries reuse it. */
-  const [requestId, setRequestId] = useState<string | null>(null);
+  /* ⭐ THE HEADER IS NO LONGER REMEMBERED ACROSS A FAILURE (0410). It used to
+     be: "the header, once created, is a record — retries reuse it." That was
+     true of the old six-transaction shape, where a failed Send really did
+     leave a committed header worth re-using. `0410` makes the whole request
+     one transaction, so a refusal leaves nothing to re-use and remembering an
+     id would point at a row that was rolled back. The setter stays because the
+     successful id is still read by the caller. */
+  const [, setRequestId] = useState<string | null>(null);
   const [headerError, setHeaderError] = useState<string | null>(null);
 
   /* The Service Case picker rides the existing governed list read — no
@@ -1286,7 +1291,6 @@ function CreateRequestWorkspace({
   });
 
   const createHeader = useCreatePurchaseRequest();
-  const createLine = useCreatePurchaseRequestLine();
 
   const active = activeId ?? lines[0]?.id;
   const chosenDest = dest ?? destinations[0]?.id;
@@ -1418,71 +1422,78 @@ function CreateRequestWorkspace({
   }
 
   /**
-   * ONE act with a per-row result (the retired dialog's proven contract):
-   * the header lands first and is reused on retry; then one POST per line in
-   * order. A failed line keeps its row with the server's own words, and
-   * pressing Send again retries exactly those.
+   * ⭐ ONE ACT, ONE TRANSACTION (0410, YH 2026-09-01).
+   *
+   * THE SHAPE THIS REPLACES. The header landed in its own call, its id was
+   * read back, and then one call per line ran in a loop — six network writes
+   * and six database transactions for one thing the operator did once. A
+   * failure on line 3 left a COMMITTED header holding two of five lines, on no
+   * screen, behind no door, and it travelled: the Register listed it, an
+   * approver could Approve it, and the issue door would raise a Purchase Order
+   * for the two lines that happened to land.
+   *
+   * ⛔ AND THE BROWSER COULD NOT FIX IT HERE. A retry, a cleanup call, a
+   * confirm dialog — each is a second client-side write that can itself fail,
+   * leaving the same window open. Only a database transaction can make a group
+   * of writes all-or-nothing, which is what `0410` is.
+   *
+   * The per-row result is KEPT, because it is the thing the retired dialog
+   * proved and the operator reads. What changed is its meaning: a refused
+   * request now leaves NOTHING behind, so pressing Send again re-sends the
+   * whole thing rather than resuming a half-written record. `requestId`
+   * therefore stops being remembered across a failure — remembering it was
+   * only ever a way to re-use an orphan.
    */
   async function send() {
     if (!canSend || !chosenDest) return;
     setSaving(true);
     setHeaderError(null);
 
-    let reqId = requestId;
-    if (reqId === null) {
-      try {
-        const created = await createHeader.mutateAsync({
-          purpose,
-          destinationId: chosenDest,
-          requiredBy: deliveryDate || null,
-          why: purpose === "other_purchase" ? why.trim() : null,
-          serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
-          staffUserId:
-            purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
-          subsidiaryName:
-            purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
-        });
-        reqId = created.id;
-        setRequestId(created.id);
-      } catch (e) {
-        setHeaderError(e instanceof Error ? e.message : W.createFailed);
-        setSaving(false);
-        return;
-      }
-    }
-
     const targets = submittable.map((l) => l.id);
+    const payload = targets
+      .map((id) => lines.find((l) => l.id === id))
+      .filter((l): l is NonNullable<typeof l> & { sku: string } => Boolean(l?.sku));
+    if (payload.length === 0) {
+      setSaving(false);
+      return;
+    }
     setLines((ls) =>
       ls.map((l) =>
         targets.includes(l.id) ? { ...l, state: "pending", error: null } : l,
       ),
     );
 
-    let created = 0;
-    for (const id of targets) {
-      const line = lines.find((l) => l.id === id);
-      if (!line || !line.sku) continue;
-      try {
-        await createLine.mutateAsync({
-          requestId: reqId,
-          sku: line.sku,
-          qty: Number(line.qty),
-          destinationId: chosenDest,
+    try {
+      const created = await createHeader.mutateAsync({
+        purpose,
+        destinationId: chosenDest,
+        requiredBy: deliveryDate || null,
+        why: purpose === "other_purchase" ? why.trim() : null,
+        serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
+        staffUserId:
+          purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
+        subsidiaryName:
+          purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
+        lines: payload.map((l) => ({
+          sku: l.sku,
+          qty: Number(l.qty),
           requiredBy: deliveryDate || null,
-          note: line.note.trim() || null,
-          purpose,
-        });
-        created += 1;
-        patch(id, { state: "created", error: null });
-      } catch (e) {
-        patch(id, {
-          state: "failed",
-          error: e instanceof Error ? e.message : W.createFailed,
-        });
-      }
+          note: l.note.trim() || null,
+        })),
+      });
+      setRequestId(created.id);
+      for (const l of payload) patch(l.id, { state: "created", error: null });
+      setSaving(false);
+      onDone();
+    } catch (e) {
+      /* Nothing was written, so every row goes back to failed together —
+         naming one line as the culprit would be a guess, and the server's own
+         sentence already names it when it knows. */
+      const word = e instanceof Error ? e.message : W.createFailed;
+      setHeaderError(word);
+      for (const l of payload) patch(l.id, { state: "failed", error: word });
+      setSaving(false);
     }
-    setSaving(false);
-    if (created === targets.length) onDone();
   }
 
   const namedStaff = staff.filter((s) => (s.name ?? "").trim() !== "");
