@@ -700,19 +700,38 @@ proof. The stable read contract is one row per **assigned exact Unit** and Deliv
 `(order_id, leg)`, carrying only:
 
 - the permanent Carres Unit ID from Stock's allocation;
-- the planned collection date when Delivery has explicitly recorded one, and the confirmed
-  customer handover date from the Delivery arrangement — never the Sales promise as a substitute;
+- the exact Delivery collection appointment as **Customer delivery pickup** on its real Warehouse
+  event date (Warehouse Mon–Sat), and a separate **Customer handover** event when governed — never
+  the Sales promise as a substitute;
+- **Operations ready by**, derived one Office Mon–Fri working day before pickup; a Saturday pickup
+  remains Saturday while readiness normally reads Friday;
 - actual collection and actual customer arrival from their append-only event timestamps — never
   the time a user later entered the record;
 - the assigned Logistics Partner, Delivery Order number and source Sales Order;
 - admitted handover/delivery evidence and doors to the exact Delivery scope, DO and source order.
 
-Absence stays absence. The current arrangement has a confirmed customer date/time but no dedicated
-planned-collection field, and the current whole-order allocation read does not bind an exact Unit
-to one split-trip DO. A Warehouse projection must print **Not recorded** or omit such a row; it may
-not infer a collection day, copy a PO ETA, or attach an order-level Unit to an arbitrary split DO.
-Those gaps are completed only by extending Delivery's one arrangement/DO contract and Stock's one
-Unit allocation contract — never by a Warehouse writer.
+The read feed is `/api/operation/delivery-arrangements/warehouse-schedule`. The current whole-order
+implementation uses Delivery's confirmed appointment, the formal DO, Stock's exact Unit allocation,
+Warehouse location and append-only handover/proof facts. It deliberately omits Journey legs because
+the current allocation read does not bind one exact Unit to one split-trip DO. Absence stays absence:
+a consumer prints **Not recorded** or omits the row; it may not copy a PO ETA or attach an order-level
+Unit to an arbitrary split DO. That gap is completed only by extending Delivery's one arrangement/DO
+contract and Stock's one Unit allocation contract — never by a Warehouse writer.
+
+The same feed admits a Warehouse login only when its token is bound to a Warehouse, then keeps only
+exact Units whose Stock location is that Warehouse. The external **Handover** projection therefore
+shows only that Warehouse's assigned **Customer delivery pickup** rows: Unit, From Location, customer
+destination within permission, Logistics Partner, appointment/window, driver/vehicle, DO, collection
+fact and whether admitted evidence exists. It carries no price, payment, commercial term or internal
+note. A Transfer collection may join the same Warehouse projection only from Stock's exact Transfer
+object; Delivery does not create a second transfer record.
+
+Warehouse may record only the physical handover through the one governed handover writer. This PR's
+feed is read-only; an external Handover control must extend that same writer's Warehouse assignment
+gate, never add a route that writes the fact itself. Warehouse cannot edit the DO, customer promise,
+arrangement, price, payment or delivery proof. **DO No** means an outbound customer Delivery Order.
+Inbound Warehouse receiving stays under its PO/CO source and the document label **Supplier DO No.**;
+those facts never enter this outbound feed.
 
 The Logistics Partner boundary is the same projection narrowed by authenticated assignment. A
 Partner sees only its assigned delivery/transfer rows and only the customer, handling and evidence
@@ -720,10 +739,10 @@ fields admitted for that act. Unrelated customers, Stock, money, commercial term
 notes never cross that boundary. Signed evidence upload/view doors recheck the exact assigned
 scope; knowing a storage path is not permission.
 
-Visible Stock may say **On the way** only after confirmed collection and before confirmed arrival.
-A future booked Delivery, assigned Partner or confirmed customer date does not make goods On the
-way. Delivery exposes the append-only collection/arrival facts; Stock owns the resulting custody
-and visibility word and Delivery never writes or re-derives it.
+Visible Stock may say **On the way** only after the pickup carries confirmed collection evidence and
+before confirmed arrival. A future booked Delivery, assigned Partner or confirmed customer date does
+not make goods On the way. Delivery exposes the append-only collection/arrival facts; Stock owns the
+resulting custody and visibility word and Delivery never writes or stores it.
 
 ## 14 · Current versus intentional future
 
