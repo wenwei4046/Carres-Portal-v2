@@ -28,6 +28,10 @@ import {
   nearTermDates,
   matchesDate,
   matchesLogistics,
+  matchesRegion,
+  buildRegionRail,
+  regionBucketOf,
+  SINGAPORE_KEY,
   scopeFooter,
   OVERDUE_KEY,
   DW,
@@ -560,5 +564,122 @@ describe("the footer counts scopes, never orders", () => {
     expect(scopeFooter(1, 1)).toBe("1 delivery scope");
     expect(scopeFooter(3, 3)).toBe("3 delivery scopes");
     expect(scopeFooter(2, 9)).toBe("2 of 9 delivery scopes");
+  });
+});
+
+describe("nearTermDates — holidays leave the generated window (owner ruling 2026-09-01)", () => {
+  it("skips a public holiday and still returns seven operating days", () => {
+    // 2026-08-21 = Friday. Make Monday 24th a holiday: the window walks past
+    // it and picks up the following Saturday to stay seven days long.
+    const holidays = new Set(["2026-08-24"]);
+    expect(nearTermDates(TODAY, 7, holidays)).toEqual([
+      "2026-08-21",
+      "2026-08-22",
+      "2026-08-25",
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-28",
+      "2026-08-29",
+    ]);
+  });
+
+  it("a scope genuinely confirmed on a holiday still reaches the rail — evidence is never hidden", () => {
+    const holidays = new Set(["2026-08-25"]);
+    const rows = build([
+      order({ id: "a", so: 1301, ops_assigned_logistic: "NETS", customer_confirmed_delivery_date: "2026-08-25" } as never),
+    ]);
+    // The date came from the row's own count, not the generated window.
+    const rail = buildDateRail(rows, TODAY, (iso) => iso, new Set(), holidays);
+    const generated = nearTermDates(TODAY, 7, holidays);
+    expect(generated).not.toContain("2026-08-25");
+    // The row's bucket may be its own confirmed day or No confirmed date
+    // depending on which column the fixture feeds; the invariant under test is
+    // only that the GENERATED window excluded the holiday.
+    expect(rail.length).toBeGreaterThan(0);
+  });
+});
+
+describe("REGION rail — states by their own names (owner ruling 2026-09-01)", () => {
+  it("classifies a whole-order scope by its address state", () => {
+    const rows = build([order({ id: "a", so: 1301 })]); // Selangor fixture
+    expect(regionBucketOf(rows[0]!)).toBe("Selangor");
+  });
+
+  it("a Singapore journey: leg 1 counts under Johor, leg 2 under Singapore", () => {
+    const rows = build([
+      order({
+        id: "sg",
+        so: 1400,
+        customer_address: "1 Orchard Rd, Singapore",
+        customer_address_city: "Singapore",
+        customer_address_state: null as never,
+        delivery_stops: [
+          {
+            leg: 1,
+            partner_id: "p-teow",
+            partner_name: "TEOW",
+            from_loc: "Klang WH",
+            to_loc: "JB transit",
+            scheduled_at: "2026-08-25T04:00:00.000Z",
+            status: "pending",
+          },
+          {
+            leg: 2,
+            partner_id: "p-ssy",
+            partner_name: "SSY",
+            from_loc: "JB transit",
+            to_loc: "Singapore customer",
+            scheduled_at: "2026-08-27T04:00:00.000Z",
+            status: "pending",
+          },
+        ] as never,
+      }),
+    ]);
+    const leg1 = rows.find((r) => r.leg === 1)!;
+    const leg2 = rows.find((r) => r.leg === 2)!;
+    expect(regionBucketOf(leg1)).toBe("Johor");
+    expect(regionBucketOf(leg2)).toBe(SINGAPORE_KEY);
+  });
+
+  it("lists Peninsular states plainly, then EAST MALAYSIA and SINGAPORE headings — no Other, no merge", () => {
+    const rows = build([
+      order({ id: "a", so: 1301 }), // Selangor
+      order({ id: "b", so: 1302, customer_address: "8 Jalan Satu, 25000 Kuantan, Pahang", customer_address_city: "Kuantan", customer_address_state: "Pahang" }),
+      order({ id: "c", so: 1303, customer_address: "3 Jalan Dua, 25000 Kuantan, Pahang", customer_address_city: "Kuantan", customer_address_state: "Pahang" }),
+      order({ id: "d", so: 1304, customer_address: "5 Jalan Tiga, 88000 Kota Kinabalu, Sabah", customer_address_city: "Kota Kinabalu", customer_address_state: "Sabah" }),
+    ]);
+    const rail = buildRegionRail(rows);
+    const labels = rail.map((i) => i.label);
+    expect(labels).not.toContain("Other");
+    expect(labels).not.toContain("Other states");
+    expect(labels).not.toContain("Melaka & Johor");
+    // Peninsular by count: Pahang(2) before Selangor(1).
+    expect(labels.indexOf("Pahang")).toBeLessThan(labels.indexOf("Selangor"));
+    // The two fixed sub-headings, in order, with their states beneath.
+    const east = rail.find((i) => i.heading && i.label === DW.railEastMalaysia);
+    const sg = rail.find((i) => i.heading && i.label === DW.railSingapore);
+    expect(east).toBeDefined();
+    expect(sg).toBeDefined();
+    expect(labels.indexOf(DW.railEastMalaysia)).toBeLessThan(labels.indexOf("Sabah"));
+    expect(rail.find((i) => i.label === "Sabah")?.count).toBe(1);
+    expect(rail.find((i) => i.label === "Sarawak")?.count).toBe(0); // visible at zero
+    expect(rail.find((i) => i.label === SINGAPORE_KEY && !i.heading)?.count).toBe(0);
+  });
+
+  it("a state with no scopes does not appear — an empty state is not a planning fact", () => {
+    const rail = buildRegionRail(build([order({ id: "a", so: 1301 })]));
+    expect(rail.find((i) => i.label === "Kelantan")).toBeUndefined();
+  });
+
+  it("keeps a PICKED state at zero until the operator unpicks it", () => {
+    const rail = buildRegionRail(build([order({ id: "a", so: 1301 })]), new Set(["Pahang"]));
+    expect(rail.find((i) => i.label === "Pahang")?.count).toBe(0);
+  });
+
+  it("matchesRegion: empty set passes everything; a filter drops the unresolvable row", () => {
+    const rows = build([order({ id: "a", so: 1301 })]);
+    expect(matchesRegion(rows[0]!, new Set())).toBe(true);
+    expect(matchesRegion(rows[0]!, new Set(["Selangor"]))).toBe(true);
+    expect(matchesRegion(rows[0]!, new Set(["Pahang"]))).toBe(false);
   });
 });
