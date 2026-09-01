@@ -59,7 +59,10 @@ function order(over: Partial<Order> & { so: number; status: Order["status"] }): 
     doNote: null,
     invoiceNo: null,
     invoicedAt: null,
-    placedAt: new Date(NOW - 86_400_000).toISOString(),
+    // The board is scoped to the current month. Keeping the fixture inside that
+    // month prevents the 1st of each month from turning "yesterday" into an
+    // unrelated previous-month order.
+    placedAt: new Date(NOW).toISOString(),
     lineCount: 2,
     totalAmount: 3000,
     ...over,
