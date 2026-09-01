@@ -303,3 +303,24 @@ describe("the reply proof is an UPLOAD, not a typed path (Delivery Card 05)", ()
     expect(screen.getByTestId("edit-delivery-proof").querySelector("input[type='text']")).toBeNull();
   });
 });
+
+describe("condominium registration (Delivery Card 06, 0412)", () => {
+  it("offers the registration field on a CONDO delivery and sends it on save", () => {
+    wrap();
+    const field = screen.getByTestId("edit-delivery-condo-registration");
+    fireEvent.change(field, { target: { value: "Guard house permit GH-88, register before 10am" } });
+    fireEvent.click(screen.getByTestId("edit-delivery-save"));
+    const payload = saveMutate.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.condoRegistration).toBe("Guard house permit GH-88, register before 10am");
+  });
+
+  it("offers no registration field on a landed house", () => {
+    detailState.data = {
+      order: { ...ORDER, building_type: "Landed" },
+      arrangement: null,
+      history: [],
+    };
+    wrap();
+    expect(screen.queryByTestId("edit-delivery-condo-registration")).toBeNull();
+  });
+});
