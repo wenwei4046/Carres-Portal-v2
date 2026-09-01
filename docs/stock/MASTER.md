@@ -1347,6 +1347,52 @@ decision; Sales Order supplies reservation/demand; Receiving and Delivery supply
 Finance owns value/COGS/turnover and acknowledged Month-end version; COO consumes cross-module
 exception/approval evidence.
 
+### 12.13 Settings, permissions and external warehouse boundary
+
+**CURRENT CARRES →** page-local settings/assignees, hard-coded staff email, shared NETS account,
+external direct status/quantity write, message-as-proof and speculative heavy WMS can fragment
+authority. NETS Warehouse and NETS Delivery acts may also be confused because one organisation
+performs both.
+
+**2990 / MATURE ERP LESSON →** keep governed warehouse/Site master, explicit action permissions,
+structured reasons, source documents and actor history. Mature 3PL control separates organisation,
+person, role, Site, active dates and evidence; API/offline submissions are attributable,
+idempotent and validated. Reject broad warehouse administrator access, Carres maintenance of NETS
+internal Rack/Bin/labour, shared login, direct external overwrite and future-only WMS complexity.
+
+**RULING → ADAPT + RESTRICT + FUTURE-PROOF + REJECT.** Warehouse has one Settings entry; Team has
+the only duty rota; People has employment/access truth. External people may submit only personally
+observed, authorised physical facts. Carres Portal validates and owns the Unit result. Partner,
+3PL or future Carres-operated warehouse changes organisation/people/Sites/permissions, not the
+Unit/Receiving/Inventory/Outbound/Count/Work/evidence contracts.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** `Page Header → Settings → Warehouse` governs `Sites &
+operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence
+· Unit ID · Permissions & approvals · External partners`. NETS Warehouse is limited to receive,
+Count/Count again, check/pack, handover, problem and evidence; NETS Delivery to collection,
+arrival, return, handover, problem and evidence. Neither may create/edit PO/SO/DO, promise, cost,
+price, ownership, Ready Stock, reservation, Adjustment/approval, payment or history. Every external
+person has personal email/name/avatar, organisation, role, Sites/journeys and active dates; one
+person with two roles records the role used on each event.
+
+**OPERATOR JOURNEY →** an external operator receives a narrow mobile actual-date page with source,
+exact Units, scan, observable outcome, evidence and submit. Partner API may propose receipt,
+collection, arrival, return, handover or proof; Portal validates organisation/person/role/Site or
+journey/source/Unit/current holder/event order/duplicate/time/evidence before acceptance. Offline
+work remains `Not submitted` and changes no truth; acceptance preserves actual scan and submitted
+times. If Carres records on behalf, it preserves recorder, actual partner/person/time, recorded time
+and evidence; a sent message alone is not proof.
+
+**UI / PAGE / OBJECT PLACEMENT →** one Warehouse Settings surface and links to Team/People; no local
+settings or copied rota. External UI omits full ERP navigation, costs, payments, unrelated Sites and
+staff work. Heavy Zone/Rack/Bin/Wave/Forklift screens remain absent until measured operational need
+supports an extension of the same Unit model.
+
+**CROSS-MODULE CONNECTION →** People owns personal/effective access; Team owns PO/GRN Duty;
+Warehouse Settings owns Site/calendar/Count/evidence/partner permission; Purchasing owns supplier/
+PO/Consignment; Receiving owns receipt; Delivery owns journey/arrival; Finance owns payment/
+settlement; COO governs approval limits and segregation.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
