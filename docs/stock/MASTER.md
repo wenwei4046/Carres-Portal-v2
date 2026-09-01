@@ -1262,6 +1262,50 @@ Receiving/Outbound/Delivery supplies actual events; Purchasing handles missing i
 consequence; COO owns Adjustment approval; Finance acknowledges and uses a version for valuation/
 submission; Reports exports but never becomes authority.
 
+### 12.11 Work, Duty Roster and automatic owner resolution
+
+**CURRENT CARRES →** page-local `assigned_to`, manager-by-manager task allocation, shared NETS
+identity, generic Due/Overdue/Next Action and Mark done can leave work with departed staff, obscure
+the actual external actor, duplicate tasks across modules and close work before the business fact
+exists. Carres currently has one Manager/COO and three staff but must continue safely with two or
+one; NETS may have many warehouse/delivery people.
+
+**2990 / MATURE ERP LESSON →** keep worker-specific work, receiving/count/outbound responsibility,
+team visibility and actor/time evidence. Mature work execution assigns by governed role/queue and
+preserves handover. Reject page-local manual assignment, dependency on a full-time warehouse
+supervisor, shared warehouse login and premature labour-planning/shift/productivity complexity.
+
+**RULING → ADAPT + IMPROVE + REJECT.** The shared Work Engine stores `Trigger · Owner rule ·
+Resolved owner · Action · Completion fact · governed actual date · source object · cover rule`.
+Duty Resolver consumes Team/People facts and automatically adapts open/future Work; completed actor
+history never changes. Routine work has no Mark done and no undated generic task.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** Team maintains the one PO Duty/GRN Duty rotation and buddy/
+cover. With three active staff, approved rotation and cover apply; with two, duties split/rotate;
+with one, the same person holds both; only zero assignable staff may produce `No active Carres staff
+can take this work` for COO attention. People `Last working date` removes a leaver from the effective
+pool and re-resolves open/future Actions. NETS physical Work begins in the authorised organisation/
+Site queue; the first personally signed-in operator who starts the scan becomes resolved actor;
+governed handover preserves both people if work changes hands.
+
+**OPERATOR JOURNEY →** My Work groups the user's own source/fact/action under actual weekday/date
+without repeating their avatar. Team Work groups the same Action set under owner avatar/full name
+and action/late counts. Cover shows normal owner and today's cover as structured metadata. Every
+Warehouse page reads the same resolved owner and completes only when its stated authoritative fact
+exists.
+
+**UI / PAGE / OBJECT PLACEMENT →** Quick Rail is `Team · Calendar · My Work · Activity`. Team is the
+only PO/GRN Duty and buddy/cover edit door; People owns active/access/last-working-date facts;
+Warehouse Settings links but copies neither. Warehouse pages render returned avatar/owner only and
+store no assignee. NETS uses individual email/name/avatar; shared `NW`/company identity and
+impersonation are invalid.
+
+**CROSS-MODULE CONNECTION →** People supplies effective people facts; Team owns Duty Roster;
+Work Engine owns Action/date/owner/cover/completion; Purchasing consumes PO Duty; Receiving/Stock
+consumes GRN Duty and individually identified NETS operators; Delivery consumes its own journey
+owner rules; COO handles approvals and the genuine zero-staff exception rather than routine task
+assignment.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
