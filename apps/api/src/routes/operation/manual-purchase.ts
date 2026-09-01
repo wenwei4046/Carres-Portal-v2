@@ -1005,19 +1005,41 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     });
     if (!error) return c.json(data);
 
-    /* ⛔ MERGED IS NOT APPLIED. `0410` is applied by hand, so this build can
-       reach production before the function exists. PostgREST answers a missing
-       function with `PGRST202`; Postgres itself with `42883`. Either one means
-       "the migration has not run", NOT "this request is bad" — so the route
-       degrades to the header-only door it has always had, and the operator
-       keeps working. Every OTHER error is a real refusal and is returned.
-       This branch dies the day `0410` is applied everywhere; it is cheap, and
-       the alternative is a create form that 404s for a day. */
+    /* ⛔ MERGED IS NOT APPLIED — and DEGRADING IS NOT DROPPING (YH,
+       2026-09-01, correcting the same day's own change).
+
+       The first version of this branch fell through to the header-only door
+       when `0410` was missing, on the reasoning that a create form which 404s
+       for a day is worse than one that degrades. That reasoning was right and
+       the implementation was wrong: the header-only door cannot write lines,
+       and the browser is the only caller and ALWAYS sends them. So a missing
+       migration produced a `200`, an empty request, and a form that ticked
+       every line as created. An approver could then approve a purchase with
+       no items, and it would read `Ready to order` for ever.
+
+       "Degrade, not abort" means keep working with LESS, never claim to have
+       done something you did not do. Silence about dropped lines is the
+       worse failure of the two — a 404 is visible in a second, an empty
+       approved purchase is found weeks later by somebody wondering why
+       nothing arrived.
+
+       So a missing function is now a REFUSAL that names itself. The
+       header-only path below survives for the caller that genuinely sends no
+       lines, which is the only caller it can serve honestly. */
     const code = String((error as { code?: string }).code ?? "");
-    if (code !== "PGRST202" && code !== "42883") {
-      const m = mapPgError(error);
-      return c.json(m.body, m.status);
+    if (code === "PGRST202" || code === "42883") {
+      return c.json(
+        {
+          error: "migration_not_applied",
+          code: "migration_not_applied",
+          message: "This Manual Purchase was not created.",
+          action: "Ask IT to apply migration 0410, then send it again.",
+        },
+        503,
+      );
     }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
   }
 
   const { data, error } = await sb.rpc("purchasing_create_request", header);
