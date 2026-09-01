@@ -44,33 +44,46 @@ correction pass. **Your job is the open items in it, not a re-audit.**
 
 ## 2 · CURRENT STATUS — measured 2026-09-01, re-measure before use
 
-⛔ **MERGED IS NOT APPLIED. Do not read this table as "live."**
-Every row below is on `origin/main`. Whether the *database* has it is a separate
-question with a separate answer, because §4 is true: migrations here are applied
-BY HAND in the Supabase SQL editor, and a hand-applied migration leaves **no row
-in the tracker**.
+⛔ **MERGED IS NOT APPLIED — and on 2026-09-01, TWO of these were not.**
+Measured against the live database, not the tracker (the tracker records none of
+this lane's work, because §4 is true: migrations here are applied BY HAND and a
+hand-applied one leaves no row).
 
-Measured against the tracker on 2026-09-01: **not one migration this lane wrote
-appears in it** — `0391`, `0393`, `0394`, `0395`, `0406` are all absent, and so
-are `0387`–`0389` and `0405` from neighbouring lanes. Everything else in the
-same window (`0376`–`0404`) is present. So absence here is the tracker's normal
-behaviour for hand-applied work, **not evidence of a missing migration** — and
-equally, not evidence of a present one. The tracker cannot answer this. Ask the
-database directly, with the probes in the last column.
-
-| Shipped | What it does | Applied? — ask the DB, not the tracker |
+| Shipped | What it does | In the database? |
 |---|---|---|
-| `0391` | Office create requires a Proceed date; a blank one may be filled in ONCE, then locks | **Likely yes** — YH exercised the refusal on the site |
-| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move | **Likely yes** — the fee reached the MONEY card and a payment door |
-| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded | **Likely yes** — removal was clicked and held. Probe: `select to_regprocedure('public.remove_order_addon(uuid,uuid)')` |
-| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database | ⚠️ **UNVERIFIED, and this is the one that matters.** Only the UI half was ever exercised — the SQL half cannot be reached from the screen *because* the UI hides the button. Probe: `select public.addon_is_server_computed('STAIR_CARRY')` — an error means the guard is not there and the doubling bug is still open in the database |
+| `0391` | Office create requires a Proceed date; a blank one may be filled in ONCE, then locks | ✅ **applied** — `sales_order_create_unchecked_0374` exists |
+| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move | ✅ **applied** — `order_stamp_stair_carry` exists |
+| `0395` | A misclicked service can be removed | 🔴 **NOT APPLIED** — `remove_order_addon` does not exist |
+| `0406` | A computed fee is not a pickable service — the doubling bug | 🔴 **NOT APPLIED** — `addon_is_server_computed` does not exist |
 | — | ~20 banned words removed across Workspace, Revisions ledger and Order Route | code only, no migration |
-| — | Revisions/History gained loading + error guards (a 403 used to render as "No revisions recorded") | code only, no migration |
+| — | Revisions/History gained loading + error guards | code only, no migration |
 | — | The Order Route asks the shared money predicates instead of re-deciding them | code only, no migration |
 
-**`0406` is the live risk in this table.** Its own header says a hidden button is
-not a rule; if the migration never ran, that sentence describes the current
-production state. One `select` settles it. Run it before anything else in §6.
+**What that means, today.**
+
+- **`Remove` is a broken button in production.** `SalesOrderAddons.tsx` ships it,
+  the API route calls `sb.rpc("remove_order_addon", …)`, and the function is not
+  there. Every click errors. Visible, harmless, embarrassing.
+- **The doubling bug is OPEN in the database.** Silent, and it costs money. The
+  UI hides the control on the office screen — but a hidden button is not a rule,
+  which is the sentence `0406`'s own header opens with.
+
+**Re-measure this table before trusting it. One paste, never errors:**
+
+```sql
+select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname in ('addon_is_server_computed',
+   'remove_order_addon', 'sales_order_create_unchecked_0374',
+   'order_stamp_stair_carry') order by 1;
+```
+
+A name missing from the result is a migration that never ran.
+
+⭐ **THE LESSON, because §4 predicted this and it happened anyway.** §4 says code
+has reached production ahead of its migration before and broke order submission.
+It just did it twice more, and neither was noticed for four days — because the
+merge is visible and the apply is not. **A PR merging is not a feature shipping.**
+Until the probe above names your function, you have shipped a screen, not a rule.
 
 **Three owner rulings are LAW in `docs/orders/MASTER.md`** (YH, 2026-08-28):
 stair carry is money the customer owes · a date never recorded is not a date that
