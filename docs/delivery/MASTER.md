@@ -603,6 +603,39 @@ Future Partner APIs use authenticated Partner scope, assignment checks, idempote
 external reference, received time, governed state transitions, proof rules and append-only audit.
 They call the same business actions and never write a derived status directly.
 
+### WAREHOUSE SCHEDULE AND PARTNER PROJECTION — controller lock 2026-09-01
+
+**Warehouse Schedule is shared dated goods visibility, not Work.** It may read Delivery facts but
+must not become a local queue, invent an owner/action, or write an arrangement, date, handover or
+proof. The stable read contract is one row per **assigned exact Unit** and Delivery scope
+`(order_id, leg)`, carrying only:
+
+- the permanent Carres Unit ID from Stock's allocation;
+- the planned collection date when Delivery has explicitly recorded one, and the confirmed
+  customer handover date from the Delivery arrangement — never the Sales promise as a substitute;
+- actual collection and actual customer arrival from their append-only event timestamps — never
+  the time a user later entered the record;
+- the assigned Logistics Partner, Delivery Order number and source Sales Order;
+- admitted handover/delivery evidence and doors to the exact Delivery scope, DO and source order.
+
+Absence stays absence. The current arrangement has a confirmed customer date/time but no dedicated
+planned-collection field, and the current whole-order allocation read does not bind an exact Unit
+to one split-trip DO. A Warehouse projection must print **Not recorded** or omit such a row; it may
+not infer a collection day, copy a PO ETA, or attach an order-level Unit to an arbitrary split DO.
+Those gaps are completed only by extending Delivery's one arrangement/DO contract and Stock's one
+Unit allocation contract — never by a Warehouse writer.
+
+The Logistics Partner boundary is the same projection narrowed by authenticated assignment. A
+Partner sees only its assigned delivery/transfer rows and only the customer, handling and evidence
+fields admitted for that act. Unrelated customers, Stock, money, commercial terms and internal
+notes never cross that boundary. Signed evidence upload/view doors recheck the exact assigned
+scope; knowing a storage path is not permission.
+
+Visible Stock may say **On the way** only after confirmed collection and before confirmed arrival.
+A future booked Delivery, assigned Partner or confirmed customer date does not make goods On the
+way. Delivery exposes the append-only collection/arrival facts; Stock owns the resulting custody
+and visibility word and Delivery never writes or re-derives it.
+
 ## 14 · Current versus intentional future
 
 **CURRENT:** NETS is Klang Valley default/main; NETS contacts the customer; Operations may record
