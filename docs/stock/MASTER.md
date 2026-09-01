@@ -719,10 +719,51 @@ The shared **Team** duty door remains the one place to view or correct PO Duty, 
 buddy/cover. The governed **People** record supplies active status, access and last working date.
 Warehouse Settings links to those homes and must not copy either rota or employment truth.
 
-Carres Portal is the minimum control plane. NETS receives narrow mobile Work, scan, observable
-outcome and evidence surfaces, not the full ERP. Optional APIs may propose events but cannot
-overwrite Unit truth. Offline scans remain visibly Not submitted and non-authoritative until
-submission; actual and submitted times are separate.
+### External warehouse / NETS Portal boundary
+
+Carres Portal is the Stock authority and minimum control plane. NETS or another future partner
+receives narrow mobile Work, scan, observable outcome and evidence surfaces, not the full ERP and
+not a second inventory ledger.
+
+The permitted external work is deliberately small and written as actual dated actions:
+
+- **NETS Warehouse:** receive and check the listed Units; Count or Count again; check and pack the
+  listed Units; hand them to the named next party; report an observable problem; add the required
+  scan, photo, receiver and factual note.
+- **NETS Delivery:** collect the listed Units; record actual collection; record actual arrival or
+  return; identify the person who handed over and received; report an observable problem; add the
+  required scan, photo and proof.
+
+An external operator may submit only the fact they personally observed. They cannot create or edit
+a PO, SO, DO, customer promise, cost, price, settlement, ownership, Ready Stock decision,
+reservation, Stock Adjustment or approval. They cannot rewrite Unit History, delete an event or
+move a Unit merely by changing a status. A validated receipt, collection, arrival, return or
+handover event is what changes the authoritative holder.
+
+NETS is an organisation, never one user. Every person signs in with their own email and carries
+their own name/avatar, organisation, authorised role, governed Sites and active dates. A person may
+hold both NETS Warehouse and NETS Delivery roles, but every event records the role used for that
+act. Shared login, shared avatar and impersonation are forbidden. Removing or expiring one person
+stops future access without erasing their historical evidence.
+
+Optional partner APIs may **propose** receipt, collection, arrival, return and proof events. Before
+acceptance, Portal validates the partner organisation, individual operator, active role, permitted
+Site/journey, source document, exact Unit ID, event order, duplicate submission, actual time,
+evidence and current holder. An integration may never overwrite the Unit Register, Ready Stock,
+reservation, approval, Count/Adjustment, append-only history or a previous event.
+
+Offline scans remain visibly `Not submitted` and change no inventory fact until Portal accepts
+them. Every accepted offline event preserves both the actual scan time and submitted time; a late
+upload cannot pretend it was submitted on time.
+
+Where a partner cannot use Portal, an authorised Carres operator may record the partner's physical
+fact on its behalf only when the record identifies the Carres recorder, actual partner
+organisation, actual external person where known, actual event time, recorded time and minimum
+evidence. A sent message or WhatsApp request alone is not receipt, handover or delivery proof.
+
+The same contract is future-ready. Replacing NETS with another 3PL, or operating a Carres warehouse
+in the future, changes the operating organisation, people, Sites and permissions; it does not
+change the Unit, Receiving, Inventory, Outbound, Count, evidence or Work Engine contracts.
 
 The model never hard-codes NETS. Site, operating party, role, permission, calendar and evidence
 remain separate. Current scope rejects unproven heavy-WMS bin, rack, put-away, pick-wave, forklift
