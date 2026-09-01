@@ -704,3 +704,76 @@ describe("Sales Order record grammar contract", () => {
     expect(workspace).toContain('disabled={mode === "oldrev"}');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ONE FORM, ONE GRAMMAR (YH, 2026-09-01)
+
+   Three separate reports about the same page, and they turn out to be one
+   complaint: the Order screen was drawn in two grammars and the reader had to
+   learn by trial which shapes accept typing.
+
+   These are SOURCE SCANS, like the alignment pin above, for the same reason —
+   jsdom computes no layout, so a render test cannot see that two boxes wear
+   different skins, and mounting this 3,100-line workspace to prove a border is
+   the wrong price. Each assertion names the ONE token a later edit would flip
+   back, and each has an inverted half so the old shape cannot return quietly.
+   ═════════════════════════════════════════════════════════════════════════ */
+describe("Sales Order object page — one form grammar", () => {
+  it("draws a recorded answer in the same box as the question that would ask it", () => {
+    /* `Fact` is the page's read-only field. It must render through the kit's
+       own frame and the kit's own control skin — the point is that there is
+       ONE skin and this shares it, so a change to the control travels here
+       instead of leaving a second, drifting copy behind. */
+    expect(workspace).toContain('import FieldFrame from "@/components/kit/FieldFrame"');
+    expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
+    expect(workspace).toContain('data-kit="readonly-field"');
+    expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
+    /* Announced as what it is drawn as. A box that looks typable and reads to
+       a screen reader as loose text is the same defect in the other channel. */
+    expect(workspace).toContain('role="textbox"');
+    expect(workspace).toContain("aria-readonly");
+    /* THE OLD SHAPE: a bare micro-label with body text under it, no box. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">{label}</div>');
+  });
+
+  it("prints a service by its name and never by its database key", () => {
+    /* The Goods table printed `a.addon_key` in the Item column — the raw key,
+       where every goods row prints a product name — while `SalesOrderAddons`
+       eighty pixels below printed the catalog name for the same row from the
+       same bundle. One record, two names, and the key was the one on top.
+       ONE map, read by both, so they cannot disagree again (Law D). */
+    expect(workspace).toContain("const addonNameByKey = useMemo(");
+    expect(workspace).toContain("addonNameByKey.get(a.addon_key) ?? a.addon_key");
+    /* The service row now wears the goods row's own cells: the CJK face on the
+       item, and the second line where a goods row already puts its config. */
+    expect(workspace).toContain("cjkClassName(serviceName)");
+    /* THE OLD SHAPE: the key rendered straight into the Item cell. */
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">{a.addon_key}</td>');
+    /* COPY-STANDARD:1679 — `Not recorded` is the ONE absence word, and the
+       bare `—` the service row used sits in that row's `Do NOT use` column. */
+    expect(workspace).not.toContain('<td className="py-1.5">—</td>');
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
+  });
+
+  it("puts the salesperson door beside the salesperson, not in a row of its own", () => {
+    /* The page's own grammar: `Change delivery date` sits under the date it
+       moves. The ownership door now sits under the name it moves, in the same
+       quiet text shape, and the lane below keeps only the request panel —
+       which is truth and does deserve its rule. */
+    expect(workspace).toContain("inlineTrigger={false}");
+    expect(workspace).toContain("openSignal={attributionSignal}");
+    expect(workspace).toContain("setAttributionSignal((n) => n + 1)");
+    expect(workspace).toContain("Change salesperson");
+    /* GATE 3's rule is imported, never re-typed — one rule, one place. */
+    expect(workspace).toContain("useCanChangeSalesOwnership");
+    expect(attribution).toContain("export function useCanChangeSalesOwnership()");
+    /* THE OLD SHAPE: a hairline drawn across the lane whether or not anything
+       is in it, which is what gave one button a section of its own. */
+    expect(attribution).not.toContain(
+      '<div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="attribution-lane">',
+    );
+    expect(attribution).toContain(
+      'className={request ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}',
+    );
+  });
+});
