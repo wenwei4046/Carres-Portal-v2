@@ -428,9 +428,14 @@ hold only one carrier for a two-leg Journey, kept no history, and had two writer
 
 ```
 one 50px Destination Header  ·  Delivery
-200px local rail             ·  DELIVERY SCHEDULE + LOGISTICS, page-owned FILTERING
+local rail (the shared governed rail recipe, 240px) ·
+                                DELIVERY SCHEDULE + REGION + LOGISTICS, page-owned FILTERING
 one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
 ```
+
+The rail uses the ONE shared `RailGroup`/`RailItem` recipe every Register page uses (240px —
+the FilterRail law). The earlier page-local 200px predates that shared recipe; a page-private
+rail width would be a second rail kit, which the UI system forbids.
 
 **THE ENTRY RULE (owner ruling 2026-08-24).** A Sales Order does not become delivery work merely by
 existing. A scope enters this workspace only when it has **a delivery location/address · building
@@ -442,13 +447,35 @@ screen that no logistics operator could act on.
 **The rail.** `DELIVERY SCHEDULE` lists `No confirmed date`, then **`Overdue`** (renamed from
 `Date passed`), then the actual weekday + calendar dates ascending — **never Today, never
 Tomorrow** — and it shows the **near-term operating dates even when their count is zero**, because
-a planner has to be able to see that a day is free. The schedule reads **`Confirmed Delivery`**,
-never the customer's promised date. `LOGISTICS` lists `All`, then the governed partners
+a planner has to be able to see that a day is free. **The generated window is the next seven
+OPERATING days (owner ruling 2026-09-01): logistics runs six days, so a Sunday or a Malaysian
+public holiday is never offered as a plannable choice** — the same calendar
+`ACTION-FLOW-STANDARD.md` Law 2A already states. A scope genuinely recorded on a Sunday or
+holiday still reaches the rail through its own count: evidence is never hidden, only the empty
+generated choice is. The schedule reads **`Confirmed Delivery`**,
+never the customer's promised date.
+
+**`REGION` (owner ruling 2026-09-01)** sits between the schedule and the partners and answers
+*where is each scope going?* in the words the address actually carries:
+
+- **Peninsular states are listed by their own names, never merged and never bucketed under an
+  `Other`** — a state appears while it genuinely holds a scope (the same admission rule the
+  LOGISTICS rail applies to a partner outside the governed roster), ordered by count.
+- **`EAST MALAYSIA` is a fixed sub-heading with Sabah and Sarawak beneath it, always visible** —
+  it is a DIFFERENT journey (HOUZS owns it beyond the handover), not just another state.
+- **`SINGAPORE` is a fixed sub-heading with Singapore beneath it, always visible** — the two-leg
+  journey's home. **Leg 1 (KL → JB) counts under Johor** — the truck the planner sees on the JB
+  run — **and leg 2 under Singapore.**
+- State detection reuses the ONE address classifier; a row whose address resolves to no state
+  joins no region row and stays reachable through `All` — fixing its address is Sales work
+  through `Open Sales Order to change`.
+
+`LOGISTICS` lists `All`, then the governed partners
 **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**, then any other
 partner while it is genuinely carrying a scope, then `No logistics picked` when scopes have none.
-The two groups COMBINE, each group's counts are computed over the rows the other has already
+The three groups COMBINE, each group's counts are computed over the rows the others have already
 narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.** Choices ride
-the URL (`?date=` · `?logistics=`).
+the URL (`?date=` · `?region=` · `?logistics=`).
 
 **One parent row = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
 rows, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the
@@ -786,9 +813,14 @@ explicitly excluded from current truth rather than deferred blind spots.
 backward planning §5.1, partner calendars §11, absolute money gate §3) are persisted and the
 contradicting older text in this MASTER, `../orders/MASTER.md`, `../payment/MASTER.md`,
 `../ERP-ARCHITECTURE.md`, `../COPY-STANDARD.md`, `../ACTION-FLOW-STANDARD.md`, `../ui/MASTER.md`
-and `../workspace/BLUEPRINT.md` is overwritten. One named coverage item awaits an owner
-statement of fact — the East Malaysia journey boundary (which partner carries, and where
-Carres' governed facts end); East Malaysia is not in current governed coverage until ruled.
+and `../workspace/BLUEPRINT.md` is overwritten. **The East Malaysia journey boundary was ruled
+the same day (owner approval 2026-09-01): an East Malaysia (Sabah / Sarawak) order travels
+through HOUZS — Carres hands the goods to HOUZS with exact-Unit handover facts and proof, and
+HOUZS owns the onward journey and the customer contact, the same shape as the Singapore
+partner-warehouse boundary. Carres' governed facts end at the HOUZS handover and the arrival
+proof HOUZS returns.** Falsifier: an actual East Malaysia delivery carried by another partner,
+or Carres contacting the East Malaysia customer directly, overturns this.
+No unresolved Owner Decision remains.
 This MASTER persists the approved operating model only. It does not authorise Cards,
 implementation sequencing, migration or build work.
 
@@ -813,3 +845,20 @@ in production and has been verified through an authenticated Operations session:
 This closure records only the production slice above. It does not claim that the remaining
 Partner arrangement, proxy-recording, proof, exception, Settings, Reports or future Portal/API
 capabilities in this Blueprint are already built.
+
+**DEPLOYED 2026-09-01 — Delivery Card 03, PR #1042, main SHA
+`668be4ee355e49755a9bc5794aca3e3b2e0f16ee`, production converged (deploy probe 14:32).**
+Migration `0411` was verified in a rolled-back production transaction (columns · seeds ·
+Sunday-pickup CHECK · anonymous-caller 42501, rollback clean), then applied as the exact
+committed file under owner approval; the tracker tail reads `0411` and the TEOW/TT calendar
+seeds were measured live. Assign logistics now shows the §5.1 backward-calculation fact for a
+calendar partner. The calendar EDITOR is deliberately deferred to the Delivery Settings card.
+
+**DEPLOYED 2026-09-01 — Delivery convergence (the #999 takeover), PR #1043, main SHA
+`b0a1fb392caaba19f006f5d48735339cb12185e0`, production converged.** Kept: My Work / Team Work
+deep-links to the exact arrangement/DO, `Record Delivery Result` with evidence and exact
+reserved Units, the DO header's next handover act, exact source-order doors, the read-only
+Warehouse Schedule feed and the narrow-layout rail control. Reverted before merge, per the
+owner's takeover instruction: the `Delivery Status → Work` column rename and the
+hide-empty-rail-choices change. PR #999 is closed with a pointer; split-trip DOs still do not
+expose Delivery Result (order-scoped writers — a named follow-up, not an accident).

@@ -259,6 +259,40 @@ describe("the shape", () => {
     expect(screen.getByTestId("delivery-logistics-all")).toBeTruthy();
   });
 
+  it("REGION lists real states plainly, with the EAST MALAYSIA and SINGAPORE headings (owner 2026-09-01)", () => {
+    ordersState.data = {
+      orders: [
+        order({ id: "a", so: 1322 }), // Selangor fixture
+        order({
+          id: "b",
+          so: 1323,
+          customer_address: "8 Jalan Satu, 25000 Kuantan, Pahang",
+          customer_address_city: "Kuantan",
+          customer_address_state: "Pahang",
+        }),
+      ],
+    };
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-work-rail");
+    expect(within(rail).getByText("REGION")).toBeTruthy();
+    expect(screen.getByTestId("delivery-region-Selangor")).toBeTruthy();
+    expect(screen.getByTestId("delivery-region-Pahang")).toBeTruthy();
+    // No invented buckets, ever.
+    expect(within(rail).queryByText(/^other/i)).toBeNull();
+    // The two fixed sub-headings and their always-visible rows.
+    expect(screen.getByTestId("delivery-region-heading-__east__").textContent).toBe("EAST MALAYSIA");
+    expect(screen.getByTestId("delivery-region-heading-__sg__").textContent).toBe("SINGAPORE");
+    expect(screen.getByTestId("delivery-region-Sabah")).toBeTruthy();
+    expect(screen.getByTestId("delivery-region-Sarawak")).toBeTruthy();
+    expect(screen.getByTestId("delivery-region-Singapore")).toBeTruthy();
+    // A state holding nothing does not appear.
+    expect(screen.queryByTestId("delivery-region-Kelantan")).toBeNull();
+    // Clicking a state narrows the listing like the other two groups.
+    fireEvent.click(screen.getByTestId("delivery-region-Pahang"));
+    expect(screen.getByText("SO-1323")).toBeTruthy();
+    expect(screen.queryByText("SO-1322")).toBeNull();
+  });
+
   it("combines the date and the logistics filter into one question", () => {
     ordersState.data = {
       orders: [

@@ -44,6 +44,7 @@ import {
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import { orderBookingDay } from "@/lib/order-booking";
+import { detectState } from "@/lib/region";
 import type {
   DeliveryOrderAttemptRow,
   DeliveryOrderRow,
@@ -70,8 +71,15 @@ export const DW = {
   loadFailed: "Delivery could not be loaded",
   tryAgain: "Try again",
   railDate: "DELIVERY SCHEDULE",
+  railRegion: "REGION",
   railLogistics: "LOGISTICS",
   railAll: "All",
+  /** Sub-headings inside REGION (owner ruling 2026-09-01): East Malaysia is a
+   *  different journey (HOUZS owns it beyond the handover), and Singapore is
+   *  the two-leg journey — each stands visibly apart from the plain
+   *  Peninsular states, which are listed by their own names, never merged. */
+  railEastMalaysia: "EAST MALAYSIA",
+  railSingapore: "SINGAPORE",
   /** A scope Delivery has not yet fixed an operational date for. */
   noConfirmedDate: "No confirmed date",
   /**
@@ -546,6 +554,9 @@ export interface RailItem {
   key: string;
   label: string;
   count: number;
+  /** A non-clickable sub-heading row inside a rail group (REGION's
+   *  `EAST MALAYSIA` / `SINGAPORE`). It filters nothing and counts nothing. */
+  heading?: boolean;
 }
 
 /**
@@ -572,16 +583,27 @@ export interface RailItem {
 export const NEAR_TERM_DAYS = 7;
 
 /** The next `NEAR_TERM_DAYS` Delivery operating dates, excluding Sunday. */
-export function nearTermDates(todayIso: string, days = NEAR_TERM_DAYS): string[] {
+export function nearTermDates(
+  todayIso: string,
+  days = NEAR_TERM_DAYS,
+  /* Owner ruling 2026-09-01: logistics runs six days — a Sunday or a Malaysian
+     public holiday is never GENERATED as a plannable choice (ACTION-FLOW Law 2A,
+     the Delivery calendar). A scope genuinely recorded on one still reaches the
+     rail through its own count: evidence is never hidden, only the empty
+     generated choice is. */
+  holidays: ReadonlySet<string> = new Set(),
+): string[] {
   const out: string[] = [];
   const [y, m, d] = todayIso.slice(0, 10).split("-").map(Number);
   const wanted = Math.max(0, Math.trunc(days));
-  for (let i = 0; out.length < wanted; i += 1) {
+  /* The i < 60 guard is a runaway stop, far beyond any real run of closed days. */
+  for (let i = 0; out.length < wanted && i < 60; i += 1) {
     /* UTC arithmetic on a bare date: adding a day must never be a timezone
        question, and `Date.UTC` is the one place in this file that touches a
        clock-shaped API without asking what time it is. */
     const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + i));
-    if (t.getUTCDay() !== 0) out.push(t.toISOString().slice(0, 10));
+    const iso = t.toISOString().slice(0, 10);
+    if (t.getUTCDay() !== 0 && !holidays.has(iso)) out.push(iso);
   }
   return out;
 }
@@ -595,6 +617,8 @@ export function buildDateRail(
      was still on the URL — leaving an empty listing and no visible control to
      undo it. A chosen day stays on the rail at 0 until the operator unpicks it. */
   picked: ReadonlySet<string> = new Set(),
+  /** Malaysian public holidays — excluded from the GENERATED window only. */
+  holidays: ReadonlySet<string> = new Set(),
 ): RailItem[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
@@ -606,7 +630,7 @@ export function buildDateRail(
       ...counts.keys(),
       /* The near-term operating window is ALWAYS on the rail — an empty
          Thursday is a fact a planner needs, not a row to hide. */
-      ...nearTermDates(todayIso),
+      ...nearTermDates(todayIso, NEAR_TERM_DAYS, holidays),
       ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY),
     ]),
   ]
@@ -682,6 +706,108 @@ export function matchesDate(
 export function matchesLogistics(row: DeliveryScopeRow, picked: ReadonlySet<string>): boolean {
   if (picked.size === 0) return true;
   return picked.has(row.logisticsName ?? NO_LOGISTICS_KEY);
+}
+
+/* ── THE REGION RAIL — owner ruling 2026-09-01 ──────────────────────────────
+ *
+ * The rail's third group answers *where is each scope going?* in the words the
+ * address actually carries:
+ *
+ *   - Peninsular states are listed BY THEIR OWN NAMES, never merged and never
+ *     bucketed under an `Other` — a row appears while its state genuinely
+ *     holds a scope (the same admission rule the LOGISTICS rail applies to a
+ *     partner outside the governed roster).
+ *   - `EAST MALAYSIA` is a fixed sub-heading with Sabah and Sarawak beneath it,
+ *     always visible: it is a DIFFERENT journey (HOUZS owns it beyond the
+ *     handover, owner ruling 2026-09-01), not just another state.
+ *   - `SINGAPORE` is a fixed sub-heading with Singapore beneath it, always
+ *     visible: the two-leg journey's home. Leg 1 (KL → JB) counts under
+ *     Johor — the truck the planner sees on the JB run — and leg 2 under
+ *     Singapore.
+ *
+ * State detection reuses the ONE classifier (`@/lib/region` — state names,
+ * aliases, postcodes). A row whose address resolves to no state joins no
+ * region row and stays reachable through `All`; fixing its address is Sales
+ * work through `Open Sales Order to change`.
+ */
+export const EAST_MALAYSIA_STATES = ["Sabah", "Sarawak", "Labuan"] as const;
+export const SINGAPORE_KEY = "Singapore";
+
+/** The customer's own state — the STRUCTURED column first (a native order
+ *  records it directly), then the free-text classifier over the address. */
+function customerRegionOf(o: DeliveryScopeRow["o"]): string | null {
+  const stated = o.customer_address_state?.trim();
+  if (stated) {
+    if (/singapore/i.test(stated)) return SINGAPORE_KEY;
+    /* Through the classifier so an alias (`KL`, `Malacca`) lands on the one
+       canonical spelling instead of minting a second rail row. */
+    const canon = detectState(stated);
+    if (canon) return canon;
+  }
+  const text =
+    o.customer_address ??
+    [o.customer_address_line1, o.customer_address_city, stated].filter(Boolean).join(", ");
+  if (!text) return null;
+  if (/singapore/i.test(text)) return SINGAPORE_KEY;
+  return detectState(text);
+}
+
+/** The region row this scope counts under, or null when nothing resolves. */
+export function regionBucketOf(row: DeliveryScopeRow): string | null {
+  /* A Journey leg is classified by its DESTINATION — leg 1 of a Singapore
+     journey is a KL → JB run and belongs on the Johor row. */
+  if (row.legRoute) {
+    const dest = row.legRoute.split("→").pop()?.trim() ?? "";
+    if (dest && !/customer/i.test(dest)) {
+      if (/singapore/i.test(dest)) return SINGAPORE_KEY;
+      /* `JB` is the team's own word for Johor Bahru in leg routes. */
+      if (/\bJB\b|johor/i.test(dest)) return "Johor";
+      const state = detectState(dest);
+      if (state) return state;
+    }
+    /* A destination that is the customer, or resolves nowhere, falls back. */
+    return customerRegionOf(row.o);
+  }
+  return customerRegionOf(row.o);
+}
+
+export function buildRegionRail(
+  rows: DeliveryScopeRow[],
+  /* Same law as the other two rails: a picked row never disappears — a chosen
+     state stays listed at 0 until the operator unpicks it. */
+  picked: ReadonlySet<string> = new Set(),
+): RailItem[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const key = regionBucketOf(r);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const east = new Set<string>(EAST_MALAYSIA_STATES);
+  const peninsular = [...new Set([...counts.keys(), ...picked])]
+    .filter((k) => k !== SINGAPORE_KEY && !east.has(k))
+    .sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
+  const items: RailItem[] = peninsular.map((k) => ({
+    key: k,
+    label: k,
+    count: counts.get(k) ?? 0,
+  }));
+  items.push({ key: "__east__", label: DW.railEastMalaysia, count: 0, heading: true });
+  for (const s of EAST_MALAYSIA_STATES) {
+    /* Sabah and Sarawak are always visible; Labuan only while it holds one. */
+    if (s === "Labuan" && !(counts.get(s) ?? 0) && !picked.has(s)) continue;
+    items.push({ key: s, label: s, count: counts.get(s) ?? 0 });
+  }
+  items.push({ key: "__sg__", label: DW.railSingapore, count: 0, heading: true });
+  items.push({ key: SINGAPORE_KEY, label: SINGAPORE_KEY, count: counts.get(SINGAPORE_KEY) ?? 0 });
+  return items;
+}
+
+/** Does this row survive the picked regions? Empty set = everywhere. A row
+ *  that resolves to no region joins no row and survives only the empty set. */
+export function matchesRegion(row: DeliveryScopeRow, picked: ReadonlySet<string>): boolean {
+  if (picked.size === 0) return true;
+  const key = regionBucketOf(row);
+  return key != null && picked.has(key);
 }
 
 /**

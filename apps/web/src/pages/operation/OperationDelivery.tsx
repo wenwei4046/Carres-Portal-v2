@@ -110,13 +110,16 @@ import {
   buildDateRail,
   buildDeliveryScopeRows,
   buildLogisticsRail,
+  buildRegionRail,
   matchesDate,
   matchesLogistics,
+  matchesRegion,
   scopeFooter,
   DW,
   NO_LOGISTICS_KEY,
   type DeliveryScopeRow,
 } from "./delivery-work";
+import { myHolidaySet } from "@carres/shared";
 
 const STORAGE_KEY = "carres.deliveryWork.register.v1";
 
@@ -348,9 +351,14 @@ export default function OperationDelivery() {
       ),
     [searchParams],
   );
+  const regionSet = useMemo(
+    () =>
+      new Set((searchParams.get("region") ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
+    [searchParams],
+  );
 
   const toggle = useCallback(
-    (param: "date" | "logistics", key: string) => {
+    (param: "date" | "logistics" | "region", key: string) => {
       const current = new Set(
         (searchParams.get(param) ?? "").split(",").map((s) => s.trim()).filter(Boolean),
       );
@@ -365,7 +373,7 @@ export default function OperationDelivery() {
   );
 
   const clear = useCallback(
-    (param: "date" | "logistics") => {
+    (param: "date" | "logistics" | "region") => {
       const next = new URLSearchParams(searchParams);
       next.delete(param);
       setSearchParams(next, { replace: false });
@@ -373,31 +381,47 @@ export default function OperationDelivery() {
     [searchParams, setSearchParams],
   );
 
-  /* Each rail counts the rows the OTHER rail has already narrowed, so a count
-     is always what clicking it will actually produce. */
+  /* Each rail counts the rows the OTHER rails have already narrowed, so a
+     count is always what clicking it will actually produce. */
+  const holidays = useMemo(() => myHolidaySet(), []);
   const dateRail = useMemo(
     () =>
       buildDateRail(
-        rows.filter((r) => matchesLogistics(r, logisticsSet)),
+        rows.filter((r) => matchesLogistics(r, logisticsSet) && matchesRegion(r, regionSet)),
         today,
         (iso) => fmtDate(iso),
         dateSet,
+        holidays,
       ),
-    [rows, logisticsSet, today, dateSet],
+    [rows, logisticsSet, regionSet, today, dateSet, holidays],
+  );
+  const regionRail = useMemo(
+    () =>
+      buildRegionRail(
+        rows.filter((r) => matchesDate(r, dateSet, today) && matchesLogistics(r, logisticsSet)),
+        regionSet,
+      ),
+    [rows, dateSet, today, logisticsSet, regionSet],
   );
   const logisticsRail = useMemo(
     () =>
       buildLogisticsRail(
-        rows.filter((r) => matchesDate(r, dateSet, today)),
+        rows.filter((r) => matchesDate(r, dateSet, today) && matchesRegion(r, regionSet)),
         partners,
         logisticsSet,
       ),
-    [rows, dateSet, today, partners, logisticsSet],
+    [rows, dateSet, today, regionSet, partners, logisticsSet],
   );
 
   const visible = useMemo(
-    () => rows.filter((r) => matchesDate(r, dateSet, today) && matchesLogistics(r, logisticsSet)),
-    [rows, dateSet, logisticsSet, today],
+    () =>
+      rows.filter(
+        (r) =>
+          matchesDate(r, dateSet, today) &&
+          matchesLogistics(r, logisticsSet) &&
+          matchesRegion(r, regionSet),
+      ),
+    [rows, dateSet, logisticsSet, regionSet, today],
   );
 
   /** `SO No` is a door to the Sales Order — the ONLY thing that opens it. */
@@ -788,6 +812,32 @@ export default function OperationDelivery() {
                 title={`${item.count} ${item.count === 1 ? "delivery scope" : "delivery scopes"}`}
               />
             ))}
+          </RailGroup>
+          <RailGroup title={DW.railRegion}>
+            {regionRail.map((item) =>
+              item.heading ? (
+                /* A sub-heading (EAST MALAYSIA · SINGAPORE) separates the
+                   different journeys from the plain Peninsular states. It is
+                   not a filter and takes no click. */
+                <div
+                  key={item.key}
+                  className="mt-1 px-2 pt-1 text-label font-medium tracking-wide text-kit-slate-9"
+                  data-testid={`delivery-region-heading-${item.key}`}
+                >
+                  {item.label}
+                </div>
+              ) : (
+                <RailItem
+                  key={item.key}
+                  label={item.label}
+                  count={item.count}
+                  active={regionSet.has(item.key)}
+                  onClick={() => toggle("region", item.key)}
+                  testId={`delivery-region-${item.key}`}
+                  title={`${item.count} ${item.count === 1 ? "delivery scope" : "delivery scopes"}`}
+                />
+              ),
+            )}
           </RailGroup>
           <RailGroup title={DW.railLogistics}>
             <RailItem
