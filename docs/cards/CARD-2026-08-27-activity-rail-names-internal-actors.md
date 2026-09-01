@@ -2,7 +2,7 @@
 
 **Module:** Shared ERP UI / Operation shell (Activity rail) · **Surface:** Quick Rail Activity
 panel and its API read
-**Status:** QUEUED — recorded 2026-08-27; **owner review required before build. NOT LAW.**
+**Status:** EXECUTED — built 2026-09-01 on the owner's instruction ("show activity rail names then"). See §Execution at the foot.
 **Lane:** BUILD / DELIVERY (after owner approval)
 **Found by:** the operation-reader acceptance walk of
 `CARD-2026-08-27-sales-order-revisions-history-readable-records.md` (§11.7), while tracing why a
@@ -37,3 +37,45 @@ only `(id, name)` for internal-staff rows, only to operation/principal JWTs.
 
 The Activity rail stays a read-only preview (`ui/MASTER.md` §5); no new writer, no new event
 source, no change to what events are shown — only to whether the person who acted is named.
+
+---
+
+## Execution — 2026-09-01
+
+**Built as scoped, with one correction to the plan.**
+
+- The rail's lookup (`apps/api/src/routes/operation/activity.ts`) and the PO
+  audit's (`apps/api/src/routes/operation/pos.ts` — the `~line 1252` §1 asked
+  to confirm; the file had drifted) both go through `resolveActorNames`.
+- **§2b honoured:** the resolver was EXTRACTED to
+  `apps/api/src/lib/actor-names.ts` rather than copied a third time. Its two
+  Sales Order callers are unchanged.
+- **No migration.** `0390` exists and is untouched, exactly as §2 predicted.
+
+**⛔ THE CORRECTION, and it is the part worth keeping.** §2a says to route the
+lookups "through the existing door". Doing literally that — swapping in a bare
+`actor_display_names` call — would have been a regression wearing a fix's
+clothes. The door answers for internal staff ONLY, by design (`0390` returns no
+dealer-side rows), while `0211`'s triggers stamp salesperson ids straight into
+this feed and a PRINCIPAL reader names those people today. A door-only fix
+would have fixed the operation reader by breaking the principal one. The
+resolver's second source (`salespersons`) is what makes the swap safe for both,
+and a negative control pins it: replacing the resolver with the door alone
+fails the salesperson case.
+
+**One behaviour change beyond the card, stated because it is not a no-op.** The
+PO audit route printed `name || email`, so a staff row with no name showed an
+email address as if it were a person's name. The door returns no email, so an
+unresolved actor is now simply unnamed — which is what every other record
+reader already does. PII left an audit screen; nothing else moved.
+
+**Not built, and named so the next reader does not think they were missed.**
+Eleven other routes carry the same plain `app_users` read.
+`warehouse-receipts.ts:167` is the cleanest next win — a warehouse submitter is
+invisible to the ops receiving queue and the door does answer for `warehouse`.
+`routes/orders.ts:4255` is affected and must NOT be converted the same way:
+dealer and salesperson JWTs reach it and the door answers them zero rows. §3's
+boundary governed this build.
+
+**Walked as an operation account, per §2c** — a principal login cannot see this
+class of defect, which is why it survived long enough to need a card.

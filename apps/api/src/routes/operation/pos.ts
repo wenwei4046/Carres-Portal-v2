@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
   assignPickupPartnerInput,
@@ -1261,23 +1262,24 @@ operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
       ].filter((id): id is string => typeof id === "string" && id.length > 0),
     ),
   ];
-  const names = new Map<string, string>();
-  if (userIds.length > 0) {
-    const { data: users, error: usersError } = await sb
-      .from("app_users")
-      .select("id, name, email")
-      .in("id", userIds);
-    if (usersError) {
-      const mapped = mapPgError(usersError);
-      return c.json(mapped.body, mapped.status);
-    }
-    for (const user of (users ?? []) as Array<Record<string, unknown>>) {
-      const label =
-        ((user.name as string | null) ?? "").trim() ||
-        ((user.email as string | null) ?? "").trim();
-      if (label) names.set(user.id as string, label);
-    }
-  }
+  /* ⭐ THE SAME RESOLVER THE RAIL AND THE SALES ORDER RECORDS USE
+     (CARD-2026-08-27 §1, built 2026-09-01). This carried the identical defect:
+     a plain `app_users` read under the caller's JWT, so `0235`'s peers policy
+     left every principal actor unnamed on a PO's own audit — including the one
+     acting under `0403`'s operations-superuser authority, which is precisely
+     the act an audit exists to attribute.
+
+     ⚠️ THE EMAIL FALLBACK GOES WITH IT, and that is a deliberate improvement
+     rather than a loss. This printed `name || email`, so a staff row with no
+     name showed an email address as if it were a person's name — PII on an
+     audit screen, and not a governed word. An unresolved actor now simply has
+     no name, which every other record reader already treats as the honest
+     answer (`Staff identity not recorded`) instead of a guess.
+
+     ⛔ NOT a bare `actor_display_names` call, for the same reason as the rail:
+     the door is internal-staff only, and the resolver's second source keeps
+     sales-side actors named for a principal reader. */
+  const names = await resolveActorNames(sb, userIds);
   return c.json({
     revisions: revisions.map((row) => ({
       ...row,
