@@ -122,10 +122,35 @@ collect customer balance          → Payment ownership rule
 confirm delivery appointment      → Delivery ownership rule
 ```
 
-The rule resolves automatically. Staff do not assign routine work order by order. People owns the
-roster, duty and buddy/cover facts; the Work Engine applies them so absence changes who sees today's
-work without changing the underlying business record or rewriting its history. A manager may see or
-filter the resolved owner, but Work never creates a second assignment truth.
+The rule resolves automatically. Staff do not assign routine work order by order. **People owns
+identity, active/access status, last working date and membership of the assignable Carres staff
+pool. Team is the one duty door and owns the PO Duty / GRN Duty rotation plus buddy/cover override.**
+The shared Duty Resolver combines those facts with the action date; the Work Engine applies the
+answer so absence or offboarding changes who sees open work without changing the underlying
+business record or rewriting its history. The COO may see, filter or govern the resolved owner, but
+Work never creates a second assignment truth.
+
+**EVERY ACTION-BEARING PAGE CONSUMES THE SAME RESOLVED OWNER — OWNER-APPROVED / LOCKED
+2026-09-01.** Dashboard, Inbound, Inventory, Outbound, Purchasing, Receiving, Delivery, My Work,
+Team Work and every future page may render an owner/avatar only from the shared Action contract
+returned by the Work Engine. The page supplies or reads `Trigger · Owner rule · Completion fact ·
+governed date · source object`; it does not query the rota, calculate PO/GRN offsets, save a local
+`assigned_to`, copy a roster or invent a fallback person. The Duty Resolver returns the same answer
+for the same action date on every surface.
+
+```
+People: active staff + last working date + access
+→ Team: PO Duty + GRN Duty + buddy/cover
+→ Shared Duty Resolver: resolved owner for the action date
+→ Work Engine: one Action contract
+→ every page: the same avatar, action and completion fact
+```
+
+An open action re-resolves when active staff, duty or cover changes. A completed action and every
+historical receipt, count, handover and approval retain the actual actor and cover evidence forever.
+With at least one assignable staff member, a routine PO/GRN-owned action may not render
+`Not assigned`; zero assignable staff is the only valid exception and must deep-link to the governed
+People/Team correction door.
 
 Keep these identities separate: object PIC/accountability · action owner · fault owner · cost
 bearer · service provider. A module may summarise another module's action and owner, but the module

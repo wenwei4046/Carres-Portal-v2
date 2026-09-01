@@ -274,7 +274,10 @@ The Inventory rail finds Units. Quick Rail finds actions. Calendar shows dated C
 arrival, return, inspection, repair, supplier collection and month-end commitments.
 
 Warehouse does not create another rota. It consumes the one approved PO Duty / GRN Duty rotation
-from `../purchasing/MASTER.md` §2.2:
+through the shared Duty Resolver and Work Engine governed by `../ERP-ARCHITECTURE.md` Law F. Team is
+the one duty edit door; People supplies active/access and last-working-date facts; Warehouse pages
+may only render the returned resolved owner/avatar. The duty model itself remains in
+`../purchasing/MASTER.md` §2.2:
 
 - NETS's individually identified operator performs the physical count or recount.
 - The current GRN Duty investigates a persistent Stock difference and, when evidence cannot resolve
