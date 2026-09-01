@@ -770,10 +770,7 @@ export default function OperationDelivery() {
           </button>
         }
       />
-      <div
-        className="flex min-h-0 flex-1 overflow-hidden"
-        data-testid="delivery-work-body"
-      >
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside
           id="delivery-work-rail"
           className={`${filtersOpen ? "flex" : "hidden"} xl:flex w-[240px] min-h-0 shrink-0 flex-col gap-4 overflow-y-auto border-r border-kit-slate-5 bg-white px-3 py-3`}

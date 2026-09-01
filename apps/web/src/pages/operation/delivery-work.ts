@@ -559,7 +559,16 @@ export interface RailItem {
  * this file decides the ORDER and the COUNTS, `fmt-date.ts` decides the
  * spelling, and neither borrows the other's job.
  */
-/** Seven governed Delivery operating dates, used wherever a future calendar is needed. */
+/**
+ * How many days ahead the rail always shows, work or no work. Owner ruling
+ * 2026-08-24: *"Show the near-term operating dates even when count is zero."*
+ *
+ * A planning rail that lists only the days that already hold something can
+ * never be used to PLAN — the operator cannot see that Thursday is empty,
+ * because Thursday is not on it. Seven days is the horizon the team books
+ * within (production/booking lead times, `docs/purchasing/MASTER.md`), and it
+ * is a constant here rather than a setting because nobody has asked to tune it.
+ */
 export const NEAR_TERM_DAYS = 7;
 
 /** The next `NEAR_TERM_DAYS` Delivery operating dates, excluding Sunday. */
@@ -595,28 +604,27 @@ export function buildDateRail(
   const days = [
     ...new Set([
       ...counts.keys(),
+      /* The near-term operating window is ALWAYS on the rail — an empty
+         Thursday is a fact a planner needs, not a row to hide. */
+      ...nearTermDates(todayIso),
       ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY),
     ]),
   ]
     .filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY)
     .sort();
   return [
-    ...(counts.has(NO_DATE_KEY) || picked.has(NO_DATE_KEY)
-      ? [{ key: NO_DATE_KEY, label: DW.noConfirmedDate, count: counts.get(NO_DATE_KEY) ?? 0 }]
-      : []),
-    ...(counts.has(OVERDUE_KEY) || picked.has(OVERDUE_KEY)
-      ? [{ key: OVERDUE_KEY, label: DW.overdue, count: counts.get(OVERDUE_KEY) ?? 0 }]
-      : []),
+    { key: NO_DATE_KEY, label: DW.noConfirmedDate, count: counts.get(NO_DATE_KEY) ?? 0 },
+    { key: OVERDUE_KEY, label: DW.overdue, count: counts.get(OVERDUE_KEY) ?? 0 },
     ...days.map((iso) => ({ key: iso, label: fmt(iso), count: counts.get(iso) ?? 0 })),
   ];
 }
 
 /**
- * THE LOGISTICS RAIL — governed partners carrying work first, then whoever
- * else is genuinely carrying something.
+ * THE LOGISTICS RAIL — the governed roster first, always, then whoever else is
+ * genuinely carrying something.
  *
- * `All` leads and is active when nothing is picked. Governed partners with work
- * follow in the owner's ruled order. A partner outside
+ * `All` leads and is active when nothing is picked. The seven governed partners
+ * follow in the owner's ruled order and stay visible at zero. A partner outside
  * that list appears only while it holds a scope — that is what "future active
  * governed partners" buys without turning the rail into a copy of the partner
  * table. `No logistics picked` is last and appears only when scopes have none;
@@ -640,9 +648,11 @@ export function buildLogisticsRail(
     countByName.set(r.logisticsName, (countByName.get(r.logisticsName) ?? 0) + 1);
   }
   const governed = new Set<string>(GOVERNED_LOGISTICS);
-  const items: RailItem[] = GOVERNED_LOGISTICS.filter(
-    (name) => (countByName.get(name) ?? 0) > 0 || picked.has(name),
-  ).map((name) => ({ key: name, label: name, count: countByName.get(name) ?? 0 }));
+  const items: RailItem[] = GOVERNED_LOGISTICS.map((name) => ({
+    key: name,
+    label: name,
+    count: countByName.get(name) ?? 0,
+  }));
   const extra = [...new Set([...partners.map((p) => p.name), ...picked])]
     .filter(
       (name) =>

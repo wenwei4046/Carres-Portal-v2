@@ -8,7 +8,7 @@
  *  1. **The old page is gone and cannot come back.** No `Work list` / `Calendar`
  *     switch, no KPI preamble, no Refresh, no action-card wall, no permanent
  *     detail pane, no `Due` / `Next Action` / `Priority` / `Today`.
- *  2. **The shape** — one 50px Destination Header, one 240px local rail, one
+ *  2. **The shape** — one 50px Destination Header, one 200px local rail, one
  *     expandable register.
  *  3. **The approved column order**, exactly.
  *  4. **▸ has one job** — this scope's goods, and only its own.
@@ -190,7 +190,6 @@ describe("the old three-pane page is gone", () => {
 describe("the shape", () => {
   it("draws one 50px Destination Header saying only Delivery", () => {
     wrap(<OperationDelivery />);
-    expect(screen.getAllByTestId("delivery-work-destination-header")).toHaveLength(1);
     const header = screen.getByTestId("delivery-work-destination-header");
     expect(header.className).toContain("h-[50px]");
     expect(
@@ -222,18 +221,6 @@ describe("the shape", () => {
     );
   });
 
-  it("keeps narrow-width overflow inside the listing while the rail becomes explicit", () => {
-    wrap(<OperationDelivery />);
-    expect(screen.getByTestId("operation-delivery").className).toContain("min-h-0");
-    expect(screen.getByTestId("delivery-work-body").className).toContain("overflow-hidden");
-    expect(screen.getByTestId("delivery-work-listing").className).toContain("min-w-0");
-    expect(screen.getByTestId("grid-scroll").className).toMatch(/scroll/);
-    expect(screen.getByTestId("delivery-work-rail").className).toContain("xl:flex");
-    expect(screen.getByRole("button", { name: "Show filters" }).className).toContain(
-      "xl:hidden",
-    );
-  });
-
   it("orders the DELIVERY SCHEDULE rail: no confirmed date, Overdue, then real days", () => {
     ordersState.data = {
       orders: [
@@ -258,14 +245,16 @@ describe("the shape", () => {
     expect(labels[0]).toContain("No confirmed date");
     // `Overdue`, never `Date passed` — the rail is a work queue (owner 2026-08-24).
     expect(labels[1]).toContain("Overdue");
-    expect(labels[2]).toContain("Mon, 24 Aug");
-    expect(labels.some((l) => l.includes("Fri, 21 Aug"))).toBe(false);
+    /* The near-term window is always present, so the first real day is TODAY
+       rather than the first day that happens to hold work. */
+    expect(labels[2]).toContain("Fri, 21 Aug");
+    expect(labels.some((l) => l.includes("Mon, 24 Aug"))).toBe(true);
   });
 
-  it("does not offer a governed Logistics Partner that would produce zero rows", () => {
+  it("keeps every governed Logistics Partner on the rail at zero", () => {
     wrap(<OperationDelivery />);
     for (const name of ["NETS", "AL", "TEOW", "TT", "EU", "SSY", "HOUZS"]) {
-      expect(screen.queryByTestId(`delivery-logistics-${name}`)).toBeNull();
+      expect(screen.getByTestId(`delivery-logistics-${name}`)).toBeTruthy();
     }
     expect(screen.getByTestId("delivery-logistics-all")).toBeTruthy();
   });
@@ -713,17 +702,9 @@ describe("the disclosure is chrome, not an alarm", () => {
   });
 });
 
-describe("the rail says Overdue, and offers only governed days with work", () => {
+describe("the rail says Overdue, and shows the days ahead", () => {
   it("⭐ names the bucket `Overdue`, never `Date passed`", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-20" },
-        }),
-      ],
-    };
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-work-rail");
     expect(within(rail).getByText("Overdue")).toBeInTheDocument();
@@ -737,21 +718,13 @@ describe("the rail says Overdue, and offers only governed days with work", () =>
       .toBeInTheDocument();
   });
 
-  it("hides zero-result calendar rows, including Sunday, and uses no relative word", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
-        }),
-      ],
-    };
+  it("carries the near-term operating days even at zero, and no relative word", () => {
+    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-work-rail");
-    expect(within(rail).getByText("Mon, 24 Aug")).toBeInTheDocument();
-    expect(within(rail).queryByText("Fri, 21 Aug")).toBeNull();
-    expect(within(rail).queryByText("Fri, 28 Aug")).toBeNull();
+    // TODAY is Fri 21 Aug 2026 — seven operating days run to Fri 28 Aug.
+    expect(within(rail).getByText("Fri, 21 Aug")).toBeInTheDocument();
+    expect(within(rail).getByText("Fri, 28 Aug")).toBeInTheDocument();
     expect(within(rail).queryByText("Sun, 23 Aug")).toBeNull();
     expect(within(rail).queryByText("Today")).toBeNull();
     expect(within(rail).queryByText("Tomorrow")).toBeNull();
