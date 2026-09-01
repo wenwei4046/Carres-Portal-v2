@@ -11,6 +11,10 @@ const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8"
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
+const route = readFileSync(
+  join(here, "../../../../../packages/shared/src/sales-order-route.ts"),
+  "utf8",
+);
 /* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
    surfaces ask for must offer the same answers, so the list lives in shared and
    BOTH files are read here — a POS that stopped importing it would pass its own
@@ -753,6 +757,38 @@ describe("Sales Order object page — one form grammar", () => {
        bare `—` the service row used sits in that row's `Do NOT use` column. */
     expect(workspace).not.toContain('<td className="py-1.5">—</td>');
     expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
+  });
+
+  it("boxes the three money amounts without giving Money a door", () => {
+    /* The last bare label-over-value pair on the page. `Fact` is read-only by
+       construction, so this is a SHAPE change and Law B is untouched — the
+       Money card still summarises and still writes nothing. */
+    for (const amount of ["Total", "Paid", "Outstanding"]) {
+      expect(workspace).toContain(`label="${amount}"`);
+    }
+    /* Colour and size survive INSIDE the box: red while owed (owner ruling
+       2026-08-15), one `text-strong` on all three (YH, 2026-08-28). */
+    expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"');
+    expect(workspace).toContain('data-testid="money-outstanding"');
+    /* THE OLD SHAPE: three loose amounts packed left on a flex row. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">Total</div>');
+    expect(workspace).not.toContain("flex flex-wrap items-baseline gap-x-8 gap-y-3");
+  });
+
+  it("says how many Units are ready instead of the word the dictionary refuses", () => {
+    /* COPY-STANDARD:1755 puts `Not allocated` in its `Do NOT use` column. The
+       registered answer is the count and then what is being waited on, and it
+       is written ONCE in shared so the Goods table, the Order Route STOCK node
+       and the register expansion cannot drift into three spellings. */
+    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    /* The rendered STRING is gone; the governance comment recording WHY it
+       went stays, which is why this pins the quoted literal. */
+    expect(workspace).not.toContain('"Not allocated"');
+    expect(route).toContain("unitsShortWords(readyQty, line.committedQty)");
+    expect(route).not.toContain("Waiting for purchase");
+    /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
+       the Unit ID cell printed a shortage while the read was still in flight. */
+    expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
   });
 
   it("puts the salesperson door beside the salesperson, not in a row of its own", () => {

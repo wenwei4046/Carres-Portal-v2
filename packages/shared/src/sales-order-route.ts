@@ -54,6 +54,7 @@
  * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
+import { unitsShortWords } from "./line-readiness";
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 /* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
    were re-implemented inline here while this file's own comment claimed it
@@ -713,7 +714,7 @@ function stockDraft(
     complete: allReady,
     lines: allReady
       ? [`${units(line.committedQty)} ready`, codes || null, destination]
-      : [`${readyQty} of ${line.committedQty} Units ready`, "Waiting for purchase"],
+      : unitsShortWords(readyQty, line.committedQty),
     action: {
       ownerKey: "stock",
       label: "Create the Units",
