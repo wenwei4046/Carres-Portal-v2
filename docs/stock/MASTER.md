@@ -1218,6 +1218,50 @@ Sales Order owns exact reservation/sale; Delivery owns collection/return/custome
 owns Supplier Invoice/Credit Note/settlement; COO approves major unexplained difference/write-off/
 compensation.
 
+### 12.10 Month-end Stock Confirmation and Finance handoff
+
+**CURRENT CARRES →** a warehouse may not finish the physical Count on the month's final day;
+Stock date, actual Count and submission can be collapsed or backdated; Finance may receive an
+untraceable spreadsheet total; later correction can overwrite the version Finance used.
+
+**2990 / MATURE ERP LESSON →** keep dated Stock snapshots, Count/Adjustment history and movement-
+source trace. Mature period control separates accounting cut-off from observation time, reconciles
+intervening movements, preserves before/after approval and records the version used. Reject
+backdating, overwriting the first Count/report, declaring unresolved difference fully confirmed and
+letting an export become inventory authority.
+
+**RULING → ADAPT + IMPROVE + REJECT.** Stock date is the final calendar day at 11:59 PM. Physical
+Count may occur within two calendar days before or after that point, always with its actual Count
+and submission dates. Portal reconstructs the cut-off through Unit events, preserves unresolved
+differences and approved Adjustments, versions every confirmation and records Finance acknowledgement.
+Finance cannot edit the Unit or Count.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** the governed calendar creates the Count window and concrete
+dated Work; NETS submits the blind Count on the actual day; Portal compares the Count with all
+Receiving, Transfer, Outbound, Delivery and Return events between observation and Stock date; GRN
+Duty investigates Unit differences; COO decides governed Adjustments; Portal issues an immutable
+version showing confirmed Units, unresolved differences, movement reconciliation and approvals;
+Finance acknowledges the exact version used for valuation/submission. A later correction creates a
+new version without deleting the previous one.
+
+**OPERATOR JOURNEY →** NETS reads `Submit the {month} Stock Count for {Site}` under the governed
+actual date and submits honestly. GRN Duty reconciles source events around the cut-off and resolves
+or requests Adjustment. COO reviews remaining material/unexplained Units. Finance reads Stock date,
+actual Count, submission, version and difference/approval evidence, then acknowledges the chosen
+version without changing physical truth.
+
+**UI / PAGE / OBJECT PLACEMENT →** Dashboard shows the month, Count window and concrete submission
+date under `MONTH-END`. Month-end Detail shows `Stock month · Stock date · Count window · actual
+Count date · submitted date · version · confirmed Units · unresolved differences · approved
+Adjustments · movement reconciliation · Finance acknowledgement · History`. Reports provides
+`Month-end Stock Confirmations`; every export prints Stock date/version/generation person/date/
+filters/exact Unit rows/unresolved differences and remains read-only.
+
+**CROSS-MODULE CONNECTION →** Stock owns cut-off reconstruction, Count, reconciliation and version;
+Receiving/Outbound/Delivery supplies actual events; Purchasing handles missing inbound/supplier
+consequence; COO owns Adjustment approval; Finance acknowledges and uses a version for valuation/
+submission; Reports exports but never becomes authority.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
