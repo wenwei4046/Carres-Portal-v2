@@ -428,7 +428,7 @@ hold only one carrier for a two-leg Journey, kept no history, and had two writer
 
 ```
 one 50px Destination Header  ·  Delivery
-200px local rail             ·  DELIVERY SCHEDULE + LOGISTICS, page-owned FILTERING
+240px local rail             ·  DELIVERY SCHEDULE + LOGISTICS, page-owned FILTERING
 one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
 ```
 
@@ -441,11 +441,15 @@ screen that no logistics operator could act on.
 
 **The rail.** `DELIVERY SCHEDULE` lists `No confirmed date`, then **`Overdue`** (renamed from
 `Date passed`), then the actual weekday + calendar dates ascending — **never Today, never
-Tomorrow** — and it shows the **near-term operating dates even when their count is zero**, because
-a planner has to be able to see that a day is free. The schedule reads **`Confirmed Delivery`**,
-never the customer's promised date. `LOGISTICS` lists `All`, then the governed partners
-**NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**, then any other
-partner while it is genuinely carrying a scope, then `No logistics picked` when scopes have none.
+Tomorrow**. **Controller convergence ruling 2026-09-01 overwrites the earlier zero-capacity
+display:** a date or Logistics Partner is offered only while selecting it can produce at least one
+row. A currently selected zero may remain temporarily so the operator can clear that URL choice;
+it is not offered as a new filter. Sundays stay outside generated operating-calendar choices; a
+real recorded Sunday remains visible as evidence. The schedule reads **`Confirmed Delivery`**,
+never the customer's promised date. `LOGISTICS` lists
+`All`, then the governed partners **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that
+order when they carry matching work**, then any other partner while it is genuinely carrying a
+scope, then `No logistics picked` when scopes have none.
 The two groups COMBINE, each group's counts are computed over the rows the other has already
 narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.** Choices ride
 the URL (`?date=` · `?logistics=`).
