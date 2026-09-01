@@ -32,6 +32,60 @@ POS confirm step — a different surface. The `NOT REGISTERED` list in §4 stand
 
 ---
 
+## 0-B · THE REFUTATION ROUND, FINALLY RUN — 2026-08-28
+
+§0 recorded that the adversarial pass "DID NOT RUN" and named §4 as the section carrying the
+residual risk. It has now run, together with the two coverage gaps §9 listed. **It was right to
+be worried: the copy pass was the weakest part of this document, and it was wrong in both
+directions.**
+
+### What it did to this audit's own findings
+
+| Class | Count | Examples |
+|---|---|---|
+| **Citations simply WRONG** | 8 | `CS:1735` (used in rows 39, 52 and Tier C) is *"Nobody holds PO duty this month."* — the measure-word row is **CS:1764**. In Tier B: `Cancel SO` is **M:1338**, not M:1250/M:1334 · `Paid` is **M:1321**, not M:1239 · `No lift`/`Has lift` is **M:333**, not M:288 · `creates a Revision · needs approval` is **M:252/264/1314**, not M:259 · **`Goods` has no backticked entry in either MASTER**, so its M:1171 citation does not hold at all |
+| **`NOT REGISTERED` marks REFUTED** — the word was governed all along | 12 | `Item` (**M:227**, one of the six locked columns — which also kills row 82) · `Print ▾` (**M:1269**, printed verbatim, caret included) · `New Sales Order` (**M:5156**) · `Delivery payment approval` (**CS:1405**) · `Reason` + `Send request` (**CS:1406**) · `Approve` · `Refuse` · `Decision reason` (**CS:1407**) · `Waiting for decision` (**CS:1409**) · `More actions` (**CS:1503**) · `Accessory` (**CS:1081**) |
+| **Marks UPGRADED — the word is BANNED, not merely unregistered** | 6 | see the table below |
+| **Strings MISSED entirely** | 5 | see below |
+
+### 🔴 The six that are worse than reported
+
+| String | Where | Ruling |
+|---|---|---|
+| `Required for delivery` | Building type field error | **CS:1982** says *"Fixed phrasings — reuse, never invent a variant"*; **CS:1985** fixes the refusal as `Fill in the building type first — a condominium can only take a half-day delivery.` This is an invented variant |
+| `Building type is required — pick what kind of building the delivery goes to` | toast | Same ruling. **Row 96 marked this OK — that was wrong.** Two invented variants of one ruled refusal now ship on this screen |
+| `Add item` | GOODS create | **CS:925** rules the control `Add line` and lists `Add item` under *Do NOT use*. **Row 79 marked this OK.** CS:930 excuses the Sales Portal by name; this workspace is not covered |
+| `Remove line` | GOODS aria-label | **CS:926** rules `Remove` and lists `Remove line` under *Do NOT use*. Row 78 charged only "icon-only" |
+| `Today` | `Ordered` value, create mode | **CS:1890** and **CS:2190** ban it portal-wide (*"`Today` and `Tomorrow` are not dates"*) |
+| `Other goods` | category fallback | **CS:1082** BANS it for the no-catalog-row fact and rules **`Not in catalog`** — the word this same file already uses at the SKU hint. Two spellings, one fact |
+
+### 🟡 Governed but MISSPELLED on screen
+
+- `A proposal is waiting for management.` → **CS:1650** rules `Waiting for management`
+- `A proposal on this order is out of date.` → **CS:1655** rules `Out of date — propose again`
+
+### Strings this audit missed entirely
+
+- **`Sales Order views`** — the second aria-label (`:2513`). §1 row 100 recorded only the other one.
+- **`DRAFT`** — not internal: the PDF template prints `SALES ORDER · DRAFT` on the paper. **CS:1320** bans `Draft` on the customer-order axis.
+- **`To be confirmed`** — the document's delivery date when `delivery_date_tbd`. A near-variant of **CS:1656** `Delivery date to be confirmed`.
+- **The em-dash `—` used as a VALUE** for a missing customer name or address. **CS:2096-2110** (*AN ABSENT VALUE READS AS WORDS*) bans exactly this and rules `No {field}`.
+- **`Carres`** as the dealer-name fallback — a document with no dealer names the house as the dealer.
+
+### One finding that needs re-measuring
+
+**F-9** (`Ordered` means two things) cited CS:639/:701, the Purchasing status words. It missed
+**CS:1624**, which rules *"The day the order was taken"* as `Ordered: {date}` — precisely this
+screen's meaning. The finding may survive on the *colon*, but its cited basis was wrong.
+
+### Verified and closed, so nobody re-reports them
+
+- The punctuation sweep is **clean** — U+2026 used consistently, no three-dot ellipsis in any visible string.
+- The dead collapsible strings (`Hide`, `Unsaved changes here`, `This section has unsaved changes`) are **genuinely unreachable** — no `Block` on this screen passes `summary`.
+- `MYR` never renders — the template maps it to `RM` before printing.
+
+---
+
 ## 0 · What this audit ran, and what it did not
 
 Honesty about coverage matters more than a clean-looking report, so this is stated first.
@@ -666,15 +720,99 @@ Refuse. If nobody holds it, nothing changes.
 
 ## 9 · What this audit did not cover
 
-- `SalesOrderAmendment.tsx`, `SalesOrderAttribution.tsx`, `SalesOrderLedger.tsx`,
-  `CorrectionWorkList.tsx`, `CancelSalesOrderDialog.tsx` and `ServiceCaseWizard.tsx` were read for
-  their **gates and their mounted strings**, not audited field by field. Each is a separate object.
+- ~~The child components were read for gates only~~ → **CLOSED 2026-08-28, see §10.**
+- ~~Order Route, Revisions and History are separate surfaces~~ → **CLOSED 2026-08-28, see §11.**
 - **Add-ons cannot be amended** (`amendmentSubmitInput` is `.strict()` over four keys while the
   governing doc files them Class A) is KNOWN-OPEN and belongs to its own task. Row #87 records the
   related fact that they cannot be *created* here either.
-- The Order Route, Revisions and History views are separate surfaces.
+- `ServiceCaseWizard.tsx` remains out of scope — it is Service's object, not this screen's.
 - No production database was queried. Every column fact comes from `supabase/migrations/`.
+  *(The migration tracker was checked by YH on 2026-08-28: top row `0390`.)*
 
 ---
 
-*No application code was changed. No PR was opened.*
+## 10 · THE CHILD COMPONENTS — gap closed
+
+36 rows walked across `SalesOrderAmendment` · `SalesOrderAttribution` ·
+`SalesOrderAmendDeliveryDate` · `CorrectionWorkList` · `CancelSalesOrderDialog`.
+
+**The model row of this whole audit** is here, and it is worth naming because everything else is
+measured against it: `Management decision reason` is registered at **CS:1651**, and the *same
+rule* is stated at the UI, the route, the RPC **and** a table CHECK constraint
+(`sales_order_amendments_decision_complete`). Four layers, one sentence. That is what the rest of
+this screen should look like.
+
+### 🔴 Findings
+
+| # | What | Why |
+|---|---|---|
+| **C-1** | `Promised delivery` on the amendment modal | **CS:1282 / CS:1365** retired this word on 2026-08-27 and banned it *from reuse*. CS:1288-1290 says the ban is by **meaning**, so a respelling does not escape it. The ruled word is `Requested Delivery Date` |
+| **C-2** | `Promised today — {date}` hint | Same ban. `Promised` is named in CS:1365's Do-NOT-use column for this exact column |
+| **C-3** | **Instalment months has no bound above the database** | `orders_installment_months_chk` allows only NULL/6/12 (`0007:44-51`). The Input is a free integer, Zod is `.int().min(0)`, and the RPC writes it raw. Type `9` → the proposal saves → **the principal presses Approve** → 23514 → neither error mapper handles it → **HTTP 500 with the raw constraint text on screen**, at the approver's press, not the proposer's |
+| **C-4** | `{raw server error message}` on both mutations | Unfiltered pass-through. For C-3 it prints `new row for relation "orders" violates check constraint …` to the operator |
+| **C-5** | **The amendment reason is required at two layers, not three** | UI requires it, the API requires it (*"An amendment says why"*), the **RPC does not** — it stores `nullif(trim(…))` into a nullable column with no raise. Every sibling reason in this family *is* enforced at the RPC (`0329:66`, `0336:63`, `0350:224`, `0348:193`). CS:1501 marks the field `(required)`. Any other caller records a contractual proposal with no stated cause |
+| **C-6** | **A future `Requested date (from customer)` is silently discarded** | The client sends `null` instead of the date. The RPC refuses a future day **by name**, with a governed sentence — so the UI throws away the operator's answer to avoid an error that would have taught them something |
+| **C-7** | **`New delivery date` has no lead-time floor** | The create door on the same screen refuses a too-soon date using the catalog lead. This door — which moves *the same customer promise* — applies no floor at all |
+| **C-8** | `{Purchasing\|Delivery} closes this — the sales order raised it.` | Names a closer the system cannot authenticate: neither is an `app_role` value, and `correction_work_close` admits only operation/finance/principal |
+| **C-9** | `Propose a change to the customer` idle strip | **Dead on this surface** — the workspace mounts with `inlineTrigger={false}`, so this governed string has no reachable render path here |
+
+---
+
+## 11 · ORDER ROUTE · REVISIONS · HISTORY — gap closed
+
+143 rows. **No UI role gate exists on any of the three** — Order Route is read-only by
+construction across all 804 lines, and the Ledger has no role check. So none of §5's G-1..G-5
+mismatches can recur here; there is no client gate to diverge.
+
+### 🔴 The Route contradicts the dictionary about money and dates
+
+**CS:1400 states the rule outright**: the gate, the canvas, the object page, the drawer and the DO
+document *all read these sentences from the shared modules*. The Route re-implements them instead.
+
+| # | What | Why |
+|---|---|---|
+| **R-1** | `RM {amount} still outstanding — collect, or request a payment approval` | Not the CS:1411 sentence. Retyped, not imported |
+| **R-2** | `Finance is holding this delivery for {n} reasons — Finance clears them` | **The reasons vanish.** The shared `financeExceptionReason()` *names* them; this drops the list |
+| **R-3** | `Factory ready: {date}` | CS:1622-1633 is the Route's own exhaustive date table, and `expected_ready_date` has exactly one row there: **`Estimated ready: {date}`**. One fact, two spellings, on one canvas |
+| **R-4** | `Unassigned` | **CS:1547 lists it in Do-NOT-use for this exact surface** — and it is not an edge case: the page supplies only `purchasing` and `receiving` owners while `ownerOf` reads six keys, so every stock/delivery/sales node prints it |
+| **R-5** | `collect back` loan edge label | **Never reaches the screen** — the presentation fold rewrites every edge with `labelAt: null` |
+| **R-6** | Two predicates retyped on the canvas | `paymentApprovalOpensGate` and `financeExceptionHolds` are re-implemented inline, while the file's own comment claims it asks the shared one. They agree today — **Law D's exact stated condition** |
+
+### 🔴 The Ledger's empty sentence is also its error state
+
+| # | What | Why |
+|---|---|---|
+| **R-7** | `No revisions recorded` / `No history recorded` | The Revisions/History branch has **no loading guard and no error guard** — unlike the Order Route branch fifteen lines above, which has both. A 403, a 500 or an expired token prints the governed *empty* sentence. **A permission refusal renders as a factual claim about the order** |
+| **R-8** | `Actor was not recorded` | **The governed word exists and this is not it.** `ui/MASTER.md:718` (Staff Identity Law, owner-approved/LOCKED 2026-08-27, Jess) rules **`Staff identity not recorded`** |
+| **R-9** | `Recorded by System · {when}` | **Unreachable.** The revisions endpoint calls `actorKindOf` with no third argument, and `system` can only be returned by reading `metadata.actor` |
+| **R-10** | `Promised delivery: {old} → {new}` · `Promised delivery TBD` | Banned words (CS:1365/CS:1282), built on the name retired 2026-08-27 — while the *same component* prints the ruled word one rank above |
+| **R-11** | `Lift: Yes → No` · `Lift available: …` | **CS:1513** names both in Do-NOT-use; **CS:1514** bans `Yes/No` for this fact and rules `No lift` · `Has lift` |
+| **R-12** | `Stair-carry items` | **CS:1516** names it in Do-NOT-use; the ruled label is `Items needing stair carry` |
+| **R-13** | **Seven savable fields produce a SILENT diff** | `customer_race`, `customer_gender`, `customer_birthday`, `customer_address_unknown`, `customer_billing_same`, `delivery_stair_items` and `entry_fields` change the order and appear in **no** History line — while `MASTER:1142` asks History for actor, time, reason, Before and After. Note this is the *same seven fields* §2 F-13 found the floors evaluator blind to |
+
+### 🟡 One gate note
+
+`GET /:id/revisions` sits on `requireOperation` (operation|principal) while the table's own RLS
+admits operation|principal|finance|hr|bd. Not a live leak — those roles cannot open the workspace
+at all — but `0327`'s policy states an access intent no door honours.
+
+---
+
+## 12 · NEW GATE FINDING — G-2b
+
+§5's G-2 said *"an operation user is shown four buttons and 42501'd every time."* **True of three,
+false of the fourth.**
+
+`Apply the change` is gated the **opposite** way to its three neighbours in the same panel: the
+route is `requireOperation` and the RPC admits operation|principal. So `operation` **can** complete
+Apply — the only one of the four it can — while `hr`, the role the footnote directly above the
+button names as the approver, is 403'd at the route before the database is reached. Its refusal
+then arrives as `requireOperation`'s generic *"operation or Principal only"* rather than the GATE 3
+sentence — which is precisely what the withdraw route was written to avoid.
+
+G-1, G-2 and G-5 were each re-verified line by line and **all still hold** (one line reference
+drifted: the attribution route is now `orders.ts:1619`).
+
+---
+
+*No application code was changed by this audit. The Q2 proceed-date build is a separate PR.*

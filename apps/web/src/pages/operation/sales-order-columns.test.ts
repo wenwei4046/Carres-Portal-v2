@@ -274,3 +274,51 @@ describe("Emergency contact is three columns, not one crammed cell", () => {
     expect(byKey("emergency_relationship").text(r)).toBe("Friend · from work");
   });
 });
+
+/**
+ * "SAME AS DELIVERY" IS AN ANSWER, NOT A BLANK.
+ *
+ * `customer_billing` is empty by design whenever the customer ticked
+ * `Billing address same as delivery`. The column printed `Not recorded` on
+ * every one of those orders - which reads as "nobody asked" when the truth is
+ * "asked, and the answer was: the same address".
+ */
+describe("Billing address reads the same-as-delivery flag", () => {
+  const byKey = (k: string) => REGISTER_FIELDS.find((f) => f.key === k)!;
+  const bill = (over: Partial<operationOrderListRow>) =>
+    byKey("billing").text(buildRegisterRow(order(over)));
+
+  it("prints the delivery address when billing is the same", () => {
+    expect(
+      bill({
+        customer_billing_same: true,
+        customer_billing: null,
+        customer_address: "12 Jalan Ampang, 50450 Kuala Lumpur",
+      }),
+    ).toBe("12 Jalan Ampang, 50450 Kuala Lumpur");
+  });
+
+  it("prints the separate billing address when it is NOT the same", () => {
+    expect(
+      bill({
+        customer_billing_same: false,
+        customer_billing: "8 Jalan Bangsar, 59100 Kuala Lumpur",
+        customer_address: "12 Jalan Ampang, 50450 Kuala Lumpur",
+      }),
+    ).toBe("8 Jalan Bangsar, 59100 Kuala Lumpur");
+  });
+
+  it("still reads as absent when the flag is set and there is no address either", () => {
+    // The governed `Address not given yet` case - nothing IS recorded, so the
+    // honest cell says so rather than inheriting a blank and calling it an answer.
+    expect(bill({ customer_billing_same: true, customer_billing: null, customer_address: null }))
+      .toBe("Not recorded");
+  });
+
+  it("an older Worker that never sends the flag keeps the old reading", () => {
+    // `customer_billing_same` is optional on the wire; absent must not be read
+    // as `true` and silently swap in a delivery address nobody asked for.
+    expect(bill({ customer_billing: null, customer_address: "12 Jalan Ampang" }))
+      .toBe("Not recorded");
+  });
+});

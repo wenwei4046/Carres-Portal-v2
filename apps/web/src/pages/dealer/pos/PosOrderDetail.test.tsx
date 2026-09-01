@@ -5,7 +5,7 @@
  * un-proceed visibility rules and the diff-only save payload.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/react";
 import type { CatalogResponse, Order } from "@carres/shared";
 import PosOrderDetail from "./PosOrderDetail";
 
@@ -224,6 +224,17 @@ function orderWithAddons(over: Partial<Order> = {}): Order {
         unitPrice: 250,
         attrs: null,
       },
+      // 0406 — the FOURTH server-computed fee. It sits in the shared fixture on
+      // purpose: every pencil count in this file then guards the gate, and a
+      // regression shows up as an off-by-one rather than as a missing test.
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-0000000000a4",
+        orderId: "00000000-0000-0000-0000-000000001201",
+        addonKey: "STAIR_CARRY",
+        qty: 1,
+        unitPrice: 150,
+        attrs: null,
+      },
     ],
     ...over,
   } as Partial<Order>);
@@ -426,11 +437,13 @@ describe("line edit (0255)", () => {
     expect(h.replaceMutateAsync).not.toHaveBeenCalled();
   });
 
-  // 0258 — service add-on rows get the pencil too; DELIVERY* stays locked.
-  it("addon pencil edits qty directly in the place lane (DELIVERY row locked)", async () => {
+  // 0258 — service add-on rows get the pencil too; a server-computed fee stays
+  // locked. 0406 — that is all FOUR computed keys, not only the delivery trio.
+  it("addon pencil edits qty directly in the place lane (computed rows locked)", async () => {
     renderDrawer(orderWithAddons());
     const pencils = screen.getAllByTestId("pos-od-edit-addon");
-    expect(pencils).toHaveLength(1); // dispose-sofa only — DELIVERY has none
+    // dispose-sofa only — DELIVERY and STAIR_CARRY are both server-computed.
+    expect(pencils).toHaveLength(1);
     fireEvent.click(pencils[0]);
     expect(screen.getByTestId("pos-od-addon-modal")).toBeTruthy();
     // qty 1 → 2 (minus disabled at the original qty — up-sell law).
@@ -495,6 +508,27 @@ describe("line edit (0255)", () => {
       }),
     );
     expect(h.editAddonMutateAsync).not.toHaveBeenCalled();
+  });
+
+  // 0406 — a computed fee is not a pickable service, on EVERY surface. The
+  // office screen closed this door on 2026-08-29; this one stayed open because
+  // its gate read a local label map instead of the exported list. The bug was
+  // a double charge: one click sent qty 2 and the customer owed RM 300 for a
+  // carry nobody quoted.
+  it("never offers the pencil on a stair carry — in either editable lane", () => {
+    for (const over of [
+      {} as Partial<Order>, // place lane — the fixture's own status
+      { status: "proceed_order", operationStage: "confirmed" } as Partial<Order>,
+    ]) {
+      const onClose = renderDrawer(orderWithAddons(over));
+      // The row is still SHOWN and still carries its money — it is locked, not
+      // hidden. A fee the customer owes must remain readable.
+      expect(screen.getByText("150")).toBeTruthy();
+      // ...and exactly one pencil exists, on the one service a human picked.
+      expect(screen.getAllByTestId("pos-od-edit-addon")).toHaveLength(1);
+      onClose();
+      cleanup();
+    }
   });
 
   it("proceed pencil hides while a change request is pending; delivered hides it too", () => {

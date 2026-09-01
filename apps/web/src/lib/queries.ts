@@ -2959,6 +2959,11 @@ export interface operationOrderListRow {
    */
   customer_email?: string | null;
   customer_billing?: string | null;
+  /** 0230 — the customer ticked "Billing address same as delivery". The
+   *  billing COLUMN is only meaningful when this is false; when it is true the
+   *  billing address IS the delivery address and `customer_billing` is empty
+   *  by design, not unrecorded. */
+  customer_billing_same?: boolean;
   customer_emergency?: string | null;
   customer_address_line1?: string | null;
   customer_address_line2?: string | null;

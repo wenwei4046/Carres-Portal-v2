@@ -303,8 +303,27 @@ export const REGISTER_FIELDS: readonly RegisterField[] = [
     text: (r) => r.emergency.phone || NOT_RECORDED },
   { key: "emergency_relationship", label: "Emergency relationship", width: "180px", group: "Customer",
     text: (r) => r.emergency.relationship || NOT_RECORDED },
+  /* "SAME AS DELIVERY" IS AN ANSWER, NOT A BLANK.
+     `customer_billing` is empty BY DESIGN whenever the customer ticked
+     `Billing address same as delivery` - the detail row type says so in its own
+     comment: "only meaningful when customer_billing_same is false". The column
+     printed `Not recorded` on every one of those orders, which reads as "nobody
+     asked" when the truth is "asked, and the answer was: the same address".
+
+     So the cell prints the address we would actually bill. It prints the ADDRESS
+     rather than the sentence `Billing address same as delivery` because
+     `RegisterField.text` is the one string that is also FILTERED, SORTED and
+     EXPORTED - a column of identical sentences can be none of those. Deriving a
+     displayed value from a sibling column is the same thing `Delivery Location`
+     already does from city + state.
+
+     An order with the flag set and no delivery address either (the governed
+     `Address not given yet` case) still reads `Not recorded`, because then
+     nothing IS recorded. */
   { key: "billing", label: "Billing address", width: "220px", group: "Customer",
-    text: (r) => r.o.customer_billing || NOT_RECORDED },
+    text: (r) =>
+      (r.o.customer_billing_same ? r.o.customer_address : r.o.customer_billing) ||
+      NOT_RECORDED },
 
   /* ⭐ PARITY WITH WHAT THE TILL ACTUALLY ASKS (2026-08-24).
      A salesperson fills these at SO creation and the register route already
