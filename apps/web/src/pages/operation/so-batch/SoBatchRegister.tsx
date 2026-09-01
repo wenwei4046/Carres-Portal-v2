@@ -27,7 +27,11 @@ import {
   type SoBatchRailFilter,
   type SoBatchSelection,
 } from "@carres/shared";
-import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import {
+  DataGrid,
+  type DataGridColumn,
+  type DataGridContextMenuItem,
+} from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
@@ -97,6 +101,51 @@ export interface SoBatchRegisterProps {
 
 export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchRegisterProps) {
   const navigate = useNavigate();
+
+  /* ⭐ THE ROW IS A DOOR (YH, 2026-09-01).
+   *
+   * This register handed the grid `expandable` and `selectable` and nothing
+   * else, so `onRowDoubleClick` and `contextMenu` were undefined: the engine
+   * called nothing and the browser's event was discarded. Double-click did
+   * nothing at all, and right-click gave the browser's own menu.
+   *
+   * That left ONE working door on a ~1200px row — the ~90px blue `SO-####`
+   * cell — on the module's permanent purchasing audit book. An operator who
+   * wants the order behind a row reaches for double-click first, gets nothing,
+   * and concludes the page is dead. That is the report that started this.
+   *
+   * ⭐ IT ALSO MAKES THE CURSOR HONEST (defect 13). The grid paints the
+   * pointing hand on any row that is selectable OR expandable, and every row
+   * here is expandable — so the page advertised itself as clickable on all
+   * ~1200px and answered on 90. Now every row answers.
+   *
+   * ⛔ THE MENU CARRIES ONLY DOORS THAT EXIST. The sibling Sales Orders menu
+   * ends in `Cancel SO`; a buying register must not offer that — it records
+   * what was bought, it does not amend the sale. `Open <PO>` appears only when
+   * the order has exactly one, which is the same test the PO No cell makes;
+   * the exact numbers for a multi-PO order live in the expansion. */
+  const openOrder = useCallback(
+    (o: SoBatchOrderRow) => navigate(`/operation/orders/so/${o.orderId}`),
+    [navigate],
+  );
+  const rowMenu = useCallback(
+    (o: SoBatchOrderRow): DataGridContextMenuItem[] => {
+      const po = soBatchCellSummary(o.pos.map((p) => p.poId));
+      return [
+        { label: "View", onClick: () => openOrder(o) },
+        ...(po.kind === "one"
+          ? [
+              {
+                label: `Open ${po.value}`,
+                onClick: () =>
+                  navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
+              },
+            ]
+          : []),
+      ];
+    },
+    [navigate, openOrder],
+  );
   const leafs = data.rows;
   const orders = data.registerRows;
   const leafById = useMemo(() => new Map(leafs.map((r) => [r.id, r])), [leafs]);
@@ -778,6 +827,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               groupBanner={false}
               stickyIdentity={{ columnKey: "soNo" }}
               chooserGroupOrder={["Order", "Documents", "Buying"]}
+              onRowDoubleClick={openOrder}
+              contextMenu={rowMenu}
               expandable={{
                 renderExpansion,
                 testId: (o) => `so-batch-expand-${o.orderId}`,
@@ -919,6 +970,10 @@ function SoBatchOrderExpansion({
   destinationName: (id: string | null) => string;
   safetyDays: number;
 }) {
+  /* Its own handle on the router: this box is a top-level component, not a
+     closure inside the register, so the multi-PO door below cannot borrow the
+     register's `navigate`. */
+  const navigate = useNavigate();
   const expansion = useSalesOrderExpansion(order.orderId);
   const unitIdsByLine = useMemo(
     () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
@@ -1068,6 +1123,17 @@ function SoBatchOrderExpansion({
         showCoveredBy
         showSupplier
         showPoDeliveryDate
+        /* ⭐ THE EXPANSION IS THE MULTI-PO DOOR (YH, 2026-09-01). The `PO No`
+           cell links only when there is exactly one; with several it prints
+           "2 POs" and sends the reader here, where the exact numbers were bare
+           text. So the more work an order generated, the fewer doors it had.
+           Same navigation the single-PO cell already performs.
+           `Ready Stock` is an answer, not a document, so `poById` — not a
+           string test — decides what is a door. */
+        isCoveredByLinkable={(v) => poById.has(v)}
+        onCoveredByClick={(poId) =>
+          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+        }
         selection={{
           selectedKeys: new Set(
             order.lines

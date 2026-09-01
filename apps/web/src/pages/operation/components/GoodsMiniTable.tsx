@@ -239,6 +239,8 @@ export default function GoodsMiniTable({
   showCoveredBy = false,
   showSupplier = false,
   showPoDeliveryDate = false,
+  onCoveredByClick,
+  isCoveredByLinkable,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
@@ -247,6 +249,29 @@ export default function GoodsMiniTable({
   selection?: GoodsMiniTableSelection;
   /** A page that BUYS asks for `Covered by`; a truth register does not. */
   showCoveredBy?: boolean;
+  /**
+   * ⭐ THE EXACT MAPPING IS ALSO A DOOR (YH, 2026-09-01).
+   *
+   * The register's `PO No` cell links only when an order has exactly ONE
+   * purchase order; with several it prints "2 POs" and points the reader at
+   * this expansion, which the blueprint names as the place the exact numbers
+   * live. Those numbers were bare text, so the MORE work an order generated
+   * the FEWER doors it had — the operator copied a PO number by eye and went
+   * to look for it in Purchase Orders.
+   *
+   * Optional on purpose: a truth register that only STATES coverage passes
+   * nothing and keeps the printed strings. Only a page that can navigate
+   * supplies this.
+   */
+  onCoveredByClick?: (poId: string) => void;
+  /**
+   * Which `Covered by` entries are documents, decided by the page that built
+   * the list. The column mixes real purchase orders with `Ready Stock` — an
+   * answer, not a document — and only the caller knows which is which. This
+   * box does not learn what a PO number looks like; a predicate that never
+   * answers true simply leaves every entry as text.
+   */
+  isCoveredByLinkable?: (value: string) => boolean;
   /** Card 02-B — the exact-mapping columns the buying Register asks for. */
   showSupplier?: boolean;
   showPoDeliveryDate?: boolean;
@@ -358,7 +383,28 @@ export default function GoodsMiniTable({
               {showCoveredBy ? (
                 <td className="px-2 py-2">
                   {line.coveredBy?.length ? (
-                    line.coveredBy.map((po) => <div key={po}>{po}</div>)
+                    line.coveredBy.map((po) =>
+                      /* `Ready Stock` and anything else that is not a
+                         document stays text — only a real PO number is a
+                         door, and only the page knows which is which. */
+                      onCoveredByClick && (isCoveredByLinkable?.(po) ?? false) ? (
+                        <div key={po}>
+                          <button
+                            type="button"
+                            className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
+                            data-testid={`goods-covered-by-${po}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCoveredByClick(po);
+                            }}
+                          >
+                            {po}
+                          </button>
+                        </div>
+                      ) : (
+                        <div key={po}>{po}</div>
+                      ),
+                    )
                   ) : (
                     <Absence>{line.coveredByAbsence ?? "—"}</Absence>
                   )}

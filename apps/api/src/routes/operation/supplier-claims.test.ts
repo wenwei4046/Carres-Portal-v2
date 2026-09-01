@@ -189,6 +189,38 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(eqCalls).toContainEqual(["po_id", "PO-2030"]);
   });
 
+  it("counts a PO's stages from head counts, not from the page it just filtered", async () => {
+    /* ⛔ A COUNT MAY NOT BE DERIVED FROM AN ALREADY-FILTERED PAGE. The PO
+       branch counted the rows it had fetched, and those rows are narrowed by
+       `status` — so `?poId=X&status=open` reported ZERO closed claims for a PO
+       that has them. Invisible while the only caller asked for `all`; the
+       moment the page's `?po=` door is wired, the stage chips are read as
+       "this PO has none". */
+    const eqCalls: Array<[string, unknown]> = [];
+    const openRows = [{ ...CLAIM, po_id: "PO-2030", supplier_id: null, reported_by: null }];
+    const sb = {
+      from: vi.fn((table: string) =>
+        listBuilder(table === "supplier_claims" ? openRows : [], eqCalls),
+      ),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/supplier-claims?status=open&poId=PO-2030", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // The PO scopes the LIST and BOTH head counts — three reads, one filter.
+    expect(eqCalls.filter(([col, val]) => col === "po_id" && val === "PO-2030")).toHaveLength(3);
+    // And the closed count comes from its own read rather than from the open
+    // page, which by construction contains no closed row to find.
+    const body = (await res.json()) as { counts: { open: number; closed: number } };
+    expect(body.counts.closed).not.toBe(0);
+  });
+
   it("returns every claim connected to one PO beyond the worklist window", async () => {
     const eqCalls: Array<[string, unknown]> = [];
     const claims = Array.from({ length: 205 }, (_, index) => ({
