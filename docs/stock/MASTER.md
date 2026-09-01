@@ -255,6 +255,27 @@ Service Case                                            Counts & Adjustments
 Needs checking                                          History
 ```
 
+The dated work strip remains above the Register. For the selected actual date it shows only the
+Inventory work governed for that date — Count, Count again, investigate a difference, inspect a
+problem or decide an Adjustment — with the resolved owner/avatar and concrete action. The Register
+below answers the different question, `What physical Stock does Carres control now?`; work dates
+never replace or filter away the current-Stock authority unless the operator deliberately selects a
+Register filter.
+
+The default current-Inventory columns are:
+
+```
+Unit ID · Product · Stock use · Who has it · SO No · SO date ·
+PO/Source No · PO/Source date · Received
+```
+
+`Unit ID`, SO, PO/Consignment and GRN/source references are clickable. A reserved Unit must expose
+the exact SO No and SO date. Every Unit exposes the document that explains why Carres controls it.
+No SO No means unallocated only; it does not make the Unit Ready Stock. Goods not formally received
+remain in Inbound, not current Inventory. Delivered, returned-to-supplier, written-off or otherwise
+ended Units leave the default current list but remain searchable in History with their distinct
+lifecycle outcome.
+
 Low-volume purchase categories such as Internal Staff Purchase, Subsidiary Purchase and Other
 Purchase remain visible as the Unit's `Category` and connected document while Carres controls the
 Unit; they do not require permanent rail rows. `Needs checking` states the exact observed problem,
@@ -262,6 +283,28 @@ Unit, recorded holder/Site, finding, resolved owner/avatar, actual date and conc
 uses a vague `Attention` label. Ready Stock groups eligible Units by Catalog product and Site and
 expands to exact IDs. Sales uses `Choose Ready Unit`; Operations uses `Make available for sale` only
 after the Unit passes eligibility. Stock owns neither reservation nor release from an SO.
+
+`Make available for sale` is permitted only for an existing Unit whose current Site and `Who has
+it` are confirmed, condition and required components/packages are acceptable, ownership permits
+sale, and which has no unresolved issue, active transfer, repair, handover or SO reservation. It
+does not create Stock. When the checks pass, the same Unit becomes visible automatically through
+the shared Ready Stock authority.
+
+Sales reaches that authority through `Sales → Ready Stock`; Operations reaches it inside Inventory.
+Both see the same eligible Unit IDs in real time. Sales defaults to `Product · Unit ID · Where ·
+Earliest handover` and acts through `Choose Ready Unit`. Operations sees the physical-control facts
+and `Make available for sale`. Choosing a Unit atomically creates the Sales Order reservation;
+Inventory immediately reads `Reserved for Sales Orders · {SO No}`. Warehouse cannot release or
+change that promise. A legal SO release returns the Unit to Ready Stock only if it still satisfies
+every eligibility check.
+
+`Needs checking` never stops at a label such as Damaged, Not found or Wrong position. It prints the
+full observable fact, Unit ID, recorded Site/holder, latest evidence, actual governed date, resolved
+owner/avatar and action. Examples are `U-1003 was reported damaged at NETS Warehouse` / `Check the
+damage and record the result by Wed, 2 Sep`, and `U-1012 was not found in the Stock Count; Portal
+says NETS Warehouse` / `Look for U-1012 at NETS Warehouse and scan it again by Thu, 3 Sep`.
+Carres does not record a NETS internal Zone, Rack or Bin, so a fabricated location such as
+`Zone A3` is invalid.
 
 `Counts & Adjustments` contains scheduled counts, submitted counts, differences, recount,
 investigation, Adjustment request, COO approval, completion and reversal in one control surface.
@@ -306,9 +349,12 @@ Inbound, Inventory and Outbound use the shared cross-module reconciliation contr
 - Partial receipt or handover changes only the affected Units. Any quantity disagreement preserves
   both parties' evidence and creates a dated `Needs checking` action.
 
-Unit Detail is titled by Unit ID and product. It shows Where, Who has it, ownership, condition,
-availability, reservation, last verified, one current `Needs checking` fact, connected records, evidence,
-history and permitted actions. There is no generic Edit, status selector or Delete.
+Unit Detail follows the governed Object Detail Template and is titled by Unit ID and product. Its
+current-facts block shows Stock use, Where, Who has it, ownership, condition and last verified. Its
+connected-records block shows clickable SO, PO/Consignment, GRN, Transfer, DO, Service/Repair and
+Count records where present. Current Work renders the one shared Action contract; History renders
+append-only receipt, reservation, Count, preparation and handover facts with actual actor/evidence.
+There is no generic Edit, status selector or Delete.
 
 - NETS Warehouse opens dated Work, scans receipt, Count and handover, and supplies evidence.
 - NETS Delivery scans collection and arrival; unresolved Units remain visibly with it.
