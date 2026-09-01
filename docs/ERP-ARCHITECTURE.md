@@ -439,6 +439,42 @@ Delivery · Service Case · Finance.
 
 ---
 
+### 3.5.1 · CROSS-MODULE UNIT RECONCILIATION — OWNER-APPROVED / LOCKED 2026-09-01
+
+Receiving, Stock/Warehouse and Delivery do not tally by retyping quantities into three modules.
+They reconcile through the same source-document scope, permanent Carres Unit IDs for traceable
+goods, quantity lines for governed interchangeable goods, and append-only physical events.
+
+```
+Receiving proves what physically arrived
+→ Stock states where each received Unit is and who has it
+→ Delivery states which exact Units the customer journey requires
+→ Warehouse Outbound proves which exact Units were handed over
+```
+
+The shared reconciliation equations are projections, never stored replacement totals:
+
+```
+PO/Consignment scope: expected = cumulatively received + not yet received
+DO/Outbound scope:     required = handed over + not handed over
+Open Delivery leg:     collected = arrived + still with the recorded journey holder
+                       + explicitly returned/exception-routed
+```
+
+Every result drills to exact Unit IDs where Unit identity is governed. A partial event changes only
+the affected Units. A scheduled collection, expected arrival or whole-document status never moves
+physical authority. The owning event does: Receiving posts arrival; Warehouse records physical
+handover; Logistics records its receipt and arrival; Stock derives current `Who has it` from those
+facts. If two parties record different quantities, both original facts remain and the difference
+creates `Needs checking`; neither side overwrites the other to make the totals match.
+
+The lineage is always clickable: `SO → DO → Outbound handover → Unit IDs → Logistics receipt →
+customer arrival proof`, and `PO/Consignment Order → Receiving Session/GRN → Unit IDs → Inventory`.
+Each module may show the shared reconciliation block read-only, but only the owning door may create
+or correct its event.
+
+---
+
 ## 3.6 · DELIVERY
 
 **OWNS**

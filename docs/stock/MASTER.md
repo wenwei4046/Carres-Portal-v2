@@ -227,6 +227,18 @@ Delivery owns customer DO, journey, Logistics Partner and customer-delivery proo
 Unit's current holder and physical history. Purchasing owns Supplier Return and supplier decision.
 Service Case owns the repair need and resolution. Outbound stores no duplicate business status.
 
+Inbound, Inventory and Outbound use the shared cross-module reconciliation contract in
+`../ERP-ARCHITECTURE.md` §3.5.1. They do not ask an operator to tally Receiving or Delivery again:
+
+- Inbound reads `Expected · Received · Not yet received · With issue` from the PO/Consignment and
+  Receiving Session/GRN; only posted arrival facts enter Inventory.
+- Inventory derives the current Unit and `Who has it` from the append-only arrival and handover
+  facts; each Unit has only one current answer.
+- Outbound reads the exact Units required by the source DO, Transfer, Supplier Return or Repair
+  record and prints `Required · Handed over · Not handed over` with drill-down to IDs.
+- Partial receipt or handover changes only the affected Units. Any quantity disagreement preserves
+  both parties' evidence and creates a dated `Needs checking` action.
+
 Unit Detail is titled by Unit ID and product. It shows Where, Who has it, ownership, condition,
 availability, reservation, last verified, one current `Needs checking` fact, connected records, evidence,
 history and permitted actions. There is no generic Edit, status selector or Delete.

@@ -1446,6 +1446,24 @@ Tables: `warehouse_receipts` **3** · `receiving_events` **3**
 
 **ONE physical delivery (one truck) = ONE Receiving Session.**
 
+**RECEIVING-TO-INVENTORY RECONCILIATION — owner-approved 2026-09-01.** Receiving owns the actual
+arrival result; Inventory consumes it and never asks NETS or Carres staff to type the count again.
+For each PO/Consignment scope, the page prints `Expected · Received · Not yet received · With
+issue`, with every traceable Unit result drilling to its Unit ID. The governed equation is
+`expected = cumulatively received + not yet received`; `With issue` is a condition subset of what
+arrived, not extra quantity. Posting the Receiving Session creates the GRN and the physical facts
+Stock may consume:
+
+- received acceptable Unit → enters Inventory at the actual receiving Site/current holder;
+- received with issue → enters Inventory under `Needs checking`, never Ready Stock;
+- not yet received → remains expected Inbound and cannot enter Inventory;
+- unexpected/excess Unit → follows the refused or controlled-surplus rule above, never a shortcut
+  into available Stock.
+
+The shared contract, including partials, disagreement handling and clickable lineage, is defined
+once in `../ERP-ARCHITECTURE.md` §3.5.1. Receiving may show Inventory consequence read-only, but it
+does not write a second current-holder or available-total field.
+
 - A missed line on the same truck is an **Amend** on the same Session — never a second one.
 - A genuinely second truck is a NEW Session (a normal partial delivery).
 - A wrong record (wrong qty / PO / DO) is a **Void** plus a correct new Session.
