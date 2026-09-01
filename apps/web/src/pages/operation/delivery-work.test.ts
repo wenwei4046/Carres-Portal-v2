@@ -10,8 +10,8 @@
  *     confirmed booking, and a carrier's provisional date is never confirmed.
  *  3. The DELIVERY DATE rail orders itself `No confirmed date` → `Overdue`
  *     → real ascending days, and prints no relative day word.
- *  4. The LOGISTICS rail keeps the seven governed partners visible at zero and
- *     admits an ungoverned one only while it is carrying something.
+ *  4. The LOGISTICS rail offers only choices that can produce a row; a picked
+ *     zero remains only long enough for the operator to clear the URL choice.
  *  5. The two filters COMBINE.
  */
 import { describe, it, expect } from "vitest";
@@ -251,14 +251,13 @@ describe("the DELIVERY DATE rail", () => {
     expect(rail.find((r) => r.label === "printed:2026-08-25")?.count).toBe(1);
   });
 
-  it("⭐ shows the near-term operating dates even at ZERO — a planner needs the empty day", () => {
-    // A rail that lists only the days already holding work cannot be used to
-    // plan, but Sunday is closed and must not be offered as empty capacity.
+  it("offers only real governed date results, never empty calendar choices", () => {
     const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    for (const iso of nearTermDates(TODAY)) {
-      expect(rail.find((r) => r.label === `printed:${iso}`)).toBeDefined();
-    }
+    expect(rail.find((r) => r.label === "printed:2026-08-22")?.count).toBe(1);
+    expect(rail.find((r) => r.label === "printed:2026-08-25")?.count).toBe(1);
+    expect(rail.find((r) => r.label === "printed:2026-08-21")).toBeUndefined();
     expect(rail.find((r) => r.label === "printed:2026-08-23")).toBeUndefined();
+    expect(rail.every((item) => item.count > 0)).toBe(true);
   });
 
   it("the near-term window starts today and runs seven operating days", () => {
@@ -271,6 +270,19 @@ describe("the DELIVERY DATE rail", () => {
       "2026-08-27",
       "2026-08-28",
     ]);
+  });
+
+  it("keeps a real Sunday delivery as evidence while never inventing an empty Sunday", () => {
+    const sundayRows = build([
+      order({
+        id: "sunday",
+        so: 1310,
+        ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-23" },
+      }),
+    ]);
+    const rail = buildDateRail(sundayRows, TODAY, (iso) => `printed:${iso}`);
+    expect(rail.find((r) => r.label === "printed:2026-08-23")?.count).toBe(1);
+    expect(rail.find((r) => r.label === "printed:2026-08-24")).toBeUndefined();
   });
 
   it("crosses a month end and skips a Sunday start", () => {
@@ -295,10 +307,17 @@ describe("the DELIVERY DATE rail", () => {
 });
 
 describe("the LOGISTICS rail", () => {
-  it("keeps every governed partner visible at zero, in the ruled order", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), []);
-    expect(rail.slice(0, 7).map((r) => r.label)).toEqual([...GOVERNED_LOGISTICS]);
-    expect(rail.slice(0, 7).every((r) => r.count === 0)).toBe(true);
+  it("offers governed partners only when they can produce a row, in ruled order", () => {
+    const rail = buildLogisticsRail(
+      build([
+        order({ id: "a", so: 1301, delivery_partners: { id: "p-nets", name: "NETS" } }),
+        order({ id: "b", so: 1302, delivery_partners: { id: "p-teow", name: "TEOW" } }),
+      ]),
+      [],
+    );
+    expect(rail.map((r) => r.label)).toEqual(["NETS", "TEOW"]);
+    expect(rail.every((item) => item.count > 0)).toBe(true);
+    expect(rail.find((r) => r.label === GOVERNED_LOGISTICS[1])).toBeUndefined();
   });
 
   it("names the scopes nobody is carrying rather than hiding them under All", () => {
