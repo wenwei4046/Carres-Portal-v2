@@ -615,6 +615,20 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("tab=payments&so=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
+    /* ⭐ AND IT RIDES THE TITLE (YH, 2026-09-01) — a hairline and a whole row
+       at the foot of a card holding three numbers, to carry one link. The word
+       is locked (COPY-STANDARD:1595) and unchanged; the row is gone. Still a
+       navigator, never a writer: `headerSlot` admits a read-only door and
+       nothing that submits. */
+    expect(workspace).toContain('data-testid="workspace-open-payments"');
+    /* It rides the Money card's own heading now: the slot appears inside the
+       Money Block's props, not in a bordered strip at the foot of the card. */
+    const money = workspace.indexOf('title="Money"');
+    expect(money, "the Money block exists").toBeGreaterThan(-1);
+    expect(
+      workspace.slice(money, money + 900),
+      "the payments door rides the Money title",
+    ).toContain("headerSlot");
   });
 
   /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
@@ -757,6 +771,35 @@ describe("Sales Order object page — one form grammar", () => {
        bare `—` the service row used sits in that row's `Do NOT use` column. */
     expect(workspace).not.toContain('<td className="py-1.5">—</td>');
     expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
+  });
+
+  it("keeps 0362's approval door, moved under the amount it governs", () => {
+    /* ⛔ THE CAPABILITY IS NOT DELETED. `0362` is Jess's ruling of 2026-08-19,
+       written the day goods went out with the money uncollected: an owing
+       order delivers only against a RECORDED approval, never a verbal one.
+       Removing this door would leave Operation no governed way to ask, so what
+       changed is WHERE it lives — a bordered sub-block standing open on every
+       owing order became a quiet door under `Outstanding`, which is the shape
+       `Change delivery date` and `Change salesperson` already use. */
+    expect(workspace).toContain("function PaymentApprovalBlock(");
+    expect(workspace).toContain('data-testid="payment-approval-open"');
+    expect(workspace).toContain('data-testid="payment-approval-request-send"');
+    expect(workspace).toContain('data-testid="payment-approval-approve"');
+    /* Both words are locked (COPY-STANDARD:1575) and unchanged. */
+    expect(workspace).toContain("Delivery payment approval");
+    expect(workspace).toContain("Request payment approval");
+    /* A PENDING OR APPROVED RECORD IS TRUTH, NOT AN ACTION, so it still prints
+       without opening anything — hiding it would be "a hidden button is not a
+       rule" in its other direction: the rule invisible because the door shut. */
+    expect(workspace).toContain('data-testid="payment-approval-live"');
+    /* THE FORM IS BEHIND A DOOR, so the block's body is a Modal rather than a
+       bordered strip standing open on the card. */
+    const fn = workspace.indexOf("function PaymentApprovalBlock(");
+    const body = workspace.slice(fn, workspace.indexOf("function ", fn + 40));
+    expect(body, "the approval form lives in a Modal").toContain("<Modal");
+    expect(body, "and not in a standing bordered strip").not.toContain(
+      'className="mt-3 border-t border-kit-slate-5 pt-3"',
+    );
   });
 
   it("boxes the three money amounts without giving Money a door", () => {
