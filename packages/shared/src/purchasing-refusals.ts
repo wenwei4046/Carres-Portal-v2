@@ -217,6 +217,32 @@ export function purchasingRefusal(
         wrong: "One sofa purchase order carries one customer order.",
         todo: "Split the sofas by customer order, then issue again.",
       };
+    /* ── THE MANUAL PURCHASE ISSUE PATH ───────────────────────────────────
+       Three codes the route has always raised and this file has never
+       answered, so each one reached the operator as the fallback: "The Portal
+       refused this purchase order. Tell IT the message on screen." Two of them
+       are the COMMONEST refusals on that door — somebody else issued the
+       request, or it is simply not approved yet — so the ordinary working day
+       read as a system fault, which is the exact thing this file exists to
+       stop.
+       `not_ready_to_order` USED TO CARRY BOTH facts: not-yet-approved AND
+       refused. One code cannot say two things, so the route now separates them
+       and each gets its own sentence — fact first, in the operator's words. */
+    case "unknown_request":
+      return {
+        wrong: "One Manual Purchase on this list is no longer there.",
+        todo: "Reload the page, then tick the ones that are left and issue again.",
+      };
+    case "not_ready_to_order":
+      return {
+        wrong: "One Manual Purchase has not been approved yet.",
+        todo: "Ask its approver to Approve it, then issue again.",
+      };
+    case "request_refused":
+      return {
+        wrong: "One Manual Purchase was refused.",
+        todo: "Go back and untick the refused one, then issue again.",
+      };
     case "nothing_to_issue":
       return {
         wrong: "There is nothing left to buy on these lines.",
@@ -380,6 +406,9 @@ export const PURCHASING_REFUSAL_CODES = [
   "duplicate_build",
   "already_on_po",
   "sofa_merge",
+  "unknown_request",
+  "not_ready_to_order",
+  "request_refused",
   "nothing_to_issue",
   "blocked_delivery_date",
   "production_days_required",
