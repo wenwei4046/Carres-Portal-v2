@@ -584,7 +584,7 @@ export default function EditDelivery() {
 
             {chosenPartner && (
               <div
-                className="flex flex-col gap-2 rounded-control border border-kit-slate-5 bg-kit-slate-2 p-3"
+                className="flex flex-col gap-2 rounded-control border border-kit-slate-5 bg-white p-3"
                 data-testid="edit-delivery-chase"
               >
                 <span className="text-meta font-semibold text-kit-slate-12">
