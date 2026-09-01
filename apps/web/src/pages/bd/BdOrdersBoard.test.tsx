@@ -7,10 +7,38 @@
  * gates its orders to that dealer-id set — mocked here with an order whose
  * store is NOT in the list (a showroom's), which must never surface.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterAll } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { Order } from "@carres/shared";
 import BdOrdersBoard from "./BdOrdersBoard";
+
+/* ⭐ THE BOARD IS SCOPED TO THE CURRENT MONTH, SO THE CLOCK IS PART OF THE
+   FIXTURE — OWNER FIX 2026-09-01 (YH).
+
+   `BdOrdersBoard` anchors on `new Date()` and keeps only the orders whose
+   `placedAt` falls in that month (`monthAnchor` + `sameMonth`). A fixture
+   stamped "yesterday" therefore leaves the board on the 1st of ANY month, and
+   every card assertion below fails at once on a suite nobody touched: green
+   on 31 Aug 2026, red on 1 Sep. CI reads UTC, so the same roll-over held the
+   gate red for the whole 24 hours the runner's date said the 1st.
+
+   Pinning the clock mid-month makes "yesterday" and "today" the same month by
+   construction, and the suite stops depending on the day it is run.
+
+   ONLY `Date` is faked. Testing Library's `waitFor`/`findBy*` drive themselves
+   with real `setTimeout`, so faking every timer would hang the suites that use
+   them.
+
+   ⛔ #1002 FIRST FIXED THIS FILE THE OTHER WAY — by dating the fixture `NOW`
+   instead of pinning the clock. Both were correct; two of them in three
+   sibling board suites were not, because a later reader could not tell which
+   one was load-bearing. The pin won on reach: it covers every date-sensitive
+   assertion this file may grow, not the one field that happened to break. */
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date("2026-09-15T12:00:00+08:00"));
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 const NOW = Date.now();
 const DEALER_A = "00000000-0000-0000-0000-00000000d001";
@@ -58,16 +86,10 @@ function order(over: Partial<Order> & { so: number; status: Order["status"] }): 
     doNote: null,
     invoiceNo: null,
     invoicedAt: null,
-    /* THE CLOCK, NOT A DATE. The board shows the CURRENT month
-       (`inPeriod` = `sameMonth(o.placedAt, monthAnchor)`), and this fixture
-       used `NOW - 1 day`. On the 1st of any month "yesterday" is LAST month,
-       every card falls out of scope and ten assertions fail on a product that
-       is working. It failed on 2026-09-01, having passed on 2026-08-31.
-
-       `NOW` is always inside the month the component anchors to, so the test
-       asks what it means to ask. Nothing here depends on the order being a day
-       old - the board filters by month and by source, never by age. */
-    placedAt: new Date(NOW).toISOString(),
+    /* THE CLOCK, NOT A DATE — see the pin at the top of this file, which is
+       what keeps this safe. A day old is what a real order looks like, and
+       the board filters by month and by source, never by age. */
+    placedAt: new Date(NOW - 86_400_000).toISOString(),
     lineCount: 2,
     totalAmount: 3000,
     ...over,
