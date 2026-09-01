@@ -73,6 +73,18 @@ vi.mock("./OperationDelivery", () => ({
 vi.mock("./EditDelivery", () => ({
   default: () => <div data-testid="edit-delivery-stub">edit-delivery</div>,
 }));
+vi.mock("./WarehouseUnitDetail", () => ({
+  default: () => <div data-testid="warehouse-unit-stub">warehouse-unit</div>,
+}));
+vi.mock("./WarehouseStockRegister", () => ({
+  default: () => <div data-testid="stock-register-destination-header">stock</div>,
+}));
+vi.mock("./WarehouseSchedule", () => ({
+  default: () => <div data-testid="warehouse-schedule-destination-header">schedule</div>,
+}));
+vi.mock("./OperationStockPlan", () => ({
+  default: () => <div data-testid="ready-stock-destination-header">ready-stock</div>,
+}));
 // The right rail self-fetches (tasks/notes) — stub it; this suite tests routing.
 vi.mock("./components/OperationRightRail", () => ({
   default: () => <div data-testid="right-rail-stub">rail</div>,
@@ -284,6 +296,69 @@ describe("OperationApp — Edit Delivery mounts at its URL", () => {
   it("a leg keeps its query string", () => {
     renderApp("/operation/delivery/edit/order-1?leg=2");
     expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * A Unit ID is a permanent object address. Declaring the descendant Route is
+ * not enough: the shell must also enter its URL-driven branch, otherwise a
+ * direct load keeps the URL but renders Dashboard underneath it.
+ */
+describe("OperationApp — an exact Stock Unit mounts at its permanent URL", () => {
+  it("/operation/stock/unit/:unitCode mounts Unit Detail, not Dashboard", () => {
+    renderApp("/operation/stock/unit/id-yjk864506");
+    expect(screen.getByTestId("warehouse-unit-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation/stock/unit/id-yjk864506",
+    );
+  });
+
+  it("stands the slim global bar down because Unit Detail owns its header", () => {
+    renderApp("/operation/stock/unit/id-yjk864506");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+});
+
+describe("OperationApp — Warehouse registers own the only Destination Header", () => {
+  it("mounts Schedule as the Warehouse landing Register without duplicate chrome", () => {
+    renderApp("/operation?tab=warehouse-schedule");
+    expect(screen.getByTestId("warehouse-schedule-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("retires the old In & out bookmark into Stock", () => {
+    renderApp("/operation?tab=movements");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand",
+    );
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("movements-stub")).not.toBeInTheDocument();
+  });
+
+  it("retires the Warehouse Dashboard bookmark into Schedule", () => {
+    renderApp("/operation?tab=warehouse");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=warehouse-schedule",
+    );
+    expect(screen.getByTestId("warehouse-schedule-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("warehouse-stub")).not.toBeInTheDocument();
+  });
+
+  it("Stock mounts its Destination Header and the global utility row stands down", () => {
+    renderApp("/operation?tab=stock-onhand");
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("retires the old Ready stock bookmark into Stock's Available to sell filter", () => {
+    renderApp("/operation?tab=stock-plan");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand&availability=available",
+    );
+    expect(screen.getByTestId("stock-register-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("ready-stock-destination-header")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
   });
 });
 

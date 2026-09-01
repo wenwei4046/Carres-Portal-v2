@@ -52,7 +52,7 @@ export function RailItem({
   /** Omitted renders no number at all — an absent count and a zero are
    *  different facts, and a queue that has not been read yet must not print a
    *  reassuring `0`. */
-  count?: number;
+  count?: number | string;
   active: boolean;
   onClick: () => void;
   title?: string;
@@ -175,7 +175,7 @@ export function FilterRailRow({
   label: string;
   /** Omitted renders no number (the section's `All …` rows). A live count is
    *  passed as-is — the fixed rows print zero rather than hiding it. */
-  count?: number;
+  count?: number | string;
   active: boolean;
   onClick: () => void;
   title?: string;

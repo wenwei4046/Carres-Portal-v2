@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  ArrowLeftRight,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -366,25 +365,22 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
        * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
        * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
-       * row becomes the module's pages in the rail. The three built pages keep
-       * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
+       * row becomes the module's pages in the rail. The built Stock page keeps
+       * its `?tab=` address; `Transfers` and `Counts` are blueprint pages
        * printing `Coming soon` until their own PRs. The blueprint keeps
        * Reports and Settings central: NO Report row, NO Settings row here.
-       * The three live rows keep K0's learned order (Stock · Ready stock ·
-       * In & out) — the rail never reshuffles under an operator; when Ready
-       * stock folds into Stock Views (blueprint item 13.7) its row dies in
-       * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
+       * Available to sell is a filter inside Stock, not another page. Word law
+       * (COPY-STANDARD): "Inventory" and
        * "Movements" stay banned UI words; the goods pool is still `Stock` on
        * any page — `Warehouse` is the MODULE heading, not the pool word. */
       /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1, and
        * Stock MASTER §2 rejects `On hand` and `Stock Units` as the master-list
        * name by name. `On hand` described a QUANTITY on a shelf; the page now
-       * lists exact Units and answers which one, where, who has it and whether
+       * lists exact Units and answers identity, Location, Held by and whether
        * it can be used. The `?tab=` address is unchanged, so no bookmark and no
        * learned rail position moves. */
-      { key: "stock", label: "Stock", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
-      { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
-      { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
+      { key: "warehouse-schedule", label: "Schedule", icon: ClipboardList, tab: "warehouse-schedule", section: "Warehouse" },
+      { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
       { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },

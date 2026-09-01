@@ -11,7 +11,6 @@ import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
 import Segmented from "@/components/Segmented";
 import StockTabs from "./StockTabs";
-import ReorderStockCard from "./components/ReorderStockCard";
 
 /**
  * ⚠ DE-ROUTED 2026-08-21 — CARD-2026-08-20-stock-register.
@@ -24,17 +23,13 @@ import ReorderStockCard from "./components/ReorderStockCard";
  * IT IS NOT DELETED, AND THAT IS DELIBERATE. Two capabilities still live ONLY
  * here and nowhere else in the portal:
  *
- *   · `ReorderStockCard`   — the K1 reorder points (migration 0286). The one
- *                            door where the reorder point and lead days are set.
  *   · `ImportStockDialog`  — the Klg Warehouse sheet import.
  *
  * Deleting the file would destroy both without replacing them, and an existing
  * useful capability defaults to KEEP (CLAUDE.md §4, Plan/Design Research Law).
- * Their proper homes are Ready stock (reorder points) and Settings/Maintenance
- * (the sheet import) — a relocation this card's scope explicitly excludes, and
- * one that needs its own acceptance boundary rather than being smuggled in.
- * The gap is recorded in docs/stock/MASTER.md; this file dies in the PR that
- * gives those two a home.
+ * Reorder points and lead days now live in Settings → Stock. The remaining
+ * sheet import gap is recorded in docs/stock/MASTER.md; this file dies in the
+ * PR that gives that import its governed home.
  *
  * Everything below is the superseded surface, unchanged.
  *
@@ -352,10 +347,6 @@ export default function OperationStockOnHand() {
         />
       ) : null}
 
-      {/* K1 — the import accessories that need ordering before they run out.
-          Renders nothing when there is nothing to watch. */}
-      <ReorderStockCard />
-
       {invQ.isLoading ? (
         <p className="text-body text-base-500">Loading…</p>
       ) : invQ.isError ? (
@@ -364,7 +355,7 @@ export default function OperationStockOnHand() {
             Couldn&rsquo;t load stock
           </div>
           <div className="text-meta text-base-700 mb-3">
-            {(invQ.error as Error | undefined)?.message ?? "Unknown error"}
+            Try again. If it still fails, ask the system owner to check the Stock Register.
           </div>
           <button
             type="button"

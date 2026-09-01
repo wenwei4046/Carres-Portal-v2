@@ -4,6 +4,7 @@
 // wrong story. Same idiom family as OperationRental / OperationReceiving, and
 // it matches its two sibling Stock tabs.
 import { useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { ClipboardList, Check, X, TriangleAlert, Plus } from "lucide-react";
 import { PLAN_STATUS_LABEL, type OpsStockPlanRow, type PlanStatus } from "@carres/shared";
 import {
@@ -54,9 +55,18 @@ function thisMonth(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 7);
 }
 
+/**
+ * The former Warehouse Ready-stock address is an alias onto Stock's canonical
+ * availability filter. The monthly ordering cycle remains named and testable
+ * below while its Purchasing destination is reconciled; no writer moves here.
+ */
 export default function OperationStockPlan() {
+  return <Navigate to="/operation?tab=stock-onhand&availability=available" replace />;
+}
+
+export function PurchasingReplenishmentPlan() {
   const [period, setPeriod] = useState<string>(() => thisMonth());
-  const { data, isLoading, isError, error } = useStockPlan(period);
+  const { data, isLoading, isError } = useStockPlan(period);
   const openM = useOpenStockPlan();
 
   const planId = data?.plan?.id ?? "";
@@ -120,7 +130,7 @@ export default function OperationStockPlan() {
               Couldn&rsquo;t load the plan
             </div>
             <div className="text-meta text-base-700">
-              {(error as Error | undefined)?.message ?? "Unknown error"}
+              Try again. If it still fails, ask the system owner to check Purchasing.
             </div>
           </div>
         ) : !data?.plan ? (
@@ -677,7 +687,7 @@ function DecisionBar({
       </button>
       {decide.isError ? (
         <span className="text-meta text-danger" data-testid="plan-decide-error">
-          {(decide.error as Error | undefined)?.message ?? "Not saved"}
+          Not saved. Try again.
         </span>
       ) : null}
     </div>

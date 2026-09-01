@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
-import OperationStockPlan from "./OperationStockPlan";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import OperationStockPlan, { PurchasingReplenishmentPlan } from "./OperationStockPlan";
 import type { OpsStockPlanResponse, OpsStockPlanRow } from "@carres/shared";
 
 /**
@@ -86,7 +86,19 @@ function renderPage() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation?tab=stock-plan"]}>
+        <PurchasingReplenishmentPlan />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderReadyStock() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/operation?tab=stock-plan"]}>
         <OperationStockPlan />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -95,6 +107,24 @@ function renderPage() {
 beforeEach(() => {
   vi.mocked(apiFetch).mockReset();
 });
+
+describe("the retired Ready stock address", () => {
+  it("redirects into Stock's Available to sell filter and renders no second register", async () => {
+    renderReadyStock();
+    expect(await screen.findByTestId("location-probe")).toHaveTextContent(
+      "/operation?tab=stock-onhand&availability=available",
+    );
+    expect(screen.queryByTestId("ready-stock-destination-header")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Plan month")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plan-grid")).not.toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+});
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-probe">{location.pathname}{location.search}</output>;
+}
 
 /**
  * The page mounts THREE independent lanes (K2's monthly plan, K3's urgent

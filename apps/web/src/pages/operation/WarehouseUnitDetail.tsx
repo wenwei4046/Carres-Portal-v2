@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  availabilityLabel,
+  stockAvailabilityLabel,
   UNIT_LIFECYCLE_OUTCOME_LABEL,
   UNIT_OWNERSHIP_LABEL,
   type UnitAvailability,
@@ -79,10 +79,10 @@ export default function WarehouseUnitDetail() {
       <div className="min-h-0 flex-1 overflow-y-auto px-9 py-6" data-testid="stock-unit-detail">
         <button
           type="button"
-          onClick={() => navigate("/operation/stock")}
+          onClick={() => navigate("/operation?tab=stock-onhand")}
           className="mb-4 text-meta text-base-500 hover:text-base-800"
         >
-          ← Stock
+          ← Inventory
         </button>
 
         {isLoading ? (
@@ -94,32 +94,34 @@ export default function WarehouseUnitDetail() {
                 ? "No Unit carries that ID."
                 : "This Unit could not be loaded."}
             </p>
-            {(error as Error | undefined)?.message ? (
-              <p className="mt-1 text-meta text-base-500">{(error as Error).message}</p>
-            ) : null}
+            <p className="mt-1 text-meta text-base-500">
+              {(error as { status?: number } | undefined)?.status === 404
+                ? "Check the Unit ID and open the record again."
+                : "Try again. If it still fails, ask the system owner to check Inventory."}
+            </p>
           </div>
         ) : unit ? (
           <div className="space-y-4">
             {/* ── CURRENT FACTS ──────────────────────────────────────────── */}
             <section className="rounded-md border border-base-200 bg-white">
               <header className="border-b border-base-100 px-4 py-2.5">
-                <h2 className="text-label font-semibold text-base-900">Where it is now</h2>
+                <h2 className="text-label font-semibold text-base-900">Location and holder</h2>
               </header>
               <dl className="grid grid-cols-2 gap-x-8 gap-y-3 px-4 py-4 md:grid-cols-3">
                 <Fact label="Availability">
                   <span className="inline-flex items-center gap-1.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${AVAILABILITY_DOT[unit.availability]}`} />
-                    {availabilityLabel(unit.availability)}
+                    {stockAvailabilityLabel(unit)}
                   </span>
                 </Fact>
-                <Fact label="Where">{unit.siteName ?? "—"}</Fact>
-                <Fact label="Who has it">
+                <Fact label="Location">{unit.siteName ?? "—"}</Fact>
+                <Fact label="Held by">
                   {unit.holderName ?? <Absent>Not recorded</Absent>}
                 </Fact>
                 <Fact label="Ownership">
                   {UNIT_OWNERSHIP_LABEL[unit.ownership as keyof typeof UNIT_OWNERSHIP_LABEL] ?? unit.ownership}
                 </Fact>
-                <Fact label="Condition">
+                <Fact label="Item condition">
                   {CONDITION_LABEL[unit.condition] ?? unit.condition}
                   {unit.needsRepair ? " · in repair" : ""}
                 </Fact>

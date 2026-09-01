@@ -248,6 +248,9 @@ export type DataGridProps<T> = {
   stickyIdentity?: boolean | { columnKey: string };
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
+  /** Initial grouping for a Register whose approved reading order is grouped.
+   *  A saved operator layout still wins; this is only the first-load default. */
+  defaultGroupBy?: readonly string[];
   emptyMessage?: string;
   isLoading?: boolean;
   /**
@@ -343,15 +346,16 @@ const DEFAULT_LAYOUT: Layout = {
   sort: null,
 };
 
-function readLayout(key: string): Layout {
-  if (typeof window === "undefined") return DEFAULT_LAYOUT;
+function readLayout(key: string, defaultGroupBy: readonly string[] = []): Layout {
+  const defaults = { ...DEFAULT_LAYOUT, groupBy: [...defaultGroupBy] };
+  if (typeof window === "undefined") return defaults;
   try {
     const raw = window.localStorage.getItem(key);
-    if (!raw) return DEFAULT_LAYOUT;
+    if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<Layout>;
-    return { ...DEFAULT_LAYOUT, ...parsed };
+    return { ...defaults, ...parsed };
   } catch {
-    return DEFAULT_LAYOUT;
+    return defaults;
   }
 }
 function writeLayout(key: string, layout: Layout) {
@@ -454,6 +458,7 @@ function DataGridInner<T>({
   collapseAllNonce,
   stickyIdentity = false,
   groupBanner = true,
+  defaultGroupBy = [],
   emptyMessage = "No data.",
   isLoading = false,
   contextMenu,
@@ -476,7 +481,7 @@ function DataGridInner<T>({
       return n;
     });
   }, []);
-  const [layout, setLayoutRaw] = useState<Layout>(() => readLayout(storageKey));
+  const [layout, setLayoutRaw] = useState<Layout>(() => readLayout(storageKey, defaultGroupBy));
   const setLayout = useCallback(
     (updater: (l: Layout) => Layout) => {
       setLayoutRaw((prev) => {

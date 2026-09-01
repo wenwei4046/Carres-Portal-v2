@@ -3,13 +3,16 @@ import {
   applyRailSelection,
   ATTENTION_REASON_LABEL,
   availabilityLabel,
+  stockAvailabilityLabel,
   categoryKeyOf,
   changedWithin,
   EMPTY_RAIL_SELECTION,
+  exactUnitRecords,
   hasAttention,
   isCurrentUnit,
   isRailFiltered,
   matchesRegisterQuery,
+  nextMovementLabel,
   NO_CATALOG_KEY,
   registerSummaryLine,
   summariseRegister,
@@ -136,20 +139,29 @@ describe("Changed reads the PHYSICAL event ledger, never updated_at (Card §3)",
 });
 
 describe("Attention chips only exist where the FACT exists", () => {
+  it("uses observed problems, never generic condition or inspection wording", () => {
+    expect(Object.values(ATTENTION_REASON_LABEL)).toEqual([
+      "Damage reported",
+      "Unit cannot be found",
+      "Parts missing",
+      "Returned — check before sale",
+    ]);
+    expect(Object.values(ATTENTION_REASON_LABEL).join(" ")).not.toMatch(/inspection|condition check/i);
+  });
+
   it("each reason reads its own fact", () => {
-    expect(hasAttention(unit({ holdReason: "inspection" }), "on_hold")).toBe(true);
-    expect(hasAttention(unit({ holdReason: null }), "on_hold")).toBe(false);
-    expect(hasAttention(unit({ needsRepair: true }), "in_repair")).toBe(true);
-    expect(hasAttention(unit({ condition: "damaged" }), "damaged")).toBe(true);
-    expect(hasAttention(unit({ poNo: null }), "no_source")).toBe(true);
-    expect(hasAttention(unit({ poNo: "PO/1" }), "no_source")).toBe(false);
+    expect(hasAttention(unit({ condition: "damaged" }), "damage_reported")).toBe(true);
+    expect(hasAttention(unit({ holdReason: "cannot_find" }), "cannot_find")).toBe(true);
+    expect(hasAttention(unit({ holdReason: "components_missing" }), "parts_missing")).toBe(true);
+    expect(hasAttention(unit({ holdReason: "returned" }), "returned_check")).toBe(true);
+    expect(hasAttention(unit({ holdReason: null }), "cannot_find")).toBe(false);
   });
 
   it("no chip is named after a fact the database does not hold", () => {
     // The five Card §3 reasons with no column behind them must not have shipped
     // as controls. If a future card adds the fact, it adds the chip WITH it.
     const shipped = Object.keys(ATTENTION_REASON_LABEL);
-    for (const absent of ["cannot_find", "unit_id_issue", "site_differs", "components_missing", "evidence_incomplete"]) {
+    for (const absent of ["unit_id_issue", "site_differs", "evidence_incomplete"]) {
       expect(shipped).not.toContain(absent);
     }
   });
@@ -187,6 +199,19 @@ describe("rail sections combine; one selection applies within a section (Card §
     expect(out.map((r) => r.id)).toEqual(["a"]);
   });
 
+  it("Held by matches a governed party and the honest Not recorded bucket", () => {
+    const held = unit({ id: "held", holderPartyId: "party-1", holderName: "NETS Warehouse" });
+    const unheld = unit({ id: "unheld", holderPartyId: null, holderName: null });
+    expect(applyRailSelection([held, unheld], {
+      ...EMPTY_RAIL_SELECTION,
+      holder: "party-1",
+    }, now).map((row) => row.id)).toEqual(["held"]);
+    expect(applyRailSelection([held, unheld], {
+      ...EMPTY_RAIL_SELECTION,
+      holder: "__not_recorded__",
+    }, now).map((row) => row.id)).toEqual(["unheld"]);
+  });
+
   it("a filtered rail reports itself as filtered", () => {
     expect(isRailFiltered({ ...EMPTY_RAIL_SELECTION, category: "sofa" })).toBe(true);
     expect(isRailFiltered({ ...EMPTY_RAIL_SELECTION, query: "  " })).toBe(false);
@@ -219,7 +244,7 @@ describe("the footer tells the truth about what can be promised", () => {
       unit({ id: "b", availability: "available", qty: 555 }),
       unit({ id: "c", availability: "reserved", qty: 1 }),
     ];
-    expect(summariseRegister(rows)).toEqual({ units: 3, available: 1, bulkOnHand: 555 });
+    expect(summariseRegister(rows)).toEqual({ units: 2, available: 1, bulkOnHand: 555 });
   });
 
   it("a bulk record NEVER counts as promisable — 0366 forbids it being reserved", () => {
@@ -245,10 +270,60 @@ describe("the footer tells the truth about what can be promised", () => {
   });
 });
 
-describe("the operator's word for `reserved` lives only at the UI boundary", () => {
-  it("reads Reserved / sold on screen while the VALUE stays reserved", () => {
-    expect(availabilityLabel("reserved")).toBe("Reserved / sold");
+describe("Stock lists controlled exact Units", () => {
+  it("keeps every exact identity and does not turn a quantity record into one", () => {
+    const rows = [
+      unit({ id: "free", qty: 1 }),
+      unit({ id: "held", qty: 1, availability: "not_available", status: "on_hold" }),
+      unit({ id: "ended", qty: 1, availability: "ended", status: "sold" }),
+      unit({ id: "bulk", qty: 555 }),
+    ];
+
+    expect(exactUnitRecords(rows).map((row) => row.id)).toEqual(["free", "held", "ended"]);
+  });
+});
+
+describe("Next movement names only an official source", () => {
+  it.each([
+    [{ nextMovementKind: "none" as const }, "No movement planned"],
+    [{ nextMovementKind: "transfer" as const, nextMovementLocation: "PJ Showroom", nextMovementRef: "TR-18" }, "To PJ Showroom · TR-18"],
+    [{ nextMovementKind: "customer_delivery" as const, nextMovementRef: "DO-22" }, "To customer · DO-22"],
+    [{ nextMovementKind: "supplier_arrival" as const, nextMovementLocation: "Carres Klang Warehouse", nextMovementRef: "PO/26-1" }, "To Carres Klang Warehouse · PO/26-1"],
+    [{ nextMovementKind: "problem_block" as const }, "No movement until this problem is fixed"],
+  ])("formats the governed source", (movement, expected) => {
+    expect(nextMovementLabel(movement)).toBe(expected);
+  });
+
+  it("does not guess when an official source has not been joined", () => {
+    expect(nextMovementLabel({ nextMovementKind: null })).toBe("—");
+  });
+});
+
+describe("the operator's availability words live only at the UI boundary", () => {
+  it("uses the approved Stock words while the governed values stay unchanged", () => {
+    expect(availabilityLabel("reserved")).toBe("Reserved for customer");
     expect(availabilityLabel("ended")).toBe("Delivered / history");
-    expect(availabilityLabel("available")).toBe("Available");
+    expect(availabilityLabel("available")).toBe("Available to sell");
+    expect(availabilityLabel("incoming")).toBe("Ordered — not received");
+    expect(availabilityLabel("in_transit")).toBe("On the way");
+    expect(availabilityLabel("not_available")).toBe("Cannot sell");
+  });
+
+  it("names an observed reason when a Unit cannot be sold", () => {
+    expect(stockAvailabilityLabel(unit({
+      availability: "not_available",
+      condition: "damaged",
+    }))).toBe("Cannot sell — Damage reported");
+    expect(stockAvailabilityLabel(unit({
+      availability: "not_available",
+      holdReason: "parts_missing",
+    }))).toBe("Cannot sell — Parts missing");
+  });
+
+  it("does not expose a raw or invented reason when none was recorded", () => {
+    expect(stockAvailabilityLabel(unit({
+      availability: "not_available",
+      holdReason: "internal_db_value",
+    }))).toBe("Cannot sell — reason not recorded");
   });
 });

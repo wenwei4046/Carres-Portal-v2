@@ -45,6 +45,7 @@ import {
   type OpsStockPlanProposeInput,
   type OpsStockPlanConsolidateInput,
   type OpsStockPlanFinalInput,
+  type WarehouseScheduleRow,
   type OpsStockPlanDecideInput,
   type OpsStockEmergencyResponse,
   type OpsStockEmergencyRaiseInput,
@@ -6406,6 +6407,22 @@ export function useStockRegister() {
   return useQuery<StockRegisterPayload, ApiError>({
     queryKey: ["operation", "stock-register"],
     queryFn: () => apiFetch<StockRegisterPayload>("/api/ops/stock/register"),
+    staleTime: 30_000,
+  });
+}
+
+export interface WarehouseSchedulePayload {
+  rows: WarehouseScheduleRow[];
+}
+
+/** Warehouse's Monday–Saturday landing projection. Every row stays owned by
+ *  its PO, Receiving, Delivery or later governed movement source. */
+export function useWarehouseSchedule(from: string, to: string) {
+  return useQuery<WarehouseSchedulePayload, ApiError>({
+    queryKey: ["operation", "warehouse-schedule", from, to],
+    queryFn: () => apiFetch<WarehouseSchedulePayload>(
+      `/api/ops/stock/schedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    ),
     staleTime: 30_000,
   });
 }

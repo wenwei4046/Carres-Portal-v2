@@ -24,7 +24,7 @@ import type { OpsReorderRow } from "@carres/shared";
  * has to mean "watched and fine", never "nobody has looked".
  */
 
-export default function ReorderStockCard() {
+export default function ReorderStockCard({ settingsOnly = false }: { settingsOnly?: boolean }) {
   const { data, isLoading, isError } = useReorderStock();
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -42,6 +42,43 @@ export default function ReorderStockCard() {
   const alertCount = data.alertCount ?? 0;
   const unsetCount = data.unsetCount ?? 0;
   const canEdit = data.canEdit === true;
+
+  if (settingsOnly) {
+    return (
+      <div className="rounded border border-base-200 bg-white" data-testid="reorder-stock-card">
+        <header className="border-b border-base-100 px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <PackageSearch size={16} strokeWidth={2} className="text-base-400" />
+            <h2 className="text-strong text-base-900">Reorder points and lead days</h2>
+          </div>
+          <p className="mt-0.5 text-meta text-base-600">
+            Purchasing uses these values when it prepares replenishment work.
+          </p>
+        </header>
+        <div className="px-4 py-1">
+          <div
+            className="grid items-center gap-3 py-1.5 text-label font-semibold uppercase tracking-[0.03em] text-base-400"
+            style={{ gridTemplateColumns: "minmax(240px, 1fr) 120px 120px 28px" }}
+          >
+            <span>Item</span>
+            <span className="text-right">Reorder point</span>
+            <span className="text-right">Lead days</span>
+            <span />
+          </div>
+          {rows.map((row) => (
+            <StockSettingRow
+              key={row.sku}
+              row={row}
+              canEdit={canEdit}
+              editing={editing === row.sku}
+              onEdit={() => setEditing(row.sku)}
+              onDone={() => setEditing(null)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -101,6 +138,129 @@ export default function ReorderStockCard() {
         ))}
       </div>
     </div>
+  );
+}
+
+function StockSettingRow({
+  row,
+  canEdit,
+  editing,
+  onEdit,
+  onDone,
+}: {
+  row: OpsReorderRow;
+  canEdit: boolean;
+  editing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div
+      className="grid min-h-11 items-center gap-3 border-t border-base-100 py-2"
+      style={{ gridTemplateColumns: "minmax(240px, 1fr) 120px 120px 28px" }}
+      data-testid={`reorder-row-${row.sku}`}
+    >
+      <div className="min-w-0">
+        <div className="truncate text-body text-base-900" title={row.sku}>{row.sku}</div>
+        {row.kind ? <div className="text-label text-base-500">{row.kind}</div> : null}
+      </div>
+      {editing ? (
+        <StockSettingEditor row={row} onDone={onDone} />
+      ) : (
+        <>
+          <span className="text-right font-mono text-body text-base-800">
+            {row.reorderPoint == null ? "Not set" : row.reorderPoint}
+          </span>
+          <span className="text-right font-mono text-body text-base-800">
+            {row.leadDays == null ? "Not set" : row.leadDays}
+          </span>
+          <div className="text-right">
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-base-400 hover:text-primary"
+                aria-label={`Edit stock settings for ${row.sku}`}
+                data-testid={`reorder-edit-${row.sku}`}
+              >
+                <Pencil size={14} strokeWidth={2} />
+              </button>
+            ) : null}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StockSettingEditor({ row, onDone }: { row: OpsReorderRow; onDone: () => void }) {
+  const [point, setPoint] = useState(String(row.reorderPoint ?? ""));
+  const [leadDays, setLeadDays] = useState(String(row.leadDays ?? ""));
+  const save = useSetReorderPoint();
+  const pointValue = Number(point);
+  const leadValue = Number(leadDays);
+  const valid =
+    point.trim() !== "" &&
+    leadDays.trim() !== "" &&
+    Number.isInteger(pointValue) &&
+    Number.isInteger(leadValue) &&
+    pointValue >= 0 &&
+    pointValue <= 100000 &&
+    leadValue >= 0 &&
+    leadValue <= 3650;
+
+  function submit() {
+    if (!valid || save.isPending) return;
+    save.mutate(
+      { sku: row.sku, reorderPoint: pointValue, leadDays: leadValue },
+      { onSuccess: onDone },
+    );
+  }
+
+  return (
+    <>
+      <input
+        autoFocus
+        value={point}
+        inputMode="numeric"
+        onChange={(event) => setPoint(event.target.value.replace(/[^0-9]/g, ""))}
+        className="w-full rounded border border-base-300 px-2 py-1 text-right text-body font-mono focus:border-primary focus:outline-none"
+        aria-label={`Reorder point for ${row.sku}`}
+        data-testid={`reorder-input-${row.sku}`}
+      />
+      <input
+        value={leadDays}
+        inputMode="numeric"
+        onChange={(event) => setLeadDays(event.target.value.replace(/[^0-9]/g, ""))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") submit();
+          if (event.key === "Escape") onDone();
+        }}
+        className="w-full rounded border border-base-300 px-2 py-1 text-right text-body font-mono focus:border-primary focus:outline-none"
+        aria-label={`Lead days for ${row.sku}`}
+        data-testid={`lead-days-input-${row.sku}`}
+      />
+      <div className="flex justify-end gap-1">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!valid || save.isPending}
+          className="text-success-700 disabled:text-base-300"
+          aria-label="Save stock settings"
+          data-testid={`reorder-save-${row.sku}`}
+        >
+          <Check size={16} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-base-400 hover:text-base-700"
+          aria-label="Cancel"
+        >
+          <X size={16} strokeWidth={2} />
+        </button>
+      </div>
+    </>
   );
 }
 

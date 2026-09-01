@@ -45,8 +45,6 @@ import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
 import OperationManualPurchase from "./OperationManualPurchase";
-import OperationWarehouse from "./OperationWarehouse";
-import OperationMovements from "./OperationMovements";
 import TabbedProcurementShell from "./procurement/TabbedProcurementShell";
 import OperationPurchaseOrders from "./OperationPurchaseOrders";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
@@ -79,8 +77,8 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
+import WarehouseSchedule from "./WarehouseSchedule";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
-import OperationStockPlan from "./OperationStockPlan";
 // Migration 0140 — Service Notes / Issue Tracker.
 import OperationServiceCases from "./OperationServiceCases";
 import OperationIssueTracker from "./OperationIssueTracker";
@@ -89,7 +87,6 @@ import OperationGuarantees from "./OperationGuarantees";
 // Gmail-style right rail — Calendar (deliveries/day) · Keep notes · Tasks board.
 import OperationRightRail from "./components/OperationRightRail";
 import GlobalTopBar from "./components/GlobalTopBar";
-import type { MovementsFilters } from "@/lib/queries";
 
 /**
  * operation shell — sidebar + main routing area. Mirrors the Phase 3 PrincipalApp
@@ -105,10 +102,8 @@ import type { MovementsFilters } from "@/lib/queries";
  * and `useLocation` keeps the sidebar's "procurement" highlight in sync with
  * the URL pathname (without forcing the rest of the app to URL-driven nav).
  *
- * Cross-tab prefill (M5.5): OperationWarehouse → OperationMovements carries
- * `{ sku?, warehouseId? }` through `movementsPrefill` so the user lands on
- * the movement log already filtered to the row they clicked. Mirrors the
- * proto's `movementsPrefill` state in `reference/proto/operation.jsx` line 15.
+ * Historical movement-log callbacks now land on Stock. Physical event truth
+ * is read through Last moved and Unit Detail History, not a second page.
  */
 export default function OperationApp() {
   const location = useLocation();
@@ -169,6 +164,11 @@ export default function OperationApp() {
      Manual Purchase needed before it. A page that draws a header joins this
      list in the PR that gives it one. */
   const isEditDeliveryUrl = location.pathname.startsWith("/operation/delivery/edit");
+  /* One exact Unit is an object route, addressed by its permanent Unit ID.
+     The route was declared below but omitted from this gate, so a direct load
+     retained the URL while rendering Dashboard. URL routes join both the
+     render gate and the one-header suppression in the same change. */
+  const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit/");
   /* The one Settings Workspace is its own route, not a module tab — the
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
@@ -181,21 +181,13 @@ export default function OperationApp() {
        the production walk, invisible to a component test that never mounts the
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
-    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
+    isDeliveryOrdersUrl || isStockUnitUrl || isSettingsUrl || isIssuesUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
   // 2026-06-30) — it self-owns the collapsed state + localStorage so every area
   // (Operations / Finance / Admin) collapses consistently. The grid column is
   // now `auto`, tracking the rail's intrinsic width.
-  const [movementsPrefill, setMovementsPrefill] = useState<
-    Partial<MovementsFilters> | undefined
-  >(undefined);
-  // Cross-tab prefill for the warehouse slot — currently just the alert filter
-  // intent seeded by the dashboard StockAlertsTile. Mirrors `movementsPrefill`.
-  const [warehousePrefill, setWarehousePrefill] = useState<
-    { alert?: boolean } | undefined
-  >(undefined);
 
   // Unified Internal Portal — the merged PortalSidebar links to
   // `/operation?tab=<key>`, so cross-area deep links (e.g. principal jumping in
@@ -223,8 +215,17 @@ export default function OperationApp() {
       || isIssuesUrl
     )
       return;
-    setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
-    setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
+    if (urlTab === "movements" || urlTab === "stock-plan" || urlTab === "warehouse") {
+      navigate(
+        urlTab === "stock-plan"
+          ? "/operation?tab=stock-onhand&availability=available"
+          : urlTab === "warehouse"
+            ? "/operation?tab=warehouse-schedule"
+            : "/operation?tab=stock-onhand",
+        { replace: true },
+      );
+      return;
+    }
     setTab(urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
@@ -242,26 +243,11 @@ export default function OperationApp() {
     }
   }, [isProcurementUrl, isOrdersUrl, tab]);
 
-  function goMovements(prefill?: Partial<MovementsFilters>) {
-    setMovementsPrefill(prefill);
-    setTab("movements");
-    // Leave any URL-driven section if we were inside one — otherwise the
-    // nested <Routes> below would keep showing that page.
-    if (isUrlDriven) {
-      navigate("/operation");
-    }
-  }
-
-  // Cross-tab jump used by the dashboard StockAlertsTile → lands on the
-  // warehouse tab with the alert filter pre-applied. Mirrors goMovements: seed
-  // the prefill, flip the tab, leave any URL-driven section. No URL write —
-  // warehouse is tab-state-driven (closes `phase-4.5-chunk-2-alerts-tab-routing`).
-  function goWarehouse(prefill?: { alert?: boolean }) {
-    setWarehousePrefill(prefill);
-    setTab("warehouse");
-    if (isUrlDriven) {
-      navigate("/operation");
-    }
+  // Dashboard warehouse shortcuts land on Inventory. The retired Warehouse
+  // Dashboard is never a rendering target.
+  function goWarehouse(_prefill?: { alert?: boolean }) {
+    setTab("stock-onhand");
+    navigate("/operation?tab=stock-onhand");
   }
 
   /**
@@ -277,22 +263,13 @@ export default function OperationApp() {
   function changeTab(next: string) {
     if (next === "procurement") {
       navigate("/operation/procurement");
-      setMovementsPrefill(undefined);
-      setWarehousePrefill(undefined);
       return;
     }
     if (next === "orders") {
       navigate("/operation/orders");
-      setMovementsPrefill(undefined);
-      setWarehousePrefill(undefined);
       return;
     }
 
-    // Switching away from the movements / warehouse tabs via the sidebar
-    // discards any pending prefill so re-entering the tab starts fresh — a
-    // plain warehouse entry must NOT inherit a stale alert filter.
-    if (next !== "movements") setMovementsPrefill(undefined);
-    if (next !== "warehouse") setWarehousePrefill(undefined);
     setTab(next);
     // Leave any URL-driven section behind so the nested <Routes> stops
     // matching.
@@ -324,6 +301,7 @@ export default function OperationApp() {
         {!isOrdersUrl &&
           !isDeliveryOrdersUrl &&
           !isEditDeliveryUrl &&
+          !isStockUnitUrl &&
           !isOldOrdersUrl &&
           !isProcurementUrl &&
           !isToOrderUrl &&
@@ -342,7 +320,10 @@ export default function OperationApp() {
           tab !== "receiving" &&
           tab !== "claims" &&
           tab !== "purchasing-report" &&
-          tab !== "purchasing-settings" && <GlobalTopBar />}
+          tab !== "purchasing-settings" &&
+          tab !== "stock-onhand" &&
+          tab !== "warehouse-schedule" &&
+          <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
             isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
@@ -442,20 +423,6 @@ export default function OperationApp() {
             {tab === "dashboard" && (
               <OperationDashboard setTab={changeTab} goWarehouse={goWarehouse} />
             )}
-            {tab === "warehouse" && (
-              <OperationWarehouse
-                setTab={changeTab}
-                goMovements={goMovements}
-                initialAlert={warehousePrefill?.alert ?? false}
-              />
-            )}
-            {tab === "movements" && (
-              <OperationMovements
-                initialFilters={movementsPrefill}
-                clearInitialFilters={() => setMovementsPrefill(undefined)}
-                setTab={changeTab}
-              />
-            )}
             {/* P3 — GRN receiving station (待收 queue). Distinct from the
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
@@ -517,8 +484,8 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {tab === "warehouse-schedule" && <WarehouseSchedule />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
-            {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}
             {tab === "all-orders" && <OperationAllOrders />}
             {tab === "suppliers" && <OperationSuppliers />}
