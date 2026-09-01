@@ -18,6 +18,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { useCreateSofaCombo, useDeleteSofaCombo, useUpdateSofaCombo } from "@/lib/queries";
 import { INPUT_CLS, Modal } from "@/pages/operation/components/Modal";
+import { slotsSummary } from "../format";
 import { skuMargin } from "../margin";
 
 /**
@@ -60,12 +61,6 @@ function fmtDateTime(iso: string): string {
   const d = fmtDate(date);
   const time = rest ? rest.slice(0, 5) : "";
   return time ? `${d} ${time}` : d;
-}
-
-/** A short human summary of a combo's slots, e.g. "2A(LHF)|2A(RHF) + L(LHF)". */
-function slotsSummary(slots: string[][]): string {
-  if (slots.length === 0) return "—";
-  return slots.map((s) => s.join("|")).join(" + ");
 }
 
 

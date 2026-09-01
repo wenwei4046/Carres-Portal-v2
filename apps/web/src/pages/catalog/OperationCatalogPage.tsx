@@ -4,11 +4,12 @@ import { useAuth } from "@/lib/auth";
 import { PillTabs, type PillTab } from "./components/PillTabs";
 import OperationSkuCostTab from "./tabs/OperationSkuCostTab";
 import OperationFabricCostTab from "./tabs/OperationFabricCostTab";
+import OperationComboCostTab from "./tabs/OperationComboCostTab";
 import ModularTab from "./modular/ModularTab";
 
 /**
  * Operation Catalog (0226, Loo 2026-07-16) — the BUYING-side door onto the one
- * catalog. Three tabs:
+ * catalog. Four tabs:
  *
  *   • SKU Master — the SAME shared product_skus list. Cost and supplier are
  *     this door's reason to exist and are editable by operation + principal.
@@ -16,6 +17,9 @@ import ModularTab from "./modular/ModularTab";
  *     component as Product & Maintenance).
  *   • Fabric     — the procurement fabric master with a per-fabric buying
  *     ADD-ON (RM): picking a specific fabric adds its recorded cost.
+ *   • Sofa Combos — read-only costing view: what a combo costs us at each
+ *     seat height. The combo itself is created, priced and retired on the
+ *     admin Sofa combos tab, so this is a door and not a duplicate.
  *
  * ⭐ ALIGNED WITH PRODUCT & MAINTENANCE — owner ruling 2026-08-26 (Jess):
  * *"the 2 catalogues should align"*. This page used to hide the selling price,
@@ -31,12 +35,13 @@ import ModularTab from "./modular/ModularTab";
  * one catalog behind two doors.
  */
 
-type TabKey = "sku" | "modular" | "fabric";
+type TabKey = "sku" | "modular" | "fabric" | "combo";
 
 const TABS: readonly PillTab<TabKey>[] = [
   { key: "sku", label: "SKU Master" },
   { key: "modular", label: "Modular" },
   { key: "fabric", label: "Fabric" },
+  { key: "combo", label: "Sofa Combos" },
 ];
 
 export default function OperationCatalogPage() {
@@ -75,6 +80,7 @@ export default function OperationCatalogPage() {
           {tab === "sku" && <OperationSkuCostTab catalog={catalogQ.data} />}
           {tab === "modular" && <ModularTab catalog={catalogQ.data} isPrincipal={isPrincipal} />}
           {tab === "fabric" && <OperationFabricCostTab catalog={catalogQ.data} />}
+          {tab === "combo" && <OperationComboCostTab catalog={catalogQ.data} />}
         </>
       )}
     </div>

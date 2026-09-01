@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   PROCEED_BLOCKER_LABEL,
+  SERVER_EXCLUSIVE_ADDON_KEYS,
   isProceedBlockerCode,
   maxLeadDaysFor,
   minDeliveryDateISO,
@@ -91,7 +92,13 @@ interface Props {
 }
 
 /** 0184 — delivery trip-fee addons appended by the Hono recompute (same
- *  labels DealerOrderDetail uses). */
+ *  labels DealerOrderDetail uses).
+ *
+ *  ⚠️ LABELS ONLY. This map is not the list of server-computed fees and must
+ *  never be used as one — `SERVER_EXCLUSIVE_ADDON_KEYS` is. It was used as the
+ *  pencil's gate until 2026-09-01, which is how `STAIR_CARRY` kept an edit door
+ *  the office screen had already closed. A stair-carry row needs no label here
+ *  because the catalog carries its name (`Stair carry`, seeded by 0393). */
 const DELIVERY_ADDON_LABELS: Record<string, string> = {
   DELIVERY: "Delivery fee",
   DELIVERY_CROSS: "Cross-category delivery",
@@ -1141,11 +1148,19 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                     ? ((a.attrs as { size: string }).size)
                     : null;
                 // 0258 — service add-ons get the pencil too (Loo: "service
-                // sku need to be editable as well"); DELIVERY* rows are
-                // server-computed and stay locked.
+                // sku need to be editable as well"); a SERVER-COMPUTED fee
+                // stays locked, because its price is worked out per order and
+                // nobody picked it.
+                //
+                // 0406 — ask the one exported list, never a local copy. The
+                // gate here read `DELIVERY_ADDON_LABELS`, a LABEL map holding
+                // the three 0184 delivery keys, so when `STAIR_CARRY` became
+                // the fourth computed fee this pencil kept offering it. The
+                // office screen closed the same door on the same day; this one
+                // was a different copy of the list and nobody edited it.
                 const editable =
                   (scope.editablePlaced || (scope.editableProceed && !pendingChange)) &&
-                  !DELIVERY_ADDON_LABELS[a.addonKey] &&
+                  !SERVER_EXCLUSIVE_ADDON_KEYS.has(a.addonKey) &&
                   !!a.id;
                 return (
                   <div
