@@ -671,7 +671,7 @@ export default function OperationDelivery() {
       },
       {
         key: "delivery_status",
-        label: "Work",
+        label: "Delivery Status",
         width: 180,
         sortable: true,
         filterType: "enum",

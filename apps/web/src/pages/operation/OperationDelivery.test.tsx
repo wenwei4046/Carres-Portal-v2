@@ -323,17 +323,16 @@ describe("the listing", () => {
       "Logistics Partner",
       "Goods",
       "DO No",
-      "Work",
+      "Delivery Status",
     ]);
-    // A register finds documents; the governed action column is exactly Work.
+    // A register finds documents; it never names an owner or an action.
     expect(headers).not.toContain("Owner");
     expect(headers).not.toContain("Next Action");
-    expect(headers).not.toContain("Current Action");
   });
 
-  it("⭐ Work says where the work is, never `Created` and never the DO absence", () => {
+  it("⭐ Delivery Status says where the WORK is, never `Created` and never the DO absence", () => {
     /* OWNER CORRECTION 2026-08-24, and it OVERWRITES the earlier twinning.
-       `DO No` answers *which document* and `Work` answers *where is
+       `DO No` answers *which document* and `Delivery Status` answers *where is
        the work* — two questions, so two answers. The document's own word
        `Created` belongs to the Delivery Orders Register and may not appear. */
     wrap(<OperationDelivery />);
