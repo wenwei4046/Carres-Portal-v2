@@ -1085,6 +1085,49 @@ Warehouse owns check/pack/handover evidence; NETS Delivery owns acceptance/trans
 evidence; Purchasing receives dated shortage/late-arrival work; Finance consumes events without
 controlling physical handover.
 
+### 12.7 Transfer between governed Sites
+
+**CURRENT CARRES →** legacy transferred status or direct warehouse/location change can teleport a
+Unit without origin handover, transport holder and destination receipt. Transfer, Delivery and PO
+relocation may duplicate one movement; partial arrival and post-collection cancellation can be
+hidden by a whole-document state.
+
+**2990 / MATURE ERP LESSON →** keep 2990 Transfer number, From/To, paired OUT/IN events, batch/Unit
+trace and correction history. Mature ERP confirms that dispatch and receipt are separate facts and
+the carrier holds goods between them. Reject instant posting, overdraw warning with continue,
+variant/batch flattening, Warehouse freight/cost allocation and destructive cancellation after
+dispatch.
+
+**RULING → ADAPT + IMPROVE + REJECT.** Transfer is one exact-Unit Stock object, projected into
+origin Outbound and destination Inbound; it does not add a fifth Warehouse destination. Each Unit
+changes holder only through accepted handovers. A whole Transfer cannot hide partial collection,
+acceptance, arrival or an unmatched Unit.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** a Transfer request states exact Units, From, To, collection
+date and arrival date. The origin person scans and hands affected Units to the actual NETS Delivery
+person; only those Units change holder. Destination Inbound provides the dated work; the authorised
+destination person scans/checks each actual arrival and only accepted Units change to that Site.
+Computed presentation may read `Planned · Collected from origin · With delivery person · Arrived at
+destination`; `Moved` is insufficient. Before collection the Transfer may be cancelled with reason;
+after collection, return or redirect requires a new governed handover journey.
+
+**OPERATOR JOURNEY →** origin opens the Transfer through Outbound, reads number/From/To/date/exact
+Units, scans what is handed over and identifies the actual delivery person. Destination opens the
+same Transfer through Inbound, scans what arrived, checks identity/condition and records each receipt
+outcome. Investigation compares origin handover, delivery acceptance and destination receipt
+without deleting conflicting evidence; each unmatched Unit receives its own concrete Action.
+
+**UI / PAGE / OBJECT PLACEMENT →** no Transfer top navigation is added. Outbound hosts origin work;
+Inbound hosts destination work; Inventory shows current holder and History. Transfer Detail uses
+the Object Detail Template with `Transfer No · source request · exact Units · From · To · collection
+date · arrival date · delivery party · Outbound work · Inbound work · evidence · History`.
+Inventory/Reports may filter Transfer History but do not create a second movement ledger.
+
+**CROSS-MODULE CONNECTION →** Stock owns Transfer and Unit-holder truth; Outbound owns origin work;
+Inbound/Receiving owns destination receipt; NETS Delivery owns transport-period evidence; customer
+Delivery keeps its own DO/Journey; supplier return keeps Purchase Return/Supplier Claim authority;
+Finance consumes physical movement without maintaining freight allocation in Transfer.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
