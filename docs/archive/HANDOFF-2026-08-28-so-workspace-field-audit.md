@@ -1,3 +1,13 @@
+> ⛔ **ARCHIVED 2026-08-31 — MISSION COMPLETE. NOT AUTHORITY.**
+> This prompt launched the Sales Order Workspace field audit on 2026-08-28. That
+> audit was delivered, corrected once, and its findings are now tracked in
+> `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md`.
+>
+> **The live starter for this lane is
+> `docs/handoff/SO-LANE-CONTINUATION-PROMPT.md`.** Per `CLAUDE.md` Law 1, nothing
+> in `docs/archive/` is read as authority — this file is kept only so the audit's
+> original scope and wording can be checked against what was delivered.
+
 # HANDOFF PROMPT — Sales Order Workspace, line-by-line field audit
 
 Paste everything below the line into a fresh session. It is self-contained.
