@@ -279,6 +279,35 @@ actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, 
 Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
 it into a misleading current-day bucket.
 
+The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
+For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
+5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
+later working date come from the Warehouse calendar rather than staff memory.
+
+For any selected date, the operator journey is always:
+
+1. **Open Dashboard:** read everything that must happen on that actual date across Inbound,
+   Inventory, `Needs checking`, Outbound and Month-end.
+2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
+   Units through Receiving; unresolved arrivals remain under their promised date.
+3. **Complete Inventory work:** Count or Count again, inspect reported damage, look for an exact
+   Unit not found and confirm an observed holder/Site mismatch. Inventory does not invent a NETS
+   Zone, Rack or Bin.
+4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
+   the accepted event transfers holder authority to the individually identified next person.
+5. **Close the date:** Dashboard separates `Completed on {date}`, `{n} not done`, `Evidence not
+   submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
+   Units.
+
+The sequence changes presentation only, never ownership. Receiving completes receipt facts;
+Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
+re-resolves the responsible person. Dashboard and the date strip store none of them.
+
+Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
+done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
+Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
+opens another date.
+
 Dashboard is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
 from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
 an actual date, the page groups the one work set in business order:
