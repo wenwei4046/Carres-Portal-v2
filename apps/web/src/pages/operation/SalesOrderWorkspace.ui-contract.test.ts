@@ -9,6 +9,7 @@ const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
 const addons = readFileSync(join(here, "SalesOrderAddons.tsx"), "utf8");
+const queries = readFileSync(join(here, "../../lib/queries.ts"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
@@ -937,6 +938,12 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).toContain('data-pos-field="orderAddons"');
     expect(addons).toContain('data-testid="so-addon-open"');
     expect(addons).toContain("Add a service");
+    /* ⭐ AND THE TABLE ACTUALLY REFRESHES (YH, 2026-09-01 — "ensure numbers
+       and generated SO are correct"). The table is now the ONLY place a new
+       service appears, so the add path must invalidate the key the office
+       reads. `["orders"]` never reached `["operation","orders",id]` — see
+       `order-addon-invalidation.test.ts` for the prefix proof. */
+    expect(queries).toContain('void qc.invalidateQueries({ queryKey: ["operation", "orders"] });');
   });
 
   it("puts the salesperson door beside the salesperson, not in a row of its own", () => {
