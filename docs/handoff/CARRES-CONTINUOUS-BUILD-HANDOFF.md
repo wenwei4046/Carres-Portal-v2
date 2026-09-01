@@ -15,6 +15,13 @@ Paste everything below the line into a fresh session. It is self-contained.
 > **When this lane's mission changes, OVERWRITE this file — never add a second
 > one beside it.**
 >
+> **2026-09-01: FOUR Claude Code sessions were merged into one, and this file is
+> what they became.** They were the continuous build, the Sales Order Workspace
+> field audit, the code-review/deploy watch, and the Catalog lane. Context
+> switching between four of them cost more than they returned. **§6 is now one
+> list with no owners.** Purchasing/Receiving/Delivery/Warehouse is a separate
+> CODEX lane and was NOT merged — see §6.5.
+>
 > Its sections do not age at the same rate:
 >
 > | Section | Shelf life |
@@ -55,46 +62,77 @@ items in it are the work; do not re-audit.**
 
 | Fact | Value | How to re-measure |
 |---|---|---|
-| `origin/main` | `c35adc60` | `git rev-parse --short origin/main` |
-| Branch state | level with main, tree clean | `git rev-list origin/main..dev_branch_yh --count` |
-| `apps/web` tests | **GREEN — 282 files, 3634 tests** | `cd apps/web && pnpm exec vitest run` |
-| `apps/api` + `shared` | **GREEN — 130 files, 2590 tests** | `pnpm --filter @carres/api --filter @carres/shared test` |
+| `origin/main` | `31ad3af4` — **and it moved 8 times in one hour** | `git rev-parse --short origin/main` |
+| `apps/web` tests | **GREEN — 283 files, 3660 tests** | `cd apps/web && pnpm exec vitest run` |
+| `apps/api` + `shared` | **GREEN — api 130 files / 2599 tests · shared 119 files / 2814 tests** | `pnpm --filter @carres/api --filter @carres/shared test` |
 | Typecheck | clean | `pnpm -r typecheck` |
 | Lint | passes (Stage 1, warn-only) | `pnpm -r lint` |
-| Migration filenames | 418 validated | `node scripts/check-migrations.mjs` |
+| Migration filenames | **419 validated** | `node scripts/check-migrations.mjs` |
 | Migration tail, ALL branches | **0409** → next free is **0410** | the rename-safe command in §4 |
-| On `main` | `0393`–`0409`, plus `0398a` | `ls supabase/migrations` |
-| Production | **2 commits behind, deploys queued** | `EXPECTED_SHA=$(git rev-parse origin/main) node scripts/verify-production.mjs` |
+| On `main` | through `0409`; `0407`/`0408` exist only on branches | `git ls-tree origin/main supabase/migrations/` |
+| Production | **all five surfaces agree on `71cfcb01`** | `EXPECTED_SHA=$(git rev-parse origin/main) node scripts/verify-production.mjs` |
 
-**On production lag:** all five surfaces agreed on `e70cac31` while `#1004`'s
-deploy had been in-progress 21 minutes and `#1006`'s was cancelled by a newer
-push. Queued deploys, not a failure. `verify-production.mjs` polls for 15
-minutes by default; set `CONVERGENCE_TIMEOUT_MS=1` for a single pass that
-reports what each surface currently serves.
+**On production lag — read this before reporting a deploy as failed.** Deploys
+are cancelled by concurrency constantly here: eight merges in one hour produced
+six cancelled runs, and every one of them is normal. **The newest run builds the
+main tip, and it carries everything the cancelled ones held.** The honest test
+is not "did my SHA deploy" but **"is my SHA an ancestor of what production
+serves"**:
 
-**The ten red `os-card-*` tests are FIXED** (`8bfa1099`, `#1002`/`#1003`). They
-were never a product bug — see §3.7. Do not go looking for them.
+```
+git merge-base --is-ancestor <your-sha> <deployed-sha> && echo IN || echo NOT-IN
+```
 
-### Shipped by this lane, merged and live
+`CONVERGENCE_TIMEOUT_MS=1` gives a single pass that reports what each surface
+currently serves instead of polling for 15 minutes.
 
-| Migration | What it does |
-|---|---|
-| `0391` | Office create requires a Proceed date; a blank one may be filled ONCE, then locks |
-| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move |
-| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded |
-| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database |
-| `0409` | Layer ④ Carres Execution — in what ORDER the goods move. Completes Loo's four-layer claim model; **applied by YH 2026-09-01** |
+### What is live, and what is only merged
 
-Plus, without a migration: the office add-on door (`SalesOrderAddons.tsx`) · the
-FK guard that stops a missing migration blocking a sale · one name for the
-delivery fee · the two POS delivery-fee inputs withheld · one absence word
-(`Not recorded`) · goods-row alignment · Money card one size · `Change delivery
-date` · the building-type gate · duty work reaching Finance and Delivery ·
-`Preview PDF` retired · `Copy to a new Sales Order` retired · the stair-count
-clamp · ~20 banned words removed across Workspace, Revisions and Order Route ·
-Revisions/History loading and error guards (a 403 used to render as "No
-revisions recorded") · the Order Route asking the shared money predicates
-instead of re-deciding them.
+⛔ **MERGED IS NOT APPLIED, AND THIS TABLE USED TO GET IT WRONG.** The previous
+version of this file listed `0395` and `0406` under "merged and live" and said
+`0406` was "closed at UI **and** database" — while §6 of the same file said both
+were probably unapplied. **Two sentences in one document, contradicting each
+other, for four hours.** That is why the finding now lives in
+`docs/carry-forwards.md` instead of in a status table that decays.
+
+| Migration | What it does | State |
+|---|---|---|
+| `0391` | Office create requires a Proceed date; a blank one may be filled ONCE, then locks | applied by hand |
+| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move | applied by hand |
+| `0395` | A misclicked service can be removed | **merged — measured ABSENT from the database** |
+| `0406` | A computed fee is not a pickable service — the doubling bug | **merged — measured ABSENT from the database** |
+| `0409` | Layer ④ Carres Execution — in what ORDER the goods move | applied by YH 2026-09-01 |
+
+**Verify before trusting either row.** See §6.1 item 1 for the one-paste query.
+
+### Shipped and live in production, by lane
+
+**Sales Order / Workspace lane** — the office add-on door
+(`SalesOrderAddons.tsx`) · the FK guard that stops a missing migration blocking
+a sale · one name for the delivery fee · the two POS delivery-fee inputs
+withheld · one absence word (`Not recorded`) · goods-row alignment · Money card
+one size · `Change delivery date` · the building-type gate · duty work reaching
+Finance and Delivery · `Preview PDF` retired · `Copy to a new Sales Order`
+retired · the stair-count clamp · ~20 banned words removed across Workspace,
+Revisions and Order Route · Revisions/History loading and error guards (a 403
+used to render as "No revisions recorded") · the Order Route asking the shared
+money predicates instead of re-deciding them.
+
+**Catalog lane** — the supplier **column** became a **door** (`efe73b7e`, #1008):
+a cell cannot hold a list, so one item code opens a modal showing the routing
+slot and every supplier that has quoted it, HOUZS-style · sofa combos gained a
+read-only **costing** view on `/operation?tab=op-catalog` (`969bd1b1`, #1014),
+answering *what does this combo cost us* per seat height, with a blank reading
+`not set` and never `RM 0.00` · the register's billing column now shows the
+delivery address when **"same as delivery"** is ticked instead of `Not recorded`
+(#1001) · emergency contact split from one column into three.
+
+**Both merges are confirmed live** — `efe73b7e` and `969bd1b1` are both
+ancestors of the deployed `71cfcb01`.
+
+**Calendar-fragility lane** — three board suites pinned their clock (#1002,
+#1003, #1013). The ten red `os-card-*` tests are FIXED and were never a product
+bug; see §3.7. **Do not go looking for them.**
 
 **Three owner rulings are LAW in `docs/orders/MASTER.md`** (YH, 2026-08-28):
 stair carry is money the customer owes · a date never recorded is not a date
@@ -217,8 +255,9 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
   `verify-production.mjs` after deploy.
 - **Merge `origin/main` before starting and before every push.** `gh pr merge`
   leaves you on main — run `git branch --show-current` before committing.
-- **Three sessions share this clone.** It has moved branches underneath a lane
-  twice and discarded uncommitted work once. Work in your own `git worktree`,
+- **This clone is shared, and merging the sessions did not stop that.** It has
+  moved branches underneath a lane twice and discarded uncommitted work once,
+  and the codex lane still pushes to it. Work in your own `git worktree`,
   stage by filename, commit early, and re-measure `origin/main` before and after.
   Do not touch another lane's branch.
 
@@ -236,8 +275,9 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 - **Do not re-run the field audit.** It exists, it has been corrected once, and a
   second sweep will re-report closed items.
 - **Do not touch the Purchasing lane** (`docs/purchasing/MASTER.md`, anything
-  `Manual Purchase` / `GRN` / `PO`) unless YH reassigns it. Another session owns
-  it and had ~112 commits in three days.
+  `Manual Purchase` / `GRN` / `PO`) unless YH reassigns it. It is a **codex**
+  lane, it was not part of the four-session merge, and it has five open PRs
+  right now (#1000, #999, #993, #986, #1005).
 - **Do not "fix" the `delivery_payment_approver` UI to read the duty.** The duty
   key was never created, so the gate is already identical to principal-only.
   Refuted in the audit §5 G-4 and ruled CHANGEABLE in the MASTER.
@@ -251,71 +291,134 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 6 · OPEN WORK, in order
 
-**Closed since this file was written:** Layer ④ (Carres Execution) is BUILT —
-migration `0409`, applied by YH 2026-09-01. Loo's four-layer claim model is
-complete, and the argument Purchase Returns (§9.6) and Repair Orders (§9.7) were
-frozen on now exists. **Both are still unbuilt**; they are unfrozen, not
-delivered, and each is a register with its own numbering, PDFs, handover proof
-and custody moves. The audit's 818-line correction pass also landed, from
-another lane.
+**This section now carries all four lanes.** Ownership is gone; the list is one
+list. Where an item came from another lane, its evidence is named so you can
+re-measure rather than trust it.
 
-**YH ruled while building it (2026-09-01): the layers are NOT cross-validated.**
-`Replace First` with `No Replacement Required` is incoherent and the database
-accepts it, deliberately — a guard would collapse two layers Loo's model keeps
-apart, and would refuse a real event (the van is already collecting; the
-customer has not settled what they want). Written into
-`docs/purchasing/MASTER.md` §9.5 and pinned by a test. **Do not add the guard**
-without reopening it with Loo.
+### 6.1 · The two things that are wrong RIGHT NOW
 
-1. 🔴 **The stair fee goes stale when goods change** — a live money defect in
+1. 🔴 **`0395` and `0406` may never have been applied — and one of them is a
+   money bug.** Both are merged, both have live callers, and the SO lane
+   measured both absent from the database on 2026-09-01. **This file said the
+   opposite in §2 for four hours; that contradiction is why the finding now
+   lives in `docs/carry-forwards.md`** as
+   `two-shipped-migrations-may-never-have-been-applied-and-one-is-a-money-bug`
+   (HIGH), where it cannot be quietly overwritten by a status line. If it holds:
+   `Remove` is a dead button in production (`orders.ts:3255` calls a function
+   that is not there), and the add-on doubling bug is open in the database.
+   **First action of the merged session: run the query in that entry.** It is
+   one paste and it never errors.
+
+2. 🔴 **The stair fee goes stale when goods change** — a live money defect in
    shipped code. `stairCarryFee` clamps on the order's item count, but
    `touchesStairInputs` watches only `delivery_floor`, `delivery_has_lift` and
    `delivery_stair_items`. Add or remove goods on a clamped order and the
    on-screen working-out recomputes live while the stored row does not. **One
-   screen, two numbers** — ownership Law D, and the exact defect the stair Card
+   screen, two numbers** — Ownership Law D, and the exact defect the stair Card
    was opened to close. Fix: make the line-writing paths re-stamp too.
 
-2. **`SO Date` is unregistered and contradicts the dictionary.** Commit
+### 6.2 · Waiting on YH, not on engineering
+
+3. **`SO Date` is unregistered and contradicts the dictionary.** Commit
    `11e11ca2` renamed `Ordered` → `SO Date` on five surfaces with no
    COPY-STANDARD entry, and the table at `COPY-STANDARD:1756` still rules
-   `Ordered: {date}` for that exact fact. Shipped code breaks the dictionary it
-   is ruled by. Register `SO Date` against `orders.placed_at` and retire the old
-   row — or revert the rename. YH decides which.
+   `Ordered: {date}` for that exact fact. Register `SO Date` against
+   `orders.placed_at` and retire the old row — or revert the rename. **YH picks.**
 
-3. **The instalment-months 500.** `orders_installment_months_chk` allows
-   NULL/6/12 and nothing above the database knows. A proposal of 9 saves fine and
-   fails at the **principal's** Approve press with raw constraint text on screen.
-   The bound is verified; the refusal **sentence** needs a ruled word from YH.
+4. **The instalment-months 500.** `orders_installment_months_chk` allows
+   NULL/6/12. A proposal of 9 saves fine and fails at the **principal's** Approve
+   press with raw constraint text on screen. The bound is verified; the refusal
+   **sentence** needs a ruled word.
 
-4. **Migrations `0395`–`0406` are probably unapplied.** YH applied through `0394`
-   by hand. `0395` is the one the office add-on door needs. Run the tracker query
-   and apply what is missing.
+5. **The add-on suppliers Card is QUEUED on one question.**
+   `docs/cards/CARD-2026-09-01-an-addon-remembers-every-supplier-that-quoted-it.md`
+   (merged `65a0ec91`). One add-on can be bought from several suppliers at
+   several costs and there is nowhere to put the second quotation — no add-on
+   table has ever carried a supplier. §9 asks: **does Carres ever raise a PO for
+   an add-on, or is add-on cost only ever a margin reference?** The Card
+   recommends building the offers table and leaving the routing slot out, which
+   is useful either way and cannot be wrong. **Do not build it before §9 is
+   answered.**
 
-5. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
-   (dry run), `-- --apply` to write. **YH's to run** — it needs the service-role
-   key and it changes money on existing orders.
+6. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
+   (dry run), `-- --apply` to write. **YH's to run** — service-role key, and it
+   changes money on existing orders.
 
-6. **Still open from the audit:** F-7 (`building_type` decides delivery slot
-   length, has no column and no constraint) · F-8 (floor bounds disagree across
-   UI/API/DB) · F-11 (the promised date is guarded by one layer, not two) · F-12
-   (`update_order` freezes six delivery fields after Proceed; the office door does
-   not) · F-13 (the floors evaluator is blind to seven fields) · F-14
-   (`sales-order-copy.ts` is dead code — its only importer is its own test) · the
-   emergency-contact parts-direction round-trip.
+7. **Nine alpha accounts and `principal@carres.com` are still on `111`.** Must
+   be rotated before go-live. YH's, not engineering's.
+
+### 6.3 · Carried in from the Catalog lane
+
+8. **Blank Sales Order fields — YH is filling them himself.** Jess asked that
+   every fillable column be filled by the time an order reaches Operations. The
+   measurement that settled the panic: 85 orders, 37 AutoCount imports (100%
+   blank, and §6 of the Constitution says today's rows are test data), 48
+   portal, of which 10 could not have passed the delivery-date gate and 4 are
+   genuinely unexplained. **Every order above SO-1322 is clean.** ⚠️ **Untick
+   `Address not given yet` BEFORE typing an address, or the save discards it.**
+   Re-scan after YH finishes.
+
+9. **Catalog has no module MASTER.** `CLAUDE.md`'s authority map calls it a
+   `PROPOSAL / authority gap` and says *do not infer rules from other modules*.
+   Four owner rulings now live only in Card headers and commit messages — the
+   supplier slot vs. offer list split, one item code with a modal rather than a
+   column, cost belongs on the Operation door, and combos are viewable there
+   read-only. **They belong in a MASTER.** This is the highest-value docs work
+   available and needs no owner decision to start.
+
+### 6.4 · Still open from the SO field audit
+
+10. F-7 (`building_type` decides delivery slot length, has no column and no
+    constraint) · F-8 (floor bounds disagree across UI/API/DB) · F-11 (the
+    promised date is guarded by one layer, not two) · F-12 (`update_order`
+    freezes six delivery fields after Proceed; the office door does not) · F-13
+    (the floors evaluator is blind to seven fields) · F-14
+    (`sales-order-copy.ts` is dead code — its only importer is its own test) ·
+    the emergency-contact parts-direction round-trip.
+
+    **Do not re-run the audit.** It exists, it has been corrected once, and a
+    second sweep will re-report closed items.
+
+### 6.5 · Not yours unless YH reassigns
+
+**Purchasing, Receiving, Delivery and Warehouse are a CODEX lane, not one of the
+merged sessions**, and they have five open PRs right now — #1000, #999, #993,
+#986, #1005. Merging the Claude sessions did **not** merge that lane. Do not
+touch `docs/purchasing/MASTER.md` or anything `Manual Purchase` / `GRN` / `PO`.
+
+**#948 must not ride an ordinary merge** — it needs `0391` applied before merge
+and `0392` after the Worker is verified, and it needs Jess's approval.
+
+**Purchase Returns (§9.6) and Repair Orders (§9.7) are unfrozen, not
+released.** Layer ④ (`0409`) completed Loo's four-layer claim model and removed
+the argument they were frozen on. Each is a full register — numbering, PDF
+issue, handover proof, custody moves, Finance credit reads — and §9.6/§9.7 are
+page blueprints, not build scopes. **Do not start either on your own
+initiative.**
+
+**YH ruled 2026-09-01: the layers are NOT cross-validated.** `Replace First`
+with `No Replacement Required` is incoherent and the database accepts it,
+deliberately — a guard would collapse two layers Loo's model keeps apart, and
+would refuse a real event. Written into `docs/purchasing/MASTER.md` §9.5 and
+pinned by a test. **Do not add the guard** without reopening it with Loo.
 
 ## 7 · EXACT NEXT STEP
 
-Ask YH which item in §6 he is releasing, and recommend **① the stale stair fee**
-— it is the only 🔴 on the list, it is a live money defect in code this lane
-shipped, and it is small. If he releases nothing, stand by. **Do not invent
-work.**
+**Run the `pg_proc` query from §6.1 item 1 first.** Everything else on this list
+is a guess until you know whether `0395` and `0406` are in the database. It is
+one paste, it never errors, and it either closes a HIGH carry-forward or turns
+it into the most urgent item in the file.
 
-Do NOT start Purchase Returns or Repair Orders on your own initiative just
-because Layer ④ unfroze them. Each is a full register — numbering, PDF issue,
-handover proof, custody moves, Finance credit reads — and §9.6/§9.7 are page
-blueprints, not build scopes. They need YH to release them.
+Then ask YH which item he is releasing, and recommend **the stale stair fee
+(§6.1 item 2)** — it is a live money defect in shipped code, it is small, and it
+needs no owner ruling.
+
+If he releases nothing, **do the Catalog MASTER (§6.3 item 9)**. Four owner
+rulings currently survive only in Card headers and commit messages, the
+authority map already flags the gap, and writing them down needs no decision
+from anybody. **Do not invent work beyond that.**
 
 ---
 
-*Written 2026-09-01 at `origin/main` = `c35adc60`. Status lines decay within
+*Merged from four sessions on 2026-09-01. Every status line above decays within
 days in this repo — measure, do not recite.*
