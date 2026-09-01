@@ -1128,6 +1128,51 @@ Inbound/Receiving owns destination receipt; NETS Delivery owns transport-period 
 Delivery keeps its own DO/Journey; supplier return keeps Purchase Return/Supplier Claim authority;
 Finance consumes physical movement without maintaining freight allocation in Transfer.
 
+### 12.8 Customer Return, Supplier Return and Repair
+
+**CURRENT CARRES →** a failed Delivery or return can leave the Unit falsely with Delivery; returned
+goods may become Ready Stock without inspection; Service Case/Supplier Claim closure can be
+mistaken for physical completion; Warehouse may duplicate the owning Return document; repair out
+and back can lack a continuous holder story.
+
+**2990 / MATURE ERP LESSON →** keep explicit Delivery Return/Purchase Return documents, source,
+actual date and new reverse-direction movement history. Mature ERP confirms that return is a new
+physical journey and must not delete the original dispatch/delivery attempt. Reject Warehouse-owned
+commercial return documents, quantity-only return, automatic availability after posting and
+destructive reversal of the original event.
+
+**RULING → ADAPT + IMPROVE + REJECT.** The commercial owner authorises why a Unit returns, leaves
+or is repaired; Stock/Receiving/Outbound prove the actual Unit, holder, condition and handovers.
+Every returned Unit is `Check required`, never automatically Ready Stock. Case/Claim closure does
+not move a Unit; original delivery/handover evidence remains append-only.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** an authorised Customer/failed-Delivery Return creates dated
+Inbound work; NETS Delivery hands back the exact Unit; NETS Warehouse scans/checks it; accepted
+receipt changes holder and sends the Unit to inspection, then governed outcome may return it to
+Ready Stock/reservation or route it to repair/service/write-off request. Purchasing-authorised
+Supplier Return creates Outbound work; only actual supplier/collection-party acceptance produces
+`Returned to supplier`. Repair creates Outbound handover to the actual repair partner, continuous
+`Who has it`, dated expected return, Inbound receipt and new inspection before any availability is
+restored.
+
+**OPERATOR JOURNEY →** return receiver opens the expected Inbound work, scans Unit/source,
+condition/components/evidence and submits receipt into `Needs checking`. Supplier-return operator
+opens Outbound, scans the exact Unit and identifies the actual supplier collector. Repair operator
+records out handover; Portal keeps the repair partner as holder and creates a concrete follow-up if
+the dated return is not submitted; actual return is scanned through Inbound and checked again.
+
+**UI / PAGE / OBJECT PLACEMENT →** no Warehouse Return top page exists. Inbound hosts `Customer
+Return · Return from repair · Supplier replacement · Failed Delivery return`; Outbound hosts
+`Return to supplier · Send for repair · Return to showroom/warehouse`. Unit Detail shows `Return/
+Repair reason · owning document · expected date · actual outbound handover · current Who has it ·
+expected return · actual receipt · condition before/after · evidence · physical outcome · History`.
+
+**CROSS-MODULE CONNECTION →** Sales/Delivery owns customer-return authorisation and outcome;
+Service Case owns customer problem and repair treatment; Purchasing owns Supplier Claim/return/
+replacement; Stock owns physical holder/condition/availability; Receiving owns return receipt;
+Outbound owns supplier/repair handover; Finance owns refund, Credit Note, write-off value and
+supplier settlement.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
