@@ -69,6 +69,7 @@ import {
   resolveSalesOrderRoute,
   supplierClaimStatusLabel,
   myHolidaySet,
+  unitsShortWords,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
@@ -2177,33 +2178,53 @@ export default function SalesOrderWorkspace() {
             which is what read as "alignment wrong". One size on all three
             fixes the alignment and the fallback strings at the same time.
             Colour still separates them: Outstanding is red while owed. */}
-        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
-          <div>
-            <div className="text-label text-base-500">Total</div>
-            <div className="text-strong text-base-900" data-testid="money-total">
-              {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-base-500">Paid</div>
-            <div className="text-strong text-base-700" data-testid="money-paid">
-              <Money value={money.paid} />
-            </div>
-          </div>
+        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
+            last bare label-over-value pair on the page — the shape the rest of
+            the card stopped using when `Fact` took the kit's control skin. A
+            reader scanning down met boxes, boxes, boxes and then three loose
+            numbers, which reads as a different kind of thing rather than as
+            three answers this surface may not change.
+            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
+            door, and nothing here writes. The three-across grid is the same one
+            `Order info` and `Customer` use, so the amounts line up with every
+            other answer instead of packing left on a flex row.
+            Colour survives INSIDE the box: Outstanding is still red while any
+            of it is owed (owner ruling 2026-08-15), and all three keep
+            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
+            untouched. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Fact
+            label="Total"
+            value={
+              <span className="text-strong text-base-900" data-testid="money-total">
+                {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
+              </span>
+            }
+          />
+          <Fact
+            label="Paid"
+            value={
+              <span className="text-strong text-base-700" data-testid="money-paid">
+                <Money value={money.paid} />
+              </span>
+            }
+          />
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
               CUSTOMER owes HQ). It is the most-read number on the page
               (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
               (owner ruling 2026-08-15) — the colour carries that on its own,
               at the same size as its two neighbours. */}
-          <div>
-            <div className="text-label text-base-500">Outstanding</div>
-            <div
-              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-              data-testid="money-outstanding"
-            >
-              {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-            </div>
-          </div>
+          <Fact
+            label="Outstanding"
+            value={
+              <span
+                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+                data-testid="money-outstanding"
+              >
+                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+              </span>
+            }
+          />
         </div>
         {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
             SUMMARISES money and may never gain a form for it — so the one thing
@@ -2627,7 +2648,37 @@ export default function SalesOrderWorkspace() {
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
                     <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
+                    {/* ⭐ THE SHORT-LINE WORDS ARE RULED, AND `Not allocated`
+                        IS NOT ONE OF THEM (YH, 2026-09-01).
+                        `COPY-STANDARD.md`:1755 lists `Not allocated` in its
+                        `Do NOT use` column beside `No stock` and `Units not
+                        created yet`; the registered answer is the COUNT and
+                        then what is being waited on. `unitsShortWords` is that
+                        sentence, written once in shared, so this cell, the
+                        Order Route's STOCK node and the register expansion
+                        cannot drift into three spellings of one fact.
+                        A LOAD IS NOT A SHORTAGE. The Deliver To cell beside
+                        this one has always said `Loading…` while the expansion
+                        is in flight; this one did not, so a slow read printed
+                        `Not allocated` on a fully allocated line. Same guard,
+                        same word, same column behaviour. */}
+                    <td className="py-1.5 pr-3 font-mono text-meta">
+                      {goodsTruthQ.isLoading && !truth ? (
+                        "Loading…"
+                      ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
+                        truth.unitIds.join(" · ")
+                      ) : (
+                        (() => {
+                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          return (
+                            <>
+                              <div>{count}</div>
+                              <div className="mt-0.5 text-base-600">{waiting}</div>
+                            </>
+                          );
+                        })()
+                      )}
+                    </td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
                     <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
