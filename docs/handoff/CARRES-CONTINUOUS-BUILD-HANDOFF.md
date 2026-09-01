@@ -1,42 +1,79 @@
-# HANDOFF — Carres Portal v2 · continuous build
+# HANDOFF — Carres Portal v2 · one session, all modules
 
 Paste everything below the line into a fresh session. It is self-contained.
 
 > **`docs/handoff/` HOLDS EXACTLY ONE LIVE PROMPT, AND THIS IS IT.**
->
-> Two prompts existed here for four hours on 2026-09-01 — this one and
-> `SO-LANE-CONTINUATION-PROMPT.md`, merged five minutes apart by two sessions on
-> the same branch. They disagreed about whether the stair-carry backfill was
-> allowed. A fresh session could not tell which one ruled, which is the exact
-> failure Law 5 asks about: *can the project have one file fewer?* The Sales
-> Order prompt now lives in `docs/archive/`, which `CLAUDE.md` Law 1 excludes
-> from authority, and everything still live in it was folded into this file.
->
-> **When this lane's mission changes, OVERWRITE this file — never add a second
-> one beside it.**
->
-> Its sections do not age at the same rate:
+> When the mission changes, OVERWRITE this file. Never add a second one beside
+> it — that happened on 2026-09-01 and the two prompts disagreed about whether a
+> backfill was allowed. Finished ones go to `docs/archive/`, which `CLAUDE.md`
+> Law 1 excludes from authority.
 >
 > | Section | Shelf life |
 > |---|---|
-> | §2 status · §6 open work · §7 next step | **days** — re-measure or delete |
-> | §3 decisions · §4 constraints · §5 what to avoid | months — these are why the file exists |
+> | §2 status · §8 open work · §9 next step | **days** — re-measure or delete |
+> | §0 style · §3 autonomy · §4 decisions · §5 constraints · §6 avoid | months |
 >
 > Re-measure every number in §2 before trusting it. That is the point of the
 > file, not a disclaimer.
 
 ---
 
-CARRES PORTAL v2 — CONTINUOUS BUILD
+CARRES PORTAL v2 — ONE SESSION, ALL MODULES
 Repo `C:\Users\User\Desktop\Carres\Carres-Portal-v2` · branch `dev_branch_yh`
 Read `CLAUDE.md` first. Red lines §5 are absolute. No `Co-Authored-By` trailer.
-Lane: **BUILD/DELIVERY**. You ship. Interrupt YH only for a business rule.
+
+## 0 · HOW TO WRITE TO YH — read this before anything else
+
+**YH ran four sessions at once until 2026-09-01 and stopped because the reading
+load was the bottleneck, not the building.** He named the cause: too much prose,
+written for other engineers. You are now one session so that there is one thing
+to read. Do not spend that budget badly.
+
+**Rules, in the order they get broken.**
+
+1. **Answer in the first sentence.** Not context, not what you did, not a
+   restatement of the question. The answer.
+2. **A status update is a table.** Three columns at most: thing · state · what to
+   do. Prose wrapped around a table is usually the table said twice.
+3. **Mechanism second, and short.** One line, prefixed `Why:`. If it needs a
+   paragraph, the paragraph goes in the PR body and he gets the link.
+4. **Use the words on the screen.** `Remove`, `Proceed date`, `Stair carry` — not
+   `remove_order_addon`, not `p_proceed_date`, not `status = 'place'`. He caught
+   this directly: *"wdym allow removal on status = 'place' only?"* A database
+   value is not a word you may say to him.
+5. **No em-dash chains. No three-clause sentences.** Full stops are free.
+6. **One report per task, not per step.** He wants what shipped, what needs him,
+   what is still red. Not narration.
+7. **Never pad.** No "great question", no summary of the summary. If nothing
+   happened, say nothing happened.
+
+**The test:** could Jess — the boss, no coding background — read it and know what
+changed? If not, rewrite it.
+
+This governs **messages to YH only**. Code comments, migration headers, PR
+bodies and this file are written for the next session and stay thorough.
 
 ## 1 · GOAL
 
 Ship owner-released work end to end — build, test, PR, merge, verify — without
 returning routine engineering choices to the owner. YH releases the work; you
 own delivery. Jess is the boss and has no coding background.
+
+**⭐ YOU OWN EVERY MODULE NOW.** Until 2026-09-01 this was four sessions, each
+told to stay out of the others' files. That rule is retired: a bullet saying
+"another session owns Purchasing" is now just a way to leave work undone.
+
+| Module | Authority | State |
+|---|---|---|
+| Orders / Sales Order | `docs/orders/MASTER.md` | most active; the field audit's open items live here |
+| Purchasing · PO · GRN | `docs/purchasing/MASTER.md` | ~112 commits in 3 days; 3 stale PRs (§7) |
+| Stock / Warehouse | `docs/stock/MASTER.md` | 2 stale PRs, both conflicting (§7) |
+| Delivery | `docs/delivery/MASTER.md` | 1 stale draft PR (§7) |
+| Payment · Service · Rental · Guarantee · HR · UI · Issue tracker | their own `MASTER.md` | quiet |
+
+**Work one module at a time, in its own worktree.** Owning everything is not
+permission to touch everything in one branch. It is permission to pick up any of
+it when YH releases it.
 
 **The one thing that matters more than shipping: not shipping a wrong number.**
 This is a furniture ERP. Most defects found here are money defects, and they are
@@ -51,57 +88,105 @@ this number, may I change it). That was audited in full on 2026-08-28 —
 `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md`, 103 rows in render order. **The open
 items in it are the work; do not re-audit.**
 
-## 2 · CURRENT STATUS — measured 2026-09-01, re-measure before use
+## 2 · CURRENT STATUS — measured 2026-09-01 18:00, re-measure before use
 
 | Fact | Value | How to re-measure |
 |---|---|---|
-| `origin/main` | `c35adc60` | `git rev-parse --short origin/main` |
-| Branch state | level with main, tree clean | `git rev-list origin/main..dev_branch_yh --count` |
-| `apps/web` tests | **GREEN — 282 files, 3634 tests** | `cd apps/web && pnpm exec vitest run` |
-| `apps/api` + `shared` | **GREEN — 130 files, 2590 tests** | `pnpm --filter @carres/api --filter @carres/shared test` |
-| Typecheck | clean | `pnpm -r typecheck` |
-| Lint | passes (Stage 1, warn-only) | `pnpm -r lint` |
-| Migration filenames | 418 validated | `node scripts/check-migrations.mjs` |
-| Migration tail, ALL branches | **0409** → next free is **0410** | the rename-safe command in §4 |
-| On `main` | `0393`–`0409`, plus `0398a` | `ls supabase/migrations` |
-| Production | **2 commits behind, deploys queued** | `EXPECTED_SHA=$(git rev-parse origin/main) node scripts/verify-production.mjs` |
+| `origin/main` | `31ad3af4` | `git rev-parse --short origin/main` |
+| `apps/web` tests | GREEN — 282 files, 3639 tests | `cd apps/web && pnpm exec vitest run` |
+| `apps/api` tests | GREEN — 130 files, 2590 tests | `pnpm --filter @carres/api test` |
+| `packages/shared` | GREEN — 119 files, 2807 tests | `pnpm --filter @carres/shared test` |
+| Typecheck · lint · migration filenames | clean | `pnpm -r typecheck` · `pnpm -r lint` · `node scripts/check-migrations.mjs` |
+| Migration tail on `main` | `0409` | `ls supabase/migrations` |
+| Migration tail, ALL branches | `0409` → **next free is `0410`** | the rename-safe command in §5 |
+| Open PRs, other lanes | **6, four of them CONFLICTING** | §7 |
 
-**On production lag:** all five surfaces agreed on `e70cac31` while `#1004`'s
-deploy had been in-progress 21 minutes and `#1006`'s was cancelled by a newer
-push. Queued deploys, not a failure. `verify-production.mjs` polls for 15
-minutes by default; set `CONVERGENCE_TIMEOUT_MS=1` for a single pass that
-reports what each surface currently serves.
+### Migrations — what is in the DATABASE, not just the repo
 
-**The ten red `os-card-*` tests are FIXED** (`8bfa1099`, `#1002`/`#1003`). They
-were never a product bug — see §3.7. Do not go looking for them.
+**Merged is not applied.** Migrations here are run BY HAND in the Supabase SQL
+editor, and a hand-applied one leaves **no tracker row** — so the tracker cannot
+answer this and a green `main` is not evidence. Ask the database:
 
-### Shipped by this lane, merged and live
+```sql
+select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname in ('addon_is_server_computed',
+   'remove_order_addon', 'sales_order_create_unchecked_0374',
+   'order_stamp_stair_carry') order by 1;
+```
 
-| Migration | What it does |
-|---|---|
-| `0391` | Office create requires a Proceed date; a blank one may be filled ONCE, then locks |
-| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move |
-| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded |
-| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database |
-| `0409` | Layer ④ Carres Execution — in what ORDER the goods move. Completes Loo's four-layer claim model; **applied by YH 2026-09-01** |
+A name missing from the result is a migration that never ran.
 
-Plus, without a migration: the office add-on door (`SalesOrderAddons.tsx`) · the
-FK guard that stops a missing migration blocking a sale · one name for the
-delivery fee · the two POS delivery-fee inputs withheld · one absence word
-(`Not recorded`) · goods-row alignment · Money card one size · `Change delivery
-date` · the building-type gate · duty work reaching Finance and Delivery ·
-`Preview PDF` retired · `Copy to a new Sales Order` retired · the stair-count
-clamp · ~20 banned words removed across Workspace, Revisions and Order Route ·
-Revisions/History loading and error guards (a 403 used to render as "No
-revisions recorded") · the Order Route asking the shared money predicates
-instead of re-deciding them.
+| Migration | What it does | In the DB |
+|---|---|---|
+| `0391` | Office create requires a Proceed date; a blank one may be filled ONCE, then locks | ✅ applied |
+| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth, re-stamped when floor/lift/count move | ✅ applied |
+| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded | ✅ **applied by YH 2026-09-01** |
+| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database | ✅ **applied by YH 2026-09-01** |
+| `0409` | Layer ④ Carres Execution — in what ORDER the goods move | ✅ applied by YH 2026-09-01 |
+
+⭐ **`0395` and `0406` sat merged-but-unapplied for four days and nobody noticed**,
+because merging is visible and applying is not. For those four days `Remove` was
+a dead button and the add-on doubling bug was open in the database while the
+screen looked correct — the office UI hides that control, so the missing rule
+was invisible *because* it was missing. **A PR merging is not a feature
+shipping.** Run the probe above before you report anything as live.
+
+### Shipped without a migration
+
+The office add-on door (`SalesOrderAddons.tsx`) · the POS pencil asking the one
+shared key list instead of a local label map · the FK guard that stops a missing
+migration blocking a sale · one name for the delivery fee · the two POS
+delivery-fee inputs withheld · one absence word (`Not recorded`) · goods-row
+alignment · Money card one size · `Change delivery date` · the building-type gate
+· duty work reaching Finance and Delivery · `Preview PDF` retired · `Copy to a
+new Sales Order` retired · the stair-count clamp · ~20 banned words removed
+across Workspace, Revisions and Order Route · Revisions/History loading and error
+guards (a 403 used to render as "No revisions recorded") · the Order Route asking
+the shared money predicates instead of re-deciding them · the field audit's
+818-line correction pass.
+
+**The ten red `os-card-*` tests are FIXED** (`#1002`/`#1003`, unified by `#1013`).
+They were month-boundary fixtures, not a product bug. `sameMonth` had been on the
+ruled-out list and `sameMonth` is what it was — **"ruled out" meant "found nothing
+in it"**, which is a weaker claim than it reads as. Do not go looking for them.
 
 **Three owner rulings are LAW in `docs/orders/MASTER.md`** (YH, 2026-08-28):
-stair carry is money the customer owes · a date never recorded is not a date
-that is locked · the delivery-payment approver is the principal only, and that
-is explicitly marked CHANGEABLE.
+stair carry is money the customer owes · a date never recorded is not a date that
+is locked · the delivery-payment approver is the principal only, and that is
+explicitly marked CHANGEABLE.
 
-## 3 · KEY DECISIONS, AND WHY
+## 3 · AUTONOMY — what "let it run" means
+
+YH merged four sessions into one to stop context-switching. That only pays off if
+you stop asking him things he has already answered. **Default to shipping.**
+
+**SHIP without asking.** Open the PR, merge it when the gate is green, tell him
+after in one line.
+
+- Any fix to a defect you can demonstrate — a wrong number, a dead button, a gate
+  that disagrees with its API, a duplicated list.
+- Tests, types, lint, dead-code removal, comment and docs accuracy.
+- Any item in §8 that has no ⚠️ beside it.
+- Choosing the approach, the file layout, the migration shape, the test strategy.
+- Re-measuring anything in §2 and correcting it.
+
+**STOP and ask.** These are his, and guessing them has cost real money here.
+
+- ⚠️ **A customer-facing word that is not already in `docs/COPY-STANDARD.md`.**
+  Not a synonym, not "obviously fine". Ruled words only.
+- ⚠️ **A business rule** — who may approve, what a fee means, whether a thing is
+  owed. Ask Jess's question, not the schema's.
+- ⚠️ **Anything that writes to existing rows** — backfills, repricing, migrations
+  that touch data rather than shape.
+- ⚠️ **Applying a migration.** You cannot; it is hand-run. Hand him the file and
+  the probe.
+- ⚠️ **Deleting anything he did not ask you to delete** (red line 5).
+
+**When blocked, do not idle.** Finish everything in the task that does not depend
+on the answer, ship that, then ask the one question. One question, at the end,
+with your recommendation first.
+
+## 4 · KEY DECISIONS, AND WHY
 
 Do not re-litigate these. Each was ruled by the owner or resolved from authority.
 
@@ -171,7 +256,7 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 15. **Purchase Returns NOT built.** Its only legitimate source is an approved
     claim outcome, and that layer — Carres Execution — was frozen by Loo.
     Building it means inventing authorisation the repo says nobody may guess.
-    YH approved building Carres Execution itself on 30 Aug (§6).
+    YH approved building Carres Execution itself on 30 Aug (§8).
 
 16. **The stair-carry backfill IS allowed** (YH, 30 Aug: *"on old orders, if they
     should be added, they get added"*). The archived SO prompt said the opposite,
@@ -189,7 +274,7 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
     makes an operator type a false answer to record a true one. In
     `docs/purchasing/MASTER.md` §9.5 and pinned by a test.
 
-## 4 · CONSTRAINTS
+## 5 · CONSTRAINTS
 
 - **Migrations are applied BY HAND.** Code can reach production before its
   migration does — it did on 29 Aug and every stair-carry order failed with
@@ -217,12 +302,16 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
   `verify-production.mjs` after deploy.
 - **Merge `origin/main` before starting and before every push.** `gh pr merge`
   leaves you on main — run `git branch --show-current` before committing.
-- **Three sessions share this clone.** It has moved branches underneath a lane
-  twice and discarded uncommitted work once. Work in your own `git worktree`,
-  stage by filename, commit early, and re-measure `origin/main` before and after.
-  Do not touch another lane's branch.
+- **One session now, but the clone still holds five worktrees and other tools
+  push here.** Branches have moved underneath a lane twice and uncommitted work
+  was discarded once. Work in your own `git worktree`, stage by filename, commit
+  early, and re-measure `origin/main` before and after. A branch name that
+  already exists is a signal, not an obstacle — pick another.
+- **A PR can merge while you are editing its branch.** It happened on
+  2026-09-01: a push landed on an already-merged branch and never reached `main`.
+  Re-check `gh pr view <n>` before pushing a follow-up commit.
 
-## 5 · WHAT TO AVOID
+## 6 · WHAT TO AVOID
 
 - **Do not report a PR's contents from a local commit count.**
   `git rev-list origin/main..HEAD --count` answers "what is unmerged", NOT "what
@@ -235,9 +324,12 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
   §3.7 — it is this codebase's signature defect.
 - **Do not re-run the field audit.** It exists, it has been corrected once, and a
   second sweep will re-report closed items.
-- **Do not touch the Purchasing lane** (`docs/purchasing/MASTER.md`, anything
-  `Manual Purchase` / `GRN` / `PO`) unless YH reassigns it. Another session owns
-  it and had ~112 commits in three days.
+- ~~Do not touch the Purchasing lane~~ **— RETIRED 2026-09-01.** That bullet
+  existed because another session owned it. It does not any more; see §1. What
+  survives is the reason it was written: Purchasing moves fast (~112 commits in
+  three days) and has three open PRs, so **re-read `docs/purchasing/MASTER.md`
+  and `git log` that module before you change it**, rather than trusting anything
+  you remember about it.
 - **Do not "fix" the `delivery_payment_approver` UI to read the duty.** The duty
   key was never created, so the gate is already identical to principal-only.
   Refuted in the audit §5 G-4 and ruled CHANGEABLE in the MASTER.
@@ -246,18 +338,39 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 - **Do not delete files that were not requested** (red line 5), and do not use
   `git checkout <ref> -- .` to inspect another branch — it overwrites the working
   tree. Use `git show <ref>:<path>`.
-- **Do not write long explanations to YH.** He has said so repeatedly. Plain
-  words, conclusion first, mechanism second or on request.
+- **Do not write long explanations to YH.** The rules are in **§0** and they are
+  not a style preference — the reading load is what ended the four-session setup.
+  Kept as one line here rather than restated, because a rule written twice is the
+  defect §4.7 is about.
 
-## 6 · OPEN WORK, in order
+## 7 · INHERITED PRs — six open, none of them yours
 
-**Closed since this file was written:** Layer ④ (Carres Execution) is BUILT —
+These are the other sessions' work, left open when the four became one. **Nothing
+here is urgent and nothing here should be merged blind.** Four conflict against
+`main` and two are drafts. They are listed so you know they exist, not so you
+close them.
+
+| PR | Module | State | Size |
+|---|---|---|---|
+| [#1000](https://github.com/wenwei4046/Carres-Portal-v2/pull/1000) | Purchasing — converge through formal GRN | mergeable | +10393 / −3966 |
+| [#993](https://github.com/wenwei4046/Carres-Portal-v2/pull/993) | Purchasing — governed Purchase Orders | **conflicting** | +3134 / −235 |
+| [#986](https://github.com/wenwei4046/Carres-Portal-v2/pull/986) | Receiving — reconcile GRN authority | **conflicting** | +813 / −68 |
+| [#1005](https://github.com/wenwei4046/Carres-Portal-v2/pull/1005) | Stock — Stock Register and exact Unit access | **conflicting**, draft | +188 / −2 |
+| [#999](https://github.com/wenwei4046/Carres-Portal-v2/pull/999) | Delivery — Work, DO handover, result, narrow layout | draft | +1152 / −78 |
+| [#860](https://github.com/wenwei4046/Carres-Portal-v2/pull/860) | Warehouse — a unit crosses a site only by transfer | **conflicting**, stale since 20 Aug | +1950 / −15 |
+
+**Ask YH before touching any of them.** #1000 alone is 10k lines; rebasing it is
+a project, not a chore. The right first question is whether each is still wanted,
+not how to merge it.
+
+## 8 · OPEN WORK, in order
+
+**Recently closed:** Layer ④ (Carres Execution) is BUILT —
 migration `0409`, applied by YH 2026-09-01. Loo's four-layer claim model is
 complete, and the argument Purchase Returns (§9.6) and Repair Orders (§9.7) were
 frozen on now exists. **Both are still unbuilt**; they are unfrozen, not
 delivered, and each is a register with its own numbering, PDFs, handover proof
-and custody moves. The audit's 818-line correction pass also landed, from
-another lane.
+and custody moves. The audit's 818-line correction pass also landed.
 
 **YH ruled while building it (2026-09-01): the layers are NOT cross-validated.**
 `Replace First` with `No Replacement Required` is incoherent and the database
@@ -287,9 +400,10 @@ without reopening it with Loo.
    fails at the **principal's** Approve press with raw constraint text on screen.
    The bound is verified; the refusal **sentence** needs a ruled word from YH.
 
-4. **Migrations `0395`–`0406` are probably unapplied.** YH applied through `0394`
-   by hand. `0395` is the one the office add-on door needs. Run the tracker query
-   and apply what is missing.
+4. ✅ **CLOSED — `0395` and `0406` were unapplied and now are not.** Measured
+   against the live database on 2026-09-01 and applied by YH the same day. The
+   probe in §2 is what answered it; keep using it rather than reasoning from the
+   repo.
 
 5. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
    (dry run), `-- --apply` to write. **YH's to run** — it needs the service-role
@@ -303,19 +417,25 @@ without reopening it with Loo.
    (`sales-order-copy.ts` is dead code — its only importer is its own test) · the
    emergency-contact parts-direction round-trip.
 
-## 7 · EXACT NEXT STEP
+## 9 · EXACT NEXT STEP
 
-Ask YH which item in §6 he is releasing, and recommend **① the stale stair fee**
-— it is the only 🔴 on the list, it is a live money defect in code this lane
-shipped, and it is small. If he releases nothing, stand by. **Do not invent
-work.**
+**Start with §8 ① — the stale stair fee.** Do not ask first. It is the only 🔴 on
+the list, it is a live money defect in code this lane shipped, it is small, and
+it needs no ruling: the arithmetic already exists and one caller does not run it.
 
-Do NOT start Purchase Returns or Repair Orders on your own initiative just
-because Layer ④ unfroze them. Each is a full register — numbering, PDF issue,
-handover proof, custody moves, Finance credit reads — and §9.6/§9.7 are page
+Then work down §8 in order, shipping each as its own PR. **Stop only at an item
+marked ⚠️**, which today means ② (`SO Date` — YH picks register-or-revert) and ③
+(the instalment refusal sentence — needs a ruled word). Bank those two questions
+and ask them together, once, with your recommendation first.
+
+Do NOT start Purchase Returns or Repair Orders just because Layer ④ unfroze them.
+Each is a full register — numbering, PDF issue, handover proof, custody moves,
+Finance credit reads — and `docs/purchasing/MASTER.md` §9.6/§9.7 are page
 blueprints, not build scopes. They need YH to release them.
+
+Do NOT touch the six inherited PRs in §7 without asking.
 
 ---
 
-*Written 2026-09-01 at `origin/main` = `c35adc60`. Status lines decay within
-days in this repo — measure, do not recite.*
+*Written 2026-09-01 at `origin/main` = `31ad3af4`, when four sessions became one.
+Status lines decay within days in this repo — measure, do not recite.*
