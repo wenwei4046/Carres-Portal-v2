@@ -1173,6 +1173,51 @@ replacement; Stock owns physical holder/condition/availability; Receiving owns r
 Outbound owns supplier/repair handover; Finance owns refund, Credit Note, write-off value and
 supplier settlement.
 
+### 12.9 Showroom Stock and Supplier Consignment
+
+**CURRENT CARRES →** display sofas can live in staff memory, a supplier list or separate showroom
+sheet; Carres-owned, Consignment, sold-awaiting-Delivery and repair/change/collection goods may be
+split; showroom can be treated as a sales address rather than a Stock Site; ownership, holder,
+reservation and settlement can collapse into one status.
+
+**2990 / MATURE ERP LESSON →** keep warehouse/Site breakdown, source/batch/Unit trace and linked
+sale/transfer/return movements. Mature consignment control separates legal ownership, physical
+holder/location, customer allocation and supplier settlement. Reject a showroom stock ledger,
+Rack/Bin as a substitute for handover, quantity-only display stock and any status that merges
+supplier ownership with current place.
+
+**RULING → KEEP + ADAPT + IMPROVE + REJECT.** Every physical display sofa carries a Carres Unit ID
+and belongs to the one Unit Register; PJ Showroom and future outlets are governed Sites. Inventory
+may filter by Site and ownership but keeps one authority. Current scope rejects fabricated display
+Position/Zone/slot. Stock cannot change legal ownership or supplier settlement price.
+
+**RECOMMENDED CARRES BUSINESS FLOW →** `Showroom Display` includes Carres Owned, Supplier
+Consignment, reserved/sold awaiting Delivery, waiting repair/change and waiting supplier collection.
+An actual arrival requires the showroom person to scan/check the Unit and submit evidence before
+the Site/holder changes; departure requires an actual recipient handover. Sales Order reservation
+binds the exact display Unit while holder remains the showroom until collection. Consignment sale
+creates Purchasing `Sold to Settle`; Finance verifies invoice/payment. Purchasing authority to
+change/return/collect never moves the Unit without Outbound and recipient proof.
+
+**OPERATOR JOURNEY →** a personally signed-in showroom operator sees the Site's actual dated
+arrival, departure, Count and condition-check Work; scans arrival/departure, Counts, reports a
+problem and reads processing state; cannot change ownership/cost/SO reservation/Claim. Sales chooses
+an authorised exact display Unit without moving it. Purchasing manages Consignment Order, exchange,
+Claim, collection and Sold to Settle without editing holder.
+
+**UI / PAGE / OBJECT PLACEMENT →** Inventory rail contains `Showroom Display`, `WHO HAS IT → PJ
+Showroom / Other outlets` and `OWNERSHIP → Carres Owned / Supplier Consignment`. The saved view
+defaults to `Unit ID · Product · Site · Ownership · Stock use · SO No · Display since · Last
+condition check · Who has it · Expected collection · Work`. `Zone A3`, `Position 6`, Rack and other
+unverified placement fields are absent unless future measured outlet operations justify a governed
+extension.
+
+**CROSS-MODULE CONNECTION →** Purchasing owns Consignment Order/supplier/exchange/Claim/Sold to
+Settle; Stock owns Unit/Site/holder/condition/Count; Showroom owns physical scans and evidence;
+Sales Order owns exact reservation/sale; Delivery owns collection/return/customer handover; Finance
+owns Supplier Invoice/Credit Note/settlement; COO approves major unexplained difference/write-off/
+compensation.
+
 ## 13 · Current implementation reality — evidence, not law
 
 The superseded implementation has one Stock entry with On hand, In & out and a reorder-planning
