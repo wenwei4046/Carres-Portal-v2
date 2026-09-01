@@ -459,12 +459,32 @@ check why NETS has not submitted. Neither action becomes a generic `Overdue` rem
 
 Stock operations never close. The Portal reconciles exact timestamped Unit events between count and
 Stock date; it never guesses, backdates or adjusts a total to match. The frozen report separates
-Carres Owned, Supplier Consignment, Sites, In transit, Reserved or sold, controlled Units, approved
-adjustments and unresolved differences, with drill-down to IDs.
+Carres Owned, Supplier Consignment, Reserved for Sales Orders, Ready Stock, Showroom Display, each
+recorded journey holder, `Needs checking`, approved Adjustments and unresolved differences. Every
+section and total drills to exact Unit IDs, source documents and evidence; a summary number without
+that lineage is invalid.
 
 Warehouse may submit on time with disclosed unresolved differences. Finance acknowledges a specific
-version. Later correction creates a reasoned Version 2; Version 1 remains. Finance valuation reads
-ownership and source facts but does not write physical Stock.
+version. Submission therefore may truthfully read `136 Units confirmed · 3 unresolved differences`
+and expose the three Units, first Count, Count again, current investigation, resolved owner, next
+actual work date and any required COO decision. Staff do not manufacture a zero-difference report
+to meet Finance's deadline.
+
+Finance may `Acknowledge Version {n}` for valuation and reporting. It cannot edit a Unit, holder,
+Count, difference, Adjustment or physical event and must not save another month-end Stock total.
+Purchasing supplies ownership and PO/Consignment source facts; Sales Order supplies reservations;
+Delivery supplies handover and journey-holder facts. Reading those consequences never transfers
+their write ownership into Finance or Month-end.
+
+A later resolved difference or corrected physical fact creates a reasoned Version 2 containing the
+new evidence; Version 1 remains immutable and identifiable as the version Finance previously
+acknowledged. No new version silently overwrites history, and Finance valuation always identifies
+the exact acknowledged version it used.
+
+The dated Work set keeps the acts separate: NETS counts on its actual date; the current GRN Duty
+reconciles and submits by the governed submission date; the COO decides any Adjustment on its own
+actual date. Completion comes from the Count submission, Month-end submission or COO decision fact,
+never a generic `Mark done`.
 
 ## 10 · Permissions
 
