@@ -1,9 +1,9 @@
 # PURCHASING — CARD 06 · RECEIVING / GRN AUTHORITY RECONCILIATION
 
-**Module:** Purchasing → Receiving  
+**Module:** Purchasing → Receiving
 **Owner rulings:** 29–31 Aug 2026
 **Status:** OWNER-APPROVED DESIGN — implementation remains gated
-**Lane:** PLAN / AUTHORITY RECONCILIATION  
+**Lane:** PLAN / AUTHORITY RECONCILIATION
 **Branch:** `codex/receiving-grn`
 
 ## 1 · Why this Card exists
