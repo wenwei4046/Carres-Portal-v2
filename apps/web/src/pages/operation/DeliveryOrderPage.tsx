@@ -342,14 +342,28 @@ export default function DeliveryOrderPage() {
 
           {/* SOURCE SALES ORDER — the door */}
           <Panel title="Source Sales Order">
-            <button
-              type="button"
-              data-testid="do-open-so"
-              className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation/orders/so/${order.id}`)}
-            >
-              Open SO-{order.so} →
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                data-testid="do-open-so"
+                className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={() => navigate(`/operation/orders/so/${order.id}`)}
+              >
+                Open SO-{order.so} →
+              </button>
+              <button
+                type="button"
+                data-testid="do-open-order-route"
+                className="text-body font-medium text-blue-700 underline-offset-2 hover:underline"
+                onClick={() =>
+                  navigate(
+                    `/operation/orders/so/${encodeURIComponent(order.id)}?route=1`,
+                  )
+                }
+              >
+                Open Order Route →
+              </button>
+            </div>
           </Panel>
 
           {/* DELIVERY STATUS */}
