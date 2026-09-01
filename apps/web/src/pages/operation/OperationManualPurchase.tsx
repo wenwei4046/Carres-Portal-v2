@@ -245,7 +245,9 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       lines: lines.map((l) => ({
         qty: l.qty,
         issuedQty: l.issued_qty,
-        remainingQty: l.remaining_qty,
+        /* The APPROVER's number, not the database's generated
+           `qty − issued_qty`. See `manualPurchaseStatusOf`. */
+        approvedQty: l.approved_qty,
         cancelledAt: l.cancelled_at,
         poId: l.po_id,
         received: l.received,
@@ -2181,7 +2183,8 @@ function ManualPurchaseObject({
         lines: d.lines.map((l) => ({
           qty: l.qty,
           issuedQty: l.issued_qty,
-          remainingQty: l.remaining_qty,
+          /* The APPROVER's number — see `manualPurchaseStatusOf`. */
+          approvedQty: l.approved_qty,
           cancelledAt: l.cancelled_at,
           poId: l.po_id,
           received: l.received,

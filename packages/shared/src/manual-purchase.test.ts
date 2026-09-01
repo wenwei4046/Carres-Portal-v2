@@ -173,7 +173,7 @@ describe("Card 06 · `All not ordered` is derived request truth", () => {
       approvedAt: "2026-08-20T00:00:00Z",
       refusedAt: null,
       refuseReason: null,
-      lines: [{ qty: 2, issuedQty: 2, remainingQty: 0, cancelledAt: null, poId: "PO-1" }],
+      lines: [{ qty: 2, issuedQty: 2, cancelledAt: null, poId: "PO-1" }],
     });
     expect(manualPurchaseNotOrdered(ordered.kind)).toBe(false);
 
@@ -182,7 +182,7 @@ describe("Card 06 · `All not ordered` is derived request truth", () => {
       approvedAt: null,
       refusedAt: "2026-08-20T00:00:00Z",
       refuseReason: "duplicate",
-      lines: [{ qty: 2, issuedQty: 0, remainingQty: 2, cancelledAt: null, poId: null }],
+      lines: [{ qty: 2, issuedQty: 0, cancelledAt: null, poId: null }],
     });
     expect(manualPurchaseNotOrdered(refused.kind)).toBe(false);
 
@@ -191,7 +191,7 @@ describe("Card 06 · `All not ordered` is derived request truth", () => {
       approvedAt: null,
       refusedAt: null,
       refuseReason: null,
-      lines: [{ qty: 2, issuedQty: 0, remainingQty: 2, cancelledAt: null, poId: null }],
+      lines: [{ qty: 2, issuedQty: 0, cancelledAt: null, poId: null }],
     });
     expect(manualPurchaseNotOrdered(waiting.kind)).toBe(true);
   });

@@ -314,7 +314,11 @@ export interface ManualPurchaseStatusInput {
   lines: Array<{
     qty: number;
     issuedQty: number;
-    remainingQty: number;
+    /** ⭐ THE APPROVER'S NUMBER (YH, 2026-09-01). `null` = nobody cut it, so
+     *  the ask stands. This replaces `remainingQty`, which was the database's
+     *  generated `qty − issued_qty` column and does not know the cut exists —
+     *  see the note on `manualPurchaseStatusOf`. */
+    approvedQty?: number | null;
     cancelledAt: string | null;
     poId: string | null;
     /** Slice 3 wires this from the linked PO's posted receipt. */
@@ -363,14 +367,48 @@ export function manualPurchaseStatusOf(r: ManualPurchaseStatusInput): ManualPurc
       reasonLabel: null,
     };
   }
-  if (live.length > 0 && live.every((l) => l.received === true)) {
+  /* ⭐ THE APPROVER'S CUT IS PART OF THE ARITHMETIC (YH, 2026-09-01).
+     This read `remainingQty`, the database's generated `qty − issued_qty`
+     column, which does not know an approval cut exists. Every OTHER number on
+     the Manual Purchase page uses `manualPurchaseLineRemainingOf`, which
+     honours it. So a request for 5 that the approver cut to 2, then issued in
+     full, still reported 3 outstanding: the record read `Ready to order` after
+     its purchase order was raised, sat in the `All not ordered` worklist for
+     ever, and was untickable at the same time. The buying queue could never
+     empty and finished work was indistinguishable from outstanding work.
+     ONE arithmetic now, the same one the rest of the page reads (Law D).
+
+     ⭐ AND A LINE CUT TO ZERO IS NOT WAITING FOR ANYTHING. The issue door
+     filters a zero-remainder line out (`manual-purchase.ts` route), so it
+     never receives a `po_id` — and `every(… poId !== null)` could therefore
+     never be satisfied on a request containing one. A line the approver cut to
+     nothing is a line nobody is buying; it is excluded from what the request
+     is still PURSUING rather than blocking it for ever. If every live line was
+     cut to zero, nothing is going ahead, and the status says so. */
+  const remainingOf = (l: (typeof r.lines)[number]) =>
+    manualPurchaseLineRemainingOf({
+      qty: l.qty,
+      approvedQty: l.approvedQty ?? null,
+      issuedQty: l.issuedQty,
+    });
+  const cutToNothing = (l: (typeof r.lines)[number]) => (l.approvedQty ?? null) === 0;
+  const pursued = live.filter((l) => !cutToNothing(l));
+
+  if (live.length > 0 && pursued.length === 0) {
+    return {
+      kind: "not_going_ahead",
+      label: MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead,
+      reasonLabel: null,
+    };
+  }
+  if (pursued.length > 0 && pursued.every((l) => l.received === true)) {
     return {
       kind: "arrived",
       label: MANUAL_PURCHASE_STATUS_WORDS.arrived,
       reasonLabel: null,
     };
   }
-  if (live.length > 0 && live.every((l) => l.remainingQty <= 0 && l.poId !== null)) {
+  if (pursued.length > 0 && pursued.every((l) => remainingOf(l) <= 0 && l.poId !== null)) {
     return {
       kind: "ordered",
       label: MANUAL_PURCHASE_STATUS_WORDS.ordered,

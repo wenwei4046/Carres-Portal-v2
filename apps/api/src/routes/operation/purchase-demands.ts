@@ -626,21 +626,44 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
    * a purchase order sent to a yard that shut last month must still be able to
    * print where it went — and `active` is what stops it being CHOSEN again.
    * Filtering it out here would make an old document unreadable. */
-  let destinations: PurchasingDestination[] = [];
-  try {
-    const dest = await sb
-      .from("purchasing_destinations")
-      .select("id, name, is_default, active")
-      .order("name");
-    destinations = ((dest.data ?? []) as Record<string, unknown>[]).map((d) => ({
-      id: d.id as string,
-      name: (d.name as string) ?? "",
-      isDefault: d.is_default === true,
-      active: d.active !== false,
-    }));
-  } catch (e) {
-    console.error("so batch — destinations unavailable", (e as Error).message);
+  /* ⛔ THIS READ MAY NOT FAIL SOFT (YH, 2026-09-01).
+     It used to. The `try/catch` below was dead code for a failed query:
+     supabase-js returns a query error in the RESULT OBJECT and does not throw,
+     so `dest.error` went unread, `dest.data` was null, and `destinations`
+     quietly became `[]`. The log line "destinations unavailable" could not
+     fire.
+     WHAT AN EMPTY LIST COSTS. The whole buying capability of
+     `/operation?tab=purchase` dies and the page looks completely normal: every
+     checkbox is a no-op because a tick must be allocated to a destination, no
+     Deliver To dropdown draws, no Split button draws, and `Issue PO` never
+     appears. Nobody can tell it from a UI bug — which is exactly how it was
+     reported ("the boxes are all not clickable").
+     A page that cannot buy must SAY it cannot buy. This is the same rule the
+     lineage read above already follows. */
+  const dest = await sb
+    .from("purchasing_destinations")
+    .select("id, name, is_default, active")
+    .order("name");
+  if (dest.error) {
+    console.error("so batch — destinations unavailable", dest.error.message);
+    return c.json(
+      {
+        error: "destinations_unavailable",
+        code: "destinations_unavailable",
+        message: "The Deliver To list could not be read, so nothing can be bought on this page.",
+        action: "Reload the page. If it happens again, tell IT.",
+      },
+      500,
+    );
   }
+  const destinations: PurchasingDestination[] = (
+    (dest.data ?? []) as Record<string, unknown>[]
+  ).map((d) => ({
+    id: d.id as string,
+    name: (d.name as string) ?? "",
+    isDefault: d.is_default === true,
+    active: d.active !== false,
+  }));
   const defaultDestination = destinations.find((d) => d.isDefault && d.active) ?? null;
 
   /* WHO MAY COLLECT FROM A FACTORY. Read here rather than on the issue POST so
