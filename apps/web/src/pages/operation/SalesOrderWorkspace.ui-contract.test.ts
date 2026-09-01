@@ -326,6 +326,33 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
   });
 
+  /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
+     The working-out priced from the live `floor_config` singleton in EVERY
+     mode, so a principal moving the rate made one page print two numbers: the
+     sentence narrated the new rate while MONEY, the PDF and every payment cap
+     kept the fee that was actually stamped. An old revision was worse — it
+     mixed the snapshot's floor with the CURRENT order's line count.
+
+     ⛔ The live rate may reach this sentence on a CREATE and nowhere else,
+     because a create is the one state with no stamped row to read. */
+  it("prices the working-out from the stamped row once the order exists", () => {
+    expect(workspace).toContain("const stairWorking = useMemo");
+    /* The saved branch reads the stamped STAIR_CARRY row — the same row MONEY
+       reads, so the two cannot disagree on one page. */
+    expect(workspace).toContain("STAIR_CARRY_ADDON_KEY");
+    /* A REVISION IS A PHOTOGRAPH: its own lines and its own addons, never the
+       order's current ones. */
+    expect(workspace).toContain('mode === "oldrev" ? (viewedRevision?.snapshot ?? null) : null');
+    /* The rendered fee is the one the memo resolved per mode, never the live
+       re-derivation. */
+    expect(workspace).toContain("<Money value={stairWorking.fee} />");
+    expect(
+      workspace,
+      "the live rate must not be rendered directly — it is create-only, via stairWorking",
+    ).not.toContain("<Money value={stair.cfg.perFloorPerItem} />");
+    expect(workspace).not.toContain("<Money value={stair.fee} />");
+  });
+
   /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26),
      REFINED 2026-08-28 (YH): a date that was never RECORDED is not a date that
      is LOCKED. The lock is on the ANSWER, never on the emptiness.
