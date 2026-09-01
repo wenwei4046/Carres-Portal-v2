@@ -209,11 +209,19 @@ describe("Sales Order object template contract", () => {
   /* ⭐ FEWER CARDS, SAME FACTS — owner ruling 2026-08-26 (Jess): "make it merge
      more". `DELIVERY ADDRESS` joined `CUSTOMER` and `SALES OWNERSHIP` joined
      `ORDER INFO`. The merge may not cost a locked WORD, so each keeps its exact
-     name as a subsection heading; what it loses is a border, a 24px gap and a
-     second heading rule. */
-  it("merges the address into Customer and ownership into Order info, keeping both names", () => {
+     name; what it loses is a border, a 24px gap and a second heading rule.
+
+     ⭐ RE-PINNED 2026-09-01 (YH): `Sales ownership` came back OUT as a card of
+     its own. Jess's ruling was "fewer, fuller cards", and this half of it did
+     not serve that — `Order info` is what the CUSTOMER asked for (dates,
+     floors, a lift) and sales ownership is who inside Carres gets paid, so the
+     merged card held two topics rather than one fuller one. `Delivery address`
+     is untouched: it is the same party's fact as the customer above it, which
+     is why that half of the merge still reads as one card. */
+  it("merges the address into Customer, and gives ownership its own card again", () => {
     expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
-    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).toContain('<Block title="Sales ownership">');
+    expect(workspace).not.toContain("<SubHead>Sales ownership</SubHead>");
     expect(workspace).not.toContain('<Block title="Delivery address">');
     /* Every field of both merged sections still renders. */
     expect(workspace).toContain('data-pos-field="address"');
@@ -240,6 +248,7 @@ describe("Sales Order object template contract", () => {
       "Customer",
       "Money",
       "Order info",
+      "Sales ownership",
       "Goods",
       "What this change started elsewhere",
     ]);
@@ -564,10 +573,11 @@ describe("Sales Order object template contract", () => {
   });
 
   it("names the governed ownership request and hides it from Operation", () => {
-    /* The section merged into `Order info` on 2026-08-26 and kept its locked
-       word as the subsection heading — the merge moved the border, not the
-       name (COPY-STANDARD:1427 still governs the door below it). */
-    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    /* The word is locked (COPY-STANDARD:1427) and has now been a card, a
+       merged subsection, and a card again. It is the SAME STRING through all
+       three — `Block` uppercases every title, so becoming a card title moved
+       the border and never the name. */
+    expect(workspace).toContain('<Block title="Sales ownership">');
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");
@@ -911,6 +921,32 @@ describe("Sales Order object page — one form grammar", () => {
     /* The POS half of the same rule, so the parity is asserted and not
        assumed: both surfaces reach the one shared clamp. */
     expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
+  });
+
+  it("gives every heading on the page one colour and one face", () => {
+    /* YH, 2026-09-01: "card headers should have the same color".
+       They did not. A card title was `text-base-900` in the mono face and a
+       subsection heading was `text-base-600` in the UI face, so on one card
+       the reader met two kinds of heading and had to read the SHADE to work
+       out whether the second was a section or a field label.
+       Same colour, same face, same tracking; the hierarchy moves to SIZE,
+       which is where it belongs — a subsection is a smaller instance of the
+       same thing rather than a different species. */
+    const title = "font-mono text-strong uppercase tracking-[0.08em] text-base-900";
+    const sub = "font-mono text-label uppercase tracking-[0.08em] text-base-900";
+    expect(workspace, "the card title").toContain(title);
+    expect(workspace, "the subsection heading").toContain(sub);
+    /* THE OLD SHAPE: a lighter, different-faced subsection. Pinned on the
+       heading's OWN class string — `text-label font-semibold text-base-600`
+       alone also matches the goods table's Category cell, which is a cell and
+       not a heading and is deliberately untouched. */
+    expect(workspace).not.toContain(
+      "gap-x-2 text-label font-semibold text-base-600 first:mt-0",
+    );
+    /* ⛔ AND NOT THE ACCENT. `01-design-tokens.md` §2.2 spends blue once per
+       screen and the tab underline already holds it; a blue heading would be
+       the second spend and the current thing would stop standing out. */
+    expect(workspace).not.toContain("uppercase tracking-[0.08em] text-kit-blue");
   });
 
   it("keeps a service to ONE row, carrying its own doors", () => {
