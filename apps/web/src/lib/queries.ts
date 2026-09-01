@@ -3820,6 +3820,13 @@ export interface SupplierClaimListRow {
   customer_resolution: string | null;
   customer_resolution_note: string | null;
   customer_resolution_at: string | null;
+  /** Layer ④ (0409) — in what ORDER the goods move. Independent of layer ③:
+   *  `replace` is the promise, and `Replace First` / `Collect First` are two
+   *  ways of keeping it that leave Carres holding a different number of units
+   *  until the collection happens. */
+  carres_execution: string | null;
+  carres_execution_note: string | null;
+  carres_execution_at: string | null;
   /** Does the PO line still owe us units? Read for late claims only; null =
    *  could not tell (the line was deleted), which counts as still pending. */
   line_pending: boolean | null;
@@ -3971,6 +3978,33 @@ export function useSupplierClaimCustomerResolutionMutation(
 ) {
   return useSupplierClaimMove<{ customer_resolution: string; note?: string }>(
     (id) => `/api/operation/supplier-claims/${id}/customer-resolution`,
+    opts,
+  );
+}
+
+/**
+ * Layer ④ — in what ORDER the goods move (Loo, 2026-08-05 · migration 0409).
+ *
+ * A SEPARATE axis from the customer's resolution, not a narrowing of it:
+ * `replace` is the promise, and `Replace First` / `Collect First` are two ways
+ * of keeping it that leave Carres holding a different number of units until the
+ * collection happens.
+ *
+ * Same shape as the resolution above on purpose — not gated on the supplier's
+ * answer, re-recordable while the claim is open, refused once it is closed. It
+ * moves no stock either, so it invalidates nothing but the claim list.
+ */
+export function useSupplierClaimCarresExecutionMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      SupplierClaimMoveResult,
+      ApiError,
+      { claimId: string; carres_execution: string; note?: string }
+    >
+  >,
+) {
+  return useSupplierClaimMove<{ carres_execution: string; note?: string }>(
+    (id) => `/api/operation/supplier-claims/${id}/carres-execution`,
     opts,
   );
 }

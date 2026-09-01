@@ -1105,6 +1105,14 @@ export {
   customerResolutionMeaning,
   isCustomerResolution,
   type CustomerResolution,
+  // Layer ④ · in what ORDER the goods move (Loo, 2026-08-05 · 0409)
+  CARRES_EXECUTIONS,
+  CARRES_EXECUTION_KEYS,
+  CARRES_EXECUTION_MEANING,
+  carresExecutionLabel,
+  carresExecutionMeaning,
+  isCarresExecution,
+  type CarresExecution,
 } from "./supplier-claim";
 
 // R6 · The warehouse files its own receiving — a queued call to R1's engine

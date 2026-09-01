@@ -30,11 +30,18 @@ import {
   customerResolutionLabel,
   customerResolutionMeaning,
   isCustomerResolution,
+  CARRES_EXECUTIONS,
+  CARRES_EXECUTION_KEYS,
+  CARRES_EXECUTION_MEANING,
+  carresExecutionLabel,
+  carresExecutionMeaning,
+  isCarresExecution,
+  type CarresExecution,
   type CustomerResolution,
   type ReceiveLineClaimDraft,
   type SupplierClaimMoveInput,
 } from "./supplier-claim";
-import { STOCK_HOLD_OUTCOME_KEYS } from "./stock-hold";
+import { STOCK_HOLD_OUTCOMES, STOCK_HOLD_OUTCOME_KEYS } from "./stock-hold";
 import { CASE_ISSUE_KEYS, caseIssuesFor } from "./service-case-intake";
 
 function draft(over: Partial<ReceiveLineClaimDraft> = {}): ReceiveLineClaimDraft {
@@ -611,9 +618,11 @@ describe("Customer Resolution — what are we doing for the CUSTOMER?", () => {
   });
 
   it("explains each option in one plain line — a DEFINITION, never a consequence", () => {
-    // Consequences are f(Resolution, Execution) and Execution is unbuilt, so a
-    // guide line that named stock, money or an outstanding quantity would be
-    // wrong by Loo's own law 5.
+    // Consequences are f(Resolution, Execution). Execution was unbuilt when
+    // this was first pinned; layer ④ (0409) built it, so both arguments now
+    // exist — and the invariant is UNCHANGED, for a different reason. The pair
+    // is computable; WHICH stock, finance and demand moves it produces has
+    // never been ruled, so a guide line naming one is still wrong by law 5.
     for (const key of CUSTOMER_RESOLUTION_KEYS) {
       const line = CUSTOMER_RESOLUTION_MEANING[key as CustomerResolution];
       expect(line).toBeTruthy();
@@ -630,6 +639,147 @@ describe("Customer Resolution — what are we doing for the CUSTOMER?", () => {
   it("changes nothing about who owes the next move", () => {
     // The Next Action region belongs to the unbuilt Workspace layer. Recording
     // a resolution must not silently re-word the queue, the row or the button.
+    const base: SupplierClaimMoveInput = {
+      claim_no: "SC-1001",
+      status: "open",
+      claim_type: "damaged",
+      requested_action: "replace",
+      supplier_response: "reject",
+      supplier_name: "Ohana",
+    };
+    expect(claimNextMove(base)).toEqual(claimNextMove({ ...base }));
+    expect(claimNextMove(base).key).toBe("close");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer ④ · Carres Execution (Loo, 2026-08-05 · migration 0409)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The last of the four layers, ruled the same day as layer ③ and unbuilt for
+// four weeks. What these tests pin is the SEPARATION: this is a third axis, not
+// a longer version of an existing list, and the failure they exist to prevent
+// is a future chat folding it back into the resolution or the item outcome.
+
+describe("Carres Execution — in what ORDER do the goods move?", () => {
+  it("offers Loo's five, in his order and with his spelling", () => {
+    expect(CARRES_EXECUTIONS.map((e) => e.label)).toEqual([
+      "Return to Supplier",
+      "Collect Defective Item",
+      "Replace First",
+      "Collect First",
+      "Exchange on Collection",
+    ]);
+    expect(CARRES_EXECUTION_KEYS).toEqual([
+      "return_to_supplier",
+      "collect_defective_item",
+      "replace_first",
+      "collect_first",
+      "exchange_on_collection",
+    ]);
+  });
+
+  it("admits no word belonging to another layer, each refused by name", () => {
+    // The four customer resolutions answer what the customer GETS; the supplier
+    // answers are theirs to say; `write_off` / `put_back_in_stock` are ITEM
+    // outcomes. Folding any of them in here is the collapse Loo's model forbids.
+    for (const foreign of [
+      "replace",
+      "repair",
+      "accept_as_is",
+      "no_replacement_required",
+      "write_off",
+      "written_off",
+      "put_back_in_stock",
+      "reject",
+      "deliver_remaining",
+      "replacement",
+      "return_and_replace",
+      "refund",
+    ]) {
+      expect(isCarresExecution(foreign), foreign).toBe(false);
+    }
+    expect(isCarresExecution(null)).toBe(false);
+    expect(isCarresExecution("")).toBe(false);
+  });
+
+  it("shares NO key with the customer resolution — a third axis, not a longer list", () => {
+    // Loo's test again: can both be true at once? `Replace` is the promise and
+    // `Replace First` is one way of keeping it, so both are recorded and the
+    // two lists must never offer the same key on one screen.
+    for (const key of CARRES_EXECUTION_KEYS) {
+      expect(CUSTOMER_RESOLUTION_KEYS as readonly string[]).not.toContain(key);
+      expect(isCustomerResolution(key), key).toBe(false);
+    }
+    for (const key of CUSTOMER_RESOLUTION_KEYS) {
+      expect(isCarresExecution(key), key).toBe(false);
+    }
+  });
+
+  it("SHARES `return_to_supplier` with the item outcome, and that is the ruling", () => {
+    // The one deliberate overlap in the whole model, settled the same way
+    // COPY-STANDARD settles `Repair` on two lists. The Item Outcome is where
+    // the UNIT ended up; this is the CHOREOGRAPHY — specifically that there is
+    // no customer leg at all, which is what makes it the fifth option rather
+    // than four. A chat that "de-duplicates" this breaks the count above.
+    expect(isCarresExecution("return_to_supplier")).toBe(true);
+    expect(STOCK_HOLD_OUTCOME_KEYS as readonly string[]).toContain("returned");
+
+    // …and they are DIFFERENT keys — `returned` there, `return_to_supplier`
+    // here — so neither list can be read as the other by a join or a careless
+    // `includes`, and a claim can execute one while the unit ends the other way.
+    expect(CARRES_EXECUTION_KEYS as readonly string[]).not.toContain("returned");
+    expect(STOCK_HOLD_OUTCOME_KEYS as readonly string[]).not.toContain(
+      "return_to_supplier",
+    );
+
+    // 🟡 THE LABELS ARE ONE TENSE APART, and both are Loo's ruled spellings:
+    // `Return to Supplier` (this list) and `Returned to supplier` (the item
+    // outcome) render about seven lines apart on the same panel. Pinned rather
+    // than renamed — neither is ours to change — so that if either is ever
+    // re-ruled, this test names the other one that has to move with it.
+    expect(carresExecutionLabel("return_to_supplier")).toBe("Return to Supplier");
+    expect(
+      STOCK_HOLD_OUTCOMES.find((o) => o.key === "returned")?.label,
+    ).toBe("Returned to supplier");
+  });
+
+  it("labels every key, and never prints a raw column value", () => {
+    for (const e of CARRES_EXECUTIONS) {
+      expect(carresExecutionLabel(e.key)).toBe(e.label);
+      expect(e.label).not.toMatch(/_/);
+    }
+    expect(carresExecutionLabel(null)).toBe("—");
+    expect(carresExecutionLabel(undefined)).toBe("—");
+  });
+
+  it("explains each option in one plain line — a DEFINITION, never a consequence", () => {
+    // Both arguments of f(Resolution, Execution) exist now. The function does
+    // not: which stock, finance and demand moves each pair produces has never
+    // been ruled, so a line naming one would be a guess wearing a screen's
+    // authority — the same law layer ③'s meanings carry.
+    for (const key of CARRES_EXECUTION_KEYS) {
+      const line = CARRES_EXECUTION_MEANING[key as CarresExecution];
+      expect(line).toBeTruthy();
+      expect(line).not.toMatch(/_/);
+      expect(line).not.toMatch(/stock|refund|credit|invoice|outstanding|write.?off/i);
+    }
+    // The ORDER is the decision, and the two that differ in nothing else say so
+    // in words an operator cannot skim past. Getting these backwards sends a
+    // van to the wrong address.
+    expect(CARRES_EXECUTION_MEANING.replace_first).toContain("BEFORE");
+    expect(CARRES_EXECUTION_MEANING.collect_first).toContain("BEFORE");
+    expect(CARRES_EXECUTION_MEANING.replace_first).not.toEqual(
+      CARRES_EXECUTION_MEANING.collect_first,
+    );
+    expect(carresExecutionMeaning("no_such_option")).toBeNull();
+    expect(carresExecutionMeaning(null)).toBeNull();
+  });
+
+  it("changes nothing about who owes the next move", () => {
+    // The Next Action region belongs to the unbuilt Workspace layer. Recording
+    // an execution must not silently re-word the queue, the row or the button —
+    // the same guard layer ③ carries, for the same reason.
     const base: SupplierClaimMoveInput = {
       claim_no: "SC-1001",
       status: "open",
