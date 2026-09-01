@@ -82,7 +82,7 @@ export default function WarehouseUnitDetail() {
           onClick={() => navigate("/operation/stock")}
           className="mb-4 text-meta text-base-500 hover:text-base-800"
         >
-          ← Stock
+          ← Inventory
         </button>
 
         {isLoading ? (
