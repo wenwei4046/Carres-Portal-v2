@@ -393,8 +393,9 @@ Orders and Report all run it. To Order runs the same shell with a launcher rail.
 > `stock_planner`; `po_duty_editor` is *the person who edits the rota*. The rota is
 > **`ops_po_duty`** (month → user). Live: Jul = Shasha · Aug = **Yu Jun (CR004)** · Sep = Khor Yee.
 
-**THE DUTY MODEL** (Jess 2026-07-24, LOCKED · cover ruled by Loo 2026-08-06). Two rotating
-duties, offset by ONE month, one 3-person office team — there is no warehouse crew:
+**THE DUTY MODEL** (Jess 2026-07-24, LOCKED · cover ruled by Loo 2026-08-06 · active-headcount
+continuity ruled by Jess 2026-09-01). Two rotating duties, offset by ONE month, over the active
+Carres office assignment pool — there is no separate Carres warehouse crew:
 
 ```
         PO duty (issue + call)    GRN duty (receive)    no duty this month
@@ -406,7 +407,7 @@ Sep     Khor Yee                  Shasha                Yu Jun
 - **GRN duty is COMPUTED — the NEXT month's PO holder from the same rota. No second table,
   no second API.** Read the table down a column: July's GRN holder is Yu Jun, who is
   *August's* PO holder. The person who ordered never receives (segregation of duties).
-  Urgent orders may bypass the rotation; a manager may override.
+  Urgent orders may bypass the rotation; only the COO may override the rota.
 
   > **⚠️ "offset-1" IS AMBIGUOUS AND IT COST A YEAR OF EMPTY ROWS. The arithmetic reaches
   > FORWARD.** This line used to read "offset-1" with no direction, and two readers took it
@@ -416,6 +417,30 @@ Sep     Khor Yee                  Shasha                Yu Jun
   > payload, found nothing, and printed `Not assigned` **every single month from the day the
   > row shipped**. The direction is now a named function, `grnDutyMonth()`, and the rota
   > table above is its test.
+
+- **THE ROTA ADAPTS TO ACTIVE HEADCOUNT; STAFF DO NOT REASSIGN ROUTINE WORK ONE ROW AT A TIME.**
+  The three-person table above is an example of the present rotation, not a permanent three-name
+  rule. Team/People supplies the active staff and employment/access facts; the duty resolver supplies
+  the current answer.
+  - With three or more assignable staff, PO Duty and GRN Duty remain separate and another active
+    person is the buddy/cover where available.
+  - With two assignable staff, the two duties rotate between them; there is no required third
+    buddy row.
+  - With one assignable staff member, that person holds both PO Duty and GRN Duty. The Portal must
+    state both duties truthfully and must not emit `Not assigned` merely because separation is no
+    longer possible.
+  - `Not assigned` is valid only when zero assignable staff exist. That is a management continuity
+    failure, not an ordinary Warehouse action.
+  This continuity rule preserves service when headcount changes; it does not give the duty holder
+  approval powers reserved to the COO.
+
+- **OFFBOARDING RE-RESOLVES DUTY AUTOMATICALLY.** The COO records the person's actual last working
+  date and disables access through the governed People/Team account controls. From the effective
+  date the person leaves the assignable pool; the Portal recalculates current and future PO Duty,
+  GRN Duty and buddy/cover, and routes every still-open duty-owned Action to the newly resolved
+  active holder. Past actions, avatars, receipts, approvals, handovers and cover evidence keep the
+  actor who actually performed them. Offboarding never rewrites history and never requires manual
+  reassignment of each PO, receipt or Stock action.
 
 - **GRN DUTY IS AUTO-ASSIGNED AND EDITABLE — owner ruling 2026-08-15, BUILT.** The row must
   always name a current holder.
@@ -434,14 +459,16 @@ Sep     Khor Yee                  Shasha                Yu Jun
   - **`Not assigned` may appear ONLY when no assignable staff exists**, and it must then say
     where to fix it (`Add someone to the assignment pool in Settings.`). A dead-end absence is
     a defect.
-- **BUDDY COVER.** The member with NO duty this month covers EITHER duty. **The absence
+- **BUDDY COVER.** When an additional active member has NO duty this month, that person covers
+  EITHER duty. **The absence
   signal and the cutoff are the Orders pool's own law** (`staff.ts`, Jess round-3 —
   reused, never respelt): before 10:00 MYT late ≠ absent; from 10:00 with no heartbeat
   today the holder is absent TODAY and the free member covers; the holder logging in later
   takes the duty straight back; `away` (planned leave) covers from the start. **The two
   hat-wearers never cover each other** — that would put issuing and receiving in one pair
   of hands. Both absent → the remaining member does both and the Team panel says so to a
-  manager. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
+  COO. With two active staff there may be no separate buddy; with one, the same person visibly
+  carries both duties. **Nothing is reassigned in data: duty is DERIVED, so cover changes the answer
   to "who, today?", never a row.**
 - **WHERE IDENTITY SHOWS (Loo, 2026-08-06): the Team panel is the ONE home.** It states
   `PO DUTY` and `GRN DUTY` — **both BUILT and both always named, 2026-08-15**. A page never

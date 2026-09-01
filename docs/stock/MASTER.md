@@ -1,6 +1,6 @@
 # STOCK / WAREHOUSE — MASTER
 
-> **APPROVED / LOCKED — owner-reviewed 2026-08-20.**
+> **APPROVED / LOCKED — owner-reviewed 2026-08-20; duty continuity amended 2026-09-01.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
 
@@ -179,6 +179,11 @@ history and permitted actions. There is no generic Edit, status selector or Dele
 - Finance receives frozen month-end facts and never edits Units.
 - Management decides material exceptions; approval never replaces physical proof.
 
+NETS is an organisation, not one avatar. Every NETS operator uses an individual email login and
+appears by their own name/avatar on count, receipt, recount and handover evidence. Shared NETS
+credentials are invalid. Carres staff ownership does not become NETS ownership merely because NETS
+performed the physical act.
+
 ## 8 · Work and dates
 
 Warehouse uses the one shared Work Engine. Owner and cover are structured metadata, not sentence
@@ -196,6 +201,19 @@ contract is incomplete and cannot enter Work.
 
 The Stock rail finds Units. Quick Rail finds actions. Calendar shows dated Count, collection,
 arrival, return, inspection, repair, supplier collection and month-end commitments.
+
+Warehouse does not create another rota. It consumes the one approved PO Duty / GRN Duty rotation
+from `../purchasing/MASTER.md` §2.2:
+
+- NETS's individually identified operator performs the physical count or recount.
+- The current GRN Duty investigates a persistent Stock difference and, when evidence cannot resolve
+  it, submits the Adjustment request.
+- The current PO Duty owns supplier/PO follow-up and Supplier Claim work.
+- Only the COO approves a material Adjustment, write-off or unexplained major difference; the
+  requester cannot approve it.
+- When a Carres staff member leaves, the shared duty engine removes them from the effective-date
+  assignment pool and automatically re-resolves open and future Warehouse Actions. Two active staff
+  rotate PO/GRN Duty; one active staff holds both. Historical actor and cover evidence never change.
 
 ## 9 · Month-end Stock Confirmation
 
@@ -224,7 +242,8 @@ ownership and source facts but does not write physical Stock.
 - Warehouse / Stock owns Unit, location, condition, availability control, differences, returns and
   month-end; no commercial terms, customer promise or payment.
 - Finance owns invoice, settlement, payment, valuation and report acknowledgement; no Unit edits.
-- Management approves material adjustment, write-off, compensation and major dispute; approval does
+- The COO is the sole Management approver for material adjustment, write-off, compensation and
+  major dispute; approval does
   not replace evidence.
 
 No person completes demand, ordering, receipt, stock adjustment and payment end to end. Cover moves
@@ -236,9 +255,12 @@ Reports cover Stock by Site, product, ownership and availability; Showroom; stal
 receipt, Transfer and Count; partner evidence; current issues; corrections and adjustments; and
 month-end versions. Reports are read-only. Export never becomes authority.
 
-Central Settings owns Sites, operators and roles, Stock calendar, month-end and Count rules, issue
-reasons, evidence rules, Unit ID rules, permissions and approval limits. Settings never edits a
-Unit, reservation, event or report.
+Central Settings owns Sites, external operators and roles, Stock calendar, month-end and Count
+rules, issue reasons, evidence rules, Unit ID rules, permissions and approval limits. The shared
+**Team** duty door remains the one place to view or correct PO Duty, GRN Duty and buddy/cover; the
+governed People/account record supplies active status, access and last working date. Warehouse
+Settings must not copy either rota or employment truth. Settings never edits a Unit, reservation,
+event or report.
 
 Carres Portal is the minimum control plane. NETS receives narrow mobile Work, scan, observable
 outcome and evidence surfaces, not the full ERP. Optional APIs may propose events but cannot
