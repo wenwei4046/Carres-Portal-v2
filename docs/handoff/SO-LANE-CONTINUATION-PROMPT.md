@@ -146,21 +146,21 @@ Read these before proposing anything — several were argued and settled.
 - **Do not propose a backfill.** `CLAUDE.md` §6 — every row today is test data.
 - **Do not invent customer-facing words.** Two open items are blocked on a ruled
   sentence and must stay blocked rather than be guessed.
-- ✅ **The 10 `os-card-*` failures are CLOSED — they were the calendar.**
-  On 2026-08-31 the web suite was red with 10 failures across
-  `OrderStatusPage.test.tsx` and `BdOrdersBoard.test.tsx`, and the owning lane
-  ruled out seven causes (card markup, `laneOf`, `sameMonth`, the query mock,
-  fake-timer ordering, the global setup restoring real timers, the PIN gate)
-  without finding a code path. On 2026-09-01 the same suite passes
-  **3639/3639**, unchanged.
-  The eighth candidate was the date. Nothing was fixed; the month rolled over.
-  **So the answer to "stale tests or broken site?" is stale tests** — no page
-  load needed, and no grep either. What is still owed to the POS lane is a
-  *fixture* that does not depend on today, which is their call to make.
-  ⚠️ The general lesson outlives the incident: **a red suite here may be red
-  because of the date.** Before debugging a failure you did not cause, check
-  whether it reproduces — and note that this one would have "fixed itself"
-  overnight and taught nobody anything.
+- ✅ **The 10 `os-card-*` failures are FIXED — and it was `sameMonth` after all.**
+  `pnpm -r test` on `main` is green as of 2026-09-01: **9036 passed, 0 failed**.
+  Do not warn the next session about a red suite.
+  The mechanism: the POS and BD boards scope to the current month
+  (`monthAnchor` + `sameMonth`), and the board fixtures were dated *yesterday* —
+  which falls out of scope on the 1st of any month. Closed by **#1002** (fixture
+  dated to `NOW`) and **#1003** (clock pinned), both merged; **#1013** is in
+  flight to leave all three sibling suites on **one** mechanism, the pin,
+  because two defences against one hazard invite deleting the load-bearing one.
+  ⚠️ **Read the ruled-out list with suspicion.** `sameMonth` was ON the seven
+  causes that lane had eliminated, and `sameMonth` is what it was. "Ruled out"
+  meant "found nothing in it", which is not the same claim.
+  ⚠️ **And do not read green as fixed.** This suite passing today is consistent
+  with *two* stories — somebody fixed it, or the month rolled over and hid it.
+  Only one is true, and `git log` says which. Check before you conclude.
 
 ## 6 · EXACT NEXT STEP
 
