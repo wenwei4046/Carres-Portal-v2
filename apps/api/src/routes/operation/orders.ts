@@ -872,12 +872,19 @@ const revisionHeaderInput = z
        all, so an office-keyed order could store floor 7: a number no shop
        floor can produce, promising a carry nobody performs, on a job Carres
        has said it will not do.
-       ⛔ THE FLOOR OF THE RANGE STAYS 0, deliberately. The POS asks `min(1)`
-       because a customer standing in a shop has a floor; the office inherits
-       orders where nobody recorded one, and 0 is how "ground, or nobody said"
-       already reads in this column. Raising it to 1 here would refuse a save
-       of a row this door did not create. */
-    delivery_floor: z.number().int().min(0).max(MAX_DELIVERY_FLOOR).optional(),
+       ⭐ AND THE FLOOR OF THE RANGE FOLLOWS THE POS TOO (YH, 2026-09-01 —
+       "office follow POS"). This kept `min(0)` for one commit on the reasoning
+       that the office inherits orders where nobody recorded a floor, and that
+       raising it would refuse an ordinary correction of a row this door did
+       not create.
+       MEASURED, AND THE CONCERN DOES NOT HOLD. The office form does not have a
+       zero to send: it reads the floor as `delivery_floor ?? 1` in all four
+       places it touches it (`SalesOrderWorkspace.tsx:217`, `:537`, `:591`,
+       `:1121`), so a null or absent floor already reaches the operator — and
+       already saves — as 1. `min(0)` was not protecting an inherited zero; it
+       was admitting one that only a non-UI caller could produce.
+       Both ends now match the POS exactly: 1 to 3. */
+    delivery_floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
     delivery_has_lift: z.boolean().optional(),
     /**
      * 0354 — the rest of what the Sales Portal asks. The object page's form IS
