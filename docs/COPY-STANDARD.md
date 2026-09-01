@@ -1183,8 +1183,12 @@ it is in the wrong element.
 
 `Chase` · `POD` / `Proof of Delivery` · `Unscheduled` · `Not booked` · `need booking` ·
 `Pending` · `Processing` · `In Progress` · `At Risk` · `Attention` ·
-`Inventory` · `Movements` · `Recovery` **in the delay sense** (staff say "this order going to
+`Movements` · `Recovery` **in the delay sense** (staff say "this order going to
 delay" — the word on screen is `Delay planning`)
+
+**`Inventory` is no longer banned globally — owner ruling 2026-09-01.** It is the approved
+Warehouse master Register destination under `Dashboard · Inbound · Inventory · Outbound`. It does
+not become a synonym for Finance valuation, Purchasing planning or another module's goods pool.
 
 **`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
 different word that happens to be spelt the same, and it stays. C8 grepped the live bundle,
@@ -1243,11 +1247,12 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Telling logistics to re-arrange a delayed delivery | **`Call {logistics} — arrange new delivery date`** | Call customer (stock delay) · Inform customer · Reschedule |
 | Call to fix delivery date + slot | **Call {customer} — book delivery date** | Schedule delivery · Chase · Call customer (book delivery) [old T2 spelling] |
 | The company responsible for customer contact/transport in Delivery | **Logistics Partner** · a named one reads `NETS Logistics` | Logistic · Carrier · Delivery partner |
-| The goods pool (any page/tab/label) | **Stock** | Inventory · Warehouse (as the goods-pool word — `WAREHOUSE` is the module's rail HEADING since 2026-08-19, never the pool's name) |
+| The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
-| Stock in/out history (page/label) | **In & out** | Movements · Movement log (menu) · Ledger |
-| The cross-site custody journey page (Warehouse Blueprint item 13, `Coming soon`) | **Transfers** | Movements · Relocations |
-| The formal unit-verification page (Warehouse Blueprint item 13, `Coming soon`) | **Counts** | Stocktake · Audit |
+| The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
+| Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
+| Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
+| Formal Unit verification and correction view | **Counts & Adjustments** | Stocktake · Audit · separate Count Differences page · separate Adjustment Requested page |
 | A logistics company's own working rules | **delivery rules** | Partner profile · SLA · Carrier config |
 | Notice logistics need before a delivery day | **working days notice** | Lead time · Cut-off · Booking window |
 | A date logistics are closed | **not running on** | Blackout · Unavailable · Out of service |
@@ -1923,13 +1928,12 @@ the screen already has one word for it — the booking, spelt **`{logistics} · 
 {date} · {slot}`** (T1). A second noun for one fact is exactly the synonym rule 8 forbids, so
 the ruling's phrase stays in the documents and the screen keeps the word it has.
 
-**The Stock word law (K0, Jess 2026-07-27):** one warehouse, three questions —
-`On hand` (what's here now) · `Ready stock` (how much to keep — a PLAN about
-the same goods, never a second pool) · `In & out` (when things moved).
-"Inventory" and "Movements" are banned UI words (POD treatment); internal
-keys/routes keep their names. **Since CARD-2026-08-19-warehouse-rail the three
-questions are sidebar rows under the `WAREHOUSE` heading** (Warehouse Blueprint
-item 13) — the words are unchanged; only the door moved.
+**SUPERSEDED Stock word law — owner ruling 2026-09-01.** The former `On hand · Ready stock · In &
+out` top-page model is historical evidence only. Warehouse now has exactly `Dashboard · Inbound ·
+Inventory · Outbound`. Inventory is the one current Unit Register; Ready Stock is a saved eligible-
+Unit view shared with Sales; History is a rail/detail/report view; Transfer projects into Inbound,
+Outbound and Inventory; `Counts & Adjustments` is one Inventory control view. `Movements`, `Stock
+Units`, bare Hold/Quarantine/Attention and the old master-list name `On hand` remain rejected.
 
 **Aligning Purchase and Orders panels:** the Orders panel uses **Placed**
 for the pre-Proceed state (customer ordered, ETA not confirmed). The
