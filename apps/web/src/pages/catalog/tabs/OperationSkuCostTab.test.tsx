@@ -326,6 +326,18 @@ describe("supplier editing (2026-08-24)", () => {
  * single supplier slot meant the second company's code and prices had nowhere
  * to be written. The strip records offers; the slot stays the routing truth.
  */
+/**
+ * ⭐ RE-PINNED, NOT DELETED (YH, 2026-09-01) — "click on the code to show the
+ * modal, rather than a toggle expandable part".
+ *
+ * The offers capability is unchanged: same component, same writes, same
+ * price-lock. What moved is the DOOR. This grid opened an expandable strip
+ * from an `Other suppliers` toggle while the SKU Master grid, one tab over,
+ * opened `SupplierOffersModal` from the code chip — one capability with two
+ * interactions on two tabs of one page. Every assertion below is the same
+ * assertion; only the element that opens it changed, from
+ * `opcost-offers-toggle-*` to `opcost-suppliers-door-*`.
+ */
 describe("supplier offers strip (0388)", () => {
   beforeEach(() => {
     mockRole = "principal";
@@ -336,7 +348,7 @@ describe("supplier offers strip (0388)", () => {
 
   function open() {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-CLOUD-KING"));
   }
 
   it("opens per row and says plainly when nothing is recorded", () => {
@@ -459,7 +471,7 @@ describe("offers strip — editing an existing offer starts from what is on file
 
   it("⭐ prefills code, price and PWP when that supplier is picked", () => {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-CLOUD-KING"));
     fireEvent.change(screen.getByTestId("opcost-offer-supplier-CLOUD-KING"), {
       target: { value: "00000000-0000-4000-8000-0000000000a1" },
     });
@@ -476,7 +488,7 @@ describe("offers strip — editing an existing offer starts from what is on file
 
   it("⭐ fixing only the code keeps the recorded prices", () => {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-CLOUD-KING"));
     fireEvent.change(screen.getByTestId("opcost-offer-supplier-CLOUD-KING"), {
       target: { value: "00000000-0000-4000-8000-0000000000a1" },
     });
@@ -492,7 +504,7 @@ describe("offers strip — editing an existing offer starts from what is on file
 
   it("clears the boxes when switching to a supplier with no offer yet", () => {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-CLOUD-KING"));
     const pick = screen.getByTestId("opcost-offer-supplier-CLOUD-KING");
     fireEvent.change(pick, { target: { value: "00000000-0000-4000-8000-0000000000a1" } });
     fireEvent.change(pick, { target: { value: "" } });
@@ -521,7 +533,7 @@ describe("offers strip — per-seat-height sofa offers (0389)", () => {
 
   function openSofaStrip() {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_NULL])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-LUNA-3S"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-LUNA-3S"));
   }
 
   it("⭐ shows one box per height for a sofa SKU, and no flat price box", () => {
@@ -533,7 +545,7 @@ describe("offers strip — per-seat-height sofa offers (0389)", () => {
 
   it("keeps the flat price box for a non-sofa SKU", () => {
     render(<OperationSkuCostTab catalog={makeCatalog([SKU_COST_SET])} />);
-    fireEvent.click(screen.getByTestId("opcost-offers-toggle-CLOUD-KING"));
+    fireEvent.click(screen.getByTestId("opcost-suppliers-door-CLOUD-KING"));
     expect(screen.getByTestId("opcost-offer-price-CLOUD-KING")).toBeInTheDocument();
     expect(screen.queryByTestId("opcost-offer-height-CLOUD-KING-24")).not.toBeInTheDocument();
   });
