@@ -16,7 +16,11 @@ import OrderStatusPage, {
   sumRevenue,
 } from "./OrderStatusPage";
 
-const NOW = Date.now();
+// Keep the relative order fixtures inside the month that the board opens on.
+// `Date.now() - one day` crossed into the previous month on every first day,
+// leaving the correctly current-month board empty and making CI calendar-bound.
+const today = new Date();
+const NOW = new Date(today.getFullYear(), today.getMonth(), 15, 12).getTime();
 
 function order(over: Partial<Order> & { so: number; status: Order["status"] }): Order {
   return {
