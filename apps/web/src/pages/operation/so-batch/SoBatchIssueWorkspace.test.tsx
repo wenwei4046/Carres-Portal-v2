@@ -479,11 +479,19 @@ describe("the issue review only reviews the purchase order", () => {
     expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
   });
 
+  /* The refusal names BOTH parties by name — the supplier that refused and the
+     destination it must go to. It used to name neither, so on a batch spanning
+     suppliers the operator could not tell which one had stopped, and had to go
+     to Settings to learn where it wanted to go. Pin the whole sentence: the
+     names are the fix, and a fallback that quietly returns must fail here. */
   it("refuses a destination that differs from the governed collection rule", () => {
     renderWorkspace([{ ...fixedPickup, destinationId: BULOH.id }]);
     expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
     expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
-      "Nice Future must be collected to its configured destination.",
+      "Nice Future must be collected to Carres Klang.",
+    );
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
+      "Set Deliver To to Carres Klang, then issue again.",
     );
   });
 

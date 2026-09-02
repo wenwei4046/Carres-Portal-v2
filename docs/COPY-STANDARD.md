@@ -898,6 +898,7 @@ rule from the Sales Order entrance.
 | Factory-pickup collection fact | `{partner} collects from {supplier} and delivers to {destination}.` |
 | Missing Catalog cost | `{sku} has no transaction cost.` · `Set the cost of {sku} in Catalog.` |
 | Missing supplier collection rule | `{supplier} collection is not configured.` · `Set its collector and destination in Purchasing Settings.` |
+| Deliver To differs from the governed collection rule | `{supplier} must be collected to {destination}.` · `Set Deliver To to {destination}, then issue again.` — the act names the purchase, not Settings: Settings holds the collection agreement and changes rarely, the purchase is today's work |
 
 Issue review contains no cost editor, `Free of Charge` choice or procurement-partner picker.
 Catalog owns normal cost; Purchasing Settings owns supplier collection. The review only states the

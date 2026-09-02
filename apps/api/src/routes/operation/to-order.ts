@@ -1400,6 +1400,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ) {
       return refuse(c, 422, "supplier_collection_destination_mismatch", {
         supplier: group.proposal.supplierName ?? null,
+        /* The destination the operator must move TO, by name. Without it the
+           sentence can only say "its configured destination" and the operator
+           has to go and look it up — which is the message doing half its job. */
+        destination: destById.get(collection.fixedDestinationId)?.name ?? null,
       });
     }
 
