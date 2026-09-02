@@ -868,8 +868,18 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               set a default in Purchasing → Settings.
             </p>
           ) : null}
+          {/* ⛔ `flex flex-col` IS LOAD-BEARING, NOT DECORATION (YH, 2026-09-02
+              — "is it me or is /operation?tab=purchase not scrollable").
+              DataGrid's own scroller fills its shell with `flex: 1 1 auto`
+              (`DataGrid.module.css` `.root` / `.scroll`), which does nothing
+              inside a plain block. So the grid sized itself to its CONTENT —
+              measured 948px of rows in a box reporting 948px, nothing to
+              scroll — and `:723`'s `overflow-hidden` cut off whatever did not
+              fit the window. Every register that works mounts the grid inside
+              a flex column (`SalesOrdersRegister.tsx:613`); this one put a
+              bare wrapper in between and lost the chain. */}
           <div
-            className="min-h-0 flex-1"
+            className="flex min-h-0 flex-1 flex-col"
             data-testid="so-batch-grid"
           >
             <DataGrid<SoBatchOrderRow>
