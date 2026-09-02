@@ -19,9 +19,19 @@ import {
  *   · the fee is priced from the SAVED row, never from the patch
  *   · a save that cannot move the fee does not pay for the round-trip
  *   · a re-stamp that fails REPORTS, and never throws over a saved edit
+ *   · a fee that has NOT moved is not re-written at all
+ *
+ * ⭐ THE FIXTURES CARRY `order_addons` NOW (YH, 2026-09-02). They did not, so
+ * every stub read as "no stair row on the order, fee 0". That was invisible
+ * while every call wrote unconditionally; once a re-stamp skips an unchanged
+ * fee, a fixture with no row cannot express the REMOVAL case — 0 to 0 is
+ * correctly nothing to do, and 150 to 0 must still delete the row. A fixture
+ * that cannot tell those apart is not testing the thing.
  */
 
 function sb(opts: {
+  /** Include `order_addons` to say what fee is on the order NOW. Omit it and
+   *  the order reads as carrying no stair row, i.e. a stored fee of 0. */
   order?: Record<string, unknown> | null;
   orderError?: { message: string } | null;
   rpcError?: { message: string } | null;
@@ -101,6 +111,9 @@ describe("restampStairCarry — the fee is priced from the SAVED row", () => {
           delivery_has_lift: true,
           delivery_stair_items: 3,
           order_lines: [{ qty: 3 }],
+          /* The order IS carrying a fee — otherwise "removes the row" has
+             nothing to remove and the skip is the correct answer. */
+          order_addons: [{ addon_key: "STAIR_CARRY", qty: 1, unit_price: 150 }],
         },
         calls,
       }),
@@ -204,10 +217,44 @@ describe("the stair fee follows the GOODS, not only the floor", () => {
     expect((two[0].args as { p_fee: number }).p_fee).toBe(100);
   });
 
-  it("stamps zero when the last chargeable item leaves", async () => {
+  it("stamps zero when the last chargeable item leaves — removing the row", async () => {
     const calls: Array<{ name: string; args: unknown }> = [];
-    await restampAfterLineWrite(sb({ order: at3rdNoLift(0), calls }), ORDER);
+    /* The order was carrying RM 150; every item has now gone, so the fee falls
+       to 0 and the row must be DELETED. 0 is a real value here. */
+    const order = {
+      ...at3rdNoLift(0),
+      order_addons: [{ addon_key: "STAIR_CARRY", qty: 1, unit_price: 150 }],
+    };
+    await restampAfterLineWrite(sb({ order, calls }), ORDER);
     expect((calls[0].args as { p_fee: number }).p_fee).toBe(0);
+  });
+
+  /* ⭐ AND THE COMMON CASE WRITES NOTHING AT ALL. `order_stamp_stair_carry`
+     deletes and re-inserts, so an unchanged fee was a real write every time —
+     on every office save, because the form sends all three keys whether they
+     moved or not, and on every line write, because the count is clamped and a
+     sixth item does not change a fee priced for two. */
+  it("writes nothing when the fee has not moved", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const order = {
+      ...at3rdNoLift(3),
+      /* 1 floor above the free 2F x 3 items x RM 50 = RM 150, which is exactly
+         what the order already carries. */
+      order_addons: [{ addon_key: "STAIR_CARRY", qty: 1, unit_price: 150 }],
+    };
+    const r = await restampAfterLineWrite(sb({ order, calls }), ORDER);
+    expect(r).toBeUndefined();
+    expect(calls, "no stamp call at all").toHaveLength(0);
+  });
+
+  it("still writes when the fee genuinely moves", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const order = {
+      ...at3rdNoLift(2),
+      order_addons: [{ addon_key: "STAIR_CARRY", qty: 1, unit_price: 150 }],
+    };
+    await restampAfterLineWrite(sb({ order, calls }), ORDER);
+    expect((calls[0].args as { p_fee: number }).p_fee).toBe(100);
   });
 
   it("never throws over a committed line write, even when the stamp refuses", async () => {

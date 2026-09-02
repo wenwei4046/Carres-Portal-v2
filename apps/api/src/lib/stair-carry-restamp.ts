@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { STAIR_CARRY_ADDON_KEY } from "@carres/shared";
 import { recomputeStairCarry } from "./stair-carry-recompute";
 
 /**
@@ -30,12 +31,14 @@ import { recomputeStairCarry } from "./stair-carry-recompute";
  * a lost edit.
  */
 
-/** The three inputs plus the line quantities the fee is priced from. */
+/** The three inputs, the line quantities the fee is priced from, and the fee
+ *  that is on the order right now. */
 interface OrderStairInputs {
   delivery_floor: number | null;
   delivery_has_lift: boolean | null;
   delivery_stair_items: number | null;
   order_lines: Array<{ qty: number }> | null;
+  order_addons: Array<{ addon_key: string; qty: number; unit_price: number }> | null;
 }
 
 export async function restampStairCarry(
@@ -60,7 +63,10 @@ async function restamp(
 ): Promise<{ ok: true; fee: number } | { ok: false; reason: string }> {
   const { data, error } = await sb
     .from("orders")
-    .select("delivery_floor, delivery_has_lift, delivery_stair_items, order_lines(qty)")
+    .select(
+      "delivery_floor, delivery_has_lift, delivery_stair_items, " +
+        "order_lines(qty), order_addons(addon_key, qty, unit_price)",
+    )
     .eq("id", orderId)
     .maybeSingle();
   if (error) return { ok: false, reason: `read order: ${error.message}` };
@@ -73,6 +79,28 @@ async function restamp(
     stairItems: row.delivery_stair_items,
   });
   if (recompute.status !== "ok") return { ok: false, reason: recompute.message };
+
+  /* ⭐ A FEE THAT HAS NOT MOVED IS NOT RE-WRITTEN (YH, 2026-09-02).
+     `order_stamp_stair_carry` (0394) DELETES the row and re-INSERTS it, so
+     every call is a real write even when the number is identical. And the
+     callers fire far more often than the fee changes:
+       · `touchesStairInputs` tests whether the KEY is present, and the office
+         form sends all three on every save — so a phone-number correction
+         re-stamps.
+       · `restampAfterLineWrite` fires on every line write, but the count is
+         CLAMPED (`stairCarryCount`), so adding a 6th item to an order that
+         carries 2 changes nothing about the fee.
+     Comparing the computed fee with the one already on the order turns both of
+     those into no-ops. `0` is a real value here — it means "no row" — so the
+     stored side reads a missing row as 0 rather than as unknown.
+     ⛔ THIS DOES NOT FIX THE RATE. If `floor_config` moved, the recomputed fee
+     legitimately differs and this still re-stamps — at TODAY's rate, on an
+     order the customer already signed. That is the defect `0414` closes by
+     pinning the rate to the order; this only stops the pointless writes that
+     make it fire. Said plainly so nobody reads this as the whole fix. */
+  const stored = (row.order_addons ?? []).find((a) => a.addon_key === STAIR_CARRY_ADDON_KEY);
+  const storedFee = stored ? Number(stored.unit_price) * Number(stored.qty) : 0;
+  if (storedFee === recompute.fee) return { ok: true, fee: recompute.fee };
 
   const { error: stampError } = await sb.rpc("order_stamp_stair_carry", {
     p_order_id: orderId,
