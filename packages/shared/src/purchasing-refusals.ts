@@ -59,6 +59,14 @@ export function purchasingRefusal(
 ): PurchasingRefusal {
   const sku = some(facts.sku, "This item");
   const supplier = some(facts.supplier, "the supplier");
+  /* The same fact for the five lines that OPEN a sentence with it. A real name
+     already carries its own capital, so this differs from `supplier` only when
+     no name was passed — and there it is the difference between "The supplier
+     must be collected to Carres Klang." and the same sentence starting
+     lowercase in the middle of a screen. `supplier` stays as it is because it
+     also lands mid-sentence ("...the price of B1201S-K for Hooka."), and one
+     constant cannot be right in both places. */
+  const supplierOpening = some(facts.supplier, "The supplier");
   const po = some(facts.po, "This purchase order");
   const dest = some(facts.destination, "that place");
 
@@ -255,7 +263,7 @@ export function purchasingRefusal(
       };
     case "production_days_required":
       return {
-        wrong: `${supplier} has no production days set.`,
+        wrong: `${supplierOpening} has no production days set.`,
         todo: `Ask Purchasing to set production days for ${supplier} in Settings.`,
       };
     case "unresolved_supplier":
@@ -266,22 +274,40 @@ export function purchasingRefusal(
     case "pickup_partner_required":
     case "supplier_collection_not_configured":
       return {
-        wrong: `${supplier} collection is not configured.`,
+        wrong: `${supplierOpening} collection is not configured.`,
         todo: "Set its collector and destination in Purchasing Settings, then issue again.",
       };
     case "supplier_collection_mismatch":
       return {
-        wrong: `${supplier} has a different collector in Purchasing Settings.`,
+        wrong: `${supplierOpening} has a different collector in Purchasing Settings.`,
         todo: "Reload the purchase, then issue it with the configured collector.",
       };
+    /* YH, 2026-09-02, meeting this on the issue screen: "????". Both lines
+       earned it. The first said `the supplier` — the fallback, because two of
+       the three callers passed no name — so on a batch spanning suppliers it
+       named none of them. The second, `Reload the purchase, then issue it to
+       the destination in Purchasing Settings`, asked for a refresh (not an
+       act, and not the problem) and never said WHICH destination or WHICH of
+       the two Deliver To settings to move. Its own neighbour eight lines down
+       has always got this right: `Remove the collector, then issue again.`
+       Named, and one act. */
     case "supplier_collection_destination_mismatch":
       return {
-        wrong: `${supplier} must be collected to its configured destination.`,
-        todo: "Reload the purchase, then issue it to the destination in Purchasing Settings.",
+        wrong: `${supplierOpening} must be collected to ${some(
+          facts.destination,
+          "its configured destination",
+        )}.`,
+        /* TWO Deliver To values disagree — this purchase's and the supplier's
+           in Settings — and naming both acts costs 17 words, past the 14 this
+           file is held to. So the act names the one that is normally wrong:
+           Settings holds the collection CONTRACT and changes rarely; the
+           purchase is today's transaction. An operator who really means to move
+           the contract still has the destination's name from line 1. */
+        todo: `Set Deliver To to ${some(facts.destination, "that destination")}, then issue again.`,
       };
     case "pickup_partner_not_allowed":
       return {
-        wrong: `${supplier} delivers the goods itself.`,
+        wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
       };
     case "no_warehouse":

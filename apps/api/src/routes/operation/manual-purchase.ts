@@ -1354,8 +1354,15 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     ]),
   );
 
-  const { data: supRows } = await sb.from("suppliers").select("id, kind");
+  /* `name` is read for the REFUSALS, not for the document. Both collection
+     refusals below used to pass no facts at all, so `purchasingRefusal`
+     degraded to its `the supplier` fallback and named nobody — on a batch
+     spanning suppliers the operator could not tell which one refused. */
+  const { data: supRows } = await sb.from("suppliers").select("id, kind, name");
   const supplierKind = new Map((supRows ?? []).map((s) => [s.id as string, s.kind as string]));
+  const supplierNameById = new Map(
+    (supRows ?? []).map((s) => [s.id as string, (s.name as string | null) ?? null]),
+  );
   const { data: collectionRows, error: collectionErr } = await sb
     .from("purchasing_supplier_settings")
     .select("supplier_id, fixed_destination_id, collected_by_partner_id");
@@ -1430,15 +1437,31 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const kind = supplierKind.get(first.supplierId!) ?? null;
     const collection = collectionBySupplier.get(first.supplierId!) ?? null;
     const partnerId = kind === "factory_pickup" ? (collection?.partnerId ?? null) : null;
+    const supplierNameForRefusal = first.supplierId
+      ? (supplierNameById.get(first.supplierId) ?? null)
+      : null;
     if (kind === "factory_pickup" && !partnerId) {
-      return refuse(c, 422, "pickup_partner_required");
+      return refuse(c, 422, "pickup_partner_required", { supplier: supplierNameForRefusal });
     }
     if (
       kind === "factory_pickup" &&
       collection?.fixedDestinationId &&
       collection.fixedDestinationId !== group.destinationId
     ) {
-      return refuse(c, 422, "supplier_collection_destination_mismatch");
+      /* Read the destination NAME here and nowhere else. It is wanted only to
+         write the refusal, and this line is one statement from returning, so
+         the happy path — the one that runs every time a PO is issued — pays no
+         subrequest for it. A read that fails degrades to the unnamed sentence
+         rather than turning a 422 into a 500. */
+      const { data: destRow } = await sb
+        .from("purchasing_destinations")
+        .select("name")
+        .eq("id", collection.fixedDestinationId)
+        .maybeSingle();
+      return refuse(c, 422, "supplier_collection_destination_mismatch", {
+        supplier: supplierNameForRefusal,
+        destination: ((destRow?.name as string | null) ?? null),
+      });
     }
     governedPos.push({
       supplier_id: first.supplierId,

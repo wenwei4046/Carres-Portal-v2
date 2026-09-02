@@ -128,11 +128,12 @@ export default function SoBatchIssueWorkspace({
       ) {
         return purchasingRefusal("supplier_collection_destination_mismatch", {
           supplier: doc.supplierName ?? null,
+          destination: destinationName(doc.supplierCollection.fixedDestinationId),
         });
       }
     }
     return null;
-  }, [documents]);
+  }, [documents, destinationName]);
 
   /**
    * ONE REQUEST FOR EVERY DOCUMENT (§7.3), carrying selections only. The
@@ -173,9 +174,25 @@ export default function SoBatchIssueWorkspace({
          exactly where they were, with the selection intact, and can fix the
          line the server named — in the approved two lines (closure §9), never
          as a code or a raw database sentence. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string; sku?: string } })
-        .body;
-      const fallback = purchasingRefusal(body?.code, { sku: body?.sku ?? null });
+      const body = (e as {
+        body?: {
+          message?: string;
+          action?: string;
+          code?: string;
+          sku?: string;
+          supplier?: string;
+          destination?: string;
+        };
+      }).body;
+      /* Every fact the server sent, not just the SKU. `refuse()` echoes its
+         facts alongside `message`, so a refusal that names a supplier or a
+         destination keeps them here — and the fallback stops degrading to
+         `the supplier` on the day a server sends a code without a message. */
+      const fallback = purchasingRefusal(body?.code, {
+        sku: body?.sku ?? null,
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
       setError({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
