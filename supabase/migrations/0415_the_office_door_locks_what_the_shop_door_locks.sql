@@ -218,6 +218,33 @@ begin
   end if;
 end $$;
 
+-- ⛔ THE WRAPPER MAY NOT BE CREATED UNLESS THE RENAME HAPPENED, and this guard
+-- is here because the first version of this file did not have it.
+--
+-- If the `create or replace` below ran while the rename had not, it would
+-- OVERWRITE 0328's body with a wrapper that calls a function which does not
+-- exist — and 0328's body would be gone, not renamed. Every Sales Order write
+-- that consults the evaluator would then error, and the original could only be
+-- recovered by re-running 0328.
+--
+-- Raising here makes that state unreachable: the statement aborts, the
+-- transaction rolls back, and the database is left exactly as it was. Half of
+-- this migration is worse than none of it, so there is no half.
+do $$
+begin
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'sales_order_floors_unchecked_0328'
+  ) then
+    raise exception
+      '0415 stopped before it could break the floors evaluator: sales_order_floors '
+      'was not renamed to sales_order_floors_unchecked_0328, so the wrapper below '
+      'would call a function that does not exist. Nothing has been changed. Check '
+      'that public.sales_order_floors(uuid, text[], jsonb) exists, then run this '
+      'file again as ONE statement so it commits or rolls back together.';
+  end if;
+end $$;
+
 create or replace function public.sales_order_floors(
   p_order_id uuid,
   p_changed  text[],
