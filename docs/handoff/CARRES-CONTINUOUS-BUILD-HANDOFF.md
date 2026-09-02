@@ -302,6 +302,20 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 is probed and applied — `0410`, `0413`, `0414`, `0415`, the last confirmed
 whole rather than half — and the code that rides on them is merged.
 
+⚠️ **THAT IS NOT "NOTHING TO DO", AND DO NOT REPORT IT AS SUCH.** This file
+covers one lane. YH's two active areas each keep their own tracker, and both
+hold real work:
+
+| Tracker | Where | Holds |
+|---|---|---|
+| `PURCHASING-TODO.md` | the Carres desktop folder — **outside this repo** | **15 open defects**, ranked, plus rulings R1 and R4 |
+| `PURCHASING-FIELD-GUIDE.md` | same folder | the reference the tracker indexes — §4 is the 41 defects |
+| `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` | in-repo | 103 rows. **Its 🔴 markers are 28 Aug and NOT maintained** — several are since closed (F-2, F-3, F-4, F-8). Re-measure any row before quoting it |
+| `docs/carry-forwards.md` | in-repo | open risks, per `CLAUDE.md` §11 |
+
+The purchasing tracker is the freshest of them and names its own start point.
+Read it before concluding there is no work.
+
 **Both items below belong to somebody else**, which YH ruled on 2 Sep (§3.19).
 Neither is work an agent may pick up, and neither is waiting on him: one needs
 Jess, one needs an owner release. They are listed so the next session does not
@@ -374,11 +388,19 @@ The two items in §6 belong to Jess and to the MASTER's owner, and YH ruled on
 2 Sep that neither is his — so **do not present them to him as his open work**,
 and do not treat their presence in this file as permission to start them.
 
-⛔ **The failure mode to avoid here is inventing work to look busy.** Three items
-were on this list yesterday that should not have been: the instalment sentence
-(already closed in #1036), migration numbering (not governed during development —
-§3.18), and two blueprints (not YH's). Each survived because it was carried
-forward rather than measured. **If §6 is empty, say it is empty.**
+⛔ **Two failure modes, and they pull in opposite directions.**
+
+*Inventing work to look busy.* Three items were on this list yesterday that
+should not have been: the instalment sentence (already closed in #1036),
+migration numbering (not governed during development — §3.18), and two
+blueprints (not YH's). Each survived because it was carried forward rather than
+measured. **If §6 is empty, say it is empty.**
+
+*Reporting "nothing left" from one empty list.* This file covers one lane. The
+purchasing tracker named in §6 held **15 open defects** on 2 Sep while this
+section was correctly empty — both true at once. **Check the other trackers
+before telling YH he is done.** He is finalising Sales Order and working on
+Purchasing, and neither of those is finished.
 
 ---
 
