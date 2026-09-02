@@ -88,14 +88,34 @@ describe("purchasing refusals", () => {
     expect(purchasingRefusal("inactive_destination", { destination: "AL Sungai Buloh" }).wrong).toBe(
       "AL Sungai Buloh is closed.",
     );
+    /* Both parties by name. This one named NEITHER until 2026-09-02: it said
+       "the supplier must be collected to its configured destination", so on a
+       batch spanning suppliers the operator could not tell which one had
+       stopped, and had to open Settings to learn where it wanted to go. */
+    expect(
+      purchasingRefusal("supplier_collection_destination_mismatch", {
+        supplier: "Nice Future",
+        destination: "Carres Klang",
+      }),
+    ).toEqual({
+      wrong: "Nice Future must be collected to Carres Klang.",
+      todo: "Set Deliver To to Carres Klang, then issue again.",
+    });
+    /* And it still degrades to a whole sentence when the caller has no name. */
+    expect(purchasingRefusal("supplier_collection_destination_mismatch", {})).toEqual({
+      wrong: "The supplier must be collected to its configured destination.",
+      todo: "Set Deliver To to that destination, then issue again.",
+    });
   });
 
   it("falls back to a plain noun rather than printing an empty gap", () => {
     expect(purchasingRefusal("cost_required", { sku: "  " }).wrong).toBe(
       "This item has no transaction cost.",
     );
+    /* Capitalised, because this one OPENS the sentence. A nameless supplier is
+       still a sentence, and it used to start lowercase halfway down a screen. */
     expect(purchasingRefusal("pickup_partner_required", { supplier: null }).wrong).toBe(
-      "the supplier collection is not configured.",
+      "The supplier collection is not configured.",
     );
   });
 
