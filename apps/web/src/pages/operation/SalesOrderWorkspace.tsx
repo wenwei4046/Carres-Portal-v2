@@ -2289,12 +2289,17 @@ export default function SalesOrderWorkspace() {
                 the input actually enforces. One statement, in the field's own
                 name, and the separate hint line goes with it. */}
             <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
-              type="number" min={0} max={MAX_DELIVERY_FLOOR}
+              type="number" min={1} max={MAX_DELIVERY_FLOOR}
               value={String(draft.delivery_floor)}
               onChange={(e) =>
                 setField(
                   "delivery_floor",
-                  Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
+                  /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
+                     "office follow POS"). The floor was 0 here while the POS
+                     stepper starts at 1; the form already shows a missing
+                     floor as 1 (`?? 1`, four places), so the zero was a value
+                     only this box could type and nothing could mean. */
+                  Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
                 )
               } />
           {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask

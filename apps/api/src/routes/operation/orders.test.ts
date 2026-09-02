@@ -2725,12 +2725,21 @@ describe("POST /api/operation/orders (create)", () => {
     expect(res.status).toBe(201);
   });
 
-  /* ⛔ AND 0 STAYS LEGAL HERE. The POS asks `min(1)` because a customer
-     standing in a shop has a floor; the office inherits orders where nobody
-     recorded one, and 0 is how "ground, or nobody said" already reads in this
-     column. Refusing it would block a save of a row this door did not create. */
-  it("still accepts 0 — the office inherits orders with no floor recorded", async () => {
-    const { res } = await saveFloor(0);
+  /* ⭐ RE-PINNED (YH, 2026-09-01 — "office follow POS"). This asserted that 0
+     stayed legal here, on the reasoning that the office inherits orders where
+     nobody recorded a floor. MEASURED, and the reasoning does not hold: the
+     office form reads the floor as `delivery_floor ?? 1` in all four places it
+     touches it, so a null already reaches the operator AND already saves as 1.
+     The zero was not an inherited value being protected — it was one only a
+     non-UI caller could produce. Both ends match the POS now: 1 to 3. */
+  it("refuses 0 too — the office asks the same 1-to-3 the POS does", async () => {
+    const { res, rpc } = await saveFloor(0);
+    expect(res.status).toBe(422);
+    expect(rpc, "refused before the RPC").not.toHaveBeenCalled();
+  });
+
+  it("still accepts 1 — the floor a customer actually stands on", async () => {
+    const { res } = await saveFloor(1);
     expect(res.status).toBe(201);
   });
 });
