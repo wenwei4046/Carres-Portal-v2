@@ -323,7 +323,7 @@ which YH asked for on 2 Sep.
 **Still open on the SO side: D5.** Cancelling a Sales Order removes it from the
 only register that lists Sales Orders, while `CancelSalesOrderDialog.tsx:83`
 promises nothing is deleted — the list read is
-`.in("status", ["place","proceed_order","delivered"])` at `orders.ts:328`, so a
+`.in("status", ["place","proceed_order","delivered"])` at `operation/orders.ts:303`, so a
 cancelled order has nowhere left to be seen. **D6 is a method caution, not a
 defect** (re-measure the old-revision lock with a check that walks fieldset
 ancestors; the obvious check reports a false pass). Both live in
