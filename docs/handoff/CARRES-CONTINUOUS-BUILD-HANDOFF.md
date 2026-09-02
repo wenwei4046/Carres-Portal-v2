@@ -302,13 +302,61 @@ without reopening it with Loo.
    (dry run), `-- --apply` to write. **YH's to run** — it needs the service-role
    key and it changes money on existing orders.
 
-6. **Still open from the audit:** F-7 (`building_type` decides delivery slot
-   length, has no column and no constraint) · F-8 (floor bounds disagree across
-   UI/API/DB) · F-11 (the promised date is guarded by one layer, not two) · F-12
-   (`update_order` freezes six delivery fields after Proceed; the office door does
-   not) · F-13 (the floors evaluator is blind to seven fields) · F-14
-   (`sales-order-copy.ts` is dead code — its only importer is its own test) · the
-   emergency-contact parts-direction round-trip.
+6. **Still open from the audit** (re-measured 2026-09-01): F-7
+   (`building_type` — see item 7) · F-11 (the promised date is guarded by one
+   layer, not two) · F-12 (`update_order` freezes six delivery fields after
+   Proceed; the office door does not) · F-13 (the floors evaluator is blind to
+   seven fields) · F-14 (`sales-order-copy.ts` is dead code — its only importer
+   is its own test; **deleting it is the owner's call**, red line 5).
+   **CLOSED since this list was written:** F-8 (floor bounds — the office door
+   now carries the same 1-to-3 the POS does) · the emergency-contact
+   parts-direction round-trip.
+
+7. **`building_type` — DECIDED, PARTLY UNRULED, DELIBERATELY NOT BUILT.**
+   The business rule is not missing and never was. `COPY-STANDARD.md` §"The
+   delivery window words" carries Jess's locked map of 2026-07-27 — `Landed` ·
+   `Retail` take a full day, `Condo` · `Apartment` · `Office` take a half day,
+   and `Other` / not filled takes a full day **with the booking refused until it
+   is filled**. Loo made the field mandatory at go-live on 2026-07-28 and set a
+   Saturday capacity weight of `Landed = 1 · Condo = 0.5`. Jess made it required
+   on both doors on 2026-08-21.
+
+   **YH confirmed 2026-09-01: `Other` follows Jess's row — it does not satisfy
+   the requirement.** Today it does: both create doors accept `Other` as filled
+   (`draft.ts`, `SalesOrderWorkspace.tsx` both test only for emptiness).
+
+   ⛔ **AND THE ENFORCEMENT IS STILL NOT BUILT, on purpose.** Nothing in the
+   codebase turns a building type into a delivery window: a grep for half-day /
+   full-day / slot length across every `.ts`, `.tsx` and `.sql` returns the two
+   refusal SENTENCES and nothing else. The field is free text inside
+   `entry_data->fields` with no column and no CHECK, and the only branch on it
+   anywhere (`EditDelivery.tsx`) matches `condo|apartment|flat|serviced` — two
+   words that are not legal options, and it misses `Office`, which is half-day.
+
+   **THE OWNER HAS STOPPED THIS DELIBERATELY (YH, 2026-09-01), and the reason is
+   the right one:** the parts nobody has ruled cannot be guessed, and building
+   the ruled half alone would put a half-finished rule on the delivery calendar.
+   What is genuinely unruled:
+
+   - **What a half-day IS, in slots.** `DELIVERY_TIME_SLOTS` offers four windows
+     plus `Anytime`; none of them is half a day. Which windows may a half-day
+     take, and does full-day mean `Anytime`?
+   - **The Saturday weight's denominator.** `Landed = 1 · Condo = 0.5` had
+     nothing to count against when Loo wrote it. ⚠️ **That may have changed on
+     2026-09-01:** the Delivery lane added a per-partner `dailyCapacity`, and
+     `delivery-calendar.ts` counts every booking as exactly 1 against it — which
+     is where a weight would go. Two gaps remain: the table names only `Landed`
+     and `Condo`, so Apartment/Office/Retail/Other have no weight; and Loo ruled
+     SATURDAY while capacity applies to every day.
+   - **A third create door.** Jess ruled "both doors". `PrincipalNewOrder.tsx`
+     never asks for building type at all.
+   - **Orders with no address.** Both doors skip the building-type gate when
+     `customer_address_unknown` is set. Nothing covers what happens when one
+     reaches booking.
+
+   **Do not build any of the above from inference.** The column and its CHECK
+   are the only part that is fully ruled, and they are not worth a migration on
+   their own until the window rule that reads them exists.
 
 ## 7 · EXACT NEXT STEP
 
