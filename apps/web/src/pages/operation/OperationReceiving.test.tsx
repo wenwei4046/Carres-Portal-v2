@@ -125,10 +125,10 @@ let receivingResponse: { sessions: unknown[]; events: unknown[] } = {
  *  arrival states). Null = the shared `POS` above. */
 let posOverride: unknown[] | null = null;
 
-function wrap() {
+function wrap(entry = "/operation?tab=receiving") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={["/operation?tab=receiving"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <QueryClientProvider client={qc}>
         <OperationReceiving />
       </QueryClientProvider>
@@ -193,6 +193,28 @@ describe("OperationReceiving — the Workspace shell", () => {
     await ready();
     expect(listing().queryByText("PO-2004")).not.toBeInTheDocument();
     expect(listing().getByText("PO-2001")).toBeInTheDocument();
+  });
+
+  it("`To receive` holds only what is still owed (defect 6)", async () => {
+    /* It used to hold every non-cancelled PO, fully received ones included,
+       sorted oldest-first - so with no `?po=` the page auto-selected the OLDEST
+       purchase order ever placed, which is almost always closed. The receiving
+       desk opened on a panel with no Start Receiving button, every morning, and
+       the count beside the queue was the count of all POs on file rather than
+       of deliveries still owed. */
+    wrap();
+    await ready();
+    expect(listing().getByText("PO-2001")).toBeInTheDocument(); // in transit
+    expect(listing().getByText("PO-2002")).toBeInTheDocument(); // partially received
+    expect(listing().queryByText("PO-2003")).not.toBeInTheDocument(); // fully received
+  });
+
+  it("`Fully received` is still the way back to a finished delivery", async () => {
+    /* Removing them from the default queue may not make them unreachable -
+       the rail row is the door, and it must still open. */
+    wrap();
+    await ready();
+    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
     expect(listing().getByText("PO-2003")).toBeInTheDocument();
   });
 
@@ -284,9 +306,32 @@ describe("OperationReceiving — Read Mode", () => {
     expect(log).toHaveTextContent("3 units");
   });
 
+  it("names a `?po=` that misses instead of showing a different PO (defect 7)", async () => {
+    /* The auto-select fired whenever the lookup returned null - which is true
+       both when there is no `?po=` at all AND when the one asked for missed.
+       So a cancelled PO, a mistyped id or a partner-warehouse PO was answered
+       with ANOTHER purchase order's number, its history, and a live Start
+       Receiving button, written into the URL with `replace: true` so Back could
+       not recover it. RECEIVING MOVES STOCK: counting goods against the wrong
+       purchase order loses real furniture. */
+    wrap("/operation?tab=receiving&po=PO-9999999");
+
+    /* No `ready()` here - it waits for the workspace to auto-select, and the
+       whole point is that nothing is selected. */
+    await waitFor(() =>
+      expect(screen.getByText(/PO-9999999 is not in this queue/)).toBeInTheDocument(),
+    );
+    /* And it must NOT have quietly swapped in a real one. */
+    expect(screen.queryByTestId("start-receiving")).not.toBeInTheDocument();
+  });
+
   it("offers no Start Receiving on a PO that owes nothing", async () => {
     wrap();
     await ready();
+    /* A finished PO left the default queue with defect 6, so the route to it
+       is its own rail row. The law under test is unchanged: a button that could
+       only refuse is not an action. */
+    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
     await openRow("PO-2003");
     expect(screen.getByTestId("receiving-summary-outstanding")).toHaveTextContent(
       "0",

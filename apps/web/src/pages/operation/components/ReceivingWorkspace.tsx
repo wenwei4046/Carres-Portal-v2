@@ -450,6 +450,30 @@ function ReceivingMode({
    * Input ORDER is free — only completeness is frozen (§7.6) — so this reads
    * the state, never a step counter.
    */
+  /**
+   * ⛔ THE COUNTS MUST ADD UP, AND THE BUTTON MUST KNOW IT (YH, 2026-09-02,
+   * defect 8).
+   *
+   * The gate below tested the DO number, the photo, a non-zero count and the
+   * claim rules - and never that a line's THREE counts add up to what the line
+   * still owes. The server does (`line_over_reported`, 0314). So the button
+   * looked ready, the operator pressed it, and the save came back refused.
+   *
+   * Damage is the normal reason anybody is on this screen, so this is the
+   * common path, not an edge: type 1 into Dmgd, leave `Receive now` at the
+   * prefilled remainder, and the line now counts one unit more than the PO
+   * owes. The counts are lost with the driver waiting, and the refusal names a
+   * SKU without ever saying the fix is to lower `Receive now`.
+   *
+   * This file's own contract claims the button and the server read the same
+   * rule. That was true of photos and claim types and false of quantities.
+   * It is true of quantities now, and the message names the control to change.
+   */
+  const overCounted = lines.find((l) => {
+    const c = counts[l.id] ?? EMPTY_COUNT;
+    return c.receivedNow + c.damagedQty + c.wrongItemQty > poLineReportable(l);
+  });
+
   const blocker: string | null =
     doNumber.trim().length < 3
       ? "Save — add a DO number"
@@ -457,9 +481,11 @@ function ReceivingMode({
         ? "Save — upload signed DO"
         : counted === 0
           ? "Save — count at least one unit"
-          : claimProblems.length > 0
-            ? `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[claimProblems[0]].toLowerCase()}`
-            : null;
+          : overCounted
+            ? "Save — lower Receive now, the line counts more than is owed"
+            : claimProblems.length > 0
+              ? `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[claimProblems[0]].toLowerCase()}`
+              : null;
 
   function submit() {
     if (blocker || !doFilePath || save.isPending) return;
