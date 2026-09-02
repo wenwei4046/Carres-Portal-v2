@@ -51,18 +51,18 @@ this number, may I change it). That was audited in full on 2026-08-28 —
 `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md`, 103 rows in render order. **The open
 items in it are the work; do not re-audit.**
 
-## 2 · CURRENT STATUS — measured 2026-09-02, re-measure before use
+## 2 · CURRENT STATUS — measured 2026-09-02 after #1060, re-measure before use
 
 | Fact | Value | How to re-measure |
 |---|---|---|
-| `origin/main` | `0585cf2b` | `git rev-parse --short origin/main` |
+| `origin/main` | `90147ff2` | `git rev-parse --short origin/main` |
 | `apps/web` tests | **GREEN — 285 files, 3731 tests** | `cd apps/web && pnpm exec vitest run` |
-| `apps/api` tests | **GREEN — 131 files, 2644 tests** | `pnpm --filter @carres/api test` |
+| `apps/api` tests | **GREEN — 131 files, 2649 tests** | `pnpm --filter @carres/api test` |
 | `packages/shared` tests | **GREEN — 122 files, 2836 tests** | `pnpm --filter @carres/shared test` |
 | Typecheck | clean | `pnpm -r typecheck` — **NOT** `tsc -p tsconfig.json` in `apps/web`, which checks nothing |
-| Migration filenames | 423 validated | `node scripts/check-migrations.mjs` |
-| Migration tail, ALL branches | `0415` → **next free is `0416`** | the rename-safe command in §4 |
-| Open PRs from this lane | **#1058** (0414 pin) · **#1059** (0415 guard) — both green, both need merging | `gh pr list --author @me` |
+| Migration filenames | 425 validated | `node scripts/check-migrations.mjs` |
+| Migration tail, ALL branches | `0416` — on the unmerged `fix/so-batch-scroll-and-unit-id`, NOT on main → **next free is `0417`** | the rename-safe command in §4 |
+| Open PRs from this lane | **none** — #1058, #1059 and #1060 all merged 2 Sep | `gh pr list --author @me` |
 
 ### Migrations — APPLIED means probed, not merged
 
@@ -72,7 +72,8 @@ items in it are the work; do not re-audit.**
 | `0405` | ✅ applied 1 Sep. **It had never run**; the PO collection guard existed only in two API routes |
 | `0410` Manual Purchase is one transaction | ✅ applied |
 | `0414` a stamped fee remembers its rate | ✅ applied |
-| `0415` the office door locks what the shop door locks | ❌ **NOT APPLIED** — see §7 |
+| `0415` the office door locks what the shop door locks | ✅ **applied 2026-09-02 by YH.** Confirm it landed WHOLE — §6.2 |
+| `0413` the over-issue guard counts what was approved | ❓ **NEVER PROBED** — merged 2 Sep inside #1054, and its own PR body says *MERGED IS NOT APPLIED*. §6.1 |
 | `0411` instalment months widened | **WITHDRAWN, never applied.** YH asked *"if the POS still sells 6 and 12, why widen?"* and he was right |
 
 ### Shipped 1–2 Sep, merged and live
@@ -272,23 +273,35 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
   every line of a Manual Purchase. "Degrade, don't abort" is not "stay silent" —
   if the safe path cannot do the whole job, refuse in words (503), never
   half-write.
+- **A gate that never ran, read as a gate that passed.** Two ways to get this,
+  both hit on 2026-09-02. A **fresh worktree has no `node_modules`**, so
+  `pnpm -r typecheck` fails with *'tsc' is not recognized* — a missing binary,
+  not clean code. And `pnpm -r test 2>&1 | tail` reports **tail's** exit code,
+  so a red suite prints green. Run `pnpm install` in a new worktree first, and
+  redirect to a file rather than piping: `pnpm -r test > log 2>&1; echo $?`.
+  Same family as the `tsc -p tsconfig.json` warning in §2 — the failure mode is
+  always that nothing was measured, and nothing looks like success.
 
 ## 6 · OPEN WORK, in order
 
-1. 🔴 **`0415` is NOT applied, and its half-apply is the danger.** The file
-   renames `sales_order_floors` → `sales_order_floors_unchecked_0328` and then
-   installs a wrapper. If it stops between those two steps, `0328`'s body is
-   gone and every Sales Order write loses its floors check. **A guard DO block
-   now makes that impossible** — it raises if the rename did not happen — but
-   the guard is on PR **#1059**, unmerged. Merge #1059 first, then run
-   `0415-diagnose.sql`, which distinguishes NOT APPLIED / APPLIED OK / HALF, and
-   apply only if it says NOT APPLIED. It carries F-11 (the promised date guarded
-   by one layer, not two), F-12 (`update_order` freezes six delivery fields after
-   Proceed; the office door did not) and F-13 (the floors evaluator blind to
-   seven fields).
+1. ⚠️ **`0413` has never been probed.** It merged inside #1054 on 2 Sep and its
+   own PR body says *MERGED IS NOT APPLIED*. It makes the over-issue guard count
+   what the approver ALLOWED (`coalesce(approved_qty, qty)`) rather than the
+   original ask, so until it is applied the database will let a caller issue the
+   full ask on a line the approver cut. No money has moved wrongly — the API is
+   the only caller and it respects the cut — but a guard that is correct only
+   because the layer above it happens to be correct is not a guard. Hand YH
+   `0413-applied.sql`; apply only if it answers `false`.
 
-2. **Merge #1058** (the `0414` rate pin). Conflict already resolved and pushed,
-   green. The migration is applied; only the code is waiting.
+2. **Confirm `0415` landed WHOLE, not half.** YH applied it on 2 Sep, so F-11
+   (the promised date guarded by one layer, not two), F-12 (`update_order`
+   freezes six delivery fields after Proceed; the office door did not) and F-13
+   (the floors evaluator blind to ten fields) are all live. The half-apply was
+   the whole risk: the file renames `sales_order_floors` →
+   `sales_order_floors_unchecked_0328` and then installs a wrapper, and a stop
+   between those two steps leaves every Sales Order write with no floors check
+   at all. The guard DO block should have made that impossible. Confirming costs
+   one query — `0415-landed-whole.sql`, expect `2, true, true`.
 
 3. **The instalment-months refusal sentence.** The bound is verified and
    correct — NULL/6/12, matching what the POS sells. A proposal of 9 still fails
@@ -323,16 +336,17 @@ apart and would refuse a real event.
 
 ## 7 · EXACT NEXT STEP
 
-**Merge #1059, then hand YH `0415-diagnose.sql` and wait for the verdict.**
-Nothing else in §6 moves until the floors wrapper is known-good, because F-11,
-F-12 and F-13 all ride on it and a half-apply is the one outcome that makes
-things worse than not applying at all.
+**Hand YH two probes — `0413-applied.sql` and `0415-landed-whole.sql` — and
+wait for both verdicts.** One query each, and they are the only two facts in this
+file that cannot be measured from the repository. Every line of the 1–2 Sep build
+is merged; whether the DATABASE agrees is the open question, and this repo has
+been wrong about that twice in three days.
 
-Then merge #1058. Then ask YH which item in §6 he is releasing. **Do not invent
-work**, and do not start Purchase Returns or Repair Orders on your own
-initiative.
+Then ask YH which item in §6 he is releasing. Items 3, 4 and 5 are each blocked
+on a ruling from him, not on work. **Do not invent work**, and do not start
+Purchase Returns or Repair Orders on your own initiative.
 
 ---
 
-*Written 2026-09-02 at `origin/main` = `0585cf2b`. Status lines decay within
+*Written 2026-09-02 at `origin/main` = `90147ff2`. Status lines decay within
 days in this repo — measure, do not recite.*
