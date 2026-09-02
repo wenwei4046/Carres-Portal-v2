@@ -81,14 +81,31 @@ export interface EmergencyContactParts {
 /**
  * Three fields → the one `customer_emergency` column.
  *
- * Empty parts are dropped so a contact with no relationship still reads
+ * A trailing empty part is dropped, so a contact with no relationship reads
  * `"Alice · 012-3456789"` rather than `"Alice · 012-3456789 · "`. All three
  * empty composes to `""`, which every caller turns into SQL NULL.
+ *
+ * ⛔ ONLY TRAILING (YH, 2026-09-01 — audit F-4, and it silently corrupted a
+ * real field). This used to drop EVERY empty part, which loses the POSITION of
+ * the ones that remain. `parseEmergencyContact` reads by position, so:
+ *
+ *     { name: "", phone: "012-3456789", relationship: "Spouse" }
+ *       compose → "012-3456789 · Spouse"
+ *       parse   → { name: "012-3456789", phone: "Spouse", relationship: "" }
+ *
+ * Save a contact with no name, reload the order, and the PHONE has become the
+ * name and the relationship has become the phone. Nothing warned, nothing
+ * failed, and the next reader saw a plausible-looking contact that was wrong.
+ *
+ * Keeping the empty slot preserves the position: the same input composes to
+ * `" · 012-3456789 · Spouse"` and parses back to itself. A trailing empty
+ * carries no position — there is nothing after it — so dropping it is safe and
+ * keeps the common shape unchanged.
  */
 export function composeEmergencyContact(parts: EmergencyContactParts): string {
-  return [parts.name.trim(), parts.phone.trim(), parts.relationship.trim()]
-    .filter(Boolean)
-    .join(EMERGENCY_SEPARATOR);
+  const trio = [parts.name.trim(), parts.phone.trim(), parts.relationship.trim()];
+  while (trio.length > 0 && trio[trio.length - 1] === "") trio.pop();
+  return trio.join(EMERGENCY_SEPARATOR);
 }
 
 /**
@@ -105,8 +122,15 @@ export function composeEmergencyContact(parts: EmergencyContactParts): string {
 export function parseEmergencyContact(
   stored: string | null | undefined,
 ): EmergencyContactParts {
-  const raw = (stored ?? "").trim();
-  if (!raw) return { name: "", phone: "", relationship: "" };
+  /* ⛔ THE RAW STRING IS SPLIT UNTRIMMED, and that is load-bearing rather than
+     sloppy. A composed contact with no name legitimately BEGINS with the
+     separator (`" · 012-3456789 · Spouse"`); trimming the whole string first
+     would eat that separator's leading space, the split would find one fewer
+     boundary, and the phone would land in `name` — the exact defect this pair
+     was fixed for. Emptiness is still judged on the trimmed string, and every
+     PART is trimmed below, so nothing else changes. */
+  const raw = stored ?? "";
+  if (!raw.trim()) return { name: "", phone: "", relationship: "" };
   const parts = raw.split(EMERGENCY_SEPARATOR);
   return {
     name: (parts[0] ?? "").trim(),
