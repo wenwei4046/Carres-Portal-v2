@@ -5,10 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PO_DELAY_REASONS } from "@carres/shared";
 import { LegacyOperationPurchaseOrders as OperationPurchaseOrders } from "./OperationPurchaseOrders";
-
-const PO_DELAY_REASONS_FOR_TEST: readonly string[] = PO_DELAY_REASONS;
 
 /**
  * Purchase Orders — the Supplier Execution Register.
@@ -798,17 +795,6 @@ describe("the balance-date door (Q14 — the queue and the door in one place)", 
    * gains no trigger: its door is `SupplierDateForm`, on this same surface a
    * line above. A second one here would rebuild what Q14 tore down.
    */
-  it("the TOMORROW call is stated here and has no door of its own", async () => {
-    await mountLoaded();
-    const work = await expandPo("PO-9003"); // arrives today → the call is open
-    fireEvent.click(work.getByTestId("po-date-row"));
-    // Scoped to the expand: the Current Action column says the same words on
-    // the row above, and this test is about the WORK AREA's own statement.
-    expect(work.getByText("Confirm tomorrow's delivery")).toBeInTheDocument();
-    expect(screen.queryByTestId(/^po-balance-/)).not.toBeInTheDocument();
-    // Its one door, unchanged.
-    expect(screen.getByTestId("po-date-open")).toBeInTheDocument();
-  });
 });
 
 /**
@@ -1799,56 +1785,17 @@ describe("the ONE Current Action source (Law 7)", () => {
   });
 });
 
-describe("the supplier-date door (Jess's cycle, one form)", () => {
-  it("a PO with NO date takes its FIRST date — no reason asked", async () => {
-    await mountLoaded();
-    const work = await expandPo("PO-9002");
-    // PO-9002 is cancelled; use the one with no date instead.
-    fireEvent.click(work.getByTestId("po-date-row"));
-    fireEvent.click(screen.getByTestId("po-date-open"));
-    const form = within(screen.getByTestId("po-date-form"));
-    expect(form.getByTestId("po-date-input")).toBeInTheDocument();
-    // No date held → nothing to delay → the reason picker stays away.
-    expect(form.queryByTestId("po-date-reason")).not.toBeInTheDocument();
-  });
-
-  it("keying a DIFFERENT date asks for a reason and posts a delay", async () => {
-    await mountLoaded();
-    // PO-9001 holds a supplier-confirmed date (its ledger says so).
-    await expandPo("PO-9001");
-    fireEvent.click(screen.getByTestId("po-date-row"));
-    fireEvent.click(screen.getByTestId("po-date-open"));
-    const input = screen.getByTestId("po-date-input");
-    fireEvent.change(input, { target: { value: "2099-12-31" } });
-    expect(screen.getByTestId("po-date-reason")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("po-date-remarks-open"));
-    fireEvent.change(screen.getByTestId("po-date-remarks"), {
-      target: { value: "factory said Tuesday" },
-    });
-    fireEvent.click(screen.getByTestId("po-date-save"));
-    await waitFor(() =>
-      expect(
-        apiFetch.mock.calls.some(
-          (c) =>
-            String(c[0]).includes("/tomorrow-delivery") &&
-            String((c[1] as { body?: string })?.body).includes('"delayed"'),
-        ),
-      ).toBe(true),
-    );
-    const call = apiFetch.mock.calls.find((c) =>
-      String(c[0]).includes("/tomorrow-delivery"),
-    )!;
-    const body = JSON.parse(String((call[1] as { body: string }).body));
-    expect(body).toMatchObject({
-      answer: "delayed",
-      newDate: "2099-12-31",
-      remarks: "factory said Tuesday",
-    });
-    // The reason is the countable CATEGORY, never free text.
-    expect(PO_DELAY_REASONS_FOR_TEST).toContain(body.reason);
-  });
-});
-
+/* THE SUPPLIER-DATE FORM'S TESTS MOVED (YH, 2026-09-02, defect 5).
+   Six tests here drove `SupplierDateForm` - a component inside
+   `LegacyOperationPurchaseOrders`, which sits BELOW this file's live re-export
+   and so rendered nowhere. They were green, and they were testing a door no
+   operator could reach; that is precisely how the register went on counting
+   "Ask {supplier} for the delivery date" with nothing to answer it.
+   The form is deleted. Its behaviour now lives on the real Document view as
+   `SupplierDateBlock`, and its tests live beside it in
+   `purchase-orders/PurchaseOrdersPage.test.tsx`.
+   What remains below still passes, because it reads the date HISTORY rather
+   than the form. */
 describe("the supplier's date history, numbered (SAP's shape)", () => {
   it("counts the dates and prints the slip once there is more than one", async () => {
     await mountLoaded();
@@ -1870,53 +1817,8 @@ describe("the supplier's date history, numbered (SAP's shape)", () => {
     expect(h.getByText("3rd")).toBeInTheDocument();
   });
 
-  it("the extend is QUIET — no form until you ask to record something", async () => {
-    await mountLoaded();
-    const work = await expandPo("PO-9003");
-    fireEvent.click(work.getByTestId("po-date-row"));
-    // History and a quiet trigger; no date box, no Remarks box standing open.
-    expect(screen.queryByTestId("po-date-form")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("po-date-remarks")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("po-date-open"));
-    const input = screen.getByTestId("po-date-input") as HTMLInputElement;
-    // A date already given can never be edited — you record the NEXT one.
-    expect(input.value).toBe("");
-    expect(screen.queryByTestId("po-date-effect")).not.toBeInTheDocument();
-    // A multi-field form gets a real Save (Jess: "i cant save?"); Remarks is
-    // the exception and stays folded until asked for.
-    expect(screen.getByTestId("po-date-save")).toBeDisabled();
-    expect(screen.queryByTestId("po-date-remarks")).not.toBeInTheDocument();
-    expect(screen.getByTestId("po-date-remarks-open")).toBeInTheDocument();
-  });
 
-  it("Esc closes the date form and records nothing", async () => {
-    await mountLoaded();
-    const work = await expandPo("PO-9003");
-    fireEvent.click(work.getByTestId("po-date-row"));
-    fireEvent.click(screen.getByTestId("po-date-open"));
-    fireEvent.change(screen.getByTestId("po-date-input"), {
-      target: { value: "2099-12-31" },
-    });
-    fireEvent.keyDown(screen.getByTestId("po-date-input"), { key: "Escape" });
-    expect(screen.queryByTestId("po-date-form")).not.toBeInTheDocument();
-    expect(
-      apiFetch.mock.calls.some((c) => String(c[0]).includes("/tomorrow-delivery")),
-    ).toBe(false);
-  });
 
-  it("once a date is keyed it says exactly what Save will record", async () => {
-    await mountLoaded();
-    await expandPo("PO-9001"); // it holds 2099-12-30 — the date this test keys
-    fireEvent.click(screen.getByTestId("po-date-row"));
-    fireEvent.click(screen.getByTestId("po-date-open"));
-    const input = screen.getByTestId("po-date-input");
-    fireEvent.change(input, { target: { value: "2099-12-31" } });
-    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/^Delay \d+ day/);
-    // The same date is a confirmation, not a delay — and asks no reason.
-    fireEvent.change(input, { target: { value: "2099-12-30" } });
-    expect(screen.getByTestId("po-date-effect").textContent).toMatch(/Same date/);
-    expect(screen.queryByTestId("po-date-reason")).not.toBeInTheDocument();
-  });
 });
 
 describe("where each line goes (0311, Jess 2026-08-02 — now a cell of the expand)", () => {
