@@ -1724,10 +1724,23 @@ over this question is gone.
   `order_history` + `order_change_requests`. An approved+applied change
   request IS the customer-change record on that lane. Unifying them onto the
   revision ledger is a later card.
-- The Stage-3 amendment lane (ISSUE/ACCEPT/APPLY, 3.6–3.8) stays walled; until
-  it lands, the governed path for a customer change is the SAVE door with
-  `change_type='customer_change'`, exactly as Stage 2 shipped it — Card 1
-  labels the act, it does not open a new one.
+- ~~The Stage-3 amendment lane stays walled; until it lands, the governed path
+  for a customer change is the SAVE door.~~ **SPENT 2026-09-02 — its own
+  condition expired, and it is struck under Law 3 rather than left to
+  contradict the "read-only facts" rule above.** The lane LANDED:
+  `sales_order_submit_amendment` and `sales_order_decide_amendment` ship
+  (`0348`, `0354`), the route calls the first
+  (`apps/api/src/routes/operation/orders.ts:1884`), and `Change delivery date`
+  is on the object card (`SalesOrderWorkspace.tsx:2283`).
+  **THE GOVERNED PATH FOR A CUSTOMER DATE CHANGE IS THE AMENDMENT.** `0415`
+  makes the save door refuse it (`promise_moves_by_amendment`) — which is what
+  this paragraph had been quietly authorising for as long as it outlived its
+  own "until".
+  **The reading lesson, and why this is struck rather than removed:** a
+  sentence that says "until X lands" stops being law the day X lands, but it
+  goes on READING like law for as long as nobody re-measures X. This one
+  outlived its condition and became the only text in the repository
+  authorising a silent move of a customer's promised date.
 - Cannot answer "how much is physically fulfilled" — that is Card 2 (units)
   + Card 5 (delivery attempts), on purpose.
 
