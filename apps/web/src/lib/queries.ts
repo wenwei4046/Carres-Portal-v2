@@ -7775,6 +7775,17 @@ export function useOfficeReceiveMutation(
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      /* THE REGISTER THAT PROVES THE SAVE (YH, 2026-09-02, defect 19).
+         Nine keys were invalidated and NOT this one - the receipts list, which
+         is cached for 30 seconds. So the operator posted a receipt, opened
+         Goods Received to confirm it was filed, and found no new record and an
+         unchanged count. That register is the page own proof the delivery
+         happened, and an operator who cannot see the proof receives the same
+         goods a second time.
+         The warehouse door sibling mutation already invalidated it, so the two
+         doors behaved differently after the same act - which is the worse half:
+         whether your delivery appears depended on which screen filed it. */
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },

@@ -346,6 +346,21 @@ export default function OperationReceiving() {
     const base = searched.filter(
       (p) =>
         (stateSel === null || progressById.get(p.id)?.state === stateSel) &&
+        /* "TO RECEIVE" MEANS SOMETHING IS STILL OWED (YH, 2026-09-02, defect 6).
+           The queue held EVERY non-cancelled purchase order, fully received
+           ones included, sorted oldest-first. Two things followed, and both hurt:
+             · with no `?po=` the page auto-selected the oldest PO ever placed,
+               which is almost always one that closed months ago - so the
+               landing state was a panel reading "this purchase order is closed"
+               with no Start Receiving button. A receiving desk opened on a dead
+               end every morning.
+             · the count beside "To receive" was the count of all POs on file,
+               not of deliveries still owed. That number is what an operator
+               reads as their day's work, and it was wrong.
+           A finished delivery is not work to do. It stays reachable through the
+           rail's own "Fully received" row - which is why this only applies when
+           no progress facet is picked, so clicking that row still shows them. */
+        (stateSel !== null || progressById.get(p.id)?.state !== "fully_received") &&
         (supplierSel === null || p.supplier_id === supplierSel),
     );
     const sorted = [...base];
@@ -479,9 +494,33 @@ export default function OperationReceiving() {
     () => live.find((p) => p.id === selectedId) ?? null,
     [live, selectedId],
   );
+  /* A `?po=` THAT CANNOT BE SHOWN IS NOT AN INVITATION TO SHOW ANOTHER ONE
+     (YH, 2026-09-02, defect 7).
+
+     This auto-select fired whenever `selected` was null - and `selected` is
+     null in two completely different situations:
+
+       · no `?po=` at all. Opening the queue cold. Picking the first row is a
+         convenience and is what this effect was written for.
+       · a `?po=` that MISSED. A cancelled PO, a mistyped id, or one owned by a
+         partner warehouse falls out of `live`, so the lookup returns null -
+         and the effect then wrote a DIFFERENT PO's id into the URL with
+         `replace: true`, so Back could not even recover what was asked for.
+
+     The operator got another PO's number, its history, and a live
+     `Start Receiving` button, with nothing saying the one they asked for was
+     not found. RECEIVING MOVES STOCK. Counting goods against the wrong
+     purchase order is a real loss of real furniture, and these links are
+     produced by the Order Detail Drawer, the Purchase Orders page and the
+     Procurement tab - so the wrong PO arrives by ordinary navigation, not by
+     typing.
+
+     Auto-select only when the parameter is ABSENT. A miss is reported below
+     instead, and the bad id stays in the address bar where it can be read. */
+  const askedForMissingPo = selectedId != null && selected == null && !posQ.isLoading;
   useEffect(() => {
     if (queue !== "to_receive") return;
-    if (selected || posQ.isLoading || rows.length === 0) return;
+    if (selectedId || selected || posQ.isLoading || rows.length === 0) return;
     setParams(
       (prev) => {
         const n = new URLSearchParams(prev);
@@ -491,7 +530,7 @@ export default function OperationReceiving() {
       { replace: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, posQ.isLoading, rows]);
+  }, [selectedId, selected, posQ.isLoading, rows]);
 
   /** A record's selection rides `?receipt=` — its own key, because a PO and a
    *  Receiving Session are two different documents and one param naming both
@@ -1158,6 +1197,18 @@ export default function OperationReceiving() {
               receiving={receiving}
               onReceiving={setReceiving}
             />
+          ) : askedForMissingPo ? (
+            /* The third state this panel never had. A `?po=` that misses used
+               to be answered with a DIFFERENT purchase order and a live
+               `Start Receiving` button; naming the miss is the whole fix. The
+               three real causes are listed because each has a different next
+               act, and the operator cannot tell them apart from the number. */
+            <div className="h-full flex items-center justify-center p-4">
+              <EmptyState
+                title={`${selectedId} is not in this queue.`}
+                detail="It may have been cancelled, it may already be fully received, or the number may be wrong. Pick a purchase order from the list to carry on."
+              />
+            </div>
           ) : (
             !posQ.isLoading &&
             live.length === 0 && (

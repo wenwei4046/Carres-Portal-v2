@@ -9,6 +9,7 @@ import {
   defaultAllocations,
   isSelectableForBuying,
   purchaseDemandRailWords,
+  isPurchaseDemandTimingState,
   purchaseDemandStateWords,
   setDestination,
   soBatchCellSummary,
@@ -612,6 +613,40 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               : issued.kind === "one"
                 ? issued.value
                 : W.multiple;
+          /* THE EMPTY CELL SAYS WHY IT IS EMPTY (YH, 2026-09-02:
+             "still cant click checkboxes, delivery to column is still empty").
+             This cell draws a CONTROL on any row that can still be bought, so
+             an empty one means no line is eligible. That has two very different
+             causes and the page drew them identically:
+               · nothing left to buy - Ordered, or covered from ready stock.
+                 Correct, and the Status column already says so.
+               · a BLOCKER - the row cannot be bought at all, because a SKU has
+                 no catalog cost, no supplier, no production days, no customer
+                 date, or no SKU. Any one of these makes `issueRef` null and the
+                 tick, the dropdown and the Split button all vanish together.
+             The reason was computed and then shown ONLY inside the row
+             expansion, behind the small grey triangle. So the operator met a
+             blank row, a dead checkbox and an empty cell with nothing on screen
+             naming the cause - which reads as a broken page and is exactly how
+             it was reported, twice.
+             A page that cannot buy a row must say why on that row. */
+          if (text == null) {
+            const blocked = (leafsByOrder.get(o.orderId) ?? []).filter(
+              (leaf) => !isPurchaseDemandTimingState(leaf.state),
+            );
+            if (blocked.length > 0) {
+              const reasons = [...new Set(blocked.map((leaf) => stateWords[leaf.state]))];
+              return (
+                <span
+                  className="text-kit-amber-11"
+                  data-testid={`so-batch-deliver-to-${o.orderId}`}
+                  title="Open the row to see what to do about it"
+                >
+                  {reasons.length === 1 ? reasons[0] : W.multiple}
+                </span>
+              );
+            }
+          }
           return <span data-testid={`so-batch-deliver-to-${o.orderId}`}>{text}</span>;
         },
         exportValue: (o) => {
