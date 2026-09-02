@@ -39,7 +39,19 @@ interface OrderStairInputs {
   delivery_stair_items: number | null;
   order_lines: Array<{ qty: number }> | null;
   order_addons: Array<{ addon_key: string; qty: number; unit_price: number }> | null;
+  /** 0414 — the rate this order's fee was priced at. Both null until the order
+   *  is next stamped, and absent entirely until 0414 is applied. */
+  stair_rate_per_floor_per_item?: number | null;
+  stair_rate_free_up_to_floor?: number | null;
 }
+
+/** The columns 0414 adds. Selected separately so their absence is survivable —
+ *  migrations here are applied BY HAND and this code can reach production
+ *  first. */
+const PIN_COLUMNS = "stair_rate_per_floor_per_item, stair_rate_free_up_to_floor";
+const BASE_COLUMNS =
+  "delivery_floor, delivery_has_lift, delivery_stair_items, " +
+  "order_lines(qty), order_addons(addon_key, qty, unit_price)";
 
 export async function restampStairCarry(
   sb: SupabaseClient,
@@ -61,22 +73,42 @@ async function restamp(
   sb: SupabaseClient,
   orderId: string,
 ): Promise<{ ok: true; fee: number } | { ok: false; reason: string }> {
-  const { data, error } = await sb
+  /* ⛔ MERGED IS NOT APPLIED. `0414` is applied by hand, so this build can
+     reach production before its two columns exist — and a select naming a
+     missing column fails the whole read, which would stop every re-stamp.
+     Ask for them, and on failure ask again without them: an order with no pin
+     prices from the live config, which is exactly the behaviour before 0414.
+     Degrade, never abort. The second round trip happens only while the
+     migration is outstanding. */
+  let withPin = true;
+  let read = await sb
     .from("orders")
-    .select(
-      "delivery_floor, delivery_has_lift, delivery_stair_items, " +
-        "order_lines(qty), order_addons(addon_key, qty, unit_price)",
-    )
+    .select(`${BASE_COLUMNS}, ${PIN_COLUMNS}`)
     .eq("id", orderId)
     .maybeSingle();
+  if (read.error) {
+    withPin = false;
+    read = await sb.from("orders").select(BASE_COLUMNS).eq("id", orderId).maybeSingle();
+  }
+  const { data, error } = read;
   if (error) return { ok: false, reason: `read order: ${error.message}` };
   if (!data) return { ok: false, reason: "order not found" };
 
   const row = data as unknown as OrderStairInputs;
+  /* BOTH HALVES OR NEITHER. A rate without its free band prices a different
+     fee, so a half-written pin is treated as no pin at all. */
+  const pinned =
+    row.stair_rate_per_floor_per_item != null && row.stair_rate_free_up_to_floor != null
+      ? {
+          perFloorPerItem: Number(row.stair_rate_per_floor_per_item),
+          freeUpToFloor: Number(row.stair_rate_free_up_to_floor),
+        }
+      : null;
   const recompute = await recomputeStairCarry(sb, row.order_lines ?? [], {
     floor: row.delivery_floor ?? 0,
     hasLift: row.delivery_has_lift ?? false,
     stairItems: row.delivery_stair_items,
+    pinned,
   });
   if (recompute.status !== "ok") return { ok: false, reason: recompute.message };
 
@@ -101,6 +133,27 @@ async function restamp(
   const stored = (row.order_addons ?? []).find((a) => a.addon_key === STAIR_CARRY_ADDON_KEY);
   const storedFee = stored ? Number(stored.unit_price) * Number(stored.qty) : 0;
   if (storedFee === recompute.fee) return { ok: true, fee: recompute.fee };
+
+  /* ⭐ THE STAMP RECORDS THE RATE THAT MADE IT (0414), once. `..._pinned`
+     writes the pin only where none exists and then delegates to `0394`'s door
+     unchanged, so a re-stamp on an already-pinned order moves the fee and
+     leaves the rate — which is the ruling.
+     Same hand-applied caveat as the read: a missing function means 0414 has
+     not run, so fall back to the original door and carry on unpinned. */
+  const rate = recompute.rate;
+  if (withPin && rate) {
+    const { error: pinnedError } = await sb.rpc("order_stamp_stair_carry_pinned", {
+      p_order_id: orderId,
+      p_fee: recompute.fee,
+      p_rate: rate.perFloorPerItem,
+      p_free_up_to: rate.freeUpToFloor,
+    });
+    if (!pinnedError) return { ok: true, fee: recompute.fee };
+    const code = String((pinnedError as { code?: string }).code ?? "");
+    if (code !== "PGRST202" && code !== "42883") {
+      return { ok: false, reason: `stamp: ${pinnedError.message}` };
+    }
+  }
 
   const { error: stampError } = await sb.rpc("order_stamp_stair_carry", {
     p_order_id: orderId,
