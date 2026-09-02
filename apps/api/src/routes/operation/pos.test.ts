@@ -702,7 +702,15 @@ describe("GET /api/operation/pos/:id/audit", () => {
           occurred_at: "2026-08-28T09:00:00Z",
         },
       ],
-      app_users: [{ id: "user-1", name: "Yee Jean", email: "yj@carres.com" }],
+      /* ⭐ RE-PINNED 2026-09-01. The route read `app_users` directly, under
+         the caller's own JWT — so `0235`'s peers policy left every PRINCIPAL
+         actor unnamed on a purchase order's own audit, including one acting
+         under `0403`'s operations-superuser authority. It goes through
+         `resolveActorNames` now, the same arithmetic the Sales Order records
+         and the Activity rail use, so the mock answers the door instead of the
+         table. The assertion is unchanged: a real staff name reaches the
+         screen. */
+      salespersons: [],
     };
     vi.mocked(userClient).mockReturnValue({
       from: vi.fn((table: string) => {
@@ -713,6 +721,11 @@ describe("GET /api/operation/pos/:id/audit", () => {
         chain.order = vi.fn().mockResolvedValue({ data: tables[table] ?? [], error: null });
         return chain;
       }),
+      rpc: vi.fn(async (fn: string) =>
+        fn === "actor_display_names"
+          ? { data: [{ id: "user-1", name: "Yee Jean" }], error: null }
+          : { data: null, error: null },
+      ),
     } as never);
 
     const res = await app.fetch(

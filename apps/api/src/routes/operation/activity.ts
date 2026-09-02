@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { resolveActorNames } from "../../lib/actor-names";
 import { mapPgError } from "../../lib/route-helpers";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
@@ -12,9 +13,14 @@ import type { AppEnv } from "../../types";
  * searches / tabs client-side (same pattern as the orders control table).
  *
  * Read-only, no migration: reads the append-only ops_activity_log +
- * order_annotations under the caller's RLS (internal roles). Actor names come
- * from app_users in one extra round-trip (the FK points at auth.users, which
- * PostgREST can't traverse — same trick as the escalations route).
+ * order_annotations under the caller's RLS (internal roles).
+ *
+ * ⚠️ THE SENTENCE THAT USED TO END THIS PARAGRAPH WAS THE BUG. It read
+ * "Actor names come from app_users in one extra round-trip", and that plain
+ * read is what left every principal, Finance, HR and Warehouse actor unnamed
+ * to an operation login — `0235` shows an operation JWT only operation-role
+ * rows. Names now come from `resolveActorNames`, the one arithmetic the Sales
+ * Order History and Revisions already use (Law D). See the note at the call.
  */
 export const activityRouter = new Hono<AppEnv>();
 
@@ -60,13 +66,27 @@ activityRouter.get("/", requireOperationOrPrincipal, async (c) => {
       ].filter(Boolean) as string[],
     ),
   ];
-  const nameMap: Record<string, string> = {};
-  if (actorIds.length) {
-    const { data: users } = await sb.from("app_users").select("id, name").in("id", actorIds);
-    (users ?? []).forEach((u) => {
-      nameMap[u.id] = u.name;
-    });
-  }
+  /* ⭐ THE RAIL NAMES EVERY INTERNAL ACTOR (CARD-2026-08-27, built
+     2026-09-01).
+     This read `app_users` straight, under the caller's own JWT. `0235`'s peers
+     policy shows an OPERATION login only operation-role rows, so every act by
+     a principal, Finance, HR or Warehouse arrived here unnamed and the rail
+     printed the event with nobody attached to it. The Person filter and the
+     search box are built from these names too, so those actors were also
+     unfilterable and unsearchable — a whole class of activity the operator
+     could see happening and could not attribute or find.
+     ⛔ AND A PRINCIPAL READER COULD ALWAYS SEE THEM, which is why nobody
+     caught it: `0002`'s `app_users_self_read` gives a principal every row. The
+     card says to walk this rail as an OPERATION account for exactly that
+     reason.
+     `resolveActorNames` is the one arithmetic the Sales Order History and
+     Revisions already use (Law D). ⛔ NOT a bare `actor_display_names` call:
+     that door returns internal staff only, so swapping it in alone would have
+     STOPPED naming the salesperson and dealer actors a principal names today —
+     `0211`'s triggers stamp their ids straight into this feed. The resolver's
+     second source is what makes the swap safe for both readers. */
+  const nameById = await resolveActorNames(sb, actorIds);
+  const nameMap: Record<string, string> = Object.fromEntries(nameById);
 
   const rows = [
     ...acts.map((r) => {
