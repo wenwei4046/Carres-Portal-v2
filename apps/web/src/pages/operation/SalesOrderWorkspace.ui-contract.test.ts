@@ -932,8 +932,19 @@ describe("Sales Order object page — one form grammar", () => {
        Same colour, same face, same tracking; the hierarchy moves to SIZE,
        which is where it belongs — a subsection is a smaller instance of the
        same thing rather than a different species. */
-    const title = "font-mono text-strong uppercase tracking-[0.08em] text-base-900";
-    const sub = "font-mono text-label uppercase tracking-[0.08em] text-base-900";
+    /* ⭐ AND THE COLOUR IS THE BRAND'S (YH, 2026-09-02 — "I asked for color on
+       the card titles"). One shade for every heading was the first half; this
+       is the second. `signature-700` is flame-dark, an EXISTING declared token
+       — no new value is invented, which §2 of the Constitution locks.
+       ⛔ WHY NOT ANY OTHER HUE. `index.css`:187 assigns every colour a job:
+       flame = action, blue = selection, green/amber/red = status, and §2.2
+       adds "decoration by hue is not a job". Every hue in the system is
+       spoken for, so a heading painted blue would read as selected and one
+       painted amber as a warning. Flame-dark is the one tone that carries the
+       brand without carrying a JOB — a heading is not an action, so it cannot
+       be mistaken for the one flame CTA the page is allowed. */
+    const title = "font-mono text-strong uppercase tracking-[0.08em] text-signature-700";
+    const sub = "font-mono text-label uppercase tracking-[0.08em] text-signature-700";
     expect(workspace, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
     /* THE OLD SHAPE: a lighter, different-faced subsection. Pinned on the
@@ -947,6 +958,12 @@ describe("Sales Order object page — one form grammar", () => {
        screen and the tab underline already holds it; a blue heading would be
        the second spend and the current thing would stop standing out. */
     expect(workspace).not.toContain("uppercase tracking-[0.08em] text-kit-blue");
+    /* Nor any status hue, for the same reason. */
+    for (const job of ["text-kit-green", "text-kit-amber", "text-kit-red", "text-danger"]) {
+      expect(workspace, `${job} is a status colour, not a heading colour`).not.toContain(
+        `uppercase tracking-[0.08em] ${job}`,
+      );
+    }
   });
 
   it("keeps a service to ONE row, carrying its own doors", () => {

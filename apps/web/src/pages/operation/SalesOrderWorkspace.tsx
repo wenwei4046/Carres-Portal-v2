@@ -694,7 +694,7 @@ export function Block({
             keep the face — one class, no other change. */}
         <h2
           id={headingId}
-          className="font-mono text-strong uppercase tracking-[0.08em] text-base-900"
+          className="font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
         >
           {title}
         </h2>
@@ -775,7 +775,7 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
      smaller instance of the same thing rather than as a different species. */
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-base-900 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
