@@ -66,14 +66,14 @@ items in it are the work; do not re-audit.**
 
 ### Migrations — APPLIED means probed, not merged
 
-| Migration | Probe verdict 2026-09-02 |
+| Migration | Probe verdict — all probed 2026-09-02, none recited |
 |---|---|
 | `0395`, `0406` | ✅ applied — closed the HIGH carry-forward that had been open four days |
 | `0405` | ✅ applied 1 Sep. **It had never run**; the PO collection guard existed only in two API routes |
 | `0410` Manual Purchase is one transaction | ✅ applied |
 | `0414` a stamped fee remembers its rate | ✅ applied |
-| `0415` the office door locks what the shop door locks | ✅ **applied 2026-09-02 by YH.** Confirm it landed WHOLE — §6.2 |
-| `0413` the over-issue guard counts what was approved | ❓ **NEVER PROBED** — merged 2 Sep inside #1054, and its own PR body says *MERGED IS NOT APPLIED*. §6.1 |
+| `0415` the office door locks what the shop door locks | ✅ applied 2026-09-02 and **confirmed WHOLE** — `floors_fns = 2`, F-11 true, F-12 true |
+| `0413` the over-issue guard counts what was approved | ✅ applied — probed 2 Sep after the refresh found it had never been checked at all |
 | `0411` instalment months widened | **WITHDRAWN, never applied.** YH asked *"if the POS still sells 6 and 12, why widen?"* and he was right |
 
 ### Shipped 1–2 Sep, merged and live
@@ -284,32 +284,19 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 6 · OPEN WORK, in order
 
-1. ⚠️ **`0413` has never been probed.** It merged inside #1054 on 2 Sep and its
-   own PR body says *MERGED IS NOT APPLIED*. It makes the over-issue guard count
-   what the approver ALLOWED (`coalesce(approved_qty, qty)`) rather than the
-   original ask, so until it is applied the database will let a caller issue the
-   full ask on a line the approver cut. No money has moved wrongly — the API is
-   the only caller and it respects the cut — but a guard that is correct only
-   because the layer above it happens to be correct is not a guard. Hand YH
-   `0413-applied.sql`; apply only if it answers `false`.
+**The database is level with `main` for this lane.** Every migration 1–2 Sep
+shipped is probed and applied — `0410`, `0413`, `0414`, `0415`, and `0415`
+confirmed whole rather than half. **Nothing below is blocked on an apply.** All
+four items are blocked on a RULING from YH, which is why none of them has a
+next action an agent may take alone.
 
-2. **Confirm `0415` landed WHOLE, not half.** YH applied it on 2 Sep, so F-11
-   (the promised date guarded by one layer, not two), F-12 (`update_order`
-   freezes six delivery fields after Proceed; the office door did not) and F-13
-   (the floors evaluator blind to ten fields) are all live. The half-apply was
-   the whole risk: the file renames `sales_order_floors` →
-   `sales_order_floors_unchecked_0328` and then installs a wrapper, and a stop
-   between those two steps leaves every Sales Order write with no floors check
-   at all. The guard DO block should have made that impossible. Confirming costs
-   one query — `0415-landed-whole.sql`, expect `2, true, true`.
-
-3. **The instalment-months refusal sentence.** The bound is verified and
+1. **The instalment-months refusal sentence.** The bound is verified and
    correct — NULL/6/12, matching what the POS sells. A proposal of 9 still fails
    at the principal's Approve press with **raw constraint text on screen**. The
    *word* needs ruling by YH; the bound does not need changing. **Do not widen
    the constraint** — that was `0411`, and it was withdrawn for a good reason.
 
-4. **`building_type` — DECIDED, PARTLY UNRULED, DELIBERATELY NOT BUILT.**
+2. **`building_type` — DECIDED, PARTLY UNRULED, DELIBERATELY NOT BUILT.**
    Unchanged from the previous revision of this file and still correct. Jess's
    locked map lives in `COPY-STANDARD.md`; `Other` does **not** satisfy the
    requirement (YH, 2026-09-01) but both create doors still accept it. What is
@@ -320,12 +307,12 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
    (`PrincipalNewOrder.tsx` never asks) · orders with no address. **Do not build
    any of it from inference.**
 
-5. **Purchase Returns (§9.6) and Repair Orders (§9.7)** — unfrozen by `0409`,
+3. **Purchase Returns (§9.6) and Repair Orders (§9.7)** — unfrozen by `0409`,
    still unbuilt. Each is a full register: numbering, PDF issue, handover proof,
    custody moves, Finance credit reads. They are page blueprints, not build
    scopes. **They need YH to release them.**
 
-6. **Six migration numbers are each claimed twice** across Chai's unmerged
+4. **Six migration numbers are each claimed twice** across Chai's unmerged
    branches. Not this lane's to fix, but check before numbering anything.
 
 **Ruled, do not re-open:** the four claim layers are NOT cross-validated —
@@ -336,15 +323,18 @@ apart and would refuse a real event.
 
 ## 7 · EXACT NEXT STEP
 
-**Hand YH two probes — `0413-applied.sql` and `0415-landed-whole.sql` — and
-wait for both verdicts.** One query each, and they are the only two facts in this
-file that cannot be measured from the repository. Every line of the 1–2 Sep build
-is merged; whether the DATABASE agrees is the open question, and this repo has
-been wrong about that twice in three days.
+**Ask YH which item in §6 he is releasing, and build nothing until he answers.**
 
-Then ask YH which item in §6 he is releasing. Items 3, 4 and 5 are each blocked
-on a ruling from him, not on work. **Do not invent work**, and do not start
-Purchase Returns or Repair Orders on your own initiative.
+That is the whole next step, and it is unusual for this file to have no
+engineering in it. The 1–2 Sep build is merged, applied and probed; the four
+items left are each waiting on a decision only he can make — a customer-facing
+sentence, an unruled half-day, two registers nobody has scoped, and six migration
+numbers belonging to another lane.
+
+**Do not invent work.** Do not start Purchase Returns or Repair Orders on your
+own initiative, and do not build any part of `building_type` from inference —
+§6.2 lists precisely what is unruled, and guessing it is how a wrong rule reaches
+production wearing the authority of a screen.
 
 ---
 
