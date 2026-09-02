@@ -765,9 +765,21 @@ describe("composeEmergency", () => {
     expect(composeEmergency(c)).toBe("Tan Junior · 012-9988776 · Cousin");
   });
 
-  it("omits empty parts cleanly", () => {
+  /* ⭐ RE-PINNED (YH, 2026-09-01 — audit F-4). This asserted
+     `"Tan Junior · Spouse"` for a contact with no phone, and that string is
+     the DEFECT: `parseEmergencyContact` reads by position, so it comes back as
+     name `Tan Junior`, phone `Spouse`. The relationship had become the phone
+     number, silently, on the next reload.
+     A middle empty keeps its slot now so nothing shifts left. A TRAILING empty
+     is still dropped — there is nothing after it to move. */
+  it("keeps a middle empty part's slot, and still drops a trailing one", () => {
     const c = validDraft().customer;
     c.emergencyPhone = "";
-    expect(composeEmergency(c)).toBe("Tan Junior · Spouse");
+    expect(composeEmergency(c)).toBe("Tan Junior ·  · Spouse");
+
+    const d = validDraft().customer;
+    d.emergencyRelationship = "";
+    d.emergencyRelationshipOther = "";
+    expect(composeEmergency(d)).toBe("Tan Junior · 012-9988776");
   });
 });
