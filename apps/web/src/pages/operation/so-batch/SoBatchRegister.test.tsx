@@ -438,6 +438,64 @@ describe("one permanent row per proceeded Sales Order", () => {
   });
 });
 
+describe("a missing DEFAULT destination does not stop the buying", () => {
+  /* YH, 2026-09-02: "is making it tickable, that is all i ask for".
+     A tick is an allocation, so it needs a destination id - but it used to
+     demand the DEFAULT one specifically, and nothing in the schema requires a
+     default row to exist (`purchasing_destinations_one_default` is a partial
+     index: at most one, never at least one). So a perfectly healthy list with
+     nobody's `is_default` set killed every checkbox on the page, while the
+     Deliver To dropdown and Split's Apply carried on ticking lines without
+     ever reading the default. Three controls, one fact, two answers. */
+
+  it("ticks a row when destinations exist but none is the default", () => {
+    renderRegister({ defaultDestinationId: null });
+
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+
+    /* The selection actually happened - the bar is the page's own proof. */
+    const bar = screen.getByTestId("selection-bar");
+    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+  });
+
+  it("opens on the first ACTIVE destination and says which, without blocking", () => {
+    renderRegister({ defaultDestinationId: null });
+
+    /* Not the blocker sentence - buying works. */
+    expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
+    const note = screen.getByTestId("so-batch-no-default-destination");
+    expect(note).toHaveTextContent("ticks open on Carres Klang");
+  });
+
+  it("an EMPTY list still blocks, and still names the setting", () => {
+    /* The real blocker survives: with nowhere for the goods to go there is
+       nothing to allocate a tick to, and that is not a warning, it is a stop. */
+    renderRegister({ destinations: [], defaultDestinationId: null });
+
+    expect(screen.getByTestId("so-batch-no-destination")).toHaveTextContent(
+      "Purchasing → Settings",
+    );
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
+  });
+
+  it("skips an INACTIVE destination when picking the opening one", () => {
+    renderRegister({
+      destinations: [
+        { id: KLANG, name: "Carres Klang", isDefault: false, active: false },
+        { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },
+      ],
+      defaultDestinationId: null,
+    });
+
+    expect(screen.getByTestId("so-batch-no-default-destination")).toHaveTextContent(
+      "ticks open on AL Sungai Buloh",
+    );
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("selection-bar")).toBeVisible();
+  });
+});
+
 describe("selection — the parent checkbox is ALL eligible child demand", () => {
   it("offers the governed Operations Superuser the duty owner chip and Issue PO action", () => {
     renderRegister({

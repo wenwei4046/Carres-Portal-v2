@@ -253,7 +253,16 @@ export function useOpenWorkSet(): OpenWorkSet {
         lines: lines.map((l) => ({
           qty: l.qty,
           issuedQty: l.issued_qty,
-          remainingQty: l.remaining_qty,
+          /* ⭐ THE APPROVER'S NUMBER, NOT THE DATABASE'S COLUMN (YH, 2026-09-02).
+             `manualPurchaseStatusOf` stopped reading `remainingQty` when the
+             cut joined the arithmetic — it reads `approvedQty` now. This call
+             site was still handing over `remaining_qty`, a field the input type
+             no longer has, and never passing the cut at all. So the status fell
+             back to `qty − issuedQty` and the OPEN-WORK RAIL kept showing a
+             fully-issued request as outstanding, which is the same defect the
+             register and the record page were fixed for. Three callers, one
+             arithmetic; this was the third. */
+          approvedQty: l.approved_qty,
           cancelledAt: l.cancelled_at,
           poId: l.po_id,
           received: l.received,
