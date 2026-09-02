@@ -1,7 +1,10 @@
 # SALES ORDERS — CARD · STAIR CARRY IS MONEY, AND THE ORDER MUST BE ABLE TO HOLD IT
 
 **Module:** Sales Orders · **Surface:** the order's money — POS confirm step, SO Workspace MONEY, every payment door
-**Status:** READY — the owner ruling exists and is LOCKED. Not queued behind a decision.
+**Status:** **DONE 2026-09-02** — all seven acceptance points met. `0393` stamps a real
+`STAIR_CARRY` addon row, `0394` re-stamps it when the goods change, `0406` closes the
+doubling, and `0414` stores the rate that produced a stamped fee. The card read READY for
+five days after it shipped; that is what this line is for.
 **Lane:** BUILD / DELIVERY
 **Authority:** `docs/orders/MASTER.md` § *STAIR CARRY IS MONEY THE CUSTOMER OWES* (owner ruling YH, 2026-08-28)
 **Found by:** `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` §2 F-2, then measured end to end 2026-08-28
@@ -109,7 +112,12 @@ once, at the order.
 4. `top_up_order` accepts the full balance instead of answering *"already fully paid"*.
 5. The customer's SO PDF total matches the signed total, and `balance_due` cannot go negative.
 6. Changing `floor_config.per_floor_per_item` afterwards does **not** move the fee on an existing
-   order.
+   order. ✅ **Met in full, ruled 2026-09-02.** It read half-met while D1 asked whether a saved
+   order should also PRINT the rate that made the fee. YH ruled it should not — *"a saved order
+   should save just what was charged"* — so the working-out is not owed, and what this point
+   protects is the money, which does not move. Recovering the rate for display would need it and
+   `freeUpToFloor` from one stored product: one equation, two unknowns. `stair-carry-recompute.ts:143-147`
+   forbids stamping the breakdown — *"a second copy would be a second arithmetic for one number."*
 7. An order with lift, or floor ≤ 2, or an unset count, creates **no** addon row — the fee is 0
    and a zero row is noise.
 
