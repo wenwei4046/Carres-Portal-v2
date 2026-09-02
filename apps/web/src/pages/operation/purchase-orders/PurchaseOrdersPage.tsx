@@ -6,8 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import {
   poDateHistoryOf,
+  PO_DELAY_REASONS,
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
+  purchasingRefusal,
+  supplierClaimRequestLabel,
   type PurchaseOrderRegisterFacts,
   type PurchaseOrderRegisterFilter,
   type PurchaseOrderRegisterInput,
@@ -32,6 +35,7 @@ import {
   useOperationWarehouse,
   usePoReceiving,
   useRecordSend,
+  useRecordSupplierDate,
   useRevisePo,
   type operationPoListRow,
   type SupplierRow,
@@ -71,6 +75,14 @@ const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
       { key: "partly_received", label: "Partly received" },
       { key: "completed", label: "Completed" },
     ],
+  },
+  /* A cancelled purchase order is kept, never deleted — so there must be a way
+     to look at one. Until 2026-09-01 the only door was the `PO Issued` funnel,
+     which offered document states on a column of timestamps (defect 27). The
+     funnel is a date filter now, so the state gets a row of its own. */
+  {
+    heading: "DOCUMENT STATE",
+    rows: [{ key: "cancelled", label: "Cancelled" }],
   },
 ];
 
@@ -219,7 +231,15 @@ export default function PurchaseOrdersPage() {
     });
   }, [destinations, posQ.data, suppliers, today, warehouses]);
 
-  const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError || dutyQ.isError;
+  /* ⛔ A DECORATIVE BADGE MAY NOT BLANK THE REGISTER (YH, 2026-09-01, defect 14).
+     `dutyQ` was in both mandatory-read gates, and it is the ONE query on this
+     page configured never to retry — while its own docblock promises it "fails
+     soft". So a blip on a badge threw away every purchase order fact already
+     fetched and sitting in memory, and told the operator the register could not
+     be loaded. Its data feeds two decorative badges and nothing else, and
+     `OwnerBadge` already degrades to "PO Duty not assigned" on a null holder,
+     which is the right thing to show. */
+  const requiredReadError = posQ.isError || suppliersQ.isError || warehouseQ.isError;
   if (requiredReadError) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
@@ -232,6 +252,8 @@ export default function PurchaseOrdersPage() {
               void posQ.refetch();
               void suppliersQ.refetch();
               void warehouseQ.refetch();
+              /* Still retried on demand — it just no longer decides whether
+                 the page renders at all. */
               void dutyQ.refetch();
             }}
           />
@@ -239,7 +261,7 @@ export default function PurchaseOrdersPage() {
       </div>
     );
   }
-  const requiredReadLoading = posQ.isLoading || suppliersQ.isLoading || warehouseQ.isLoading || dutyQ.isLoading;
+  const requiredReadLoading = posQ.isLoading || suppliersQ.isLoading || warehouseQ.isLoading;
   if (requiredReadLoading) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
@@ -249,8 +271,37 @@ export default function PurchaseOrdersPage() {
     );
   }
 
-  const selectedPoId = params.get("po");
-  const selected = allRows.find((row) => row.id === selectedPoId) ?? null;
+  /* ⛔ A LINK THAT MISSES SAYS SO (YH, 2026-09-01, defect 11).
+     The match was exact and case-sensitive, so `?po=po-2054` failed the same
+     silent way as a number that never existed — the plain register, no message,
+     and the bad parameter still in the address bar. The PO number is the
+     identifier every purchasing link, email and WhatsApp message carries, so
+     the operator's only reading was "the PO was deleted" or "I clicked the
+     wrong thing". It also made every integration that builds these links
+     untestable: a wrong link and a right link looked identical. */
+  const selectedPoId = params.get("po")?.trim().toUpperCase() || null;
+  const selected = allRows.find((row) => row.id.toUpperCase() === selectedPoId) ?? null;
+  if (selectedPoId && !selected) {
+    return (
+      <div className="flex h-full min-h-0 flex-col bg-kit-canvas">
+        <PurchasingTabs />
+        <div className="m-4 max-w-[720px]" data-testid="po-not-found">
+          <ReadProblem
+            problem={`${selectedPoId} is not in the purchase order register`}
+            action="Check the number. If it is right, the purchase order may never have been raised."
+            onRetry={() => {
+              setParams((current) => {
+                const next = new URLSearchParams(current);
+                next.delete("po");
+                next.delete("view");
+                return next;
+              });
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
   if (selectedPoId && selected) {
     return (
       <PurchaseOrderObject
@@ -288,7 +339,14 @@ export default function PurchaseOrdersPage() {
 
   const columns: Array<DataGridColumn<RegisterRow>> = [
     {
+      /* ⛔ EVERY COLUMN NAMES ITS GROUP (YH, 2026-09-01, defect 39).
+         `chooserGroupOrder` asked the grid for five business groups while NO
+         column declared a `chooserGroup`, so the grid short-circuited to a flat
+         list: the Columns popover showed 13 ungrouped checkboxes, and the next
+         reader believed the grouping shipped. A prop that orders nothing is
+         worse than no prop. */
       key: "po",
+      chooserGroup: "Document",
       label: "PO No.",
       width: 182,
       sortable: true,
@@ -306,17 +364,35 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "issued",
+      chooserGroup: "Document",
       label: "PO Issued",
       width: 174,
       sortable: true,
       accessor: (row) => row.facts.currentSend
         ? fmtDate(row.facts.currentSend.sentAt, { time: true })
         : <Absence>Not sent</Absence>,
+      /* ⭐ ONE COLUMN, ONE FACT (defect 27). The funnel used to offer Issued /
+         Not sent to supplier / Completed / Cancelled — words that appear
+         NOWHERE in the column being filtered, on a column of timestamps. So an
+         operator could not narrow the register to POs issued this month, which
+         is the commonest thing anyone asks of an issue date.
+
+         The state words stay in SEARCH, where they cost nothing and someone
+         typing "cancelled" still finds what they meant; the FUNNEL is a date
+         filter, matching what the column actually shows. The states that were
+         only reachable through the old funnel now have the rail's own
+         `Cancelled` row and `PDF not sent` / `Completed` above it. */
       searchValue: (row) => row.facts.documentState,
-      filterValue: (row) => row.facts.documentState,
+      filterValue: (row) =>
+        row.facts.currentSend ? row.facts.currentSend.sentAt : "Not sent",
+      dateValue: (row) => row.facts.currentSend?.sentAt ?? null,
+      filterType: "date",
+      sortFn: (a, b) =>
+        (a.facts.currentSend?.sentAt ?? "").localeCompare(b.facts.currentSend?.sentAt ?? ""),
     },
     {
       key: "supplier",
+      chooserGroup: "Supplier",
       label: "Supplier",
       width: 150,
       sortable: true,
@@ -326,6 +402,7 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "source",
+      chooserGroup: "Supplier",
       label: "Source",
       width: 164,
       sortable: true,
@@ -335,6 +412,7 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "deliver_to",
+      chooserGroup: "Receiving",
       label: "Deliver To",
       width: 160,
       sortable: true,
@@ -344,6 +422,7 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "po_delivery_date",
+      chooserGroup: "Goods",
       label: "PO Delivery Date",
       width: 150,
       sortable: true,
@@ -352,23 +431,53 @@ export default function PurchaseOrdersPage() {
       filterValue: (row) => row.po.eta_date ?? "Not recorded",
       dateValue: (row) => row.po.eta_date,
       filterType: "date",
+      /* ⛔ A DATE COLUMN SORTS BY DATE (defect 26). Without this the grid falls
+         back to comparing the RENDERED text — and these render as "Wed, 12
+         Aug", so the register sorted alphabetically by WEEKDAY NAME: every
+         "Fri, …" together, then "Mon, …", then "Sat, …". "Which POs land
+         first" is the register's main question, and the header that promises
+         to answer it produced a meaningless order that still looked plausible,
+         because dates do increase inside each weekday block. ISO, so the
+         string comparison IS the chronological one. */
+      sortFn: (a, b) => (a.po.eta_date ?? "").localeCompare(b.po.eta_date ?? ""),
     },
     {
       key: "supplier_delivery_date",
+      chooserGroup: "Goods",
       label: "Supplier Delivery Date",
       width: 166,
       sortable: true,
-      accessor: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
-        ? "Same as PO"
-        : row.supplierDate ? fmtDate(row.supplierDate) : <Absence />,
-      searchValue: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
-        ? "Same as PO"
-        : row.supplierDate ?? "Not recorded",
-      filterValue: (row) => row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date)
-        ? "Same as PO"
-        : row.supplierDate ?? "Not recorded",
-      dateValue: (row) => row.supplierDate === row.po.eta_date ? null : row.supplierDate,
+      /* ⛔ NO PROMISE ON FILE IS NOT A CONFIRMED DATE (YH, 2026-09-01).
+         The test was `!row.supplierDate || row.supplierDate === row.po.eta_date`,
+         and the first half turned "the supplier has said nothing" into "the
+         supplier confirmed our date" — asserted on the same row whose Work
+         column says the date is MISSING. A buyer skips the chase call; a
+         manager reads a factory promise that does not exist. It also broke the
+         column's own date filter, because the shown value had no date behind
+         it. Absence first, THEN the equality. */
+      accessor: (row) =>
+        !row.supplierDate
+          ? <Absence />
+          : row.supplierDate === row.po.eta_date
+            ? "Same as PO"
+            : fmtDate(row.supplierDate),
+      searchValue: (row) =>
+        !row.supplierDate
+          ? "Not recorded"
+          : row.supplierDate === row.po.eta_date
+            ? "Same as PO"
+            : row.supplierDate,
+      filterValue: (row) =>
+        !row.supplierDate
+          ? "Not recorded"
+          : row.supplierDate === row.po.eta_date
+            ? "Same as PO"
+            : row.supplierDate,
+      /* The real date, always — a row that prints `Same as PO` still HAS one,
+         and hiding it from the filter made the column's own funnel lie too. */
+      dateValue: (row) => row.supplierDate,
       filterType: "date",
+      sortFn: (a, b) => (a.supplierDate ?? "").localeCompare(b.supplierDate ?? ""),
     },
     ...(["ordered", "received", "open"] as const).map((key): DataGridColumn<RegisterRow> => ({
       key,
@@ -376,6 +485,7 @@ export default function PurchaseOrdersPage() {
       width: key === "open" ? 118 : 94,
       align: "right",
       sortable: true,
+      chooserGroup: "Goods",
       accessor: (row) => row.facts.quantities[key],
       searchValue: (row) => String(row.facts.quantities[key]),
       filterValue: (row) => String(row.facts.quantities[key]),
@@ -385,6 +495,7 @@ export default function PurchaseOrdersPage() {
     })),
     {
       key: "current_version",
+      chooserGroup: "Document",
       label: "Current Version",
       width: 138,
       sortable: true,
@@ -401,6 +512,7 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "supplier_has",
+      chooserGroup: "Document",
       label: "Supplier Has",
       width: 128,
       sortable: true,
@@ -412,6 +524,7 @@ export default function PurchaseOrdersPage() {
     },
     {
       key: "work",
+      chooserGroup: "Work",
       label: "Work",
       width: 330,
       sortable: true,
@@ -562,7 +675,8 @@ async function downloadOfficialPdf(poId: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-type ObjectView = "Document" | "Revisions" | "History" | "Order Route";
+const OBJECT_VIEWS = ["Document", "Revisions", "History", "Order Route"] as const;
+type ObjectView = (typeof OBJECT_VIEWS)[number];
 type DocumentMode = "read" | "issue" | "revise";
 
 function PurchaseOrderObject({
@@ -582,9 +696,32 @@ function PurchaseOrderObject({
   onBack: () => void;
   onChanged: () => void;
 }) {
-  const [view, setView] = useState<ObjectView>("Document");
+  /* ⭐ THE VIEW LIVES IN THE ADDRESS (YH, 2026-09-01, defect 29).
+     It was local component state, while the Back handler deleted a `view`
+     parameter that NOTHING ever set or read. So every link anyone shared
+     landed on Document, any reload mid-investigation threw the reader back to
+     the start, and the orphaned delete read as a working feature to the next
+     person who touched the file. Driving it from the URL makes that delete
+     correct instead of dead. Validated against the four names and defaulting
+     to Document, so a hand-typed `?view=nonsense` cannot render a blank tab. */
+  const [objectParams, setObjectParams] = useSearchParams();
+  const viewParam = objectParams.get("view");
+  const view: ObjectView = (OBJECT_VIEWS as readonly string[]).includes(viewParam ?? "")
+    ? (viewParam as ObjectView)
+    : "Document";
+  const setView = (next: ObjectView) => {
+    setObjectParams((current) => {
+      const updated = new URLSearchParams(current);
+      if (next === "Document") updated.delete("view");
+      else updated.set("view", next);
+      return updated;
+    }, { replace: true });
+  };
   const [mode, setMode] = useState<DocumentMode>("read");
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
+  const [pdfAction, setPdfAction] = useState<string | null>(null);
+  /* Cancelled is the one document state with no official PDF to show. */
+  const cancelled = row.po.status === "cancelled";
   const unitsQ = useOperationPoUnits(row.id);
   const receivingQ = usePoReceiving(row.id);
   const claimsQ = useOperationSupplierClaims("all", row.id);
@@ -618,26 +755,52 @@ function PurchaseOrderObject({
                 <FileCheck2 size={14} /> Issue current PDF
               </button>
             ) : null}
-            <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={() => {
-              setPdfProblem(null);
-              void downloadOfficialPdf(po.id).catch(() => {
-                setPdfProblem("The official PDF could not be downloaded");
-              });
-            }}>
-              <Download size={14} /> Download PDF
-            </button>
+            {/* ⛔ A BUTTON THAT CAN ONLY REFUSE IS NOT AN ACTION (defect 18).
+                The database refuses to print a cancelled PO BY DESIGN
+                (`po_not_printable`, 0402), and cancelled POs are deliberately
+                KEPT in the register — so operators met this routinely. The page
+                mounted the button and the preview unconditionally, threw away
+                the server's actual reason and printed a constant sentence
+                telling them to escalate a HEALTHY refusal, which teaches a team
+                to distrust the page's error strip. */}
+            {cancelled ? null : (
+              <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-control border border-kit-slate-5 px-3 text-meta" onClick={() => {
+                setPdfProblem(null);
+                setPdfAction(null);
+                void downloadOfficialPdf(po.id).catch((e: unknown) => {
+                  /* The server's OWN two lines, the way PoIssueEvidence already
+                     does it; a refusal carrying only a code becomes governed
+                     words rather than a code on screen. */
+                  const body = (e as { body?: { message?: string; action?: string; code?: string } }).body;
+                  if (body?.message || body?.code) {
+                    const fallback = purchasingRefusal(body.code, { po: po.id, supplier: row.supplierName });
+                    setPdfProblem(body.message ?? fallback.wrong);
+                    setPdfAction(body.action ?? fallback.todo);
+                    return;
+                  }
+                  /* No body at all is a READ that failed, not a refusal — and
+                     "try again, then escalate" is the right advice for that.
+                     Defect 18 was about the opposite case: a HEALTHY refusal
+                     (a cancelled PO) wearing those words. */
+                  setPdfProblem("The official PDF could not be downloaded");
+                  setPdfAction(null);
+                });
+              }}>
+                <Download size={14} /> Download PDF
+              </button>
+            )}
           </div>
         </div>
         {pdfProblem ? (
           <div className="mt-2">
             <ReadProblem
               problem={pdfProblem}
-              action="Use Download PDF again. If it still fails, ask the system owner to check the PO document."
+              action={pdfAction ?? "Use Download PDF again. If it still fails, ask the system owner to check the PO document."}
             />
           </div>
         ) : null}
         <nav className="mt-3 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Purchase order views">
-          {(["Document", "Revisions", "History", "Order Route"] as const).map((item) => (
+          {OBJECT_VIEWS.map((item) => (
             <button
               key={item}
               type="button"
@@ -708,6 +871,7 @@ function PurchaseOrderObject({
           <DocumentView
             row={row}
             owner={owner}
+            onSupplierDateSaved={onChanged}
             units={unitsQ.data?.units ?? []}
             receiving={receivingQ.data?.sessions ?? []}
             claims={claimsQ.data?.claims ?? []}
@@ -788,7 +952,7 @@ function WorkCard({ row, owner }: { row: RegisterRow; owner: { userId: string; n
   );
 }
 
-function DocumentView({ row, owner, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims }: {
+function DocumentView({ row, owner, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
   row: RegisterRow;
   owner: { userId: string; name: string | null } | null;
   units: Array<{ unit_code: string; sku: string; status: string }>;
@@ -804,6 +968,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   onRetryUnits: () => void;
   onRetryReceiving: () => void;
   onRetryClaims: () => void;
+  onSupplierDateSaved: () => void;
 }) {
   const po = row.po;
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
@@ -818,11 +983,14 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Source" value={row.source} />
           <Fact label="PO Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
           <Fact label="PO Delivery Date" value={row.po.eta_date ? fmtDate(row.po.eta_date) : "Not recorded"} />
-          <Fact label="Supplier Delivery Date" value={row.po.eta_date && (!row.supplierDate || row.supplierDate === row.po.eta_date) ? "Same as PO" : row.supplierDate ? fmtDate(row.supplierDate) : "Not recorded"} />
+          {/* Same law as the register column: absence FIRST, then equality.
+              `Same as PO` is a claim about what the supplier said. */}
+          <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not recorded" : row.supplierDate === row.po.eta_date ? "Same as PO" : fmtDate(row.supplierDate)} />
           <Fact label="Current Version" value={`Version ${row.facts.version}`} />
           <Fact label="Supplier Has" value={row.facts.supplierHas} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
+        <SupplierDateBlock row={row} onSaved={onSupplierDateSaved} />
       </section>
       <section className="overflow-hidden border border-kit-slate-5 bg-white">
         <h2 className="px-4 py-3 text-label font-semibold uppercase tracking-wide text-kit-slate-9">Goods lines</h2>
@@ -860,12 +1028,165 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
         </ConnectionBlock>
         <ConnectionBlock title="Claims and returns" empty="No claim or return is connected to this PO." hasContent={claims.length + returnRows.length > 0} loading={claimsLoading || receivingLoading} problem={claimsError || receivingError ? "The claims and returns connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the claim and receiving return connections." onRetry={() => { onRetryClaims(); onRetryReceiving(); }}>
-          {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return" ? " · Return requested" : ""}`} />)}
+          {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
           {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
-      <OfficialPreview poId={po.id} />
+      {/* A cancelled purchase order has no official document to preview —
+          0402 refuses to print one by design. Saying so beats mounting a frame
+          that can only fill with an error strip. */}
+      {row.po.status === "cancelled" ? (
+        <section className="border border-kit-slate-5 bg-kit-slate-3 px-3 py-2" data-testid="po-cancelled-no-document">
+          <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
+          <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
+        </section>
+      ) : (
+        <OfficialPreview poId={po.id} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * THE DATE THE FACTORY GAVE YOU ON THE PHONE (YH, 2026-09-01, defect 5).
+ *
+ * The register counted this work in TWO rail rows and named it in TWO Work
+ * sentences - "Ask {supplier} for the delivery date" - and there was nowhere on
+ * the live surface to record the answer. The only writer,
+ * `useRecordSupplierDate`, was called from exactly one place: a form inside the
+ * retired legacy tree that no route mounts, sitting BELOW that file's live
+ * re-export, so it was dead code that made the door look wired.
+ *
+ * The buyer phoned the factory, got the date, and had nowhere to put it. The
+ * count never fell, and the register's most urgent-looking numbers became
+ * wallpaper. The RPC, the route and the hook all existed and were tested; only
+ * this was missing.
+ *
+ * TWO ANSWERS, BECAUSE THE DOOR HAS TWO. A first confirmation is `shipping`
+ * and needs only the date. CHANGING a date already on file is a `delayed`
+ * answer, and the API requires a reason for it - moving a promise silently is
+ * the thing the promise ledger exists to prevent. The form asks for exactly
+ * what the answer it is about to send requires, and says which it is.
+ */
+function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => void }) {
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
+  const [remarks, setRemarks] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const record = useRecordSupplierDate(row.id);
+
+  /* Nothing to promise on a document that is finished or withdrawn. */
+  if (row.facts.operationStatus === "Completed" || row.facts.operationStatus === "Cancelled") {
+    return null;
+  }
+
+  const known = row.supplierDate;
+  const changing = known != null && date !== "" && date !== known;
+  const ready = date !== "" && date !== known && !record.isPending;
+
+  function save() {
+    if (!ready) return;
+    setProblem(null);
+    /* The SAME arithmetic the retired legacy form used, kept deliberately:
+       no date on file is a first confirmation (`shipping` + `firstDate`);
+       moving one that exists is a `delayed` answer and carries its category.
+       Getting this pair wrong records the supplier's real date as a promise
+       about our own estimate and then drops it. */
+    const input = changing
+      ? {
+          answer: "delayed" as const,
+          newDate: date,
+          reason,
+          remarks: remarks.trim() || undefined,
+        }
+      : {
+          answer: "shipping" as const,
+          firstDate: date,
+          remarks: remarks.trim() || undefined,
+        };
+    record.mutate(input, {
+      onSuccess: () => {
+        setDate("");
+        setRemarks("");
+        onSaved();
+      },
+      onError: (e: unknown) => {
+        const body = (e as { body?: { message?: string } }).body;
+        setProblem(body?.message ?? "The supplier date could not be recorded");
+      },
+    });
+  }
+
+  return (
+    <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-date">
+      <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+        Supplier delivery date
+      </div>
+      <p className="mt-1 text-meta text-kit-slate-11">
+        {known
+          ? `${row.supplierName} has promised ${fmtDate(known)}. Recording a different date files a delay, and needs a reason.`
+          : `${row.supplierName} has not given a date. Record the one they gave you.`}
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-label text-kit-slate-9">Date</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            data-testid="po-supplier-date-input"
+            className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
+          />
+        </label>
+        {changing ? (
+          <label className="flex flex-col gap-1">
+            {/* A LOCKED CATEGORY, never free text (Jess, 2026-08-02) - the
+                ledger has to be countable. The story goes in Remarks. */}
+            <span className="text-label text-kit-slate-9">Why has it moved?</span>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              data-testid="po-supplier-date-reason"
+              className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
+            >
+              {PO_DELAY_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className="flex min-w-[200px] flex-1 flex-col gap-1">
+          <span className="text-label text-kit-slate-9">Remarks</span>
+          <input
+            type="text"
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            data-testid="po-supplier-date-remarks"
+            placeholder="What the factory actually said (optional)"
+            className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={save}
+          data-testid="po-supplier-date-save"
+          className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
+        >
+          {/* A dead button names what is missing - this page's own rule. */}
+          {record.isPending
+            ? "Recording..."
+            : date === ""
+              ? "Record - pick a date"
+              : date === known
+                ? "Record - that is the date on file"
+                : changing
+                  ? "Record the new date"
+                  : "Record the date"}
+        </button>
+      </div>
+      {problem ? (
+        <div className="mt-2 text-meta text-kit-red-11" data-testid="po-supplier-date-problem">{problem}</div>
+      ) : null}
     </div>
   );
 }

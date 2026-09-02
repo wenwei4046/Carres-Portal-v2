@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const navigate = vi.fn();
 const refetch = vi.fn();
 const reviseMutate = vi.fn();
+const supplierDateMutate = vi.fn();
 let auditError = false;
 let connectionError = false;
 let requiredLoading = false;
@@ -177,6 +178,7 @@ vi.mock("@/lib/queries", () => ({
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
   useRecordSend: () => ({ mutate: vi.fn() }),
+  useRecordSupplierDate: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
 }));
 

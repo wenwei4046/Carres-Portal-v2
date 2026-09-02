@@ -581,9 +581,17 @@ describe("one supplier date, one door — counted across apps/web", () => {
   it("the tomorrow-delivery endpoint has exactly ONE caller", () => {
     // The URL is built in the hook, so the hook is what a caller names.
     const callers = hitsFor("useRecordSupplierDate(");
+    /* THE DOOR MOVED, AND IT IS A REAL ONE NOW (YH, 2026-09-01, defect 5).
+       It used to name this legacy file - but that caller sat inside
+       `LegacyOperationPurchaseOrders`, BELOW this file's live re-export, so it
+       rendered nowhere. The register counted "Ask {supplier} for the delivery
+       date" in two rail rows and two Work sentences while the only place to
+       answer was unreachable, and the buyer had nowhere to put the date the
+       factory gave them on the phone. The dead form is deleted; the live
+       Document view carries `SupplierDateBlock`. Still exactly one door. */
     expect(callers.map(rel).sort()).toEqual([
       "/lib/queries.ts", // where it is defined
-      "/pages/operation/OperationPurchaseOrders.tsx", // the one door
+      "/pages/operation/purchase-orders/PurchaseOrdersPage.tsx", // the one door
     ]);
     // And no SECOND hook writes that endpoint any more.
     expect(hitsFor("/tomorrow-delivery")).toHaveLength(1);
