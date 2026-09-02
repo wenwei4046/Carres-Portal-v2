@@ -200,6 +200,20 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
     makes an operator type a false answer to record a true one. In
     `docs/purchasing/MASTER.md` §9.5 and pinned by a test.
 
+18. **Migration NUMBERING is not governed during development** (YH, 2 Sep):
+    *"no comm on numbering during dev — this is just a trivial matter, leave it
+    as it is, just ensure the SQLs are integrated/migrated."* Collisions and
+    out-of-order numbers across unmerged branches are NOT defects and no card
+    may be written for them. **What is governed is whether the SQL is APPLIED**,
+    which §2's probe table tracks. Still take the max across all branches when
+    numbering a NEW file (§4) — that is to avoid overwriting a live one, not to
+    tidy the sequence.
+
+19. **Blueprints and unruled business rules are not this lane's work** (YH,
+    2 Sep). A page blueprint with no build scope, and a rule nobody has ruled,
+    both wait on their owner. Neither is an engineering item and neither belongs
+    on this lane's open list as though it were one.
+
 ## 4 · CONSTRAINTS
 
 - **Migrations are applied BY HAND.** Code can reach production before its
@@ -284,36 +298,65 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 6 · OPEN WORK, in order
 
-**The database is level with `main` for this lane.** Every migration 1–2 Sep
-shipped is probed and applied — `0410`, `0413`, `0414`, `0415`, and `0415`
-confirmed whole rather than half. **Nothing below is blocked on an apply.** All
-four items are blocked on a RULING from YH, which is why none of them has a
-next action an agent may take alone.
+**This lane has no open engineering.** Every migration the 1–2 Sep build shipped
+is probed and applied — `0410`, `0413`, `0414`, `0415`, the last confirmed
+whole rather than half — and the code that rides on them is merged.
 
-1. **The instalment-months refusal sentence.** The bound is verified and
-   correct — NULL/6/12, matching what the POS sells. A proposal of 9 still fails
-   at the principal's Approve press with **raw constraint text on screen**. The
-   *word* needs ruling by YH; the bound does not need changing. **Do not widen
-   the constraint** — that was `0411`, and it was withdrawn for a good reason.
+**Both items below belong to somebody else**, which YH ruled on 2 Sep (§3.19).
+Neither is work an agent may pick up, and neither is waiting on him: one needs
+Jess, one needs an owner release. They are listed so the next session does not
+rediscover them, not as a queue.
 
-2. **`building_type` — DECIDED, PARTLY UNRULED, DELIBERATELY NOT BUILT.**
-   Unchanged from the previous revision of this file and still correct. Jess's
-   locked map lives in `COPY-STANDARD.md`; `Other` does **not** satisfy the
-   requirement (YH, 2026-09-01) but both create doors still accept it. What is
-   genuinely unruled: what a half-day *is* in slots · the Saturday weight's
-   denominator (`delivery-calendar.ts` now counts every booking as 1, which is
-   where a weight would go — but only `Landed` and `Condo` have weights, and Loo
-   ruled Saturday while capacity applies every day) · the third create door
-   (`PrincipalNewOrder.tsx` never asks) · orders with no address. **Do not build
-   any of it from inference.**
+⛔ **CLOSED 2 Sep, do not re-open.** The *instalment-months refusal sentence* sat
+here for two revisions asking YH for "a word". Measured: there is nothing to
+rule. #1036 replaced the amendment form's free number box with a picker of the
+same two plans the POS sells, `installmentMonthsField` (`6 | 12 | null`) is the
+one union every door validates against, and `PrincipalNewOrder` coerces to 6 or
+12. **A term the database refuses can no longer be typed on any surface**, so the
+raw constraint text cannot reach the principal's Approve press. It survived two
+refreshes because it was renumbered rather than re-measured — which is what §2's
+own header warns against.
 
-3. **Purchase Returns (§9.6) and Repair Orders (§9.7)** — unfrozen by `0409`,
+1. **`building_type` — NOT THIS LANE'S. Four questions, and they are Jess's.**
+   YH ruled on 2 Sep that this is not his to answer. **Do not build any of it
+   from inference**, and do not put it back on his list.
+
+   What IS ruled and needs nothing: Jess locked the map on 2026-07-27 and
+   `COPY-STANDARD.md` §2143–2179 carries it — `Landed`/`Retail` full day,
+   `Condo`/`Apartment`/`Office` half day, `Other`/blank full day with the
+   booking refused — including the exact refusal sentence. The field is stored
+   in `entry_data.fields.building_type` and **nothing reads it**, which the
+   standard says out loud.
+
+   The four questions, each with the code fact behind it:
+
+   a. **Does a half-day take half a slot, or a whole one?**
+      `delivery-calendar.ts` does `cur.confirmed += 1` per booking, so six
+      condos and six landed houses are the same number to the calendar. Its own
+      header already admits this: *"counts as one; it is listed as what it is."*
+   b. **What are the other four building types worth?** Loo set Saturday weights
+      for `Landed = 1` and `Condo = 0.5` and stopped there. `Apartment`,
+      `Office`, `Retail` and `Other` have none.
+   c. **Does the weight apply every day, or only Saturday?** Loo ruled Saturday;
+      `dailyCapacity` applies to every day of the week.
+   d. **Is the principal's create door exempt?** `PrincipalNewOrder.tsx` never
+      asks for a building type, while the POS and the office both do — and the
+      rule refuses the booking until it is filled. So an order created there is
+      born unbookable. Related: orders with no address at all.
+
+   **For Chai, not Jess:** Delivery and warehouse scheduling is his lane and his
+   Blueprint closed on 1 Sep. Ask whether it already answers (a) — if it does,
+   the building-type map feeds it rather than becoming a second capacity rule.
+
+2. **Purchase Returns (§9.6) and Repair Orders (§9.7)** — unfrozen by `0409`,
    still unbuilt. Each is a full register: numbering, PDF issue, handover proof,
-   custody moves, Finance credit reads. They are page blueprints, not build
-   scopes. **They need YH to release them.**
+   custody moves, Finance credit reads. `docs/purchasing/MASTER.md` §9.6–9.7
+   gives each a purpose, a left rail, columns, a journey and its exceptions —
+   which is a page blueprint, not a build scope.
 
-4. **Six migration numbers are each claimed twice** across Chai's unmerged
-   branches. Not this lane's to fix, but check before numbering anything.
+   **This is NOT YH's to release** (ruled 2 Sep). It waits on whoever owns the
+   purchasing MASTER. Do not ask him to scope it, and do not start either one on
+   your own initiative.
 
 **Ruled, do not re-open:** the four claim layers are NOT cross-validated —
 `Replace First` with `No Replacement Required` is incoherent and the database
@@ -323,18 +366,19 @@ apart and would refuse a real event.
 
 ## 7 · EXACT NEXT STEP
 
-**Ask YH which item in §6 he is releasing, and build nothing until he answers.**
+**Ask YH what he wants built next, and build nothing until he says.**
 
-That is the whole next step, and it is unusual for this file to have no
-engineering in it. The 1–2 Sep build is merged, applied and probed; the four
-items left are each waiting on a decision only he can make — a customer-facing
-sentence, an unruled half-day, two registers nobody has scoped, and six migration
-numbers belonging to another lane.
+This lane is genuinely finished, which is worth stating plainly rather than
+manufacturing a queue out of it. The 1–2 Sep work is merged, applied and probed.
+The two items in §6 belong to Jess and to the MASTER's owner, and YH ruled on
+2 Sep that neither is his — so **do not present them to him as his open work**,
+and do not treat their presence in this file as permission to start them.
 
-**Do not invent work.** Do not start Purchase Returns or Repair Orders on your
-own initiative, and do not build any part of `building_type` from inference —
-§6.2 lists precisely what is unruled, and guessing it is how a wrong rule reaches
-production wearing the authority of a screen.
+⛔ **The failure mode to avoid here is inventing work to look busy.** Three items
+were on this list yesterday that should not have been: the instalment sentence
+(already closed in #1036), migration numbering (not governed during development —
+§3.18), and two blueprints (not YH's). Each survived because it was carried
+forward rather than measured. **If §6 is empty, say it is empty.**
 
 ---
 
