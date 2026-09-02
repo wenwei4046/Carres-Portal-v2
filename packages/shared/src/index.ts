@@ -40,7 +40,9 @@ export {
 } from "./sales-order-route";
 
 export {
+  INSTALMENT_MONTHS,
   MAX_DELIVERY_FLOOR,
+  type InstalmentMonths,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
   // Owner ruling 2026-08-15 — a Sales Order must contain goods.
@@ -184,6 +186,7 @@ export {
   type UpdateOrderInput,
   type CancelOrderInput,
   type SetOpsAssignedLogisticInput,
+  installmentMonthsField,
 } from "./schemas/orders";
 
 export {

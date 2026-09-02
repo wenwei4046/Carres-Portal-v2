@@ -12,6 +12,7 @@ import {
   type DeliveryPaymentApproval,
   confirmProceedRequestInputSchema,
   ListOperationOrdersQuery,
+  installmentMonthsField,
   MAX_DELIVERY_FLOOR,
   recheckStockInput,
   reselectPartnerInput,
@@ -1864,7 +1865,20 @@ const amendmentSubmitInput = z.object({
         .optional(),
       delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       delivery_date_tbd: z.boolean().optional(),
-      installment_months: z.number().int().min(0).nullable().optional(),
+      /* ⭐ THE SAME RULE THE CREATE DOOR ALREADY ENFORCES (YH, 2026-09-01).
+         This door declared its own weaker one — `z.number().int().min(0)` —
+         while the shared schema three files over had the real union and the
+         POS had a two-button picker. So a proposal of 9 months passed here,
+         passed `sales_order_submit_amendment` (which validates no values at
+         all), passed `sales_order_decide_amendment` (which writes it raw), and
+         died on `0007`'s CHECK at the PRINCIPAL's Approve press — as raw
+         constraint text, on the screen of the one person who cannot fix it,
+         after the customer had already been told the change was going in.
+         Refused at the earliest honest place now: the moment the proposal is
+         submitted, by the person who typed it, while they can still change it.
+         ⚠️ 6 and 12 are what the database holds; nobody recorded WHY. See
+         `INSTALMENT_MONTHS`. */
+      installment_months: installmentMonthsField.optional(),
     })
     .strict(),
   reason: z.string().trim().min(1, "An amendment says why").max(500),
