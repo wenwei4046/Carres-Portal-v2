@@ -83,13 +83,30 @@ export default function DOFileUploadField({ poId, doNumber, onUploaded }: Props)
 
   return (
     <div>
+      {/* ⛔ THE GUARD ITS OWN SIBLING ALREADY HAS (YH, 2026-09-02, defect 30).
+          The upload names its files after the DO number, so attaching a photo
+          before typing one is rejected by `/api/storage/dos/sign-upload` - and
+          the rejection was printed VERBATIM under the file picker:
+          "String must contain at least 3 character(s)". A programmer's message,
+          naming nothing, sitting under the wrong control, and impossible to
+          connect to the Save button's own "Save - add a DO number".
+          Photo-first is the natural order when you are standing at the lorry
+          holding the phone and the paper, so operators met this constantly.
+          `ClaimPhotoUploadField` - the field directly beside this one - has
+          disabled its input below three characters and explained why since it
+          shipped. Two sibling fields, one guard, and only this one lacked it. */}
       <input
         type="file"
         accept=".pdf,image/jpeg,image/png"
         onChange={handleChange}
-        disabled={busy}
+        disabled={busy || doNumber.trim().length < 3}
         aria-label="DO file"
       />
+      {doNumber.trim().length < 3 && (
+        <p className="text-label text-base-500 mt-1 font-body" data-testid="do-file-needs-number">
+          Enter the supplier DO number first — the file is named after it.
+        </p>
+      )}
       {previewName && (
         <p className="text-body text-base-600 mt-1">Uploaded: {previewName}</p>
       )}
