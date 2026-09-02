@@ -36,7 +36,7 @@ import MYAddressFields from "@/components/MYAddressFields";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { addonSubtotal, floorSurcharge, lineSubtotal } from "@/lib/order-totals";
+import { addonSubtotal, lineSubtotal } from "@/lib/order-totals";
 import {
   useAddOrderLines,
   useCancelOrderChangeRequest,
@@ -696,11 +696,25 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
     };
   }, [onClose, nestedSurfaceOpen]);
 
-  // ── totals (order-totals — line + addon + stair carry) ───────────────────
+  /* ── totals (order-totals — lines + addons) ───────────────────────────────
+     ⛔ THE STAIR FEE IS ALREADY IN `addonSub`, AND ADDING IT AGAIN CHARGED IT
+     TWICE (YH, 2026-09-02 — live money on the collection screen).
+     `addonSubtotal` sums EVERY `order.addons` row, and `0393` stamps the
+     `STAIR_CARRY` row at birth while `0394` re-stamps it whenever an input
+     moves. A saved order therefore always carries the fee as a row. This screen
+     then added `floorSurcharge(order, catalog.floorConfig)` — a LIVE
+     recomputation — on top of it.
+     WHAT THAT COST. `total` drives `outstanding`, and `outstanding` prefills
+     the record-payment amount. So the POS asked the customer for the stair
+     carry twice, and printed it twice in the items list — once as its own addon
+     row and once as a `Stair carry` line beneath.
+     The office screen already carries this exact rule and says so
+     (`SalesOrderWorkspace.tsx`: "adding it here too would count it twice").
+     That branch computes the fee live because CREATE has no persisted row to
+     read; this screen only ever shows a SAVED order, so it never needed one. */
   const lineSub = order ? lineSubtotal(order) : 0;
   const addonSub = order ? addonSubtotal(order) : 0;
-  const stair = order && catalog ? floorSurcharge(order, catalog.floorConfig) : 0;
-  const total = lineSub + addonSub + stair;
+  const total = lineSub + addonSub;
   const paid = order?.paid ?? 0;
   const outstanding = Math.max(0, total - paid);
 
@@ -1208,15 +1222,6 @@ export default function PosOrderDetail({ id, staffName, onClose }: Props) {
                 <span>
                   <sup>RM</sup>
                   {rm(addonSub)}
-                </span>
-              </div>
-            )}
-            {stair > 0 && (
-              <div className="os-items__total">
-                <span>Stair carry</span>
-                <span>
-                  <sup>RM</sup>
-                  {rm(stair)}
                 </span>
               </div>
             )}
