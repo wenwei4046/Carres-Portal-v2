@@ -35,7 +35,8 @@ vi.mock("@/lib/queries", async () => {
     await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
   return {
     ...actual,
-    useOperationSupplierClaims: (status: string) => claimsQuery(status),
+    useOperationSupplierClaims: (status: string, poId?: string) =>
+      claimsQuery(status, poId),
     useOperationSupplierClaimPhotos: (id: string | null) => photosQuery(id),
     useOperationSuppliers: () => suppliersQuery(),
     useSupplierClaimRequestMutation: () => mutation(requestMutate),
@@ -47,10 +48,10 @@ vi.mock("@/lib/queries", async () => {
   };
 });
 
-function wrap(node: React.ReactNode) {
+function wrap(node: React.ReactNode, at = "/operation?tab=claims") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <QueryClientProvider client={qc}>{node}</QueryClientProvider>
     </MemoryRouter>
   );
@@ -184,14 +185,67 @@ describe("OperationSupplierClaims — the facts (R2)", () => {
     ).toBeInTheDocument();
   });
 
+  /* ⭐ THE PAGE READS THE ADDRESS THAT NAMES IT (YH, 2026-09-01).
+     Two surfaces link INTO this page — the PO's `Claims and returns` card
+     (`?po=`) and the Route's claim door (`?claim=`) — and the component never
+     read the URL, so both doors dumped the reader on the whole unfiltered
+     queue, on the Open stage. A PO whose only claim was CLOSED therefore
+     answered "No open claims.", which is the opposite of what the card the
+     operator had just clicked told them. */
+  describe("the doors into this page", () => {
+    it("scopes to the PO named in `?po=` and opens on ALL, not Open", () => {
+      claimsQuery.mockReturnValue(
+        ok({ claims: [], counts: { open: 0, closed: 2, all: 2 } }),
+      );
+      render(
+        wrap(<OperationSupplierClaims />, "/operation?tab=claims&po=PO-2054"),
+      );
+      /* ALL, because the link fires for a claim of ANY status — opening on
+         Open is how a PO with one closed claim got told it had none. */
+      expect(claimsQuery).toHaveBeenCalledWith("all", "PO-2054");
+    });
+
+    it("shows the PO as a chip the operator can clear", () => {
+      claimsQuery.mockReturnValue(
+        ok({ claims: [], counts: { open: 0, closed: 2, all: 2 } }),
+      );
+      render(
+        wrap(<OperationSupplierClaims />, "/operation?tab=claims&po=PO-2054"),
+      );
+      expect(screen.getByText("PO: PO-2054")).toBeInTheDocument();
+    });
+
+    it("opens the one claim named in `?claim=`", () => {
+      claimsQuery.mockReturnValue(
+        ok({
+          claims: [row({ id: "c1" }), row({ id: "c2", claim_no: "SC-1002" })],
+          counts: { open: 2, closed: 0, all: 2 },
+        }),
+      );
+      render(wrap(<OperationSupplierClaims />, "/operation?tab=claims&claim=c2"));
+      /* The panel belongs to c2 — the Route names ONE claim, so landing the
+         reader on an unfiltered list to find it by eye is not an answer. */
+      expect(screen.getByTestId("claim-panel-SC-1002")).toBeInTheDocument();
+    });
+
+    it("leaves the queue unscoped when no PO is named", () => {
+      claimsQuery.mockReturnValue(
+        ok({ claims: [], counts: { open: 4, closed: 9, all: 13 } }),
+      );
+      render(wrap(<OperationSupplierClaims />));
+      expect(claimsQuery).toHaveBeenCalledWith("open", undefined);
+      expect(screen.queryByText(/^PO: /)).not.toBeInTheDocument();
+    });
+  });
+
   it("opens on the OPEN queue and switches status on the tabs", () => {
     claimsQuery.mockReturnValue(
       ok({ claims: [], counts: { open: 4, closed: 9, all: 13 } }),
     );
     render(wrap(<OperationSupplierClaims />));
-    expect(claimsQuery).toHaveBeenCalledWith("open");
+    expect(claimsQuery).toHaveBeenCalledWith("open", undefined);
     fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
-    expect(claimsQuery).toHaveBeenLastCalledWith("closed");
+    expect(claimsQuery).toHaveBeenLastCalledWith("closed", undefined);
   });
 
   it("an empty open queue answers the question instead of shrugging", () => {
@@ -693,7 +747,7 @@ describe("Claims · §8.2 the status tabs are a STAGE picker (card P2)", () => {
     expect(screen.getByTestId("listshell-active-chips")).toHaveTextContent(
       "Supplier: Ohana",
     );
-    expect(claimsQuery).toHaveBeenLastCalledWith("open");
+    expect(claimsQuery).toHaveBeenLastCalledWith("open", undefined);
   });
 
   it("a DIFFERENT tab is a different list, so it clears the picks", () => {
@@ -704,7 +758,7 @@ describe("Claims · §8.2 the status tabs are a STAGE picker (card P2)", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
 
     expect(screen.queryByTestId("listshell-active-chips")).toBeNull();
-    expect(claimsQuery).toHaveBeenLastCalledWith("closed");
+    expect(claimsQuery).toHaveBeenLastCalledWith("closed", undefined);
   });
 });
 

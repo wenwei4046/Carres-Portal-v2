@@ -3,6 +3,7 @@
 // render ListPageShell's breadcrumb + big title: they duplicate the active tab
 // and burn ~80px Jess does not have. Same shape as its sibling To Order.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   supplierClaimTypeLabel,
   supplierClaimStatusLabel,
@@ -261,8 +262,28 @@ function sortClaims(
 }
 
 export default function OperationSupplierClaims() {
-  const [tab, setTab] = useState<Tab>("open");
-  const [openClaimId, setOpenClaimId] = useState<string | null>(null);
+  /* ⭐ THE PAGE READS THE ADDRESS THAT NAMES IT (YH, 2026-09-01).
+   *
+   * Two surfaces build links INTO this page — the PO's `Claims and returns`
+   * card (`?po=`) and the Sales Order Route's claim door (`?claim=`) — and
+   * this component never read the URL at all. Both doors were dead: they
+   * dumped the reader on the whole unfiltered queue, on the Open stage.
+   *
+   * ⛔ THE WORST CASE WAS NOT AN INCONVENIENCE, IT WAS A WRONG ANSWER. A PO
+   * whose only claim is CLOSED landed the operator on "No open claims." —
+   * the exact opposite of what the card they had just clicked told them,
+   * delivered with a screen's authority. That is why a named PO opens on
+   * `all` rather than `open`: the link fires for a claim of ANY status, so
+   * the stage must not silently exclude the very claim being pointed at.
+   *
+   * The API and the query hook have supported a PO filter all along; only
+   * the page was never wired to them. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const poParam = searchParams.get("po")?.trim() || null;
+  const claimParam = searchParams.get("claim")?.trim() || null;
+
+  const [tab, setTab] = useState<Tab>(poParam ? "all" : "open");
+  const [openClaimId, setOpenClaimId] = useState<string | null>(claimParam);
 
   // ── §8.2 filter state — the three things this rail can pick ────────────────
   const [queueOnly, setQueueOnly] = useState(false);
@@ -274,7 +295,7 @@ export default function OperationSupplierClaims() {
   const [sort, setSort] = useState<TableSort | null>(null);
 
   const { data, isLoading, isError, error, refetch } =
-    useOperationSupplierClaims(tab);
+    useOperationSupplierClaims(tab, poParam ?? undefined);
   // The WhatsApp GROUP link per supplier (0239) — the follow-up door the card
   // names. Cached 5 minutes and shared with the rest of the operation portal.
   const suppliersQ = useOperationSuppliers();
@@ -373,6 +394,19 @@ export default function OperationSupplierClaims() {
 
   // ── §8.2 · one ✕-able chip per pick ────────────────────────────────────────
   const activeChips: ActiveChip[] = [];
+  /* The PO reads as a chip like every other pick, and clears the same way —
+     but it lives in the ADDRESS, not in component state, so clearing it edits
+     the URL. `replace` keeps Back pointing at the PO the reader came from
+     rather than at this same page one chip ago. */
+  if (poParam)
+    activeChips.push({
+      label: `PO: ${poParam}`,
+      onClear: () => {
+        const next = new URLSearchParams(searchParams);
+        next.delete("po");
+        setSearchParams(next, { replace: true });
+      },
+    });
   if (queueOnly)
     activeChips.push({ label: QUEUE_TILE, onClear: () => setQueueOnly(false) });
   for (const id of supplierFilter)

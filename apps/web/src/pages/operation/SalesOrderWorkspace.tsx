@@ -1246,6 +1246,84 @@ export default function SalesOrderWorkspace() {
     detailQ.data?.lines,
   ]);
 
+  /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
+   *
+   * The `stair` memo above prices from `catalogQ.data.floorConfig` — the live
+   * `floor_config` singleton a principal can PATCH — and the sentence below it
+   * was rendered in EVERY mode. So stamping an order at RM 50/floor/item and
+   * later moving the rate to RM 60 made one page print two numbers: the
+   * working-out narrated `× RM 60 = RM 360` while MONEY, the PDF,
+   * `stripe-checkout` and every payment cap stayed at the RM 300 that was
+   * actually charged. The Card's own trap — STAMP THE FEE, DO NOT RE-DERIVE IT
+   * — was closed in the database and left open on screen.
+   *
+   * An old revision was worse again: `stair` reads the CURRENT order's lines
+   * for `itemsTotal` while the floor and the count come from the snapshot, so a
+   * photograph of Rev 3 mixed two revisions and today's rate in one sentence.
+   *
+   * ⭐ SO THE SENTENCE CHANGES SHAPE WITH THE MODE, because what is KNOWN
+   * changes with the mode:
+   *
+   *   · CREATE — nothing is stamped yet, so the live rate IS the quote and the
+   *     whole multiplication is exactly what the operator needs. Unchanged.
+   *
+   *   · OBJECT / OLDREV — the fee is the stamped `STAIR_CARRY` row, the same
+   *     one MONEY reads, and the counts are the ones that produced it: the
+   *     snapshot's for a revision, the order's own otherwise.
+   *
+   * ⛔ IT STOPS SHORT OF THE MULTIPLICATION ON A SAVED ORDER, and that is the
+   * point rather than a shortcut. Recovering `× RM rate above NF` from a
+   * stamped fee needs BOTH the rate and `freeUpToFloor`, and only their product
+   * is stored — one equation, two unknowns. Reading either back off today's
+   * config is the very defect this closes, one term smaller. So a saved order
+   * states what it holds: how many items were carried, to which floor, and what
+   * it was charged. `stair-carry-recompute.ts` rules that the breakdown is NOT
+   * re-stated on the addon row ("a second copy of it would be a second
+   * arithmetic for one number"), so there is nowhere honest to read it from.
+   */
+  const stairWorking = useMemo(() => {
+    if (mode === "create") {
+      if (!stair || stair.fee <= 0) return null;
+      return {
+        quoted: true as const,
+        items: stair.items,
+        itemsTotal: stair.itemsTotal,
+        floors: stair.floors,
+        freeUpToFloor: stair.cfg.freeUpToFloor,
+        perFloorPerItem: stair.cfg.perFloorPerItem,
+        fee: stair.fee,
+      };
+    }
+    /* A REVISION IS A PHOTOGRAPH — its own lines and its own addons, never the
+       order's current ones. MONEY already reads it this way; this is the same
+       source, so the two cannot disagree on one page. */
+    const snapshot = mode === "oldrev" ? (viewedRevision?.snapshot ?? null) : null;
+    const lines = snapshot ? (snapshot.lines ?? []) : (detailQ.data?.lines ?? []);
+    const addons = snapshot ? (snapshot.addons ?? []) : (detailQ.data?.addons ?? []);
+    const fee = addons
+      .filter((a) => a.addon_key === STAIR_CARRY_ADDON_KEY)
+      .reduce((sum, a) => sum + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0);
+    /* No stamped row means no charge to explain — an order placed before 0393,
+       or one where the addon key was missing and the recompute degraded loudly
+       rather than failing the sale. The zero is not narrated either way. */
+    if (fee <= 0) return null;
+    const itemsTotal = lines.reduce((n, l) => n + Number(l.qty ?? 0), 0);
+    return {
+      quoted: false as const,
+      items: stairCarryCount(itemsTotal, draft.delivery_stair_items),
+      itemsTotal,
+      floor: draft.delivery_floor,
+      fee,
+    };
+  }, [
+    mode,
+    stair,
+    viewedRevision,
+    detailQ.data,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+  ]);
+
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
@@ -2371,13 +2449,24 @@ export default function SalesOrderWorkspace() {
             which is a sentence saying nothing happened, printed on the majority
             of orders. The fields above already state the floor and the lift; a
             line that only repeats them back is the noise Jess asked to cut. */}
-        {stair && stair.fee > 0 && (
+        {stairWorking && (
           <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
-            {stair.items} of {stair.itemsTotal} item{stair.itemsTotal === 1 ? "" : "s"} ×{" "}
-            {stair.floors} floor{stair.floors === 1 ? "" : "s"} above {stair.cfg.freeUpToFloor}F ×{" "}
-            <Money value={stair.cfg.perFloorPerItem} /> ={" "}
+            {stairWorking.quoted ? (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
+                {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
+                <Money value={stairWorking.perFloorPerItem} /> ={" "}
+              </>
+            ) : (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                charged{" "}
+              </>
+            )}
             <span className="font-semibold text-base-900">
-              <Money value={stair.fee} />
+              <Money value={stairWorking.fee} />
             </span>
           </p>
         )}

@@ -27,7 +27,11 @@ import {
   type SoBatchRailFilter,
   type SoBatchSelection,
 } from "@carres/shared";
-import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import {
+  DataGrid,
+  type DataGridColumn,
+  type DataGridContextMenuItem,
+} from "@/components/register/DataGrid";
 import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
@@ -97,6 +101,51 @@ export interface SoBatchRegisterProps {
 
 export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchRegisterProps) {
   const navigate = useNavigate();
+
+  /* ⭐ THE ROW IS A DOOR (YH, 2026-09-01).
+   *
+   * This register handed the grid `expandable` and `selectable` and nothing
+   * else, so `onRowDoubleClick` and `contextMenu` were undefined: the engine
+   * called nothing and the browser's event was discarded. Double-click did
+   * nothing at all, and right-click gave the browser's own menu.
+   *
+   * That left ONE working door on a ~1200px row — the ~90px blue `SO-####`
+   * cell — on the module's permanent purchasing audit book. An operator who
+   * wants the order behind a row reaches for double-click first, gets nothing,
+   * and concludes the page is dead. That is the report that started this.
+   *
+   * ⭐ IT ALSO MAKES THE CURSOR HONEST (defect 13). The grid paints the
+   * pointing hand on any row that is selectable OR expandable, and every row
+   * here is expandable — so the page advertised itself as clickable on all
+   * ~1200px and answered on 90. Now every row answers.
+   *
+   * ⛔ THE MENU CARRIES ONLY DOORS THAT EXIST. The sibling Sales Orders menu
+   * ends in `Cancel SO`; a buying register must not offer that — it records
+   * what was bought, it does not amend the sale. `Open <PO>` appears only when
+   * the order has exactly one, which is the same test the PO No cell makes;
+   * the exact numbers for a multi-PO order live in the expansion. */
+  const openOrder = useCallback(
+    (o: SoBatchOrderRow) => navigate(`/operation/orders/so/${o.orderId}`),
+    [navigate],
+  );
+  const rowMenu = useCallback(
+    (o: SoBatchOrderRow): DataGridContextMenuItem[] => {
+      const po = soBatchCellSummary(o.pos.map((p) => p.poId));
+      return [
+        { label: "View", onClick: () => openOrder(o) },
+        ...(po.kind === "one"
+          ? [
+              {
+                label: `Open ${po.value}`,
+                onClick: () =>
+                  navigate(`/operation/procurement?po=${encodeURIComponent(po.value)}`),
+              },
+            ]
+          : []),
+      ];
+    },
+    [navigate, openOrder],
+  );
   const leafs = data.rows;
   const orders = data.registerRows;
   const leafById = useMemo(() => new Map(leafs.map((r) => [r.id, r])), [leafs]);
@@ -200,6 +249,34 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     [selections, leafById],
   );
 
+  /**
+   * THE DESTINATION A TICK ALLOCATES TO (YH, 2026-09-02).
+   *
+   * A tick is an allocation, so it needs a destination id. It used to demand
+   * the DEFAULT one specifically - and nothing in the schema requires a default
+   * row to exist: `purchasing_destinations_one_default` is a partial index that
+   * enforces AT MOST one, never at least one. So a perfectly healthy list with
+   * nobody's `is_default` set killed every checkbox on the page.
+   *
+   * That gate was also stricter than its own siblings. The Deliver To dropdown
+   * and the Split editor's Apply both tick a line WITHOUT ever reading the
+   * default - which is how the page ended up half-alive rather than plainly
+   * broken: two controls that worked and one that refused, over one fact.
+   *
+   * A default is a CONVENIENCE - "everything to Carres Klang unless you say
+   * otherwise" - not a permission. When there is no default, the first active
+   * destination is the sensible opening arrangement and the operator changes it
+   * per row exactly as they always could. Only a genuinely EMPTY list can stop
+   * a tick now, because then there is truly nowhere for the goods to go.
+   */
+  const tickDestinationId = useMemo(
+    () =>
+      data.defaultDestinationId ??
+      data.destinations.find((d) => d.active)?.id ??
+      null,
+    [data.defaultDestinationId, data.destinations],
+  );
+
   const toggleLeaf = useCallback(
     (id: string) => {
       const row = leafById.get(id);
@@ -207,13 +284,13 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       setSelected((prev) => {
         const next = new Map(prev);
         if (next.has(id)) next.delete(id);
-        else if (data.defaultDestinationId) {
-          next.set(id, defaultAllocations(row, data.defaultDestinationId));
+        else if (tickDestinationId) {
+          next.set(id, defaultAllocations(row, tickDestinationId));
         }
         return next;
       });
     },
-    [leafById, data.defaultDestinationId],
+    [leafById, tickDestinationId],
   );
 
   /** The parent switch: all of the order's eligible leafs, on or off. */
@@ -225,15 +302,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         const next = new Map(prev);
         for (const id of eligible) {
           if (!on) next.delete(id);
-          else if (!next.has(id) && data.defaultDestinationId) {
+          else if (!next.has(id) && tickDestinationId) {
             const row = leafById.get(id);
-            if (row) next.set(id, defaultAllocations(row, data.defaultDestinationId));
+            if (row) next.set(id, defaultAllocations(row, tickDestinationId));
           }
         }
         return next;
       });
     },
-    [eligibleByOrder, leafById, data.defaultDestinationId],
+    [eligibleByOrder, leafById, tickDestinationId],
   );
 
   const setLeafAllocations = useCallback(
@@ -270,8 +347,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   const leafAllocations = useCallback(
     (row: PurchaseDemandRow): DestinationAllocation[] =>
       live.get(row.id) ??
-      (data.defaultDestinationId ? defaultAllocations(row, data.defaultDestinationId) : []),
-    [live, data.defaultDestinationId],
+      (tickDestinationId ? defaultAllocations(row, tickDestinationId) : []),
+    [live, tickDestinationId],
   );
 
   /* ── The parent selection surface ─────────────────────────────────────── */
@@ -721,31 +798,41 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
 
         <div className="flex min-w-0 flex-1 flex-col p-2">
           {/* ⭐ A PAGE THAT CANNOT BUY SAYS SO (YH, 2026-09-01 — "the boxes are
-              all not clickable").
-              Every control on this page that starts a purchase needs a Deliver
-              To destination to allocate a tick to. With no destination, or with
-              destinations but none marked as the default, the checkboxes are
-              silently inert (`:210`, `:228`) — and so, for the same reason, are
-              the row-level Deliver To dropdown and the Split editor's Apply.
-              Nothing said a word, so the page looked normal and broken at the
-              same time, and the operator had no way to tell it from a bug in
-              the grid.
-              THE SERVER NOW REFUSES A FAILED READ OUTRIGHT
-              (`purchase-demands.ts`), so an empty list here means the rows are
-              genuinely absent — nobody has set a destination up, or RLS is
-              hiding them — which is a Settings answer, not an outage. Both
-              cases name the fix. */}
-          {(data.destinations.length === 0 || !data.defaultDestinationId) && (
+              all not clickable"), AND ONE THAT CAN, DOESN'T (YH, 2026-09-02 —
+              "is making it tickable, that is all i ask for").
+              Every control that starts a purchase needs a Deliver To
+              destination to allocate a tick to. That is a real requirement and
+              an EMPTY list is a real blocker — the goods have nowhere to go, so
+              the sentence names the setting that fixes it.
+              A MISSING DEFAULT IS NOT THAT. It used to be treated as one, and
+              it killed every checkbox on a page whose destination list was
+              perfectly healthy. `tickDestinationId` now falls back to the first
+              active destination, so the tick works and the operator changes it
+              per row as they always could — which is exactly what the Deliver
+              To dropdown and Split's Apply were already doing without ever
+              reading the default. The warning that remains is the one that is
+              still true. */}
+          {data.destinations.length === 0 ? (
             <p
               className="mb-2 rounded-control bg-kit-amber-3 px-3 py-2 text-meta text-kit-amber-11"
               data-testid="so-batch-no-destination"
             >
-              {data.destinations.length === 0
-                ? "No Deliver To destinations are set, so nothing can be bought on this page."
-                : "No Deliver To destination is marked as the default, so nothing can be ticked."}{" "}
-              Set one in Purchasing → Settings.
+              No Deliver To destinations are set, so nothing can be bought on
+              this page. Set one in Purchasing → Settings.
             </p>
-          )}
+          ) : !data.defaultDestinationId ? (
+            /* Not a blocker — a heads-up. Buying works; it just opens on a
+               destination nobody nominated, so say WHICH one before the
+               operator discovers it on a purchase order. */
+            <p
+              className="mb-2 rounded-control bg-kit-slate-3 px-3 py-2 text-meta text-kit-slate-11"
+              data-testid="so-batch-no-default-destination"
+            >
+              No Deliver To destination is marked as the default, so ticks open
+              on {destinationName(tickDestinationId)}. Change it on any row, or
+              set a default in Purchasing → Settings.
+            </p>
+          ) : null}
           <div
             className="min-h-0 flex-1"
             data-testid="so-batch-grid"
@@ -778,6 +865,8 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               groupBanner={false}
               stickyIdentity={{ columnKey: "soNo" }}
               chooserGroupOrder={["Order", "Documents", "Buying"]}
+              onRowDoubleClick={openOrder}
+              contextMenu={rowMenu}
               expandable={{
                 renderExpansion,
                 testId: (o) => `so-batch-expand-${o.orderId}`,
@@ -919,6 +1008,10 @@ function SoBatchOrderExpansion({
   destinationName: (id: string | null) => string;
   safetyDays: number;
 }) {
+  /* Its own handle on the router: this box is a top-level component, not a
+     closure inside the register, so the multi-PO door below cannot borrow the
+     register's `navigate`. */
+  const navigate = useNavigate();
   const expansion = useSalesOrderExpansion(order.orderId);
   const unitIdsByLine = useMemo(
     () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
@@ -1068,6 +1161,17 @@ function SoBatchOrderExpansion({
         showCoveredBy
         showSupplier
         showPoDeliveryDate
+        /* ⭐ THE EXPANSION IS THE MULTI-PO DOOR (YH, 2026-09-01). The `PO No`
+           cell links only when there is exactly one; with several it prints
+           "2 POs" and sends the reader here, where the exact numbers were bare
+           text. So the more work an order generated, the fewer doors it had.
+           Same navigation the single-PO cell already performs.
+           `Ready Stock` is an answer, not a document, so `poById` — not a
+           string test — decides what is a door. */
+        isCoveredByLinkable={(v) => poById.has(v)}
+        onCoveredByClick={(poId) =>
+          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+        }
         selection={{
           selectedKeys: new Set(
             order.lines

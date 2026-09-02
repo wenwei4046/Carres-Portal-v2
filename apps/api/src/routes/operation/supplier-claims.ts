@@ -170,19 +170,29 @@ supplierClaimsRouter.get("/", async (c) => {
   // numbers stay right even when the visible page is capped at DEFAULT_LIMIT.
   let openCount: number;
   let closedCount: number;
-  if (poId) {
-    openCount = claims.filter((claim) => claim.status === "open").length;
-    closedCount = claims.filter((claim) => claim.status === "closed").length;
-  } else {
+  {
+    /* ⛔ A COUNT MAY NOT BE DERIVED FROM AN ALREADY-FILTERED PAGE (YH,
+       2026-09-01). The PO branch counted the rows it had just fetched — but
+       those rows are narrowed by `status` when the caller names one, so
+       `?poId=X&status=open` reported ZERO closed claims for a PO that has
+       them. It was invisible while the only caller asked for `all`; wiring
+       the page's `?po=` door makes the stage chips real, and a chip that
+       says 0 is read as "this PO has none", not as "you filtered them out".
+
+       The same two exact head-counts the general branch already runs, with
+       the PO filter applied when there is one. A head count is not narrowed
+       by the page window either, which is the reason they exist. */
+    const scoped = (state: "open" | "closed") => {
+      let q = sb
+        .from("supplier_claims")
+        .select("id", { count: "exact", head: true })
+        .eq("status", state);
+      if (poId) q = q.eq("po_id", poId);
+      return q;
+    };
     const [openResult, closedResult] = await Promise.all([
-      sb
-        .from("supplier_claims")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "open"),
-      sb
-        .from("supplier_claims")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "closed"),
+      scoped("open"),
+      scoped("closed"),
     ]);
     if (openResult.error || closedResult.error) {
       const m = mapPgError(openResult.error ?? closedResult.error!);

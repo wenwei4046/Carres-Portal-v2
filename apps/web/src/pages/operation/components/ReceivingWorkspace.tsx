@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   caseProductCategory,
   poLineReportable,
@@ -286,14 +287,21 @@ function ReadMode({
             </div>
           ))}
           {/* A door, never a form: the claim already exists — the receive that
-              recorded the problem opened it in the same transaction. */}
-          <a
-            href="/operation/purchasing/claims"
+              recorded the problem opened it in the same transaction.
+              ⛔ A ROUTER LINK, NOT AN ANCHOR (YH, 2026-09-01). This was
+              `<a href="/operation/purchasing/claims">` — an address no route
+              matches — so the browser left the app, the SPA reloaded from
+              scratch and fell back to the default tab. Exceptions is the ONE
+              place on this page that names a supplier claim, and its only
+              door landed on the Operation Dashboard. The working address is
+              `/operation?tab=claims`. */}
+          <Link
+            to="/operation?tab=claims"
             className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
             data-testid="receiving-open-claims"
           >
             Open in Claims
-          </a>
+          </Link>
         </Section>
       )}
 

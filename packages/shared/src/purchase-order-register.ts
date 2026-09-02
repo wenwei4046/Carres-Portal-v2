@@ -9,7 +9,16 @@ export type PurchaseOrderRegisterFilter =
   | "supplier_date_passed"
   | "supplier_update_required"
   | "partly_received"
-  | "completed";
+  | "completed"
+  /**
+   * ⭐ CANCELLED IS A STATE THE REGISTER KEEPS (YH, 2026-09-01, defect 27).
+   * Cancelled POs are deliberately never deleted, and until now the ONLY way
+   * to find one was the `PO Issued` column's funnel — a control that offered
+   * document states on a column showing a timestamp. Giving that funnel the
+   * date filter it should always have had would have removed the only door to
+   * these rows, so the rail gains the row first.
+   */
+  | "cancelled";
 
 export type PurchaseOrderOperationStatus =
   | "Issued"
@@ -95,6 +104,7 @@ export function purchaseOrderRegisterFacts(
   }
   if (!cancelled && !completed && received > 0 && open > 0) filters.push("partly_received");
   if (completed) filters.push("completed");
+  if (cancelled) filters.push("cancelled");
 
   const operationStatus: PurchaseOrderOperationStatus | null = cancelled
     ? "Cancelled"

@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigate = vi.fn();
 const refetch = vi.fn();
 const reviseMutate = vi.fn();
+const supplierDateMutate = vi.fn();
 let auditError = false;
 let connectionError = false;
 let requiredLoading = false;
@@ -177,6 +178,7 @@ vi.mock("@/lib/queries", () => ({
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
   useRecordSend: () => ({ mutate: vi.fn() }),
+  useRecordSupplierDate: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
 }));
 
@@ -332,6 +334,63 @@ describe("Purchase Orders Register", () => {
     renderPage();
     expect(screen.getByText("Loading purchase orders…")).toBeInTheDocument();
     expect(screen.queryByTestId("register-grid")).not.toBeInTheDocument();
+  });
+});
+
+describe("the supplier delivery date has a door (defect 5)", () => {
+  /* The register counted this work in two rail rows and two Work sentences -
+     "Ask {supplier} for the delivery date" - and there was nowhere on the live
+     surface to record the answer. The only writer was called from a form inside
+     the retired legacy tree, below that file's live re-export, so it rendered
+     nowhere and made the door look wired. These tests replace the six that used
+     to drive that unreachable form. */
+
+  it("offers the block on the Document view and names the supplier", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const block = screen.getByTestId("po-supplier-date");
+    expect(block).toBeInTheDocument();
+    expect(block).toHaveTextContent("Supplier delivery date");
+  });
+
+  it("a dead button names what is missing, which is this page's own rule", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const save = screen.getByTestId("po-supplier-date-save");
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Record - pick a date");
+  });
+
+  it("moving a date already on file posts `delayed` and carries its category", async () => {
+    /* This PO holds a supplier promise, so a different date is a DELAY, not a
+       first confirmation. Getting that pair wrong records the supplier's real
+       date as a promise about our own estimate and then drops it. */
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), {
+      target: { value: "2099-12-31" },
+    });
+
+    /* A moved promise must say why, and the category is a locked list. */
+    const reason = screen.getByTestId("po-supplier-date-reason") as HTMLSelectElement;
+    expect(reason.tagName).toBe("SELECT");
+    expect(reason.value).toBe("Production Delay");
+
+    const save = screen.getByTestId("po-supplier-date-save");
+    expect(save).toBeEnabled();
+    expect(save).toHaveTextContent("Record the new date");
+    fireEvent.click(save);
+
+    await waitFor(() => expect(supplierDateMutate).toHaveBeenCalled());
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
+      answer: "delayed",
+      newDate: "2099-12-31",
+      reason: "Production Delay",
+    });
+  });
+
+  it("the reason is the locked CATEGORY, never free text", () => {
+    /* Jess locked the list on 2026-08-02 so the ledger can be counted; the
+       story goes in Remarks, never inside the category. */
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(screen.getByTestId("po-supplier-date-remarks")).toBeInTheDocument();
   });
 });
 
