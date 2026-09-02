@@ -29,6 +29,56 @@ import {
  * that cannot tell those apart is not testing the thing.
  */
 
+/**
+ * ⭐ 0414 — A STAMPED FEE REMEMBERS THE RATE THAT MADE IT.
+ *
+ * YH, 2026-08-28, `docs/orders/MASTER.md` §405-410, APPROVED / LOCKED: *"the
+ * fee must be STAMPED at the order, not re-derived. A charge the customer
+ * signed for may not move because a rate changed afterwards."*
+ *
+ * Before the pin, every re-stamp re-priced at whatever `floor_config` said
+ * TODAY — so raising the rate and then correcting a phone number on a July
+ * order billed the customer a figure they never agreed to. These pin the
+ * behaviour that ends it, and the two ways it must survive a database that has
+ * not run 0414 yet.
+ */
+function sbPinned(opts: {
+  order?: Record<string, unknown> | null;
+  /** `false` = the two 0414 columns do not exist, i.e. the migration has not
+   *  been applied. The first select fails and the code must ask again. */
+  hasPinColumns?: boolean;
+  /** `false` = `order_stamp_stair_carry_pinned` does not exist either. */
+  hasPinnedRpc?: boolean;
+  calls?: Array<{ name: string; args: unknown }>;
+}) {
+  const hasCols = opts.hasPinColumns !== false;
+  const hasRpc = opts.hasPinnedRpc !== false;
+  return {
+    from: (table: string) => ({
+      select: (cols: string) => ({
+        eq: () => ({
+          maybeSingle: async () => {
+            if (table === "floor_config") {
+              return { data: { free_up_to_floor: 2, per_floor_per_item: 50 }, error: null };
+            }
+            if (!hasCols && cols.includes("stair_rate_per_floor_per_item")) {
+              return { data: null, error: { message: 'column "stair_rate…" does not exist' } };
+            }
+            return { data: opts.order ?? null, error: null };
+          },
+        }),
+      }),
+    }),
+    rpc: async (name: string, args: unknown) => {
+      if (name === "order_stamp_stair_carry_pinned" && !hasRpc) {
+        return { data: null, error: { code: "PGRST202", message: "not found" } };
+      }
+      opts.calls?.push({ name, args });
+      return { data: null, error: null };
+    },
+  } as unknown as Parameters<typeof restampStairCarry>[0];
+}
+
 function sb(opts: {
   /** Include `order_addons` to say what fee is on the order NOW. Omit it and
    *  the order reads as carrying no stair row, i.e. a stored fee of 0. */
@@ -98,7 +148,10 @@ describe("restampStairCarry — the fee is priced from the SAVED row", () => {
     );
     expect(r).toEqual({ ok: true, fee: 150 });
     expect(calls).toEqual([
-      { name: "order_stamp_stair_carry", args: { p_order_id: ORDER, p_fee: 150 } },
+      {
+        name: "order_stamp_stair_carry_pinned",
+        args: { p_order_id: ORDER, p_fee: 150, p_rate: 50, p_free_up_to: 2 },
+      },
     ]);
   });
 
@@ -123,6 +176,11 @@ describe("restampStairCarry — the fee is priced from the SAVED row", () => {
     /* 0394 deletes on 0. The call still HAPPENS — an order that used to carry a
        fee and no longer should must lose the row, and only the stamp can do it. */
     expect(calls).toEqual([
+      /* ⭐ NO RATE TO PIN, SO THE ORIGINAL DOOR IS THE RIGHT ONE (0414).
+         A lift means no charge WHATEVER the rate is, so `recomputeStairCarry`
+         short-circuits before it reads `floor_config` — there is no rate to
+         record, and inventing one by reading the table anyway would pin a
+         number that never priced anything. */
       { name: "order_stamp_stair_carry", args: { p_order_id: ORDER, p_fee: 0 } },
     ]);
   });
@@ -213,7 +271,7 @@ describe("the stair fee follows the GOODS, not only the floor", () => {
        stayed at 150 while the screen said 100. */
     const two: Array<{ name: string; args: unknown }> = [];
     await restampAfterLineWrite(sb({ order: at3rdNoLift(2), calls: two }), ORDER);
-    expect(two[0].name).toBe("order_stamp_stair_carry");
+    expect(two[0].name).toBe("order_stamp_stair_carry_pinned");
     expect((two[0].args as { p_fee: number }).p_fee).toBe(100);
   });
 
@@ -305,5 +363,72 @@ describe("no line-writing door ships without a re-stamp", () => {
       const after = routes.slice(at, routes.indexOf("fetchAndShapeOrder", at));
       expect(after, `${rpc} must not re-stamp`).not.toContain("restampAfterLineWrite");
     }
+  });
+});
+
+describe("0414 — the fee is priced at the order's own rate", () => {
+  const at3rdNoLift = (over: Record<string, unknown> = {}) => ({
+    delivery_floor: 3,
+    delivery_has_lift: false,
+    delivery_stair_items: 3,
+    order_lines: [{ qty: 3 }],
+    order_addons: [],
+    ...over,
+  });
+
+  it("prices from the PINNED rate, not from today's floor_config", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    /* The live table says RM 50 per floor per item. This order agreed RM 30.
+       1 floor above the free 2F x 3 items x RM 30 = RM 90 — NOT the RM 150
+       today's rate would produce. */
+    await restampStairCarry(
+      sbPinned({
+        order: at3rdNoLift({
+          stair_rate_per_floor_per_item: 30,
+          stair_rate_free_up_to_floor: 2,
+        }),
+        calls,
+      }),
+      ORDER,
+    );
+    expect((calls[0].args as { p_fee: number }).p_fee).toBe(90);
+  });
+
+  it("records the rate it used when the order has none yet", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    await restampStairCarry(sbPinned({ order: at3rdNoLift(), calls }), ORDER);
+    expect(calls[0].name).toBe("order_stamp_stair_carry_pinned");
+    expect(calls[0].args).toMatchObject({ p_fee: 150, p_rate: 50, p_free_up_to: 2 });
+  });
+
+  /* ⛔ HALF A PIN IS NOT A PIN. A rate without its free band prices a
+     different fee, so a half-written pair is treated as no pin at all. */
+  it("ignores a half-written pin and prices from the live rate", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    await restampStairCarry(
+      sbPinned({ order: at3rdNoLift({ stair_rate_per_floor_per_item: 30 }), calls }),
+      ORDER,
+    );
+    expect((calls[0].args as { p_fee: number }).p_fee).toBe(150);
+  });
+
+  /* ⛔ MERGED IS NOT APPLIED — both halves of the degrade. */
+  it("still re-stamps when 0414's columns do not exist yet", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const r = await restampStairCarry(
+      sbPinned({ order: at3rdNoLift(), hasPinColumns: false, calls }),
+      ORDER,
+    );
+    expect(r).toEqual({ ok: true, fee: 150 });
+  });
+
+  it("falls back to the original door when 0414's function does not exist yet", async () => {
+    const calls: Array<{ name: string; args: unknown }> = [];
+    const r = await restampStairCarry(
+      sbPinned({ order: at3rdNoLift(), hasPinnedRpc: false, calls }),
+      ORDER,
+    );
+    expect(r).toEqual({ ok: true, fee: 150 });
+    expect(calls[0].name, "the old door still stamps the fee").toBe("order_stamp_stair_carry");
   });
 });
