@@ -57,7 +57,7 @@ import { useAuth } from "@/lib/auth";
 import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
 import {
-  useDeliveryOrdersRegister,
+  useCatalog,
   useOperationOrders,
   useSalesOrderExpansion,
 } from "@/lib/queries";
@@ -349,6 +349,19 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   const lines = row.o.order_lines ?? [];
   const addons = row.o.order_addons ?? [];
   const expansion = useSalesOrderExpansion(row.o.id);
+  /* An add-on's HUMAN NAME comes from the catalog, never from its key. The
+   * key is a storage identifier: `STAIR_CARRY` de-underscored reads
+   * "STAIR CARRY", which is not a word anybody chose and not what the two
+   * surfaces that already resolve it print (`SalesOrderWorkspace.tsx` and
+   * `SalesOrderAddons.tsx`, both `addonNameByKey.get(key) ?? key`). One fact
+   * may not be spelled two ways (Law D), so this reads the same map from the
+   * same bundle they do. React Query dedupes by key, so expanding ten rows is
+   * one catalog read, and `staleTime` keeps it off the wire on later opens. */
+  const catalogQ = useCatalog();
+  const addonNameByKey = useMemo(
+    () => new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name])),
+    [catalogQ.data],
+  );
   if (lines.length === 0 && addons.length === 0) {
     return <div className="px-2 py-2 text-body text-base-500">No items on this order</div>;
   }
@@ -411,7 +424,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
       deliverToAbsence: "—",
       sku: addon.addon_key ?? "",
       qty: addon.qty,
-      item: addon.addon_key?.replace(/[_-]+/g, " ") ?? "Add-on",
+      item: addon.addon_key
+        ? (addonNameByKey.get(addon.addon_key) ?? addon.addon_key)
+        : "Add-on",
       selectable: false,
     })),
   ];
@@ -488,25 +503,26 @@ export default function SalesOrdersRegister() {
   const { data, isLoading, isError, error, refetch } = useOperationOrders(
     serverSearch ? { search: serverSearch } : {},
   );
-  const deliveryOrdersQuery = useDeliveryOrdersRegister();
-
-  const deliveryOrdersBySalesOrder = useMemo(() => {
-    const grouped = new Map<string, NonNullable<typeof deliveryOrdersQuery.data>["deliveryOrders"]>();
-    for (const deliveryOrder of deliveryOrdersQuery.data?.deliveryOrders ?? []) {
-      if (!deliveryOrder.order_id) continue;
-      const current = grouped.get(deliveryOrder.order_id) ?? [];
-      current.push(deliveryOrder);
-      grouped.set(deliveryOrder.order_id, current);
-    }
-    return grouped;
-  }, [deliveryOrdersQuery.data]);
-
+  /* ▸ D4 · EACH ORDER CARRIES ITS OWN DELIVERY ORDERS NOW.
+   *
+   * This used to fetch the whole delivery REGISTER and group it by order id.
+   * That route is `.order("issued_at", desc).limit(500)`, so an order whose DO
+   * was not among the newest 500 grouped to `[]` — and the `DO No` cell reads
+   * an empty array as the positive claim "No delivery order yet". A register
+   * asserting absence from a read that was merely truncated is the shape
+   * `claims-facet-counts-a-truncated-page` names in carry-forwards.md.
+   *
+   * The list read embeds `ops_delivery_orders(do_number)` per order, so there
+   * is no cap to fall outside of — and the page makes one fewer network read
+   * than it did. The SO-to-DO relationship still comes from the delivery
+   * document ledger and never from `orders.do_number`, the one-number mirror
+   * the `do_number` column's own comment forbids. */
   const all = useMemo<RegisterRow[]>(
     () =>
       (data?.orders ?? [])
         .filter((o) => !isRental(o))
-        .map((o) => buildRegisterRow(o, deliveryOrdersBySalesOrder.get(o.id) ?? [])),
-    [data, deliveryOrdersBySalesOrder],
+        .map((o) => buildRegisterRow(o, o.ops_delivery_orders ?? [])),
+    [data],
   );
 
   /* The scope is the register's population; the engine's search and ▽s narrow
@@ -611,12 +627,12 @@ export default function SalesOrdersRegister() {
 
       {/* 8px work-surface breathing room — REGISTER STATUS FOOTER law, docs/ui/MASTER.md. */}
       <div className="flex min-h-0 flex-1 flex-col p-2" data-testid="register-column">
-        {isError || deliveryOrdersQuery.isError ? (
+        {isError ? (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
             <p className="text-body text-base-700">The register could not be loaded</p>
-            {((error ?? deliveryOrdersQuery.error) as Error | undefined)?.message ? (
+            {(error as Error | undefined)?.message ? (
               <p className="text-meta text-base-500">
-                {((error ?? deliveryOrdersQuery.error) as Error).message}
+                {(error as Error).message}
               </p>
             ) : null}
             <button
@@ -624,7 +640,6 @@ export default function SalesOrdersRegister() {
               className="rounded-md border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-base-50"
               onClick={() => {
                 void refetch();
-                void deliveryOrdersQuery.refetch();
               }}
             >
               Try again
@@ -645,7 +660,7 @@ export default function SalesOrdersRegister() {
                the search itself still matches SO number, customer, phone and
                item, and the ▽ per-column filters say so column by column. */
             searchPlaceholder="Search sales orders…"
-            isLoading={isLoading || deliveryOrdersQuery.isLoading}
+            isLoading={isLoading}
             emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
             /* Optional columns may widen the sheet (MASTER §0.1), so the row's

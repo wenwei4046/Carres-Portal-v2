@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
+import type { operationOrderListRow } from "@/lib/queries";
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import { fmtDate } from "@/lib/fmt-date";
 
@@ -36,23 +36,22 @@ let expansionHookState: {
   isError: boolean;
 };
 
-let deliveryOrdersHookState: {
-  data: {
-    deliveryOrders: DeliveryOrderRow[];
-    attempts: [];
-    handoverEvents: [];
-  } | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error: unknown;
-  refetch: () => void;
-};
-
 /* A spy AROUND the hook: the component's calls — and the filters it passes —
  * are the assertion surface. */
 const useOperationOrdersSpy = vi.fn((..._args: unknown[]) => listHookState);
 const useSalesOrderExpansionSpy = vi.fn((..._args: unknown[]) => expansionHookState);
-const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => deliveryOrdersHookState);
+/* D4 · a tripwire, not a fixture. The register must NOT consult this hook:
+ * its read is capped at the newest 500 Delivery Orders, so order 501 and
+ * older printed "No delivery order yet" while holding a DO. It answers with
+ * nothing, so a register that went back to it would fail twice — here on the
+ * call, and below on the DO number that vanished. */
+const useDeliveryOrdersRegisterSpy = vi.fn((..._args: unknown[]) => ({
+  data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+}));
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -128,39 +127,7 @@ beforeEach(() => {
     refetch: vi.fn(),
   };
   expansionHookState = { data: { lines: [] }, isLoading: false, isError: false };
-  deliveryOrdersHookState = {
-    data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  };
 });
-
-function deliveryOrder(
-  doNumber: string,
-  orderId = "00000000-0000-0000-0000-00000000cafe",
-): DeliveryOrderRow {
-  return {
-    id: `delivery-${doNumber}`,
-    order_id: orderId,
-    do_number: doNumber,
-    issued_at: "2026-08-20T02:00:00Z",
-    trip_groups: null,
-    delivery_date: "2026-08-24",
-    time_slot: "Afternoon",
-    logistics_partner: "NETS",
-    voided_at: null,
-    void_reason: null,
-    orders: {
-      id: orderId,
-      so: 1303,
-      customer_name: "Kimmy",
-      delivery_date: "2026-08-24",
-      delivery_date_tbd: false,
-    },
-  };
-}
 
 describe("FIX 1 · the register asks the SERVER", () => {
   it("mounts asking for the unfiltered population (no search key)", () => {
@@ -650,16 +617,22 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
 
   it("says plainly when the Sales Order has produced no Delivery Order", () => {
     listHookState.data = { orders: [order({ do_number: null })] };
-    deliveryOrdersHookState.data = { deliveryOrders: [], attempts: [], handoverEvents: [] };
     mount();
     expect(screen.getByText("No delivery order yet")).toBeInTheDocument();
   });
 
+  it("reads the Delivery Orders off the order row, not a second capped read", () => {
+    listHookState.data = {
+      orders: [order({ ops_delivery_orders: [{ do_number: "DO-200826-1234" }] })],
+    };
+    mount();
+    expect(screen.getByRole("button", { name: "DO-200826-1234" })).toBeInTheDocument();
+    expect(useDeliveryOrdersRegisterSpy).not.toHaveBeenCalled();
+  });
+
   it("opens the one authoritative Delivery Order when exactly one exists", () => {
-    deliveryOrdersHookState.data = {
-      deliveryOrders: [deliveryOrder("DO-200826-1234")],
-      attempts: [],
-      handoverEvents: [],
+    listHookState.data = {
+      orders: [order({ ops_delivery_orders: [{ do_number: "DO-200826-1234" }] })],
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "DO-200826-1234" }));
@@ -669,13 +642,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
   });
 
   it("shows every Delivery Order relationship instead of hiding all but one", () => {
-    deliveryOrdersHookState.data = {
-      deliveryOrders: [
-        deliveryOrder("DO-200826-1234"),
-        deliveryOrder("DO-210826-5678"),
+    listHookState.data = {
+      orders: [
+        order({
+          ops_delivery_orders: [
+            { do_number: "DO-200826-1234" },
+            { do_number: "DO-210826-5678" },
+          ],
+        }),
       ],
-      attempts: [],
-      handoverEvents: [],
     };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "2 Delivery Orders" }));

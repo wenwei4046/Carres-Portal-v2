@@ -34,6 +34,13 @@ import { parseEmergencyContact } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
+
+/** D4 — the register needs exactly ONE fact from a delivery order: its number.
+ *  Narrow on purpose. The list read now embeds `ops_delivery_orders(do_number)`
+ *  per order, and that shape satisfies this without carrying the delivery
+ *  register's whole row; a full `DeliveryOrderRow` still assigns, so the
+ *  register's own tests may keep passing complete rows. */
+export type RegisterDeliveryOrder = Pick<DeliveryOrderRow, "do_number">;
 import {
   digits,
   itemsSummary,
@@ -103,7 +110,7 @@ export interface RegisterRow {
   poNumbers: string[];
   /** Every Delivery document produced by this SO. `orders.do_number` is only
    *  the current mirror and may never hide failed, voided or rebooked DOs. */
-  deliveryOrders: DeliveryOrderRow[];
+  deliveryOrders: RegisterDeliveryOrder[];
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
@@ -120,7 +127,7 @@ export interface RegisterRow {
 
 export function buildRegisterRow(
   o: operationOrderListRow,
-  deliveryOrders: DeliveryOrderRow[] = [],
+  deliveryOrders: RegisterDeliveryOrder[] = [],
 ): RegisterRow {
   const money = moneyOfOrder(o);
   const phone = o.customer_phone ?? "";

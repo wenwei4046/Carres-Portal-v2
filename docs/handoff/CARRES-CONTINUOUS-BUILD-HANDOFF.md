@@ -51,18 +51,18 @@ this number, may I change it). That was audited in full on 2026-08-28 —
 `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md`, 103 rows in render order. **The open
 items in it are the work; do not re-audit.**
 
-## 2 · CURRENT STATUS — measured 2026-09-02 after #1060, re-measure before use
+## 2 · CURRENT STATUS — measured 2026-09-02 after #1063, re-measure before use
 
 | Fact | Value | How to re-measure |
 |---|---|---|
-| `origin/main` | `90147ff2` | `git rev-parse --short origin/main` |
+| `origin/main` | `7613bb14` | `git rev-parse --short origin/main` |
 | `apps/web` tests | **GREEN — 285 files, 3731 tests** | `cd apps/web && pnpm exec vitest run` |
 | `apps/api` tests | **GREEN — 131 files, 2649 tests** | `pnpm --filter @carres/api test` |
 | `packages/shared` tests | **GREEN — 122 files, 2836 tests** | `pnpm --filter @carres/shared test` |
 | Typecheck | clean | `pnpm -r typecheck` — **NOT** `tsc -p tsconfig.json` in `apps/web`, which checks nothing |
-| Migration filenames | 425 validated | `node scripts/check-migrations.mjs` |
-| Migration tail, ALL branches | `0416` — on the unmerged `fix/so-batch-scroll-and-unit-id`, NOT on main → **next free is `0417`** | the rename-safe command in §4 |
-| Open PRs from this lane | **none** — #1058, #1059 and #1060 all merged 2 Sep | `gh pr list --author @me` |
+| Migration filenames | 426 validated | `node scripts/check-migrations.mjs` |
+| Migration tail, ALL branches | `0416` — **now merged** (#1061), so main and the branch tail agree → **next free is `0417`** | the rename-safe command in §4 |
+| Open PRs from this lane | **one** — `fix/so-register-three` (D3 · D4 · D7). #1058–#1063 all merged 2 Sep | `gh pr list --author @me` |
 
 ### Migrations — APPLIED means probed, not merged
 
@@ -214,6 +214,19 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
     both wait on their owner. Neither is an engineering item and neither belongs
     on this lane's open list as though it were one.
 
+20. **A saved order stores what was CHARGED, not the working-out** (YH, 2 Sep):
+    *"a saved order should save just what was charged."* This closes **R1** in
+    `PURCHASING-TODO.md` with **no code change** — the shipped behaviour already
+    matches. A saved order prints *"2 of 5 items carried to floor 4 — charged
+    RM 300"*, and the rate that produced it is not recovered for display:
+    only the product is stored, so rate and `freeUpToFloor` are one equation
+    with two unknowns, and reading either off today's config is defect D1 one
+    term smaller. `stair-carry-recompute.ts:143-147` forbids stamping the
+    breakdown — *"a second copy would be a second arithmetic for one number."*
+    Acceptance #6 of `CARD-2026-08-28-stair-carry-is-money-the-order-can-hold.md`
+    is therefore **fully met**, not half-met: what must not move after the fact
+    is the money, and the money does not move.
+
 ## 4 · CONSTRAINTS
 
 - **Migrations are applied BY HAND.** Code can reach production before its
@@ -298,9 +311,23 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 
 ## 6 · OPEN WORK, in order
 
-**This lane has no open engineering.** Every migration the 1–2 Sep build shipped
-is probed and applied — `0410`, `0413`, `0414`, `0415`, the last confirmed
-whole rather than half — and the code that rides on them is merged.
+**One PR open, and one SO defect left behind it.** Every migration the 1–2 Sep
+build shipped is probed and applied — `0410`, `0413`, `0414`, `0415`, the last
+confirmed whole rather than half — and the code that rides on them is merged.
+
+**In review:** `fix/so-register-three` closes **D3** (the register printed the
+raw add-on key), **D4** (the `DO No` column went blind past 500 delivery
+orders) and **D7** (`Paid in full` / `No price yet` were in no dictionary),
+which YH asked for on 2 Sep.
+
+**Still open on the SO side: D5.** Cancelling a Sales Order removes it from the
+only register that lists Sales Orders, while `CancelSalesOrderDialog.tsx:83`
+promises nothing is deleted — the list read is
+`.in("status", ["place","proceed_order","delivered"])` at `operation/orders.ts:303`, so a
+cancelled order has nowhere left to be seen. **D6 is a method caution, not a
+defect** (re-measure the old-revision lock with a check that walks fieldset
+ancestors; the obvious check reports a false pass). Both live in
+`PURCHASING-TODO.md` §6.
 
 ⚠️ **THAT IS NOT "NOTHING TO DO", AND DO NOT REPORT IT AS SUCH.** This file
 covers one lane. YH's two active areas each keep their own tracker, and both
@@ -380,10 +407,14 @@ apart and would refuse a real event.
 
 ## 7 · EXACT NEXT STEP
 
-**Ask YH what he wants built next, and build nothing until he says.**
+**Get `fix/so-register-three` merged, then ask YH about D5.**
 
-This lane is genuinely finished, which is worth stating plainly rather than
-manufacturing a queue out of it. The 1–2 Sep work is merged, applied and probed.
+D3, D4 and D7 are written, gated and in review. **D5 is the last SO defect on
+this lane** and it needs a word before code: a cancelled order must be visible
+somewhere, and whether that is a status filter on the register, a separate
+cancelled view, or a different promise in the dialog is his call, not an
+inference. Build nothing else until he says.
+
 The two items in §6 belong to Jess and to the MASTER's owner, and YH ruled on
 2 Sep that neither is his — so **do not present them to him as his open work**,
 and do not treat their presence in this file as permission to start them.
@@ -394,15 +425,16 @@ and do not treat their presence in this file as permission to start them.
 should not have been: the instalment sentence (already closed in #1036),
 migration numbering (not governed during development — §3.18), and two
 blueprints (not YH's). Each survived because it was carried forward rather than
-measured. **If §6 is empty, say it is empty.**
+measured. **If §6 is empty, say it is empty** — it was, for one day, and saying
+so is what surfaced D3/D4/D7 from the tracker that actually held them.
 
 *Reporting "nothing left" from one empty list.* This file covers one lane. The
 purchasing tracker named in §6 held **15 open defects** on 2 Sep while this
-section was correctly empty — both true at once. **Check the other trackers
+section read empty — both true at once. **Check the other trackers
 before telling YH he is done.** He is finalising Sales Order and working on
 Purchasing, and neither of those is finished.
 
 ---
 
-*Written 2026-09-02 at `origin/main` = `90147ff2`. Status lines decay within
+*Written 2026-09-02 at `origin/main` = `7613bb14`. Status lines decay within
 days in this repo — measure, do not recite.*

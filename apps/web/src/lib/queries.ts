@@ -3010,6 +3010,15 @@ export interface operationOrderListRow {
    *  yet (pre-confirm-proceed orders); the FE treats `[]` as "no thread state
    *  available" and omits the LP pill. */
   order_supplier_threads: operationOrderThreadRow[];
+  /** D4 (2026-09-02) — this order's OWN delivery orders, embedded on the list
+   *  read. The register's `DO No` column used to resolve itself against the
+   *  delivery REGISTER, whose route caps at 500 rows ordered newest-first, so
+   *  an older order's DO simply was not in the answer and the cell printed
+   *  "No delivery order yet" as a fact. Embedded per order there is no cap to
+   *  fall outside of. Optional: an older Worker that does not select it leaves
+   *  the field undefined, and the register reads that as "not carried" rather
+   *  than as "none exist". */
+  ops_delivery_orders?: { do_number: string }[];
   /** Blueprint card §7 (2026-08-16) — the two composed Work facts: an OPEN
    *  Finance exception (0355) and a loan still out (0209/0217). Optional so an
    *  older Worker that does not select them raises nothing (UNKNOWN never
