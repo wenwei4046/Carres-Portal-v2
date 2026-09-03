@@ -232,6 +232,7 @@ import {
   type PurchasingSettingsResponse,
   type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
+  type PurchasingSetSwitchInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
@@ -4573,6 +4574,10 @@ export interface ManualPurchaseRegisterPayload {
    *  and whether the server date plan could be loaded at all. */
   todayIso?: string;
   planUnavailable?: boolean;
+  /** 0422 — the Purchasing Settings switch: when true the create form refuses
+   *  a Delivery Date earlier than the plan's earliest date, mirroring the
+   *  door. Absent (older API) reads as off — proposal only. */
+  enforceEarliestDate?: boolean;
 }
 
 export interface ManualPurchaseDetailPayload {
@@ -4989,6 +4994,10 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
 
 export function useSetPurchasingNumber() {
   return usePurchasingSettingsMutation<PurchasingSetNumberInput>("/number");
+}
+/** 0422 — one on/off switch, by key. */
+export function useSetPurchasingSwitch() {
+  return usePurchasingSettingsMutation<PurchasingSetSwitchInput>("/switch");
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");

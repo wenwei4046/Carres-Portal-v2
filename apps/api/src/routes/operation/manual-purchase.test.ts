@@ -1134,6 +1134,7 @@ const CARD06_SETTINGS = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
+  manualPurchaseEnforceEarliestDate: false,
   suppliers: [
     { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
   ],
@@ -1703,5 +1704,111 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     const { res } = await post(HEADER, rpc);
     expect(res.status).toBe(200);
     expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request");
+  });
+});
+
+/**
+ * 0422 — A MANUAL PURCHASE MAY NOT ASK FOR GOODS BEFORE THEY CAN ARRIVE
+ * (YH, 2026-09-04).
+ *
+ * The plan proposes the earliest Delivery Date; nothing refused an earlier
+ * one. With the Purchasing Settings switch on, the create door refuses it
+ * BEFORE the create RPC, with the same arithmetic the plan answers with.
+ * Switch off, or no floor computable: the door behaves exactly as before.
+ */
+describe("POST /purchasing/requests — the earliest-date switch (0422)", () => {
+  const HEADER = { purpose: "ready_stock", destinationId: DEST };
+  const LINES = [{ sku: "5539-2NA", qty: 1 }];
+
+  function sbWith(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => rpc(fn, args)),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function create(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(sbWith(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  const created = () =>
+    vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
+      error: null,
+    });
+
+  it("switch on + a Delivery Date before the earliest → 422, and the RPC is never called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseEnforceEarliestDate: true,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body.code).toBe("delivery_date_before_earliest");
+    expect(body.date).toBe("2020-01-01");
+    /* The floor is the SAME arithmetic the plan answers with — pinned by
+       value, not by trusting the route. */
+    const earliest = expectedArrivalOf(CARD06_SETTINGS, {
+      supplierId: SUP,
+      category: "sofa",
+      fromIso: new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10),
+    });
+    expect(body.earliest).toBe(earliest);
+    expect(body.message).toContain("2020-01-01");
+    expect(body.action).toContain(earliest!);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("switch on + a Delivery Date on or after the earliest → the RPC is called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseEnforceEarliestDate: true,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2099-12-31", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+  });
+
+  it("switch off → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseEnforceEarliestDate: false,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("switch on but the settings cannot be loaded → no floor, no refusal", async () => {
+    vi.mocked(loadPurchasingSettings).mockRejectedValueOnce(new Error("purchasing_settings: down"));
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });
