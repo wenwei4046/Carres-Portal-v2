@@ -19,6 +19,7 @@ import {
   soCountLabel,
   sortToOrderRows,
   toOrderBuilds,
+  validateIssuePlan,
   unitsHeadline,
   poScheduleDays,
   snapToPoDay,
@@ -672,6 +673,23 @@ describe("T3 · On PO", () => {
     expect(r.qty).toBe(1); // what is still to buy — the engine already netted it
     expect(r.coveredByOpenPo).toBe(2); // …and this is why it is 1 and not 3
     expect(r.builds[0].coveredByOpenPo).toBe(2);
+  });
+
+  it("a FULLY covered build may be issued — the plan no longer refuses it", () => {
+    /* YH, 2026-09-03: a line with a supplier, a cost and a price is buyable,
+       and the buyer judges the coverage. `validateIssuePlan` used to answer
+       `already_on_po` here, which turned the tick the register now offers into
+       a trap — and the refusal never said WHICH line, because the coverage it
+       objected to comes from a per-SKU pool with no customer attribution and
+       may belong to another customer entirely. */
+    const proposal = run([MAT()], { supply: { openPoBySku: { "H1401S-K": 3 } } })[0];
+    const [build] = toOrderBuilds(proposal);
+    expect(proposal.rows[0].builds[0].fullyOnPo).toBe(true);
+    expect(
+      validateIssuePlan(proposal, [
+        { key: "d1", include: true, buildKeys: [build.buildKey] },
+      ]),
+    ).toMatchObject({ ok: true, count: 1 });
   });
 
   it("names the purchase orders behind the number", () => {

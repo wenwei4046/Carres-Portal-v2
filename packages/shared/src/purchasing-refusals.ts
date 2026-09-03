@@ -215,11 +215,6 @@ export function purchasingRefusal(
         wrong: "The same buying line is on two purchase orders.",
         todo: "Go back to buying and tick the line once.",
       };
-    case "already_on_po":
-      return {
-        wrong: "One line is already on an open purchase order.",
-        todo: "Go back to buying and untick that line.",
-      };
     case "sofa_merge":
       return {
         wrong: "One sofa purchase order carries one customer order.",
@@ -430,7 +425,6 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_build",
   "duplicate_demand",
   "duplicate_build",
-  "already_on_po",
   "sofa_merge",
   "unknown_request",
   "not_ready_to_order",
