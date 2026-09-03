@@ -1,4 +1,4 @@
--- 0413_the_partner_says_it_cannot_deliver.sql
+-- 0417_the_partner_says_it_cannot_deliver.sql
 -- Delivery Card 07 — the partner portal's second act, AND the repair of
 -- 0412's latent door defect (docs/delivery/MASTER.md §2 + §5).
 --

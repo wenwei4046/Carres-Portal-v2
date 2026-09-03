@@ -10,7 +10,7 @@ minimum customer/handling data — no money, no other partners, no reassignment)
 
 ## What ships
 
-1. **Migration `0413`** — repairs 0412's latent door defect (the events table was keyed by
+1. **Migration `0417`** — repairs 0412's latent door defect (the events table was keyed by
    `arrangement_id NOT NULL`; the 0412 door speaks `(order_id, leg)`): scope columns added and
    backfilled, arrangement link optional, `cannot_deliver` joins the event dictionary with its
    reason-required constraint. Probed on production in a rolled-back transaction (zero orphans
@@ -37,4 +37,4 @@ decision), and the Operations-side Work row raised by a Cannot Deliver report (W
 ## Gate
 
 11 partner-API + 5 page tests green · `pnpm -r typecheck` green · design-standard clean ·
-0413 probed then applied (tracker tail to verify at merge).
+0417 probed then applied (applied under the name 0413 before the number collision with main's 0413_the_guard_counts_what_was_approved was caught by CI; the tracker row was renamed to 0417 in the same repair) (tracker tail to verify at merge).
