@@ -680,6 +680,189 @@ describe("Card 03 · the left filter rail", () => {
   });
 });
 
+/* ⭐ DELIVER TO FOLLOWS THE COLLECTION RULE (owner, 2026-09-03). The owner
+   raised MPR-20260903-3381 for Ohana to Carres Klang and was refused at issue
+   with `Ohana must be collected to Ohana.` — and the request's Deliver To has
+   no door to move it. So the form may not offer the dead end, and the Register
+   must say the same sentence BEFORE the round trip. */
+describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
+  const OHANA = "2f181917-f4e1-42b2-9e25-d7ee6785424b";
+  const GOVERNED = {
+    ...REGISTER,
+    destinations: [
+      { id: KLANG, name: "Carres Klang" },
+      { id: OHANA, name: "Ohana" },
+    ],
+    supplierCollections: [
+      { supplierId: "s1", supplierName: "Ohana", destinationId: OHANA, partnerId: "p1" },
+    ],
+  };
+  function withRegister(register: unknown) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        url.includes("/purchasing/requests") &&
+        !url.includes("/plan") &&
+        !url.includes("/detail/") &&
+        !url.includes("/issue") &&
+        !url.includes("/already-have")
+      ) {
+        return Promise.resolve(register);
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("locks the create form's Deliver To to the rule once a collected item is picked, and says why", async () => {
+    withRegister(GOVERNED);
+    await openWorkspace();
+    /* Free until a governed supplier is on the form. */
+    expect(screen.queryByTestId("mp-dest-governed")).toBeNull();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* 5539-2NA's plan names supplier s1, collected to Ohana. */
+    const why = await screen.findByTestId("mp-dest-governed");
+    expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+    const select = document.getElementById("mp-dest")!;
+    expect(select).toHaveTextContent("Ohana");
+    expect(select).toBeDisabled();
+    /* Remove the item — the choice returns. */
+    fireEvent.click(screen.getByTestId("mp-line-remove-0"));
+    await waitFor(() => expect(screen.queryByTestId("mp-dest-governed")).toBeNull());
+  });
+
+  it("starts the create form on the governed default when no rule binds", async () => {
+    withRegister({ ...GOVERNED, defaultDestinationId: OHANA });
+    await openWorkspace();
+    expect(document.getElementById("mp-dest")).toHaveTextContent("Ohana");
+    expect(document.getElementById("mp-dest")).not.toBeDisabled();
+  });
+
+  it("the Register refuses an issue that disagrees with the rule before sending it", async () => {
+    /* REQ2's line is supplier s2 to Carres Klang; govern s2 to Ohana. */
+    withRegister({
+      ...GOVERNED,
+      supplierCollections: [
+        { supplierId: "s2", supplierName: "Office Co", destinationId: OHANA, partnerId: "p1" },
+      ],
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    await screen.findByTestId("mp-selection-bar");
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    expect(err).toHaveTextContent("Office Co must be collected to Ohana.");
+    expect(err).toHaveTextContent("Set Deliver To to Ohana, then issue again.");
+    expect(
+      apiFetch.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/purchasing/requests/issue") &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+      "nothing was sent",
+    ).toBe(false);
+  });
+
+  /* ⭐ THE DOOR ON AN EXISTING REQUEST (0421). The refusal above told the
+     operator to "Set Deliver To to Ohana" — and a request's Deliver To had no
+     door. `Change` beside the fact is that door, until a line is on a PO. */
+  describe("the object's Deliver To may move until a line is ordered", () => {
+    const READY = {
+      ...REGISTER.requests[0],
+      approval_required: false,
+    };
+    async function openObject(over: Record<string, unknown>) {
+      withRegister(GOVERNED);
+      seedDetail(false, {
+        destinations: GOVERNED.destinations,
+        ...over,
+      });
+      await loaded();
+      fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+      await screen.findByTestId("mp-detail");
+    }
+
+    it("a Ready-to-order request offers Change beside Deliver To", async () => {
+      await openObject({ request: READY });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.getByTestId("mp-detail-deliver-to-change")).toHaveTextContent("Change");
+    });
+
+    it("an Ordered request offers no door", async () => {
+      await openObject({
+        request: READY,
+        lines: REGISTER.lines
+          .filter((l) => l.request_id === REQ1)
+          .map((l) => ({ ...l, po_id: "PO-2041", po_ids: ["PO-2041"], issued_qty: 1 })),
+      });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.queryByTestId("mp-detail-deliver-to-change")).toBeNull();
+    });
+
+    it("Save PUTs the chosen place — locked to the supplier's governed place, with the sentence", async () => {
+      /* REQ1's line is supplier s1, collected to Ohana. */
+      await openObject({
+        request: READY,
+        supplierCollections: GOVERNED.supplierCollections,
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      const why = await screen.findByTestId("mp-detail-deliver-to-governed");
+      expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+      const select = document.getElementById("mp-detail-deliver-to-select")!;
+      expect(select).toHaveTextContent("Ohana");
+      expect(select).toBeDisabled();
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      await waitFor(() => {
+        const put = apiFetch.mock.calls.find(
+          ([url, init]) =>
+            String(url).endsWith(`/purchasing/requests/${REQ1}/deliver-to`) &&
+            (init as RequestInit | undefined)?.method === "PUT",
+        );
+        expect(put, "the move was sent").toBeTruthy();
+        expect(JSON.parse(String((put![1] as RequestInit).body))).toEqual({
+          destinationId: OHANA,
+        });
+      });
+      /* Saved: the choice closes back into the fact. */
+      await waitFor(() =>
+        expect(document.getElementById("mp-detail-deliver-to-select")).toBeNull(),
+      );
+    });
+
+    it("a refusal from the door prints the two lines and keeps the choice open", async () => {
+      await openObject({ request: READY });
+      apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/deliver-to") && init?.method === "PUT") {
+          return Promise.reject(
+            Object.assign(new Error("422"), {
+              body: {
+                code: "request_ordered",
+                message: "This request is already ordered. Deliver To cannot move.",
+                action: "Revise the purchase order instead.",
+              },
+            }),
+          );
+        }
+        if (
+          url.includes("/purchasing/requests") &&
+          !url.includes("/plan") &&
+          !url.includes("/detail/") &&
+          !url.includes("/issue") &&
+          !url.includes("/already-have")
+        ) {
+          return Promise.resolve(GOVERNED);
+        }
+        return Promise.resolve(respond(url, init));
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      const err = await screen.findByTestId("mp-detail-deliver-to-error");
+      expect(err).toHaveTextContent("This request is already ordered. Deliver To cannot move.");
+      expect(err).toHaveTextContent("Revise the purchase order instead.");
+      expect(document.getElementById("mp-detail-deliver-to-select")).not.toBeNull();
+    });
+  });
+});
+
 describe("the create workspace — full page, never a dialog (card §3)", () => {
   it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
     await openWorkspace();

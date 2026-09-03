@@ -32,6 +32,10 @@ export const MANUAL_PURCHASE_WORDS = {
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
   cancel: "Cancel",
+  /** The Deliver To door on an existing request (0421): the text button that
+   *  opens the choice, and the act that closes it. */
+  change: "Change",
+  save: "Save",
   needFor: "Need for",
   /**
    * THE TWO VISIBLE DATE MEANINGS (Card 06, owner-corrected 2026-08-29 —

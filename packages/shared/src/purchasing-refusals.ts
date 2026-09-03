@@ -246,6 +246,20 @@ export function purchasingRefusal(
         wrong: "One Manual Purchase was refused.",
         todo: "Go back and untick the refused one, then issue again.",
       };
+    /* The Deliver To door on an existing request (0421). A request whose line
+       is already on a PO keeps its place: the PO names its own destination and
+       changes through Revise. A request with nothing left to deliver has no
+       place to move. */
+    case "request_ordered":
+      return {
+        wrong: "This request is already ordered. Deliver To cannot move.",
+        todo: "Revise the purchase order instead.",
+      };
+    case "request_closed":
+      return {
+        wrong: "This request is not going ahead.",
+        todo: "Raise a new request.",
+      };
     case "nothing_to_issue":
       return {
         wrong: "There is nothing left to buy on these lines.",
@@ -429,6 +443,8 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_request",
   "not_ready_to_order",
   "request_refused",
+  "request_ordered",
+  "request_closed",
   "nothing_to_issue",
   "blocked_delivery_date",
   "production_days_required",
