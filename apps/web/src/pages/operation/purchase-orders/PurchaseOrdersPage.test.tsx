@@ -435,6 +435,21 @@ describe("Purchase Order object", () => {
     expect(screen.getByText("SC-1001 · Receiving return")).toBeInTheDocument();
   });
 
+  /* ⭐ THE FACTS AND THE DOCUMENT ARE READ TOGETHER (YH, 2026-09-03).
+     The preview used to sit BELOW every block, so checking a goods line against
+     what the supplier actually received meant scrolling the two apart. Issue and
+     Revise already put them side by side; the Document view now does too. */
+  it("shows the official document beside the facts, not below them", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const column = screen.getByTestId("po-document-column");
+    expect(within(column).getByLabelText("Official purchase order preview")).toBeInTheDocument();
+    /* The Goods lines table sets `min-w-[900px]`. Without `min-w-0` the grid
+       item sizes to it and the document column collapses — the one failure this
+       layout has, and the reason the class is asserted rather than eyeballed. */
+    expect(column.parentElement?.className).toContain("lg:grid-cols-2");
+    expect(column.parentElement?.firstElementChild?.className).toContain("min-w-0");
+  });
+
   it("uses the 50/50 official-document layout only for issue or revision work", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
