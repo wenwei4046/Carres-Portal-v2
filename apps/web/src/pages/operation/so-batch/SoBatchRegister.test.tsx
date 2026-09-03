@@ -682,11 +682,11 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
   });
 
   it.each([
-    ["no_sku", "Booqit"],
-    ["no_supplier", "Booqit"],
-    ["no_cost", "Booqit"],
-    ["no_production_days", "Booqit"],
-    ["no_customer_date", "Booqit"],
+    "no_sku",
+    "no_supplier",
+    "no_cost",
+    "no_production_days",
+    "no_customer_date",
   ] as const)("a %s row SAYS why it cannot be ticked", (state) => {
     /* Every untickable row must answer "why not?" on the page itself. The
        amber panel is that answer, and until now nothing pinned it. */
