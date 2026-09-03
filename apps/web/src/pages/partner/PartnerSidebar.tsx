@@ -20,6 +20,7 @@ import CarresLockup from "@/components/CarresLockup";
 const NAV_ITEMS = [
   { to: "/delivery-partner/incoming",        label: "Incoming",        icon: "✦", end: false },
   { to: "/delivery-partner/dashboard",       label: "Today",           icon: "◆", end: false },
+  { to: "/delivery-partner/arrange",         label: "Delivery dates",  icon: "▤", end: false },
   { to: "/delivery-partner/factory-pickups", label: "Factory pickups", icon: "▦", end: false },
   { to: "/delivery-partner/deliveries",      label: "Deliveries",      icon: "▣", end: false },
   { to: "/delivery-partner/fleet",           label: "Fleet",           icon: "▥", end: false },

@@ -500,6 +500,8 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
     const event = isLogisticsChange(before.partnerId, partnerId) ? "changed" : "assigned";
     const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
       arrangement_id: saved.id,
+      order_id: s.orderId,
+      leg: s.leg,
       event,
       from_partner_id: before.partnerId,
       to_partner_id: partnerId,
@@ -598,6 +600,8 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     const event = !nextPartner ? "cleared" : isLogisticsChange(before.partnerId, nextPartner) ? "changed" : "assigned";
     const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
       arrangement_id: (saved as unknown as ArrangementRecord).id,
+      order_id: orderId,
+      leg,
       event,
       from_partner_id: before.partnerId,
       to_partner_id: nextPartner,
