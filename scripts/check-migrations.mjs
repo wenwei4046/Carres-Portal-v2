@@ -55,6 +55,15 @@ if (invalid.length) throw new Error(`Invalid migration filenames: ${invalid.join
 const COLLISION_BASELINE = new Set([
   "0165", "0166", "0204", "0206", "0232", "0233",
   "0239", "0241", "0242", "0255", "0267",
+  /* 0417 · two lanes merged sixteen seconds apart on 2026-09-03 (#1066, then
+     #1065) and both carried an 0417. Both halves are committed, so the rename
+     path is closed (immutability, red line 6) and the pair is baselined the
+     way the eleven above were. Measured state at baselining:
+     `the_partner_says_it_cannot_deliver` APPLIED (tracker row carries the
+     exact file name) · `the_register_names_the_site_and_the_holder`
+     NOT APPLIED — that half is the other lane's apply debt and a production
+     decision reported to the owner, not decided here. */
+  "0417",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
