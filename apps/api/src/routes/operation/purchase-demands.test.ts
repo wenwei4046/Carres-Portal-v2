@@ -753,6 +753,39 @@ describe("the buying facts SO Batch Purchase needs", () => {
     });
   });
 
+  it("names a factory-collected supplier with NO collector, instead of failing at issue", async () => {
+    /* YH, 2026-09-03. `to-order.ts` refuses this plan with
+       `pickup_partner_required` AFTER the operator has ticked and pressed
+       Issue PO — the same trap shape as `already_on_po`. The facts were on the
+       row all along, so the refusal moves to where the tick is offered. */
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    (t.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).toBe("no_pickup_partner");
+    expect(row.action!.action).toContain("Purchasing Settings");
+  });
+
+  it("a factory-collected supplier WITH a collector is orderable as normal", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    (t.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    t.purchasing_supplier_settings = {
+      data: [{
+        supplier_id: NICE,
+        off_days: [0],
+        transit_days: 1,
+        fixed_destination_id: KLANG_DEST,
+        collected_by_partner_id: "p-nets",
+      }],
+      error: null,
+    };
+    t.delivery_partners = { data: [{ id: "p-nets", name: "NETS" }], error: null };
+
+    const { rows } = await rowsOf(t);
+    expect(bySku(rows, "B1201S-K")!.state).not.toBe("no_pickup_partner");
+  });
+
   it("carries the arrival date off the ENGINE — the route subtracts nothing", async () => {
     const { rows } = await rowsOf();
     const ready = bySku(rows, "B1201S-K")!;

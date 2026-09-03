@@ -687,6 +687,7 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     "no_cost",
     "no_production_days",
     "no_customer_date",
+    "no_pickup_partner",
   ] as const)("a %s row SAYS why it cannot be ticked", (state) => {
     /* Every untickable row must answer "why not?" on the page itself. The
        amber panel is that answer, and until now nothing pinned it. */
