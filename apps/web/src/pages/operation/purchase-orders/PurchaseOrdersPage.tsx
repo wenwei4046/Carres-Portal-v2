@@ -973,7 +973,18 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   const po = row.po;
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-3">
+    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE (YH, 2026-09-03).
+       The official PDF used to sit BELOW every block, so checking a goods line
+       against what the supplier actually received meant scrolling the two apart
+       and holding one in your head. They are now two columns, and the document
+       is sticky — it stays in view for the whole length of the left column.
+
+       `min-w-0` on the left column is load-bearing. A grid item defaults to
+       `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
+       the COLUMN rather than scroll inside it, and the document would be
+       squeezed to nothing. Below `lg` the two stack, exactly as before. */
+    <div className="mx-auto grid max-w-[1440px] grid-cols-1 items-start gap-3 lg:grid-cols-2">
+      <div className="flex min-w-0 flex-col gap-3">
       <WorkCard row={row} owner={owner} />
       <section className="border border-kit-slate-5 bg-white p-4">
         <h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Purchase order</h2>
@@ -1019,7 +1030,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           </table>
         </div>
       </section>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      {/* Three across fitted the full width; in half of it they were three
+          slivers. Two, and the third wraps. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
           {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
         </ConnectionBlock>
@@ -1033,17 +1046,22 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
       </div>
-      {/* A cancelled purchase order has no official document to preview —
-          0402 refuses to print one by design. Saying so beats mounting a frame
-          that can only fill with an error strip. */}
-      {row.po.status === "cancelled" ? (
-        <section className="border border-kit-slate-5 bg-kit-slate-3 px-3 py-2" data-testid="po-cancelled-no-document">
-          <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
-          <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
-        </section>
-      ) : (
-        <OfficialPreview poId={po.id} />
-      )}
+      </div>
+      {/* The document column. Sticky so it holds its place while the facts
+          scroll beside it — the whole reason the two are side by side. */}
+      <div className="min-w-0 lg:sticky lg:top-3" data-testid="po-document-column">
+        {/* A cancelled purchase order has no official document to preview —
+            0402 refuses to print one by design. Saying so beats mounting a frame
+            that can only fill with an error strip. */}
+        {row.po.status === "cancelled" ? (
+          <section className="border border-kit-slate-5 bg-kit-slate-3 px-3 py-2" data-testid="po-cancelled-no-document">
+            <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
+            <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
+          </section>
+        ) : (
+          <OfficialPreview poId={po.id} />
+        )}
+      </div>
     </div>
   );
 }
