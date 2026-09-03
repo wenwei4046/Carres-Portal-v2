@@ -143,4 +143,35 @@ describe("FinanceRecon page", () => {
       expect(screen.getByRole("textbox", { name: "Description" })).toBeInTheDocument();
     });
   });
+
+  it("confirming a match saves the invoice number the row showed, not a made-up one", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    vi.mocked(apiFetch).mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        calls.push({ url, body: JSON.parse(String(init.body)) });
+        return {};
+      }
+      if (url.includes("bank-statements") && !url.includes("suggest")) return [BS_UNMATCHED];
+      if (url.includes("/reconciliations/suggest/")) return SUGGEST_PAYLOAD;
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    render(wrap(<FinanceRecon />));
+
+    await waitFor(() => {
+      expect(screen.getByText("FPX TRF · unknown ref 8821")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Match…" }));
+    await waitFor(() => {
+      expect(screen.getByText("INV-2026-1240")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole("radio")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm match" }));
+
+    await waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
+    expect(calls[0].url).toBe("/api/finance/reconciliations");
+    expect(calls[0].body).toEqual({ bankStatementId: BS_UNMATCHED.id, manualRef: "INV-2026-1240" });
+  });
 });

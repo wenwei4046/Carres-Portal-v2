@@ -5,6 +5,7 @@ import {
   type FinanceApPayStatusUi,
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { FinanceKpi } from "@/components/FinanceKpi";
 import APDrawer from "./APDrawer";
 
 type ApTab = FinanceApPayStatusUi;
@@ -71,9 +72,9 @@ export default function FinanceAP() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <Kpi label="Ready to pay" value={rmCompact(totalReady)} hint={`${buckets?.matched.count ?? 0} matched POs`} tone="warn" accent />
-        <Kpi label="Paid this month" value={rmCompact(totalPaid)} hint={`${buckets?.paid.count ?? 0} settlements`} tone="ok" />
-        <Kpi label="Total exposure" value={rmCompact(totalAll)} hint={`${rows.length} active POs`} />
+        <FinanceKpi label="Ready to pay" value={rmCompact(totalReady)} hint={`${buckets?.matched.count ?? 0} matched POs`} tone="warn" accent />
+        <FinanceKpi label="Paid this month" value={rmCompact(totalPaid)} hint={`${buckets?.paid.count ?? 0} settlements`} tone="ok" />
+        <FinanceKpi label="Total exposure" value={rmCompact(totalAll)} hint={`${rows.length} active POs`} />
       </div>
 
       <div className="flex gap-1 mb-3.5 border-b border-border">
@@ -187,28 +188,5 @@ function MatchPill({ ok, children }: { ok: boolean; children: React.ReactNode })
     >
       {children}
     </span>
-  );
-}
-
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
-    </div>
   );
 }

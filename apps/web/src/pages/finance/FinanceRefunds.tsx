@@ -7,6 +7,7 @@ import {
   type FinanceRefundRow,
 } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
+import { FinanceKpi } from "@/components/FinanceKpi";
 
 type RefundKind = "credit" | "refund";
 
@@ -108,9 +109,9 @@ export default function FinanceRefunds() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <Kpi label="Issued" value={rm(totals.issued)} hint="Credit notes outstanding" tone="warn" />
-        <Kpi label="Pending / approved" value={rm(totals.pending)} hint="Refunds awaiting bank release" tone="warn" accent />
-        <Kpi label="Applied / paid" value={rm(totals.applied)} hint="Used or refunded" tone="ok" />
+        <FinanceKpi label="Issued" value={rm(totals.issued)} hint="Credit notes outstanding" tone="warn" />
+        <FinanceKpi label="Pending / approved" value={rm(totals.pending)} hint="Refunds awaiting bank release" tone="warn" accent />
+        <FinanceKpi label="Applied / paid" value={rm(totals.applied)} hint="Used or refunded" tone="ok" />
       </div>
 
       <div className="bg-card rounded-md border border-border overflow-auto">
@@ -334,29 +335,6 @@ function IssueRefundModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
   type FinanceReconCandidate,
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { appTodayIso } from "@/lib/fmt-date";
+import { FinanceKpi } from "@/components/FinanceKpi";
 
 /**
  * Finance Reconciliation page — Phase 5 Chunk B.
@@ -69,10 +71,10 @@ export default function FinanceRecon() {
       </header>
 
       <div className="grid grid-cols-4 gap-3.5 mb-6">
-        <Kpi label="Inflow" value={rmCompact(inflow)} hint="Across visible window" tone="ok" />
-        <Kpi label="Outflow" value={rmCompact(outflow)} hint="Across visible window" tone="warn" />
-        <Kpi label="Matched" value={String(matchedCount)} hint={rows.length > 0 ? `${Math.round(matchedCount / rows.length * 100)}% reconciled` : "—"} />
-        <Kpi label="Unmatched" value={String(unmatchedCount)} hint="Need attention" tone={unmatchedCount > 0 ? "warn" : "ok"} accent={unmatchedCount > 0} />
+        <FinanceKpi label="Inflow" value={rmCompact(inflow)} hint="Across visible window" tone="ok" />
+        <FinanceKpi label="Outflow" value={rmCompact(outflow)} hint="Across visible window" tone="warn" />
+        <FinanceKpi label="Matched" value={String(matchedCount)} hint={rows.length > 0 ? `${Math.round(matchedCount / rows.length * 100)}% reconciled` : "—"} />
+        <FinanceKpi label="Unmatched" value={String(unmatchedCount)} hint="Need attention" tone={unmatchedCount > 0 ? "warn" : "ok"} accent={unmatchedCount > 0} />
       </div>
 
       <div className="bg-card rounded-md border border-border overflow-auto">
@@ -108,7 +110,7 @@ export default function FinanceRecon() {
       <div className="mt-3.5 px-4 py-3 bg-muted/30 rounded-md text-label text-muted-foreground flex gap-3">
         <span>💡</span>
         <span>
-          Auto-match runs nightly using FPX customer reference + amount. Unmatched lines need a finance person to manually link them — usually customer transferred without quoting their SO number.
+          Unmatched lines need a finance person to link them by hand — usually the customer transferred without quoting their SO number.
         </span>
       </div>
 
@@ -193,11 +195,14 @@ function MatchModal({
 }) {
   const suggest = useFinanceReconSuggest(line.id);
   const candidates = suggest.data?.candidates ?? [];
-  const [pick, setPick] = useState<number | null>(null);
+  // The pick IS the invoice number the row showed. It used to be the SO number
+  // re-spelled as `INV-0001`, so the toast and the saved reference named an
+  // invoice that did not exist while the row above said `INV-2026-1240`.
+  const [pick, setPick] = useState<string | null>(null);
 
   const createRec = useCreateReconciliation({
     onSuccess: () => {
-      toast.success(`Matched to INV-${String(pick).padStart(4, "0")}`);
+      toast.success(`Matched to ${pick}`);
       onCancel();
     },
     onError: (e) => toast.error(`Match failed: ${e.message}`),
@@ -207,7 +212,7 @@ function MatchModal({
     if (pick === null) return;
     createRec.mutate({
       bankStatementId: line.id,
-      manualRef:       `INV-${String(pick).padStart(4, "0")}`,
+      manualRef:       pick,
     });
   }
 
@@ -224,7 +229,7 @@ function MatchModal({
         <div className="text-meta text-muted-foreground mt-1.5 mb-4">
           {line.description} ·{" "}
           <span className={`font-mono font-semibold ${line.amount > 0 ? "text-success" : "text-primary"}`}>
-            {line.amount > 0 ? "+" : ""}RM {Math.abs(line.amount).toFixed(2)}
+            {line.amount > 0 ? "+" : ""}{rm(Math.abs(line.amount))}
           </span>
         </div>
 
@@ -272,12 +277,12 @@ function CandidateRow({
   c, pick, setPick, bankAmount,
 }: {
   c: FinanceReconCandidate;
-  pick: number | null;
-  setPick: (v: number) => void;
+  pick: string | null;
+  setPick: (v: string) => void;
   bankAmount: number;
 }) {
   const close = Math.abs(c.outstanding - bankAmount) < 1;
-  const selected = pick === c.so;
+  const selected = pick === c.invoice_no;
   return (
     <label
       className={`flex items-center gap-2.5 px-3 py-2 rounded border cursor-pointer ${
@@ -289,7 +294,7 @@ function CandidateRow({
       <input
         type="radio"
         checked={selected}
-        onChange={() => setPick(c.so)}
+        onChange={() => setPick(c.invoice_no)}
         className="accent-primary"
       />
       <div className="flex-1 min-w-0">
@@ -325,7 +330,7 @@ function OpenMatchModal({
           <Row k="Description" v={line.description} />
           <Row k="Amount"      v={
             <span className={`font-mono font-semibold ${line.amount > 0 ? "text-success" : "text-primary"}`}>
-              {line.amount > 0 ? "+" : ""}RM {Math.abs(line.amount).toFixed(2)}
+              {line.amount > 0 ? "+" : ""}{rm(Math.abs(line.amount))}
             </span>
           } />
           <Row k="Matched to"  v={<span className="font-mono font-semibold">{line.matched_ref}</span>} />
@@ -354,7 +359,7 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 function ImportStatementModal({ onClose }: { onClose: () => void }) {
-  const [statementDate, setStatementDate] = useState(new Date().toISOString().slice(0, 10));
+  const [statementDate, setStatementDate] = useState(appTodayIso());
   const [description, setDescription]     = useState("");
   const [amount, setAmount]               = useState("");
   const [reference, setReference]         = useState("");
@@ -368,8 +373,11 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
   });
 
   function submit() {
-    const amt = parseFloat(amount);
-    if (!amt) {
+    // "1,500.00" is how a bank statement writes it; parseFloat would have read
+    // that as 1. Strip thousands separators and refuse anything that is not a
+    // whole number of ringgit and sen.
+    const amt = Number(amount.replace(/,/g, "").trim());
+    if (!Number.isFinite(amt) || amt === 0) {
       toast.error("Amount required");
       return;
     }
@@ -454,29 +462,6 @@ function ImportStatementModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }

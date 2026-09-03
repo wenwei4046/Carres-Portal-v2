@@ -47,7 +47,7 @@ function appDateParts(d: Date) {
  * Malaysian operator at 00:30 on 1 January and a UTC CI runner must agree on
  * which year is current.
  */
-function appYearNow(): number {
+export function appYearNow(): number {
   const now = new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIME_ZONE,
     year: "numeric",
@@ -181,4 +181,24 @@ export function fmtDateShort(iso: string | null | undefined): string {
   return carriesYear(p.full, undefined)
     ? `${p.day} ${p.mon} ${p.yr}`
     : `${p.day} ${p.mon}`;
+}
+
+/**
+ * Today's date as `YYYY-MM-DD` in Carres' business timezone — for a date input
+ * that should start on "today".
+ *
+ * `new Date().toISOString().slice(0, 10)` is the wrong spelling: it is UTC, so
+ * between midnight and 08:00 in Malaysia it names yesterday. Same timezone as
+ * every other date in this file, so a form and the screen that lists it agree.
+ */
+export function appTodayIso(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }

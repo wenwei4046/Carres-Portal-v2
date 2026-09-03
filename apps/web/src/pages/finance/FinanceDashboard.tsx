@@ -4,6 +4,7 @@ import {
   type FinanceArAgingBucket,
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { FinanceKpi } from "@/components/FinanceKpi";
 
 const BUCKET_KEYS = ["0-30", "31-60", "61-90", "90+"] as const;
 
@@ -64,25 +65,25 @@ export default function FinanceDashboard() {
         <KpiSkeletonRow />
       ) : (
         <div className="grid grid-cols-4 gap-3.5 mb-5">
-          <FinKpi
+          <FinanceKpi
             label="A/R Outstanding"
             value={rmCompact(ar.outstanding)}
             hint={`${ar.count} open invoice${ar.count === 1 ? "" : "s"}`}
             tone="warn"
             accent
           />
-          <FinKpi
+          <FinanceKpi
             label="Overdue (>30d)"
             value={rmCompact(ar.overdueAmt)}
             hint={`${ar.overdueCount} invoice${ar.overdueCount === 1 ? "" : "s"}`}
             tone={ar.overdueAmt > 0 ? "danger" : "ok"}
           />
-          <FinKpi
+          <FinanceKpi
             label="A/P Due"
             value={rmCompact(ap.dueAmt)}
             hint={`${ap.count} ready to pay`}
           />
-          <FinKpi
+          <FinanceKpi
             label="Net cash · 12 wks"
             value={rmCompact(cashflow.net)}
             hint={`In ${rmCompact(cashflow.inflow)} · Out ${rmCompact(cashflow.outflow)}`}
@@ -111,42 +112,6 @@ export default function FinanceDashboard() {
 }
 
 // ---------- KPI tile ----------
-function FinKpi({
-  label,
-  value,
-  hint,
-  accent,
-  tone,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  accent?: boolean;
-  tone?: "warn" | "ok" | "danger" | "neutral";
-}) {
-  const toneClass =
-    tone === "danger" ? "text-destructive" :
-    tone === "warn"   ? "text-primary" :
-    tone === "ok"     ? "text-success" :
-                        "text-foreground";
-  const borderClass = accent ? "border-primary" : "border-border";
-  const labelClass  = accent ? "text-primary" : "text-muted-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${borderClass} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${labelClass}`}>
-        {label}
-      </div>
-      <div
-        data-kpi-value
-        className={`font-display text-page mt-1.5 leading-none tabular-nums ${toneClass}`}
-      >
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
-    </div>
-  );
-}
-
 function KpiSkeletonRow() {
   return (
     <div className="grid grid-cols-4 gap-3.5 mb-5">
