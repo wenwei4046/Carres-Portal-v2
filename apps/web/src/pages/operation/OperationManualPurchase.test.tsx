@@ -681,6 +681,27 @@ describe("Card 03 · the left filter rail", () => {
 });
 
 describe("the create workspace — full page, never a dialog (card §3)", () => {
+  it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
+    await openWorkspace();
+    const lines = screen.getByTestId("mp-lines");
+    // The word. COPY-STANDARD rules `Note` for this form's field; `Remark` was
+    // the retired dialog's word and may not survive the port.
+    const caption = screen.getByText("Note");
+    expect(lines.contains(caption)).toBe(true);
+    expect(lines.textContent).not.toContain("Remark");
+    expect(screen.getByLabelText("Note")).toBe(document.getElementById("mp-note-0"));
+    // ONE grid: the caption row and the line share a parent, so the four
+    // tracks are resolved once and the caption sits over the note it names.
+    const line0 = screen.getByTestId("mp-line-0");
+    expect(line0.parentElement).toBe(caption.parentElement);
+    // The add control FOLLOWS the list, where the operator's eye ends.
+    const add = screen.getByTestId("mp-line-add");
+    expect(lines.contains(add)).toBe(true);
+    expect(line0.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(add);
+    expect(screen.getByTestId("mp-line-1").parentElement).toBe(caption.parentElement);
+  });
+
   it("offers exactly the approved six purposes (Cards 03/04)", () => {
     // The list a control may render IS the shared constant (0322's law); the
     // Select renders from it verbatim. Management folds under Internal Staff

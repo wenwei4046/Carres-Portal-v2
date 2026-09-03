@@ -1251,6 +1251,11 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
 ];
 
 const LINE_GRID = "minmax(0,1fr) 53px minmax(0,1fr) auto";
+/** The picker window. Bounded because `/demand/pick-items` returns every
+ *  supplied SKU (to-order.ts) — the ceiling is a render budget, not a rule.
+ *  The list scrolls inside a `max-h-64` box, so a needle that matches many
+ *  items reaches all of them instead of stopping at the eighth. */
+const PICK_LIMIT = 50;
 
 function CreateRequestWorkspace({
   destinations,
@@ -1673,38 +1678,34 @@ function CreateRequestWorkspace({
         </p>
       ) : null}
 
-      {/* ── ITEMS · one row per SKU, the dialog's proven split ── */}
+      {/* ── ITEMS · one row per SKU, the dialog's proven split ──
+          ONE grid holds the caption row and every line, so the four tracks are
+          resolved once and `Note` sits over the note it names. Two grids
+          sharing a template do not share widths — the trailing `auto` track
+          held nothing in the caption row and `Remove` in the lines, and the
+          captions drifted (owner, 2026-09-03). A line is `contents`: its four
+          cells join the grid directly; whatever stacks under it (supplier,
+          lead gap, already-have, error, picker) spans the full row. */}
       <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-lines">
-        <div className="flex items-center justify-between">
-          <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-            {MW.items}
-          </h3>
-          <Button variant="ghost" onClick={addLine} data-testid="mp-line-add">
-            {MW.addLine}
-          </Button>
-        </div>
+        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+          {MW.items}
+        </h3>
 
         <div
-          className="grid items-center gap-2 text-label text-kit-slate-11"
+          className="grid items-center gap-x-2 gap-y-2"
           style={{ gridTemplateColumns: LINE_GRID }}
         >
-          <span>{W.itemLabel}</span>
-          <span>{W.itemsColQty}</span>
-          <span>{W.remark}</span>
+          <span className="text-label text-kit-slate-11">{W.itemLabel}</span>
+          <span className="text-label text-kit-slate-11">{W.itemsColQty}</span>
+          <span className="text-label text-kit-slate-11">{MW.note}</span>
           <span />
-        </div>
 
-        {lines.map((line, i) => {
-          const picked = items.find((it) => it.sku === line.sku) ?? null;
-          const showPicker = line.id === active && line.sku == null;
-          const done = line.state === "created";
-          return (
-            <div key={line.id} className="flex flex-col gap-1">
-              <div
-                className="grid items-center gap-2"
-                style={{ gridTemplateColumns: LINE_GRID }}
-                data-testid={`mp-line-${i}`}
-              >
+          {lines.map((line, i) => {
+            const picked = items.find((it) => it.sku === line.sku) ?? null;
+            const showPicker = line.id === active && line.sku == null;
+            const done = line.state === "created";
+            return (
+              <div key={line.id} className="contents" data-testid={`mp-line-${i}`}>
                 {/* SKU + Model, never the model word alone — four Booqit
                     variants rendered as the single word `Booqit` is P15's
                     own defect returned (2026-08-19 owner walk). */}
@@ -1729,7 +1730,7 @@ function CreateRequestWorkspace({
                 />
                 <Input
                   id={`mp-note-${i}`}
-                  aria-label={W.remark}
+                  aria-label={MW.note}
                   value={line.note}
                   disabled={done}
                   onChange={(e) => patch(line.id, { note: e.target.value })}
@@ -1745,64 +1746,79 @@ function CreateRequestWorkspace({
                     {MW.remove}
                   </Button>
                 )}
+
+                {/* Everything that stacks under the line spans the row. An
+                    empty stack draws nothing, so it costs no grid gap. */}
+                <div className="col-span-full flex flex-col gap-1 empty:hidden">
+                  {picked?.supplier ? (
+                    <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
+                      {W.supplierLabel}: {picked.supplier}
+                    </p>
+                  ) : null}
+
+                  {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
+                      the governed two lines, and the act deep-links Settings.
+                      Send stays `Send — lead days are not set` until repaired;
+                      nothing substitutes zero or a browser date. */}
+                  {leadGaps
+                    .filter((g) => g.sku === line.sku)
+                    .map((g) => (
+                      <span
+                        key={`${g.sku}-${g.wrong}`}
+                        className="flex min-w-0 flex-col"
+                        data-testid={`mp-lead-gap-${i}`}
+                      >
+                        <span className="text-body font-medium text-kit-red-11">
+                          {g.wrong}
+                        </span>
+                        <Link
+                          to="/operation?tab=purchasing-settings"
+                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                        >
+                          {g.todo}
+                        </Link>
+                      </span>
+                    ))}
+
+                  {picked ? (
+                    <AlreadyHave
+                      sku={picked.sku}
+                      free={picked.free}
+                      qty={Number(line.qty) || 0}
+                      index={i}
+                    />
+                  ) : null}
+
+                  {line.error ? (
+                    <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
+                      {line.error}
+                    </p>
+                  ) : null}
+
+                  {showPicker ? (
+                    <LinePicker
+                      items={items}
+                      needle={line.needle}
+                      loading={pick.isLoading}
+                      onPick={(sku) => patch(line.id, { sku, needle: "" })}
+                    />
+                  ) : null}
+                </div>
               </div>
+            );
+          })}
+        </div>
 
-              {picked?.supplier ? (
-                <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
-                  {W.supplierLabel}: {picked.supplier}
-                </p>
-              ) : null}
-
-              {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
-                  the governed two lines, and the act deep-links Settings.
-                  Send stays `Send — lead days are not set` until repaired;
-                  nothing substitutes zero or a browser date. */}
-              {leadGaps
-                .filter((g) => g.sku === line.sku)
-                .map((g) => (
-                  <span
-                    key={`${g.sku}-${g.wrong}`}
-                    className="flex min-w-0 flex-col"
-                    data-testid={`mp-lead-gap-${i}`}
-                  >
-                    <span className="text-body font-medium text-kit-red-11">
-                      {g.wrong}
-                    </span>
-                    <Link
-                      to="/operation?tab=purchasing-settings"
-                      className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
-                    >
-                      {g.todo}
-                    </Link>
-                  </span>
-                ))}
-
-              {picked ? (
-                <AlreadyHave
-                  sku={picked.sku}
-                  free={picked.free}
-                  qty={Number(line.qty) || 0}
-                  index={i}
-                />
-              ) : null}
-
-              {line.error ? (
-                <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
-                  {line.error}
-                </p>
-              ) : null}
-
-              {showPicker ? (
-                <LinePicker
-                  items={items}
-                  needle={line.needle}
-                  loading={pick.isLoading}
-                  onPick={(sku) => patch(line.id, { sku, needle: "" })}
-                />
-              ) : null}
-            </div>
-          );
-        })}
+        {/* The add control sits where the operator's eye ends — under the last
+            line — and wears the neutral box, not the ghost: in this block it
+            is the only road to a second item, and a boxless grey word next to
+            grey captions read as one more caption (owner, 2026-09-03). Not
+            `primary`: `Send for approval` already holds the screen's one. */}
+        <div className="flex">
+          <Button variant="neutral" onClick={addLine} data-testid="mp-line-add">
+            {MW.addLine}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1874,24 +1890,33 @@ function LinePicker({
 }) {
   const shown = useMemo(() => {
     const n = needle.trim().toLowerCase();
-    if (!n) return items.slice(0, 8);
+    if (!n) return items.slice(0, PICK_LIMIT);
     return items
       .filter(
         (i) => i.label.toLowerCase().includes(n) || i.sku.toLowerCase().includes(n),
       )
-      .slice(0, 8);
+      .slice(0, PICK_LIMIT);
   }, [items, needle]);
 
+  /* The kit's DataTable is its own scroller (`min-h-0 flex-1 overflow-auto`)
+     and needs a parent that BOUNDS its height to shrink against; in an
+     auto-height column `flex-1` resolves to content height and the list
+     never scrolls. The wrapper carries the ceiling ONLY — never a second
+     `overflow-*`, which DataTable.tsx warns scrolls in jsdom and dies in a
+     browser. 256px = the head plus five rows and half of the sixth, the
+     kit's own bounded-list height (DataTable's column filter). */
   return (
-    <DataTable<DemandPickItem>
-      rows={shown}
-      columns={PICK_COLUMNS}
-      rowId={(i) => i.sku}
-      onRowOpen={(i) => onPick(i.sku)}
-      label={W.pickerTableLabel}
-      loading={loading}
-      empty={null}
-    />
+    <div className="flex max-h-64 min-h-0 flex-col">
+      <DataTable<DemandPickItem>
+        rows={shown}
+        columns={PICK_COLUMNS}
+        rowId={(i) => i.sku}
+        onRowOpen={(i) => onPick(i.sku)}
+        label={W.pickerTableLabel}
+        loading={loading}
+        empty={null}
+      />
+    </div>
   );
 }
 
