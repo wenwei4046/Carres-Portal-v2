@@ -304,6 +304,7 @@ import {
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
   type SupplierCreateInput,
+  type PurchasingSupplierCollectionSetting,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -4557,6 +4558,13 @@ export interface ManualPurchaseRegisterPayload {
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
+  /** The governed standing Deliver To (MASTER §5.4) — null means none is set. */
+  defaultDestinationId?: string | null;
+  /** The factory-collection rule per collected supplier, from Purchasing
+   *  Settings: where that supplier's goods MUST land. The create form locks
+   *  Deliver To to it; the Register refuses an issue that disagrees with it
+   *  before the server does. */
+  supplierCollections?: PurchasingSupplierCollectionSetting[];
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved

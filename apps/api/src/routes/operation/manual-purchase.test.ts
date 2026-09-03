@@ -1464,10 +1464,15 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
 describe("POST /purchasing/requests/issue — a refusal says what is wrong and what to do", () => {
   const FALLBACK = purchasingRefusal("__not_a_code__");
 
-  function sbWith(
-    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
-    rpc: ReturnType<typeof vi.fn>,
-  ) {
+  type Over = {
+    requests?: unknown[];
+    lines?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    collections?: unknown[];
+  };
+
+  function sbWith(over: Over, rpc: ReturnType<typeof vi.fn>) {
     return {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -1483,7 +1488,9 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
               ],
             );
           case "suppliers":
-            return tableStub([{ id: SUP, kind: "own_logistics" }]);
+            return tableStub(over.suppliers ?? [{ id: SUP, kind: "own_logistics", name: "Ohana" }]);
+          case "purchasing_supplier_settings":
+            return tableStub(over.collections ?? []);
           case "warehouses":
             return tableStub([
               { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
@@ -1499,10 +1506,7 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     } as unknown as ReturnType<typeof userClient>;
   }
 
-  async function issueAgainst(
-    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
-    body: unknown,
-  ) {
+  async function issueAgainst(over: Over, body: unknown) {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: [] }, error: null });
     vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
     const jwt = await makeJwt("operation");
@@ -1526,6 +1530,33 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     expect(payload.message, `${code} is not the fallback`).not.toBe(FALLBACK.wrong);
     expect(payload.action, `${code} is not the fallback`).not.toBe(FALLBACK.todo);
   }
+
+  /* ⭐ THE DELIVER TO GATE (owner, 2026-09-03). A supplier Carres collects
+     from has one place its goods land, held in Purchasing Settings. A request
+     that names another Deliver To is refused BEFORE any PO exists, and the
+     refusal names the supplier and the governed place — the sentence the
+     owner met on MPR-20260903-3381. This pre-flight had no test until now. */
+  it("refuses a collected supplier's request that names another Deliver To, before creating anything", async () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+    const { res, rpc, body } = await issueAgainst(
+      {
+        suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+        collections: [
+          {
+            supplier_id: SUP,
+            fixed_destination_id: OHANA,
+            collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+          },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "supplier_collection_destination_mismatch");
+    expect(body.message).toContain("Ohana must be collected to");
+    expect(body.supplier, "the supplier travels as a fact").toBe("Ohana");
+    expect(rpc, "no PO was created").not.toHaveBeenCalled();
+  });
 
   it("names a Manual Purchase that is no longer on the list", async () => {
     const { res, rpc, body } = await issueAgainst(
