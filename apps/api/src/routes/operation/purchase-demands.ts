@@ -472,11 +472,23 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
            missing customer date. */
+        /* A factory-collected supplier with no collector set in Purchasing
+           Settings CANNOT be issued: `to-order.ts` refuses the plan with
+           `pickup_partner_required` after the operator has ticked and pressed
+           Issue PO. Named HERE instead, so the row is untickable and says why,
+           rather than failing at the end of the act (YH, 2026-09-03). The row
+           already carried both facts; nothing new is read. */
+        const pickupPartnerMissing =
+          (supplierKinds.get(proposal.supplierId) ?? "own_logistics") ===
+            "factory_pickup" &&
+          !collectionBySupplier.get(proposal.supplierId)?.procurementPartnerId;
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
             : catalogCostMissing
               ? "no_cost"
+            : pickupPartnerMissing
+              ? "no_pickup_partner"
             : build.readyIfOrderedToday != null
               ? purchaseDemandTimingOf({
                   today,

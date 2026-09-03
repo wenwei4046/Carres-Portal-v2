@@ -8,6 +8,7 @@ import {
   SO_BATCH_RAIL_CLEAR,
   defaultAllocations,
   isSelectableForBuying,
+  isSelectableForOrder,
   purchaseDemandRailWords,
   isPurchaseDemandTimingState,
   purchaseDemandStateWords,
@@ -159,17 +160,33 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     }
     return m;
   }, [leafs]);
+  /* An `Ordered` order has bought everything it required, and its own
+     `po_line_sources` lineage proves it. Its demand rows stay VISIBLE — the
+     register is permanent (Card 02-B) — but nothing on them may be ticked, or
+     the tick raises a SECOND purchase order for units this order already sent
+     for. `isSelectableForOrder` carries the reasoning and the fail-open rule
+     that keeps a lineage-less order tickable. */
+  const statusByOrder = useMemo(
+    () => new Map(orders.map((o) => [o.orderId, o.status])),
+    [orders],
+  );
+  const selectable = useCallback(
+    (row: PurchaseDemandRow) =>
+      isSelectableForOrder(row, statusByOrder.get(row.orderId) ?? "blank"),
+    [statusByOrder],
+  );
+
   /** The order's eligible uncovered demand — the parent checkbox's meaning. */
   const eligibleByOrder = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const o of orders) {
       m.set(
         o.orderId,
-        (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying).map((r) => r.id),
+        (leafsByOrder.get(o.orderId) ?? []).filter(selectable).map((r) => r.id),
       );
     }
     return m;
-  }, [orders, leafsByOrder]);
+  }, [orders, leafsByOrder, selectable]);
 
   /* ── The rail (fact sections, one selection per section) ────────────────
    *
@@ -236,10 +253,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
     const out = new Map<string, DestinationAllocation[]>();
     for (const [id, allocations] of selected) {
       const row = leafById.get(id);
-      if (row && isSelectableForBuying(row)) out.set(id, allocations);
+      if (row && selectable(row)) out.set(id, allocations);
     }
     return out;
-  }, [selected, leafById]);
+  }, [selected, leafById, selectable]);
 
   const selections = useMemo<SoBatchSelection[]>(
     () => [...live].map(([demandId, allocations]) => ({ demandId, allocations })),
@@ -281,7 +298,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   const toggleLeaf = useCallback(
     (id: string) => {
       const row = leafById.get(id);
-      if (!row || !isSelectableForBuying(row)) return;
+      if (!row || !selectable(row)) return;
       setSelected((prev) => {
         const next = new Map(prev);
         if (next.has(id)) next.delete(id);
@@ -291,7 +308,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         return next;
       });
     },
-    [leafById, tickDestinationId],
+    [leafById, tickDestinationId, selectable],
   );
 
   /** The parent switch: all of the order's eligible leafs, on or off. */
@@ -557,7 +574,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         width: 176,
         chooserGroup: "Buying",
         accessor: (o) => {
-          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying);
+          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(selectable);
           if (eligible.length === 1) {
             const row = eligible[0]!;
             return (
@@ -650,7 +667,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           return <span data-testid={`so-batch-deliver-to-${o.orderId}`}>{text}</span>;
         },
         exportValue: (o) => {
-          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(isSelectableForBuying);
+          const eligible = (leafsByOrder.get(o.orderId) ?? []).filter(selectable);
           if (eligible.length > 0) {
             return eligible
               .flatMap((r) =>
@@ -1080,7 +1097,7 @@ function SoBatchOrderExpansion({
       ...(l.stockTaken > 0 ? ["Ready Stock"] : []),
       ...l.pos.map((p) => p.poId),
     ];
-    const eligible = leaf != null && isSelectableForBuying(leaf);
+    const eligible = leaf != null && isSelectableForOrder(leaf, order.status);
     const drawEditor = eligible && !editorDrawn.has(leaf.id);
     if (drawEditor) editorDrawn.add(leaf.id);
     const arranged = eligible ? leafAllocations(leaf) : [];
@@ -1178,9 +1195,17 @@ function SoBatchOrderExpansion({
   }
 
   const stateWords = purchaseDemandStateWords(safetyDays);
-  const blockers = leafs.filter(
-    (leaf) => !isSelectableForBuying(leaf) && leaf.action != null,
-  );
+  /* An `Ordered` order's leaves are not blockers and must not be listed as
+     any. They fail `isSelectableForOrder` because the order is FINISHED
+     buying, not because something is wrong with them — printing
+     "Issue PO to Ohana" in an amber panel on an order whose purchase orders
+     are already sent would be an instruction to duplicate work. The `Ordered`
+     pill and the `PO No` column are the explanation, and both read the same
+     lineage that closed the tick. */
+  const blockers =
+    order.status === "ordered"
+      ? []
+      : leafs.filter((leaf) => !isSelectableForBuying(leaf) && leaf.action != null);
 
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>

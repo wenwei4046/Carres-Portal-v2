@@ -2037,9 +2037,7 @@ export type IssuePlanError =
   | "duplicate_build"
   | "unknown_build"
   | "sofa_merge"
-  | "batch_too_large"
-  /** T6 — the build is on the sheet as a receipt; every unit is already bought. */
-  | "already_on_po";
+  | "batch_too_large";
 
 export interface IssuePlanCheck {
   ok: boolean;
@@ -2112,22 +2110,26 @@ export function validateIssuePlan(
           count: active.length,
         };
       }
-      /**
-       * T6 — a fully covered build is on the sheet now, as a RECEIPT. The page
-       * cannot tick one (`selectable` refuses a row with a purchase order), so
-       * this can only be reached by a stale tab or a hand-made request — and
-       * either way it would buy goods that are already bought. Refused HERE,
-       * server-side, because a rule that lives only in the browser is not a
-       * rule.
-       */
-      if (b.fullyOnPo) {
-        return {
-          ok: false,
-          code: "already_on_po",
-          message: "Something on this plan is already on a purchase order.",
-          count: active.length,
-        };
-      }
+      /* A FULLY COVERED BUILD IS ISSUABLE, and this is where it used to be
+         refused (`already_on_po`).
+
+         The rule rested on a premise that stopped being true on 2026-09-03:
+         "the page cannot tick one". It can now — YH ruled that a line with a
+         supplier, a cost and a price is buyable and that the buyer judges the
+         coverage. So the refusal had become a TRAP: the register offered the
+         tick, the operator ticked it, and the server answered "One line is
+         already on an open purchase order. Go back to buying and untick that
+         line" without saying which line, on a page that had just invited the
+         act.
+
+         The coverage it defended against is also not the duplication anyone
+         feared. `fullyOnPo` is drawn from a per-SKU pool with NO customer
+         attribution (T6), so the covering document routinely belongs to
+         ANOTHER customer; refusing here blocked a first purchase order for
+         this one. The duplication that IS real — an order whose OWN
+         `po_line_sources` lineage already covers every unit it required — is
+         refused by `isSelectableForOrder`, which reads the attributed fact
+         rather than the pool. */
       orders.add(b.orderId);
     }
     // A merged sofa purchase order is forbidden: fabric, size and configuration

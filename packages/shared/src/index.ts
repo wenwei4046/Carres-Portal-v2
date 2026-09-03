@@ -2252,6 +2252,7 @@ export {
   type SoBatchCellSummary,
   type SoBatchPurchaseResponse,
   isSelectableForBuying,
+  isSelectableForOrder,
   defaultAllocations,
   setDestination,
   splitAllocation,

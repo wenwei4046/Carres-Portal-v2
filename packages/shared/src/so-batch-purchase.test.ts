@@ -21,6 +21,7 @@ import {
   groupSelectionsIntoDocuments,
   soBatchSelectionSummary,
   isSelectableForBuying,
+  isSelectableForOrder,
   type DestinationAllocation,
   type PurchasingDestination,
   type SoBatchSelection,
@@ -499,6 +500,35 @@ describe("every timing row stays orderable; blockers and Buy = 0 do not", () => 
 
   it("refuses a row with no supplier resolved", () => {
     expect(isSelectableForBuying(row({ supplierId: null, supplier: null }))).toBe(false);
+  });
+});
+
+describe("an Ordered order is finished buying — its rows are not tickable", () => {
+  it("refuses a perfectly buyable row when the order already bought everything", () => {
+    /* The row itself passes every one of the five demand conditions. What
+       stops it is the ORDER: its own `po_line_sources` lineage covers every
+       unit it required, on purchase orders already sent. Ticking it would
+       raise a second one. */
+    expect(isSelectableForBuying(row({}))).toBe(true);
+    expect(isSelectableForOrder(row({}), "ordered")).toBe(false);
+  });
+
+  it("leaves a blank or partial order alone — buying is not finished there", () => {
+    expect(isSelectableForOrder(row({}), "blank")).toBe(true);
+    expect(isSelectableForOrder(row({}), "partial")).toBe(true);
+  });
+
+  it("FAILS OPEN — a lineage-less order reads blank and stays tickable", () => {
+    /* `ordered` needs lineage, and lineage exists only from migration 0382
+       with no backfill. An order whose purchase orders predate it scores
+       `sentCoveredQty` 0 and is `blank`, so this gate can never hide genuine
+       demand — it only refuses a buy the order's own documents account for. */
+    expect(soBatchOrderStatusOf({ buyingRequiredQty: 3, sentCoveredQty: 0 })).toBe("blank");
+    expect(isSelectableForOrder(row({}), soBatchOrderStatusOf({ buyingRequiredQty: 3, sentCoveredQty: 0 }))).toBe(true);
+  });
+
+  it("still refuses a blocked row on a blank order — the demand gate survives", () => {
+    expect(isSelectableForOrder(row({ state: "no_supplier", toBuy: 5 }), "blank")).toBe(false);
   });
 });
 
