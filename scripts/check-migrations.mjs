@@ -47,14 +47,31 @@ if (invalid.length) throw new Error(`Invalid migration filenames: ${invalid.join
  * half-applied. Renumbering would edit committed migrations (red line 6) and
  * would not make the missing halves apply.
  *
- * The baseline is a FIXED LIST rather than "ignore old numbers", so a twelfth
+ * The baseline is a FIXED LIST rather than "ignore old numbers", so a thirteenth
  * cannot join it silently, and a pair that stops colliding must leave it. A
  * suffix letter stays legal — `0376a_…` exists precisely so a follow-up can sit
  * behind a number without taking it.
+ *
+ * ── 0417, added 2026-09-03 ──────────────────────────────────────────────────
+ * Two pull requests merged sixteen seconds apart, each having taken 0417 while
+ * the other was still open:
+ *   0417_the_partner_says_it_cannot_deliver.sql          (#1065)
+ *   0417_the_register_names_the_site_and_the_holder.sql  (#1066)
+ * Both are merged and both are applied, so the same rule the eleven above are
+ * baselined under applies here: renumbering either would edit a committed
+ * migration (red line 6), and a rename reaches this file's own immutability
+ * check below as `R…` rather than `A`, which fails it.
+ *
+ * The apply order is genuinely undefined and genuinely does not matter. They
+ * share no object: one adds scope columns to `ops_delivery_arrangement_events`,
+ * the other adds two joined names to `stock_unit_register_v`. Neither reads
+ * what the other writes.
+ *
+ * This unblocked main, which was red for every pull request until it landed.
  */
 const COLLISION_BASELINE = new Set([
   "0165", "0166", "0204", "0206", "0232", "0233",
-  "0239", "0241", "0242", "0255", "0267",
+  "0239", "0241", "0242", "0255", "0267", "0417",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
