@@ -38,6 +38,20 @@ vi.mock("./OperationOrders", () => ({
 vi.mock("./OperationWarehouse", () => ({
   default: () => <div data-testid="warehouse-stub">warehouse</div>,
 }));
+// 【WAREHOUSE】 CARD 02 — Unit Detail is a route that must MOUNT (the same
+// walk-found defect class as Edit Delivery: Route declared, `isUrlDriven`
+// unaware, dashboard drawn over a real Unit address — measured live
+// 2026-09-03). The register and plan pages self-fetch; stubs, because this
+// suite owns routing and slim-bar suppression only.
+vi.mock("./WarehouseUnitDetail", () => ({
+  default: () => <div data-testid="unit-detail-stub">unit-detail</div>,
+}));
+vi.mock("./WarehouseStockRegister", () => ({
+  default: () => <div data-testid="stock-register-stub">stock-register</div>,
+}));
+vi.mock("./OperationStockPlan", () => ({
+  default: () => <div data-testid="stock-plan-stub">stock-plan</div>,
+}));
 vi.mock("./OperationMovements", () => ({
   default: () => <div data-testid="movements-stub">movements</div>,
 }));
@@ -284,6 +298,59 @@ describe("OperationApp — Edit Delivery mounts at its URL", () => {
   it("a leg keeps its query string", () => {
     renderApp("/operation/delivery/edit/order-1?leg=2");
     expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * 【WAREHOUSE】 CARD 02 — UNIT DETAIL IS A ROUTE THAT MOUNTS. The Route shipped
+ * 2026-08-21 (`stock/unit/:unitCode`) and never joined `isUrlDriven`, so a
+ * Unit's permanent address rendered the DASHBOARD — measured live 2026-09-03 on
+ * /operation/stock/unit/id-aam135002. A component test cannot see that; only
+ * mounting the APP at the URL can.
+ */
+describe("OperationApp — a Unit's permanent address mounts Unit Detail", () => {
+  it("/operation/stock/unit/:unitCode mounts the page, not the dashboard", () => {
+    renderApp("/operation/stock/unit/id-aam135002");
+    expect(screen.getByTestId("unit-detail-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+
+  it("and the slim global bar stands down — the page draws its own header", () => {
+    renderApp("/operation/stock/unit/id-aam135002");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 【WAREHOUSE】 CARD 02 — ONE TOP ROW PER WAREHOUSE SURFACE. The Inventory
+ * Register and the two de-navigated legacy Stock pages draw their own 50px
+ * Destination Header (ModuleHeader embeds TopBarIcons), so the slim global bar
+ * must stand down — the same defect Manual Purchase and Delivery Work each
+ * shipped with, measured live on the CARD 01 production walk (two Jump to,
+ * two bells, two gears on one screen).
+ */
+describe("OperationApp — Warehouse surfaces draw one top row, not two", () => {
+  it("?tab=stock-onhand mounts the Inventory Register with no slim bar", () => {
+    renderApp("/operation?tab=stock-onhand");
+    expect(screen.getByTestId("stock-register-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("?tab=stock-plan keeps its route and loses the slim bar", () => {
+    renderApp("/operation?tab=stock-plan");
+    expect(screen.getByTestId("stock-plan-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("?tab=movements keeps its route and loses the slim bar", () => {
+    renderApp("/operation?tab=movements");
+    expect(screen.getByTestId("movements-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("the dashboard keeps the slim bar — suppression is per surface, not global", () => {
+    renderApp("/operation?tab=dashboard");
+    expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
   });
 });
 
