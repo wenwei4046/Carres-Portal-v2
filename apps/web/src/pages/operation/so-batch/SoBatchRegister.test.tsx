@@ -681,6 +681,42 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.getByTestId("so-batch-row-open-po-pool-mismatch")).toBeInTheDocument();
   });
 
+  it.each([
+    ["no_sku", "Booqit"],
+    ["no_supplier", "Booqit"],
+    ["no_cost", "Booqit"],
+    ["no_production_days", "Booqit"],
+    ["no_customer_date", "Booqit"],
+  ] as const)("a %s row SAYS why it cannot be ticked", (state) => {
+    /* Every untickable row must answer "why not?" on the page itself. The
+       amber panel is that answer, and until now nothing pinned it. */
+    const blocked = leaf({
+      id: `build::ob::${state}`,
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      lineIds: ["lb1"],
+      skus: ["B1201S-K"],
+      state,
+    });
+    const order = orderRow({
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lb1", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "Booqit", variant: "King", category: "mattress", pos: [] },
+      ],
+    });
+    renderRegister({ rows: [blocked], registerRows: [order] });
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+
+    const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
+    expect(panel.textContent).toBeTruthy();
+    expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
   it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
     /* THE PINNING TEST THIS REPLACES WAS VACUOUS (YH, 2026-09-03 — "an
        ordered's checkbox still tickable"). `ORDER_O5` is Ordered and carries
