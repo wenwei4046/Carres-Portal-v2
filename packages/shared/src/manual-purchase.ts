@@ -60,6 +60,10 @@ export const MANUAL_PURCHASE_WORDS = {
   items: "ITEMS",
   addLine: "+ Add line",
   remove: "Remove",
+  /** COPY-STANDARD §Manual Purchase: the per-line free-text field is `Note`.
+   *  `Remark` was the retired To Order dialog's word and rode in with the
+   *  port; the state, the input id and the payload always said `note`. */
+  note: "Note",
   alreadyHave: "WHAT WE ALREADY HAVE",
   freeStock: "free stock",
   alreadyOnPo: "already on PO",
