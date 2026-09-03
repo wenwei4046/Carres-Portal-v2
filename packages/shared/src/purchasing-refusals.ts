@@ -43,6 +43,10 @@ export interface PurchasingRefusalFacts {
   actor?: string | null;
   /** The line's own requested quantity — the approved-quantity ceiling. */
   qty?: number | null;
+  /** 0422 — the Delivery Date asked for, and the earliest date the items can
+   *  arrive. Both arrive already formatted for the surface printing them. */
+  date?: string | null;
+  earliest?: string | null;
 }
 
 const some = (v: string | null | undefined, fallback: string) =>
@@ -319,6 +323,18 @@ export function purchasingRefusal(
         wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
       };
+    /* 0422 — the Purchasing Settings switch is on and the asked-for Delivery
+       Date is before the earliest date the picked items can arrive (their
+       production + transit working days, the same arithmetic that proposed
+       the date). The act names the one fix: move the date. */
+    case "delivery_date_before_earliest":
+      return {
+        wrong: `Delivery Date ${some(facts.date, "asked for")} is earlier than the earliest date ${some(
+          facts.earliest,
+          "the items can arrive",
+        )}.`,
+        todo: `Set Delivery Date to ${some(facts.earliest, "the earliest date")} or later, then send again.`,
+      };
     case "no_warehouse":
       return {
         wrong: "No Carres warehouse is set up.",
@@ -454,6 +470,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "supplier_collection_mismatch",
   "supplier_collection_destination_mismatch",
   "pickup_partner_not_allowed",
+  "delivery_date_before_earliest",
   "no_warehouse",
   "unknown_source_order",
   "source_line_mismatch",

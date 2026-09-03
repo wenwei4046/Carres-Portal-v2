@@ -16,12 +16,15 @@ import {
   type PurchasingDestinationSetting,
   type PurchasingNumberKey,
   type PurchasingSettingsResponse,
+  type PurchasingSwitchKey,
 } from "@carres/shared";
+import Checkbox from "@/components/kit/Checkbox";
 import {
   usePurchasingSettings,
   useCreatePurchasingDestination,
   useSetProductionDays,
   useSetPurchasingNumber,
+  useSetPurchasingSwitch,
   useSetPurchasingPoDays,
   useSetSupplierWorkWeek,
   useSetPurchasingSupplierCollection,
@@ -99,6 +102,49 @@ function ChangeLine({
     <div className="text-label text-base-500 mt-1" data-testid="setting-change-line">
       {change.changedBy ?? "—"} · {fmtDate(change.changedAt)}
       {was ? ` · was ${was}` : ""}
+    </div>
+  );
+}
+
+/** One on/off switch (0422). A tick is the write; the screen re-renders
+ *  from the server's answer, so an unticked box means the door is off. */
+function SwitchRow({
+  label,
+  hint,
+  checked,
+  canEdit,
+  pending,
+  onChange,
+  testId,
+  children,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  canEdit: boolean;
+  pending: boolean;
+  onChange: (value: boolean) => void;
+  testId: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="py-3 border-b border-base-100 last:border-b-0">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-[240px]">
+          <div className="text-body text-base-900">{label}</div>
+          <div className="text-meta text-base-500 mt-0.5">{hint}</div>
+          {children}
+        </div>
+        <div className="flex items-center gap-2" data-testid={testId}>
+          <Checkbox
+            id={testId}
+            label={checked ? "On" : "Off"}
+            checked={checked}
+            disabled={!canEdit || pending}
+            onCheckedChange={onChange}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -270,6 +316,7 @@ export default function OperationPurchasingSettings({
 }: { embedded?: boolean } = {}) {
   const { data, isLoading, error } = usePurchasingSettings();
   const setNumber = useSetPurchasingNumber();
+  const setSwitch = useSetPurchasingSwitch();
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
   const setWorkWeek = useSetSupplierWorkWeek();
@@ -842,6 +889,23 @@ export default function OperationPurchasingSettings({
               <ChangeLine settings={data} settingKey="earliest_sell_days" />
             </NumberRow>
 
+            {/* 0422 — the switch. The earliest date is already computed from
+                the supplier's production and transit working days; this only
+                decides whether a Manual Purchase dated before it is refused.
+                The kit Checkbox's whole row is the label, so one click is
+                one audited write — no Save step for a yes/no. */}
+            <SwitchRow
+              label="Refuse a Manual Purchase whose Delivery Date is earlier than the earliest date"
+              hint="The earliest date is the day the slowest picked item can arrive."
+              checked={data.manualPurchaseEnforceEarliestDate}
+              canEdit={canEdit}
+              pending={setSwitch.isPending}
+              testId="manual-purchase-enforce-earliest-date"
+              onChange={(value) => saveSwitch("manual_purchase_enforce_earliest_date", value)}
+            >
+              <ChangeLine settings={data} settingKey="manual_purchase_enforce_earliest_date" />
+            </SwitchRow>
+
             <NumberRow
               label="Confirm delivery date"
               hint="Working days before the delivery date this call is raised."
@@ -908,6 +972,13 @@ export default function OperationPurchasingSettings({
 
   function saveNumber(key: PurchasingNumberKey, value: number) {
     setNumber
+      .mutateAsync({ key, value })
+      .then(() => toast.success("Saved"))
+      .catch(fail);
+  }
+
+  function saveSwitch(key: PurchasingSwitchKey, value: boolean) {
+    setSwitch
       .mutateAsync({ key, value })
       .then(() => toast.success("Saved"))
       .catch(fail);

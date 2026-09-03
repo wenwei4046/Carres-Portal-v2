@@ -20,6 +20,7 @@ const response: Omit<PurchasingSettingsResponse, "canEdit"> = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
+  manualPurchaseEnforceEarliestDate: false,
   suppliers: [],
   productionDays: [],
   destinations: [
@@ -155,5 +156,54 @@ describe("Purchasing Settings — supplier collection", () => {
 
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Purchasing Settings — the earliest-date switch (0422)", () => {
+  it("turns the switch on through the audited SQL door and answers the whole settings object", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({
+      ...response,
+      manualPurchaseEnforceEarliestDate: true,
+    });
+
+    const res = await testApp().request("/settings/switch", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "manual_purchase_enforce_earliest_date", value: true }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_switch", {
+      p_key: "manual_purchase_enforce_earliest_date",
+      p_value: true,
+    });
+    expect(
+      ((await res.json()) as PurchasingSettingsResponse).manualPurchaseEnforceEarliestDate,
+    ).toBe(true);
+  });
+
+  it("refuses a key that is not a switch before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+
+    const res = await testApp().request("/settings/switch", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "earliest_sell_days", value: true }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the GET carries the switch so the screen renders it from the server's answer", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp().request("/settings");
+    expect(res.status).toBe(200);
+    expect(
+      ((await res.json()) as PurchasingSettingsResponse).manualPurchaseEnforceEarliestDate,
+    ).toBe(false);
   });
 });

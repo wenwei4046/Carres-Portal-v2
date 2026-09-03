@@ -32,6 +32,7 @@ const SETTINGS: PurchasingSettings = {
   orderByBufferDays: 7,
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
+  manualPurchaseEnforceEarliestDate: false,
   poDays: [1, 3, 5],
   suppliers: [
     { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },

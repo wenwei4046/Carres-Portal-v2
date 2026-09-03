@@ -27,6 +27,9 @@ export const MANUAL_PURCHASE_WORDS = {
    *  form's own top-to-bottom order — lead days first (Card 06). */
   sendNeedsLeadDays: "Send — lead days are not set",
   sendNeedsDate: "Send — pick a date",
+  /** 0422 — the Purchasing Settings switch is on and the chosen date is
+   *  before the plan's earliest date; the sentence under the field says so. */
+  sendNeedsLaterDate: "Send — pick a later date",
   sendNeedsWhy: "Send — say what it is for",
   sendNeedsServiceCase: "Send — pick the Service Case",
   sendNeedsStaff: "Send — pick the staff member",

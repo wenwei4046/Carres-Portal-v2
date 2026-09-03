@@ -2244,3 +2244,70 @@ describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
   });
 });
+
+/**
+ * 0422 — A MANUAL PURCHASE MAY NOT ASK FOR GOODS BEFORE THEY CAN ARRIVE
+ * (YH, 2026-09-04). The Register carries the Purchasing Settings switch;
+ * when on, the form prints the door's own refusal under Delivery Date and
+ * blocks Send. When off, the earliest date stays a proposal only.
+ */
+describe("0422 · the earliest-date switch on the create form", () => {
+  /** A far-future floor, so whichever day of the current month the picker
+   *  offers is EARLIER than it — the test does not depend on the run date. */
+  const FLOOR = "2099-01-15";
+  function withSwitch(enforceEarliestDate: boolean) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) {
+        const base = planFor(init) as { lines: Array<Record<string, unknown>> };
+        return Promise.resolve({
+          ...base,
+          lines: base.lines.map((l) => ({ ...l, arrival: FLOOR })),
+          deliveryDateDefault: base.lines.length > 0 ? FLOOR : null,
+        });
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, enforceEarliestDate });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("switch on: a date before the earliest prints the refusal and blocks Send", async () => {
+    withSwitch(true);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    const line = await screen.findByTestId("mp-date-too-early");
+    // The door's words, with the two dates in the portal's own spelling.
+    expect(line.textContent).toContain("is earlier than the earliest date");
+    expect(line.textContent).toContain(fmtDate(FLOOR));
+    expect(line.textContent).toContain("then send again.");
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsLaterDate);
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/purchasing/requests"),
+      expect.objectContaining({ method: "POST", body: expect.stringContaining("requiredBy") }),
+    );
+  });
+
+  it("switch on: the server's own proposal is never refused", async () => {
+    withSwitch(true);
+    await openWorkspace();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+  });
+
+  it("switch off: the same early date stays a proposal only — no sentence, Send live", async () => {
+    withSwitch(false);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
+  });
+});

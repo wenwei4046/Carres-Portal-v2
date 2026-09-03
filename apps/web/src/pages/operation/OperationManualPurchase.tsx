@@ -757,6 +757,7 @@ export default function OperationManualPurchase() {
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
           supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
+          enforceEarliestDate={q.data?.enforceEarliestDate === true}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -1313,12 +1314,15 @@ function CreateRequestWorkspace({
   defaultDestinationId,
   supplierCollections,
   staff,
+  enforceEarliestDate,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
   defaultDestinationId: string | null;
   supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
+  /** 0422 — the Purchasing Settings switch, as the Register read it. */
+  enforceEarliestDate: boolean;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -1481,6 +1485,20 @@ function CreateRequestWorkspace({
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
   const dateOk = deliveryDate !== "";
+  /** 0422 — with the Purchasing Settings switch on, a chosen date before the
+   *  plan's earliest date is refused HERE in the door's own words, so the
+   *  person moves it before Send rather than after a 422. Switch off: the
+   *  earliest date stays a proposal. No plan default (a lead-days gap, or
+   *  the plan unavailable) means no floor and no refusal — the server
+   *  refuses nothing it cannot compute, and neither does this form. */
+  const dateTooEarly =
+    enforceEarliestDate && dateOk && planDefault != null && deliveryDate < planDefault;
+  const dateTooEarlyWords = dateTooEarly
+    ? purchasingRefusal("delivery_date_before_earliest", {
+        date: fmtDate(deliveryDate),
+        earliest: fmtDate(planDefault!),
+      })
+    : null;
 
   const canSend =
     !saving &&
@@ -1490,6 +1508,7 @@ function CreateRequestWorkspace({
     staffOk &&
     subsidiaryOk &&
     dateOk &&
+    !dateTooEarly &&
     chosenDest != null &&
     submittable.length > 0 &&
     submittable.every(qtyOk) &&
@@ -1508,6 +1527,8 @@ function CreateRequestWorkspace({
       ? MW.sendNeedsLeadDays
       : !dateOk
         ? MW.sendNeedsDate
+        : dateTooEarly
+          ? MW.sendNeedsLaterDate
         : !caseOk
           ? MW.sendNeedsServiceCase
           : !staffOk
@@ -1685,15 +1706,23 @@ function CreateRequestWorkspace({
         {/* `Delivery Date` — the ONE date input. The server proposes the
             slowest selected line's arrival once lead facts are complete; a
             chosen date is the person's and is never silently overwritten. */}
-        <DatePicker
-          id="mp-delivery-date"
-          label={MW.deliveryDate}
-          value={deliveryDate || null}
-          onChange={(v) => {
-            setDateTouched(true);
-            setDeliveryDate(v ?? "");
-          }}
-        />
+        <div>
+          <DatePicker
+            id="mp-delivery-date"
+            label={MW.deliveryDate}
+            value={deliveryDate || null}
+            onChange={(v) => {
+              setDateTouched(true);
+              setDeliveryDate(v ?? "");
+            }}
+          />
+          {/* 0422 — the door's own refusal, printed before Send is pressed. */}
+          {dateTooEarlyWords ? (
+            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-date-too-early">
+              {dateTooEarlyWords.wrong} {dateTooEarlyWords.todo}
+            </p>
+          ) : null}
+        </div>
         <div>
           <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
           {/* A FACT, never a control — the server stamps created_by itself. */}

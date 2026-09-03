@@ -54,6 +54,19 @@ export function isPurchasingNumberKey(v: unknown): v is PurchasingNumberKey {
   return typeof v === "string" && (PURCHASING_NUMBER_KEYS as readonly string[]).includes(v);
 }
 
+/** The on/off switches (0422). Written only by `purchasing_set_switch()`,
+ *  whose CHECK repeats this list — a later switch adds its key to both.
+ *
+ *  `manual_purchase_enforce_earliest_date` — when on, a Manual Purchase
+ *  whose Delivery Date is earlier than the earliest date its items can
+ *  arrive is refused at creation. Off: the earliest date is a proposal only. */
+export const PURCHASING_SWITCH_KEYS = ["manual_purchase_enforce_earliest_date"] as const;
+export type PurchasingSwitchKey = (typeof PURCHASING_SWITCH_KEYS)[number];
+
+export function isPurchasingSwitchKey(v: unknown): v is PurchasingSwitchKey {
+  return typeof v === "string" && (PURCHASING_SWITCH_KEYS as readonly string[]).includes(v);
+}
+
 /** The legal range for each single number — the same bounds as the SQL
  *  CHECK, so the form refuses what the database would refuse. */
 export const PURCHASING_NUMBER_RANGE: Record<PurchasingNumberKey, { min: number; max: number }> = {
@@ -135,6 +148,8 @@ export interface PurchasingSettings {
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
   poDays: readonly number[];
+  /** 0422 — refuse a Manual Purchase dated before its items can arrive. */
+  manualPurchaseEnforceEarliestDate: boolean;
   suppliers: readonly PurchasingSupplierRow[];
   productionDays: readonly PurchasingProductionDays[];
   destinations: readonly PurchasingDestinationSetting[];
@@ -420,6 +435,7 @@ export const purchasingSettingsResponseSchema = z.object({
   earliestSellDays: z.number().int(),
   logisticsCallWorkingDays: z.number().int(),
   poDays: weekdayList,
+  manualPurchaseEnforceEarliestDate: z.boolean(),
   suppliers: z.array(
     z.object({
       id: z.string(),
@@ -522,6 +538,14 @@ export const purchasingSetNumberInput = z
   })
   .strict();
 export type PurchasingSetNumberInput = z.infer<typeof purchasingSetNumberInput>;
+
+export const purchasingSetSwitchInput = z
+  .object({
+    key: z.enum(PURCHASING_SWITCH_KEYS),
+    value: z.boolean(),
+  })
+  .strict();
+export type PurchasingSetSwitchInput = z.infer<typeof purchasingSetSwitchInput>;
 
 export const purchasingSetPoDaysInput = z.object({ days: weekdayList }).strict();
 export type PurchasingSetPoDaysInput = z.infer<typeof purchasingSetPoDaysInput>;
