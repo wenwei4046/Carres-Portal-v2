@@ -507,7 +507,26 @@ export function purchaseDemandQuantities(build: {
 } {
   const modular = isOnePoPerOrder(category) && build.lines.length > 1;
   const fully = build.fullyOnPo === true;
-  const toBuy = fully ? 0 : build.qty;
+  /* A build every unit of which sits on an open purchase order is STILL
+     buyable. `toBuy` used to be forced to 0 here, which made the row fail
+     `isSelectableForBuying` and disappear from SO Batch Purchase entirely.
+
+     The coverage that produced `fullyOnPo` is a GLOBAL, per-SKU pool: the
+     engine drains `openPoBySku` earliest-deadline-first with no customer link
+     at all, so the purchase order "covering" this order may have been raised
+     for somebody else and may stop covering it on the next refresh (T6,
+     `to-order.ts`). A buyer looking at their own Sales Order could not see
+     that, could not act on it, and was given no sentence saying why — the row
+     simply had no tick. YH ruled on 2026-09-03 that a line with a supplier, a
+     cost and a price is buyable, and that the buyer decides whether the pooled
+     coverage is good enough. This states the quantity and lets them choose.
+
+     `qtyNeeded` below still reads `build.qty` for a covered build rather than
+     adding the coverage back: `build.qty` is already what the covering
+     purchase order carries (T6), so adding `coveredByOpenPo` to it would count
+     the same units twice. `onPo` continues to report the coverage, so the row
+     shows both numbers and the operator can see they overlap. */
+  const toBuy = build.qty;
   const qtyNeeded = modular || fully
     ? build.qty
     : build.qty + build.coveredByOpenPo + build.takenFromStock;

@@ -302,7 +302,7 @@ describe("purchaseDemandQuantities — the engine's numbers, never a second coun
     });
   });
 
-  it("a fully covered build buys nothing and states what the PO carries", () => {
+  it("a fully covered build stays buyable and shows the coverage beside it", () => {
     const q = purchaseDemandQuantities(
       {
         qty: 3,
@@ -314,9 +314,32 @@ describe("purchaseDemandQuantities — the engine's numbers, never a second coun
       },
       "mattress",
     );
-    expect(q.toBuy).toBe(0);
-    expect(q.qtyNeeded).toBe(3);
+    /* The coverage is a per-SKU pool with no customer attribution, so it can
+       belong to another order and can move on the next refresh. The buyer
+       decides, and needs both numbers to decide with. */
+    expect(q.toBuy).toBe(3);
     expect(q.onPo).toBe(3);
+    /* NOT 6. `qty` on a covered build is already what the purchase order
+       carries, so the coverage must not be added back on top of it. */
+    expect(q.qtyNeeded).toBe(3);
+  });
+
+  it("a covered build can be ticked — it is not filtered out by a zero", () => {
+    const q = purchaseDemandQuantities(
+      {
+        qty: 2,
+        freeStock: 0,
+        takenFromStock: 0,
+        coveredByOpenPo: 2,
+        fullyOnPo: true,
+        lines: ["a"],
+      },
+      "mattress",
+    );
+    /* `isSelectableForBuying` refuses any row whose `toBuy` is not above zero.
+       This is the assertion that keeps SO-1297 tickable: a regression here
+       takes the tick-box away again with no other symptom. */
+    expect(q.toBuy).toBeGreaterThan(0);
   });
 
   it("a modular sofa states ONE sofa — a module count is never added to it", () => {

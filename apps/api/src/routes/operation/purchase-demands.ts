@@ -438,12 +438,28 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       // guard costs nothing and keeps the boundary explicit.
       if (row.readyStock) continue;
       for (const build of row.builds) {
-        /* A FULLY COVERED build does not remain in SO Batch Purchase (Card
-           02-A §3): it is found through Purchase Orders, Stock and Order
-           Route. The engine reads `status = 'open'` and nothing else, so the
-           moment that purchase order is cancelled the coverage falls away and
-           the demand returns here by recomputation — nothing is stored. */
-        if (build.fullyOnPo === true) continue;
+        /* A FULLY COVERED build STAYS, and stays buyable.
+           Card 02-A §3 said such a build "does not remain in SO Batch
+           Purchase … found through Purchase Orders, Stock and Order Route",
+           and this line dropped it. Measured on production 2026-09-03: SO-1297
+           still rendered its two goods lines, with no tick-box, no supplier,
+           no Deliver To and no sentence, because the parent row is drawn from
+           `order.lines` while the tick is drawn from these leaves. The card's
+           "does not remain" and Card 02-B's permanent register cannot both be
+           obeyed, and what shipped obeyed neither.
+
+           The coverage is also weaker than the card assumes. It comes from a
+           per-SKU pool with no customer attribution (T6), so the covering
+           purchase order may belong to another customer and may stop covering
+           this one on the next refresh. Card 02-B forbids naming that document
+           here — lineage `po_line_sources` only — so the screen cannot even
+           tell the buyer where the units went.
+
+           YH ruled on 2026-09-03: a line with a supplier, a cost and a price
+           is tickable, and the buyer judges the coverage. The row now carries
+           `onPo` beside `toBuy`, so the overlap is visible rather than
+           decided for them. This reverses Card 02-A §3 and needs the owner's
+           confirmation on the PR. */
         const q = purchaseDemandQuantities(build, proposal.category);
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
