@@ -10,7 +10,7 @@ import { adminClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * THE PARTNER'S OWN DELIVERY SCREEN — Delivery Card 07 (0417).
+ * THE PARTNER'S OWN DELIVERY SCREEN — Delivery Card 07 (0418).
  * `docs/delivery/MASTER.md` §5 + §13, owner rulings 2026-09-01.
  *
  * The ruled NETS portal: the partner sees ONLY its own assigned deliveries and

@@ -10,7 +10,7 @@ minimum customer/handling data — no money, no other partners, no reassignment)
 
 ## What ships
 
-1. **Migration `0417`** — repairs 0412's latent door defect (the events table was keyed by
+1. **Migration `0418`** — repairs 0412's latent door defect (the events table was keyed by
    `arrangement_id NOT NULL`; the 0412 door speaks `(order_id, leg)`): scope columns added and
    backfilled, arrangement link optional, `cannot_deliver` joins the event dictionary with its
    reason-required constraint. Probed on production in a rolled-back transaction (zero orphans
