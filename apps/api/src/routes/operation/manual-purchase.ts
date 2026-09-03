@@ -460,7 +460,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     .map((r) => r.for_service_case_id as string | null)
     .filter((v): v is string => v != null);
   const [dests, sups, users, cases] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name"),
+    sb.from("purchasing_destinations").select("id, name, is_default").order("name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
@@ -532,7 +532,19 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: sc.id as string,
       case_no: sc.case_no as string,
     })),
-    destinations: dests.data ?? [],
+    destinations: (dests.data ?? []).map((d) => ({ id: d.id, name: d.name })),
+    /* ⭐ THE TWO GOVERNED DELIVER TO FACTS (owner, 2026-09-03). Until now the
+       create form defaulted Deliver To to whichever destination came first
+       and offered every one as an equal choice, so a request for a supplier
+       Carres COLLECTS from could name Carres Klang — and the issue door then
+       refused it (`supplier_collection_destination_mismatch`) with no door
+       left to correct the request. SO Batch ships both facts
+       (`purchase-demands.ts`); this lane never did. `settings` is already in
+       hand from the date plan, so this costs no subrequest. No default
+       configured means NO default (MASTER §5.4). */
+    defaultDestinationId:
+      ((dests.data ?? []).find((d) => d.is_default === true)?.id as string | undefined) ?? null,
+    supplierCollections: settings?.supplierCollections ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,

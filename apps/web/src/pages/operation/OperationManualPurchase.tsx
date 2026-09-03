@@ -31,6 +31,7 @@ import {
   manualPurchaseTimingOf,
   manualPurchaseWorkOrder,
   purchasingRefusal,
+  type PurchasingSupplierCollectionSetting,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
@@ -474,6 +475,35 @@ export default function OperationManualPurchase() {
     setIssueError(null);
     const ids = selectedRows.map((r) => r.id);
     if (ids.length === 0) return;
+    /* ⭐ THE SAME GATE THE SERVER APPLIES, BEFORE THE REQUEST IS SENT (owner,
+       2026-09-03; the SoBatchIssueWorkspace shape). A collected supplier's
+       goods land where Purchasing Settings says; a Manual Purchase that names
+       somewhere else is refused by the issue door with the same two lines
+       this prints. Refusing here saves the round trip and — since a request's
+       Deliver To has no door to move it — says so before anything is tried.
+       `supplierCollections` carries ONLY factory-pickup suppliers
+       (`purchasing-settings.ts`), so no kind gate is needed here, and a
+       payload without the field (an older API) gates nothing. */
+    if (q.data) {
+      const collectionBySupplier = new Map(
+        (q.data.supplierCollections ?? []).map((c) => [c.supplierId, c]),
+      );
+      const destName = new Map(q.data.destinations.map((d) => [d.id, d.name]));
+      for (const row of selectedRows) {
+        for (const wall of row.issueWalls) {
+          const rule = wall.supplierId ? collectionBySupplier.get(wall.supplierId) : undefined;
+          if (rule?.destinationId && rule.destinationId !== wall.destinationId) {
+            setIssueError(
+              purchasingRefusal("supplier_collection_destination_mismatch", {
+                supplier: rule.supplierName || null,
+                destination: destName.get(rule.destinationId) ?? null,
+              }),
+            );
+            return;
+          }
+        }
+      }
+    }
     if (ids.length > 20) {
       /* The one cap this door enforces in the browser. It is a refusal like
          any other, so it wears the refusal shape rather than a lone sentence
@@ -493,9 +523,27 @@ export default function OperationManualPurchase() {
       void q.refetch();
     } catch (e) {
       /* THE APPROVED TWO LINES: the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } })
-        .body;
-      const fallback = purchasingRefusal(body?.code);
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            sku?: string | null;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      /* Every fact the server sent, not just the code. `refuse()` echoes its
+         facts beside `message`, so a code that arrives without a sentence
+         still names the supplier and the destination instead of degrading to
+         `the supplier` (the SoBatchIssueWorkspace shape). */
+      const fallback = purchasingRefusal(body?.code, {
+        sku: body?.sku ?? null,
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
       setIssueError({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
@@ -705,6 +753,8 @@ export default function OperationManualPurchase() {
         <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
+          defaultDestinationId={q.data?.defaultDestinationId ?? null}
+          supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
           onDone={() => {
             setMode("register");
@@ -1259,10 +1309,14 @@ const PICK_LIMIT = 50;
 
 function CreateRequestWorkspace({
   destinations,
+  defaultDestinationId,
+  supplierCollections,
   staff,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
+  defaultDestinationId: string | null;
+  supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
   onDone: () => void;
 }) {
@@ -1322,7 +1376,6 @@ function CreateRequestWorkspace({
   const createHeader = useCreatePurchaseRequest();
 
   const active = activeId ?? lines[0]?.id;
-  const chosenDest = dest ?? destinations[0]?.id;
 
   /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
      The server previews Proceed Date (its Malaysia date) and, once every
@@ -1341,6 +1394,34 @@ function CreateRequestWorkspace({
       ),
     [plan.data],
   );
+
+  /* ── DELIVER TO IS THE RULE'S WHEN A RULE EXISTS (owner, 2026-09-03) ────
+     A supplier Carres collects from has ONE place its goods land, kept in
+     Purchasing Settings. The issue door refuses any purchase that names
+     somewhere else, and a Manual Purchase has no door to move its Deliver To
+     afterwards — so offering the choice here was offering a dead end (the
+     SoBatchRegister.changeWholeLeaf principle: a governed destination is not
+     the purchase's to move; the operator changes the rule in Settings). The
+     plan already names each picked SKU's supplier, so the rule is derived,
+     never stored: pick a collected item and the field locks; remove it and
+     the choice returns. Two picked items governed to DIFFERENT places cannot
+     be one request (0401 pins one Deliver To per request); that case is left
+     to the issue door's refusal until the owner rules split-or-refuse.
+     Otherwise: the person's choice, then the governed default, then the
+     first destination — the same order SO Batch uses. */
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const sku of pickedSkus) {
+      const supplierId = planBySku.get(sku)?.supplierId;
+      const rule = supplierId ? bySupplier.get(supplierId) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [pickedSkus, planBySku, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const chosenDest =
+    governedRule?.destinationId ?? dest ?? defaultDestinationId ?? destinations[0]?.id;
   /* The server's proposal fills the field only while the person has not
      chosen a date; a chosen date is theirs and is preserved (§3.2). */
   const planDefault = plan.data?.deliveryDateDefault ?? null;
@@ -1573,8 +1654,23 @@ function CreateRequestWorkspace({
             id="mp-dest"
             value={chosenDest}
             onValueChange={setDest}
+            disabled={governedRule != null}
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
+          {/* The lock names its rule in the ONE approved sentence for this
+              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
+              line 1) — no new word reaches the screen. */}
+          {governedRule ? (
+            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
+              {
+                purchasingRefusal("supplier_collection_destination_mismatch", {
+                  supplier: governedRule.supplierName || null,
+                  destination:
+                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+                }).wrong
+              }
+            </p>
+          ) : null}
         </div>
         {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
             Malaysia-date preview before Send; the stored hand-off truth

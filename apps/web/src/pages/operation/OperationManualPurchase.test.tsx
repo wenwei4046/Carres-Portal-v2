@@ -680,6 +680,89 @@ describe("Card 03 · the left filter rail", () => {
   });
 });
 
+/* ⭐ DELIVER TO FOLLOWS THE COLLECTION RULE (owner, 2026-09-03). The owner
+   raised MPR-20260903-3381 for Ohana to Carres Klang and was refused at issue
+   with `Ohana must be collected to Ohana.` — and the request's Deliver To has
+   no door to move it. So the form may not offer the dead end, and the Register
+   must say the same sentence BEFORE the round trip. */
+describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
+  const OHANA = "2f181917-f4e1-42b2-9e25-d7ee6785424b";
+  const GOVERNED = {
+    ...REGISTER,
+    destinations: [
+      { id: KLANG, name: "Carres Klang" },
+      { id: OHANA, name: "Ohana" },
+    ],
+    supplierCollections: [
+      { supplierId: "s1", supplierName: "Ohana", destinationId: OHANA, partnerId: "p1" },
+    ],
+  };
+  function withRegister(register: unknown) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        url.includes("/purchasing/requests") &&
+        !url.includes("/plan") &&
+        !url.includes("/detail/") &&
+        !url.includes("/issue") &&
+        !url.includes("/already-have")
+      ) {
+        return Promise.resolve(register);
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("locks the create form's Deliver To to the rule once a collected item is picked, and says why", async () => {
+    withRegister(GOVERNED);
+    await openWorkspace();
+    /* Free until a governed supplier is on the form. */
+    expect(screen.queryByTestId("mp-dest-governed")).toBeNull();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* 5539-2NA's plan names supplier s1, collected to Ohana. */
+    const why = await screen.findByTestId("mp-dest-governed");
+    expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+    const select = document.getElementById("mp-dest")!;
+    expect(select).toHaveTextContent("Ohana");
+    expect(select).toBeDisabled();
+    /* Remove the item — the choice returns. */
+    fireEvent.click(screen.getByTestId("mp-line-remove-0"));
+    await waitFor(() => expect(screen.queryByTestId("mp-dest-governed")).toBeNull());
+  });
+
+  it("starts the create form on the governed default when no rule binds", async () => {
+    withRegister({ ...GOVERNED, defaultDestinationId: OHANA });
+    await openWorkspace();
+    expect(document.getElementById("mp-dest")).toHaveTextContent("Ohana");
+    expect(document.getElementById("mp-dest")).not.toBeDisabled();
+  });
+
+  it("the Register refuses an issue that disagrees with the rule before sending it", async () => {
+    /* REQ2's line is supplier s2 to Carres Klang; govern s2 to Ohana. */
+    withRegister({
+      ...GOVERNED,
+      supplierCollections: [
+        { supplierId: "s2", supplierName: "Office Co", destinationId: OHANA, partnerId: "p1" },
+      ],
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    await screen.findByTestId("mp-selection-bar");
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    expect(err).toHaveTextContent("Office Co must be collected to Ohana.");
+    expect(err).toHaveTextContent("Set Deliver To to Ohana, then issue again.");
+    expect(
+      apiFetch.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/purchasing/requests/issue") &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+      "nothing was sent",
+    ).toBe(false);
+  });
+});
+
 describe("the create workspace — full page, never a dialog (card §3)", () => {
   it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
     await openWorkspace();
