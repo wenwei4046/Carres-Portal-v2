@@ -893,6 +893,21 @@ on-screen law *sending is not confirmation*) and the reply proof as a REAL uploa
 `POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
 bucket under `arrangement/{order}/{leg}/…`.
 
+**DEPLOYED 2026-09-03 — Delivery Card 07, PRs #1065 + #1068, production converged at
+`1ffb21e8882ebd7e46b2851ce090f24f17d1570a`.** The ruled partner screen (§5/§13) is live:
+`Delivery dates` at `/delivery-partner/arrange` — one phone-first column, the ruled minimum
+facts, and exactly two acts, `Save Delivery Arrangement` and `Cannot Deliver` (governed reason;
+`other` demands the note; a reported scope reads *Carres Operations is deciding*). The API is
+partner-gated with service-role reads narrowed in code; another partner's scope answers 404;
+the PUT accepts only the four partner fields. Migration `0417_the_partner_says_it_cannot_deliver`
+(probed in a rolled-back production transaction, applied as the exact file, tracker row matching
+the file name) gave the arrangement-events table its scope columns — which also repaired 0412's
+latent door defect, stated plainly in that migration's own header. The merge collided with a
+sibling's `0417` sixteen seconds apart; the deploy gate correctly held production, and the pair
+is baselined in `check-migrations.mjs` with its measured state (#1068). The legacy Accept-based
+partner kanban's retirement, POD work and the Operations Work row raised by a Cannot Deliver
+report remain named follow-ups, not accidents.
+
 **DEPLOYED 2026-09-01 — Delivery Card 06, PR #1048, main SHA
 `feec4618f053b183b8a66f94c884799db3051615`, production converged.** Migration `0412` was
 probed in a rolled-back production transaction, then applied as the exact file; the tracker
