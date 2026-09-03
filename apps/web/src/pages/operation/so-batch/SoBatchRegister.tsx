@@ -346,9 +346,20 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   const changeWholeLeaf = useCallback(
     (row: PurchaseDemandRow, destinationId: string) => {
       const current = live.get(row.id);
+      /* ⭐ A GOVERNED DESTINATION IS NOT THE PURCHASE'S TO MOVE (0405).
+         When Purchasing Settings pins where a supplier's collected goods land,
+         the server refuses any purchase that names somewhere else
+         (`to-order.ts`, `supplier_collection_destination_mismatch`). So a
+         control that moved the line anyway was offering a choice the system
+         would then reject — and the order-level Deliver To did exactly that to
+         EVERY line at once, which on an order spanning two governed suppliers
+         could not be satisfied by any single value the dropdown offered. The
+         line keeps its rule; the operator changes the rule in Settings. */
+      const fixed = row.supplierCollection?.fixedDestinationId;
+      const to = fixed ?? destinationId;
       const next = setDestination(
         { demandId: row.id, allocations: current ?? [] },
-        destinationId,
+        to,
         row.toBuy ?? 0,
       );
       setLeafAllocations(row.id, next.allocations);

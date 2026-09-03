@@ -122,7 +122,17 @@ export default function SoBatchIssueWorkspace({
           supplier: doc.supplierName ?? null,
         });
       }
+      /* ⭐ FACTORY PICKUP ONLY — the same gate the server applies.
+         `supplierCollection` is carried for ANY supplier that has a collector
+         in Purchasing Settings (`purchase-demands.ts`, which stops only at a
+         missing partner), not just the ones Carres collects from. Without the
+         kind gate this line refused an `own_logistics` supplier that happened
+         to have a fixed destination configured — a greyed-out Issue PO with no
+         way past it, for a document the server (`to-order.ts`, which gates on
+         `needsPartner`) would have accepted. A blocker the server does not
+         share is not a rule; it is a dead button. */
       if (
+        doc.supplierKind === "factory_pickup" &&
         doc.supplierCollection?.fixedDestinationId &&
         doc.supplierCollection.fixedDestinationId !== doc.destinationId
       ) {

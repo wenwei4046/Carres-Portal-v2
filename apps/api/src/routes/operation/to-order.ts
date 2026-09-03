@@ -1565,7 +1565,31 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
           : detail === "supplier_price_changed"
             ? 409
             : 422;
-      return refuse(c, status, detail);
+      /* ⭐ NAME THE PARTIES (YH, 2026-09-03). This forwarded the database's
+         code with NO facts, so every batch refusal reached the operator as the
+         factless fallback — "The supplier must be collected to its configured
+         destination" — on a batch spanning suppliers, naming none of them and
+         showing the error beside whichever document happened to be on screen.
+         The route knows every document it just built, so it names the one the
+         rule is about: the only supplier here whose governed destination is not
+         the one it was issued to. When no single document answers, the facts
+         stay empty and the honest fallback is what appears. */
+      const facts: Parameters<typeof purchasingRefusal>[1] = {};
+      const hint = (batchErr as { hint?: string }).hint;
+      if (hint) {
+        try {
+          const named = JSON.parse(hint) as Record<string, unknown>;
+          for (const k of ["supplier", "destination", "sku", "po"] as const) {
+            const v = named[k];
+            if (typeof v === "string" && v.trim() !== "") facts[k] = v;
+          }
+        } catch {
+          /* A hint that is not the JSON we write is a hint from somewhere else.
+             The refusal still leaves in the approved two lines, unnamed — which
+             is what it did before this existed. */
+        }
+      }
+      return refuse(c, status, detail, facts);
     }
     const m = mapPgError(batchErr);
     return c.json(m.body, m.status);
