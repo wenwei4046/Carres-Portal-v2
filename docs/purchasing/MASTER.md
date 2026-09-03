@@ -1017,16 +1017,19 @@ SETUP TO FIX
   state or filter.
 - The rail says `Approve purchase`; the Register/object shows the real action owner's name —
   the governed sentence `{name} approves` beside `Waiting for approval`, naming the resolved
-  `ops_manager` duty holder(s); a robot or shared-password login never prints while a named
+  `Purchasing Approver` Duty holder; a robot or shared-password login never prints while a named
   person holds the duty; nothing resolved prints nothing.
-  The approver is the configured Purchasing Settings manager gate — Jess today, changeable
-  without redesigning this rail; Jess may approve a purchase for herself. Operation
+  Purchasing Settings stores only the required `Purchasing Approver` Duty key; the person resolves
+  from `Workspace → Staff & Duties`, so the holder can change without redesigning this rail. The
+  holder may approve a purchase they requested when the purchasing rule permits self-approval. Operation
   prepares and submits; it does not approve and does not control price. Approved requests
   continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
   Purchase remain separate doors.
 - **The decision renders only for who the SQL door would pass (fixed 2026-08-29).**
-  `purchasing_decide_request`'s gate (`purchasing_settings_gate`, 0360) is the `principal`
-  role or the real `ops_manager` position duty — no legacy-email pass — and `canApprove`
+  The approved target is the resolved `Purchasing Approver` Duty. The current
+  `purchasing_decide_request` gate (`purchasing_settings_gate`, 0360) still admits `principal`
+  or the `ops_manager` position duty — legacy implementation that must converge behind the Shared
+  Duty Resolver, with no legacy-email pass — and `canApprove`
   (the Approve/Refuse controls AND the approver-only money) asks exactly that, never the
   wider daily-surface manager check that admits the shared `operation@` login. Card 04's
   production walk measured the disagreement (`MPR-20260829-2779`: controls offered, door
@@ -1182,8 +1185,8 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
   `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
   role or an email.
-- **Work Engine boundary — owner-corrected by Card 06:** undecided approval supplies
-  `Approve {MPR}` to the configured real approver, due no later than Order By and completed only by
+- **Work Engine boundary — owner-corrected by Card 06 and Duty ruling 2026-09-03:** undecided
+  approval supplies `Approve {MPR}` to the resolved `Purchasing Approver`, due no later than Order By and completed only by
   the stored decision. Approved remaining demand supplies `Issue the purchase order for {MPR}` to
   normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
   current PO version has confirmed-sent evidence. Both deep-link the exact source; the local
@@ -1394,7 +1397,7 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Manual Purchase awaits decision; due no later than its Order By | Configured real purchase approver | `Approve MPR-20260829-2779` | Stored approval or refusal with actual actor/time exists |
+| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve MPR-20260829-2779` | Stored approval or refusal with Primary, Cover and actual actor/time exists |
 | Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
 | Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
@@ -1432,7 +1435,7 @@ completion facts in the table above.
 Settings lives under the global header gear and requires authorised roles. It includes:
 
 - document number format/version and locked Unit ID family;
-- a read-only door to Team's PO Duty / GRN Duty and buddy-cover settings; Purchasing Settings
+- a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
 - approval limits and Manual Purchase purposes;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
@@ -1476,7 +1479,7 @@ are snapshots, not editable truth or a second settlement ledger.
 |---|---|---|
 | Sales / Showroom | create Display Request; read connected purchase state; receive/sign/report at showroom if rostered | issue PO/CO, choose supplier price, change ownership |
 | Requester | create Manual Purchase and supply missing request facts | issue PO or mark ordered merely because they requested it |
-| Approver / Manager | approve/reject governed internal buy and commercial exceptions; the configured approver may approve their own request | replace receiving/PO evidence |
+| Purchasing Approver | approve/reject governed internal buy and commercial exceptions; the resolved holder may approve their own request where the rule permits | replace receiving/PO evidence |
 | Normal PO Duty / dated cover | owns the daily work; issue/revise supplier documents; record promises/claims through the one door | approve unauthorised price; post stock or supplier payment |
 | Operations Superuser (`operation@carres.com`, Jess) | use the same governed operational doors when available, including PO issuance; actual actor remains separate from normal duty/cover | impersonate duty, create a second PO/receipt writer or bypass approval/commercial gates |
 | Normal GRN Duty / dated cover | owns daily Receiving work; count, inspect, attach Supplier DO/evidence and finish source receipt | change PO price/quantity or ownership agreement |

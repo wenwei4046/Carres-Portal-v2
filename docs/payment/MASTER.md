@@ -191,8 +191,10 @@ The delivery money gate belongs to Sales Orders, not Payment.
 - **Payment's own ownership is unchanged by all of this.** Payment supplies the ONE outstanding
   answer and owns the one arithmetic; Sales Orders owns the delivery gate and decides what blocks
   goods. That boundary did not move — what moved (back) is Sales Orders' answer.
-- **`Finance exception` (0355) — Finance owns it, and it is the SECOND blocker.** An explicit
-  Finance-created record; only Finance creates or clears it, clearing costs evidence. `OPEN`
+- **`Finance exception` (0355) — Money In owns it, and it is the SECOND blocker.** An explicit
+  Payment-exception record; only the resolved `Payment Approver` creates or clears it, and clearing
+  costs evidence. The current Finance/principal-only 0355 gate is legacy implementation that must
+  converge behind the Shared Duty Resolver. `OPEN`
   blocks the DO gate **regardless of payment, and a payment approval does not clear it**;
   `CLEARED` removes the block. It is a decision, never a derived state.
 - **THE COLLECTION CLOCK'S DEADLINE IS T−2 — owner ruling 2026-08-19** (§5 above): logistics
@@ -375,6 +377,8 @@ Duty, not email, determines permission.
 | Contact customer / record observed channel-open | Payment duty |
 | Set promise-to-pay | Payment duty |
 | Issue invoice / reprint receipt | Payment duty under document rules |
+| Approve a storage-fee waiver | Storage Waiver Approver |
+| Decide a Payment exception | Payment Approver |
 | Void payment / waive charge / approve refund | manager/principal duty |
 | Pay approved refund | Payment duty; separate requester/approver where practical |
 | Import/match bank statement | finance-control duty |
@@ -396,6 +400,12 @@ Central Settings → Payments owns:
 - reconciliation suggestion rules with audit; exact amount is the default;
 - refund payment methods and evidence;
 - customer statement/contact templates under Copy authority.
+
+It also stores the **required Duty key** for each Payment rule, never the person's name or a second
+approver list. Example: storage days 22–30 require `Storage Waiver Approver`. The actual person is
+resolved from `Workspace → Staff & Duties` through ERP Architecture Law F.1, so changing the
+Primary holder or activating Buddy cover updates Payment, My Work and Team Work together. Payment
+must not hard-code `Jess`, `Manager` or a universal `ERP Owner`.
 
 Historical transactions snapshot applicable settings. Editing configuration changes future use only.
 Sales Order checkout may read admitted payment-method choices but does not own Money In configuration.

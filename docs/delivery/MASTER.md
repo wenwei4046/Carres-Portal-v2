@@ -685,8 +685,10 @@ owns audited/versioned:
 Per-DO dates/Partner/ETA, single-event handling, personal Columns and personal Saved Views are not
 Settings. Historical objects retain the rule/version used when their event occurred.
 
-Delivery Settings contains no PO Duty, GRN Duty, Warehouse Duty or buddy-cover roster. Those facts
-exist only in Team; Delivery consumes their resolved action owner through the shared Work Engine.
+Delivery Settings contains no PO Duty, GRN Duty, Warehouse Duty or Buddy-cover roster. Those facts
+exist only in `Workspace → Staff & Duties`; Delivery consumes their resolved action owner through
+the shared Work Engine. Delivery Settings stores only the required `Delivery Charge Approver` Duty
+key for governed charge exceptions, never a person's name or local approver list.
 
 ## 12 · Reports
 
@@ -710,6 +712,8 @@ Permissions separate view, record, record-on-behalf, review, correct, approve, c
   impersonate Warehouse or silently rewrite results.
 - Delivery Manager additionally approves governed reassignment, exceptional proof, corrections,
   refusal closure and rule changes.
+- Governed delivery-charge exceptions route only to the resolved `Delivery Charge Approver`; the
+  normal Primary, today's Cover and actual actor remain separate evidence.
 - Warehouse roles see and record only preparation, handover and returns for their Warehouse.
 - NETS Logistics sees only assigned deliveries and minimum customer/handling data; it may arrange,
   update ETA, record results/proof and use Cannot Deliver. It never sees money, other Partners or

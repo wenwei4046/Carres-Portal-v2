@@ -22,7 +22,7 @@ another 3PL or a future Carres-operated warehouse.
 | journey, carrier handover and proof | Delivery |
 | customer problem after delivery | Service Case |
 | invoice, settlement, payment and valuation | Finance |
-| material adjustment, write-off and major dispute approval | Management |
+| material adjustment, write-off and major dispute approval | Stock Adjustment Approver |
 
 Purchasing explains why Carres obtained the Unit. Stock explains where it is now. A consequence
 never transfers write ownership.
@@ -223,7 +223,7 @@ authoritative outcome:
 |---|---|---|
 | Delivered | Delivery records customer arrival/acceptance and required proof | Delivered to customer |
 | Returned to supplier | actual supplier collection/handover is accepted | Returned to supplier |
-| Written off | COO approves the governed Stock Adjustment | Written off |
+| Written off | the `Stock Adjustment Approver` approves the governed Stock Adjustment | Written off |
 | Disposed | authorised disposal has both approval and disposal evidence | Disposed |
 | Voided/cancelled before receipt | the source is cancelled and no physical receipt ever occurred | Never received · Source cancelled |
 | Returned by customer | Receiving proves the Unit is physically back under Carres control | the actual current holder and `Check required` |
@@ -282,8 +282,8 @@ Problem Detail follows the Object Detail Template: observed fact and Unit · act
 reporter/avatar and evidence · automatic effect on availability/customer risk · current Action ·
 connected PO/GRN/SO/DO/Count/Service records · append-only History. A problem completes only from an
 authoritative fact: inspection restores eligibility; repair returns and passes inspection;
-Purchasing-owned supplier collection is physically completed; a correction is approved; or the COO
-approves write-off and separate physical-disposal proof later records disposal. Write-off approval
+Purchasing-owned supplier collection is physically completed; a correction is approved; or the
+`Stock Adjustment Approver` approves write-off and separate physical-disposal proof later records disposal. Write-off approval
 and disposal are never one fact, and no generic `Close issue` may replace either.
 
 Counts are dated Site work. The first count hides the expected list. After submission, differences
@@ -374,8 +374,8 @@ or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manual
 work. Completion occurs only when the authoritative source fact exists, after which the shared row
 updates everywhere.
 
-The COO view adds exception summaries over the same drillable facts: unresolved Stock differences,
-Adjustments awaiting COO approval, damaged Units requiring a decision and Month-end submissions not
+The management view adds exception summaries over the same drillable facts: unresolved Stock differences,
+Adjustments awaiting Stock Adjustment Approver decision, damaged Units requiring a decision and Month-end submissions not
 done. Every number expands to exact Units/documents, actual dates and resolved owners; a KPI with no
 drill-down is invalid.
 
@@ -486,7 +486,7 @@ Carres does not record a NETS internal Zone, Rack or Bin, so a fabricated locati
 `Zone A3` is invalid.
 
 `Counts & Adjustments` contains scheduled counts, submitted counts, differences, recount,
-investigation, Adjustment request, COO approval, completion and reversal in one control surface.
+investigation, Adjustment request, Stock Adjustment Approver decision, completion and reversal in one control surface.
 The first count is blind. Difference is evidence requiring comparison and recount; it is not an
 automatic Adjustment.
 
@@ -497,15 +497,16 @@ Count No · Site · Stock date · Count date · Must submit by · Result · Work
 ```
 
 It retains scheduled, submitted, differences found, Count again, investigation, Adjustment waiting
-for COO, completed and reversed records in this one view. The governed path is:
+for the Stock Adjustment Approver, completed and reversed records in this one view. The governed path is:
 
 ```
 blind first Count → compare → Count again → investigate Receiving/handovers/Delivery/repair/
-Transfers → record result → Correct this record OR Request Adjustment → COO decision
+Transfers → record result → Correct this record OR Request Adjustment → Stock Adjustment Approver decision
 ```
 
 NETS performs physical Count and Unit-level Count again with evidence. The current GRN Duty
-investigates a persistent difference and submits any Adjustment request. Only the COO approves or
+investigates a persistent difference and submits any Adjustment request. Only the resolved
+`Stock Adjustment Approver` approves or
 rejects an Adjustment or write-off; the requester cannot approve it. An Adjustment request exposes
 Unit, Portal fact, first and second Count results, last evidence, investigation performed, requester
 and approval state. Original Count and investigation evidence remain immutable.
@@ -581,7 +582,7 @@ completion is an authoritative fact, never Mark done.
 
 Warehouse Settings contains no Duty roster. Supplier/PO problems use `Current PO Duty`; receiving,
 persistent stock differences and adjustment requests use `Current GRN Duty`; adjustment approval
-uses `COO`; physical Count/recount and outbound handover use the assigned NETS individual; customer
+uses `Stock Adjustment Approver`; physical Count/recount and outbound handover use the assigned NETS individual; customer
 delivery problems use the Delivery ownership rule. Every displayed avatar is the Shared Work
 Engine's resolved owner. Stock pages do not save `assigned_to`, read a rota table or calculate PO /
 GRN Duty.
@@ -608,7 +609,8 @@ shows source identity, fact and action without repeating the grouped person on e
 The shared Quick Rail remains `Team · Calendar · My Work · Activity`:
 
 - **Team** shows every active Carres staff member, including zero work, current PO/GRN Duty,
-  buddy/cover and counts from the same Work Engine. Team is the only duty edit door. External NETS
+  Buddy cover and counts from the same Work Engine. `Workspace → Staff & Duties` is the only Duty
+  edit door; Team is a read-only workload/coverage view. External NETS
   people appear only inside their permitted Warehouse/partner scope; they do not gain the full
   Carres team view.
 - **Calendar** projects expected arrivals, Counts/Count again, collections, arrivals, Outbound
@@ -640,7 +642,7 @@ may only render the returned resolved owner/avatar. The duty model itself remain
 - The current GRN Duty investigates a persistent Stock difference and, when evidence cannot resolve
   it, submits the Adjustment request.
 - The current PO Duty owns supplier/PO follow-up and Supplier Claim work.
-- Only the COO approves a material Adjustment, write-off or unexplained major difference; the
+- Only the resolved `Stock Adjustment Approver` approves a material Adjustment, write-off or unexplained major difference; the
   requester cannot approve it.
 - When a Carres staff member leaves, the shared duty engine removes them from the effective-date
   assignment pool and automatically re-resolves open and future Warehouse Actions. Two active staff
@@ -674,7 +676,7 @@ that lineage is invalid.
 Warehouse may submit on time with disclosed unresolved differences. Finance acknowledges a specific
 version. Submission therefore may truthfully read `136 Units confirmed · 3 unresolved differences`
 and expose the three Units, first Count, Count again, current investigation, resolved owner, next
-actual work date and any required COO decision. Staff do not manufacture a zero-difference report
+actual work date and any required Stock Adjustment Approver decision. Staff do not manufacture a zero-difference report
 to meet Finance's deadline.
 
 Finance may `Acknowledge Version {n}` for valuation and reporting. It cannot edit a Unit, holder,
@@ -689,8 +691,8 @@ acknowledged. No new version silently overwrites history, and Finance valuation 
 the exact acknowledged version it used.
 
 The dated Work set keeps the acts separate: NETS counts on its actual date; the current GRN Duty
-reconciles and submits by the governed submission date; the COO decides any Adjustment on its own
-actual date. Completion comes from the Count submission, Month-end submission or COO decision fact,
+reconciles and submits by the governed submission date; the `Stock Adjustment Approver` decides any
+Adjustment on its own actual date. Completion comes from the Count submission, Month-end submission or stored approver decision fact,
 never a generic `Mark done`.
 
 ## 10 · Permissions
@@ -703,8 +705,8 @@ never a generic `Mark done`.
 - Warehouse / Stock owns Unit, location, condition, availability control, differences, returns and
   month-end; no commercial terms, customer promise or payment.
 - Finance owns invoice, settlement, payment, valuation and report acknowledgement; no Unit edits.
-- The COO is the sole Management approver for material adjustment, write-off, compensation and
-  major dispute; approval does
+- The `Stock Adjustment Approver` is the sole resolved approver for material adjustment, write-off,
+  compensation and major dispute; approval does
   not replace evidence.
 
 No person completes demand, ordering, receipt, stock adjustment and payment end to end. Cover moves
@@ -734,7 +736,7 @@ Condition · Month-end Stock Confirmations · Partner Evidence · Unit History`.
   events stay Unit-level.
 - **Counts/Differences/Adjustments:** expose Count No, Site, Stock date, actual Count/submission,
   counter, Portal/Counted/matched/difference IDs, first Count, Count again, investigation,
-  correction, Adjustment request, COO decision and reversal. A final adjusted total may not hide the
+  correction, Adjustment request, Stock Adjustment Approver decision and reversal. A final adjusted total may not hide the
   original Count or merge Difference with Adjustment.
 - **Problems & Condition:** expose observable problem, Unit, holder/Site, actual reported date,
   reporter/evidence, affected SO/customer consequence, current Action/resolved owner, completion
@@ -753,7 +755,7 @@ truth and never becomes a second authority.
 Report visibility follows need: Sales receives Ready Stock and permitted showroom availability;
 NETS receives its authorised organisation/Site work/evidence; Purchasing receives Receiving,
 ownership, Consignment and supplier consequences; Finance receives Month-end/ownership/valuation
-facts; the COO receives all Warehouse reports and approval evidence. Cost, settlement, customer
+facts; management receives all Warehouse reports and approval evidence. Cost, settlement, customer
 payment and unrelated-outlet information remain hidden where the role does not require them.
 
 The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
@@ -783,16 +785,17 @@ never edits a Unit, reservation, Count result, Transfer/event or Month-end versi
   prevention, replacement-label rule and never-reuse law. Settings cannot rename an existing Unit;
   label error enters `Report a problem`.
 - **Permissions & approvals:** capability follows role/duty, never a hard-coded email. NETS
-  Warehouse, NETS Delivery, Showroom, GRN Duty, PO Duty, Sales, Purchasing, Finance and COO receive
-  only the actions stated in §10. The COO governs approval limits; a permission never overrides
+  Warehouse, NETS Delivery, Showroom, GRN Duty, PO Duty, Sales, Purchasing and Finance receive only
+  the actions stated in §10. The governed approval Duties resolve approval work; a permission never overrides
   segregation or evidence.
 - **External partners:** maintain organisation, warehouse/delivery roles, governed Sites, calendar,
   allowed actions, evidence requirements and active dates. No rule hard-codes NETS, so another 3PL
   or a future Carres-operated warehouse uses the same Unit/Receiving/Inventory/Outbound model.
 
-The shared **Team** duty door remains the one place to view or correct PO Duty, GRN Duty and
-buddy/cover. The governed **People** record supplies active status, access and last working date.
-Warehouse Settings links to those homes and must not copy either rota or employment truth.
+**Workspace → Staff & Duties** is the one place to view or correct PO Duty, GRN Duty and
+Buddy cover. The governed **People** record supplies identity, active status, access, leave and last
+working date. Warehouse Settings links to those homes and must not copy either Duty assignment or
+employment truth.
 
 ### External warehouse / NETS Portal boundary
 
@@ -1009,8 +1012,8 @@ Inventory, My Work and Team Work render the one Action; no second Problems Regis
 **CROSS-MODULE CONNECTION →** Stock owns physical availability, last confirmed holder and
 investigation fact; Receiving owns receipt observations; Purchasing owns Supplier Claim/exchange/
 supplier return; Delivery owns transport and handover investigation; Service Case owns customer or
-product service; Sales Order displays promise risk only; COO alone approves governed material
-Adjustment, write-off or unexplained major difference.
+product service; Sales Order displays promise risk only; the `Stock Adjustment Approver` alone
+approves governed material Adjustment, write-off or unexplained major difference.
 
 ### 12.5 Stock Count, Difference and Adjustment
 
@@ -1036,7 +1039,7 @@ reveals exact matched, missing, unexpected, holder/Site and condition difference
 dated Unit-level Count again where required; current GRN Duty investigates Receiving, Transfer,
 Outbound, Delivery and Unit History. Evidence-backed source correction completes an explainable
 difference. Only a genuinely unresolved physical difference becomes an Adjustment Request, and
-only the COO may approve or reject it. Approval creates an append-only Unit correction while
+only the resolved `Stock Adjustment Approver` may approve or reject it. Approval creates an append-only Unit correction while
 preserving snapshot, first Count, Count again, investigation and decision.
 
 **OPERATOR JOURNEY →** NETS opens the actual dated Count Work, scans every Unit without seeing the
@@ -1050,13 +1053,13 @@ with saved views `Scheduled counts · Counting · Differences to check · Adjust
 Completed`. Count Register defaults are `Count No · Site · Stock date · Actual count date ·
 Submitted date · Scope · Counter avatar · Portal Units · Counted Units · Differences · State ·
 Work`. Count Detail contains scope, first Count, Count again, exact Unit differences,
-investigation, correction, Adjustment request, COO decision, resulting Unit events and History.
+investigation, correction, Adjustment request, Stock Adjustment Approver decision, resulting Unit events and History.
 No ordinary-user plus/minus form exists.
 
 **CROSS-MODULE CONNECTION →** Stock owns Count/Difference/investigation and physical correction;
 Receiving and Delivery/Outbound supply missing receipt/handover facts; Purchasing handles supplier
-quantity/product consequence; Finance consumes approved results and the Month-end version; COO
-alone approves governed material or unexplained Adjustment.
+quantity/product consequence; Finance consumes approved results and the Month-end version; the
+`Stock Adjustment Approver` alone approves governed material or unexplained Adjustment.
 
 ### 12.6 Outbound exact-Unit handover
 
@@ -1233,8 +1236,8 @@ extension.
 **CROSS-MODULE CONNECTION →** Purchasing owns Consignment Order/supplier/exchange/Claim/Sold to
 Settle; Stock owns Unit/Site/holder/condition/Count; Showroom owns physical scans and evidence;
 Sales Order owns exact reservation/sale; Delivery owns collection/return/customer handover; Finance
-owns Supplier Invoice/Credit Note/settlement; COO approves major unexplained difference/write-off/
-compensation.
+owns Supplier Invoice/Credit Note/settlement; the `Stock Adjustment Approver` approves major
+unexplained difference/write-off/compensation.
 
 ### 12.10 Month-end Stock Confirmation and Finance handoff
 
@@ -1277,7 +1280,7 @@ filters/exact Unit rows/unresolved differences and remains read-only.
 
 **CROSS-MODULE CONNECTION →** Stock owns cut-off reconstruction, Count, reconciliation and version;
 Receiving/Outbound/Delivery supplies actual events; Purchasing handles missing inbound/supplier
-consequence; COO owns Adjustment approval; Finance acknowledges and uses a version for valuation/
+consequence; `Stock Adjustment Approver` owns Adjustment approval; Finance acknowledges and uses a version for valuation/
 submission; Reports exports but never becomes authority.
 
 ### 12.11 Work, Duty Roster and automatic owner resolution
@@ -1295,11 +1298,11 @@ supervisor, shared warehouse login and premature labour-planning/shift/productiv
 
 **RULING → ADAPT + IMPROVE + REJECT.** The shared Work Engine stores `Trigger · Owner rule ·
 Resolved owner · Action · Completion fact · governed actual date · source object · cover rule`.
-Duty Resolver consumes Team/People facts and automatically adapts open/future Work; completed actor
+Duty Resolver consumes Staff & Duties/People facts and automatically adapts open/future Work; completed actor
 history never changes. Routine work has no Mark done and no undated generic task.
 
-**RECOMMENDED CARRES BUSINESS FLOW →** Team maintains the one PO Duty/GRN Duty rotation and buddy/
-cover. With three active staff, approved rotation and cover apply; with two, duties split/rotate;
+**RECOMMENDED CARRES BUSINESS FLOW →** `Workspace → Staff & Duties` maintains the one PO Duty/GRN
+Duty rotation and Buddy cover. With three active staff, approved rotation and cover apply; with two, duties split/rotate;
 with one, the same person holds both; only zero assignable staff may produce `No active Carres staff
 can take this work` for COO attention. People `Last working date` removes a leaver from the effective
 pool and re-resolves open/future Actions. NETS physical Work begins in the authorised organisation/
@@ -1312,16 +1315,16 @@ and action/late counts. Cover shows normal owner and today's cover as structured
 Warehouse page reads the same resolved owner and completes only when its stated authoritative fact
 exists.
 
-**UI / PAGE / OBJECT PLACEMENT →** Quick Rail is `Team · Calendar · My Work · Activity`. Team is the
-only PO/GRN Duty and buddy/cover edit door; People owns active/access/last-working-date facts;
+**UI / PAGE / OBJECT PLACEMENT →** Quick Rail is `Team · Calendar · My Work · Activity`. Team shows
+coverage but `Workspace → Staff & Duties` is the only PO/GRN Duty and Buddy-cover edit door; People owns active/access/last-working-date facts;
 Warehouse Settings links but copies neither. Warehouse pages render returned avatar/owner only and
 store no assignee. NETS uses individual email/name/avatar; shared `NW`/company identity and
 impersonation are invalid.
 
-**CROSS-MODULE CONNECTION →** People supplies effective people facts; Team owns Duty Roster;
+**CROSS-MODULE CONNECTION →** People supplies effective people facts; Staff & Duties owns Duty assignments;
 Work Engine owns Action/date/owner/cover/completion; Purchasing consumes PO Duty; Receiving/Stock
 consumes GRN Duty and individually identified NETS operators; Delivery consumes its own journey
-owner rules; COO handles approvals and the genuine zero-staff exception rather than routine task
+owner rules; the relevant approval Duty handles approvals and management handles the genuine zero-staff exception rather than routine task
 assignment.
 
 ### 12.12 Reports and analytical boundaries
@@ -1406,10 +1409,10 @@ settings or copied rota. External UI omits full ERP navigation, costs, payments,
 staff work. Heavy Zone/Rack/Bin/Wave/Forklift screens remain absent until measured operational need
 supports an extension of the same Unit model.
 
-**CROSS-MODULE CONNECTION →** People owns personal/effective access; Team owns PO/GRN Duty;
+**CROSS-MODULE CONNECTION →** People owns personal/effective access; Staff & Duties owns PO/GRN Duty;
 Warehouse Settings owns Site/calendar/Count/evidence/partner permission; Purchasing owns supplier/
 PO/Consignment; Receiving owns receipt; Delivery owns journey/arrival; Finance owns payment/
-settlement; COO governs approval limits and segregation.
+settlement; governed approval Duties and their limits preserve segregation.
 
 ### 12.14 Complete reference-to-Carres capability matrix
 
@@ -1419,7 +1422,7 @@ settlement; COO governs approval limits and segregation.
 | 2990 GRN inbound movement and rack choice | Receiving/GRN plus legacy Stock Add / Receiving, Stock | ADAPT + REJECT | one physical receipt door; no second Stock In or NETS placement model | Receiving posts; Inventory projects accepted results |
 | 2990 availability, reserve horizons and FIFO/batch logic | Ready Stock and reservation / Stock, Sales Order | ADAPT + IMPROVE | exact eligible Unit and set integrity fit Carres | Sales Order owns bind/release; no quantity-only promise |
 | Dynamics quality/quarantine and 2990 damage adjustment reason | issue/hold fragments / Stock, Claim, Service | ADAPT + REJECT | suspect Unit must stop use, but observer reports facts only | `Needs checking`; no generic Quarantine or instant write-off |
-| 2990 Stock Take snapshot, untouched/zero and variance | incomplete count controls / Stock | ADAPT + IMPROVE | blind exact-Unit Count and history protect physical truth | Difference precedes investigation/COO-approved Adjustment |
+| 2990 Stock Take snapshot, untouched/zero and variance | incomplete count controls / Stock | ADAPT + IMPROVE | blind exact-Unit Count and history protect physical truth | Difference precedes investigation/Stock-Adjustment-Approver decision |
 | 2990 OUT movement and mature load verification | take-out/Delivery links / Stock, Delivery | ADAPT + IMPROVE | exact two-sided handover prevents digital/physical drift | Delivery owns DO/Journey; no wave/staging/shortage override |
 | 2990 paired Transfer OUT/IN and reversal | movement primitives / Stock | ADAPT + IMPROVE | origin, transport holder and destination are separate facts | projects into Outbound/Inbound/Inventory; no fifth page |
 | 2990 Delivery/Purchase Return documents | return states / Delivery, Purchasing, Service, Stock | ADAPT | commercial owner authorises; Stock proves physical return | every returned/repaired Unit is checked before availability |

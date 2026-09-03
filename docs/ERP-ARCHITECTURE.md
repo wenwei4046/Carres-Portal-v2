@@ -132,38 +132,60 @@ confirm delivery appointment      → Delivery ownership rule
 ```
 
 The rule resolves automatically. Staff do not assign routine work order by order. **People** owns
-employment/account eligibility facts only; **Team** is the ONE Duty settings door and owns PO Duty,
-GRN Duty, buddy/cover and effective-month COO override. The Shared Duty Resolver applies those
-facts so absence changes who sees today's work without changing the underlying business record or
-rewriting its history. A manager may see or filter the resolved owner, but Work never creates a
-second assignment truth.
+employment/account eligibility facts only; **Workspace → Staff & Duties** is the ONE company-wide
+Duty assignment door. Every module references a Duty key and never stores its own staff list. The
+Shared Duty Resolver applies the active Primary holder and governed Buddy cover so absence changes
+who sees today's work without changing the underlying business record or rewriting its history. A
+manager may see or filter the resolved owner, but Work never creates a second assignment truth.
 
 ### Law F.1 · One Shared Duty Resolver
 
-**OWNER-APPROVED / LOCKED 2026-09-01.** No page, module or API reads a rota table or calculates a
-Duty holder for itself. The complete resolution chain is:
+**OWNER-APPROVED / LOCKED 2026-09-01; GLOBAL DUTY MODEL OVERWRITTEN 2026-09-03.** No page, module
+or API reads a rota table or calculates a Duty holder for itself. The same assignment, approval
+routing and Buddy-cover mechanism applies across the ERP; each kind of work still names its own
+Duty. The complete resolution chain is:
 
 ```
-People — active staff, last working date, access and rotation-pool eligibility
-→ Team — PO Duty, GRN Duty, buddy/cover and effective-month COO override
+People — individual staff identity, active/access, last working date and leave facts
+→ Workspace → Staff & Duties — Duty catalogue, one Primary holder and optional Buddy cover
 → Shared Duty Resolver — date + active staff + leave/cover rules
 → Work Engine — resolves the owner of each action from its Owner rule
 → every Register, object, Dashboard, My Work, Team Work and Quick Rail
 ```
 
-An action stores its `Owner rule`, trigger, completion fact, governed date and source object. The
-displayed owner/avatar is the resolver result, not a second stored `assigned_to`. A page may not
-read `ops_po_duty`, `ops_po_duty_cover`, a GRN rota or any equivalent table directly. It may not
-implement its own rotation arithmetic. Any Warehouse action or owner avatar that did not come from
-the shared Work Engine's resolved owner is an architecture violation, not an acceptable temporary
-integration.
+An action stores its `Owner rule`, trigger, completion fact, governed date and source object. Its
+audit evidence preserves three distinct identities: the normal Primary owner, today's resolved
+Cover (when one acts), and the actual person who completed/approved the work. Historical evidence
+never changes when a Duty holder changes later. The displayed owner/avatar is the resolver result,
+not a second stored `assigned_to`. A page may not read `ops_po_duty`, `ops_po_duty_cover`, a GRN
+rota or any equivalent table directly. It may not implement its own rotation arithmetic. Any action
+or owner avatar that did not come from the shared Work Engine's resolved owner is an architecture
+violation, not an acceptable temporary integration.
 
-Automatic Duty resolution uses the eligible active Carres staff pool unless Team contains an
-effective override: three people resolve PO Duty, GRN Duty and a third buddy/cover; two people
-rotate PO and GRN; one person carries both; a last-working-date change removes the person and
-re-resolves open and future Work. Only zero eligible people produces `Not assigned`, with a direct
-door to People / Team. Capability remains separate: an authorised actor may perform an act without
-becoming its resolved owner, and history records normal owner, cover and actual actor separately.
+The governed Duty catalogue is business-specific, not one fake `ERP Owner`:
+
+| ERP work | Owner Duty |
+|---|---|
+| Storage free approval | `Storage Waiver Approver` |
+| Purchase Order approval | `Purchasing Approver` |
+| Delivery charge approval | `Delivery Charge Approver` |
+| Payment exception | `Payment Approver` |
+| Stock adjustment | `Stock Adjustment Approver` |
+| Service Case decision | `Service Case Approver` |
+
+Each Duty has exactly one active Primary holder and may have one governed Buddy cover. When the
+Primary holder is on recorded leave, the Work Engine routes today's open work to the active Cover;
+it does not rewrite the normal owner. Changing staff or approval ownership happens once in
+`Workspace → Staff & Duties`, and every module, My Work and Team Work resolves the change together.
+No action sentence, module setting or permission check hard-codes `Jess`, `Manager` or another
+person's name.
+
+Automatic rotation may supply a recommended Primary/Cover for operational rotas such as PO Duty and
+GRN Duty, but the authoritative assignment is the effective-dated record in `Staff & Duties`. A
+last-working-date change removes the person and re-resolves open and future Work. Only no eligible
+Primary or Cover produces `Not assigned`, with a direct door to People / Staff & Duties. Capability
+remains separate: an authorised actor may perform an act without becoming its resolved owner, and
+history records normal owner, cover and actual actor separately.
 
 An action owner and an action capability are separate facts. A governed Operations Superuser may
 perform the operational action without replacing the resolved owner. The event records both the
