@@ -61,6 +61,11 @@ happened, accountability, financial consequence, recovery and the learning that 
 meeting, training and SOP. Its approved operating model lives once in
 [`issue-tracker/MASTER.md`](issue-tracker/MASTER.md).
 
+**ACTION HAS AN OWNER; A BUSINESS OBJECT DOES NOT GAIN ONE UNIVERSAL OWNER.** Every action and
+approval carries an owner rule expressed as a shared duty, a resolved primary holder, optional
+today's buddy cover, actual actor and evidence. Workspace owns assignment. Modules only name the
+duty required. Owner identity is metadata/avatar, never repeated inside the action sentence.
+
 The approved end-to-end Sales Order V2 target, its implementation state and its restart order
 live once in [`orders/MASTER.md`](orders/MASTER.md), immediately after the Card 1 production
 record. Architecture owns this boundary; the Orders MASTER owns the build sequence and business
@@ -684,8 +689,10 @@ do not chase payment for goods you cannot deliver).
 
 > ### STORAGE — FROZEN (§6.1, Decision ①)
 > **Money In owns the FEE** — the rate table, the one arithmetic, the charge, the collection
-> and the waiver. The Customer Order owns the TRIGGER and the HOLD (the clock runs from the
-> PROMISE — *you did not collect*, never *your goods are here*). Stock is the WITNESS.
+> and the waiver. The Customer Order owns the TRIGGER and the HOLD. The clock starts only when
+> Carres can complete the agreed delivery scope AND the customer delays/refuses it; the later
+> authoritative witness is Storage Start. Supplier/Carres delay and goods-not-ready days never
+> charge. Stock/Warehouse supplies readiness, location, condition and photo evidence.
 > The rate asks the CATALOG for the category, which closes D9's storage half by ownership.
 
 ---
@@ -758,6 +765,14 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 > **Duty or a governed capability — never a runtime email check — decides permission.** Duty stays
 > the normal owner; an Operations Superuser capability permits action without changing ownership.
 > **And the PIC on an order is a POINTER to a person, never a copy of them.**
+
+### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
+
+Workspace owns one Staff & Duties registry for every ERP module. Each work/approval type maps to
+its own duty (for example Payment Duty, Storage Waiver Approver, Purchasing Approver); there is no
+universal ERP Manager owner. A duty has a primary holder and optional buddy cover. Resolution
+retains normal owner, today's cover and actual actor, so absence changes today's work without
+rewriting history. Reassignment is one Workspace change and never a module code change.
 
 ---
 
