@@ -25,6 +25,10 @@ import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
+/* The Sales Order's card: same heading face, same border, same padding. The
+   PO document is read against the SO every day; two card grammars on two
+   sister pages read as two apps (YH, 2026-09-04). */
+import { Block } from "../SalesOrderWorkspace";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
@@ -1000,9 +1004,8 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
     <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="po-document-panes">
       <div className="flex min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4 lg:w-1/2 lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
-      <section className="border border-kit-slate-5 bg-white p-4">
-        <h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Purchase order</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Block title="Purchase order">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Supplier" value={row.supplierName} />
           <Fact label="Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={row.source} />
@@ -1016,10 +1019,11 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
         <SupplierDateBlock row={row} onSaved={onSupplierDateSaved} />
-      </section>
-      <section className="overflow-hidden border border-kit-slate-5 bg-white">
-        <h2 className="px-4 py-3 text-label font-semibold uppercase tracking-wide text-kit-slate-9">Goods lines</h2>
-        <div className="overflow-x-auto">
+      </Block>
+      <Block title="Goods lines">
+        {/* The table bleeds to the card edge so its own scroller, not the
+            card, is what moves sideways. */}
+        <div className="-mx-4 -mb-3 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
               <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Ordered</th><th className="px-3 text-right">Received</th><th className="px-3 text-right">Open</th></tr>
@@ -1043,13 +1047,15 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
             </tbody>
           </table>
         </div>
-      </section>
+      </Block>
       {/* Three across fitted the full width; in half of it they were three
-          slivers. Two, and the third wraps. */}
+          slivers. Two, and the third wraps.
+
+          Order: the short cards first, the long list last. Receiving and
+          Claims hold a handful of rows; Unit IDs holds one row per unit and
+          is the card a reader scrolls past, not to (YH, 2026-09-04). No rule
+          in docs/purchasing/MASTER.md or docs/ui/MASTER.md fixes this order. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
-          {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
-        </ConnectionBlock>
         <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
           {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
@@ -1058,6 +1064,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
           {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
+        </ConnectionBlock>
+        <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
+          {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
         </ConnectionBlock>
       </div>
       </div>
@@ -1233,7 +1242,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="flex min-h-[150px] flex-col border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <Absence>{empty}</Absence>}</div></section>;
+  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <Absence>{empty}</Absence>}</div></Block>;
 }
 
 function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {

@@ -456,6 +456,19 @@ describe("Purchase Order object", () => {
     expect(panes.firstElementChild?.className).toContain("min-w-0");
   });
 
+  it("wears the Sales Order's card heading and keeps the long Unit ID list last (2026-09-04)", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const facts = screen.getByTestId("po-document-panes").firstElementChild!;
+    const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    /* Same card as the Sales Order: the mono, tracked heading face. */
+    const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
+    expect(po.className).toContain("font-mono");
+    /* Short cards first; the one-row-per-unit list is scrolled past, not to. */
+    const order = ["Receiving", "Claims and returns", "Unit IDs"].map((t) => heads.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
   it("uses the 50/50 official-document layout only for issue or revision work", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.queryByTestId("po-document-split")).not.toBeInTheDocument();
