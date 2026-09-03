@@ -4,6 +4,7 @@ import {
   type FinanceArAgingRow,
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { FinanceKpi } from "@/components/FinanceKpi";
 import ARDrawer from "./ARDrawer";
 
 type StatusFilter = "open" | "settled" | "all";
@@ -75,9 +76,9 @@ export default function FinanceAR() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-5">
-        <Kpi label="Gross billed"  value={rmCompact(totals.gross)}       hint={`${filtered.length} invoices`} />
-        <Kpi label="Collected"     value={rmCompact(totals.paid)}        hint={totals.gross > 0 ? `${Math.round((totals.paid / totals.gross) * 100)}% of gross` : "—"} tone="ok" />
-        <Kpi label="Outstanding"   value={rmCompact(totals.outstanding)} hint="What we still need to collect" tone="warn" accent />
+        <FinanceKpi label="Gross billed"  value={rmCompact(totals.gross)}       hint={`${filtered.length} invoices`} />
+        <FinanceKpi label="Collected"     value={rmCompact(totals.paid)}        hint={totals.gross > 0 ? `${Math.round((totals.paid / totals.gross) * 100)}% of gross` : "—"} tone="ok" />
+        <FinanceKpi label="Outstanding"   value={rmCompact(totals.outstanding)} hint="What we still need to collect" tone="warn" accent />
       </div>
 
       <FilterBar
@@ -229,26 +230,3 @@ function AgingPill({ bucket }: { bucket: FinanceArAgingRow["aging"] }) {
 }
 
 // ---------- KPI ----------
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
-    </div>
-  );
-}
-

@@ -185,7 +185,12 @@ Destructive or uncertain SQL therefore cannot ride an ordinary merge-to-main dep
 
 - **Unit (vitest)** — every adapter, zod schema and utility, 100%.
 - **Integration (vitest + msw)** — every Hono route, Supabase mocked.
-- **E2E (Playwright)** — each role's happy path.
+- **E2E (Playwright)** — each role's happy path. **This gate is MANUAL, not CI.** `ci.yml` has
+  no Playwright job and no Supabase secrets, so `e2e/phase-5-*` (AR aging buckets, dealer
+  top-up approve, invoice-issue-after-delivered) never run on a PR. Before merging a change to
+  the Finance surface, run them locally against a seeded dev stack:
+  `pnpm seed:test-users && pnpm seed:e2e-fixtures && pnpm test:e2e e2e/phase-5-`.
+  A green CI on a finance PR says nothing about the e2e suite.
 - **A negative control is required.** A test that passes when you break the thing it guards is
   measuring nothing. Verify on disk that the control edit actually applied — CRLF files have
   silently swallowed `perl -0pi` edits at least seven times on this repo.

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { RequireRole } from "@/lib/require-role";
+import { loginState } from "@/lib/return-to";
 import { roleAllowedOnPortal } from "@/lib/portal";
 import WrongPortal from "@/components/WrongPortal";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -28,6 +29,7 @@ import { PayCancelled, PaySuccess } from "@/pages/pay/PayResult";
 const UiShowcase = lazy(() => import("@/pages/dev/UiShowcase"));
 
 function HomeRedirect() {
+  const location = useLocation();
   const session = useAuth((s) => s.session);
   const role = useAuth((s) => s.role);
   const hydrated = useAuth((s) => s.hydrated);
@@ -38,7 +40,8 @@ function HomeRedirect() {
       </div>
     );
   }
-  if (!session) return <Navigate to="/login" replace />;
+  // Both guards remember the same thing the same way — see lib/return-to.ts.
+  if (!session) return <Navigate to="/login" state={loginState(location)} replace />;
   // POS/ERP domain split (2026-07-18): wrong-domain roles get the signpost
   // before any role-home navigation. pages.dev/localhost stay ungated.
   if (role && !roleAllowedOnPortal(role)) return <WrongPortal role={role} />;
@@ -69,7 +72,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
     );
   }
   if (!session) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    // Path + query + hash, so a document-number deep link survives the login.
+    return <Navigate to="/login" state={loginState(location)} replace />;
   }
   return <>{children}</>;
 }

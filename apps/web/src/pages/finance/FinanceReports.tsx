@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   useFinanceMonthlyPl,
   useFinanceTopSkus,
@@ -7,12 +6,16 @@ import {
   type FinanceTopSkuRow,
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { FinanceKpi } from "@/components/FinanceKpi";
+import { appYearNow } from "@/lib/fmt-date";
 
 type PeriodChoice = "6m" | "ytd" | "12m";
 
+// The year is read off the business clock, not typed in — "YTD 2026" was a
+// literal that would have gone stale on 1 January.
 const PERIOD_LABEL: Record<PeriodChoice, string> = {
   "6m":  "Last 6 months",
-  "ytd": "YTD 2026",
+  "ytd": `YTD ${appYearNow()}`,
   "12m": "Last 12 months",
 };
 
@@ -68,10 +71,6 @@ export default function FinanceReports() {
     ? (latest.net / latest.revenue) * 100
     : 0;
 
-  function handleExport() {
-    toast.info("PDF export lands in Chunk C (server-side @react-pdf/renderer per Q7=A).");
-  }
-
   return (
     <div className="p-9 max-w-[1400px] mx-auto">
       <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
@@ -86,6 +85,9 @@ export default function FinanceReports() {
             Monthly P&amp;L · revenue trend · top SKUs
           </div>
         </div>
+        {/* No Export button: there is no export yet. A button that only toasts
+            "coming later" is a promise on screen, and the operator learns to
+            stop trusting buttons. It returns with the feature. */}
         <div className="flex gap-2">
           <select
             aria-label="Period"
@@ -97,36 +99,29 @@ export default function FinanceReports() {
               <option key={k} value={k}>{PERIOD_LABEL[k]}</option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="px-3 py-2 rounded-md border border-border bg-background text-meta font-semibold"
-          >
-            Export PDF
-          </button>
         </div>
       </header>
 
       <div className="grid grid-cols-4 gap-3.5 mb-6">
-        <Kpi
+        <FinanceKpi
           label={`Revenue · ${latest?.m ?? "—"}`}
           value={rmCompact(latest?.revenue ?? 0)}
           hint={prev ? `${revGrowth >= 0 ? "+" : ""}${revGrowth.toFixed(1)}% MoM` : "—"}
           tone={revGrowth >= 0 ? "ok" : "warn"}
         />
-        <Kpi
+        <FinanceKpi
           label={`COGS · ${latest?.m ?? "—"}`}
           value={rmCompact(latest?.cogs ?? 0)}
           hint={latest && latest.revenue > 0 ? `${Math.round(latest.cogs / latest.revenue * 100)}% of rev` : "—"}
         />
-        <Kpi
+        <FinanceKpi
           label="Net profit"
           value={rmCompact(latest?.net ?? 0)}
           hint={`${margin.toFixed(1)}% margin`}
           tone="ok"
           accent
         />
-        <Kpi
+        <FinanceKpi
           label="Opex"
           value={rmCompact(latest?.opex ?? 0)}
           hint="Rent · payroll · ops"
@@ -279,29 +274,6 @@ function TopSkuRow({ s, max }: { s: FinanceTopSkuRow; max: number }) {
         />
       </div>
       <div className="text-label text-muted-foreground mt-1">{s.qty} units sold</div>
-    </div>
-  );
-}
-
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
     </div>
   );
 }
