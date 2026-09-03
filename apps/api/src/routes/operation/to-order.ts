@@ -432,11 +432,19 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     for (const proposal of proposals) {
       for (const row of proposal.rows) {
         for (const build of row.builds) {
-          if (build.fullyOnPo) alreadyCovered += 1;
-          else if (proposal.blocked === "production_days")
+          /* `alreadyCovered` reports, it no longer excludes. A build sitting
+             wholly on an open purchase order is issuable like any other since
+             the SO Batch register began offering it a tick, so counting it
+             here as NOT issuable would have this door and that one disagree
+             about the same build. The tally stays because "these units are
+             already on order" is worth saying; it just no longer decides. */
+          if (proposal.blocked === "production_days")
             blockedProductionDays += 1;
           else if (row.delivery == null) blockedDeliveryDate += 1;
-          else issuable += 1;
+          else {
+            issuable += 1;
+            if (build.fullyOnPo) alreadyCovered += 1;
+          }
         }
       }
     }

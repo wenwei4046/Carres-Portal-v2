@@ -561,10 +561,19 @@ describe("the derived states — blockers and order timing", () => {
     }
   });
 
-  it("a fully covered build LEAVES the page; a partly covered one stays with its numbers", async () => {
+  it("a fully covered build STAYS and stays buyable; a partly covered one keeps its numbers", async () => {
     const { rows } = await rowsOf();
-    // Every COV-K unit is on PO-2051 — Buy = 0 does not remain in SO Batch Purchase.
-    expect(bySku(rows, "COV-K")).toBeUndefined();
+    /* Every COV-K unit is on PO-2051. That coverage comes from a per-SKU pool
+       with no customer attribution, so it may belong to another order and may
+       move on the next refresh — the buyer is shown both numbers and decides.
+       Before 2026-09-03 this row was dropped and the operator got a Sales
+       Order with goods lines, no tick-box and no sentence. */
+    expect(bySku(rows, "COV-K")).toMatchObject({
+      qtyNeeded: 3,
+      onPo: 3,
+      toBuy: 3,
+      poNumbers: ["PO-2051"],
+    });
     expect(bySku(rows, "PART-K")).toMatchObject({
       state: "safety_days_low",
       qtyNeeded: 3,
@@ -1248,12 +1257,13 @@ describe("Card 02-C · a `place` order is invisible to Purchasing", () => {
 
   it("cannot consume Open PO coverage ahead of a proceeded order", async () => {
     /* One open unit of COV2-K; the `place` order asked first (2026-06-01).
-       Under the corrected boundary the PROCEEDED order's unit is fully
-       covered — its leaf leaves the buying listing entirely. If the `place`
-       order were still allowed to drink the coverage, the proceeded order
-       would surface here with `toBuy: 1`. */
+       Under the corrected boundary the PROCEEDED order drinks that unit, so
+       its build reports `onPo: 1`. If the `place` order were still allowed to
+       take the coverage first, the proceeded order would report `onPo: 0`.
+       That number is the assertion — the row itself is present either way
+       since 2026-09-03, so its mere existence proves nothing. */
     const { rows, body } = await rowsOf();
-    expect(bySku(rows, "COV2-K")).toBeUndefined();
+    expect(bySku(rows, "COV2-K")).toMatchObject({ onPo: 1 });
     /* And the proceeded order's PERMANENT row is still on the Register. */
     expect(body.registerRows.find((r) => r.orderId === "o13")).toBeDefined();
   });
