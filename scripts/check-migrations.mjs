@@ -47,14 +47,27 @@ if (invalid.length) throw new Error(`Invalid migration filenames: ${invalid.join
  * half-applied. Renumbering would edit committed migrations (red line 6) and
  * would not make the missing halves apply.
  *
- * The baseline is a FIXED LIST rather than "ignore old numbers", so a twelfth
+ * The baseline is a FIXED LIST rather than "ignore old numbers", so a new pair
  * cannot join it silently, and a pair that stops colliding must leave it. A
  * suffix letter stays legal — `0376a_…` exists precisely so a follow-up can sit
  * behind a number without taking it.
+ *
+ * ── 0417 · the twelfth pair, measured 2026-09-03 ────────────────────────────
+ * PR #1066 (`0417_the_register_names_the_site_and_the_holder`, Warehouse
+ * CARD 02) and PR #1065 (`0417_the_partner_says_it_cannot_deliver`) numbered
+ * from the same tail mid-CI and merged minutes apart — the 2026-08-24 story
+ * again, this time caught by THIS gate on the very next deploy. Both files are
+ * committed, so red line 6 forbids renaming either (a rename PR was refused by
+ * the immutability check, correctly). Measured against the tracker: the
+ * PARTNER half is APPLIED (2026-09-03 01:56); the REGISTER half is NOT APPLIED
+ * — its apply is owner-gated and its content is one CREATE OR REPLACE VIEW, so
+ * whichever order a fresh database runs the pair in, the view lands identically
+ * and neither file touches the other's objects. Reported to the owner with the
+ * CARD 02 closure, as this comment's own doctrine requires.
  */
 const COLLISION_BASELINE = new Set([
   "0165", "0166", "0204", "0206", "0232", "0233",
-  "0239", "0241", "0242", "0255", "0267",
+  "0239", "0241", "0242", "0255", "0267", "0417",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);

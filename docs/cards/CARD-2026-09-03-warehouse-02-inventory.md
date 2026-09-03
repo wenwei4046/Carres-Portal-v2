@@ -53,8 +53,15 @@ copy, an identifier is a contract.
 ## Execution record
 
 - Migration `0417_the_register_names_the_site_and_the_holder.sql` (repo tail 0416, tracker
-  tail 0412, branch max 0416 → 0417; #1005's draft 0410 collides with main's own 0410 and must
-  renumber on its own PR).
+  tail 0412, branch max 0416 → 0417). **The number then collided**: PR #1065 merged its own,
+  already-applied `0417_the_partner_says_it_cannot_deliver` minutes after this card's PR —
+  the 2026-08-24 race again, caught by the deploy gate. Both files are committed, so red
+  line 6 forbids renaming either (a renumber PR was refused by the immutability check,
+  correctly); the pair is BASELINED in `scripts/check-migrations.mjs` per that gate's own
+  doctrine, with the measured applied/unapplied split recorded there. The register half's
+  content is one idempotent `CREATE OR REPLACE VIEW`, order-independent of the partner half.
+  #1005's draft 0410 likewise collides with main's own 0410 and must renumber on its own PR
+  (it is unmerged, so renaming remains legal there).
 - Code: `OperationApp.tsx` (`isStockUnitUrl` joins `isUrlDriven` + four suppression entries) ·
   `WarehouseStockRegister.tsx` (three word renames).
 - Tests: `OperationApp.test.tsx` +6 (Unit route mounts · slim-bar stands down · three
