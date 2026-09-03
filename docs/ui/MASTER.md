@@ -626,16 +626,18 @@ directory only and said so.*
   person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
   **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
   zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
-- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
+- **Team states BOTH operational duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
   through the ONE Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1, owner ruling
-  2026-09-01): **Team is the one Duty settings door**, People owns eligibility only, and no
+  2026-09-01 / 2026-09-03): **Workspace → Staff & Duties is the one Duty assignment door**,
+  People owns identity/eligibility only, and no
   page reads a rota table or calculates a Duty for itself (the current `ops_po_duty` read is
   legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
   `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
   fix it. This file does not restate the duty model.
 - **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
   the resolved owner/avatar from the one Work Engine Action contract governed by
-  `../ERP-ARCHITECTURE.md` Law F.1. Only Team edits the duty rotation; People supplies
+  `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and
+  Buddy cover; People supplies
   active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
   Team Work and Quick Rail may change display density, but they may not query the rota, calculate
   an offset, store local assignment or invent a fallback identity.

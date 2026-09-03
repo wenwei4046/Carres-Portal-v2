@@ -10,6 +10,20 @@
 > actor remain distinct. This slice is current law in `docs/purchasing/MASTER.md` and
 > `docs/ERP-ARCHITECTURE.md`. The rest of this Workspace/Dashboard proposal remains unapproved.
 
+> **Approved slice, 3 Sep 2026:** `Workspace → Staff & Duties` is the ONE company-wide Duty and
+> Approval Owner settings door. ERP Architecture Law F.1 owns the shared business rule; this
+> Blueprint owns its Workspace placement. Every module references its own Duty key and keeps no
+> local person list. Primary, Buddy cover and actual actor remain separate evidence.
+
+> **IMPLEMENTATION STATE — APPROVED TARGET / NOT FULLY BUILT (measured from repository,
+> 3 Sep 2026):** the portal already has individual staff, position-duty grants, PO Duty, dated PO
+> cover and several module-local approval gates. It does **not** yet have the one `Staff & Duties`
+> screen or a global Primary/Buddy assignment store/resolver. Several governed Duty names below are
+> absent from the closed Duty catalogue, and existing gates still resolve `principal`,
+> `ops_manager`, PO/GRN tables or module settings directly. Those are convergence gaps, not
+> permission for a module to add another local approver list. A later BUILD lane must deliver the
+> shared foundation first, then migrate module callers behind it with contract and history tests.
+
 ## 0. Decision record
 
 ### Already approved / locked
@@ -255,17 +269,29 @@ Claims remain authoritative only for supplier-side exceptions. Guarantee claims 
 7. A claimed action may expose `Release` only when its owner permits return to the group.
 8. Completing the business action is never `Mark done` in Work. The owning module records the result.
 
-### 4.3 Duty and buddy cover
+### 4.3 Duty and Buddy cover
 
-Carres' approved PO/GRN rotation remains the model:
+The global business rule lives only in ERP Architecture Law F.1. Workspace supplies its one edit
+door:
 
-- PO duty and GRN duty are offset; the same two people do not cover each other.
-- The no-duty buddy covers either duty.
-- Planned `Away` activates cover from the start of the day.
-- Before 10:00 MYT, no heartbeat is not absence.
-- From 10:00 MYT, no heartbeat today activates cover.
-- When the duty holder returns, new/open duty work resolves back to the holder. No business row is rewritten merely to express temporary cover.
-- If both duty holders are absent, the remaining person covers both and Dashboard raises `Duty coverage` as a management exception.
+```text
+Workspace
+└── Staff & Duties
+    ├── Staff eligibility / leave link → People
+    └── Duty
+        ├── Primary holder
+        ├── Buddy cover
+        └── Effective dates / current coverage
+```
+
+- Each work kind references its own Duty; there is no fake all-ERP owner.
+- Recorded leave activates the governed Cover. Missing heartbeat is not an absence decision.
+- New/open Work resolves to today's holder while the normal Primary remains accountable evidence.
+- The actual authenticated actor is recorded separately from both Primary and Cover.
+- Changing a holder updates future/open routing only; historical approval and completion evidence
+  stays unchanged.
+- A module Settings page may show the required Duty key and link here, but never edits a person
+  list.
 
 Work presentation:
 
@@ -274,7 +300,8 @@ PO-2051 · Expected Arrival not recorded
 [YJ] covering PO duty · Call Ohana — confirm ready date
 ```
 
-The Team panel remains the one home for the rota. Work explains cover only on rows where it changes who acts today.
+The Team panel may summarise coverage and workload; `Staff & Duties` remains the one assignment
+home. Work explains cover only on rows where it changes who acts today.
 
 ---
 

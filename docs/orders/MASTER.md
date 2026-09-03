@@ -4549,7 +4549,7 @@ staff · due: the delivery day itself · completion: the loan row reads returned
 Work engine from the loan fact; it never blocks a delivery (Card 6's law is untouched).
 
 **`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
-exception holds the delivery (0355) · owner: the Finance owner — only Finance clears it, with
+exception holds the delivery (0355) · owner: the resolved `Payment Approver` Duty holder, with
 evidence · due: immediately · completion: the exception reads cleared. Composed by the Work
 engine; a duty with no roster holder yet shows its duty word, never a borrowed PIC.
 
@@ -4730,16 +4730,18 @@ arithmetic). A paid order's DO renders no COD line.
 ```
 WHAT IT IS      an explicit record, linked to the Sales Order (0355)
 IT CARRIES      creator · reason · status · timestamps · clear evidence
-WHO CREATES     Finance, and only Finance
-WHO CLEARS      Finance, and only Finance
+WHO CREATES     resolved Payment Approver
+WHO CLEARS      resolved Payment Approver
 STATUS OPEN     blocks the DO gate — regardless of payment, and an approval
                 does NOT clear it
 STATUS CLEARED  removes the block
 ```
 
-- **One record, one owner (Law A).** Finance creates, changes and clears it and owns its completion
-  evidence. Sales Orders READS it to answer the gate; Delivery READS it; neither may write it, and
-  no surface may offer a second door onto the act (Law C).
+- **One record, one owner (Law A).** Money In owns the exception record and completion evidence;
+  the resolved `Payment Approver` performs its governed create/clear actions. Sales Orders READS it
+  to answer the gate; Delivery READS it; neither may write it, and no surface may offer a second
+  door onto the act (Law C). The current Finance/principal-only implementation is a convergence gap,
+  not authority to keep a module-local person or role list.
 - **`clear evidence` is a required field, not a nicety.** A block liftable without saying why is the
   hand-keyed `payment_status` defect this MASTER already retired once.
 - **It is a decision, never a derived state.** Opening one is a judgement; owing money is a fact.

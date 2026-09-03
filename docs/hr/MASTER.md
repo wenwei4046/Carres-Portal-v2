@@ -53,10 +53,11 @@ against a real session.
   locked out.
 - **A residual is accepted and documented:** a token issued BEFORE the disable lives out its
   hour.
-- **Team is the ONE Duty settings door** (owner ruling 2026-09-01). It stores current and future
-  effective-month `PO Duty` and `GRN Duty`, buddy/cover and COO override. No Warehouse,
-  Purchasing, Receiving or Delivery Settings surface keeps another Duty roster. The Shared Duty
-  Resolver defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
+- **Workspace → Staff & Duties is the ONE company-wide Duty assignment door** (owner rulings
+  2026-09-01 / 2026-09-03). It keeps the Duty catalogue, each Duty's one Primary holder, optional
+  Buddy cover and effective dates. `Team` may show staff and workload, but it is not a second Duty
+  editor. No module Settings surface keeps another approver list or rota. The Shared Duty Resolver
+  defined by ERP Architecture Law F.1 is the only reader exposed to pages and Work.
 
 # §3 · People — one record per CR-coded human
 
@@ -81,7 +82,7 @@ against a real session.
 - **People owns Duty eligibility, not Duty assignment** (owner ruling 2026-09-01): employee name,
   personal account, active/disabled, last working date and membership of the eligible Carres staff
   rotation pool. A last-working-date change removes the person from future resolution; People does
-  not store PO Duty, GRN Duty or buddy/cover.
+  not store any Duty assignment or Buddy cover.
 
 # §4 · Commission
 
@@ -132,7 +133,8 @@ against a real session.
 
 | What | Why it is not built |
 |---|---|
-| **Roster / presence / leave** | **DROPPED by Loo at the design stage.** Never started; nothing to remove. |
+| **Duty-cover leave fact** | **APPROVED 2026-09-03.** This is the effective-dated unavailable fact the Shared Duty Resolver needs to route today's Duty work to the governed Buddy. It is not a shift roster, attendance clock or presence monitor. |
+| **Shift roster / attendance / live presence** | **DROPPED by Loo at the design stage.** Missing heartbeat never activates a Cover; only a recorded leave fact does. |
 | **BD revenue on the cost screen** | Cost shows; revenue reads *not enrolled* — 0 dealers have a BD owner. Wiring it needs a dealer-channel revenue read, **not a widening of the showroom-only source.** |
 | **Effective dating on the other four config tables** | Approved. Today only rates carry it, so editing model rates, tiers, milestones or the scheme method rewrites live figures. Harmless for CLOSED months **because the run freezes the lines** — which is exactly why closed months must be read, never recomputed. |
 | **Pro-rating salary by join date** | Approved; blocked because `join_date` is filled for 0 of 9. |

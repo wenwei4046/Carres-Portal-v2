@@ -93,7 +93,7 @@ finished — do not build it.
 | **Completion** | a condition the SYSTEM measures. Never "someone says they did it" |
 | **Due** | when it turns late, in **working days** |
 | **Source object** | the canonical object identity; stored as a link, not repeated inside the action sentence |
-| **Cover rule** | roster/buddy-cover resolution; preserves both normal owner and today's cover evidence |
+| **Cover rule** | shared Duty/Buddy-cover resolution; preserves normal Primary owner and today's Cover evidence |
 
 **AN ACTION HAS AN OWNER. A SALES ORDER DOES NOT HAVE ONE UNIVERSAL OWNER.** One SO may raise
 several simultaneous actions, each with a different owner rule. Never add a permanent generic
@@ -120,6 +120,13 @@ Display density changes; the contract does not:
 
 **Case Owner**, where a module genuinely defines one, remains separate. It is never substituted
 for an action's owner rule and never written into the action sentence.
+
+**DUTY EVIDENCE IS THREE FACTS, NEVER ONE OVERWRITTEN NAME — owner ruling 2026-09-03.** A
+Duty-owned action and its completion/approval record preserve: (1) the normal Primary holder,
+(2) today's resolved Buddy cover when different, and (3) the actual authenticated actor. The shared
+resolver supplies them from `Workspace → Staff & Duties`; modules store the Duty key, not a local
+staff list. Reassigning a Duty changes open and future routing only. It never rewrites historical
+evidence or turns the Cover/actor into the former Primary holder.
 
 ## Law 2.1 — two-line action copy
 
