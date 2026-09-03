@@ -537,6 +537,11 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
 > describes one module, and every boundary defect found so far lived *between* two of them.
 
+> **GLOBAL DUTY LAW — OWNER-APPROVED 2026-09-03.** Every ERP action and approval resolves its
+> owner through the shared Staff & Duties system: duty rule → primary holder → today's buddy cover
+> → actual actor evidence. A module may name the duty it needs; it may never hard-code a person's
+> name, keep a second assignment list, or turn owner identity into action-sentence text.
+
 ## 8.1 · Modules
 
 | Module | What it owns | MASTER |
@@ -550,6 +555,7 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 | **UI** | the design system, the kit, the portal shell and its right rail | [`docs/ui/MASTER.md`](docs/ui/MASTER.md) |
 | **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
 | **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
+| **Workspace** | Staff & Duties, duty holders, cover and shared approval routing | [`docs/workspace/MASTER.md`](docs/workspace/MASTER.md) |
 
 **A module gets a folder only when it is a real operator surface with measured reality.**
 Never create an empty master for symmetry.

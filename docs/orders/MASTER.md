@@ -3172,8 +3172,10 @@ archive. **`Owing` and the delivery-photo queue are the two deliberate exception
 delivered orders, because the money and the proof outlive the delivery.
 
 **The bulk bar writes:** assign logistics (loops the ops-assign endpoint) · create follow-up
-tasks · mark completed (**server-scoped to AutoCount rows only**) · **No storage** (writes
-`storage_fee_override = 0`) · CSV · Print.
+tasks · mark completed (**server-scoped to AutoCount rows only**) · the legacy **No storage**
+direct write (`storage_fee_override = 0`) · CSV · Print. **The direct No storage write is measured
+legacy behaviour, not target authority, and must retire:** `payment/MASTER.md` owns written request,
+tiered duty and exact-end-date waiver. Orders may never silently forgive the charge.
 
 **The auto-assign sweep is SERVER-SIDE and fires once per page load from ANY operation
 session** — a staff member receives their share the moment THEY open the portal, with no
@@ -4610,9 +4612,11 @@ uncollected at T−2 is a delivery about to slip; T−1 and later while owing is
 consumers, one module: the collections desk and the Work engine's `collect` due. The full
 ruling lives below in this section.
 
-### `Collect RM {amount} from {customer}`
+### `Ask the customer to pay`
 Trigger: outstanding > RM 0 · completion: outstanding = RM 0 ·
 **survives delivery** — a delivered order that still owes keeps this action and its red dot.
+Amount and customer are structured row/card facts; action owner is metadata/avatar. They are not
+duplicated in the action sentence.
 
 ### MONEY LEAVES A TRACE ON THE ORDER
 `payment_record` and `payment_void` write `payment.received` / `payment.voided` into the order's

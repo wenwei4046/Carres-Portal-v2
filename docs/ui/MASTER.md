@@ -1183,6 +1183,13 @@ breathing gap
   config fields, Save/Cancel controls and database-like keys are not the default view. Future
   Purchasing, Warehouse and Delivery settings inherit the grammar without creating empty pages or
   duplicate top-level settings homes.
+- **ACTION OWNER TEMPLATE — OWNER-APPROVED / LOCKED (2026-09-03).** Object identity belongs to the
+  row/card header; owner belongs to structured metadata/avatar; the action sentence contains only
+  the act. Avatar initials are a separate chip and hover reveals the person. My Work omits the
+  current person's repeated avatar. Team Work groups by owner header. Cover shows normal owner and
+  today's cover without overwriting either. Counts name concrete work (`5 customer balances need
+  collection`), never abstract `open`/`late` totals. Register, My Work and Team Work render the same
+  Action contract at different density; none stores a second free-text truth.
 - **ERP SHELL + SALES ORDER UI REFERENCE — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** PR #771
   merged as `5fed50d3`; the known-goods classification correction followed in PR #773 and merged
   as `4934826d`; PR #776 closed the final object-route/Settings presentation mismatches and merged
