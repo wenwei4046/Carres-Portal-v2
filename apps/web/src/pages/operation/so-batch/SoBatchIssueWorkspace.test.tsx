@@ -495,6 +495,22 @@ describe("the issue review only reviews the purchase order", () => {
     );
   });
 
+  /* A supplier that DELIVERS its own goods is never collected, so its fixed
+     destination is a setting nothing reads — and the server never refuses on
+     it. The browser used to, which greyed out Issue PO for a document the
+     server would have accepted, with no way past it from the screen. */
+  it("does not refuse a supplier that delivers its own goods", () => {
+    renderWorkspace([
+      {
+        ...fixedPickup,
+        supplierKind: "own_logistics",
+        destinationId: BULOH.id,
+      },
+    ]);
+    expect(screen.queryByTestId("so-batch-issue-blocker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
+  });
+
   it("sends only the selected demand and destination arrangement", async () => {
     issuesOk();
     renderWorkspace();

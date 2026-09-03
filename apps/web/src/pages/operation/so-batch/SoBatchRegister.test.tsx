@@ -1133,6 +1133,40 @@ describe("the arrangement on the parent row", () => {
     ).toBeInTheDocument();
   });
 
+  /* ⭐ THE ORDER-LEVEL SELECT USED TO OVERWRITE A GOVERNED LINE (YH, 2026-09-03).
+     Purchasing Settings pins where a collected supplier's goods land, and the
+     server refuses any purchase naming somewhere else. This one dropdown moved
+     EVERY line at once — so on an order spanning two governed suppliers no
+     value it offered could be issued, and Issue PO died with
+     `supplier_collection_destination_mismatch` and no way back. The governed
+     line now keeps its rule while its ungoverned neighbour still moves. */
+  it("leaves a line whose supplier has a governed destination where Settings put it", () => {
+    renderRegister({
+      rows: [
+        LEAF_O1,
+        LEAF_O3,
+        LEAF_O8A,
+        {
+          ...LEAF_O8B,
+          supplierCollection: {
+            procurementPartnerId: "p-eu",
+            procurementPartnerName: "EU",
+            fixedDestinationId: KLANG,
+          },
+        },
+        LEAF_O4,
+      ],
+    });
+    fireEvent.change(screen.getByTestId("so-batch-deliver-to-select-o8"), {
+      target: { value: BULOH },
+    });
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledWith([
+      { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
+      { demandId: "build::o8::b", allocations: [{ destinationId: KLANG, qty: 1 }] },
+    ]);
+  });
+
   it("several eligible lines share one whole-order select; changing it arranges every line", () => {
     renderRegister();
     const select = screen.getByTestId("so-batch-deliver-to-select-o8");

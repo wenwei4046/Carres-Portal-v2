@@ -2015,6 +2015,40 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
   });
 
+  /* ⭐ THE DATABASE'S REFUSAL KEEPS ITS NAMES (YH, 2026-09-03).
+     The route reads the collection rule as the OPERATOR while the guard is
+     `security definer`, so the rule can be invisible to the code that has to
+     explain it — and this refusal reached the screen as "The supplier must be
+     collected to its configured destination", naming neither party, beside
+     whichever document happened to be showing. 0418 sends the names in `hint`;
+     this pins that they reach the operator instead of the fallback. */
+  it("names the supplier and the destination the database refused over", async () => {
+    const { sb, demands } = await ready();
+    /* Only the batch call is replaced — the PO-duty read and every other RPC
+       keep their real answers, or the route refuses for the wrong reason. */
+    const passThrough = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "purchasing_issue_pos_batch") return passThrough(fn, args);
+      return {
+        data: null,
+        error: {
+          code: "P0001",
+          message: "The PO destination must match Purchasing Settings.",
+          details: "supplier_collection_destination_mismatch",
+          hint: JSON.stringify({ supplier: "Ohana", destination: "Carres Klang" }),
+        },
+      };
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message?: string; action?: string };
+    expect(body.message).toBe("Ohana must be collected to Carres Klang.");
+    expect(body.action).toBe("Set Deliver To to Carres Klang, then issue again.");
+  });
+
   it("a browser collector cannot replace a missing governed collection rule", async () => {
     const tables = TABLES();
     (tables.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
