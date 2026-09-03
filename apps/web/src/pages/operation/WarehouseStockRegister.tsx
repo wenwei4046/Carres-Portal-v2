@@ -296,7 +296,7 @@ export default function WarehouseStockRegister() {
       },
       {
         key: "attention",
-        label: "Current attention",
+        label: "Needs checking",
         minWidth: 190,
         chooserGroup: "Unit",
         exportValue: (u) => attentionSentence(u) ?? "",
@@ -403,9 +403,9 @@ export default function WarehouseStockRegister() {
             testId="rail-all-stock"
           />
 
-          <RailSection title="Attention">
+          <RailSection title="Needs checking">
             {ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).length === 0 ? (
-              <p className="px-1 text-meta text-base-400">Nothing needs attention</p>
+              <p className="px-1 text-meta text-base-400">Nothing needs checking</p>
             ) : (
               ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).map((r) => (
                 <RailButton

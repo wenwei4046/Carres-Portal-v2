@@ -1713,6 +1713,21 @@ relocate — replenishment to Purchasing/Settings under this Blueprint, the hist
 History/Inventory. Those relocations join the `OperationStockOnHand` debt above as the named
 next scopes. Production proof rides the PR's deploy record.
 
+### 13.6 · BUILT — Inventory works and tells the truth (CARD 02, PR #TBD)
+
+`CARD-2026-09-03-warehouse-02-inventory` closed three measured P0s. **The register API had
+answered 500 since birth**: the route selected `site_name`/`holder_name` from
+`stock_unit_register_v` and no migration ever gave the view either column — the route merged
+2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
+governed-name joins on 0373's exact shape. **A Unit's permanent address rendered the
+Dashboard**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
+route-gate test that only mounting the app can provide. **Every Warehouse surface drew two top
+rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
+Header and none suppressed the slim global bar; all four do now, with a dashboard control test.
+The rail group and column that said `Attention` say **`Needs checking`** (§2's rejected-word
+list, applied). Column/rail re-architecture to §12.1's defaults remains the next Inventory
+slice, deliberately.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings

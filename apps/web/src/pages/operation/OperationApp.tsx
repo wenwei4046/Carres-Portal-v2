@@ -173,6 +173,13 @@ export default function OperationApp() {
      Page Header gear is the ERP's single Settings entry (ui/MASTER.md). */
   const isSettingsUrl = location.pathname.startsWith("/operation/settings");
   const isIssuesUrl = location.pathname.startsWith("/operation/issues");
+  /* 【WAREHOUSE】 CARD 02 — one exact Unit, addressed by its permanent Carres
+     Unit ID. The Route shipped 2026-08-21 and never joined this gate, so the
+     URL fell through to the `?tab=` branch and rendered the DASHBOARD over a
+     real Unit address — the exact defect the Edit Delivery note below names:
+     a new route joins BOTH lists in the same commit. Measured live 2026-09-03
+     on /operation/stock/unit/id-aam135002 before the fix. */
+  const isStockUnitUrl = location.pathname.startsWith("/operation/stock/unit");
   const isUrlDriven =
     isProcurementUrl || isToOrderUrl || isOrdersUrl || isOldOrdersUrl ||
     /* Edit Delivery (2026-08-24) is a real route. Its flag joined the
@@ -181,7 +188,7 @@ export default function OperationApp() {
        the production walk, invisible to a component test that never mounts the
        router. A new route joins BOTH lists in the same commit. */
     isEditDeliveryUrl ||
-    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl;
+    isDeliveryOrdersUrl || isSettingsUrl || isIssuesUrl || isStockUnitUrl;
 
   const [tab, setTab] = useState<string>("dashboard");
   // Sidebar collapse moved into PortalSidebar (Unified Internal Portal,
@@ -342,7 +349,17 @@ export default function OperationApp() {
           tab !== "receiving" &&
           tab !== "claims" &&
           tab !== "purchasing-report" &&
-          tab !== "purchasing-settings" && <GlobalTopBar />}
+          tab !== "purchasing-settings" &&
+          /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
+             de-navigated legacy Stock pages and Unit Detail all draw their own
+             50px Destination Header (ModuleHeader embeds TopBarIcons), so the
+             slim bar was a second Jump to, a second bell, a second gear on one
+             screen — the same defect Manual Purchase and Delivery Work each
+             shipped with, measured live on the CARD 01 walk. */
+          tab !== "stock-onhand" &&
+          tab !== "stock-plan" &&
+          tab !== "movements" &&
+          !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
             isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
