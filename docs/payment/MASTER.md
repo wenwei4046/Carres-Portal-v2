@@ -2,6 +2,8 @@
 
 > **APPROVED / LOCKED by Jess, 2026-09-03.** This is the only Payment Blueprint. It completely
 > overwrites the former routine Refund, Bank Matching and storage model. Git is the history.
+> **Customer payment posting convergence is PRODUCTION-VERIFIED.** The rest of this Blueprint is
+> approved target truth and is not claimed built by that closure.
 >
 > Read `CLAUDE.md` → `docs/ERP-ARCHITECTURE.md` → this MASTER. Sales Orders owns the delivery
 > money gate; Workspace owns people/duties; Payment never creates a second owner, calendar,
@@ -250,7 +252,36 @@ Carres has no-refund policy. The single known mattress-sagging refund was except
 Case/Operation handled customer/application, Management decided, Finance transferred externally,
 Operation informed customer. Payment may show linked read-only history; it does not generalise it.
 
-## 14 · Migration and done-when
+## 14 · Current build truth
+
+### Production-verified — Customer payment posting convergence
+
+Every current customer-order money entrance delegates to the canonical `_customer_payment_post`
+transaction: Finance receipt, operational/manual Payment, Sales/POS top-up and customer Stripe
+checkout. Source channel plus idempotency key prevents a retry from recording money twice. One
+successful transaction creates the canonical Payment, its allocation, one receipt identity, the
+derived `orders.paid` change and one Order activity fact; failure rolls the transaction back.
+
+The old generic `payments` table cannot accept new incoming customer-order money. Existing Finance
+receipt history was linked into the canonical ledger without increasing paid money again. A void
+preserves the Payment and reverses its live allocation and paid contribution; there is no delete.
+All current money readers and the Delivery gate derive from the same paid truth.
+
+Production evidence, reconfirmed 2026-09-03: migration
+`0351_customer_payment_posting_convergence.sql` is on `main`; focused API tests prove every posting
+entrance, idempotency mapping, role gate and void contract; focused web tests prove the shared money
+states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
+same deployed `main` SHA.
+
+### Approved target / not claimed built by this scope
+
+Collect + History replacement UI; structured collection outcomes and promise-to-pay; immutable
+invoice/receipt snapshots beyond the present receipt identity; overpayment/reallocation review;
+Payment-owned storage rules, requests, invoices and settings; global Duty/cover; complete reports;
+and retirement of the rejected routine Refund/Bank Matching/Negative Payment surfaces remain
+approved target work. Their absence does not reopen this production-verified posting contract.
+
+## 15 · Migration and module done-when
 
 Adapt 2990's useful lineage: SO → DO → Sales Invoice → canonical Payment → Receipt, ledger-derived
 balance, history and export. Reject its routine negative-payment/refund/credit surface.
