@@ -2,7 +2,7 @@
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import {
   poDateHistoryOf,
@@ -24,6 +24,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
+import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
@@ -813,10 +814,19 @@ function PurchaseOrderObject({
         </nav>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+      {/* The Document view hands the height to its two panes (each scrolls on
+          its own, the SalesOrderWorkspace shape); every other view scrolls the
+          page as before. Below `lg` the panes stack and the page scrolls. */}
+      <main
+        className={
+          view === "Document" && mode === "read"
+            ? "min-h-0 flex-1 overflow-auto lg:overflow-hidden"
+            : "min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
+        }
+      >
         {view === "Document" && mode !== "read" ? (
           <div
-            className="grid min-h-[640px] grid-cols-1 gap-3 min-[1130px]:grid-cols-2"
+            className="grid grid-cols-1 gap-3 min-[1130px]:grid-cols-2"
             data-testid="po-document-split"
             data-layout="50-50"
           >
@@ -973,18 +983,22 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   const po = row.po;
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
   return (
-    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE (YH, 2026-09-03).
-       The official PDF used to sit BELOW every block, so checking a goods line
-       against what the supplier actually received meant scrolling the two apart
-       and holding one in your head. They are now two columns, and the document
-       is sticky — it stays in view for the whole length of the left column.
+    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE — AS TWO PANES (YH, 2026-09-03).
+       The first cut put them in one grid inside a scrolling page and pinned the
+       document with `sticky`: a bordered box holding an iframe holding the
+       browser's PDF viewer, with its own grey chrome and its own scrollbar,
+       jumping as the page scrolled under it. The Sales Order does not do that.
+       Its facts and its document are two panes that each scroll on their own
+       and the page does not; the document is sheets of paper on the canvas, no
+       box, no caption strip. This is that shape, 50/50 at `lg`; below it the
+       two stack, facts first, and the page scrolls normally.
 
-       `min-w-0` on the left column is load-bearing. A grid item defaults to
+       `min-w-0` on the facts pane is load-bearing. A flex item defaults to
        `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
-       the COLUMN rather than scroll inside it, and the document would be
-       squeezed to nothing. Below `lg` the two stack, exactly as before. */
-    <div className="mx-auto grid max-w-[1440px] grid-cols-1 items-start gap-3 lg:grid-cols-2">
-      <div className="flex min-w-0 flex-col gap-3">
+       the PANE rather than scroll inside it, and the document would be
+       squeezed to nothing. */
+    <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="po-document-panes">
+      <div className="flex min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4 lg:w-1/2 lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
       <section className="border border-kit-slate-5 bg-white p-4">
         <h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Purchase order</h2>
@@ -1047,21 +1061,26 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         </ConnectionBlock>
       </div>
       </div>
-      {/* The document column. Sticky so it holds its place while the facts
-          scroll beside it — the whole reason the two are side by side. */}
-      <div className="min-w-0 lg:sticky lg:top-3" data-testid="po-document-column">
+      {/* The document pane. Its own scroller, so the paper holds its place
+          while the facts scroll beside it — the whole reason the two are side
+          by side. */}
+      <aside
+        className="min-h-0 min-w-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+        aria-label="Purchase order document"
+        data-testid="po-document-column"
+      >
         {/* A cancelled purchase order has no official document to preview —
             0402 refuses to print one by design. Saying so beats mounting a frame
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
-          <section className="border border-kit-slate-5 bg-kit-slate-3 px-3 py-2" data-testid="po-cancelled-no-document">
+          <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
             <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
             <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
           </section>
         ) : (
           <OfficialPreview poId={po.id} />
         )}
-      </div>
+      </aside>
     </div>
   );
 }
@@ -1256,24 +1275,23 @@ function RouteProblem({ title, problem, action, onRetry }: { title: string; prob
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    void (async () => {
-      try {
-        const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
-        const blob = await renderPoPdf(data);
-        if (typeof URL.createObjectURL === "function") objectUrl = URL.createObjectURL(blob);
-        if (active) setUrl(objectUrl);
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "The official PDF could not be opened");
-      }
-    })();
-    return () => { active = false; if (objectUrl && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(objectUrl); };
+  /* The same blob `Download PDF` saves, painted as pages. The header already
+     names the PO, so the paper carries no caption strip of its own. */
+  const render = useCallback(async () => {
+    const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+    return renderPoPdf(data);
   }, [poId]);
-  return <section className="flex min-h-[640px] min-w-0 flex-col border border-kit-slate-5 bg-kit-slate-3"><div className="flex h-10 items-center justify-between border-b border-kit-slate-5 bg-white px-3"><span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</span><span className="font-mono text-meta text-kit-slate-9">{poId}</span></div>{error ? <div className="border-b border-kit-red-9 bg-kit-red-3 px-3 py-2"><div className="text-meta text-kit-red-11">The official PDF could not be opened</div><div className="text-meta text-kit-slate-11">Try again. If it still fails, ask the system owner to check the PO document.</div></div> : null}<iframe title="Official purchase order preview" aria-label="Official purchase order preview" className="min-h-[600px] w-full flex-1 bg-white" src={url ?? "about:blank"} /></section>;
+  const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
+  return (
+    <div className="mx-auto w-full max-w-[700px]">
+      {pdfError ? (
+        <div className="mb-3">
+          <ReadProblem problem="The official PDF could not be opened" action="Try again. If it still fails, ask the system owner to check the PO document." onRetry={retry} />
+        </div>
+      ) : null}
+      <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />
+    </div>
+  );
 }
 
 function RevisionForm({
