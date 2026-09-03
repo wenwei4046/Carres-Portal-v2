@@ -684,6 +684,43 @@ export function isSelectableForBuying(row: PurchaseDemandRow): boolean {
   );
 }
 
+/**
+ * Whether this row may be ticked ON THIS ORDER.
+ *
+ * `isSelectableForBuying` judges the DEMAND. This adds the one fact the demand
+ * cannot see: whether the order it belongs to has already bought everything it
+ * needed.
+ *
+ * WHY THE ROW ARITHMETIC IS NOT ENOUGH (YH, 2026-09-03 — "an ordered's
+ * checkbox still tickable"). The two numbers are computed from different
+ * facts and are allowed to disagree:
+ *
+ *   Status   per order line, `qty - stockTaken` against the units carried by
+ *            this order's OWN `po_line_sources` lineage on confirmed-sent
+ *            purchase orders. Customer-attributed and exact.
+ *   `toBuy`  the engine's remainder, drained from a per-SKU pool with NO
+ *            customer attribution.
+ *
+ * So an order whose own documents cover every unit it required could still
+ * carry a leaf with `toBuy > 0`, and the checkbox appeared beside an `Ordered`
+ * pill. Ticking it raises a SECOND purchase order for units this order has
+ * already bought and sent — the one duplication the pooled arithmetic cannot
+ * rule out on its own, because only lineage knows whose units they are.
+ *
+ * IT FAILS OPEN, deliberately. `ordered` requires lineage, and lineage exists
+ * only from migration 0382 with no backfill. An order whose purchase orders
+ * predate it scores `sentCoveredQty` 0, reads `blank`, and stays tickable —
+ * which is right: nothing has PROVEN those units were bought for this
+ * customer. This gate can therefore never hide genuine demand; it only refuses
+ * a buy the order's own documents already account for.
+ */
+export function isSelectableForOrder(
+  row: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+): boolean {
+  return orderStatus !== "ordered" && isSelectableForBuying(row);
+}
+
 /** Everything to Carres Klang — the standing Purchasing default (MASTER §5.4). */
 export function defaultAllocations(
   row: PurchaseDemandRow,

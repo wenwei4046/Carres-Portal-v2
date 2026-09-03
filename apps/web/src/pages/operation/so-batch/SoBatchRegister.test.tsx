@@ -681,6 +681,90 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(screen.getByTestId("so-batch-row-open-po-pool-mismatch")).toBeInTheDocument();
   });
 
+  it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
+    /* THE PINNING TEST THIS REPLACES WAS VACUOUS (YH, 2026-09-03 — "an
+       ordered's checkbox still tickable"). `ORDER_O5` is Ordered and carries
+       NO leaf, so nothing about it could ever have drawn a checkbox and the
+       suite proved nothing.
+
+       The two numbers are computed from different facts and are allowed to
+       disagree: Status counts this order's OWN `po_line_sources` lineage,
+       `toBuy` drains a per-SKU pool with no customer attribution. So a fully
+       Ordered record CAN carry a leaf whose `toBuy` is positive — and the
+       checkbox appeared beside the `Ordered` pill. Ticking it raises a second
+       purchase order for units this order already sent for. */
+    const stillBuyable = leaf({
+      id: "build::o5::b5",
+      orderId: "o5",
+      so: 1400,
+      customer: "DONE ONE",
+      lineIds: ["l51"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [stillBuyable], registerRows: [ORDER_O5] });
+
+    /* Visible and DISABLED, never absent — Card 02-B keeps the record on the
+       page; what this closes is the ability to act on it. */
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-select-o5")).toBeDisabled();
+  });
+
+  it("an Ordered record shows no amber `Issue PO` sentence — it is not blocked", () => {
+    /* Failing the tick because buying is FINISHED is not a blocker. Printing
+       "Issue PO to Hooka" in an amber panel on an order whose purchase orders
+       are already sent would be an instruction to duplicate work. */
+    const stillBuyable = leaf({
+      id: "build::o5::b5",
+      orderId: "o5",
+      so: 1400,
+      customer: "DONE ONE",
+      lineIds: ["l51"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [stillBuyable], registerRows: [ORDER_O5] });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+
+    expect(screen.queryByTestId("so-batch-blocker-build::o5::b5")).not.toBeInTheDocument();
+  });
+
+  it("a blank record with the SAME leaf shape KEEPS its tick — the gate fails open", () => {
+    /* `ordered` needs lineage, and lineage exists only from 0382 with no
+       backfill. An order whose purchase orders predate it reads `blank` and
+       must stay tickable, or this gate would hide the very demand SO-1297
+       was filed about. */
+    const uncovered = orderRow({
+      orderId: "o9",
+      so: 1297,
+      customer: "Kimi",
+      status: "blank",
+      lines: [
+        { orderLineId: "l91", sku: "H1401S-K", qty: 1, stockTaken: 0,
+          item: "Haven", variant: "King", category: "mattress", pos: [] },
+      ],
+      outstandingSuppliers: ["Hooka"],
+    });
+    const buyable = leaf({
+      id: "build::o9::b9",
+      orderId: "o9",
+      so: 1297,
+      customer: "Kimi",
+      lineIds: ["l91"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [buyable], registerRows: [uncovered] });
+
+    expect(screen.getByTestId("so-batch-select-o9")).toBeInTheDocument();
+  });
+
   it("timing facets count unique Sales Orders and filter the parent rows", () => {
     renderRegister();
     /* o1 · o3 · o8 are `can_order_early` — three ORDERS, not four leafs. */
