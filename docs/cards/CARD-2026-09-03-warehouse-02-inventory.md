@@ -15,10 +15,11 @@
 `stock_unit_register_v`; no migration ever gave the view either column (the route merged on
 2026-08-21, its migration never landed — the inverse of red line 7). Measured live 2026-09-03:
 `42703 column "site_name" does not exist` → 500 on every call; the Inventory page renders over
-an error while production holds 136 real Units. **0417** rebuilds the view on 0373's exact
+an error while production holds 136 real Units. **0418** rebuilds the view (authored as 0417; renumbered when PR #1065's applied 0417 merged minutes later — the 0398 lesson, repeated) on 0373's exact
 shape plus two governed-name joins (`warehouses.name` → Site, `stock_operating_parties.name` →
 holder), with row-count, name-agreement, negative-control and anon-grant sanity checks.
-*The apply is the governed production-migration step and awaits the owner's go.*
+*The apply is the governed production-migration step and awaits the owner's go (say
+"apply 0418").*
 
 **2 · 🔴 A Unit's permanent address rendered the Dashboard.**
 `/operation/stock/unit/:unitCode` had its Route but never joined `isUrlDriven`, so the URL fell
@@ -52,9 +53,10 @@ copy, an identifier is a contract.
 
 ## Execution record
 
-- Migration `0417_the_register_names_the_site_and_the_holder.sql` (repo tail 0416, tracker
-  tail 0412, branch max 0416 → 0417; #1005's draft 0410 collides with main's own 0410 and must
-  renumber on its own PR).
+- Migration `0418_the_register_names_the_site_and_the_holder.sql` — authored as 0417
+  (MAX(tracker 0412, repo 0416, branches 0416) + 1), renumbered to 0418 after PR #1065 merged
+  its own, already-applied 0417. The applied number keeps its name; the unapplied one moves.
+  #1005's draft 0410 likewise collides with main's own 0410 and must renumber on its own PR.
 - Code: `OperationApp.tsx` (`isStockUnitUrl` joins `isUrlDriven` + four suppression entries) ·
   `WarehouseStockRegister.tsx` (three word renames).
 - Tests: `OperationApp.test.tsx` +6 (Unit route mounts · slim-bar stands down · three

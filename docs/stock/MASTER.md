@@ -1718,8 +1718,9 @@ next scopes. Production proof rides the PR's deploy record.
 `CARD-2026-09-03-warehouse-02-inventory` closed three measured P0s. **The register API had
 answered 500 since birth**: the route selected `site_name`/`holder_name` from
 `stock_unit_register_v` and no migration ever gave the view either column — the route merged
-2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
-governed-name joins on 0373's exact shape. **A Unit's permanent address rendered the
+2026-08-21, its migration never landed (the inverse of red line 7). **0418** adds the two
+governed-name joins on 0373's exact shape (authored 0417, renumbered when #1065's applied
+0417 merged minutes later). **A Unit's permanent address rendered the
 Dashboard**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
 route-gate test that only mounting the app can provide. **Every Warehouse surface drew two top
 rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
