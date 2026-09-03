@@ -460,7 +460,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     .map((r) => r.for_service_case_id as string | null)
     .filter((v): v is string => v != null);
   const [dests, sups, users, cases] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name"),
+    sb.from("purchasing_destinations").select("id, name, is_default").order("name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
@@ -532,7 +532,19 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: sc.id as string,
       case_no: sc.case_no as string,
     })),
-    destinations: dests.data ?? [],
+    destinations: (dests.data ?? []).map((d) => ({ id: d.id, name: d.name })),
+    /* ⭐ THE TWO GOVERNED DELIVER TO FACTS (owner, 2026-09-03). Until now the
+       create form defaulted Deliver To to whichever destination came first
+       and offered every one as an equal choice, so a request for a supplier
+       Carres COLLECTS from could name Carres Klang — and the issue door then
+       refused it (`supplier_collection_destination_mismatch`) with no door
+       left to correct the request. SO Batch ships both facts
+       (`purchase-demands.ts`); this lane never did. `settings` is already in
+       hand from the date plan, so this costs no subrequest. No default
+       configured means NO default (MASTER §5.4). */
+    defaultDestinationId:
+      ((dests.data ?? []).find((d) => d.is_default === true)?.id as string | undefined) ?? null,
+    supplierCollections: settings?.supplierCollections ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
@@ -626,7 +638,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   }
 
   const [dests, sups, users] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name"),
+    /* `active` rides so the object's Deliver To door offers only open places;
+       a closed one still resolves to its name on a request that named it. */
+    sb.from("purchasing_destinations").select("id, name, active").order("name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email, role"),
   ]);
@@ -810,6 +824,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     pos,
     history,
     destinations: dests.data ?? [],
+    /* The collection rule per collected supplier — the object's Deliver To
+       door applies the same lock the create form applies (1083). */
+    supplierCollections: settings?.supplierCollections ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
@@ -893,6 +910,124 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
     return refuse(c, 500, "decision_not_recorded");
   }
   return c.json(data);
+});
+
+const deliverToBody = z.object({ destinationId: z.string().uuid() }).strict();
+
+/**
+ * PUT /:id/deliver-to — THE DELIVER TO DOOR ON AN EXISTING REQUEST (0421).
+ *
+ * MPR-20260903-3381 was refused at Issue with "Set Deliver To to Ohana, then
+ * issue again", and the request had no door to do that. This is the door.
+ * The RPC moves the header and every live line together and refuses once a
+ * line is on a PO (`request_ordered`), once the request is refused or every
+ * line is cancelled (`request_refused` / `request_closed`), or when the place
+ * is unknown or closed.
+ *
+ * The collection pre-flight `/issue` runs is run here first, so a move that
+ * the issue door would refuse anyway is refused now, in the same words, and
+ * nothing is written.
+ */
+manualPurchaseRouter.put("/:id/deliver-to", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = deliverToBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { destinationId } = parsed.data;
+
+  const { data: lines, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select("id, supplier_id, cancelled_at")
+    .eq("request_id", id);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  const supplierIds = [
+    ...new Set(
+      (lines ?? [])
+        .filter((l) => l.cancelled_at == null)
+        .map((l) => l.supplier_id as string | null)
+        .filter((v): v is string => v != null),
+    ),
+  ];
+  if (supplierIds.length > 0) {
+    const { data: collectionRows, error: collectionErr } = await sb
+      .from("purchasing_supplier_settings")
+      .select("supplier_id, fixed_destination_id, collected_by_partner_id")
+      .in("supplier_id", supplierIds);
+    if (collectionErr) {
+      const m = mapPgError(collectionErr);
+      return c.json(m.body, m.status);
+    }
+    const governed = ((collectionRows ?? []) as Record<string, unknown>[]).find(
+      (r) =>
+        supplierIds.includes(r.supplier_id as string) &&
+        r.fixed_destination_id != null &&
+        r.fixed_destination_id !== destinationId,
+    );
+    if (governed) {
+      const { data: supRows } = await sb
+        .from("suppliers")
+        .select("id, kind, name")
+        .in("id", supplierIds);
+      const sup = (supRows ?? []).find((s) => s.id === governed.supplier_id);
+      /* Only a collected supplier is bound by its rule; the row for one that
+         delivers its own goods is stale Settings, not a refusal. */
+      if (sup?.kind === "factory_pickup") {
+        const { data: destRow } = await sb
+          .from("purchasing_destinations")
+          .select("name")
+          .eq("id", governed.fixed_destination_id as string)
+          .maybeSingle();
+        return refuse(c, 422, "supplier_collection_destination_mismatch", {
+          supplier: (sup.name as string | null) ?? null,
+          destination: (destRow?.name as string | null) ?? null,
+        });
+      }
+    }
+  }
+
+  const { data, error } = await sb.rpc("purchasing_move_request_destination", {
+    p_id: id,
+    p_destination_id: destinationId,
+  });
+  if (error) {
+    /* The door's own detail is the code; the dictionary turns it into the
+       two lines. A 42501 (the role gate, the same one `requireOperation`
+       already asked) and anything unnamed fall to `mapPgError`. */
+    const detail = String((error as { details?: string }).details ?? "").trim();
+    if (detail === "request_ordered") return refuse(c, 422, "request_ordered");
+    if (detail === "request_closed") return refuse(c, 422, "request_closed");
+    if (detail === "request_refused") return refuse(c, 409, "request_refused");
+    if (detail === "unknown_request") return refuse(c, 404, "unknown_request");
+    if (detail === "unknown_destination") return refuse(c, 422, "unknown_destination");
+    if (detail === "inactive_destination") {
+      const { data: destRow } = await sb
+        .from("purchasing_destinations")
+        .select("name")
+        .eq("id", destinationId)
+        .maybeSingle();
+      return refuse(c, 422, "inactive_destination", {
+        destination: (destRow?.name as string | null) ?? null,
+      });
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, ...((data as Record<string, unknown> | null) ?? {}) });
 });
 
 /**

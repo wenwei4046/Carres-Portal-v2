@@ -304,6 +304,7 @@ import {
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
   type SupplierCreateInput,
+  type PurchasingSupplierCollectionSetting,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -4557,6 +4558,13 @@ export interface ManualPurchaseRegisterPayload {
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
+  /** The governed standing Deliver To (MASTER §5.4) — null means none is set. */
+  defaultDestinationId?: string | null;
+  /** The factory-collection rule per collected supplier, from Purchasing
+   *  Settings: where that supplier's goods MUST land. The create form locks
+   *  Deliver To to it; the Register refuses an issue that disagrees with it
+   *  before the server does. */
+  supplierCollections?: PurchasingSupplierCollectionSetting[];
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
@@ -4601,7 +4609,12 @@ export interface ManualPurchaseDetailPayload {
   /** Card 05 §3.7 — stored-fact events only; words live in the shared
    *  `manualPurchaseHistoryRecord` arithmetic. */
   history: ManualPurchaseHistoryEvent[];
-  destinations: Array<{ id: string; name: string }>;
+  /** `active` rides so the Deliver To door offers only open places; a closed
+   *  one still resolves to its name on a request that named it. */
+  destinations: Array<{ id: string; name: string; active?: boolean }>;
+  /** The collection rule per collected supplier (0421): the object's Deliver
+   *  To door locks to it the way the create form does. */
+  supplierCollections?: PurchasingSupplierCollectionSetting[];
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — the real action owner's name on the object too. */
@@ -4700,6 +4713,24 @@ export function useDecidePurchaseRequest() {
             reason: input.reason ?? null,
             cuts: input.cuts ?? null,
           }),
+        },
+      ),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["operation", "purchasing", "requests"] }),
+  });
+}
+
+/** The Deliver To door on an existing request (0421). The requests key covers
+ *  the Register and every object read, so both refresh. */
+export function useMoveManualPurchaseDeliverTo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; destinationId: string }) =>
+      apiFetch<{ ok: true; moved?: boolean }>(
+        `/api/operation/purchasing/requests/${input.id}/deliver-to`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ destinationId: input.destinationId }),
         },
       ),
     onSuccess: () =>

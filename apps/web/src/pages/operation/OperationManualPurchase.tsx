@@ -31,6 +31,7 @@ import {
   manualPurchaseTimingOf,
   manualPurchaseWorkOrder,
   purchasingRefusal,
+  type PurchasingSupplierCollectionSetting,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
@@ -68,6 +69,7 @@ import {
   useManualPurchaseDetail,
   useManualPurchasePlan,
   useManualPurchaseRegister,
+  useMoveManualPurchaseDeliverTo,
   type ManualPurchasePlanLine,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
@@ -474,6 +476,35 @@ export default function OperationManualPurchase() {
     setIssueError(null);
     const ids = selectedRows.map((r) => r.id);
     if (ids.length === 0) return;
+    /* ⭐ THE SAME GATE THE SERVER APPLIES, BEFORE THE REQUEST IS SENT (owner,
+       2026-09-03; the SoBatchIssueWorkspace shape). A collected supplier's
+       goods land where Purchasing Settings says; a Manual Purchase that names
+       somewhere else is refused by the issue door with the same two lines
+       this prints. Refusing here saves the round trip and — since a request's
+       Deliver To has no door to move it — says so before anything is tried.
+       `supplierCollections` carries ONLY factory-pickup suppliers
+       (`purchasing-settings.ts`), so no kind gate is needed here, and a
+       payload without the field (an older API) gates nothing. */
+    if (q.data) {
+      const collectionBySupplier = new Map(
+        (q.data.supplierCollections ?? []).map((c) => [c.supplierId, c]),
+      );
+      const destName = new Map(q.data.destinations.map((d) => [d.id, d.name]));
+      for (const row of selectedRows) {
+        for (const wall of row.issueWalls) {
+          const rule = wall.supplierId ? collectionBySupplier.get(wall.supplierId) : undefined;
+          if (rule?.destinationId && rule.destinationId !== wall.destinationId) {
+            setIssueError(
+              purchasingRefusal("supplier_collection_destination_mismatch", {
+                supplier: rule.supplierName || null,
+                destination: destName.get(rule.destinationId) ?? null,
+              }),
+            );
+            return;
+          }
+        }
+      }
+    }
     if (ids.length > 20) {
       /* The one cap this door enforces in the browser. It is a refusal like
          any other, so it wears the refusal shape rather than a lone sentence
@@ -493,9 +524,27 @@ export default function OperationManualPurchase() {
       void q.refetch();
     } catch (e) {
       /* THE APPROVED TWO LINES: the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } })
-        .body;
-      const fallback = purchasingRefusal(body?.code);
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            sku?: string | null;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      /* Every fact the server sent, not just the code. `refuse()` echoes its
+         facts beside `message`, so a code that arrives without a sentence
+         still names the supplier and the destination instead of degrading to
+         `the supplier` (the SoBatchIssueWorkspace shape). */
+      const fallback = purchasingRefusal(body?.code, {
+        sku: body?.sku ?? null,
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
       setIssueError({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
@@ -705,6 +754,8 @@ export default function OperationManualPurchase() {
         <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
+          defaultDestinationId={q.data?.defaultDestinationId ?? null}
+          supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
           onDone={() => {
             setMode("register");
@@ -1259,10 +1310,14 @@ const PICK_LIMIT = 50;
 
 function CreateRequestWorkspace({
   destinations,
+  defaultDestinationId,
+  supplierCollections,
   staff,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
+  defaultDestinationId: string | null;
+  supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
   onDone: () => void;
 }) {
@@ -1322,7 +1377,6 @@ function CreateRequestWorkspace({
   const createHeader = useCreatePurchaseRequest();
 
   const active = activeId ?? lines[0]?.id;
-  const chosenDest = dest ?? destinations[0]?.id;
 
   /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
      The server previews Proceed Date (its Malaysia date) and, once every
@@ -1341,6 +1395,34 @@ function CreateRequestWorkspace({
       ),
     [plan.data],
   );
+
+  /* ── DELIVER TO IS THE RULE'S WHEN A RULE EXISTS (owner, 2026-09-03) ────
+     A supplier Carres collects from has ONE place its goods land, kept in
+     Purchasing Settings. The issue door refuses any purchase that names
+     somewhere else, and a Manual Purchase has no door to move its Deliver To
+     afterwards — so offering the choice here was offering a dead end (the
+     SoBatchRegister.changeWholeLeaf principle: a governed destination is not
+     the purchase's to move; the operator changes the rule in Settings). The
+     plan already names each picked SKU's supplier, so the rule is derived,
+     never stored: pick a collected item and the field locks; remove it and
+     the choice returns. Two picked items governed to DIFFERENT places cannot
+     be one request (0401 pins one Deliver To per request); that case is left
+     to the issue door's refusal until the owner rules split-or-refuse.
+     Otherwise: the person's choice, then the governed default, then the
+     first destination — the same order SO Batch uses. */
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const sku of pickedSkus) {
+      const supplierId = planBySku.get(sku)?.supplierId;
+      const rule = supplierId ? bySupplier.get(supplierId) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [pickedSkus, planBySku, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const chosenDest =
+    governedRule?.destinationId ?? dest ?? defaultDestinationId ?? destinations[0]?.id;
   /* The server's proposal fills the field only while the person has not
      chosen a date; a chosen date is theirs and is preserved (§3.2). */
   const planDefault = plan.data?.deliveryDateDefault ?? null;
@@ -1573,8 +1655,23 @@ function CreateRequestWorkspace({
             id="mp-dest"
             value={chosenDest}
             onValueChange={setDest}
+            disabled={governedRule != null}
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
+          {/* The lock names its rule in the ONE approved sentence for this
+              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
+              line 1) — no new word reaches the screen. */}
+          {governedRule ? (
+            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
+              {
+                purchasingRefusal("supplier_collection_destination_mismatch", {
+                  supplier: governedRule.supplierName || null,
+                  destination:
+                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+                }).wrong
+              }
+            </p>
+          ) : null}
         </div>
         {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
             Malaysia-date preview before Send; the stored hand-off truth
@@ -2024,6 +2121,150 @@ function Fact({
   );
 }
 
+/**
+ * THE DELIVER TO DOOR ON AN EXISTING REQUEST (0421).
+ *
+ * MPR-20260903-3381 was refused at Issue with "Set Deliver To to Ohana, then
+ * issue again" and the request had nowhere to do that. This fact swaps into a
+ * choice of open places behind `Change`; `Save` asks the server to move the
+ * header and every live line together. The same rule the create form applies
+ * (1083) applies here: when every live line's supplier is collected to ONE
+ * place, the choice is locked to that place and the approved sentence says
+ * why — so the operator's Save simply moves the request where the issue door
+ * wants it.
+ */
+function DeliverToFact({
+  requestId,
+  destinationId,
+  destinations,
+  live,
+  supplierCollections,
+  movable,
+}: {
+  requestId: string;
+  destinationId: string;
+  destinations: Array<{ id: string; name: string; active?: boolean }>;
+  live: PurchaseRequestLineRow[];
+  supplierCollections: PurchasingSupplierCollectionSetting[];
+  movable: boolean;
+}) {
+  const move = useMoveManualPurchaseDeliverTo();
+  const [editing, setEditing] = useState(false);
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
+
+  const name = destinations.find((d) => d.id === destinationId)?.name ?? "";
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const l of live) {
+      const rule = l.supplier_id ? bySupplier.get(l.supplier_id) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [live, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const value = governedRule?.destinationId ?? chosen ?? destinationId;
+  /* Open places only — plus the request's own, so the field never shows a
+     blank for a place that has since closed. */
+  const options = destinations
+    .filter((d) => d.active !== false || d.id === destinationId)
+    .map((d) => ({ value: d.id, label: d.name }));
+
+  function close() {
+    setEditing(false);
+    setChosen(undefined);
+    setError(null);
+  }
+
+  async function save() {
+    setError(null);
+    try {
+      await move.mutateAsync({ id: requestId, destinationId: value });
+      close();
+    } catch (e) {
+      /* THE APPROVED TWO LINES, with every fact the server sent. */
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      const fallback = purchasingRefusal(body?.code, {
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
+      setError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
+    }
+  }
+
+  if (!editing) {
+    return (
+      <>
+        {name}
+        {movable ? (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="ml-2 text-label text-kit-blue-11 underline-offset-2 hover:underline"
+            data-testid="mp-detail-deliver-to-change"
+          >
+            {MW.change}
+          </button>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <span className="flex flex-col gap-1.5">
+      <Select
+        id="mp-detail-deliver-to-select"
+        value={value}
+        onValueChange={setChosen}
+        disabled={governedRule != null || move.isPending}
+        options={options}
+      />
+      {governedRule ? (
+        <span className="text-meta text-kit-slate-11" data-testid="mp-detail-deliver-to-governed">
+          {
+            purchasingRefusal("supplier_collection_destination_mismatch", {
+              supplier: governedRule.supplierName || null,
+              destination:
+                destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+            }).wrong
+          }
+        </span>
+      ) : null}
+      {error ? (
+        <TwoLines wrong={error.wrong} todo={error.todo} testId="mp-detail-deliver-to-error" />
+      ) : null}
+      <span className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => void save()}
+          disabled={move.isPending}
+          data-testid="mp-detail-deliver-to-save"
+        >
+          {MW.save}
+        </Button>
+        <Button size="sm" variant="neutral" onClick={close} disabled={move.isPending}>
+          {MW.cancel}
+        </Button>
+      </span>
+    </span>
+  );
+}
+
 /** WHAT WE ALREADY HAVE — one row per live SKU. `free` rides the pick-items
  *  read and `already on PO` the open-cover endpoint (the same reads the
  *  create workspace uses — Law D); `Still Needed` is PRINTED. */
@@ -2444,8 +2685,22 @@ function ManualPurchaseObject({
               <Fact label={MW.colFor} testId="mp-detail-for">
                 {forText}
               </Fact>
-              <Fact label={MW.colDeliverTo}>
-                {destName.get(request.destination_id) ?? ""}
+              <Fact label={MW.colDeliverTo} testId="mp-detail-deliver-to">
+                <DeliverToFact
+                  requestId={request.id}
+                  destinationId={request.destination_id}
+                  destinations={d.destinations}
+                  live={live}
+                  supplierCollections={d.supplierCollections ?? []}
+                  /* Movable until a line is on a PO: the RPC refuses the rest
+                     (refused, every line cancelled) and the same arithmetic
+                     hides the door here so it is never offered and refused. */
+                  movable={
+                    status != null &&
+                    (status.kind === "waiting_approval" || status.kind === "ready_to_order") &&
+                    !lines.some((l) => l.po_id != null || (l.po_ids?.length ?? 0) > 0)
+                  }
+                />
               </Fact>
               {/* The real staff display name — never `operation`, an email, a
                   role or `(you)`. A shared-account record whose individual
