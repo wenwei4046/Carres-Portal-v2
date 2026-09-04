@@ -417,7 +417,8 @@ describe("Purchase Order object", () => {
     for (const view of ["Document", "Revisions", "History", "Order Route"]) {
       expect(screen.getByRole("button", { name: view })).toBeInTheDocument();
     }
-    expect(screen.getByText("U1-000-001")).toBeInTheDocument();
+    /* The unit sits on its own Goods line, keyed by SKU, not in a card of its own. */
+    expect(within(screen.getByTestId("po-line-units-line-1")).getByText("U1-000-001")).toBeInTheDocument();
     expect(screen.getByText("DO-SUP-9")).toBeInTheDocument();
     expect(screen.getByText("SC-1001")).toBeInTheDocument();
   });
@@ -432,13 +433,13 @@ describe("Purchase Order object", () => {
     connectionLoading = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.getAllByText("Loading…")).toHaveLength(3);
-    expect(screen.queryByText("No Unit ID is recorded for this PO.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 
   it("states successful empty connections instead of leaving blank panels", () => {
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.getByText("No Unit ID is recorded for this PO.")).toBeInTheDocument();
+    expect(within(screen.getByTestId("po-line-units-line-1")).getByText("No Unit ID")).toBeInTheDocument();
     expect(screen.getByText("No receiving session is connected to this PO.")).toBeInTheDocument();
     expect(screen.getByText("No claim or return is connected to this PO.")).toBeInTheDocument();
   });
@@ -479,10 +480,15 @@ describe("Purchase Order object", () => {
     /* Same card as the Sales Order: the mono, tracked heading face. */
     const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
     expect(po.className).toContain("font-mono");
-    /* Short cards first; the one-row-per-unit list is scrolled past, not to. */
-    const order = ["Receiving", "Claims and returns", "Unit IDs"].map((t) => heads.indexOf(t));
+    /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
+       card: a unit is a row of its Goods line. */
+    const order = ["Receiving", "Claims and returns"].map((t) => heads.indexOf(t));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(heads).not.toContain("Unit IDs");
+    const cards = screen.getByRole("heading", { level: 2, name: "Receiving" }).closest("section")!.parentElement!;
+    expect(cards.className).toContain("flex-col");
+    expect(cards.className).not.toContain("sm:grid-cols-2");
   });
 
   it("uses the 50/50 official-document layout only for issue or revision work", () => {

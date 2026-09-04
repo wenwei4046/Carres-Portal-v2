@@ -1001,6 +1001,8 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   onSupplierDateSaved: () => void;
 }) {
   const po = row.po;
+  const unitsBySku = new Map<string, typeof units>();
+  for (const unit of units) unitsBySku.set(unit.sku, [...(unitsBySku.get(unit.sku) ?? []), unit]);
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
   /* Card 08 §3.5 — how many DISTINCT Manual Purchases feed this document.
      One: the bare label suffices everywhere. Several: each detailed source
@@ -1050,13 +1052,24 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <div className="-mx-4 -mb-3 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
-              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Ordered</th><th className="px-3 text-right">Received</th><th className="px-3 text-right">Open</th></tr>
+              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Unit IDs</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Ordered</th><th className="px-3 text-right">Received</th><th className="px-3 text-right">Open</th></tr>
             </thead>
             <tbody>
               {po.purchase_order_lines.map((line) => (
                 <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
                   <td className="px-3 font-mono">{line.sku}</td>
                   <td className="px-3">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
+                  {/* The units are the line's own rows: one code per physical
+                      piece, keyed back to the line by SKU (0153). They used to
+                      sit in a card of their own at the bottom of the page,
+                      cut off from the line they belong to (YH, 2026-09-04). */}
+                  <td className="px-3 py-1.5 align-top" data-testid={`po-line-units-${line.id}`}>{
+                    unitLoading ? <span className="text-kit-slate-9">Loading…</span>
+                    : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
+                    : unitsBySku.get(line.sku)?.length
+                      ? <ul className="m-0 list-none p-0">{unitsBySku.get(line.sku)!.map((unit) => <li key={unit.unit_code} className="whitespace-nowrap"><span className="font-mono">{unit.unit_code}</span> <span className="text-meta text-kit-slate-9">{unit.status}</span></li>)}</ul>
+                      : <Absence>No Unit ID</Absence>
+                  }</td>
                   <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => {
                     /* Card 08 §3.5 — several Manual Purchases behind one
                        document stay apart by business facts, never by a
@@ -1084,14 +1097,10 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           </table>
         </div>
       </Block>
-      {/* Three across fitted the full width; in half of it they were three
-          slivers. Two, and the third wraps.
-
-          Order: the short cards first, the long list last. Receiving and
-          Claims hold a handful of rows; Unit IDs holds one row per unit and
-          is the card a reader scrolls past, not to (YH, 2026-09-04). No rule
-          in docs/purchasing/MASTER.md or docs/ui/MASTER.md fixes this order. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Two cards, each its own row across the pane (YH, 2026-09-04).
+          Half-width cards left every receipt and claim wrapping. The Unit
+          IDs card is gone: units live on their Goods line above. */}
+      <div className="flex flex-col gap-3">
         <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
           {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
@@ -1100,9 +1109,6 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {claims.map((claim) => <ConnectionRow key={claim.id} primary={claim.claim_no} secondary={`${claim.status}${claim.requested_action === "return_for_inspection" ? ` · ${supplierClaimRequestLabel("return_for_inspection")}` : ""}`} />)}
           {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
-        </ConnectionBlock>
-        <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
-          {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
         </ConnectionBlock>
       </div>
       </div>
