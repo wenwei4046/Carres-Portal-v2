@@ -618,6 +618,7 @@ import {
   manualPurchaseLineRemainingOf,
   manualPurchasePoSummary,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseSupplierSummary,
 } from "./manual-purchase";
 
@@ -789,6 +790,28 @@ describe("Card 06 · selection and the issue sentence", () => {
     ] as const) {
       expect(manualPurchaseSelectable(s, 3)).toBe(false);
     }
+  });
+
+  it("a dead tick says why, from the same two facts the gate reads", () => {
+    expect(manualPurchaseNotSelectableReason("ready_to_order", 3)).toBeNull();
+    expect(manualPurchaseNotSelectableReason("ready_to_order", 0)).toBe(
+      "Approved at 0. Nothing to order.",
+    );
+    // MPR-20260904-8935: every line cut to 0 derives Not going ahead while the
+    // Approval Status column still says Approved — the cause, not the state.
+    expect(manualPurchaseNotSelectableReason("not_going_ahead", 0, "approved")).toBe(
+      "Approved at 0. Nothing to order.",
+    );
+    expect(manualPurchaseNotSelectableReason("not_going_ahead", 0, "refused")).toBe(
+      "Not going ahead.",
+    );
+    expect(manualPurchaseNotSelectableReason("not_going_ahead", 0)).toBe("Not going ahead.");
+    expect(manualPurchaseNotSelectableReason("waiting_approval", 3)).toBe(
+      "Waiting for approval.",
+    );
+    expect(manualPurchaseNotSelectableReason("waiting_sku", 3)).toBe("Waiting for the SKU.");
+    expect(manualPurchaseNotSelectableReason("ordered", 0)).toBe("Ordered.");
+    expect(manualPurchaseNotSelectableReason("arrived", 0)).toBe("Arrived.");
   });
 
   it("PO count partitions supplier × category × destination × purpose × Delivery Date", () => {

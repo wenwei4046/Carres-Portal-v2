@@ -26,6 +26,7 @@ import {
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseStatusOf,
   manualPurchaseSupplierSummary,
   manualPurchaseTimingOf,
@@ -464,6 +465,9 @@ export default function OperationManualPurchase() {
   );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
+  /** The sentence beside a row the tick refuses; null when it may be ticked. */
+  const deadReason = (r: RequestRegisterRow) =>
+    manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
   const selectedRows = useMemo(
     () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
     [filtered, selected],
@@ -585,6 +589,20 @@ export default function OperationManualPurchase() {
                 data-testid={`mp-approver-${r.id}`}
               >
                 {approverLine}
+              </span>
+            ) : null}
+            {/* A DEAD TICK SAYS WHY (MPR-20260904-8935, 2026-09-04). The row
+                read `Approved`, Approved Qty 0, Still To Order 0, and its
+                checkbox was greyed with nothing on screen naming the cause —
+                the SO Batch Deliver To cell's defect (#1056), met again here.
+                The sentence comes from the same two facts the tick reads, so
+                it can never disagree with the checkbox. */}
+            {deadReason(r) ? (
+              <span
+                className="block text-label font-normal text-kit-amber-11"
+                data-testid="mp-row-dead-reason"
+              >
+                {deadReason(r)}
               </span>
             ) : null}
           </span>
@@ -2368,12 +2386,10 @@ function ApprovalLineRow({
   index: number;
 }) {
   const onPo = useAlreadyOnPo(line.sku);
+  /* `Still Needed` is printed for the approver to read, never typed in for
+     them — the Approved Qty is seeded by the object from the requested
+     quantity (see `ManualPurchaseObject`). */
   const still = stillNeededOf(line.qty, free, onPo.data?.alreadyOnPo ?? 0);
-  const seeded = value !== undefined;
-  useEffect(() => {
-    if (!seeded && onPo.data) onChange(String(still));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onPo.data]);
   const qty = Number(value);
   const cost = line.unit_cost ?? null;
   return (
@@ -2472,7 +2488,14 @@ function ManualPurchaseObject({
   const navigate = useNavigate();
   const decide = useDecidePurchaseRequest();
 
-  /** The approver's per-line numbers — seeded once from `Still Needed`. */
+  /** The approver's per-line numbers, seeded once per line from the REQUESTED
+   *  quantity the moment the detail read lands. Field-guide defect 23: this
+   *  used to be seeded inside each row from `Still Needed`, which is
+   *  `qty − free − already on PO` — two separate reads (the pick-items list and
+   *  the already-have read), and the seed fired when the SECOND arrived using
+   *  whatever the FIRST had returned by then. So the field could open at 0 from
+   *  a half-read, and a click on Approve saved that 0 as the decision. The
+   *  request's own ask is one fact from one read; the approver cuts it down. */
   const [cuts, setCuts] = useState<Record<string, string>>({});
   const [refusing, setRefusing] = useState(false);
   const [refuseReason, setRefuseReason] = useState("");
@@ -2482,6 +2505,16 @@ function ManualPurchaseObject({
 
   const d = q.data;
   const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+  useEffect(() => {
+    if (!d) return;
+    setCuts((c) => {
+      const next = { ...c };
+      for (const l of d.lines) {
+        if (l.cancelled_at === null && next[l.id] === undefined) next[l.id] = String(l.qty);
+      }
+      return next;
+    });
+  }, [d]);
 
   const status = d
     ? manualPurchaseStatusOf({
@@ -2663,6 +2696,11 @@ function ManualPurchaseObject({
       const n = Number(cuts[l.id]);
       return cuts[l.id] !== undefined && Number.isInteger(n) && n >= 0 && n <= l.qty;
     });
+  /* Approving EVERY line at 0 is a refusal wearing the wrong button: the
+     status arithmetic derives `Not going ahead` from it, with no reason on
+     record (MPR-20260904-8935). One line at 0 among others is a legitimate
+     partial cut and stays allowed. */
+  const allZero = cutsReady && live.every((l) => Number(cuts[l.id]) === 0);
 
   /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
   const haveRows: Array<{ sku: string; requestedQty: number }> = [];
@@ -2929,6 +2967,13 @@ function ManualPurchaseObject({
                     todo={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).todo}
                   />
                 ) : null}
+                {allZero ? (
+                  <TwoLines
+                    testId="mp-approve-zero"
+                    wrong="Every line is approved at 0."
+                    todo="Refuse the request instead."
+                  />
+                ) : null}
                 {decideError ? (
                   <TwoLines
                     testId="mp-decide-error"
@@ -2976,7 +3021,7 @@ function ManualPurchaseObject({
                   {/* The ONE primary action in this section (Card 05 §3.5). */}
                   <Button
                     variant="primary"
-                    disabled={!cutsReady}
+                    disabled={!cutsReady || allZero}
                     loading={decide.isPending}
                     onClick={() => void submitDecision("approve")}
                     data-testid="mp-approve"
