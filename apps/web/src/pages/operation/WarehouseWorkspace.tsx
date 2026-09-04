@@ -138,7 +138,7 @@ export default function WarehouseWorkspace() {
       : "—";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="warehouse-workspace">
+    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-workspace">
       {/* Dashboard stays mounted underneath Outbound — visibility only, so
           Back restores filters and scroll (the Manual Purchase pattern). */}
       <div

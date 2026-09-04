@@ -65,7 +65,7 @@ export default function WarehouseOutboundWork({
   backParams.delete("do");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="warehouse-outbound">
+    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-outbound">
       <ModuleHeader
         testId="warehouse-outbound-header"
         word="Outbound"
