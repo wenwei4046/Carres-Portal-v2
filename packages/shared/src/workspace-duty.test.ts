@@ -1,0 +1,139 @@
+import { describe, expect, it } from "vitest";
+import {
+  workspaceActionActorEvidenceSchema,
+  workspaceDutyAssignmentSchema,
+  workspaceDutyKeySchema,
+  workspaceDutyResolutionSchema,
+} from "./workspace-duty";
+
+const SHASHA = "11111111-1111-4111-8111-111111111111";
+const YU_JUN = "22222222-2222-4222-8222-222222222222";
+const ASSIGNMENT = "33333333-3333-4333-8333-333333333333";
+
+describe("workspaceDutyKeySchema", () => {
+  it("accepts stable owner-Duty keys", () => {
+    expect(workspaceDutyKeySchema.parse("purchasing.po_issue")).toBe("purchasing.po_issue");
+  });
+
+  it.each(["", "   ", "person@example.com", " Shasha "])(
+    "rejects blank, identity-shaped, or display-name keys: %s",
+    (key) => expect(() => workspaceDutyKeySchema.parse(key)).toThrow(),
+  );
+});
+
+describe("workspaceDutyAssignmentSchema", () => {
+  it("keeps Primary and optional Buddy as structured assignment facts", () => {
+    expect(
+      workspaceDutyAssignmentSchema.parse({
+        id: ASSIGNMENT,
+        dutyKey: "purchasing.po_issue",
+        primaryUserId: SHASHA,
+        buddyUserId: YU_JUN,
+        startsOn: "2026-09-01",
+        endsOn: null,
+      }),
+    ).toMatchObject({ primaryUserId: SHASHA, buddyUserId: YU_JUN });
+  });
+
+  it("rejects the Primary as their own Buddy", () => {
+    expect(() =>
+      workspaceDutyAssignmentSchema.parse({
+        id: ASSIGNMENT,
+        dutyKey: "purchasing.po_issue",
+        primaryUserId: SHASHA,
+        buddyUserId: SHASHA,
+        startsOn: "2026-09-01",
+        endsOn: null,
+      }),
+    ).toThrow();
+  });
+
+  it("rejects an end date before the assignment starts", () => {
+    expect(() =>
+      workspaceDutyAssignmentSchema.parse({
+        id: ASSIGNMENT,
+        dutyKey: "purchasing.po_issue",
+        primaryUserId: SHASHA,
+        buddyUserId: null,
+        startsOn: "2026-09-02",
+        endsOn: "2026-09-01",
+      }),
+    ).toThrow();
+  });
+});
+
+describe("workspaceDutyResolutionSchema", () => {
+  it("records normal owner and today's cover without replacing either truth", () => {
+    const result = workspaceDutyResolutionSchema.parse({
+      dutyKey: "sales.customer_delivery_date",
+      onDate: "2026-09-04",
+      normalOwner: { userId: SHASHA, name: "Shasha" },
+      buddy: { userId: YU_JUN, name: "Yu Jun" },
+      activeCover: { userId: YU_JUN, name: "Yu Jun" },
+      actingPerson: { userId: YU_JUN, name: "Yu Jun" },
+      state: "covered",
+      assignmentId: ASSIGNMENT,
+    });
+
+    expect(result.normalOwner?.userId).toBe(SHASHA);
+    expect(result.activeCover?.userId).toBe(YU_JUN);
+    expect(result.actingPerson?.userId).toBe(YU_JUN);
+  });
+
+  it("accepts an explicit not-assigned result", () => {
+    expect(
+      workspaceDutyResolutionSchema.parse({
+        dutyKey: "receiving.grn",
+        onDate: "2026-09-04",
+        normalOwner: null,
+        buddy: null,
+        activeCover: null,
+        actingPerson: null,
+        state: "not_assigned",
+        assignmentId: null,
+      }).state,
+    ).toBe("not_assigned");
+  });
+
+  it("rejects impossible resolution state combinations", () => {
+    expect(() =>
+      workspaceDutyResolutionSchema.parse({
+        dutyKey: "receiving.grn",
+        onDate: "2026-09-04",
+        normalOwner: null,
+        buddy: null,
+        activeCover: null,
+        actingPerson: null,
+        state: "primary",
+        assignmentId: null,
+      }),
+    ).toThrow();
+  });
+});
+
+describe("workspaceActionActorEvidenceSchema", () => {
+  it("preserves normal owner, cover, and actual actor separately", () => {
+    expect(
+      workspaceActionActorEvidenceSchema.parse({
+        dutyKey: "purchasing.po_issue",
+        onDate: "2026-09-04",
+        normalOwnerUserId: SHASHA,
+        activeCoverUserId: YU_JUN,
+        actualActorUserId: YU_JUN,
+        assignmentId: ASSIGNMENT,
+      }),
+    ).toMatchObject({ normalOwnerUserId: SHASHA, actualActorUserId: YU_JUN });
+  });
+
+  it("requires an actual actor", () => {
+    expect(() =>
+      workspaceActionActorEvidenceSchema.parse({
+        dutyKey: "purchasing.po_issue",
+        onDate: "2026-09-04",
+        normalOwnerUserId: SHASHA,
+        activeCoverUserId: null,
+        assignmentId: ASSIGNMENT,
+      }),
+    ).toThrow();
+  });
+});
