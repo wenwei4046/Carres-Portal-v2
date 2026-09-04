@@ -136,7 +136,7 @@ function OutboundSourceRow({
     <div className="rounded border border-kit-slate-5 bg-white" data-testid={`wo-row-${card.doNumber}`}>
       <button
         type="button"
-        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-base-50"
+        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-hovertint"
         onClick={onToggle}
         aria-expanded={expanded}
         data-testid={`wo-row-toggle-${card.doNumber}`}

@@ -155,7 +155,7 @@ export default function WarehouseWorkspace() {
         <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
           <button
             type="button"
-            className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-base-50"
+            className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint"
             onClick={() => setRailHidden((h) => !h)}
             data-testid="wd-toggle-filters"
           >
@@ -166,7 +166,7 @@ export default function WarehouseWorkspace() {
             <button
               type="button"
               aria-label="Previous dates"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-base-50"
+              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
               onClick={() =>
                 isAgenda
                   ? setParam(
@@ -188,7 +188,7 @@ export default function WarehouseWorkspace() {
             <button
               type="button"
               aria-label="Next dates"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-base-50"
+              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
               onClick={() =>
                 isAgenda
                   ? setParam(
