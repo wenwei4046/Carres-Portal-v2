@@ -139,7 +139,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
     <Link
       to={monitorCardHref(card)}
       data-testid={`delivery-monitor-card-${card.scopeId}`}
-      className="block min-h-11 rounded-control border border-kit-slate-5 bg-white shadow-sm hover:border-kit-slate-7 hover:bg-hovertint"
+      className="block min-h-11 rounded-control border border-kit-slate-5 bg-white shadow-sm hover:border-kit-slate-6 hover:bg-hovertint"
     >
       <div className="flex flex-col gap-0.5 px-2 py-1.5 text-body">
         {card.confirmedTime ? (
