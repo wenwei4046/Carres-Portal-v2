@@ -443,6 +443,7 @@ export default function OperationReceiving() {
           suppliers={supplierById}
           warehouses={warehouses}
           dutyAllowed={dutyQ.data?.allowed ?? false}
+          dutyKnown={!dutyQ.isLoading}
           onBack={closeObject}
           onOpenSession={openSession}
         />
@@ -565,7 +566,13 @@ export default function OperationReceiving() {
                 <button
                   type="button"
                   data-testid="start-receiving-door"
-                  onClick={() => setFacet("find", "1")}
+                  onClick={() => {
+                    // A PUSH, not a replace — Back from the Find step returns
+                    // to the Register, the same way an open object does.
+                    const next = new URLSearchParams(params);
+                    next.set("find", "1");
+                    setParams(next);
+                  }}
                   className="inline-flex h-8 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-medium text-white hover:brightness-95"
                 >
                   Start Receiving
@@ -712,6 +719,7 @@ function PoReceivingView({
   suppliers,
   warehouses,
   dutyAllowed,
+  dutyKnown = true,
   onBack,
   onOpenSession,
 }: {
@@ -720,6 +728,7 @@ function PoReceivingView({
   suppliers: Map<string, SupplierRow>;
   warehouses: Array<{ id: string; name: string }>;
   dutyAllowed: boolean;
+  dutyKnown?: boolean;
   onBack: () => void;
   onOpenSession: (id: string) => void;
 }) {
@@ -763,6 +772,7 @@ function PoReceivingView({
           warehouseName={warehouseName}
           warehouses={warehouses}
           dutyAllowed={dutyAllowed}
+          dutyKnown={dutyKnown}
           receiving={receiving}
           onReceiving={setReceiving}
           onPosted={(id) => onOpenSession(id)}

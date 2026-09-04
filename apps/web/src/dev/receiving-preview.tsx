@@ -1,0 +1,344 @@
+/**
+ * RECEIVING PREVIEW — DEV ONLY (walk aid for CARD-2026-09-04-receiving-01).
+ *
+ * Same contract as the other `src/dev/*-preview.tsx` entries: the REAL
+ * OperationReceiving page, the REAL stylesheet, only the session seeded and
+ * the API stubbed with a card fixture. A separate vite entry — cannot reach
+ * production.
+ */
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
+import OperationReceiving from "@/pages/operation/OperationReceiving";
+import "@/index.css";
+
+useAuth.setState({
+  role: "operation",
+  user: { email: "sha@carres.co" } as never,
+});
+
+const WH = "11111111-1111-1111-1111-111111111111";
+const WH2 = "33333333-3333-3333-3333-333333333333";
+const POSTED = "22222222-2222-2222-2222-222222222222";
+const SUBMITTED = "44444444-4444-4444-4444-444444444444";
+const VOIDED = "55555555-5555-5555-5555-555555555555";
+
+const POSTED_ROW = {
+  id: POSTED,
+  po_id: "PO-20260901-4827",
+  warehouse_id: WH,
+  warehouse_name: "Carres Klang",
+  supplier_name: "Hooka",
+  do_number: "HK-5512",
+  do_file_path: "PO-20260901-4827/a-do.jpg",
+  do_file_url: null,
+  note: null,
+  status: "posted",
+  submitted_from: "office",
+  goods_received_at: "2026-09-03",
+  submitted_by_name: "Shasha",
+  submitted_at: "2026-09-03T02:00:00Z",
+  posted_at: "2026-09-03T02:05:00Z",
+  posted_by_name: "Shasha",
+  reviewed_by_name: "Shasha",
+  reviewed_at: "2026-09-03T02:05:00Z",
+  return_reason: null,
+  grn_no: "GRN-20260903-1184",
+  actual_site_id: null,
+  actual_site_name: null,
+  posted_duty_holder_name: "Khor Yee",
+  posted_duty_cover_name: null,
+  posted_authority: "grn_duty",
+  arrival_evidence: [
+    { path: "PO-20260901-4827/a-arrival.jpg", kind: "photo" },
+    { path: "PO-20260901-4827/a-arrival.mp4", kind: "video" },
+  ],
+  extra_lines: [],
+  void_at: null,
+  void_by_name: null,
+  void_reason: null,
+  lines: [
+    {
+      id: "l1",
+      sku: "MS01-K King Mattress",
+      received_now: 3,
+      damaged_qty: 1,
+      wrong_item_qty: 0,
+      wrong_item_claim_type: null,
+    },
+  ],
+  summary: "3 good · 1 damaged",
+  opens_claims: true,
+};
+
+const SUBMITTED_ROW = {
+  ...POSTED_ROW,
+  id: SUBMITTED,
+  po_id: "PO-20260902-0761",
+  supplier_name: "Ohana",
+  warehouse_id: WH2,
+  warehouse_name: "AL Sungai Buloh",
+  do_number: "OH-2210",
+  status: "submitted",
+  submitted_from: "warehouse",
+  goods_received_at: "2026-09-04",
+  posted_at: null,
+  posted_by_name: null,
+  grn_no: null,
+  posted_duty_holder_name: null,
+  posted_authority: null,
+  arrival_evidence: [],
+  lines: [
+    {
+      id: "l2",
+      sku: "BF02-Q Queen Bedframe",
+      received_now: 2,
+      damaged_qty: 0,
+      wrong_item_qty: 0,
+      wrong_item_claim_type: null,
+    },
+  ],
+  summary: "2 good",
+  opens_claims: false,
+};
+
+const VOIDED_ROW = {
+  ...POSTED_ROW,
+  id: VOIDED,
+  po_id: "PO-20260828-3350",
+  supplier_name: "Dorsettloft",
+  do_number: "DL-118",
+  status: "voided",
+  goods_received_at: "2026-08-30",
+  grn_no: "GRN-20260830-4102",
+  void_at: "2026-09-01T03:00:00Z",
+  void_by_name: "Khor Yee",
+  void_reason: "Counted against the wrong purchase order",
+  lines: [
+    {
+      id: "l3",
+      sku: "SOFA-3 Jager Sofa",
+      received_now: 1,
+      damaged_qty: 0,
+      wrong_item_qty: 0,
+      wrong_item_claim_type: null,
+    },
+  ],
+  summary: "1 good",
+  opens_claims: false,
+};
+
+const PO_OPEN = {
+  id: "PO-20260902-0761",
+  supplier_id: "sup-ohana",
+  warehouse_id: WH2,
+  status: "open",
+  placed_at: "2026-09-02T03:00:00Z",
+  eta_date: "2026-09-04",
+  purchase_order_lines: [
+    {
+      id: "l2",
+      sku: "BF02-Q Queen Bedframe",
+      qty: 4,
+      received_qty: 0,
+      damaged_qty: 0,
+      wrong_item_qty: 0,
+    },
+  ],
+};
+const PO_OPEN_2 = {
+  id: "PO-20260904-2210",
+  supplier_id: "sup-hooka",
+  warehouse_id: WH,
+  status: "open",
+  placed_at: "2026-09-04T01:00:00Z",
+  eta_date: "2026-09-06",
+  purchase_order_lines: [
+    {
+      id: "l4",
+      sku: "MS01-K King Mattress",
+      qty: 2,
+      received_qty: 0,
+      damaged_qty: 0,
+      wrong_item_qty: 0,
+    },
+  ],
+};
+
+const DETAIL = {
+  receipt: {
+    ...POSTED_ROW,
+    unit_results: [
+      {
+        stock_item_id: "u1",
+        unit_code: "U1-000-101",
+        outcome: "received",
+        issue_kind: null,
+        note: null,
+      },
+      {
+        stock_item_id: "u2",
+        unit_code: "U1-000-102",
+        outcome: "received",
+        issue_kind: null,
+        note: null,
+      },
+      {
+        stock_item_id: "u3",
+        unit_code: "U1-000-103",
+        outcome: "received_with_issue",
+        issue_kind: "damaged",
+        note: null,
+      },
+      {
+        stock_item_id: "u4",
+        unit_code: "U1-000-104",
+        outcome: "not_received",
+        issue_kind: null,
+        note: null,
+      },
+    ],
+  },
+  po: {
+    id: "PO-20260901-4827",
+    supplier_id: "sup-hooka",
+    warehouse_id: WH,
+    purchase_order_lines: [
+      {
+        id: "l1",
+        sku: "MS01-K King Mattress",
+        qty: 5,
+        received_qty: 4,
+        damaged_qty: 1,
+        wrong_item_qty: 0,
+      },
+    ],
+  },
+  events: [
+    {
+      id: "e2",
+      receipt_id: POSTED,
+      event: "amended",
+      actor_id: "u-ky",
+      actor_name: "Khor Yee",
+      event_at: "2026-09-04T01:30:00Z",
+      payload: {
+        reason: "Driver recount found one more mattress",
+        before: { goods_received_at: "2026-09-02" },
+        after: { goods_received_at: "2026-09-03" },
+      },
+    },
+    {
+      id: "e1",
+      receipt_id: POSTED,
+      event: "posted",
+      actor_id: "u-sha",
+      actor_name: "Shasha",
+      event_at: "2026-09-03T02:05:00Z",
+      payload: {
+        do_number: "HK-5512",
+        goods_received_at: "2026-09-03",
+        units_counted: 4,
+        entry_source: "office",
+        grn_no: "GRN-20260903-1184",
+        claims_linked: 1,
+      },
+    },
+  ],
+};
+
+const DUTY = {
+  duty_key: "grn_duty",
+  normal_user_id: "u-ky",
+  normal_user_name: "Khor Yee",
+  acting_user_id: null,
+  acting_user_name: null,
+  actor_user_id: "u-ky",
+  is_cover: false,
+  is_superuser: true,
+  allowed: true,
+  source: "rota",
+};
+
+const PO_RECEIVING = {
+  sessions: [],
+  events: [],
+  expected_units: [
+    { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+    { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+    { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+    { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+  ],
+};
+
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url =
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const json = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
+  if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);
+  if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
+    return json({
+      receipt: { ...SUBMITTED_ROW, unit_results: [] },
+      po: PO_OPEN,
+      events: [
+        {
+          id: "e3",
+          receipt_id: SUBMITTED,
+          event: "submitted",
+          actor_id: "u-nw",
+          actor_name: "Aina (AL)",
+          event_at: "2026-09-04T02:00:00Z",
+          payload: { do_number: "OH-2210", units_counted: 2 },
+        },
+      ],
+    });
+  if (url.includes("/api/operation/warehouse-receipts"))
+    return json({
+      receipts: [SUBMITTED_ROW, POSTED_ROW, VOIDED_ROW],
+      counts: { waiting: 1 },
+    });
+  if (url.includes("/receiving") && url.includes("/api/operation/pos/"))
+    return json(PO_RECEIVING);
+  if (url.includes("/api/operation/pos")) return json({ pos: [PO_OPEN, PO_OPEN_2] });
+  if (url.includes("/api/operation/suppliers"))
+    return json({
+      suppliers: [
+        { id: "sup-hooka", name: "Hooka" },
+        { id: "sup-ohana", name: "Ohana" },
+        { id: "sup-dorsett", name: "Dorsettloft" },
+      ],
+    });
+  if (url.includes("/api/operation/warehouse"))
+    return json({
+      warehouses: [
+        { id: WH, name: "Carres Klang", address: null },
+        { id: WH2, name: "AL Sungai Buloh", address: null },
+      ],
+    });
+  if (url.startsWith("/api/")) {
+    return new Response(JSON.stringify({}), { status: 404 });
+  }
+  return realFetch(input, init);
+};
+
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <QueryClientProvider client={qc}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="*" element={<OperationReceiving />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
   receivingAmendInput,
   receivingVoidInput,
@@ -241,10 +242,26 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
   // The optional body carries only the Actual Site — everything counted was
   // decided by the person who held the pallet. Absent body = original flow.
+  // Validated as a UUID here, so a malformed value is the caller's 422 and
+  // never Postgres's 22P02 dressed as a 500.
   let actualSiteId: string | null = null;
   try {
     const body = (await c.req.json()) as { actualSiteId?: unknown };
-    if (typeof body?.actualSiteId === "string") actualSiteId = body.actualSiteId;
+    if (typeof body?.actualSiteId === "string") {
+      const parsed = z.string().uuid().safeParse(body.actualSiteId);
+      if (!parsed.success) {
+        return c.json(
+          {
+            error: "invalid_input",
+            code: "invalid_param",
+            message: "actualSiteId must be a warehouse id",
+            field: "actualSiteId",
+          },
+          422,
+        );
+      }
+      actualSiteId = parsed.data;
+    }
   } catch {
     /* no body — fine */
   }

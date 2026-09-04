@@ -93,6 +93,7 @@ export default function ReceivingWorkspace({
   warehouseName,
   warehouses = [],
   dutyAllowed = true,
+  dutyKnown = true,
   receiving,
   onReceiving,
   onPosted,
@@ -105,6 +106,10 @@ export default function ReceivingWorkspace({
   /** The resolved GRN authority's answer (0425) — the page consumes it, it
    *  never computes it. */
   dutyAllowed?: boolean;
+  /** False while the resolver is still answering — neither the button nor
+   *  the refusal shows until the answer exists (a refusal that flickers at a
+   *  permitted operator is a false sentence). */
+  dutyKnown?: boolean;
   receiving: boolean;
   onReceiving: (on: boolean) => void;
   /** Called with the posted session id, so the page can open the GRN. */
@@ -133,6 +138,7 @@ export default function ReceivingWorkspace({
           supplierName={supplierName}
           warehouseName={warehouseName}
           dutyAllowed={dutyAllowed}
+          dutyKnown={dutyKnown}
           onStart={() => onReceiving(true)}
           events={receivingQ.data?.events ?? []}
           loadingEvents={receivingQ.isLoading}
@@ -151,6 +157,7 @@ function ReadMode({
   supplierName,
   warehouseName,
   dutyAllowed,
+  dutyKnown,
   onStart,
   events,
   loadingEvents,
@@ -161,6 +168,7 @@ function ReadMode({
   supplierName: string;
   warehouseName: string;
   dutyAllowed: boolean;
+  dutyKnown: boolean;
   onStart: () => void;
   events: ReceivingEvent[];
   loadingEvents: boolean;
@@ -248,7 +256,7 @@ function ReadMode({
             Start Receiving
           </button>
         )}
-        {!closed && summary.pendingDeliveryQty > 0 && !dutyAllowed && (
+        {!closed && summary.pendingDeliveryQty > 0 && dutyKnown && !dutyAllowed && (
           /* The same rule the SQL door holds (0426): the fact, then who may.
              A button the server would refuse is never offered. */
           <div className="mt-2 text-label text-kit-slate-9" data-testid="receiving-duty-refusal">

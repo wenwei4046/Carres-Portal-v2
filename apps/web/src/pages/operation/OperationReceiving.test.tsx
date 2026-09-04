@@ -1,429 +1,595 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RECEIVING_UNIT_OUTCOME_LABEL } from "@carres/shared";
+import type { operationPoListRow, SupplierRow } from "@/lib/queries";
 import OperationReceiving from "./OperationReceiving";
+import ReceivingWorkspace from "./components/ReceivingWorkspace";
+import ReceivingRecord from "./components/ReceivingRecord";
 
 /**
- * OperationReceiving — the Receiving Workspace (Slice B, Jess 2026-08-03).
+ * OperationReceiving — the Receiving REGISTER and its object surfaces
+ * (owner instruction 2026-09-04).
  *
- * The page it replaced was a facet-rail list whose row opened a modal; this
- * suite covers the shape that replaced it and, more importantly, the four
- * laws the slice exists to make structural:
+ * The page this suite covered before was a three-pane workspace with an
+ * auto-selecting queue; the rebuild replaced it with the register grammar:
  *
- *   · the Supplier DO number starts EMPTY (the retired modal seeded it with
- *     `"DO-" + random(5200..5999)` — a supplier reference we invented),
- *   · Save says what is MISSING rather than sitting grey and silent,
- *   · the payload carries the DELTA counted on this delivery, never the
- *     running total,
- *   · the empty Activity says the RECORD is empty, not that the goods have
- *     not come.
+ *   240px Filter Rail · full-width sessions DataGrid · status footer
+ *   [Start Receiving] → Find PO or CO → pre-start object → Session
+ *   a submitted row  → the count review (Save Receiving / Return count)
+ *   a posted row     → the read-only GRN record (Amend / Void doors)
+ *
+ * The laws held as assertions:
+ *   · the GRN number is the STORED `grn_no` — a submitted row honestly says
+ *     `No GRN yet`, and a voided record still appears (history never deletes),
+ *   · the register stays MOUNTED (`invisible`) under an open object,
+ *   · the supplier's DO number starts EMPTY — never invented,
+ *   · Save names the FIRST missing fact (`receivingSaveBlocker`, one copy),
+ *   · one physical result per governed Unit, quantities DERIVED from them,
+ *   · duty comes from the ONE resolver — a page without it gets the refusal
+ *     sentence, never a button the server would refuse.
  */
 
-const apiFetchMock = vi.fn();
+/* ── Mutable hook state — the mocked @/lib/queries reads these at call time ── */
+
+const h = vi.hoisted(() => ({
+  dutyAllowed: true,
+  receipts: [] as unknown[],
+  waiting: 0,
+  receiptsError: false,
+  pos: [] as unknown[],
+  poReceiving: {
+    sessions: [] as unknown[],
+    events: [] as unknown[],
+    expected_units: [] as unknown[],
+  },
+  sessionDetail: null as unknown,
+  officeReceive: [] as Array<[string, Record<string, unknown>]>,
+  amend: [] as Array<[string, Record<string, unknown>]>,
+  voided: [] as Array<[string, Record<string, unknown>]>,
+  review: [] as Array<[string, Record<string, unknown>]>,
+}));
+
+vi.mock("@/lib/queries", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
+  return {
+    ...actual,
+    useReceivingDuty: () => ({
+      data: { allowed: h.dutyAllowed },
+      isLoading: false,
+      isError: false,
+    }),
+    useOperationWarehouseReceipts: () => ({
+      data: h.receiptsError
+        ? undefined
+        : { receipts: h.receipts, counts: { waiting: h.waiting } },
+      isLoading: false,
+      isError: h.receiptsError,
+      refetch: () => Promise.resolve(),
+    }),
+    useOperationPos: () => ({
+      data: { pos: h.pos },
+      isLoading: false,
+      isError: false,
+    }),
+    useOperationSuppliers: () => ({
+      data: { suppliers: SUPPLIERS },
+      isLoading: false,
+      isError: false,
+    }),
+    useOperationWarehouse: () => ({
+      data: { warehouses: WAREHOUSES },
+      isLoading: false,
+      isError: false,
+    }),
+    usePoReceiving: () => ({
+      data: h.poReceiving,
+      isLoading: false,
+      isError: false,
+    }),
+    useOfficeReceiveMutation: (poId: string) => ({
+      mutate: (input: Record<string, unknown>) =>
+        h.officeReceive.push([poId, input]),
+      isPending: false,
+    }),
+    useReceivingSessionDetail: () => ({
+      data: h.sessionDetail,
+      isLoading: false,
+      isError: h.sessionDetail == null,
+      refetch: () => Promise.resolve(),
+    }),
+    useReceivingAmendMutation: (id: string) => ({
+      mutate: (body: Record<string, unknown>) => h.amend.push([id, body]),
+      isPending: false,
+    }),
+    useReceivingVoidMutation: (id: string) => ({
+      mutate: (body: Record<string, unknown>) => h.voided.push([id, body]),
+      isPending: false,
+    }),
+    useWarehouseReceiptReviewMutation: (move: string) => ({
+      mutate: (body: Record<string, unknown>) => h.review.push([move, body]),
+      isPending: false,
+    }),
+  };
+});
+
+/* Real hooks spread from the actual module (top bar etc.) still call apiFetch;
+ * it resolves quietly instead of touching a network. */
+const apiFetchMock = vi.fn(() => Promise.resolve({}));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...args: unknown[]) => apiFetchMock(...args) };
 });
 
-// The signed-DO upload goes browser → Storage. Stubbed so the whole Save path
-// (which needs a real file path) is reachable in a test.
-vi.mock("@/lib/supabase", () => ({
-  supabaseConfigured: true,
-  supabase: {
-    storage: {
-      from: () => ({ uploadToSignedUrl: async () => ({ error: null }) }),
-    },
-  },
+/* The three upload fields go browser → Storage; each is replaced with the
+ * smallest control that can hand its value back. */
+vi.mock("@/components/DOFileUploadField", () => ({
+  default: ({ onUploaded }: { onUploaded: (p: string) => void }) => (
+    <button
+      type="button"
+      data-testid="mock-do-upload"
+      onClick={() => onUploaded("dos/PO-2001/do.pdf")}
+    >
+      Upload signed DO
+    </button>
+  ),
 }));
+vi.mock("@/components/ClaimPhotoUploadField", () => ({
+  default: ({ testId }: { testId?: string }) => (
+    <div data-testid={testId ?? "mock-claim-photos"} />
+  ),
+}));
+vi.mock("@/components/ArrivalEvidenceUploadField", () => ({
+  default: ({ testId }: { testId?: string }) => (
+    <div data-testid={testId ?? "mock-arrival-evidence"} />
+  ),
+}));
+
+/* ── Fixtures ──────────────────────────────────────────────────────────────── */
 
 const SUPPLIERS = [
   { id: "sup-nf", name: "Nice Future", kind: "factory_pickup" },
   { id: "sup-oh", name: "Ohana", kind: "factory_pickup" },
-];
+] as unknown as SupplierRow[];
+
 const WAREHOUSES = [
-  { id: "wh-klang", name: "Carres Klang", address: "Klang", owning_partner_id: null },
+  { id: "wh-klang", name: "Carres Klang" },
+  { id: "wh-setia", name: "Carres Setia" },
 ];
 
 function po(p: {
   id: string;
   supplier_id: string;
-  status: "open" | "received" | "cancelled";
-  lines: {
+  status?: string;
+  lines: Array<{
     id: string;
     sku: string;
     qty: number;
     received_qty: number;
     damaged_qty?: number;
     wrong_item_qty?: number;
-  }[];
-}) {
+  }>;
+}): operationPoListRow {
   return {
     id: p.id,
     supplier_id: p.supplier_id,
     warehouse_id: "wh-klang",
-    status: p.status,
+    status: p.status ?? "open",
     sup_status: "in_production",
     so: 1001,
     so_refs: null,
-    eta_date: "2026-08-20",
+    eta_date: "2026-09-10",
     placed_at: "2026-08-01T00:00:00Z",
     purchase_order_lines: p.lines,
+  } as unknown as operationPoListRow;
+}
+
+/** A stored Receiving Session as the register lists it. */
+function receipt(over: Record<string, unknown>) {
+  return {
+    id: "r-x",
+    po_id: "PO-2001",
+    warehouse_id: "wh-klang",
+    warehouse_name: "Carres Klang",
+    supplier_name: "Nice Future",
+    do_number: "DO-5512",
+    do_file_path: "dos/PO-2001/do.pdf",
+    note: null,
+    lines: [
+      {
+        id: "lr1",
+        sku: "MS01",
+        received_now: 2,
+        damaged_qty: 0,
+        wrong_item_qty: 0,
+        wrong_item_claim_type: null,
+      },
+    ],
+    status: "posted",
+    submitted_by_name: null,
+    submitted_at: "2026-09-01T02:00:00Z",
+    reviewed_by_name: null,
+    reviewed_at: null,
+    return_reason: null,
+    summary: "2 good",
+    opens_claims: false,
+    grn_no: "GRN-20260901-1234",
+    goods_received_at: "2026-09-01",
+    submitted_from: "office",
+    posted_at: "2026-09-01T03:00:00Z",
+    posted_by_name: "Shasha",
+    ...over,
   };
 }
 
-const POS = [
-  // In transit — nothing counted in yet. Two lines, so a short receipt is
-  // expressible.
-  po({
-    id: "PO-2001",
-    supplier_id: "sup-nf",
-    status: "open",
-    lines: [
-      { id: "11111111-1111-1111-1111-111111111111", sku: "MS01", qty: 3, received_qty: 0 },
-      { id: "22222222-2222-2222-2222-222222222222", sku: "BF01", qty: 2, received_qty: 0 },
-    ],
+const REGISTER_ROWS = [
+  receipt({ id: "r-posted" }),
+  receipt({
+    id: "r-submitted",
+    status: "submitted",
+    grn_no: null,
+    supplier_name: "Ohana",
+    po_id: "PO-2002",
+    posted_at: null,
+    posted_by_name: null,
+    submitted_from: "warehouse",
+    submitted_by_name: "KLG Clerk",
   }),
-  // Partially received.
-  po({
-    id: "PO-2002",
-    supplier_id: "sup-oh",
-    status: "open",
-    lines: [
-      { id: "33333333-3333-3333-3333-333333333333", sku: "SF02", qty: 4, received_qty: 1 },
-    ],
-  }),
-  // Fully received.
-  po({
-    id: "PO-2003",
-    supplier_id: "sup-nf",
-    status: "received",
-    lines: [
-      { id: "44444444-4444-4444-4444-444444444444", sku: "BF02", qty: 3, received_qty: 3 },
-    ],
-  }),
-  // Cancelled — never belongs in a receiving queue.
-  po({
-    id: "PO-2004",
-    supplier_id: "sup-oh",
-    status: "cancelled",
-    lines: [
-      { id: "55555555-5555-5555-5555-555555555555", sku: "SF03", qty: 1, received_qty: 0 },
-    ],
+  receipt({
+    id: "r-voided",
+    status: "voided",
+    grn_no: "GRN-20260830-7777",
+    void_at: "2026-09-02T00:00:00Z",
+    void_by_name: "Jess",
+    void_reason: "Duplicate entry",
   }),
 ];
 
-let receivingResponse: { sessions: unknown[]; events: unknown[] } = {
-  sessions: [],
-  events: [],
-};
+const FIND_POS = [
+  po({
+    id: "PO-2001",
+    supplier_id: "sup-nf",
+    lines: [
+      { id: "l-ms01", sku: "MS01", qty: 3, received_qty: 0 },
+      { id: "l-bf01", sku: "BF01", qty: 2, received_qty: 0 },
+    ],
+  }),
+  po({
+    id: "PO-2002",
+    supplier_id: "sup-oh",
+    lines: [{ id: "l-sf02", sku: "SF02", qty: 4, received_qty: 1 }],
+  }),
+  // Fully received — owes nothing, so it never reaches Find PO or CO.
+  po({
+    id: "PO-2003",
+    supplier_id: "sup-nf",
+    lines: [{ id: "l-bf02", sku: "BF02", qty: 3, received_qty: 3 }],
+  }),
+];
 
-/** The listing's rows, when a suite needs its OWN purchase orders (T5's four
- *  arrival states). Null = the shared `POS` above. */
-let posOverride: unknown[] | null = null;
+/** One posted GRN as the record reads it (`useReceivingSessionDetail`). */
+function postedDetail(over?: {
+  receipt?: Record<string, unknown>;
+  lines?: unknown[];
+}) {
+  return {
+    receipt: receipt({
+      id: "r-posted",
+      actual_site_name: null,
+      posted_duty_holder_name: "Shasha",
+      posted_duty_cover_name: null,
+      posted_authority: "grn_duty",
+      lines: over?.lines ?? [
+        {
+          id: "lr1",
+          sku: "MS01",
+          received_now: 2,
+          damaged_qty: 1,
+          wrong_item_qty: 0,
+          wrong_item_claim_type: null,
+        },
+      ],
+      unit_results: [
+        {
+          stock_item_id: "si1",
+          unit_code: "U-0001",
+          outcome: "received",
+          issue_kind: null,
+          note: null,
+        },
+        {
+          stock_item_id: "si2",
+          unit_code: "U-0002",
+          outcome: "received_with_issue",
+          issue_kind: "damaged",
+          note: null,
+        },
+      ],
+      ...(over?.receipt ?? {}),
+    }),
+    po: {
+      id: "PO-2001",
+      supplier_id: "sup-nf",
+      warehouse_id: "wh-klang",
+      purchase_order_lines: [
+        {
+          id: "l-ms01",
+          sku: "MS01",
+          qty: 3,
+          received_qty: 2,
+          damaged_qty: 1,
+          wrong_item_qty: 0,
+        },
+      ],
+    },
+    events: [],
+  };
+}
 
-function wrap(entry = "/operation?tab=receiving") {
+/* ── Render helpers ────────────────────────────────────────────────────────── */
+
+function renderWithProviders(ui: React.ReactElement, entry = "/operation?tab=receiving") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={[entry]}>
-      <QueryClientProvider client={qc}>
-        <OperationReceiving />
-      </QueryClientProvider>
+      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
     </MemoryRouter>,
   );
 }
 
-/** Wait for the first row to have auto-selected into the workspace. */
-async function ready() {
-  await waitFor(() =>
-    expect(screen.getByTestId("receiving-workspace")).toBeInTheDocument(),
-  );
-}
+const renderPage = (entry?: string) =>
+  renderWithProviders(<OperationReceiving />, entry);
 
-/** A PO number appears twice on this page — once as a listing row, once as the
- *  open document's hero. Every listing assertion is scoped, or it is measuring
- *  the workspace by accident. */
-const listing = () => within(screen.getByTestId("receiving-listing"));
-
-/** Open a PO in the workspace the way an operator does — by its row. */
-async function openRow(poId: string) {
-  fireEvent.click(listing().getByText(poId));
-  await waitFor(() =>
-    expect(
-      within(screen.getByTestId("receiving-workspace-pane")).getByText(poId),
-    ).toBeInTheDocument(),
+/** The Session is owned by the page in production; here a two-line harness
+ *  supplies the `receiving` state so Start Receiving genuinely flips it. */
+function WorkspaceHarness({
+  poRow,
+  dutyAllowed = true,
+  receivingAtStart = false,
+}: {
+  poRow: operationPoListRow;
+  dutyAllowed?: boolean;
+  receivingAtStart?: boolean;
+}) {
+  const [receiving, setReceiving] = useState(receivingAtStart);
+  return (
+    <ReceivingWorkspace
+      po={poRow}
+      supplier={SUPPLIERS.find((s) => s.id === poRow.supplier_id)}
+      warehouseName="Carres Klang"
+      warehouses={WAREHOUSES}
+      dutyAllowed={dutyAllowed}
+      receiving={receiving}
+      onReceiving={setReceiving}
+    />
   );
 }
 
 beforeEach(() => {
-  receivingResponse = { sessions: [], events: [] };
-  posOverride = null;
-  apiFetchMock.mockReset();
-  apiFetchMock.mockImplementation((path: string) => {
-    if (typeof path !== "string") return Promise.resolve({});
-    // Order matters: the receiving path also starts with /api/operation/pos.
-    if (path.includes("/receiving")) return Promise.resolve(receivingResponse);
-    if (path.includes("/office-receive")) return Promise.resolve({ status: "posted" });
-    if (path.includes("/api/storage/dos/sign-upload"))
-      return Promise.resolve({ token: "tok", path: "dos/PO-2001/do.pdf" });
-    if (path.includes("/api/operation/suppliers"))
-      return Promise.resolve({ suppliers: SUPPLIERS });
-    if (path.includes("/api/operation/warehouse"))
-      return Promise.resolve({ warehouses: WAREHOUSES });
-    if (path.includes("/api/operation/pos"))
-      return Promise.resolve({ pos: posOverride ?? POS });
-    return Promise.resolve({});
-  });
+  h.dutyAllowed = true;
+  h.receipts = [...REGISTER_ROWS];
+  h.waiting = 0;
+  h.receiptsError = false;
+  h.pos = [...FIND_POS];
+  h.poReceiving = { sessions: [], events: [], expected_units: [] };
+  h.sessionDetail = null;
+  h.officeReceive.length = 0;
+  h.amend.length = 0;
+  h.voided.length = 0;
+  h.review.length = 0;
+  apiFetchMock.mockClear();
+  apiFetchMock.mockImplementation(() => Promise.resolve({}));
+  // The DataGrid persists sort/filter under its storageKey — a leak from one
+  // test's clicks would silently reorder the next test's rows.
+  localStorage.clear();
 });
 
-describe("OperationReceiving — the Workspace shell", () => {
-  it("renders the Purchasing Workspace's three panes", async () => {
-    wrap();
-    await ready();
-    expect(screen.getByTestId("receiving-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("receiving-listing")).toBeInTheDocument();
-    expect(screen.getByTestId("receiving-workspace-pane")).toBeInTheDocument();
-  });
+/* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
-  it("keeps cancelled POs out of the queue entirely", async () => {
-    wrap();
-    await ready();
-    expect(listing().queryByText("PO-2004")).not.toBeInTheDocument();
-    expect(listing().getByText("PO-2001")).toBeInTheDocument();
-  });
-
-  it("`To receive` holds only what is still owed (defect 6)", async () => {
-    /* It used to hold every non-cancelled PO, fully received ones included,
-       sorted oldest-first - so with no `?po=` the page auto-selected the OLDEST
-       purchase order ever placed, which is almost always closed. The receiving
-       desk opened on a panel with no Start Receiving button, every morning, and
-       the count beside the queue was the count of all POs on file rather than
-       of deliveries still owed. */
-    wrap();
-    await ready();
-    expect(listing().getByText("PO-2001")).toBeInTheDocument(); // in transit
-    expect(listing().getByText("PO-2002")).toBeInTheDocument(); // partially received
-    expect(listing().queryByText("PO-2003")).not.toBeInTheDocument(); // fully received
-  });
-
-  it("`Fully received` is still the way back to a finished delivery", async () => {
-    /* Removing them from the default queue may not make them unreachable -
-       the rail row is the door, and it must still open. */
-    wrap();
-    await ready();
-    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
-    expect(listing().getByText("PO-2003")).toBeInTheDocument();
-  });
-
-  it("counts the rail by the progress state the page already computes", async () => {
-    wrap();
-    await ready();
-    // 1 in transit (PO-2001) · 1 partially received (PO-2002) · 1 fully
-    // received (PO-2003). The cancelled one is counted nowhere.
-    expect(screen.getByTestId("receiving-rail-state-in_transit")).toHaveTextContent("1");
-    expect(
-      screen.getByTestId("receiving-rail-state-partially_received"),
-    ).toHaveTextContent("1");
-    expect(
-      screen.getByTestId("receiving-rail-state-fully_received"),
-    ).toHaveTextContent("1");
-  });
-
-  it("a rail pick narrows the listing, and picking it again clears", async () => {
-    wrap();
-    await ready();
-    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
-    await waitFor(() =>
-      expect(listing().queryByText("PO-2001")).not.toBeInTheDocument(),
+describe("OperationReceiving — the Receiving Register", () => {
+  it("draws the 240px Filter Rail with the RECEIVING and SUPPLIER groups", () => {
+    renderPage();
+    const rail = screen.getByTestId("receiving-rail");
+    expect(rail.className).toContain("w-[240px]");
+    const inRail = within(rail);
+    expect(inRail.getByTestId("rail-all-receiving")).toHaveTextContent(
+      "All receiving",
     );
-    expect(listing().getByText("PO-2003")).toBeInTheDocument();
-    // The OPEN document survives a filter, exactly as it does on Purchase
-    // Orders: `?po=` is the one source of selection, and a filter narrows what
-    // you can pick — it does not close what you are reading.
+    expect(inRail.getByTestId("rail-state-submitted")).toHaveTextContent(
+      "Count waiting for check",
+    );
+    expect(inRail.getByTestId("rail-state-returned")).toHaveTextContent(
+      "Sent back to recount",
+    );
+    expect(inRail.getByTestId("rail-state-posted")).toHaveTextContent("Posted");
+    expect(inRail.getByTestId("rail-state-voided")).toHaveTextContent("Voided");
+    expect(inRail.getByTestId("rail-all-suppliers")).toHaveTextContent(
+      "All suppliers",
+    );
+  });
+
+  it("prints the STORED grn_no, an honest `No GRN yet`, and never deletes a voided row", () => {
+    renderPage();
+    // Posted: the formal stored number, never re-derived.
+    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+    // Submitted: the GRN does not exist yet, and the cell says so — no `—`.
+    expect(screen.getAllByText("No GRN yet").length).toBeGreaterThan(0);
+    // Voided: history is never deleted; the record keeps its number.
+    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+  });
+
+  it("a rail state pick narrows the listing, and picking it again clears", async () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId("rail-state-posted"));
+    await waitFor(() =>
+      expect(screen.queryByText("No GRN yet")).not.toBeInTheDocument(),
+    );
+    // The voided session is not posted either.
+    expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument();
+    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByTestId("rail-state-posted"));
+    await waitFor(() =>
+      expect(screen.getAllByText("No GRN yet").length).toBeGreaterThan(0),
+    );
+  });
+
+  it("Start Receiving opens Find PO or CO, and typing narrows the candidates", async () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId("start-receiving-door"));
+    await screen.findByTestId("receiving-find-po");
+    // Only POs still owing goods are candidates — the fully received PO-2003
+    // never appears.
+    expect(screen.getByTestId("receiving-find-PO-2001")).toBeInTheDocument();
+    expect(screen.getByTestId("receiving-find-PO-2002")).toBeInTheDocument();
+    expect(screen.queryByTestId("receiving-find-PO-2003")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("receiving-find-input"), {
+      target: { value: "ohana" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("receiving-find-PO-2001"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("receiving-find-PO-2002")).toBeInTheDocument();
+  });
+
+  it("with no owing PO the Find view says no delivery is ready — the governed sentence", async () => {
+    h.pos = [];
+    renderPage();
+    fireEvent.click(screen.getByTestId("start-receiving-door"));
+    const empty = await screen.findByTestId("receiving-find-empty");
+    expect(empty).toHaveTextContent("No supplier delivery is ready to receive.");
+  });
+
+  it("a row opens the record, and the register stays MOUNTED but invisible", async () => {
+    h.sessionDetail = postedDetail();
+    renderPage();
+    fireEvent.click(screen.getAllByText("GRN-20260901-1234")[0]);
+    await screen.findByTestId("receiving-record");
+    // Never display:none — `invisible` keeps rail filters, search, sort and
+    // scroll alive for Back (the Manual Purchase / SO object law).
+    const register = screen.getByTestId("receiving-register");
+    expect(register).toBeInTheDocument();
+    expect(register.className).toContain("invisible");
+  });
+
+  it("the status footer counts receiving records", () => {
+    renderPage();
+    expect(screen.getByText(/3 receiving records/)).toBeInTheDocument();
+  });
+
+  it("a failed listing says what broke and offers Try again", () => {
+    h.receiptsError = true;
+    renderPage();
     expect(
-      within(screen.getByTestId("receiving-workspace-pane")).getByText("PO-2001"),
+      screen.getByText("Receiving could not be opened"),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
-    await waitFor(() =>
-      expect(listing().getByText("PO-2001")).toBeInTheDocument(),
-    );
+    expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 
-  it("auto-selects the first row and answers 'what has this PO taken in?'", async () => {
-    wrap();
-    await ready();
-    // Default order is PO Issued oldest first, then id — PO-2001.
-    expect(screen.getByTestId("receiving-summary-received")).toHaveTextContent(
-      "0 / 5",
-    );
-    // Outstanding is PRINTED, never left as 5 − 0 for the operator to do.
-    expect(screen.getByTestId("receiving-summary-outstanding")).toHaveTextContent(
-      "5",
-    );
+  it("an empty register says the RECORD is empty, never that goods have not come", () => {
+    h.receipts = [];
+    renderPage();
+    expect(screen.getByText("No receiving activity yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing received/i)).not.toBeInTheDocument();
   });
 });
 
-describe("OperationReceiving — Read Mode", () => {
-  it("says the RECORD is empty, never that the goods have not come", async () => {
-    wrap();
-    await ready();
-    const empty = await screen.findByTestId("receiving-activity-empty");
-    expect(empty).toHaveTextContent("No receiving activity yet.");
-    // Jess, 2026-08-03: "Nothing received" reads as "the goods did not
-    // arrive", which is a different fact and usually a false one.
-    expect(empty).not.toHaveTextContent(/Nothing received/i);
+/* ═══ THE SESSION (ReceivingWorkspace) ═════════════════════════════════════ */
+
+describe("ReceivingWorkspace — the pre-start object", () => {
+  const PRE_START = po({
+    id: "PO-2001",
+    supplier_id: "sup-nf",
+    lines: [
+      {
+        id: "l-ms01",
+        sku: "MS01",
+        qty: 3,
+        received_qty: 1,
+        damaged_qty: 1,
+        wrong_item_qty: 0,
+      },
+      { id: "l-bf01", sku: "BF01", qty: 2, received_qty: 0 },
+    ],
   });
 
-  it("reads the event ledger, and prints what the payload carries", async () => {
-    receivingResponse = {
-      sessions: [],
-      events: [
-        {
-          id: "e1",
-          receipt_id: "r1",
-          event: "posted",
-          event_at: "2026-08-03T02:00:00Z",
-          actor_name: "Shasha",
-          payload: {
-            do_number: "DO-5512",
-            units_counted: 3,
-            goods_received_at: "2026-08-02",
-            entry_source: "office",
-            claims_linked: 0,
-          },
-        },
-      ],
-    };
-    wrap();
-    await ready();
-    const log = await screen.findByTestId("receiving-activity");
-    expect(log).toHaveTextContent("Posted by Shasha");
-    expect(log).toHaveTextContent("DO DO-5512");
-    expect(log).toHaveTextContent("3 units");
+  it("prints the five governed quantity words — the operator never subtracts", () => {
+    renderWithProviders(<WorkspaceHarness poRow={PRE_START} />);
+    expect(screen.getByTestId("summary-order-qty")).toHaveTextContent("5");
+    expect(screen.getByTestId("summary-received-qty")).toHaveTextContent("1");
+    expect(screen.getByTestId("summary-damaged-qty")).toHaveTextContent("1");
+    expect(screen.getByTestId("summary-wrong-qty")).toHaveTextContent("0");
+    expect(screen.getByTestId("summary-pending-qty")).toHaveTextContent("4");
+    // The governed spelling — `Deliver To`, never `Delivery To`.
+    expect(screen.getByText("Deliver To")).toBeInTheDocument();
+    expect(screen.queryByText("Delivery To")).not.toBeInTheDocument();
   });
 
-  it("names a `?po=` that misses instead of showing a different PO (defect 7)", async () => {
-    /* The auto-select fired whenever the lookup returned null - which is true
-       both when there is no `?po=` at all AND when the one asked for missed.
-       So a cancelled PO, a mistyped id or a partner-warehouse PO was answered
-       with ANOTHER purchase order's number, its history, and a live Start
-       Receiving button, written into the URL with `replace: true` so Back could
-       not recover it. RECEIVING MOVES STOCK: counting goods against the wrong
-       purchase order loses real furniture. */
-    wrap("/operation?tab=receiving&po=PO-9999999");
+  it("Start Receiving leads while goods are owed, and genuinely opens the Session", async () => {
+    renderWithProviders(<WorkspaceHarness poRow={PRE_START} />);
+    fireEvent.click(screen.getByTestId("start-receiving"));
+    expect(await screen.findByTestId("receiving-mode")).toBeInTheDocument();
+  });
 
-    /* No `ready()` here - it waits for the workspace to auto-select, and the
-       whole point is that nothing is selected. */
-    await waitFor(() =>
-      expect(screen.getByText(/PO-9999999 is not in this queue/)).toBeInTheDocument(),
+  it("without GRN duty the button is replaced by the refusal sentence", () => {
+    renderWithProviders(
+      <WorkspaceHarness poRow={PRE_START} dutyAllowed={false} />,
     );
-    /* And it must NOT have quietly swapped in a real one. */
     expect(screen.queryByTestId("start-receiving")).not.toBeInTheDocument();
+    expect(screen.getByTestId("receiving-duty-refusal")).toHaveTextContent(
+      "Only GRN duty may save a receiving.",
+    );
   });
 
-  it("offers no Start Receiving on a PO that owes nothing", async () => {
-    wrap();
-    await ready();
-    /* A finished PO left the default queue with defect 6, so the route to it
-       is its own rail row. The law under test is unchanged: a button that could
-       only refuse is not an action. */
-    fireEvent.click(screen.getByTestId("receiving-rail-state-fully_received"));
-    await openRow("PO-2003");
-    expect(screen.getByTestId("receiving-summary-outstanding")).toHaveTextContent(
-      "0",
-    );
+  it("offers no Start Receiving on a PO that owes nothing", () => {
+    const done = po({
+      id: "PO-2003",
+      supplier_id: "sup-nf",
+      lines: [{ id: "l-bf02", sku: "BF02", qty: 3, received_qty: 3 }],
+    });
+    renderWithProviders(<WorkspaceHarness poRow={done} />);
+    expect(screen.getByTestId("summary-pending-qty")).toHaveTextContent("0");
     // A button that could only refuse is not an action.
     expect(screen.queryByTestId("start-receiving")).not.toBeInTheDocument();
   });
 });
 
-/**
- * Q14 — THE TWO SUPPLIER CALLS ARE OFF THIS TAB, AND MAY NOT COME BACK.
- *
- * Loo's role-anchor (`PURCHASING-WORKING-FLOW.md` §1, 2026-08-05): work done by
- * ASKING THE SUPPLIER for something belongs to the buyer; work done by HANDLING
- * THE GOODS belongs to Receiving. `Confirm tomorrow's delivery` had a door here
- * AND on the register, both writing one endpoint; `Confirm balance delivery
- * date` had its ONLY door here. Both now live on the Purchase Orders expand.
- *
- * **PO-2002 is why this suite can prove it**: 1 of 4 received, so the engine
- * genuinely opens a balance call on it — before Q14 this page drew a button.
- */
-describe("OperationReceiving — the supplier calls are the buyer's (Q14)", () => {
-  it("a part-received PO shows NO supplier-call button", async () => {
-    wrap();
-    await ready();
-    await openRow("PO-2002");
-    // The PO really is short — otherwise no call could have been raised and
-    // this test would pass by measuring nothing.
-    expect(screen.getByTestId("receiving-summary-received")).toHaveTextContent(
-      "1 / 4",
-    );
-    expect(screen.queryByTestId(/^receiving-balance-/)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(/^receiving-tomorrow-/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Record balance date")).not.toBeInTheDocument();
-    expect(screen.queryByText("Record answer")).not.toBeInTheDocument();
+describe("ReceivingWorkspace — the active Session", () => {
+  const SESSION_PO = po({
+    id: "PO-2001",
+    supplier_id: "sup-nf",
+    lines: [
+      { id: "l-ms01", sku: "MS01", qty: 3, received_qty: 0 },
+      { id: "l-bf01", sku: "BF01", qty: 2, received_qty: 0 },
+    ],
   });
 
-  it("Receiving's own work is untouched — Start Receiving still leads", async () => {
-    wrap();
-    await ready();
-    await openRow("PO-2002");
-    // The ONE loud element is still the module's own action; removing the two
-    // calls must not have taken the tab's actual job with them.
-    expect(screen.getByTestId("start-receiving")).toBeInTheDocument();
-  });
+  const startSession = () =>
+    renderWithProviders(<WorkspaceHarness poRow={SESSION_PO} receivingAtStart />);
 
-  it("no dead call state is left behind on the workspace", () => {
-    // Dead state no click can reach is the `ops_order_control.balance` disease
-    // in its other form — the card names it, so it is asserted, not assumed.
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "components", "ReceivingWorkspace.tsx"),
-      "utf8",
-    );
-    for (const dead of ["answerFor", "onAnswer", "setAnswerFor", "PurchasingOpenCall"])
-      expect(src).not.toContain(dead);
-  });
-});
+  const UNITS = [
+    { id: "u1", unit_code: "U-0001", sku: "MS01", status: "incoming" },
+    { id: "u2", unit_code: "U-0002", sku: "MS01", status: "incoming" },
+    { id: "u3", unit_code: "U-0003", sku: "MS01", status: "incoming" },
+  ];
 
-describe("OperationReceiving — Receiving Mode", () => {
-  async function startReceiving(poId?: string) {
-    wrap();
-    await ready();
-    if (poId) await openRow(poId);
-    fireEvent.click(screen.getByTestId("start-receiving"));
-    await screen.findByTestId("receiving-mode");
-  }
-
-  it("takes the stage — the listing steps aside while a delivery is counted", async () => {
-    await startReceiving();
-    expect(screen.getByTestId("receiving-listing").className).toContain("hidden");
-  });
-
-  it("prefills every line at its remaining qty — a full delivery is zero typing", async () => {
-    await startReceiving();
-    expect(
-      screen.getByTestId("receive-now-11111111-1111-1111-1111-111111111111"),
-    ).toHaveValue(3);
-    expect(
-      screen.getByTestId("receive-now-22222222-2222-2222-2222-222222222222"),
-    ).toHaveValue(2);
-  });
-
-  it("never invents the supplier's DO number", async () => {
-    await startReceiving();
-    // The retired ReceivePOModal opened with `DO-5xxx` already typed in.
+  it("never invents the supplier's DO number, and Save names the first missing fact", () => {
+    startSession();
     expect(screen.getByTestId("do-number")).toHaveValue("");
-    expect(screen.getByTestId("receiving-save")).toBeDisabled();
-  });
-
-  it("Save names what is missing, and the name changes as it is supplied", async () => {
-    await startReceiving();
     const save = screen.getByTestId("receiving-save");
+    expect(save).toBeDisabled();
     expect(save).toHaveTextContent("Save — add a DO number");
 
     fireEvent.change(screen.getByTestId("do-number"), {
@@ -433,454 +599,287 @@ describe("OperationReceiving — Receiving Mode", () => {
     expect(save).toBeDisabled();
   });
 
-  it("asks for a damage photo only once damage is reported", async () => {
-    await startReceiving();
-    const line = "11111111-1111-1111-1111-111111111111";
-    expect(screen.queryByTestId(`damaged-photos-${line}`)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByTestId(`damaged-${line}`), {
-      target: { value: "1" },
-    });
-    expect(await screen.findByTestId(`damaged-photos-${line}`)).toBeInTheDocument();
-  });
-
-  it("states a short receipt quietly, never as a popup", async () => {
-    await startReceiving();
-    const line = "11111111-1111-1111-1111-111111111111";
-    fireEvent.change(screen.getByTestId(`receive-now-${line}`), {
-      target: { value: "1" },
-    });
-    // Line 1: 3 remaining, 1 counted → 2 left. Line 2 is still prefilled at
-    // its full 2, so it leaves nothing. The figure is about what this SAVE
-    // will leave behind, not about what the PO has not received yet.
-    expect(await screen.findByTestId("remaining-after-save")).toHaveTextContent(
-      "Remaining after save: 2 (stays on this PO)",
+  it("prints the live Pending Delivery Qty after save beside the button", () => {
+    startSession();
+    // Every line is prefilled at its remaining count, so a full delivery
+    // leaves nothing pending.
+    expect(screen.getByTestId("pending-after-save")).toHaveTextContent(
+      "Pending Delivery Qty after save: 0",
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Count 1 of MS01's 3 instead — this SAVE leaves 2 behind.
+    fireEvent.change(screen.getByTestId("receive-now-l-ms01"), {
+      target: { value: "1" },
+    });
+    expect(screen.getByTestId("pending-after-save")).toHaveTextContent(
+      "Pending Delivery Qty after save: 2",
+    );
   });
 
-  it("posts the DELTA counted on this delivery, never the running total", async () => {
-    // PO-2002 on purpose: 4 ordered, 1 ALREADY received. On a PO with nothing
-    // received yet the delta and the running total are the same number, so
-    // this assertion would pass against either — measuring nothing. (Caught by
-    // the negative control on 2026-08-03.)
-    await startReceiving("PO-2002");
+  it("Actual Site defaults to the PO's own booked warehouse", () => {
+    startSession();
+    expect(screen.getByTestId("actual-site")).toHaveValue("wh-klang");
+  });
+
+  it("renders one outcome row per governed Unit, quantities DERIVED from them", async () => {
+    h.poReceiving.expected_units = UNITS;
+    startSession();
+    // Each expected Unit gets its own row and its three-outcome select.
+    const outcome = screen.getByTestId("unit-outcome-U-0001");
+    expect(screen.getByTestId("unit-U-0001")).toBeInTheDocument();
+    for (const label of Object.values(RECEIVING_UNIT_OUTCOME_LABEL)) {
+      expect(
+        within(outcome).getByRole("option", { name: label }),
+      ).toBeInTheDocument();
+    }
+    // Prefilled `received` up to the line's remaining count.
+    expect(screen.getByTestId("derived-l-ms01")).toHaveTextContent("3 received");
+    // Flip one Unit to `Not received` — the line's number FOLLOWS the
+    // outcomes; the two can never disagree.
+    fireEvent.change(screen.getByTestId("unit-outcome-U-0003"), {
+      target: { value: "not_received" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("derived-l-ms01")).toHaveTextContent(
+        "2 received",
+      ),
+    );
+  });
+
+  it("`+ Add line` records extra goods on their own row", () => {
+    startSession();
+    expect(screen.queryByTestId("extra-line-0")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("add-extra-line"));
+    expect(screen.getByTestId("extra-line-0")).toBeInTheDocument();
+  });
+
+  it("the save payload carries the saveKey, the per-Unit outcomes and the extra lines", async () => {
+    h.poReceiving.expected_units = UNITS;
+    startSession();
 
     fireEvent.change(screen.getByTestId("do-number"), {
       target: { value: "DO-5512" },
     });
-    // The signed DO photo — required past Draft by the store itself.
-    const file = new File(["x"], "do.pdf", { type: "application/pdf" });
-    fireEvent.change(screen.getByLabelText("DO file"), {
-      target: { files: [file] },
-    });
+    fireEvent.click(screen.getByTestId("mock-do-upload"));
     await waitFor(() =>
       expect(screen.getByTestId("receiving-save")).toHaveTextContent(
         "Save Receiving",
       ),
     );
 
-    fireEvent.change(screen.getByTestId("goods-received-at"), {
-      target: { value: "2026-08-02" },
+    fireEvent.click(screen.getByTestId("add-extra-line"));
+    fireEvent.change(screen.getByLabelText("Extra goods SKU 1"), {
+      target: { value: "SF99" },
     });
-    fireEvent.click(screen.getByTestId("receiving-save"));
 
-    await waitFor(() =>
-      expect(
-        apiFetchMock.mock.calls.some(
-          (c) => typeof c[0] === "string" && c[0].includes("/office-receive"),
-        ),
-      ).toBe(true),
-    );
-    const call = apiFetchMock.mock.calls.find(
-      (c) => typeof c[0] === "string" && c[0].includes("/office-receive"),
-    )!;
-    expect(call[0]).toBe("/api/operation/pos/PO-2002/office-receive");
-    const body = JSON.parse((call[1] as { body: string }).body);
+    fireEvent.click(screen.getByTestId("receiving-save"));
+    expect(h.officeReceive).toHaveLength(1);
+    const [poId, body] = h.officeReceive[0];
+    expect(poId).toBe("PO-2001");
     expect(body.doNumber).toBe("DO-5512");
-    expect(body.goodsReceivedAt).toBe("2026-08-02");
-    // 4 ordered − 1 already received = 3 counted THIS time. A running total
-    // would read 4 here, and the engine would book a unit that never arrived.
-    expect(body.lines).toEqual([
-      { id: "33333333-3333-3333-3333-333333333333", receivedNow: 3 },
+    expect(body.doFilePath).toBe("dos/PO-2001/do.pdf");
+    // ONE key per Session entry — the idempotency contract (0426).
+    expect(body.saveKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(body.extraLines).toEqual([
+      { sku: "SF99", qty: 1, note: undefined },
+    ]);
+    const lines = body.lines as Array<{
+      id: string;
+      receivedNow: number;
+      units?: Array<{ unitCode: string; outcome: string }>;
+    }>;
+    const ms = lines.find((l) => l.id === "l-ms01")!;
+    expect(ms.receivedNow).toBe(3);
+    expect(ms.units?.map((u) => u.unitCode).sort()).toEqual([
+      "U-0001",
+      "U-0002",
+      "U-0003",
+    ]);
+    expect(ms.units?.every((u) => u.outcome === "received")).toBe(true);
+    // The no-Unit line keeps its lawful quantity and carries no units array.
+    const bf = lines.find((l) => l.id === "l-bf01")!;
+    expect(bf.receivedNow).toBe(2);
+    expect(bf.units).toBeUndefined();
+  });
+
+  it("says what saving will do — Inventory in, extra goods never available stock", () => {
+    startSession();
+    const consequences = screen.getByTestId("posting-consequences");
+    expect(consequences).toHaveTextContent(
+      "Valid received Units enter Inventory at Carres Klang",
+    );
+    expect(consequences).toHaveTextContent(
+      "extra goods never become available stock",
+    );
+  });
+});
+
+/* ═══ THE RECORD (ReceivingRecord) ═════════════════════════════════════════ */
+
+describe("ReceivingRecord — the posted GRN, the review, the two doors", () => {
+  const renderRecord = () =>
+    renderWithProviders(
+      <ReceivingRecord sessionId="r-posted" onBack={() => {}} />,
+    );
+
+  it("a posted record shows the stored number, both site facts, the duty trio and Unit results", () => {
+    h.sessionDetail = postedDetail();
+    renderRecord();
+    expect(
+      screen.getByRole("heading", { name: "GRN-20260901-1234" }),
+    ).toBeInTheDocument();
+    // Actual Site null = the instruction's own warehouse, said in words.
+    expect(screen.getByText("Same as Deliver To")).toBeInTheDocument();
+    // The duty-evidence trio — never one overwritten name.
+    expect(screen.getByTestId("duty-trio")).toHaveTextContent(
+      "Shasha · GRN Duty",
+    );
+    expect(screen.getByTestId("unit-result-U-0001")).toHaveTextContent(
+      RECEIVING_UNIT_OUTCOME_LABEL.received,
+    );
+    expect(screen.getByTestId("unit-result-U-0002")).toHaveTextContent(
+      "damaged",
+    );
+    // A recorded issue opens the door to its claims.
+    expect(screen.getByTestId("record-open-claims")).toBeInTheDocument();
+  });
+
+  it("a CLEAN posting offers no Claims door — nothing to open", () => {
+    h.sessionDetail = postedDetail({
+      lines: [
+        {
+          id: "lr1",
+          sku: "MS01",
+          received_now: 2,
+          damaged_qty: 0,
+          wrong_item_qty: 0,
+          wrong_item_claim_type: null,
+        },
+      ],
+    });
+    renderRecord();
+    expect(screen.queryByTestId("record-open-claims")).not.toBeInTheDocument();
+  });
+
+  it("a submitted count offers Save Receiving and Return count, and the review posts the move", () => {
+    h.sessionDetail = postedDetail({
+      receipt: { status: "submitted", grn_no: null, posted_at: null },
+    });
+    renderRecord();
+    expect(screen.getByTestId("save-receiving-review")).toHaveTextContent(
+      "Save Receiving",
+    );
+    expect(screen.getByTestId("return-count-door")).toHaveTextContent(
+      "Return count to Carres Klang",
+    );
+    fireEvent.click(screen.getByTestId("save-receiving-review"));
+    expect(h.review).toEqual([["check-in", { receiptId: "r-posted" }]]);
+  });
+
+  it("Return count demands the reason, then sends it back with it", () => {
+    h.sessionDetail = postedDetail({
+      receipt: { status: "submitted", grn_no: null, posted_at: null },
+    });
+    renderRecord();
+    fireEvent.click(screen.getByTestId("return-count-door"));
+    const confirm = screen.getByTestId("confirm-return-count");
+    expect(confirm).toBeDisabled();
+    fireEvent.change(screen.getByTestId("return-reason"), {
+      target: { value: "Recount the mattresses" },
+    });
+    fireEvent.click(confirm);
+    expect(h.review).toEqual([
+      ["send-back", { receiptId: "r-posted", reason: "Recount the mattresses" }],
     ]);
   });
 
-  it("Cancel leaves Receiving Mode and gives the listing back", async () => {
-    await startReceiving();
-    fireEvent.click(screen.getByTestId("receiving-cancel"));
-    await waitFor(() =>
-      expect(screen.queryByTestId("receiving-mode")).not.toBeInTheDocument(),
-    );
-    expect(screen.getByTestId("receiving-listing").className).not.toContain(
-      "hidden",
-    );
-  });
-});
-
-/**
- * Card C2 · the `Goods Received` register (Jess, 2026-08-03).
- *
- * Her five architecture rulings, each as an assertion rather than a comment:
- * a historical register only · no Activity block · no Status column (the rail
- * says it) · Supplier/Date primary and Source secondary · and it is a
- * Receiving QUEUE, not a sixth Purchasing tab.
- */
-const RECORDS = [
-  {
-    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    po_id: "PO-2001",
-    supplier_name: "Nice Future",
-    do_number: "DO-5512",
-    status: "posted",
-    submitted_from: "office",
-    goods_received_at: "2026-08-02",
-    submitted_at: "2026-08-02T02:00:00Z",
-    posted_by_name: "Shasha",
-    do_file_url: "https://example.test/do.pdf",
-    note: null,
-    reviewed_at: null,
-    return_reason: null,
-    lines: [
-      { id: "l1", sku: "MS01", received_now: 3, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null },
-      { id: "l2", sku: "BF01", received_now: 2, damaged_qty: 1, wrong_item_qty: 0, wrong_item_claim_type: null },
-    ],
-  },
-  {
-    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-    po_id: "PO-2002",
-    supplier_name: "Ohana",
-    do_number: "DO-7001",
-    status: "posted",
-    submitted_from: "warehouse",
-    goods_received_at: "2026-06-01",
-    submitted_at: "2026-06-01T02:00:00Z",
-    posted_by_name: "Li Ching",
-    do_file_url: null,
-    note: null,
-    reviewed_at: null,
-    return_reason: null,
-    lines: [
-      { id: "l3", sku: "SF02", received_now: 4, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null },
-    ],
-  },
-];
-
-async function openRegister() {
-  wrap();
-  await ready();
-  fireEvent.click(screen.getByTestId("receiving-queue-received"));
-  await waitFor(() =>
-    expect(listing().getByText(/GRN-020826-/)).toBeInTheDocument(),
-  );
-}
-
-/** The number as the LISTING prints it. Never hardcoded: the tail is hashed
- *  from the session id, so a literal here would be asserting my arithmetic
- *  rather than the page's. What matters is the SHAPE, and that the open record
- *  prints the very same string — one function, two places, one number. */
-const grnInList = (match: RegExp) => listing().getByText(match).textContent!;
-
-describe("OperationReceiving — the Goods Received register", () => {
-  beforeEach(() => {
-    const base = apiFetchMock.getMockImplementation()!;
-    apiFetchMock.mockImplementation((path: string, ...rest: unknown[]) => {
-      if (typeof path === "string" && path.includes("/warehouse-receipts"))
-        return Promise.resolve({ receipts: RECORDS, counts: { waiting: 0 } });
-      return (base as (...a: unknown[]) => unknown)(path, ...rest);
+  it("without GRN duty the review offers the refusal sentence instead of buttons", () => {
+    h.dutyAllowed = false;
+    h.sessionDetail = postedDetail({
+      receipt: { status: "submitted", grn_no: null, posted_at: null },
     });
-  });
-
-  it("is a Receiving QUEUE, not a sixth Purchasing tab", async () => {
-    wrap();
-    await ready();
-    // Both queues live in the rail, and both are always clickable — a switch
-    // hidden at zero is a page nobody can reach.
-    expect(screen.getByTestId("receiving-queue-to-receive")).toBeInTheDocument();
-    expect(screen.getByTestId("receiving-queue-received")).toBeInTheDocument();
-    // The tab bar is untouched.
-    expect(screen.queryByRole("tab", { name: /Goods Received/ })).not.toBeInTheDocument();
-  });
-
-  it("lists records with a DERIVED GRN number, and no Status column", async () => {
-    await openRegister();
-    // PREFIX-DDMMYY-NNNN off the BUSINESS date, with no counter in it.
-    expect(grnInList(/GRN-020826-/)).toMatch(/^GRN-020826-\d{4}$/);
-    // Ruling 3: the rail carries status, so the table must not repeat it.
-    expect(listing().queryByText("Status")).not.toBeInTheDocument();
-    expect(listing().queryByText("Posted")).not.toBeInTheDocument();
-    // Six columns, ending in Units — the count of UNITS, not product lines.
-    expect(listing().getByText("Units")).toBeInTheDocument();
-    expect(listing().getByText("5")).toBeInTheDocument();
-  });
-
-  it("the record is read-only history — no Activity, no buttons, no Claims door", async () => {
-    await openRegister();
-    const no = grnInList(/GRN-020826-/);
-    fireEvent.click(listing().getByText(no));
-    const rec = await screen.findByTestId("receiving-record");
-    // Ruling 2: a historical register does not carry another history block.
-    expect(within(rec).queryByText(/Activity/i)).not.toBeInTheDocument();
-    // Ruling 1: no review, no exception handling, nothing to press.
-    expect(within(rec).queryAllByRole("button")).toEqual([]);
-    expect(within(rec).queryByText(/Claims/i)).not.toBeInTheDocument();
-    // What it DOES carry: the facts, and the paper.
-    // The list and the open record cannot print two numbers for one delivery.
-    expect(within(rec).getByTestId("receiving-record-no")).toHaveTextContent(no);
-    expect(within(rec).getByTestId("receiving-record-do")).toHaveAttribute(
-      "href",
-      "https://example.test/do.pdf",
+    renderRecord();
+    expect(
+      screen.queryByTestId("save-receiving-review"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("return-count-door")).not.toBeInTheDocument();
+    expect(screen.getByTestId("review-duty-refusal")).toHaveTextContent(
+      "Only GRN duty may save a receiving.",
     );
-    expect(rec).toHaveTextContent("Office");
-    expect(rec).toHaveTextContent("Shasha");
   });
 
-  it("says which fact is missing rather than printing a dead link", async () => {
-    await openRegister();
-    fireEvent.click(listing().getByText(/GRN-010626-/));
-    const rec = await screen.findByTestId("receiving-record");
-    expect(within(rec).queryByTestId("receiving-record-do")).not.toBeInTheDocument();
-    expect(rec).toHaveTextContent("Not on file");
-  });
+  it("Amend walks reason → change → save, and posts only the changed facts", async () => {
+    h.sessionDetail = postedDetail();
+    renderRecord();
+    fireEvent.click(screen.getByTestId("amend-receiving-door"));
 
-  it("filters by date and by supplier, and Source comes last", async () => {
-    await openRegister();
-    // Supplier and Date are primary (ruling 4) — both in the rail.
-    expect(screen.getByTestId("receiving-rail-bucket-earlier")).toBeInTheDocument();
-    expect(screen.getByTestId("receiving-rail-rec-supplier-Ohana")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("receiving-rail-rec-supplier-Ohana"));
-    await waitFor(() =>
-      expect(listing().queryByText(/GRN-020826-/)).not.toBeInTheDocument(),
-    );
-    expect(listing().getByText(/GRN-010626-/)).toBeInTheDocument();
-  });
+    const save = screen.getByTestId("amend-save");
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Save — add a correction reason");
 
-  it("the search box finds a record by its GRN, PO or supplier DO number", async () => {
-    await openRegister();
-    fireEvent.change(screen.getByPlaceholderText("Search"), {
-      target: { value: "DO-7001" },
+    fireEvent.change(screen.getByTestId("amend-reason"), {
+      target: { value: "Miscount fixed" },
     });
-    await waitFor(() =>
-      expect(listing().queryByText(/GRN-020826-/)).not.toBeInTheDocument(),
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Save — nothing changed yet");
+
+    fireEvent.change(screen.getByTestId("amend-line-lr1"), {
+      target: { value: "3" },
+    });
+    await waitFor(() => expect(save).toBeEnabled());
+    expect(save).toHaveTextContent("Save the correction");
+    fireEvent.click(save);
+
+    expect(h.amend).toHaveLength(1);
+    const [id, body] = h.amend[0];
+    expect(id).toBe("r-posted");
+    expect(body.reason).toBe("Miscount fixed");
+    expect(body.saveKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
-    expect(listing().getByText(/GRN-010626-/)).toBeInTheDocument();
+    expect(body.lines).toEqual([{ id: "lr1", receivedNow: 3 }]);
+    // Unchanged header facts stay OUT of the correction.
+    expect(body.doNumber).toBeUndefined();
+    expect(body.goodsReceivedAt).toBeUndefined();
   });
 
-  it("the work queue's own furniture stays out of the register", async () => {
-    await openRegister();
-    // R6's waiting-count panel is a WORKLIST; a filing cabinet does not carry
-    // one. The progress facets belong to the other queue too.
-    expect(screen.queryByTestId("warehouse-receipts-panel")).not.toBeInTheDocument();
+  it("Void states the impact first, demands the reason, then voids with it", () => {
+    h.sessionDetail = postedDetail();
+    renderRecord();
+    fireEvent.click(screen.getByTestId("void-receiving-door"));
+    // The impact review, BEFORE the act.
+    expect(screen.getByTestId("void-impact")).toHaveTextContent(
+      "2 received unit(s) go back to Incoming",
+    );
+    const save = screen.getByTestId("void-save");
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Void — add a reason");
+    fireEvent.change(screen.getByTestId("void-reason"), {
+      target: { value: "Wrong PO entirely" },
+    });
+    expect(save).toHaveTextContent("Void Receiving");
+    fireEvent.click(save);
+    expect(h.voided).toEqual([["r-posted", { reason: "Wrong PO entirely" }]]);
+  });
+
+  it("a voided record keeps its banner and loses both doors", () => {
+    h.sessionDetail = postedDetail({
+      receipt: {
+        status: "voided",
+        void_at: "2026-09-02T00:00:00Z",
+        void_by_name: "Jess",
+        void_reason: "Duplicate entry",
+      },
+    });
+    renderRecord();
+    const banner = screen.getByTestId("void-banner");
+    expect(banner).toHaveTextContent("Jess");
+    expect(banner).toHaveTextContent("Duplicate entry");
+    expect(banner).toHaveTextContent("preserved");
     expect(
-      screen.queryByTestId("receiving-rail-state-in_transit"),
+      screen.queryByTestId("amend-receiving-door"),
     ).not.toBeInTheDocument();
-  });
-});
-
-/**
- * T5 — A LATE TRUCK MUST LOOK LATE, and the colour may not claim the factory
- * promised something it never did (approved by Loo, 2026-08-06).
- *
- * `Goods Arrival` had exactly two states — the date, or a grey dash — so on the
- * one page whose whole job is goods physically turning up, a truck three days
- * late was pixel-identical to one arriving on time.
- *
- * The law it obeys is §4's, unchanged: **red is reserved for a date the FACTORY
- * GAVE**, and provenance is the promise ledger (`poDateHistoryOf`), never a null
- * test on `eta_date` — `eta_date` has held our own estimate since 2026-08-03.
- * Our own arithmetic warns AMBER and never accuses anyone.
- *
- * The dates are built RELATIVE to the page's own MYT today, because the page
- * reads the real clock: a hardcoded fixture would stop being late on a date this
- * suite cannot predict.
- */
-function isoFromToday(days: number): string {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kuala_Lumpur",
-  }).format(new Date());
-  return new Date(Date.parse(`${today}T00:00:00Z`) + days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
-}
-
-/** A PO the arrival column can be read off. `promised` files a real
- *  `tomorrow_delivery` promise — the only thing that makes the date the
- *  supplier's word. */
-function arrivalPo(id: string, etaIso: string | null, promised: boolean) {
-  return {
-    id,
-    supplier_id: "sup-nf",
-    warehouse_id: "wh-klang",
-    status: "open",
-    sup_status: "in_production",
-    so: 1001,
-    so_refs: null,
-    eta_date: etaIso,
-    placed_at: "2026-07-01T00:00:00Z",
-    purchase_order_lines: [
-      { id: `${id}-l1`, sku: "MS01", qty: 2, received_qty: 0 },
-    ],
-    promises:
-      promised && etaIso
-        ? [
-            {
-              kind: "tomorrow_delivery",
-              answer: "delayed",
-              about_date: isoFromToday(-10),
-              previous_date: isoFromToday(-10),
-              new_date: etaIso,
-              reason: "factory_delay",
-              recorded_at: "2026-07-20T02:00:00Z",
-            },
-          ]
-        : [],
-  };
-}
-
-describe("OperationReceiving — a late truck looks late (T5)", () => {
-  /** The column lives outside the reading-pane's compact set, so the pane is
-   *  put away first — exactly what an operator scanning arrivals does. */
-  async function openArrivals() {
-    posOverride = [
-      // The factory NAMED this day and it has passed — a broken promise.
-      arrivalPo("PO-3001", isoFromToday(-3), true),
-      // Same day, but nobody ever promised it: it is our own arithmetic.
-      arrivalPo("PO-3002", isoFromToday(-3), false),
-      // Still ahead of us — nothing to warn about, whoever said it.
-      arrivalPo("PO-3003", isoFromToday(20), true),
-      // No date at all.
-      arrivalPo("PO-3004", null, false),
-    ];
-    wrap();
-    await ready();
-    fireEvent.click(screen.getByTestId("receiving-workspace-toggle"));
-    await waitFor(() =>
-      expect(listing().getByText("Goods Arrival")).toBeInTheDocument(),
-    );
-  }
-
-  it("reddens a date the FACTORY gave once it has passed", async () => {
-    await openArrivals();
-    const cell = listing().getByTestId("receiving-arrival-PO-3001");
-    expect(cell).toHaveAttribute("data-tone", "promised");
-    expect(cell).toHaveClass("text-kit-red-11");
-  });
-
-  it("warns AMBER on our own late estimate — never red", async () => {
-    await openArrivals();
-    const cell = listing().getByTestId("receiving-arrival-PO-3002");
-    expect(cell).toHaveAttribute("data-tone", "estimate");
-    expect(cell).toHaveClass("text-kit-amber-11");
-    // The whole point: a guess may not wear a broken promise's colour.
-    expect(cell).not.toHaveClass("text-kit-red-11");
-  });
-
-  it("leaves a date that is not late alone", async () => {
-    await openArrivals();
-    const cell = listing().getByTestId("receiving-arrival-PO-3003");
-    expect(cell).toHaveAttribute("data-tone", "plain");
-    expect(cell).not.toHaveClass("text-kit-red-11");
-    expect(cell).not.toHaveClass("text-kit-amber-11");
-  });
-
-  it("keeps the existing grey dash when there is no date", async () => {
-    await openArrivals();
-    const row = listing().getByText("PO-3004").closest("tr")!;
-    expect(
-      within(row).queryByTestId("receiving-arrival-PO-3004"),
-    ).not.toBeInTheDocument();
-    expect(within(row).getByText("—")).toHaveClass("text-kit-slate-9");
-  });
-
-  it("reads provenance from the promise ledger, never from `eta_date`", () => {
-    // The test that broke on 2026-08-03 and was repaired on 2026-08-06: a null
-    // check on `eta_date` cannot tell a promise from a guess, because the issue
-    // path stamps our own estimate into that very column. PO-3001 and PO-3002
-    // above carry the SAME `eta_date` and read two different colours, which no
-    // null test could produce — and the source may not spell one either.
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), "OperationReceiving.tsx"),
-      "utf8",
-    );
-    expect(src).toContain("poDateHistoryOf");
-    expect(src).not.toMatch(/eta_date\s*(!=|!==|==|===)\s*null/);
-  });
-});
-
-/**
- * ⭐ P20.5 — `Current Action` STOPPED READING `Check in` ON EVERY ROW.
- *
- * Loo's screenshot showed one word on all 24 rows, and a column identical on
- * every row carries no information. The cause was NOT the data. Re-measured
- * against production 2026-08-08: 22 open POs, and **21 of them have no arrival
- * promise from any factory at all**. The one thing an operator cannot do to
- * those 21 is check them in — and the column was telling them to.
- *
- * The rule was a SECOND ARITHMETIC: the page answered its own question (`Check
- * in` whenever a PO still owed a unit, true of every open PO from the minute it
- * is issued) while Purchase Orders read the shared `poCurrentActionOf` — *"ONE
- * Current Action per PO"*, Law 7. Two tabs, one PO, two answers.
- *
- * `Check in` is not deleted: it is the act performed on THIS tab and no other,
- * so it is offered where it is true — a factory has named a day, or goods are
- * already partly in.
- */
-describe("P20.5 · Current Action reads the ONE shared source", () => {
-  /** Production's own shape, in miniature: a PO nobody has dated, beside one a
-   *  factory HAS given a van day for. Under the old rule both said `Check in`. */
-  async function openActions() {
-    posOverride = [
-      // 21 of production's 22 look like this — issued, waiting, no promise.
-      arrivalPo("PO-4001", null, false),
-      // Our own computed arrival is NOT a factory's word, so this is the same
-      // case as above however confident the date column looks.
-      arrivalPo("PO-4002", isoFromToday(12), false),
-      // The factory named the day — now `Check in` is the real next act here.
-      arrivalPo("PO-4003", isoFromToday(12), true),
-    ];
-    wrap();
-    await ready();
-    // The column sits outside the reading-pane's compact set, so the pane goes
-    // away first — exactly what an operator scanning the queue does.
-    fireEvent.click(screen.getByTestId("receiving-workspace-toggle"));
-    await waitFor(() =>
-      expect(listing().getByText("Current Action")).toBeInTheDocument(),
-    );
-  }
-
-  const actionOf = (poId: string) => {
-    const cells = [
-      ...listing().getByText(poId).closest("tr")!.querySelectorAll("td"),
-    ].filter((td) => td.dataset.kit !== "table-filler");
-    return cells.pop()!.textContent;
-  };
-
-  it("a PO no factory has dated asks for the date, and does NOT say `Check in`", async () => {
-    await openActions();
-    // The REGISTER's short spelling — Loo's own word for this slot (Q8), and
-    // exactly what Purchase Orders prints in the identical column. A listing
-    // never carries the workspace hero's full `Confirm Goods Arrival Date`.
-    expect(actionOf("PO-4001")).toBe("Check Expected Arrival");
-    expect(actionOf("PO-4001")).not.toBe("Check in");
-  });
-
-  it("OUR OWN arrival estimate is not a factory's word, and does not unlock `Check in`", async () => {
-    await openActions();
-    // This is the row that made the old column wrong 21 times out of 22: the
-    // date column shows a day, so the row LOOKS answered, but nobody promised
-    // it. `poWorkStateOf` reads the promise ledger, never `eta_date`.
-    expect(actionOf("PO-4002")).toBe("Check Expected Arrival");
-  });
-
-  it("`Check in` survives where it is TRUE — a factory has named the day", async () => {
-    await openActions();
-    expect(actionOf("PO-4003")).toBe("Check in");
-  });
-
-  it("the column is no longer one word repeated", async () => {
-    await openActions();
-    const words = new Set(
-      ["PO-4001", "PO-4002", "PO-4003"].map((id) => actionOf(id)),
-    );
-    expect(words.size).toBeGreaterThan(1);
+    expect(screen.queryByTestId("void-receiving-door")).not.toBeInTheDocument();
   });
 });

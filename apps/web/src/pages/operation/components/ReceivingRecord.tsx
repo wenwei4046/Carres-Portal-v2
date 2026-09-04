@@ -187,10 +187,7 @@ export default function ReceivingRecord({
           {(r.arrival_evidence ?? []).length > 0 && (
             <Prop label="Arrival evidence">
               <span className="text-body text-kit-slate-12">
-                {(r.arrival_evidence ?? []).filter((e) => e.kind === "photo").length}{" "}
-                photo(s) ·{" "}
-                {(r.arrival_evidence ?? []).filter((e) => e.kind === "video").length}{" "}
-                video(s)
+                {evidenceSentence(r.arrival_evidence ?? [])}
               </span>
             </Prop>
           )}
@@ -434,7 +431,7 @@ export default function ReceivingRecord({
                         </div>
                         {Object.entries(e.payload.before).map(([k, v]) => (
                           <div key={k} className="text-kit-slate-11">
-                            {String(v)}
+                            {comparisonValue(v)}
                           </div>
                         ))}
                       </div>
@@ -446,7 +443,7 @@ export default function ReceivingRecord({
                           (e.payload.after ?? {}) as Record<string, unknown>,
                         ).map(([k, v]) => (
                           <div key={k} className="text-kit-slate-12">
-                            {String(v)}
+                            {comparisonValue(v)}
                           </div>
                         ))}
                       </div>
@@ -460,6 +457,26 @@ export default function ReceivingRecord({
       </div>
     </div>
   );
+}
+
+function evidenceSentence(
+  entries: ReadonlyArray<{ kind: "photo" | "video" }>,
+): string {
+  const photos = entries.filter((e) => e.kind === "photo").length;
+  const videos = entries.filter((e) => e.kind === "video").length;
+  return [
+    photos > 0 ? `${photos} photo${photos === 1 ? "" : "s"}` : null,
+    videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** A bare ISO date never ships (THE YEAR RULE) — the comparison speaks the
+ *  same date words as every other cell. */
+function comparisonValue(v: unknown): string {
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return fmtDate(v);
+  return String(v);
 }
 
 /* ── The submitted count's review — the two-step flow's Carres half ──────── */
