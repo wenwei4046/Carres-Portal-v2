@@ -2,7 +2,7 @@
 
 Module: Purchasing · Sequence: 08
 Pages: Manual Purchase · Purchase Orders · Work · Principal Audit
-Status: READY FOR BUILD — owner-approved 2026-09-04
+Status: COMPLETE / PRODUCTION-VERIFIED 2026-09-04 (owner-approved 2026-09-04)
 Lane: BUILD / DELIVERY
 Start from: latest `origin/main` in a fresh dedicated worktree
 Expected migration: ONE non-destructive migration
@@ -236,14 +236,47 @@ Request No or Draft PO as alternatives.
 ## 9 · Completion evidence
 
 ```
-Branch / commits:
-PR:
-CI:
-Migration created:
-Migration applied:
-Merge SHA:
-Production SHA convergence:
-Authenticated production walk:
-MASTER/COPY overwrite:
-Final status: IN PROGRESS
+Branch / commits:  build/purchasing-08-remove-mpr (vertical slice) ·
+                   build/purchasing-08-baseline-0424 (collision repair)
+PR:                #1093 (slice) · #1094 (0424 collision baseline)
+CI:                verify SUCCESS on both PRs; full gates local: shared 60 ·
+                   api 159 (focused) · web 287 files / 3785 tests · typecheck ·
+                   lint · ci:migrations · production build all green
+Migration created: supabase/migrations/0424_a_manual_purchase_has_no_number_only_its_po_does.sql
+                   (collided with Warehouse Card 03's 0424 merged 8 minutes
+                   earlier; both committed → pair baselined per the 0417
+                   precedent in #1094 — committed migrations do not rename)
+Migration applied: 2026-09-04 via the governed Supabase path, AFTER the
+                   compatible app deployed. Verified: req_no default gone,
+                   nullable YES, both doors speak plain audit words, every
+                   stored REQ-/MPR- value unchanged, historical audit rows
+                   byte-identical.
+Merge SHA:         bc96a1e30d6c358b32c280e1cee201c3b08a3ed2 (slice) ·
+                   23ab3121bb3757c3e067a28193bf577cc38a186f (repair)
+Production SHA convergence: 23ab3121 on carres-portal.pages.dev ·
+                   carres-pos.pages.dev · erp.carresofficial.com ·
+                   pos.carresofficial.com · api.carresofficial.com/health
+Authenticated production walk (operation@, 2026-09-04): Register shows the
+                   ten columns and NO number; issued rows show clickable
+                   PO-20260904-5805 / PO-20260904-9834; created a new Manual
+                   Purchase (Ready Stock · 8022-1NA · Ohana collection lock ·
+                   Delivery Date defaulted Wed, 23 Sep) — no number shown or
+                   announced, DB row 0ecd0138… has req_no NULL while both
+                   historical rows keep their stored MPR- values; its PO No
+                   cell reads `—`; the unissued object opened via `For` with
+                   heading `Ready Stock · Ohana · Fri, 4 Sep · Ohana`
+                   [Waiting for approval] 1 of 3, browser title
+                   `Manual Purchase — Carres`; Team Work shows Jess holding
+                   `Approve purchase` and PO Duty holding two distinct
+                   `Issue PO` records, all with the
+                   `Manual Purchase · Ready Stock · Ohana` context; the served
+                   bundle greps clean of `Manual Purchase No` and literal
+                   MPR-dated strings. Principal Audit presentation is the
+                   deployed translation (unit-covered); stored audit rows
+                   verified unchanged by SQL. The waiting request is left for
+                   Jess — approving it will mint the first plain-worded
+                   `Purchase approved` audit row.
+MASTER/COPY overwrite: docs/purchasing/MASTER.md + docs/COPY-STANDARD.md in
+                   #1093; production stamps in this closure commit.
+Final status: COMPLETE / PRODUCTION-VERIFIED
 ```

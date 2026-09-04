@@ -249,7 +249,12 @@ emergency purpose, extra question, queue or approval/issue bypass. The four pre-
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
 vocabulary. **A Manual Purchase has NO visible document number — owner correction
-2026-09-04 (Card 08).** It is an internal way to prepare and approve a purchase, not a
+2026-09-04 (Card 08); PRODUCTION-VERIFIED on `bc96a1e3`/`23ab3121` 2026-09-04** (0424
+applied through the governed path after the compatible app deployed; walked
+authenticated as `operation@`: a new Manual Purchase was created with `req_no NULL`,
+no number shown or announced anywhere, `—` in its PO No cell, business-fact object
+heading, and the two historical rows keeping their stored `MPR-…` values untouched).
+It is an internal way to prepare and approve a purchase, not a
 second supplier document: before `Issue PO` nothing shows, and after it the only visible
 purchasing document identity is the actual `PO No` (`PO-YYYYMMDD-RRRR`, the same formal
 document both buying doors produce). The canonical invisible identity is
@@ -1062,7 +1067,8 @@ newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest ca
 `Order By` first, then newest Proceed Date.
 
 **Columns, exactly and in this order — owner correction 2026-09-04 (Card 08 removes the
-number column from Card 06's verified order; the date contract stays as verified on
+number column from Card 06's verified order); PRODUCTION-VERIFIED on `23ab3121`
+2026-09-04 (the date contract stays as verified on
 `87ef0e28` 2026-08-30 — the issued PO's `eta_date` IS the approved Manual Delivery Date,
 and the issue partition adds Delivery Date through the one `purchasing_issue_pos_batch`
 door):** Proceed Date ·
