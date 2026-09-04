@@ -334,6 +334,34 @@ Staff never guess a SKU, supplier or document.
   Purchasing sidebar page.
 - When resolved, the original row continues; it is not re-entered.
 
+**APPROVED / LOCKED — owner ruling 2026-09-04.** The in-context `Add Supplier` door records one
+complete governed supplier setup, top to bottom:
+
+```text
+Supplier Name
+Delivery Method
+  Supplier delivers
+  We collect
+Product Categories
+Production Days       one required value for every selected category
+Supplier work week
+Add Supplier
+```
+
+`Product Categories` is a multi-select of the three governed Purchasing production categories:
+`Mattress` · `Bedframe` · `Sofa`. It is never a free-text category creator. Every selected category
+requires its own `Production Days`; one generic supplier lead time is forbidden. For this setup
+door, the selected categories are the authority for which Supplier × Category Production Days rows
+must exist; the form does not wait for a SKU to be linked before those values can be stored.
+
+**APPROVED TARGET / NOT BUILT.** One new server/database transaction must write the Supplier
+identity, delivery method, selected categories, `Supplier work week` and each selected category's
+Production Days. It either saves the complete supplier setup or saves nothing; a sequence of
+separate browser writes may not leave a partial supplier. This supersedes SKU-derived setup for
+this door, while SKU relationships remain the authority for which specific goods that supplier may
+supply. The form never asks for a PO Delivery Date: that date belongs to each Purchase Order, not
+Supplier Master.
+
 ### 5.6 Issue means the PDF was actually sent
 
 Opening WhatsApp, email or a PDF is not issue. The system generates the numbered version in the
@@ -374,13 +402,16 @@ does not decide it.
 
 ### 5.7 PO states and balances
 
+**APPROVED / LOCKED — owner correction 2026-09-04.**
+
 The operator sees facts, not a vague workflow:
 
 ```text
 Not sent to supplier
 Issued
-Supplier Delivery Date missing
+Supplier has not confirmed the PO date
 Supplier Delivery Date changed
+Supplier delivery date passed
 Partly received
 Completed
 Cancelled
@@ -388,9 +419,11 @@ Cancelled
 
 Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
-Delivery Qty and never create available stock. A supplier date may split by quantity. A late,
-missing or changed promise creates supplier-contact work; it never rewrites the original PO
-Delivery Date or the customer promise.
+Delivery Qty and never create available stock. A supplier date may split by quantity. An
+unconfirmed, passed or changed supplier promise creates supplier-contact work; it never rewrites
+the original PO Delivery Date or the customer promise. Confirmation work begins only after the
+current PO version has confirmed-sent evidence, Pending Delivery Qty is above zero and no supplier
+answer exists for that version.
 
 ---
 
@@ -647,8 +680,8 @@ summary. Action ownership uses structured avatar metadata.
 Official UI language is English at primary-school reading level.
 
 ```text
-Supplier date is missing
-[YJ] Ask Dorsettloft for the delivery date
+Supplier has not confirmed the PO date
+[YJ] Ask Dorsettloft to confirm the PO delivery date
 ```
 
 Line 1 is the authoritative blocking fact. Line 2 is a smaller 11px action. The avatar is structured
@@ -1185,8 +1218,9 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
 - **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
   `Ordered Qty` · `Still To Order` · `PO Issued` (`placed_at`) · `PO Delivery Date` (the
   ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
-  it, else the issue-stamped date) · `Supplier Delivery Date` only when that ledger proves a
-  change (unchanged reads `Same as PO`). No lineage reads `Not ordered yet`. **The PO number
+  it, else the issue-stamped date) · `Supplier Delivery Date` as `Not confirmed` until supplier
+  evidence exists, `Same as PO` when the supplier confirms the PO date, or the supplier's changed
+  date. No lineage reads `Not ordered yet`. **The PO number
   IS `purchase_orders.id`** — no `po_no` column exists; Card 05 fixed the latent register read
   that selected one (it would have 400'd the whole Register on first lineage).
 - **History** — the final section: `Today · Yesterday · Earlier`, the locked three-rank record
@@ -1241,9 +1275,9 @@ DOCUMENT
   Version changed
   Send the new version to supplier   ← line 2 of the same row/count
 
-DELIVERY DATE
-  Supplier date missing
-  Supplier date passed
+SUPPLIER REPLY
+  Supplier has not confirmed the PO date
+  Supplier delivery date passed
 
 RECEIVING
   Partly received
@@ -1254,12 +1288,15 @@ The version row is one `supplier_update_required` filter, not two rows. Its fact
 deliberate separate lines; the em dash and the ambiguous phrase `supplier update required` never
 render. Grouping changes no population, filter key, count, permission or completion fact.
 **Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
-commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
-`Supplier Delivery Date` Register column appears only when the supplier has changed that date;
-unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
-any of these dates.
+commitment. `PO Delivery Date` is the original official supplier-facing date on the PO and therefore
+is never described as missing merely because the supplier has not replied. `Supplier Delivery Date`
+reads `Not confirmed` until supplier-answer evidence exists, `Same as PO` when the supplier confirms
+the PO date, and the supplier's actual date when it differs. `Not confirmed` is a cell fact; it
+becomes a rail/work condition only after the current PO version has confirmed-sent evidence and
+Pending Delivery Qty is above zero. `Goods Received At` belongs to Receiving and never substitutes
+for any of these dates.
 **Columns — APPROVED 2026-09-04, in this order:** PO No, PO Issued, Supplier, Source, Deliver To,
-PO Delivery Date, Supplier Delivery Date when changed, Order Qty, Received Qty,
+PO Delivery Date, Supplier Delivery Date, Order Qty, Received Qty,
 Pending Delivery Qty, PO Version, Sent to Supplier. The Register lists authoritative facts only:
 no `Work` column, no action sentence, no owner avatar or duty holder on any row — actions live in
 My Work, Team Work, the Purchase Order detail and Order Route, unchanged.
@@ -1276,8 +1313,12 @@ evidence stays visibly missing. Opening, downloading or previewing the PDF prove
 system never claims the supplier read or accepted the PO — only which version Carres sent, through
 which channel, to which recipient, when and by whom. `PO Version` beside `Sent to Supplier` makes
 a version mismatch (`PO V2` vs `PO V1`) immediately visible.
+**APPROVED TARGET / NOT BUILT — measured gap 2026-09-04:** current storage mutates the same PO date
+when a supplier changes it, so it cannot yet truthfully display the original `PO Delivery Date`
+beside the current `Supplier Delivery Date`. BUILD must preserve the issued PO date separately from
+the evidenced supplier answer and must store the reply channel/evidence before this wording ships.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
-outbound fact → record supplier date or exception → monitor receipt balance.
+outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
 History, Order Route.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
@@ -1441,7 +1482,7 @@ invoice/settlement.
 | Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
 | Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue PO` (same business context; distinct by request UUID) | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
-| Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Supplier has not confirmed the PO date | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka to confirm the PO delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact sent PO version |
 | Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
 | Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
@@ -1482,7 +1523,7 @@ Settings lives under the global header gear and requires authorised roles. It in
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
   consequence, Unit-scan requirement and signed-DO evidence controls;
-- supplier channels, contacts, lead/production days and calendars;
+- supplier channels, contacts, `Supplier work week` and Supplier × Product Category Production Days;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
 - supplier Unit-label capability (package, physical Unit, future machine-readable support);
@@ -1501,7 +1542,7 @@ Reports are generated from authoritative records and open in central Reports or 
 
 - demand remaining/covered/ordered by source;
 - purchase quantity and open balance by supplier/SKU/destination;
-- missing, changed and passed supplier dates;
+- unconfirmed, changed and passed supplier delivery dates;
 - partial receipts, quantity/condition differences and missing delivery notes;
 - supplier delivery, claim, return and repair performance;
 - supplier-owned Units by showroom, label state and age;
