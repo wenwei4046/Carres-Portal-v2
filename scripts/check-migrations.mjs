@@ -64,6 +64,18 @@ const COLLISION_BASELINE = new Set([
      NOT APPLIED — that half is the other lane's apply debt and a production
      decision reported to the owner, not decided here. */
   "0417",
+  /* 0424 · two lanes merged eight minutes apart on 2026-09-04 (#1091, then
+     #1093) and both carried an 0424. Both halves are committed, so the rename
+     path is closed (immutability, red line 6) and the pair is baselined the
+     way 0417 was. Measured state at baselining:
+     `outbound_hands_over_exact_units_and_the_holder_moves` APPLIED
+     (production defines `delivery_order_units_immutable`) ·
+     `a_manual_purchase_has_no_number_only_its_po_does` NOT APPLIED —
+     that half is Purchasing Card 08's own governed apply step, staged BY
+     NAME immediately after this baseline unblocks the deploy. The two
+     halves touch disjoint objects (Delivery Order units vs
+     purchase_requests), so their relative order is immaterial. */
+  "0424",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
