@@ -58,6 +58,7 @@ type PurchasingPage =
   | "purchase-orders"
   | "receiving"
   | "claims"
+  | "receiving-report"
   | "purchasing-report"
   | "purchasing-settings";
 
@@ -82,6 +83,9 @@ const PAGE_WORD: Record<PurchasingPage, string> = {
   "purchase-orders": "Purchase Orders",
   receiving: "Receiving",
   claims: "Supplier Claims",
+  /* Central Reports → Receiving & Inbound (owner instruction 2026-09-04).
+     Like the Purchasing Report, reachable by direct URL — no rail row. */
+  "receiving-report": "Receiving & Inbound",
   "purchasing-report": PO_REPORT_WORDS.tab,
   "purchasing-settings": "Settings",
 };
@@ -100,6 +104,8 @@ export default function PurchasingTabs({ right }: { right?: ReactNode } = {}) {
       ? "receiving"
       : tabParam === "claims"
         ? "claims"
+      : tabParam === "receiving-report"
+        ? "receiving-report"
         : tabParam === "purchasing-report"
           ? "purchasing-report"
           : tabParam === "purchasing-settings"

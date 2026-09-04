@@ -12,11 +12,17 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationReceiving from "@/pages/operation/OperationReceiving";
+import OperationReceivingReport from "@/pages/operation/OperationReceivingReport";
+import StaffDuties from "@/pages/operation/StaffDuties";
+import WarehouseIncoming from "@/pages/warehouse/WarehouseIncoming";
 import "@/index.css";
 
+/** ?page=duties | report | warehouse — defaults to the Receiving register. */
+const PAGE = new URLSearchParams(window.location.search).get("page") ?? "receiving";
+
 useAuth.setState({
-  role: "operation",
-  user: { email: "sha@carres.co" } as never,
+  role: PAGE === "warehouse" ? "warehouse" : "operation",
+  user: { email: PAGE === "warehouse" ? "nets@carres.co" : "sha@carres.co" } as never,
 });
 
 const WH = "11111111-1111-1111-1111-111111111111";
@@ -259,7 +265,89 @@ const DUTY = {
   is_cover: false,
   is_superuser: true,
   allowed: true,
-  source: "rota",
+  source: "assignment",
+};
+
+const WORKSPACE_DUTIES = {
+  can_assign: true,
+  duties: [
+    {
+      key: "grn_duty",
+      label: "GRN Duty",
+      resolution: {
+        duty_key: "grn_duty",
+        on_date: "2026-09-04",
+        normal_user_id: "u-ky",
+        normal_user_name: "Khor Yee",
+        acting_user_id: "u-sha",
+        acting_user_name: "Shasha",
+        actor_user_id: "u-sha",
+        is_cover: true,
+        cover_id: "c1",
+        source: "assignment",
+      },
+      assignments: [
+        {
+          id: "a1",
+          duty_key: "grn_duty",
+          holder_id: "u-ky",
+          holder_name: "Khor Yee",
+          effective_from: "2026-09-01",
+          effective_until: null,
+          assigned_by: "u-jess",
+          assigned_by_name: "Jess",
+          note: null,
+          created_at: "2026-09-01T01:00:00Z",
+        },
+      ],
+      covers: [
+        {
+          id: "c1",
+          duty_key: "grn_duty",
+          normal_user_id: "u-ky",
+          normal_user_name: "Khor Yee",
+          acting_user_id: "u-sha",
+          acting_user_name: "Shasha",
+          starts_on: "2026-09-04",
+          ends_on: "2026-09-05",
+          reason: "Annual leave",
+          assigned_by: "u-jess",
+          assigned_by_name: "Jess",
+          created_at: "2026-09-03T08:00:00Z",
+        },
+      ],
+    },
+  ],
+};
+
+const WAREHOUSE_INCOMING = {
+  warehouse: { id: WH2, name: "NETS Warehouse" },
+  pos: [
+    {
+      po_id: "PO-20260902-0761",
+      supplier_name: "Ohana",
+      eta_date: "2026-09-04",
+      sup_status: "otw_customer",
+      open_receipt_id: null,
+      lines: [
+        {
+          id: "l2",
+          sku: "BF02-Q Queen Bedframe",
+          qty: 4,
+          received_qty: 0,
+          damaged_qty: 0,
+          wrong_item_qty: 0,
+          category: "bedframe",
+        },
+      ],
+      expected_units: [
+        { id: "eu1", unit_code: "U1-000-201", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+        { id: "eu2", unit_code: "U1-000-202", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+        { id: "eu3", unit_code: "U1-000-203", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+        { id: "eu4", unit_code: "U1-000-204", sku: "BF02-Q Queen Bedframe", status: "incoming" },
+      ],
+    },
+  ],
 };
 
 const PO_RECEIVING = {
@@ -282,6 +370,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
+  if (url.includes("/api/operation/workspace-duties")) return json(WORKSPACE_DUTIES);
+  if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);
   if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
@@ -336,7 +426,20 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <Routes>
-          <Route path="*" element={<OperationReceiving />} />
+          <Route
+            path="*"
+            element={
+              PAGE === "duties" ? (
+                <StaffDuties />
+              ) : PAGE === "report" ? (
+                <OperationReceivingReport />
+              ) : PAGE === "warehouse" ? (
+                <WarehouseIncoming />
+              ) : (
+                <OperationReceiving />
+              )
+            }
+          />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

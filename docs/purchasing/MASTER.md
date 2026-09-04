@@ -1311,7 +1311,10 @@ Operation enters/checks goods in the Receiving Session
   at page, API and SQL. The posting stores the duty-evidence trio (normal holder · dated cover ·
   actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
   Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
-  record first, the governed rota recommendation (PO rota month M+1) while none exists.
+  record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
+  into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
+  so plainly and protected posting refuses (`no_grn_duty_holder`); the manager assigns the holder
+  in `Workspace → Staff & Duties`.
 - **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
   formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
   derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
@@ -1322,7 +1325,19 @@ Operation enters/checks goods in the Receiving Session
   `Received · Received with issue · Not received` (`receiving_unit_results`); posting flips the
   EXACT named Units (received → free at the Actual Site; with-issue → the claim hold). Quantities
   are DERIVED from the outcomes; a line without minted Units keeps the lawful quantity inputs.
-  Duplicate scans, foreign Units and already-received Units refuse by name.
+  Duplicate scans, foreign Units and already-received Units refuse by name. The external
+  Warehouse count uses the same outcomes: `warehouse_incoming_pos()` lists the expected Units,
+  the count modal records one physical result per Unit, and the submission carries the per-Unit
+  outcomes plus arrival photo/video evidence.
+- **Stock posts by Units only (0366 unit authority).** The receive engine flips/mints
+  `ops_stock_items`; `stock_balances` is DERIVED by the rollup triggers and is never written
+  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
+  exact-Unit binding, owned by the Stock reserve door. (0426 corrects the live engine, which
+  still carried both pre-0366 writes and would have refused any stock-posting receive.)
+- **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
+  marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
+  named, and the posting creates no AP consequence — supplier ownership is preserved, never
+  silently converted to Carres-owned.
 - **`Actual Site` never overwrites `Deliver To`.** Both facts are stored and displayed; valid
   received Units enter Inventory at the Actual Site. `Arrival evidence` supports photo AND video
   beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters Inventory or
@@ -1342,12 +1357,15 @@ Operation enters/checks goods in the Receiving Session
   — a submitted Warehouse count, and an arrived supplier date with goods still owed (outstanding
   quantity alone never makes a row). Owner = the resolved GRN Duty; completion = the posted
   session; lateness counts on the Warehouse calendar (Mon–Sat).
-- One Receiving engine will receive CO arrivals through the same doors when Consignment Orders
-  are built (§9.9 — APPROVED TARGET / NOT BUILT); no Manual receipt lane exists.
-- Still owed by later cards, explicitly: the `Workspace → Staff & Duties` settings SURFACE (the
-  SQL foundation ships here; assignment moves through the governed RPC until that page exists),
-  central `Reports → Receiving & Inbound`, and the external Warehouse portal's own per-Unit
-  scan/evidence upgrade.
+- **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
+  (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
+  assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
+  never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
+  central report: every non-draft session with its GRN, source, site facts, totals from the
+  shared arithmetics, submitter/poster, and the `Still owed by suppliers` pending section.
+- The GRN Duty reviewer may verify/correct `Actual Site` on a submitted Warehouse count at
+  check-in; `Deliver To` is never overwritten. No Manual receipt lane exists; no approved
+  Receiving scope is deferred to a later card.
 
 ### 9.5 Supplier Claims
 

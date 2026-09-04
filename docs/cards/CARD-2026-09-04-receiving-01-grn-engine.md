@@ -7,12 +7,17 @@
 - **May NOT touch:** PO issue/commercial flow, Sales Orders, Delivery, Payment, Catalog writes,
   Stock's own transfer/count/adjustment doors, Supplier Claim decision layers (0409), Manual
   Purchase pages. Purchase Order pages gain only read-only receiving facts and `[Open Receiving]`.
-- **Lane:** BUILD/DELIVERY under owner-approved instruction 2026-09-04. Business and UI decisions
-  are locked by that instruction; no planning reopened. **Merge / deploy / production migration
-  apply are explicitly gated on separate owner authorisation for this card.**
+- **Lane:** BUILD/DELIVERY under owner-approved instruction 2026-09-04, CONTINUED by the owner's
+  second instruction the same day: **the one Card means the complete delivery** — implementation →
+  tests → migrations applied safely → merge → deploy → authenticated production verification —
+  and that second instruction is the owner authorisation for apply/merge/deploy. Nothing in the
+  approved blueprint is deferred to a later card.
 - **Branch:** `build/receiving-grn` from `origin/main` `79f9417d`.
 - **Migrations:** start at `0425` (max of repo tail `0424`×2, production tracker tail `0424`,
-  and open-branch numbers 0406/0407/0408/0410/0365). Prepared, NOT applied.
+  and open-branch numbers 0406/0407/0408/0410/0365). Both were functionally proven against the
+  production schema in rolled-back transactions (DDL, duty gates, GRN minting, exact-Unit flips,
+  derived-stock rollup, idempotent retry, amend, void, consignment ownership, cover, superuser,
+  and the full Warehouse submit → return → resubmit → check-in lifecycle) before applying.
 
 ## Authority resolution
 
@@ -32,7 +37,7 @@
 | `is_operations_superuser()` | BUILT / VERIFIED (applied) | 0403, production tracker 20260829084610 |
 | Current posting gate is `is_operation()` (any Operation/Principal), not GRN Duty | BUILT / DEFECT vs approved authority | 0314 §9, 0315 §1 |
 | No GRN number stamped at posting; no Actual Site; no amend/void doors; quantity-FIFO unit flips instead of exact-Unit outcomes; no idempotency key | REAL GAP — this card's work | measured 0307/0314/0315 |
-| Consignment Orders (CO) upstream | APPROVED TARGET / NOT BUILT | purchasing/MASTER §9.9 — engine stays source-shaped for CO, but only PO arrivals exist today |
+| Consignment Orders (CO) upstream | APPROVED TARGET / NOT BUILT — but the RECEIVING side ships in this card | purchasing/MASTER §9.9; 0426 `purchase_orders.is_consignment` + `supplier_consignment` Unit ownership, no AP consequence |
 | Sibling PRs #986 (docs) / #1000 (implementation, 2026-09-01) | SUPERSEDED PROPOSALS | owner instruction 2026-09-04 §1: do not inherit retired Receiving proposals; built fresh from `origin/main`; PR #1000 used only as reference evidence |
 | `docs/UI-KIT.md` named in instruction | RESOLVED — successor chain | superseded 2026-07-31 → `docs/ui/MASTER.md` + `01/02/03` design system (AGENTS.md pointer is stale; fixed in this PR) |
 
@@ -68,9 +73,12 @@ names Amend/Void as Receiving's acts) · NETS two-step copy `Return count to Car
 
 ## Scope — build slices, dependency order
 
-1. **0425 — Staff & Duties minimal core (Law F.1 dependency):** duty catalogue row `grn_duty`,
+1. **0425 — Staff & Duties core (Law F.1 dependency):** duty catalogue row `grn_duty`,
    effective-dated primary + dated cover assignments, one resolver
-   `workspace_resolve_duty(key, date)`, audited assignment writes. No module rota copies.
+   `workspace_resolve_duty(key, date)`, audited assignment writes. No module rota copies, and
+   **no rota fallback** (owner correction 2026-09-04): with no assignment the resolver answers
+   `not_assigned`, the pages show the honest unassigned state, and protected posting refuses
+   (`no_grn_duty_holder`). A rota recommendation is never silently turned into an assignment.
 2. **0426 — the Receiving engine completion:** `receiving_save` posting door (GRN Duty/cover/
    superuser gate; idempotent by client save key; stamps `grn_no` via
    `allocate_formal_document_code('GRN')`), `actual_site`, per-Unit outcome results table for
@@ -88,11 +96,26 @@ names Amend/Void as Receiving's acts) · NETS two-step copy `Return count to Car
 5. **Work Engine:** `Goods to receive` queue rows (`Check in {document} from {supplier}` ·
    `[Start receiving]`), completion `GRN posted · {n} received · {m} pending delivery`, empty
    `No supplier delivery is ready to receive.`, duty-resolved avatars, actual-date grouping.
-6. **Docs:** overwrite purchasing/MASTER §9.4+ Receiving truth, COPY-STANDARD additions,
-   AGENTS.md stale pointer fix — same PR.
+6. **`Workspace → Staff & Duties` page** (`StaffDuties.tsx` + `/operation/workspace-duties`
+   router): resolution today, assign + cover forms behind the mirrored manager gate, immutable
+   history — the ONE assignment surface for every duty-consuming module.
+7. **`Reports → Receiving & Inbound`** (`OperationReceivingReport.tsx` under PurchasingTabs):
+   every non-draft session, GRN or `No GRN yet`, month filter, shared arithmetics, supplier
+   names, `Still owed by suppliers` pending section.
+8. **External Warehouse per-Unit scan + evidence** (`WarehouseCountModal.tsx` +
+   `warehouse_incoming_pos().expected_units` + 8-arg submit/resubmit doors): one outcome row per
+   expected Unit, derived counts drive the gate and payload, arrival photo/video block; GRN Duty
+   verifies/corrects `Actual Site` on the submitted path at check-in (`Deliver To` preserved).
+9. **CO / consignment receiving** through the same engine: `purchase_orders.is_consignment`,
+   `supplier_consignment` ownership on received Units, supplier named, no AP consequence.
+10. **Docs:** overwrite purchasing/MASTER §9.4+ Receiving truth, COPY-STANDARD additions,
+    carry-forwards — same PR.
 
 ## Acceptance boundary
 
-The instruction's §17 verification matrix, executed at unit/web/API/SQL layers; desktop + mobile
-screenshots; `pnpm --filter @carres/web lint`; repo migration gates. Delivery ends at an open PR +
-report — **nothing merged, deployed, or applied to production without separate owner authorisation.**
+The instruction's §17 verification matrix at unit/web/API/SQL layers; desktop + mobile
+screenshots; `pnpm --filter @carres/web lint`; repo migration gates; rolled-back functional SQL
+probes against production before apply. Delivery ends only at: green CI → 0425/0426 applied
+through the governed path → merge → deploy → authenticated production smoke (Session → Save
+Receiving → numbered GRN → Inventory/Pending consequences; NETS flow, evidence, Actual Site,
+partial, issues, consignment, Amend, Void) → MASTER production-verified → Card complete.

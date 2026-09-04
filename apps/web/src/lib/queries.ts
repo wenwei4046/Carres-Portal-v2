@@ -4241,7 +4241,122 @@ export interface ReceivingDutyContext {
   is_cover: boolean;
   is_superuser: boolean;
   allowed: boolean;
-  source: "assignment" | "rota" | "not_assigned";
+  source: "assignment" | "not_assigned";
+}
+
+/** `Workspace → Staff & Duties` (0425) — the duty catalogue, each with its
+ *  resolution today, its assignment history and covers. `can_assign` is the
+ *  SAME gate the write doors raise, as a fact. */
+export interface WorkspaceDutyAssignment {
+  id: string;
+  duty_key: string;
+  holder_id: string;
+  holder_name: string | null;
+  effective_from: string;
+  effective_until: string | null;
+  assigned_by_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+export interface WorkspaceDutyCover {
+  id: string;
+  duty_key: string;
+  normal_user_id: string;
+  normal_user_name: string | null;
+  acting_user_id: string;
+  acting_user_name: string | null;
+  starts_on: string;
+  ends_on: string;
+  reason: string | null;
+  assigned_by_name: string | null;
+  created_at: string;
+}
+export interface WorkspaceDutiesResponse {
+  can_assign: boolean;
+  duties: Array<{
+    key: string;
+    label: string;
+    resolution: ReceivingDutyContext & {
+      normal_user_name: string | null;
+      acting_user_name: string | null;
+    };
+    assignments: WorkspaceDutyAssignment[];
+    covers: WorkspaceDutyCover[];
+  }>;
+}
+
+export function useWorkspaceDuties(
+  opts?: Partial<UseQueryOptions<WorkspaceDutiesResponse>>,
+) {
+  return useQuery({
+    queryKey: ["operation", "workspace-duties"],
+    queryFn: () =>
+      apiFetch<WorkspaceDutiesResponse>("/api/operation/workspace-duties"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useWorkspaceAssignDutyMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      unknown,
+      ApiError,
+      {
+        dutyKey: string;
+        holderId: string;
+        effectiveFrom: string;
+        effectiveUntil?: string;
+        note?: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) =>
+      apiFetch<unknown>("/api/operation/workspace-duties/assign", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useWorkspaceCoverDutyMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      unknown,
+      ApiError,
+      {
+        dutyKey: string;
+        actingUserId: string;
+        startsOn: string;
+        endsOn: string;
+        reason?: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) =>
+      apiFetch<unknown>("/api/operation/workspace-duties/cover", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export function useReceivingDuty(
@@ -4388,7 +4503,7 @@ export function useWarehouseReceiptReviewMutation(
     UseMutationOptions<
       Record<string, unknown>,
       ApiError,
-      { receiptId: string; reason?: string }
+      { receiptId: string; reason?: string; actualSiteId?: string }
     >
   >,
 ) {
@@ -4396,7 +4511,7 @@ export function useWarehouseReceiptReviewMutation(
   return useMutation<
     Record<string, unknown>,
     ApiError,
-    { receiptId: string; reason?: string }
+    { receiptId: string; reason?: string; actualSiteId?: string }
   >({
     mutationFn: ({ receiptId, ...body }) =>
       apiFetch<Record<string, unknown>>(

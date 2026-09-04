@@ -501,6 +501,9 @@ export {
   // 0426 — Amend / Void doors for a posted GRN.
   receivingAmendInput,
   receivingVoidInput,
+  // 0425 — Workspace → Staff & Duties.
+  workspaceAssignDutyInput,
+  workspaceCoverDutyInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,

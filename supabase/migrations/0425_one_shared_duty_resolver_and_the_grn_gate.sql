@@ -15,20 +15,17 @@
 --
 --   workspace_duty_assignments   the effective-dated authoritative record
 --   workspace_duty_covers        the dated buddy cover
---   workspace_resolve_duty()     the ONE resolver — assignment first; for
---                                `grn_duty` the governed rota RECOMMENDATION
---                                (month M+1 of the PO rota, `grnDutyMonth`)
---                                answers while no assignment exists, exactly
---                                as Law F.1 permits ("automatic rotation may
---                                supply a recommended Primary/Cover … the
---                                authoritative assignment is the
---                                effective-dated record")
+--   workspace_resolve_duty()     the ONE resolver — the effective-dated
+--                                assignment answers, or the honest
+--                                `not_assigned`. NOTHING ELSE: a rota
+--                                recommendation is never silently turned
+--                                into an assignment (owner correction
+--                                2026-09-04) — an unassigned duty blocks
+--                                protected posting and says so.
 --   receiving_actor_context()    the one gate the Receiving doors ask
 --
--- The `Workspace → Staff & Duties` settings SURFACE remains APPROVED TARGET /
--- NOT BUILT; until it ships, assignments move through the governed RPC below,
--- and the rota recommendation keeps the office running. No module keeps a
--- second person list.
+-- The `Workspace → Staff & Duties` surface ships in the same card and is the
+-- ONE assignment door. No module keeps a second person list.
 -- ============================================================================
 
 begin;
@@ -246,17 +243,15 @@ $fn$;
 -- ---------------------------------------------------------------------------
 
 /**
- * workspace_resolve_duty — assignment first, governed rota recommendation
- * second, honest nulls third.
+ * workspace_resolve_duty — the effective-dated assignment, or the honest gap.
  *
  *   source = 'assignment'    an effective-dated Staff & Duties record answered
- *   source = 'rota'          the governed rotation recommendation answered
- *                            (`grn_duty` = PO rota month M+1 — the locked
- *                            "the person who ORDERS never RECEIVES" offset,
- *                            purchasing/MASTER.md §2.2 / grnDutyMonth)
  *   source = 'not_assigned'  nobody holds it — the callers name the
- *                            configuration gap; nothing falls back to an
- *                            email or an arbitrary manager
+ *                            configuration gap and protected posting blocks;
+ *                            nothing falls back to a rota, an email or an
+ *                            arbitrary manager (owner correction 2026-09-04:
+ *                            a recommendation is never silently an
+ *                            assignment)
  */
 create or replace function public.workspace_resolve_duty(
   p_duty_key text,
@@ -273,7 +268,6 @@ declare
   v_source text := 'assignment';
   v_cover_id uuid;
   v_acting uuid;
-  v_next_month text;
 begin
   select holder_id into v_normal
     from workspace_duty_assignments
@@ -282,15 +276,6 @@ begin
      and (effective_until is null or effective_until >= v_on)
    order by effective_from desc, created_at desc
    limit 1;
-
-  if v_normal is null and p_duty_key = 'grn_duty' then
-    -- GRN duty for month M is the PO rota row of month M+1 (grnDutyMonth).
-    v_next_month := to_char((date_trunc('month', v_on) + interval '1 month')::date, 'YYYY-MM');
-    select user_id into v_normal from ops_po_duty where month = v_next_month;
-    if v_normal is not null then
-      v_source := 'rota';
-    end if;
-  end if;
 
   if v_normal is null then
     return jsonb_build_object(
@@ -319,7 +304,26 @@ end;
 $fn$;
 
 comment on function public.workspace_resolve_duty(text, date) is
-  '0425: the ONE Shared Duty Resolver (ERP-ARCHITECTURE Law F.1). Assignment record first, governed rota recommendation second, honest not_assigned third. No page or module resolves a duty any other way.';
+  '0425: the ONE Shared Duty Resolver (ERP-ARCHITECTURE Law F.1). The effective-dated Staff & Duties assignment answers, or the honest not_assigned — never a rota recommendation, an email or an arbitrary manager. No page or module resolves a duty any other way.';
+
+/**
+ * The Staff & Duties page's own fact: may THIS person assign? The same gate
+ * the write doors raise, answered as a boolean so the page never offers a
+ * control the server would refuse.
+ */
+create or replace function public.workspace_can_assign_duties()
+returns boolean
+language plpgsql
+stable security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  perform public.workspace_duty_settings_gate();
+  return true;
+exception when others then
+  return false;
+end;
+$fn$;
 
 -- ---------------------------------------------------------------------------
 -- 5 · the Receiving gate — who may review/post a Receiving today
@@ -367,6 +371,8 @@ revoke all on function public.workspace_cover_duty(text, uuid, date, date, text)
 grant execute on function public.workspace_cover_duty(text, uuid, date, date, text) to authenticated;
 revoke all on function public.workspace_resolve_duty(text, date) from public, anon;
 grant execute on function public.workspace_resolve_duty(text, date) to authenticated;
+revoke all on function public.workspace_can_assign_duties() from public, anon;
+grant execute on function public.workspace_can_assign_duties() to authenticated;
 revoke all on function public.receiving_actor_context() from public, anon;
 grant execute on function public.receiving_actor_context() to authenticated;
 

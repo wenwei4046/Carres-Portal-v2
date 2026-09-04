@@ -248,6 +248,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
+       * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
+       * Receiving & GRN card). Modules reference duties; they never keep a
+       * second person list. */
+      { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //

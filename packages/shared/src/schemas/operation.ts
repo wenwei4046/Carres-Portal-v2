@@ -406,6 +406,31 @@ export const receivingVoidInput = z
   .strict();
 export type ReceivingVoidInput = z.infer<typeof receivingVoidInput>;
 
+/** `Workspace → Staff & Duties` (0425) — assign one primary holder. The SQL
+ *  door owns every rule (manager gate, active staff, no self-assignment). */
+export const workspaceAssignDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    holderId: z.string().uuid(),
+    effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    note: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceAssignDutyInput = z.infer<typeof workspaceAssignDutyInput>;
+
+/** `Workspace → Staff & Duties` (0425) — a dated buddy cover. */
+export const workspaceCoverDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    actingUserId: z.string().uuid(),
+    startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    reason: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceCoverDutyInput = z.infer<typeof workspaceCoverDutyInput>;
+
 /**
  * `adjustStockInput` IS GONE — 0366.
  *

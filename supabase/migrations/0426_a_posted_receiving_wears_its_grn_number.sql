@@ -62,6 +62,17 @@ comment on column warehouse_receipts.arrival_evidence is
 comment on column warehouse_receipts.extra_lines is
   '0426: extra goods recorded separately — [{"sku": text, "qty": int, "note": text}]. Extra goods never enter Inventory and never alter ordered/pending arithmetic.';
 
+-- The consignment SOURCE fact. One Receiving engine handles purchased AND
+-- supplier-consignment arrivals (purchasing/MASTER.md §7.6): a consignment
+-- source's received Units stay supplier-owned (`ops_stock_items.ownership =
+-- 'supplier_consignment'`, 0366) and receipt creates NO payable — nothing in
+-- the receive engine touches Finance/AP, and the tests pin that. The future
+-- Consignment Order door stamps this flag at issue; nothing else writes it.
+alter table purchase_orders
+  add column if not exists is_consignment boolean not null default false;
+comment on column purchase_orders.is_consignment is
+  '0426: true when this supplier commitment is a consignment placement — received Units remain supplier-owned and receipt creates no payable. Stamped at issue by the consignment door; Receiving only reads it.';
+
 -- ---------------------------------------------------------------------------
 -- §2 · one physical result per governed Unit
 -- ---------------------------------------------------------------------------
@@ -422,6 +433,7 @@ declare
   v_recv_ids           uuid[];
   v_dmg_ids            uuid[];
   v_wrong_ids          uuid[];
+  v_ownership          text;
 begin
   if p_po_id is null or length(btrim(p_po_id)) = 0 then
     raise exception 'p_po_id required' using errcode = '22023', detail = 'invalid_input';
@@ -470,6 +482,12 @@ begin
     raise exception 'actual site not found' using errcode = '22023', detail = 'actual_site_invalid';
   end if;
   v_site := coalesce(p_actual_site_id, v_po.warehouse_id);
+
+  -- 0426 · consignment: a consignment source's received Units remain
+  -- SUPPLIER-OWNED (0366's ownership contract) and receipt creates no
+  -- payable — the engine touches no Finance/AP record either way.
+  v_ownership := case when v_po.is_consignment then 'supplier_consignment'
+                      else 'carres_owned' end;
 
   v_was_relocated := v_po.sup_status = 'relocated';
   v_actor := coalesce((select name from app_users where id = v_uid), initcap(v_role::text));
@@ -606,13 +624,11 @@ begin
     v_wrong_total   := v_wrong_total + v_wrong_add;
 
     if v_delta > 0 and v_posts_stock then
-      insert into stock_balances (sku, warehouse_id, qty)
-        values (v_sku, v_site, v_delta)
-        on conflict (sku, warehouse_id)
-        do update set qty = stock_balances.qty + v_delta, updated_at = now();
-
-      insert into stock_movements (sku, warehouse_id, qty, kind, ref, by_role, by_user_id)
-      values (v_sku, v_site, v_delta, 'in', p_po_id, v_role, v_uid);
+      -- 0366 · the unit register is the ONE inventory authority: stock posts by
+      -- flipping/minting Units only. `stock_balances` is derived by the rollup
+      -- triggers on `ops_stock_items` — a direct write here is refused by
+      -- `trg_stock_balances_derived_only` (this replaces the pre-0366 balance
+      -- write the previous engine definition still carried).
 
       -- 0426 · EXACT-UNIT flips first (ERP-ARCHITECTURE §3.4): the scanned
       -- `Received` Units become free at the Actual Site. A quantity line
@@ -620,7 +636,10 @@ begin
       if cardinality(v_recv_ids) > 0 then
         with freed as (
           update ops_stock_items
-             set status = 'free', warehouse_id = v_site, updated_at = now()
+             set status = 'free', warehouse_id = v_site, updated_at = now(),
+                 ownership = case when v_po.is_consignment
+                                  then 'supplier_consignment' else ownership end,
+                 supplier = coalesce(nullif(btrim(coalesce(supplier, '')), ''), v_supplier_name)
            where id = any(v_recv_ids) and status = 'incoming'
           returning 1
         )
@@ -632,7 +651,10 @@ begin
       else
         with freed as (
           update ops_stock_items
-             set status = 'free', warehouse_id = v_site, updated_at = now()
+             set status = 'free', warehouse_id = v_site, updated_at = now(),
+                 ownership = case when v_po.is_consignment
+                                  then 'supplier_consignment' else ownership end,
+                 supplier = coalesce(nullif(btrim(coalesce(supplier, '')), ''), v_supplier_name)
            where id in (
              select id from ops_stock_items
               where po_no = p_po_id and sku = v_sku and status = 'incoming'
@@ -647,8 +669,8 @@ begin
       v_minted := 0;
       if v_is_own and v_freed < v_delta then
         insert into ops_stock_items
-          (unit_code, sku, warehouse_id, status, supplier, po_no, source_ref, date_in)
-        select public.gen_unit_code(), v_sku, v_site, 'free',
+          (unit_code, sku, warehouse_id, status, ownership, supplier, po_no, source_ref, date_in)
+        select public.gen_unit_code(), v_sku, v_site, 'free', v_ownership,
                v_supplier_name, p_po_id, btrim(p_do_number), current_date
           from generate_series(1, v_delta - v_freed);
         v_minted := v_delta - v_freed;
@@ -765,32 +787,11 @@ begin
 
     v_threads_advanced := v_threads_advanced + 1;
 
-    if v_posts_stock then
-    for v_reserve in
-      select ol.sku as sku, ol.qty as qty
-        from order_lines ol
-        join product_skus ps on ps.sku = ol.sku
-        join product_models pm on pm.id = ps.model_id
-       where ol.order_id = v_thread.order_id
-         and ps.supplier_id = v_thread.supplier_id
-         and pm.category::text = v_thread.category
-    loop
-      begin
-        update stock_balances
-           set reserved   = reserved + v_reserve.qty, updated_at = now()
-         where sku = v_reserve.sku and warehouse_id = v_site;
-        if not found then
-          raise exception 'no stock_balances row for sku=% wh=%', v_reserve.sku, v_site
-            using errcode = 'P0001', detail = 'insufficient_stock_for_reserve';
-        end if;
-      exception
-        when check_violation then
-          raise exception 'cannot reserve sku=% at wh=% (qty < reserved + %)',
-                          v_reserve.sku, v_site, v_reserve.qty
-            using errcode = 'P0001', detail = 'insufficient_stock_for_reserve';
-      end;
-    end loop;
-    end if;
+    -- 0366 · `reserved` is the Sales Order's exact-Unit binding, owned by the
+    -- Stock reserve door (`status = 'reserved'` + `reserved_ref`), never an
+    -- aggregate counter. The pre-0366 `stock_balances.reserved` increment the
+    -- previous engine definition carried is removed — a receiving advances the
+    -- thread; the dispatch flow binds its exact Units.
   end loop;
 
   select count(*) into v_outstanding
@@ -1238,6 +1239,293 @@ end;
 $fn$;
 
 -- ---------------------------------------------------------------------------
+-- §6b · the external Warehouse doors learn per-Unit outcomes, arrival
+--       photo/video evidence and extra goods — the SAME validator, the SAME
+--       session shape, still no stock movement before the Carres save
+-- ---------------------------------------------------------------------------
+
+drop function if exists public.warehouse_submit_receipt(text, text, text, text, jsonb, date);
+
+create function public.warehouse_submit_receipt(
+  p_po_id             text,
+  p_do_number         text,
+  p_do_file_path      text,
+  p_note              text,
+  p_lines             jsonb,
+  p_goods_received_at date default null,
+  p_arrival_evidence  jsonb default null,
+  p_extra_lines       jsonb default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_wh_id uuid; v_uid uuid; v_po purchase_orders; v_valid jsonb;
+  v_receipt_id uuid; v_grn_date date;
+  v_today_myt date := (now() at time zone 'Asia/Kuala_Lumpur')::date;
+  v_prior warehouse_receipts; v_extras jsonb;
+begin
+  v_uid := auth.uid();
+  if public.app_role() <> 'warehouse' then
+    raise exception 'forbidden: warehouse role required' using errcode = '42501', detail = 'forbidden';
+  end if;
+  v_wh_id := public.app_warehouse_id();
+  if v_wh_id is null then
+    raise exception 'this login is not bound to a warehouse' using errcode = '42501', detail = 'no_warehouse';
+  end if;
+  if length(btrim(coalesce(p_do_number, ''))) < 3 then
+    raise exception 'a DO number is required' using errcode = '22023', detail = 'do_number_required';
+  end if;
+  if length(btrim(coalesce(p_do_file_path, ''))) = 0 then
+    raise exception 'a photo of the signed DO is required' using errcode = '22023', detail = 'do_file_required';
+  end if;
+  v_grn_date := coalesce(p_goods_received_at, v_today_myt);
+  if v_grn_date > v_today_myt then
+    raise exception 'Goods Received At cannot be in the future'
+      using errcode = '22023', detail = 'received_date_future';
+  end if;
+  select * into v_po from purchase_orders where id = p_po_id and warehouse_id = v_wh_id for update;
+  if not found then
+    raise exception 'PO not found for this warehouse'
+      using errcode = '42501', detail = 'po_not_found_or_cross_tenant';
+  end if;
+  if v_po.status <> 'open' then
+    raise exception 'PO % is no longer open', p_po_id using errcode = '22023', detail = 'po_not_open';
+  end if;
+  if v_grn_date < (v_po.placed_at at time zone 'Asia/Kuala_Lumpur')::date then
+    raise exception 'Goods Received At cannot be before the PO date (%)',
+                    to_char((v_po.placed_at at time zone 'Asia/Kuala_Lumpur')::date, 'DD Mon YY')
+      using errcode = '22023', detail = 'received_date_before_po';
+  end if;
+  if exists (select 1 from warehouse_receipts where po_id = p_po_id and status = 'submitted') then
+    raise exception 'a receiving for % is already waiting for Carres', p_po_id
+      using errcode = 'P0001', detail = 'receipt_already_open';
+  end if;
+  select * into v_prior from warehouse_receipts
+   where po_id = p_po_id and lower(btrim(do_number)) = lower(btrim(p_do_number))
+     and status <> 'voided';
+  if found then
+    if v_prior.status = 'returned' then
+      raise exception 'DO % was returned — reopen and resubmit that receiving, do not file a new one',
+                      btrim(p_do_number)
+        using errcode = 'P0001', detail = 'do_returned_use_resubmit';
+    else
+      raise exception 'DO % was already received on % (session %)',
+                      btrim(p_do_number), to_char(v_prior.goods_received_at, 'DD Mon YY'), v_prior.id
+        using errcode = 'P0001', detail = 'do_already_received';
+    end if;
+  end if;
+  v_valid  := public.warehouse_receipt_validate_lines(p_po_id, p_lines, v_uid);
+  v_extras := public.receiving_validate_session_extras(p_arrival_evidence, p_extra_lines);
+  insert into warehouse_receipts (
+    po_id, warehouse_id, do_number, do_file_path, note, lines,
+    goods_received_at, submitted_from, status, submitted_by,
+    arrival_evidence, extra_lines
+  ) values (
+    p_po_id, v_wh_id, btrim(p_do_number), btrim(p_do_file_path),
+    nullif(btrim(coalesce(p_note, '')), ''), v_valid->'lines',
+    v_grn_date, 'warehouse', 'submitted', v_uid,
+    v_extras->'arrival_evidence', v_extras->'extra_lines'
+  ) returning id into v_receipt_id;
+  insert into receiving_events (receipt_id, event, actor_id, payload)
+  values (v_receipt_id, 'submitted', v_uid,
+          jsonb_build_object('do_number', btrim(p_do_number),
+                             'goods_received_at', v_grn_date,
+                             'units_counted', (v_valid->>'counted')::int,
+                             'arrival_evidence', jsonb_array_length(coalesce(v_extras->'arrival_evidence','[]'::jsonb)),
+                             'extra_lines', jsonb_array_length(coalesce(v_extras->'extra_lines','[]'::jsonb))));
+  insert into po_history (po_id, text, by_role, by_user_id)
+  values (p_po_id,
+          format('%s filed a receiving with DO %s — waiting Carres check',
+                 coalesce((select name from warehouses where id = v_wh_id), 'The warehouse'),
+                 btrim(p_do_number)),
+          'warehouse', v_uid);
+  return jsonb_build_object('id', v_receipt_id, 'po_id', p_po_id, 'status', 'submitted');
+end;
+$fn$;
+
+drop function if exists public.warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date);
+
+create function public.warehouse_resubmit_receipt(
+  p_receipt_id        uuid,
+  p_do_number         text,
+  p_do_file_path      text,
+  p_note              text,
+  p_lines             jsonb,
+  p_goods_received_at date default null,
+  p_arrival_evidence  jsonb default null,
+  p_extra_lines       jsonb default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_wh_id uuid; v_uid uuid; v_receipt warehouse_receipts; v_po purchase_orders;
+  v_valid jsonb; v_grn_date date; v_extras jsonb;
+  v_today_myt date := (now() at time zone 'Asia/Kuala_Lumpur')::date;
+  v_clash warehouse_receipts;
+begin
+  v_uid := auth.uid();
+  if public.app_role() <> 'warehouse' then
+    raise exception 'forbidden: warehouse role required' using errcode = '42501', detail = 'forbidden';
+  end if;
+  v_wh_id := public.app_warehouse_id();
+  if v_wh_id is null then
+    raise exception 'this login is not bound to a warehouse' using errcode = '42501', detail = 'no_warehouse';
+  end if;
+  select * into v_receipt from warehouse_receipts
+   where id = p_receipt_id and warehouse_id = v_wh_id for update;
+  if not found then
+    raise exception 'receipt not found for this warehouse' using errcode = '42P01', detail = 'receipt_not_found';
+  end if;
+  if v_receipt.status <> 'returned' then
+    raise exception 'only a returned receiving can be resubmitted (this one is %)', v_receipt.status
+      using errcode = '22023', detail = 'receipt_not_returned';
+  end if;
+  if length(btrim(coalesce(p_do_number, ''))) < 3 then
+    raise exception 'a DO number is required' using errcode = '22023', detail = 'do_number_required';
+  end if;
+  if length(btrim(coalesce(p_do_file_path, ''))) = 0 then
+    raise exception 'a photo of the signed DO is required' using errcode = '22023', detail = 'do_file_required';
+  end if;
+  v_grn_date := coalesce(p_goods_received_at, v_today_myt);
+  if v_grn_date > v_today_myt then
+    raise exception 'Goods Received At cannot be in the future'
+      using errcode = '22023', detail = 'received_date_future';
+  end if;
+  select * into v_po from purchase_orders where id = v_receipt.po_id for update;
+  if v_po.status <> 'open' then
+    raise exception 'PO % is no longer open', v_receipt.po_id using errcode = '22023', detail = 'po_not_open';
+  end if;
+  if v_grn_date < (v_po.placed_at at time zone 'Asia/Kuala_Lumpur')::date then
+    raise exception 'Goods Received At cannot be before the PO date (%)',
+                    to_char((v_po.placed_at at time zone 'Asia/Kuala_Lumpur')::date, 'DD Mon YY')
+      using errcode = '22023', detail = 'received_date_before_po';
+  end if;
+  select * into v_clash from warehouse_receipts
+   where po_id = v_receipt.po_id and lower(btrim(do_number)) = lower(btrim(p_do_number))
+     and id <> v_receipt.id and status <> 'voided';
+  if found then
+    raise exception 'DO % already belongs to another receiving (session %)',
+                    btrim(p_do_number), v_clash.id
+      using errcode = 'P0001', detail = 'do_already_received';
+  end if;
+  v_valid  := public.warehouse_receipt_validate_lines(v_receipt.po_id, p_lines, v_uid);
+  v_extras := public.receiving_validate_session_extras(p_arrival_evidence, p_extra_lines);
+  update warehouse_receipts
+     set status = 'submitted', do_number = btrim(p_do_number),
+         do_file_path = btrim(p_do_file_path),
+         note = nullif(btrim(coalesce(p_note, '')), ''),
+         lines = v_valid->'lines', goods_received_at = v_grn_date,
+         -- A resubmission that names new evidence replaces it; one that
+         -- names none keeps what the first count attached.
+         arrival_evidence = case when p_arrival_evidence is null
+                                 then arrival_evidence
+                                 else v_extras->'arrival_evidence' end,
+         extra_lines = case when p_extra_lines is null
+                            then extra_lines
+                            else v_extras->'extra_lines' end,
+         submitted_by = v_uid, submitted_at = now(), updated_at = now()
+   where id = p_receipt_id;
+  insert into receiving_events (receipt_id, event, actor_id, payload)
+  values (p_receipt_id, 'resubmitted', v_uid,
+          jsonb_build_object('do_number', btrim(p_do_number),
+                             'goods_received_at', v_grn_date,
+                             'units_counted', (v_valid->>'counted')::int));
+  insert into po_history (po_id, text, by_role, by_user_id)
+  values (v_receipt.po_id,
+          format('%s resubmitted the receiving with DO %s — waiting Carres check',
+                 coalesce((select name from warehouses where id = v_wh_id), 'The warehouse'),
+                 btrim(p_do_number)),
+          'warehouse', v_uid);
+  return jsonb_build_object('id', p_receipt_id, 'po_id', v_receipt.po_id, 'status', 'submitted');
+end;
+$fn$;
+
+revoke execute on function public.warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb) from public, anon;
+grant  execute on function public.warehouse_submit_receipt(text, text, text, text, jsonb, date, jsonb, jsonb) to authenticated;
+revoke execute on function public.warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb) from public, anon;
+grant  execute on function public.warehouse_resubmit_receipt(uuid, text, text, text, jsonb, date, jsonb, jsonb) to authenticated;
+
+/**
+ * The warehouse's incoming read gains the EXPECTED UNITS — the exact IDs the
+ * supplier was told to write on the packages — so the operator scans one
+ * physical result per governed Unit (ERP-ARCHITECTURE §3.4). A warehouse
+ * still sees only what it must count: unit code, product, state.
+ */
+create or replace function public.warehouse_incoming_pos()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_wh_id uuid;
+  v_out   jsonb;
+begin
+  if public.app_role() <> 'warehouse' then
+    raise exception 'forbidden: warehouse role required'
+      using errcode = '42501', detail = 'forbidden';
+  end if;
+  v_wh_id := public.app_warehouse_id();
+  if v_wh_id is null then
+    raise exception 'this login is not bound to a warehouse'
+      using errcode = '42501', detail = 'no_warehouse';
+  end if;
+
+  select jsonb_build_object(
+    'warehouse', (select jsonb_build_object('id', w.id, 'name', w.name)
+                    from warehouses w where w.id = v_wh_id),
+    'pos', coalesce((
+      select jsonb_agg(p order by p->>'po_id')
+        from (
+          select jsonb_build_object(
+            'po_id',         po.id,
+            'supplier_name', s.name,
+            'eta_date',      po.eta_date,
+            'sup_status',    po.sup_status,
+            'lines', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                       'id',             pol.id,
+                       'sku',            pol.sku,
+                       'qty',            pol.qty,
+                       'received_qty',   pol.received_qty,
+                       'damaged_qty',    pol.damaged_qty,
+                       'wrong_item_qty', pol.wrong_item_qty,
+                       'category',       public.claim_product_category(pol.sku)
+                     ) order by pol.sku)
+                from purchase_order_lines pol where pol.po_id = po.id
+            ), '[]'::jsonb),
+            -- 0426: the governed expected Units still incoming on this PO.
+            'expected_units', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                       'id', i.id, 'unit_code', i.unit_code,
+                       'sku', i.sku, 'status', i.status
+                     ) order by i.unit_code)
+                from ops_stock_items i
+               where i.po_no = po.id and i.status = 'incoming'
+            ), '[]'::jsonb),
+            'open_receipt_id', (
+              select wr.id from warehouse_receipts wr
+               where wr.po_id = po.id and wr.status = 'submitted' limit 1
+            )
+          ) as p
+          from purchase_orders po
+          join suppliers s on s.id = po.supplier_id
+         where po.warehouse_id = v_wh_id
+           and po.status = 'open'
+        ) q
+    ), '[]'::jsonb)
+  ) into v_out;
+
+  return v_out;
+end;
+$fn$;
+
+-- ---------------------------------------------------------------------------
 -- §7 · receiving_amend — a posted GRN has no ordinary Edit
 --      (owner instruction 2026-09-04 §9: preserve the original, require a
 --       reason, show before/after, append-only event, safe recalculation,
@@ -1408,14 +1696,8 @@ begin
         update purchase_order_lines set received_qty = received_qty + v_d
          where id = v_line_id;
         if v_posts_stock then
-          insert into stock_balances (sku, warehouse_id, qty)
-            values (v_pol.sku, v_site, v_d)
-            on conflict (sku, warehouse_id)
-            do update set qty = stock_balances.qty + v_d, updated_at = now();
-          insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, by_user_id)
-          values (v_pol.sku, v_site, v_d, 'adjust', v_receipt.po_id,
-                  format('Amend %s', coalesce(v_receipt.grn_no, p_receipt_id::text)),
-                  public.app_role(), v_uid);
+          -- 0366 · stock posts by flipping/minting Units only; the rollup
+          -- triggers derive `stock_balances` from the unit register.
           with freed as (
             update ops_stock_items
                set status = 'free', warehouse_id = v_site, updated_at = now()
@@ -1479,17 +1761,8 @@ begin
             raise exception 'units on % are reserved or moved — the count cannot be lowered', v_pol.sku
               using errcode = 'P0001', detail = 'units_block_amend';
           end if;
-          begin
-            update stock_balances set qty = qty + v_d, updated_at = now()
-             where sku = v_pol.sku and warehouse_id = v_site;
-          exception when check_violation then
-            raise exception 'stock at the site no longer covers this correction'
-              using errcode = 'P0001', detail = 'stock_block_amend';
-          end;
-          insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, by_user_id)
-          values (v_pol.sku, v_site, v_d, 'adjust', v_receipt.po_id,
-                  format('Amend %s', coalesce(v_receipt.grn_no, p_receipt_id::text)),
-                  public.app_role(), v_uid);
+          -- The rollup triggers lower the derived `stock_balances` as the
+          -- Units return to incoming (0366).
           -- The unit results this correction reversed read Not received now.
           update receiving_unit_results r
              set outcome = 'not_received', issue_kind = null
@@ -1508,7 +1781,7 @@ begin
               using errcode = 'P0001', detail = 'legacy_completion_block_amend';
           end if;
           update purchase_orders
-             set status = v_receipt.po_status_before,
+             set status = v_receipt.po_status_before::po_status,
                  sup_status = v_receipt.sup_status_before::po_sup_status,
                  updated_at = now()
            where id = v_receipt.po_id;
@@ -1677,17 +1950,8 @@ begin
         raise exception 'units on % are reserved or moved — this receiving cannot be voided', v_pol.sku
           using errcode = 'P0001', detail = 'units_block_void';
       end if;
-      begin
-        update stock_balances set qty = qty - v_recv, updated_at = now()
-         where sku = v_pol.sku and warehouse_id = v_site;
-      exception when check_violation then
-        raise exception 'stock at the site no longer covers this void'
-          using errcode = 'P0001', detail = 'stock_block_void';
-      end;
-      insert into stock_movements (sku, warehouse_id, qty, kind, ref, note, by_role, by_user_id)
-      values (v_pol.sku, v_site, -v_recv, 'adjust', v_receipt.po_id,
-              format('Void %s', coalesce(v_receipt.grn_no, p_receipt_id::text)),
-              public.app_role(), v_uid);
+      -- The rollup triggers lower the derived `stock_balances` as the Units
+      -- return to incoming (0366).
     end if;
 
     update purchase_order_lines
@@ -1699,7 +1963,7 @@ begin
 
   if v_po.status = 'received' then
     update purchase_orders
-       set status = v_receipt.po_status_before,
+       set status = v_receipt.po_status_before::po_status,
            sup_status = v_receipt.sup_status_before::po_sup_status,
            updated_at = now()
      where id = v_receipt.po_id;

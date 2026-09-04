@@ -12,6 +12,7 @@ import {
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import {
+  useOperationWarehouse,
   useReceivingAmendMutation,
   useReceivingDuty,
   useReceivingSessionDetail,
@@ -337,6 +338,7 @@ export default function ReceivingRecord({
           <SubmittedReview
             receiptId={r.id}
             warehouseName={r.warehouse_name ?? "the warehouse"}
+            bookedWarehouseId={r.warehouse_id}
             dutyAllowed={dutyAllowed}
             opensClaims={hasIssue}
             onDone={onBack}
@@ -484,12 +486,14 @@ function comparisonValue(v: unknown): string {
 function SubmittedReview({
   receiptId,
   warehouseName,
+  bookedWarehouseId,
   dutyAllowed,
   opensClaims,
   onDone,
 }: {
   receiptId: string;
   warehouseName: string;
+  bookedWarehouseId: string;
   dutyAllowed: boolean;
   opensClaims: boolean;
   onDone: () => void;
@@ -497,6 +501,12 @@ function SubmittedReview({
   const [reason, setReason] = useState("");
   const [returning, setReturning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /** GRN Duty verifies/corrects where the goods PHYSICALLY landed before
+   *  saving. `Deliver To` is never overwritten — both facts are preserved
+   *  (owner instruction §6). */
+  const [actualSiteId, setActualSiteId] = useState(bookedWarehouseId);
+  const warehousesQ = useOperationWarehouse();
+  const warehouses = warehousesQ.data?.warehouses ?? [];
   const checkIn = useWarehouseReceiptReviewMutation("check-in", {
     onSuccess: onDone,
     onError: (e) => setErr(e.message),
@@ -515,6 +525,26 @@ function SubmittedReview({
           ? " Saving will open supplier claims for the recorded issues."
           : ""}
       </p>
+      {dutyAllowed && warehouses.length > 0 ? (
+        <div className="mt-2 flex items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+            Actual Site
+          </span>
+          <select
+            value={actualSiteId}
+            onChange={(e) => setActualSiteId(e.target.value)}
+            aria-label="Actual Site"
+            data-testid="review-actual-site"
+            className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       {!dutyAllowed ? (
         <p className="mt-1 text-label text-kit-slate-9" data-testid="review-duty-refusal">
           Only GRN duty may save a receiving.
@@ -562,7 +592,14 @@ function SubmittedReview({
           <button
             type="button"
             disabled={checkIn.isPending}
-            onClick={() => checkIn.mutate({ receiptId })}
+            onClick={() =>
+              checkIn.mutate({
+                receiptId,
+                ...(actualSiteId !== bookedWarehouseId
+                  ? { actualSiteId }
+                  : {}),
+              })
+            }
             data-testid="save-receiving-review"
             className={`${DOC_BTN} disabled:opacity-40`}
           >

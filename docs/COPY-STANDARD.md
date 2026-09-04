@@ -1268,6 +1268,14 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Count waiting for check` · `Sent back to recount` · `Posted` · `Voided` | Receiving rail state rows | The session's own status labels as filters — facts, never `Today`/`Overdue` buckets. |
 | `Find PO or CO` | the Start Receiving entrance | Receiving starts from the exact source. The search is CONTROLLED: an unknown delivery may record evidence but never invents a supplier, an order, a Session, a GRN or Inventory. |
 | `Only GRN duty may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0425/0426): GRN Duty, its dated cover, or an Operations Superuser. |
+| `Staff & Duties` | Workspace rail row + page | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
+| `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
+| `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Protected posting refuses until the manager assigns. |
+| `{acting} covering for {holder}` | duty resolution while a cover runs | Both names, both facts — the cover never erases the normal holder. |
+| `Duty assignments are set by the manager.` | Staff & Duties, non-manager view | The page states the same gate the SQL door holds; it never offers a control the server would refuse. |
+| `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
+| `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
+| `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
 
 ### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
 

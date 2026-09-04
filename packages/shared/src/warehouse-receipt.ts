@@ -367,6 +367,14 @@ export interface WarehouseIncomingPo {
   eta_date: string | null;
   sup_status: string;
   lines: WarehouseIncomingLine[];
+  /** 0426 — the governed expected Units still incoming: the exact IDs the
+   *  supplier was told to write on the packages. One physical result each. */
+  expected_units?: Array<{
+    id: string;
+    unit_code: string;
+    sku: string;
+    status: string;
+  }>;
   /** Non-null when a count is already waiting for Carres — the PO must not
    *  offer a second form. */
   open_receipt_id: string | null;

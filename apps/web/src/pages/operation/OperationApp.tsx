@@ -52,6 +52,8 @@ import OperationPurchaseOrders from "./OperationPurchaseOrders";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
+import OperationReceivingReport from "./OperationReceivingReport";
+import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
@@ -482,6 +484,12 @@ export default function OperationApp() {
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
+                reachable by direct URL, like the Purchasing Report. */}
+            {tab === "receiving-report" && <OperationReceivingReport />}
+            {/* Workspace → Staff & Duties — the ONE duty assignment door
+                (workspace/MASTER.md, LOCKED 2026-09-03). */}
+            {tab === "staff-duties" && <StaffDuties />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}
