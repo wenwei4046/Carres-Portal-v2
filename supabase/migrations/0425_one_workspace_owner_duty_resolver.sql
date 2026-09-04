@@ -288,6 +288,31 @@ begin
   end if;
 
   perform pg_advisory_xact_lock(hashtext(p_duty_key));
+  select a.id, to_jsonb(a)
+    into v_id, v_previous
+    from public.workspace_duty_assignments a
+   where a.duty_key = p_duty_key
+     and a.starts_on = p_starts_on
+   for update;
+
+  -- Saving the assignment already shown in Staff & Duties is a governed
+  -- change, not an overlapping second truth. Reuse its stable id and retain
+  -- the complete before/after evidence in the append-only audit.
+  if v_id is not null then
+    update public.workspace_duty_assignments
+       set primary_user_id = p_primary_user_id,
+           buddy_user_id = p_buddy_user_id,
+           ends_on = p_ends_on,
+           changed_at = now(),
+           changed_by = auth.uid()
+     where id = v_id;
+    insert into public.workspace_duty_assignment_audit (
+      assignment_id, duty_key, event, previous_fact, resulting_fact, recorded_by
+    ) select a.id, a.duty_key, 'changed', v_previous, to_jsonb(a), auth.uid()
+        from public.workspace_duty_assignments a where a.id = v_id;
+    return v_id;
+  end if;
+
   if exists (
     select 1 from public.workspace_duty_assignments a
     where a.duty_key = p_duty_key

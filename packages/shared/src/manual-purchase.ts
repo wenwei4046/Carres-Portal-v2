@@ -13,6 +13,7 @@ import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { DEMAND_PURPOSES, type DemandPurpose } from "./to-order";
 import { SO_BATCH_RAIL, type SoBatchProductCategory } from "./so-batch-purchase";
 import type { WorkItem } from "./work-engine";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 import { countWorkingDays, type WorkingDayOptions } from "./working-days";
 
 /** Every visible word on the Manual Purchase surfaces (COPY-STANDARD). */
@@ -1158,6 +1159,9 @@ export function manualPurchaseWorkItems(
     /** The month's NORMAL PO Duty holder — Team Work groups by them; a
      *  dated cover changes who acts, never the normal owner group. */
     poDuty: { userId: string; name: string | null } | null;
+    /** Shared resolver answer; when present, acting cover and normal owner
+     * remain separate. `poDuty` is the one-release compatibility input. */
+    poDutyResolution?: WorkspaceDutyResolution | null;
   },
   todayIso: string,
   opts: WorkingDayOptions = {},
@@ -1172,12 +1176,21 @@ export function manualPurchaseWorkItems(
 
   const items: WorkItem[] = [];
   if (input.status === "waiting_approval") {
+    const approver = ctx.approver
+      ? { userId: ctx.approver.userId, name: ctx.approver.name }
+      : null;
     items.push({
       ruleKey: "manual_purchase.approve",
       module: "purchasing",
       soRef: input.context,
       orderId: input.requestId,
       action: MANUAL_PURCHASE_WORDS.workApprove,
+      ownerRule: "purchasing_approver",
+      ownerDutyKey: "approval.purchasing",
+      normalOwner: approver,
+      activeCover: null,
+      actingPerson: approver,
+      ownerState: approver ? "primary" : "not_assigned",
       ownerName: ctx.approver?.name ?? null,
       ownerUserId: ctx.approver?.userId ?? null,
       ...(ctx.approver ? {} : { ownerDuty: "Purchasing" }),
@@ -1195,15 +1208,28 @@ export function manualPurchaseWorkItems(
     (input.status === "ready_to_order" && input.remainingQty > 0) ||
     (input.status === "ordered" && input.hasPos && !input.posAllSent);
   if (issueOpen) {
+    const resolution = ctx.poDutyResolution;
+    const legacy = ctx.poDuty
+      ? { userId: ctx.poDuty.userId, name: ctx.poDuty.name }
+      : null;
+    const normalOwner = resolution?.normalOwner ?? legacy;
+    const activeCover = resolution?.activeCover ?? null;
+    const actingPerson = resolution?.actingPerson ?? legacy;
     items.push({
       ruleKey: "manual_purchase.issue_po",
       module: "purchasing",
       soRef: input.context,
       orderId: input.requestId,
       action: MANUAL_PURCHASE_WORDS.workIssuePo,
-      ownerName: ctx.poDuty?.name ?? null,
-      ownerUserId: ctx.poDuty?.userId ?? null,
-      ...(ctx.poDuty ? {} : { ownerDuty: "Purchasing" }),
+      ownerRule: "po_duty",
+      ownerDutyKey: "purchasing.po",
+      normalOwner,
+      activeCover,
+      actingPerson,
+      ownerState: resolution?.state ?? (legacy ? "primary" : "not_assigned"),
+      ownerName: actingPerson?.name ?? null,
+      ownerUserId: actingPerson?.userId ?? null,
+      ...(actingPerson ? {} : { ownerDuty: "Purchasing" }),
       tone: "info",
       locked: false,
       broken: false,

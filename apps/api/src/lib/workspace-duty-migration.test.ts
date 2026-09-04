@@ -29,6 +29,7 @@ describe("0425 one Workspace owner-Duty resolver", () => {
     expect(migration).toMatch(/create table (?:if not exists )?public\.hr_staff_unavailability_audit/i);
     expect(migration).toMatch(/create or replace function public\.workspace_set_duty_assignment\(/i);
     expect(migration).toMatch(/create or replace function public\.hr_set_staff_unavailability\(/i);
+    expect(migration).toMatch(/event, previous_fact, resulting_fact[\s\S]*'changed', v_previous, to_jsonb\(a\)/i);
   });
 
   it("fails closed and preserves normal owner, cover, acting person and date", () => {

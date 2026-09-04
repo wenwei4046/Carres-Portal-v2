@@ -1478,6 +1478,11 @@ Settings lives under the global header gear and requires authorised roles. It in
 - document number format/version and locked Unit ID family;
 - a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
+- `/api/operation/po-duty` is a one-release response-shape adapter only. It reads and writes the
+  shared Workspace Duty resolver and must be deleted when `PurchaseOrdersPage`,
+  `SalesOrderWorkspace`, `OperationOrdersControl`, the Quick Rail `TeamPanel`, and the PO-day
+  reminder consume the Workspace Duty contract directly; no caller may restore a direct
+  `ops_po_duty` or cover-table read behind it.
 - approval limits and Manual Purchase purposes;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock

@@ -162,7 +162,7 @@ export default function OperationWork() {
     const byOwner = new Map<string, WorkRow[]>();
     for (const i of allItems) {
       const key =
-        i.ownerId ??
+        i.normalOwnerId ??
         (i.ownerName
           ? `person:${i.ownerName}`
           : `duty:${i.ownerDuty ?? "No owner yet"}`);
@@ -191,6 +191,7 @@ export default function OperationWork() {
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),
         late: items.filter((i) => i.workingDaysLate > 0).length,
+        coverName: items.find((i) => i.activeCover)?.activeCover?.name ?? null,
       };
     });
     // People first (by printed name — coverage, never a ranking), duties last.
@@ -345,6 +346,11 @@ export default function OperationWork() {
                   {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
                   {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
                 </span>
+                {g.coverName && (
+                  <span className="text-label font-normal text-kit-amber-11">
+                    Cover today: {g.coverName}
+                  </span>
+                )}
               </h2>
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (

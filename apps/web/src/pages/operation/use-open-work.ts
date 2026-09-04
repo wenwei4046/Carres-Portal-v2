@@ -38,6 +38,7 @@ import {
   workItemsForOrder,
   type OpsStaffMember,
   type WorkItem,
+  type WorkOwnerRule,
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import { personLabel } from "@/lib/staff-avatar";
@@ -45,10 +46,10 @@ import {
   useDeliveryPartners,
   useManualPurchaseRegister,
   useOperationOrders,
-  useOperationPoDuty,
   useOperationStaff,
   useOperationStock,
   usePurchasingSettings,
+  useWorkspaceDuties,
 } from "@/lib/queries";
 import {
   logisticStateOf,
@@ -68,6 +69,8 @@ export interface WorkRow extends WorkItem {
    *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
    *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
+  /** Team Work grouping identity; cover never rewrites it. */
+  normalOwnerId: string | null;
   /** Delivery's active document door. Null means the work belongs to the
    *  arrangement/scope rather than an issued Delivery Order. */
   deliveryDoNumber: string | null;
@@ -102,7 +105,8 @@ export function useOpenWorkSet(): OpenWorkSet {
   // §0.1 Action Owner Engine (2026-08-27) — Purchasing's order-track work
   // resolves to the month's PO-duty holder. Fails soft exactly as the duty
   // hook always has: dormant layer → no holder → the duty word stands.
-  const poDutyQ = useOperationPoDuty();
+  const today = todayIso();
+  const workspaceDutiesQ = useWorkspaceDuties(today);
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -128,22 +132,20 @@ export function useOpenWorkSet(): OpenWorkSet {
     return m;
   }, [stockQ.data]);
 
-  const poDuty = useMemo(() => {
-    const holder = poDutyQ.data?.holder;
-    if (!holder) return null;
+  const dutyResolutions = useMemo(() => {
+    const byKey = new Map((workspaceDutiesQ.data?.duties ?? []).map((duty) => [duty.key, duty.resolution]));
     return {
-      userId: holder.userId,
-      name: personLabel(holder.name, holder.email),
-    };
-  }, [poDutyQ.data]);
+      po_duty: byKey.get("purchasing.po"),
+      payment_duty: byKey.get("payment.collection"),
+    } satisfies Partial<Record<WorkOwnerRule, NonNullable<(typeof workspaceDutiesQ.data)>["duties"][number]["resolution"] | undefined>>;
+  }, [workspaceDutiesQ.data]);
+  const poDuty = dutyResolutions.po_duty?.actingPerson ?? null;
 
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const queueLeads = useMemo(
     () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
     [settingsQ.data],
   );
-  const today = todayIso();
-
   const items = useMemo(() => {
     const out: WorkRow[] = [];
     for (const o of orders) {
@@ -167,6 +169,7 @@ export function useOpenWorkSet(): OpenWorkSet {
           picName: ownerMember ? personLabel(ownerMember.name, ownerMember.email) : null,
           picUserId: ownerId,
           poDuty,
+          dutyResolutions,
           salespersonName: o.salespersons?.name ?? null,
           // §0.1 row 1 — the 3 nobody asked, never the 8 who answered "not
           // yet" (owner ruling 2026-08-15), and never a finished order.
@@ -213,13 +216,14 @@ export function useOpenWorkSet(): OpenWorkSet {
              for Purchasing's work, else the PIC; never the PIC borrowed for
              another rule's item. */
           ownerId: it.ownerUserId,
+          normalOwnerId: it.normalOwner?.userId ?? null,
         });
       }
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today, poDuty,
+    holidayOpts, queueLeads, today, poDuty, dutyResolutions,
   ]);
 
   /* ── The Manual Purchase actions (Card 06 §7; wording Card 08 §3.4) ────
@@ -331,7 +335,7 @@ export function useOpenWorkSet(): OpenWorkSet {
             linkedPoIds.length > 0 &&
             linkedPoIds.every((id) => sentByPo.get(id) === true),
         },
-        { approver, poDuty },
+        { approver, poDuty, poDutyResolution: dutyResolutions.po_duty },
         mpToday,
         holidayOpts,
       );
@@ -341,12 +345,13 @@ export function useOpenWorkSet(): OpenWorkSet {
           line: it.action,
           customer: null,
           ownerId: it.ownerUserId,
+          normalOwnerId: it.normalOwner?.userId ?? null,
           deliveryDoNumber: null,
         });
       }
     }
     return out;
-  }, [manualQ.data, poDuty, holidayOpts, today]);
+  }, [manualQ.data, poDuty, dutyResolutions.po_duty, holidayOpts, today]);
 
   const allItems = useMemo(
     () => [...items, ...manualItems],
@@ -357,7 +362,7 @@ export function useOpenWorkSet(): OpenWorkSet {
     items: allItems,
     staff,
     staffById,
-    loading: ordersQ.isLoading || staffQ.isLoading,
+    loading: ordersQ.isLoading || staffQ.isLoading || workspaceDutiesQ.isLoading,
   };
 }
 

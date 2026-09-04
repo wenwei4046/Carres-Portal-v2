@@ -140,6 +140,32 @@ describe("WORK_RULES — five parts, or no entry", () => {
 
 describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
   const duty = { userId: "u-duty", name: "Yu Jun" };
+  const coveredPoDuty = {
+    dutyKey: "purchasing.po",
+    onDate: "2026-08-11",
+    normalOwner: { userId: "u-duty", name: "Yu Jun" },
+    buddy: { userId: "u-cover", name: "Khor Yee" },
+    activeCover: { userId: "u-cover", name: "Khor Yee" },
+    actingPerson: { userId: "u-cover", name: "Khor Yee" },
+    state: "covered" as const,
+    assignmentId: "a-po",
+  };
+
+  it("routes My Work to today's cover while preserving Team Work's normal owner", () => {
+    const open = openOrderActions({ ...baseSignals, goodsReady: false, goodsUnordered: true });
+    const po = workItemsForOrder(
+      open,
+      { ...ctx, picUserId: "u-pic", dutyResolutions: { po_duty: coveredPoDuty } },
+      "2026-08-11",
+      HOLS,
+    ).find((item) => item.ruleKey === "issue_po")!;
+
+    expect(po.ownerRule).toBe("po_duty");
+    expect(po.ownerDutyKey).toBe("purchasing.po");
+    expect(po.normalOwner).toEqual({ userId: "u-duty", name: "Yu Jun" });
+    expect(po.activeCover).toEqual({ userId: "u-cover", name: "Khor Yee" });
+    expect(po.actingPerson).toEqual({ userId: "u-cover", name: "Khor Yee" });
+  });
 
   it("Purchasing's order-track work lands on the PO-duty holder, never the PIC", () => {
     const open = openOrderActions({
@@ -167,7 +193,7 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
     expect(po.ownerDuty).toBe("Purchasing");
   });
 
-  it("collect stays with the PIC as governed cover — money never sits unowned (payment_duty, no roster yet)", () => {
+  it("Payment Duty with no assignment fails closed and never borrows the PIC", () => {
     const open = openOrderActions({
       ...baseSignals,
       hasLogistics: true,
@@ -183,9 +209,10 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
       HOLS,
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
-    expect(collect.ownerName).toBe("Shasha");
-    expect(collect.ownerUserId).toBe("u-pic");
-    expect(collect.ownerDuty).toBeUndefined();
+    expect(collect.ownerRule).toBe("payment_duty");
+    expect(collect.normalOwner).toBeNull();
+    expect(collect.actingPerson).toBeNull();
+    expect(collect.ownerDutyKey).toBe("payment.collection");
   });
 
   it("the missing customer promise composes `Ask for the delivery date` — the salesperson's work, a name without an account", () => {
@@ -330,6 +357,12 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
       soRef: "SO-1",
       orderId: "o",
       action: "Assign logistics",
+      ownerRule: "order_pic",
+      ownerDutyKey: null,
+      normalOwner: { userId: "u-pic", name: "Shasha" },
+      activeCover: null,
+      actingPerson: { userId: "u-pic", name: "Shasha" },
+      ownerState: "primary",
       ownerName: "Shasha",
       ownerUserId: "u-pic",
       tone: "info",

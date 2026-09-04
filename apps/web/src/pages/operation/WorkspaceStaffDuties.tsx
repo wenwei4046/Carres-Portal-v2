@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { WorkspaceDutyAssignment, WorkspaceDutyResolution } from "@carres/shared";
+import type { WorkspaceDutyResolution } from "@carres/shared";
 import Button from "@/components/kit/Button";
 import DatePicker from "@/components/kit/DatePicker";
 import EmptyState from "@/components/kit/EmptyState";

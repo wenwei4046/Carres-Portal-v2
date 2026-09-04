@@ -33,6 +33,7 @@ let stockState: { data: operationStockResponse | undefined };
 let staffState: { data: OpsStaffListResponse | undefined; isLoading: boolean };
 let settingsState: { data: undefined };
 let poDutyState: { data: { month: string; holder: { userId: string; email: string; name: string | null; assignedBy: string | null } | null } | undefined };
+let workspaceDutiesState: { data: import("@/lib/queries").WorkspaceDutiesResponse | undefined; isLoading: boolean };
 let authState: { role: string; email: string | null };
 
 vi.mock("@/lib/queries", async () => {
@@ -45,6 +46,7 @@ vi.mock("@/lib/queries", async () => {
     useOperationStaff: () => staffState,
     usePurchasingSettings: () => settingsState,
     useOperationPoDuty: () => poDutyState,
+    useWorkspaceDuties: () => workspaceDutiesState,
   };
 });
 
@@ -147,6 +149,7 @@ beforeEach(() => {
   staffState = { data: STAFF, isLoading: false };
   settingsState = { data: undefined };
   poDutyState = { data: undefined };
+  workspaceDutiesState = { data: { onDate: TODAY, canEdit: false, duties: [], staff: [] }, isLoading: false };
   authState = { role: "operation", email: "sha@carres.co" };
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -507,12 +510,15 @@ describe("OperationWork — owners resolve per RULE, not per order", () => {
     });
 
   it("`Issue PO` lands in the PO-duty holder's My Work — the PIC never sees it as theirs", () => {
-    poDutyState = {
-      data: {
-        month: "2026-07",
-        holder: { userId: OTHER_UID, email: "yj@carres.co", name: "Yu Jun", assignedBy: null },
+    workspaceDutiesState.data!.duties = [{
+      key: "purchasing.po", name: "PO Duty", description: "Issue POs", assignment: null,
+      resolution: {
+        dutyKey: "purchasing.po", onDate: TODAY,
+        normalOwner: { userId: OTHER_UID, name: "Yu Jun" }, buddy: null,
+        activeCover: null, actingPerson: { userId: OTHER_UID, name: "Yu Jun" },
+        state: "primary", assignmentId: "33333333-3333-4333-8333-333333333333",
       },
-    };
+    }];
     listState.data = { orders: [unorderedRow()] }; // PIC = Shasha (signed in)
     wrap(<OperationWork />);
     // My Work (Shasha, the PIC): the purchasing act is NOT here…
@@ -523,8 +529,34 @@ describe("OperationWork — owners resolve per RULE, not per order", () => {
     expect(yuJun.querySelector('[data-testid="work-row-SO-1301-issue_po"]')).toBeTruthy();
   });
 
+  it("cover receives the action in My Work while Team Work keeps the normal owner", () => {
+    workspaceDutiesState.data!.duties = [{
+      key: "purchasing.po", name: "PO Duty", description: "Issue POs", assignment: null,
+      resolution: {
+        dutyKey: "purchasing.po", onDate: TODAY,
+        normalOwner: { userId: OTHER_UID, name: "Yu Jun" },
+        buddy: { userId: OP_UID, name: "Shasha" },
+        activeCover: { userId: OP_UID, name: "Shasha" },
+        actingPerson: { userId: OP_UID, name: "Shasha" },
+        state: "covered", assignmentId: "33333333-3333-4333-8333-333333333333",
+      },
+    }];
+    listState.data = { orders: [unorderedRow()] };
+
+    wrap(<OperationWork />);
+    expect(screen.getByTestId("work-row-SO-1301-issue_po")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("work-view-team"));
+    const normalOwnerGroup = screen.getByTestId(`work-owner-group-${OTHER_UID}`);
+    expect(normalOwnerGroup).toHaveTextContent("Yu Jun");
+    expect(normalOwnerGroup).toHaveTextContent("Cover today: Shasha");
+    expect(
+      normalOwnerGroup.querySelector('[data-testid="work-row-SO-1301-issue_po"]'),
+    ).toBeTruthy();
+  });
+
   it("a dormant duty layer groups the purchasing act under the duty word — never the PIC borrowed", () => {
-    poDutyState = { data: undefined };
+    workspaceDutiesState.data!.duties = [];
     listState.data = { orders: [unorderedRow()] };
     wrap(<OperationWork />, "/operation?tab=work&scope=team");
     const duty = screen.getByTestId("work-owner-group-duty:Purchasing");
