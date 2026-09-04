@@ -1412,13 +1412,16 @@ describe("POST /api/orders", () => {
       env,
     );
     expect(res.status).toBe(403);
-    // RPC was attempted; no follow-up ORDER fetch happened. The two eqs
-    // recorded are both PRE-create singleton reads, not a follow-up fetch:
-    // the 0219 order_entry_config row (payment-method validation) and, since
-    // P1 (0303), the purchasing_settings row the earliest-sell floor reads.
+    // RPC was attempted; no follow-up ORDER fetch happened. The three eqs
+    // recorded are all PRE-create singleton reads, not a follow-up fetch:
+    // the 0219 order_entry_config row (payment-method validation), the
+    // purchasing_settings row the earliest-sell floor reads (P1, 0303), and
+    // the same row read again on its own for the Manual Purchase floor
+    // (0423), kept separate so a missing column cannot fail an order.
     expect(sb._rpcCalls).toHaveLength(1);
     expect(sb._eqs).toEqual([
       ["id", true],
+      ["id", 1],
       ["id", 1],
     ]);
   });
