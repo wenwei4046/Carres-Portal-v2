@@ -429,7 +429,7 @@ export default function OperationReceiving() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="receiving-page">
-      <PurchasingTabs active="receiving" />
+      <PurchasingTabs />
 
       {/* ── The open object takes the stage; the Register stays MOUNTED
              underneath (`invisible`, never display:none) so Back restores the

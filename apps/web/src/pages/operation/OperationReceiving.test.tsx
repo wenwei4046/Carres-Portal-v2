@@ -127,7 +127,7 @@ vi.mock("@/lib/queries", async () => {
 const apiFetchMock = vi.fn(() => Promise.resolve({}));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, apiFetch: (...args: unknown[]) => apiFetchMock(...args) };
+  return { ...actual, apiFetch: () => apiFetchMock() };
 });
 
 /* The three upload fields go browser → Storage; each is replaced with the

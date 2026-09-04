@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   receivingDisplayNo,
@@ -10,7 +10,7 @@ import {
   warehouseReceiptTotals,
   type WarehouseReceiptLine,
 } from "@carres/shared";
-import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
+import { fmtDate } from "@/lib/fmt-date";
 import {
   useReceivingAmendMutation,
   useReceivingDuty,
