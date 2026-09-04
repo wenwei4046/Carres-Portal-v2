@@ -1801,7 +1801,27 @@ the SAME governed writers, Site-narrowed server-side. The schedule feed now read
 `warehouseOutboundCards()` in `packages/shared` is the ONE card arithmetic
 (`required = handed over + not handed over`, §3.5.1).
 
-**Production proof (deployed SHA + walk) — recorded at closure below.**
+**Production proof — 2026-09-04.** Merged as `71f0bfd4` (PR #1091); `0424` applied through the
+governed path (tracker tail `0424_outbound_hands_over_exact_units_and_the_holder_moves`;
+backfill produced both live DOs' scopes, 0 split documents surfaced, all 12 partners resolve a
+holder, NETS → the `nets_delivery` seed). `erp.carresofficial.com/__carres_deploy.json`
+reported exactly `71f0bfd4` after the deploy run succeeded. Authenticated walk as
+`operation@carres.com` on that SHA: Dashboard rendered the approved rail and six-date board
+with the exact empty sentence; saving a NETS arrangement on SO-1321 through Edit Delivery made
+the `DO-170826-5050` card appear under Fri, 4 Sep reading `Required 1 · Handed over 0 · Not
+handed over 1`; the card opened Outbound scoped by URL; scan → check → pack recorded through
+the prep door (duplicate scan reconciled); `Record handover` with the actual receiver and an
+uploaded proof landed the batch — the card re-read `12:53 · Required 1 · Handed over 1 · Not
+handed over 0`, `ops_stock_items.holder_party_id` moved to **NETS Delivery** with one
+`holder_changed` lineage event and the stored proof; `DO No` opened the formal read-only
+document whose header now offers only `Confirm logistics receipt` and whose Warehouse handover
+block and History print the fact with recorder/duty/receiver; browser Back restored Outbound
+then the Dashboard. Narrow/mobile agenda verified at 375px against the identical code (the
+committed dev preview): one-day agenda, `[Filters]` drawer, horizontally self-scrolling Unit
+table — the walk found and fixed the rail crushing the agenda (`build/warehouse-03-walk-fixes`).
+Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every refusal branch
+and the partial-batch holder transition were proven on production in rolled-back probes before
+merge (`PROBE_COMPLETE_ALL_PASS`).
 
 ## 14 · Whole-domain completion gate
 

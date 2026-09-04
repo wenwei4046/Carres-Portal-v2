@@ -82,8 +82,18 @@ export default function WarehouseWorkspace() {
   const sched = (params.get("sched") ?? "calendar") as WarehouseScheduleView;
   const search = params.get("q") ?? "";
   const selectedDo = params.get("do");
-  const [railHidden, setRailHidden] = useState(false);
   const isAgenda = useIsAgendaWidth();
+  const [railHidden, setRailHidden] = useState(isAgenda);
+  /* At agenda width the 240px rail would crush the one-day list, so it opens
+     on demand from the [Filters] control and closes after a pick (card §5
+     narrow composition). */
+  useEffect(() => {
+    if (isAgenda) setRailHidden(true);
+  }, [isAgenda]);
+  function pickRail(key: string, value: string | null) {
+    setParam(key, value);
+    if (isAgenda) setRailHidden(true);
+  }
 
   const { data, isLoading, error } = useDeliveryWarehouseSchedule();
   const events = useMemo(
@@ -160,7 +170,7 @@ export default function WarehouseWorkspace() {
             data-testid="wd-toggle-filters"
           >
             {railHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-            {railHidden ? "Show filters" : "Hide filters"}
+            {railHidden ? "Filters" : "Hide filters"}
           </button>
           <div className="flex items-center gap-1" data-testid="wd-range">
             <button
@@ -224,21 +234,21 @@ export default function WarehouseWorkspace() {
                 <FilterRailRow
                   label="Calendar"
                   active={sched === "calendar"}
-                  onClick={() => setParam("sched", null)}
+                  onClick={() => pickRail("sched", null)}
                   testId="wd-sched-calendar"
                 />
                 <FilterRailRow
                   label="Not done"
                   count={allCards.filter((c) => c.notHandedOver > 0).length}
                   active={sched === "not-done"}
-                  onClick={() => setParam("sched", sched === "not-done" ? null : "not-done")}
+                  onClick={() => pickRail("sched", sched === "not-done" ? null : "not-done")}
                   testId="wd-sched-not-done"
                 />
                 <FilterRailRow
                   label="Evidence not submitted"
                   count={allCards.filter((c) => c.evidenceNotSubmitted).length}
                   active={sched === "no-evidence"}
-                  onClick={() => setParam("sched", sched === "no-evidence" ? null : "no-evidence")}
+                  onClick={() => pickRail("sched", sched === "no-evidence" ? null : "no-evidence")}
                   testId="wd-sched-no-evidence"
                 />
               </FilterRailGroup>
@@ -250,7 +260,7 @@ export default function WarehouseWorkspace() {
                       label={name}
                       count={allCards.filter((c) => c.fromLocation === name).length}
                       active={site === name}
-                      onClick={() => setParam("site", site === name ? null : name)}
+                      onClick={() => pickRail("site", site === name ? null : name)}
                       testId={`wd-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                     />
                   ))}
@@ -261,7 +271,7 @@ export default function WarehouseWorkspace() {
                   The source stays explicit on every card. */}
             </FilterRail>
           )}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className={`min-h-0 min-w-0 flex-1 flex-col${!railHidden && isAgenda ? " hidden" : " flex"}`}>
             {isLoading ? (
               <p className="p-4 text-[13px] text-base-500">Loading…</p>
             ) : error ? (
