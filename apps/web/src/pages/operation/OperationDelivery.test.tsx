@@ -408,3 +408,59 @@ describe("the URL is the state", () => {
     expect(screen.getByTestId("delivery-monitor-card-b")).toBeTruthy();
   });
 });
+
+describe("mobile is a one-day list", () => {
+  beforeEach(() => {
+    mediaMatches = true;
+    seedTwoScopes();
+  });
+
+  it("shows one selected operating day, never the six-column grid", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-daily")).toBeTruthy();
+    // Today's card renders; no day COLUMN exists in the phone layout.
+    expect(screen.getByTestId("delivery-monitor-card-a")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-03")).toBeNull();
+  });
+
+  it("the date heading is sticky and each card row is at least 44px tall", () => {
+    wrap(<OperationDelivery />);
+    const daily = screen.getByTestId("delivery-monitor-daily");
+    const heading = within(daily).getByText("Fri, 4 Sep");
+    expect(heading.className).toContain("sticky");
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(card.className).toContain("min-h-11");
+  });
+
+  it("previous/next moves one operating day and skips Sunday", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&day=2026-09-05");
+    fireEvent.click(screen.getByRole("button", { name: "Next days" }));
+    // Saturday 5 → Monday 7, never Sunday 6.
+    expect(screen.getByTestId("location-probe").textContent).toContain("day=2026-09-07");
+    fireEvent.click(screen.getByRole("button", { name: "Previous days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("day=2026-09-05");
+  });
+
+  it("a Sunday deep link lands on the next operating day", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&day=2026-09-06");
+    const daily = screen.getByTestId("delivery-monitor-daily");
+    expect(within(daily).getByText("Mon, 7 Sep")).toBeTruthy();
+  });
+
+  it("uses the identical card link arithmetic as desktop", () => {
+    wrap(<OperationDelivery />);
+    expect(
+      screen.getByTestId("delivery-monitor-card-a").closest("a")?.getAttribute("href"),
+    ).toBe("/operation/delivery-orders/do-row-1");
+  });
+
+  it("the rail becomes a filter drawer behind Show filters", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    expect(rail.className).toContain("hidden");
+    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
+    expect(screen.getByTestId("delivery-monitor-rail").className).not.toContain("hidden");
+    expect(screen.getByRole("button", { name: "Hide filters" })).toBeTruthy();
+  });
+});
