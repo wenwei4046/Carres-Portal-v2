@@ -64,6 +64,16 @@ const COLLISION_BASELINE = new Set([
      NOT APPLIED — that half is the other lane's apply debt and a production
      decision reported to the owner, not decided here. */
   "0417",
+  /* 0424 · the same race eleven minutes apart on 2026-09-04: #1091 (Warehouse
+     CARD 03, `outbound_hands_over_exact_units_and_the_holder_moves`) merged
+     04:32, #1093 (Purchasing CARD 08,
+     `a_manual_purchase_has_no_number_only_its_po_does`) merged 04:43 carrying
+     its own 0424. Both halves are committed, so the rename path is closed
+     (red line 6) and the pair is baselined. Measured state at baselining:
+     the Warehouse half APPLIED (tracker row carries the exact file name) ·
+     the Manual Purchase half NOT APPLIED — the Purchasing lane's apply debt.
+     The halves touch disjoint objects, so relative order is immaterial. */
+  "0424",
 ]);
 
 const collisions = findCollisions(files, COLLISION_BASELINE);
