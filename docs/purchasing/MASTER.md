@@ -1325,12 +1325,16 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN — owner instruction 2026-09-04, BUILT (merge/apply/production gated)
+### 9.4 Receiving / GRN — owner instruction 2026-09-04, PRODUCTION-VERIFIED
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
-(CARD-2026-09-04-receiving-01). **State: BUILT on `build/receiving-grn`; migrations 0425/0426 are
-PREPARED, NOT APPLIED; nothing is merged or deployed without separate owner authorisation.** The
-operating rule is:
+(CARD-2026-09-04-receiving-01). **State: PRODUCTION-VERIFIED 2026-09-04 — migrations 0425/0426
+APPLIED (tracker 20260904125205 / 20260904125800), PR #1099 merged `7a897494`, deployed, and
+smoked in production with committed test records: GRN-20260904-0210 (posted → amended → voided),
+-1064 (damaged claim minted, void refused `claims_block_void`), -8882 (consignment received as
+`supplier_consignment`), -9649 (staged NETS submitted count checked in with Actual Site). All
+posted under the Operations Superuser exception; GRN Duty is honestly unassigned until the
+manager assigns it in `Workspace → Staff & Duties`.** The operating rule is:
 
 ```text
 Operation enters/checks goods in the Receiving Session
