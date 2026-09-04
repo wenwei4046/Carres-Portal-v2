@@ -155,7 +155,7 @@ describe("Warehouse Dashboard — the Calendar board", () => {
           unitScannedAt: "t",
           unitCheckedAt: "t",
           unitPackedAt: "t",
-          unitHandedOverAt: "2026-09-04T11:18:00",
+          unitHandedOverAt: "2026-09-04T11:18:00+08:00",
           unitHasEvidence: true,
           unitDeliveryPerson: "Ahmad",
         }),
