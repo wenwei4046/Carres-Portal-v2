@@ -843,7 +843,7 @@ explicitly excluded from current truth rather than deferred blind spots.
 backward planning §5.1, partner calendars §11, absolute money gate §3) are persisted and the
 contradicting older text in this MASTER, `../orders/MASTER.md`, `../payment/MASTER.md`,
 `../ERP-ARCHITECTURE.md`, `../COPY-STANDARD.md`, `../ACTION-FLOW-STANDARD.md`, `../ui/MASTER.md`
-and `../workspace/BLUEPRINT.md` is overwritten. **The East Malaysia journey boundary was ruled
+and `../workspace/MASTER.md` is overwritten. **The East Malaysia journey boundary was ruled
 the same day (owner approval 2026-09-01): an East Malaysia (Sabah / Sarawak) order travels
 through HOUZS — Carres hands the goods to HOUZS with exact-Unit handover facts and proof, and
 HOUZS owns the onward journey and the customer contact, the same shape as the Singapore

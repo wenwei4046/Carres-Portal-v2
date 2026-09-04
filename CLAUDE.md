@@ -76,7 +76,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Rental / Subscription | `docs/rental/MASTER.md` | **APPROVED / LOCKED** | Frozen agreement truth plus approved subscription service/visit target |
 | People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
 | Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
-| Workspace — Dashboard + Work | No MASTER; `docs/workspace/BLUEPRINT.md` is review material | **PROPOSAL** | Owner review rulings in Blueprint §§15–16; no Cards or implementation before approval |
+| Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties and Shared Duty Resolver first; module projections during module delivery; Dashboard last |
 | Shared ERP UI | `docs/ui/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Apply the governed templates/tokens and the latest locked owner/action presentation law |
 
 `docs/issue-tracker/MASTER.md` is the one current Issue Tracker path. The former
