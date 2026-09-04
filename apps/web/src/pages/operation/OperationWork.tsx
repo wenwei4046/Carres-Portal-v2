@@ -216,6 +216,19 @@ export default function OperationWork() {
       navigate(`/operation?tab=manual-purchase&mp=${i.orderId}`);
       return;
     }
+    if (i.ruleKey === "receiving.check_in") {
+      // A submitted count opens ITS session; an arrival-day row opens the
+      // exact PO's pre-start Receiving object (the exact write door — never
+      // a module landing page).
+      // A session row carries the session UUID (36 chars); an arrival-day
+      // row carries the PO's own document id.
+      navigate(
+        i.orderId.length === 36
+          ? `/operation?tab=receiving&session=${encodeURIComponent(i.orderId)}`
+          : `/operation?tab=receiving&po=${encodeURIComponent(i.orderId)}`,
+      );
+      return;
+    }
     if (DELIVERY_ARRANGEMENT_ACTIONS.has(i.ruleKey)) {
       navigate(`/operation/delivery/edit/${encodeURIComponent(i.orderId)}`);
       return;

@@ -253,6 +253,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
+       * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
+       * Receiving & GRN card). Modules reference duties; they never keep a
+       * second person list. */
+      { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
@@ -292,7 +297,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        *   `Purchase Demands`       `purchase_demand` is hidden canonical truth,
        *                            not a page an operator is sent to
        *   `Consignment Overview`   the Stock Register reports supplier-owned
-       *   `Consignment Receipts`   Units, and `Goods Receipts` is the ONE
+       *   `Consignment Receipts`   Units, and `Receiving` is the ONE
        *                            physical receipt engine
        *   `Report` + its hairline  reports are central / Register exports
        *
@@ -340,7 +345,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * the rest of receiving (returns to warehouse, put-away) will land. It
        * receives purchased AND consignment goods — there is no second receipt
        * engine (`docs/purchasing/MASTER.md` §4). */
-      { key: "receiving", label: "Goods Receipts", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
+      /* `Receiving` is the exact destination word (owner correction 2026-08-29,
+       * ERP-ARCHITECTURE §2.1): it names the physical operation. `Goods
+       * Receipts` is retired as navigation — the GRN stays the DOCUMENT's
+       * noun, never a page name. */
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },

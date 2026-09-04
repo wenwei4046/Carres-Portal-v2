@@ -1275,6 +1275,31 @@ do not take the five-string shape.
 | `No receiving activity yet.` | Activity empty state | **Never `Nothing received yet`** (Jess, 2026-08-03) — that reads as *the goods have not come*, which is a different fact and usually a false one. What is empty is the RECORD. |
 | `Open in Claims` | Exceptions section | A DOOR, never a form. The claim already exists; the receive that recorded the problem opened it. |
 
+**OWNER INSTRUCTION 2026-09-04 — the Receiving & GRN completion words.** These joined the
+dictionary with the approved Receiving build; each is registered here so no chat re-invents it:
+
+| Word | Where | Why this word |
+|---|---|---|
+| `Actual Site` | Receiving Details field · Register column | Where the goods PHYSICALLY arrived. It never overwrites `Deliver To` — the instruction and the physical truth are two facts, both preserved. A row whose goods landed where they were booked reads `Same as Deliver To` (the `Same as PO` pattern). |
+| `Extra Qty` | Receiving Summary · Register column | Goods that were not on the source PO/CO, recorded SEPARATELY. Extra goods never enter Inventory and never alter ordered/pending-delivery arithmetic. |
+| `Extra goods` | session section | The section that records `Extra Qty` lines. First check whether the goods belong to another PO or CO. |
+| `Arrival evidence` | Receiving Details field | Photo AND video of the physical arrival — beside, never instead of, the `Signed DO photo`. |
+| `Received` · `Received with issue` · `Not received` | per-Unit outcome | The three physical results for a governed expected Unit (ERP-ARCHITECTURE §3.4, owner ruling 2026-09-01). `Received with issue` is a SUBSET of received — never counted twice. `Expected Units = Received Units + Not received Units`. (`Not received yet` stays the Route phrase for a PO-level absence; this row is the per-Unit outcome word.) |
+| `Amend Receiving` | the posted GRN's correction door | A posted GRN has no ordinary Edit. The original is preserved; the correction carries its reason, before/after, and an append-only `amended` event. |
+| `Void Receiving` | the posted GRN's reversal door | Only for a GRN that should never have existed. Distinct from an order's `Cancel`: the record and its evidence survive; the consequences reverse, or the door refuses with the exact downstream blocker. The state word on the record is `Voided`. |
+| `No GRN yet` | Register cell for an unposted session | The formal GRN exists only from the posted session (purchasing/MASTER.md §7.3) — an honest absence, never `—`. |
+| `Count waiting for check` · `Sent back to recount` · `Posted` · `Voided` | Receiving rail state rows | The session's own status labels as filters — facts, never `Today`/`Overdue` buckets. |
+| `Find PO or CO` | the Start Receiving entrance | Receiving starts from the exact source. The search is CONTROLLED: an unknown delivery may record evidence but never invents a supplier, an order, a Session, a GRN or Inventory. |
+| `Only GRN duty may save a receiving.` | the refused act | The page states the same rule the SQL door holds (0425/0426): GRN Duty, its dated cover, or an Operations Superuser. |
+| `Staff & Duties` | Workspace rail row + page | The ONE company-wide assignment surface (Law F.1). A module names the duty it needs; it never keeps a second assignment list. |
+| `GRN Duty` | duty label | The receiving duty's name everywhere — pages, history, work rows. |
+| `Nobody holds GRN Duty.` | Staff & Duties resolution · unassigned states | The honest unassigned answer (owner correction 2026-09-04): no rota recommendation is ever shown as if it were an assignment. Protected posting refuses until the manager assigns. |
+| `{acting} covering for {holder}` | duty resolution while a cover runs | Both names, both facts — the cover never erases the normal holder. |
+| `Duty assignments are set by the manager.` | Staff & Duties, non-manager view | The page states the same gate the SQL door holds; it never offers a control the server would refuse. |
+| `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
+| `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
+| `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
+
 ### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
 
 These are **Loo's own spellings**, taken from his ruling of 2026-08-05 (the claim model in

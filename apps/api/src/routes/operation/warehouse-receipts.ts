@@ -1,5 +1,8 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import {
+  receivingAmendInput,
+  receivingVoidInput,
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
   warehouseReceiptReturnInput,
@@ -74,7 +77,10 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // are what the Goods Received register reads, and they are 0314/0315
       // columns this select predates. `reviewed_*` stays until the
       // reader-rename slice drops it (0314's own discipline).
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason",
+      // 0426 widened this: grn_no · actual_site_id · arrival_evidence ·
+      // extra_lines · the posted duty-evidence trio · void_* are what the
+      // Receiving Register and the GRN record read.
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
     )
     // The register is a HISTORY, so it sorts by the BUSINESS date — when the
     // goods physically arrived — not by when somebody keyed them in. The
@@ -99,13 +105,24 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     .eq("status", "submitted");
 
   const warehouseIds = [
-    ...new Set(rows.map((r) => r.warehouse_id as string).filter(Boolean)),
+    ...new Set(
+      rows
+        .flatMap((r) => [r.warehouse_id, r.actual_site_id])
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
   ];
   const poIds = [...new Set(rows.map((r) => r.po_id as string).filter(Boolean))];
   const userIds = [
     ...new Set(
       rows
-        .flatMap((r) => [r.submitted_by, r.reviewed_by, r.posted_by])
+        .flatMap((r) => [
+          r.submitted_by,
+          r.reviewed_by,
+          r.posted_by,
+          r.posted_duty_holder,
+          r.posted_duty_cover,
+          r.void_by,
+        ])
         .filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
@@ -187,6 +204,18 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         posted_by_name: r.posted_by
           ? (userNames.get(r.posted_by as string) ?? null)
           : null,
+        actual_site_name: r.actual_site_id
+          ? (warehouseNames.get(r.actual_site_id as string) ?? null)
+          : null,
+        posted_duty_holder_name: r.posted_duty_holder
+          ? (userNames.get(r.posted_duty_holder as string) ?? null)
+          : null,
+        posted_duty_cover_name: r.posted_duty_cover
+          ? (userNames.get(r.posted_duty_cover as string) ?? null)
+          : null,
+        void_by_name: r.void_by
+          ? (userNames.get(r.void_by as string) ?? null)
+          : null,
         do_file_url: r.do_file_path
           ? (doUrls.get(r.do_file_path as string) ?? null)
           : null,
@@ -211,9 +240,230 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
  * BACK, with a reason, to the only people who can look at the goods again.
  */
 warehouseReceiptsRouter.post("/:id/check-in", requireOperation, async (c) => {
+  // The optional body carries only the Actual Site — everything counted was
+  // decided by the person who held the pallet. Absent body = original flow.
+  // Validated as a UUID here, so a malformed value is the caller's 422 and
+  // never Postgres's 22P02 dressed as a 500.
+  let actualSiteId: string | null = null;
+  try {
+    const body = (await c.req.json()) as { actualSiteId?: unknown };
+    if (typeof body?.actualSiteId === "string") {
+      const parsed = z.string().uuid().safeParse(body.actualSiteId);
+      if (!parsed.success) {
+        return c.json(
+          {
+            error: "invalid_input",
+            code: "invalid_param",
+            message: "actualSiteId must be a warehouse id",
+            field: "actualSiteId",
+          },
+          422,
+        );
+      }
+      actualSiteId = parsed.data;
+    }
+  } catch {
+    /* no body — fine */
+  }
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("warehouse_receipt_check_in", {
     p_receipt_id: c.req.param("id"),
+    p_actual_site_id: actualSiteId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/**
+ * GET /duty — who may save a Receiving today (0425 `receiving_actor_context`).
+ *
+ * The page consumes the RESOLVED owner; it never reads a rota or computes an
+ * offset (ERP-ARCHITECTURE Law F.1). Names ride along so the chip can speak.
+ */
+warehouseReceiptsRouter.get("/duty", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_actor_context");
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const ctx = (data ?? {}) as Record<string, unknown>;
+  const ids = [ctx.normal_user_id, ctx.acting_user_id].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: users } = await sb
+      .from("app_users")
+      .select("id, name")
+      .in("id", ids);
+    for (const u of users ?? []) names.set(u.id as string, u.name as string);
+  }
+  return c.json({
+    ...ctx,
+    normal_user_name: ctx.normal_user_id
+      ? (names.get(ctx.normal_user_id as string) ?? null)
+      : null,
+    acting_user_name: ctx.acting_user_id
+      ? (names.get(ctx.acting_user_id as string) ?? null)
+      : null,
+  });
+});
+
+/**
+ * GET /:id — one Receiving Session / GRN record: the row, its per-Unit
+ * results and its append-only events, names resolved.
+ */
+warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  const { data: row, error } = await sb
+    .from("warehouse_receipts")
+    .select(
+      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!row) return c.json({ error: "receipt not found" }, 404);
+  const r = row as ReceiptRow;
+
+  const [{ data: units }, { data: evs }, { data: po }] = await Promise.all([
+    sb
+      .from("receiving_unit_results")
+      .select("stock_item_id, unit_code, outcome, issue_kind, note")
+      .eq("receipt_id", id)
+      .order("unit_code"),
+    sb
+      .from("receiving_events")
+      .select("id, receipt_id, event, actor_id, event_at, payload")
+      .eq("receipt_id", id)
+      .order("event_at", { ascending: false }),
+    sb
+      .from("purchase_orders")
+      .select("id, supplier_id, warehouse_id, destination_id, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)")
+      .eq("id", r.po_id as string)
+      .maybeSingle(),
+  ]);
+
+  const userIds = [
+    ...new Set(
+      [
+        r.submitted_by,
+        r.posted_by,
+        r.reviewed_by,
+        r.posted_duty_holder,
+        r.posted_duty_cover,
+        r.void_by,
+        ...((evs ?? []) as Array<Record<string, unknown>>).map((e) => e.actor_id),
+      ].filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  ];
+  const userNames = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: users } = await sb
+      .from("app_users")
+      .select("id, name")
+      .in("id", userIds);
+    for (const u of users ?? []) userNames.set(u.id as string, u.name as string);
+  }
+  const whIds = [r.warehouse_id, r.actual_site_id].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
+  const whNames = new Map<string, string>();
+  if (whIds.length > 0) {
+    const { data: whs } = await sb.from("warehouses").select("id, name").in("id", whIds);
+    for (const w of whs ?? []) whNames.set(w.id as string, w.name as string);
+  }
+  let doUrl: string | null = null;
+  if (typeof r.do_file_path === "string" && r.do_file_path.length > 0) {
+    try {
+      const admin = adminClient(c.env);
+      const { data: signed } = await admin.storage
+        .from("delivery-orders")
+        .createSignedUrl(r.do_file_path, SIGNED_URL_TTL_SECONDS);
+      doUrl = signed?.signedUrl ?? null;
+    } catch (e) {
+      console.error("signing receipt DO url failed (non-fatal):", e);
+    }
+  }
+  const name = (v: unknown) =>
+    typeof v === "string" && v.length > 0 ? (userNames.get(v) ?? null) : null;
+  const sup = (po as Record<string, unknown> | null)?.suppliers as
+    | { name?: string }
+    | null;
+  return c.json({
+    receipt: {
+      ...r,
+      supplier_name: sup?.name ?? null,
+      warehouse_name:
+        typeof r.warehouse_id === "string"
+          ? (whNames.get(r.warehouse_id) ?? null)
+          : null,
+      actual_site_name:
+        typeof r.actual_site_id === "string"
+          ? (whNames.get(r.actual_site_id) ?? null)
+          : null,
+      submitted_by_name: name(r.submitted_by),
+      posted_by_name: name(r.posted_by),
+      posted_duty_holder_name: name(r.posted_duty_holder),
+      posted_duty_cover_name: name(r.posted_duty_cover),
+      void_by_name: name(r.void_by),
+      do_file_url: doUrl,
+      unit_results: units ?? [],
+    },
+    po: po ?? null,
+    events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({
+      ...e,
+      actor_name: name(e.actor_id),
+    })),
+  });
+});
+
+/**
+ * POST /:id/amend — `Amend Receiving` (0426). Reason required; before/after
+ * and the safe recalculation live in the RPC; a blocked correction comes back
+ * as the RPC's named refusal.
+ */
+warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingAmendInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const d = parsed.data;
+  const changes: Record<string, unknown> = {};
+  if (d.goodsReceivedAt !== undefined) changes.goods_received_at = d.goodsReceivedAt;
+  if (d.doNumber !== undefined) changes.do_number = d.doNumber;
+  if (d.actualSiteId !== undefined) changes.actual_site_id = d.actualSiteId;
+  if (d.lines !== undefined)
+    changes.lines = d.lines.map((l) => ({ id: l.id, received_now: l.receivedNow }));
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_amend", {
+    p_receipt_id: c.req.param("id"),
+    p_reason: d.reason,
+    p_changes: changes,
+    p_save_key: d.saveKey ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data ?? {});
+});
+
+/** POST /:id/void — `Void Receiving` (0426): only for a GRN that should never
+ *  have existed. Downstream blockers refuse by name; nothing partially voids. */
+warehouseReceiptsRouter.post("/:id/void", requireOperation, async (c) => {
+  const parsed = await parseJsonBody(c, receivingVoidInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("receiving_void", {
+    p_receipt_id: c.req.param("id"),
+    p_reason: parsed.data.reason,
   });
   if (error) {
     const m = mapPgError(error);

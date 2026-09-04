@@ -1325,30 +1325,88 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN seam — OWNER CORRECTION 2026-08-29
+### 9.4 Receiving / GRN — owner instruction 2026-09-04, BUILT (merge/apply/production gated)
 
-This section supersedes the stale `Goods Receipts` rail, status legend, `Source`, `Arrival Date`,
-`Expected`, `Accepted`, `Rejected` and Receiving `Work` column proposal that formerly lived here.
-The separate Receiving owner review owns its final page presentation; Purchasing binds these shared
-facts only:
+The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
+(CARD-2026-09-04-receiving-01). **State: BUILT on `build/receiving-grn`; migrations 0425/0426 are
+PREPARED, NOT APPLIED; nothing is merged or deployed without separate owner authorisation.** The
+operating rule is:
 
-- Navigation/workspace is `Receiving`. The supplier gives the Supplier DO; Carres creates the Goods
-  Receipt and numbered GRN only after physical receiving.
-- One Receiving engine handles PO and CO arrivals. SO Batch Purchase and Manual Purchase both pass
-  through the one PO authority and this same Receiving engine; no Manual receipt lane exists.
-- Source `Deliver To` is authoritative. The normal default is the configured Carres warehouse; a
-  showroom is an explicit source exception.
-- `Goods Received At` is the physical receipt date only. It never means keyed, submitted or posted
-  time and never replaces PO Issued, PO Delivery Date or Supplier Delivery Date.
-- Quantity words are `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
-  `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
-  Pending Delivery Qty and never create available stock.
-- Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
-  creates the GRN once and moves only valid received goods into Stock custody.
-- Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
-  deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+```text
+Operation enters/checks goods in the Receiving Session
+→ Save Receiving
+→ the system posts the numbered GRN (allocate_formal_document_code('GRN'), stored grn_no)
+→ valid received Units update Inventory automatically at the Actual Site
+```
 
-No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
+- Navigation/workspace is `Receiving` (the `Goods Receipts` rail label is retired). The Register
+  is the governed template: 240px `FilterRail` (state · supplier · site facets, never
+  `Today`/`Overdue`), full-width register `DataGrid`, status footer, no `Work` column, no owner
+  avatar on rows. Opening a row shows the Receiving object or the formal GRN by state. Empty
+  history reads `No receiving activity yet.`
+- **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
+  the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
+  doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
+  and `operation_receive_po_with_do`. Every posting/review door is gated on
+  `receiving_actor_context()` (0425): **GRN Duty, its dated cover, or an Operations Superuser** —
+  at page, API and SQL. The posting stores the duty-evidence trio (normal holder · dated cover ·
+  actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
+  Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
+  record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
+  into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
+  so plainly and protected posting refuses (`no_grn_duty_holder`); the manager assigns the holder
+  in `Workspace → Staff & Duties`.
+- **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
+  formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
+  derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
+- **Save Receiving is idempotent** (`save_key`): a retried uncertain response returns the first
+  posting — never a second GRN, Unit receipt or stock movement. A retried check-in of a posted
+  session returns the first result.
+- **Per-Unit outcomes** (ERP-ARCHITECTURE §3.4): a governed expected Unit records exactly
+  `Received · Received with issue · Not received` (`receiving_unit_results`); posting flips the
+  EXACT named Units (received → free at the Actual Site; with-issue → the claim hold). Quantities
+  are DERIVED from the outcomes; a line without minted Units keeps the lawful quantity inputs.
+  Duplicate scans, foreign Units and already-received Units refuse by name. The external
+  Warehouse count uses the same outcomes: `warehouse_incoming_pos()` lists the expected Units,
+  the count modal records one physical result per Unit, and the submission carries the per-Unit
+  outcomes plus arrival photo/video evidence.
+- **Stock posts by Units only (0366 unit authority).** The receive engine flips/mints
+  `ops_stock_items`; `stock_balances` is DERIVED by the rollup triggers and is never written
+  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
+  exact-Unit binding, owned by the Stock reserve door. (0426 corrects the live engine, which
+  still carried both pre-0366 writes and would have refused any stock-posting receive.)
+- **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
+  marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
+  named, and the posting creates no AP consequence — supplier ownership is preserved, never
+  silently converted to Carres-owned.
+- **`Actual Site` never overwrites `Deliver To`.** Both facts are stored and displayed; valid
+  received Units enter Inventory at the Actual Site. `Arrival evidence` supports photo AND video
+  beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters Inventory or
+  the pending arithmetic.
+- Quantity words stay `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
+  `Pending Delivery Qty`; damaged/wrong/extra never reduce Pending Delivery Qty and never create
+  available stock. `Goods Received At` is the physical receipt date only.
+- **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) requires a reason,
+  records before/after in an append-only `amended` event, recalculates the PO counters and stock
+  safely, and refuses by name when goods moved on (`threads_block_amend` · `units_block_amend`).
+  Damaged/wrong corrections belong to their claims, not to Amend. `Void Receiving`
+  (`receiving_void`) is only for a GRN that should never have existed: full exact reversal when
+  safe, a named blocker otherwise (`claims_block_void` · `threads_block_void` ·
+  `units_block_void`), the record and number preserved forever. Every physical arrival creates a
+  NEW session and a NEW GRN — a later arrival is never edited into an earlier one.
+- **Work**: the `Goods to receive` queue projects into My Work / Team Work from two triggers only
+  — a submitted Warehouse count, and an arrived supplier date with goods still owed (outstanding
+  quantity alone never makes a row). Owner = the resolved GRN Duty; completion = the posted
+  session; lateness counts on the Warehouse calendar (Mon–Sat).
+- **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
+  (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
+  assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
+  never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
+  central report: every non-draft session with its GRN, source, site facts, totals from the
+  shared arithmetics, submitter/poster, and the `Still owed by suppliers` pending section.
+- The GRN Duty reviewer may verify/correct `Actual Site` on a submitted Warehouse count at
+  check-in; `Deliver To` is never overwritten. No Manual receipt lane exists; no approved
+  Receiving scope is deferred to a later card.
 
 ### 9.5 Supplier Claims
 

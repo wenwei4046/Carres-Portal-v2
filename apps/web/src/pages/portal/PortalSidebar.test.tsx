@@ -612,7 +612,7 @@ describe("PortalSidebar — the Purchasing map", () => {
       "SO Batch Purchase",
       "Manual Purchase",
       "Purchase Orders",
-      "Goods Receipts",
+      "Receiving",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
@@ -682,8 +682,10 @@ describe("PortalSidebar — the Purchasing map", () => {
 
   it("the rail word is `Manual Purchase`, in BUY, and the old word is gone", () => {
     renderAt("/operation?tab=receiving");
-    expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
-    expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
+    expect(screen.getByText("Receiving")).toBeInTheDocument();
+    // `Goods Receipts` retired as navigation (owner instruction 2026-09-04;
+    // ERP-ARCHITECTURE §2.1 — the GRN is a document, never a page name).
+    expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
     fireEvent.click(group_("purchasing-buy"));
     const buy = screen.getByTestId("nav-group-children-purchasing-buy");
@@ -743,7 +745,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     }
   });
 
-  it("a nested path page wins — Goods Receipts does not light next to Purchase Orders", () => {
+  it("a nested path page wins — Receiving does not light next to Purchase Orders", () => {
     renderAt("/operation/procurement");
     expect(child("purchase-orders").className).toContain("bg-kit-blue-3");
     expect(screen.queryByTestId("nav-child-receiving")).not.toBeInTheDocument();
@@ -800,7 +802,7 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
     expect(child("receiving").className).toContain("bg-kit-blue-3");
 
-    fireEvent.click(module_("purchasing")); // shut it, still on Goods Receipts
+    fireEvent.click(module_("purchasing")); // shut it, still on Receiving
     expect(module_("purchasing").className).toContain("bg-kit-blue-3");
     expect(module_("purchasing").querySelector(".bg-kit-blue-9")).not.toBeNull();
   });
@@ -859,7 +861,7 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
   });
 
   /* GOODS RECEIPTS — the one-page drawer. RECEIVE must force itself open. */
-  it("arriving at Goods Receipts opens Purchasing + RECEIVE and lights ONE row", () => {
+  it("arriving at Receiving opens Purchasing + RECEIVE and lights ONE row", () => {
     renderAt("/operation?tab=receiving");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
@@ -992,7 +994,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       const icon = screen.getByTitle("Purchasing") as HTMLAnchorElement;
       // Named, never derived: the landing page does not move when row order does.
       expect(icon).toHaveAttribute("href", "/operation?tab=purchase");
-      // Standing on Goods Receipts still lights the module's one icon.
+      // Standing on Receiving still lights the module's one icon.
       expect(icon.className).toContain("bg-kit-blue-3");
       expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
     } finally {
@@ -1007,7 +1009,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
       expect(screen.queryByTestId("nav-group-purchasing-buy")).not.toBeInTheDocument();
       expect(screen.queryByText("BUY")).not.toBeInTheDocument();
-      expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
+      expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
       expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
       expect(screen.queryByText("SHOWROOM")).not.toBeInTheDocument();
     } finally {
