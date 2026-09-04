@@ -1798,11 +1798,12 @@ describe("Card 04 · selection and PO Duty", () => {
   it("a dead tick says why, in the row, beside the status word", async () => {
     await loaded();
     const reasons = screen.getAllByTestId("mp-row-dead-reason").map((el) => el.textContent);
-    // REQ-0001 waits; REQ-0003 is ordered; REQ-0002 may be ticked, so no sentence.
-    expect(reasons).toEqual(["Waiting for approval.", "Ordered."]);
+    // REQ-0003 is ordered. REQ-0002 may be ticked, so no sentence. REQ-0001
+    // waits, and its cell already says `Need approval`: no second line.
+    expect(reasons).toEqual(["Ordered."]);
     expect(
       screen.getByTestId(`mp-select-${REQ1}`).closest("tr")!.textContent,
-    ).toContain("Waiting for approval.");
+    ).not.toContain("Waiting for approval.");
   });
 
   it("MPR-20260904-8935: approved at 0 prints the cause, and no tick is live", async () => {

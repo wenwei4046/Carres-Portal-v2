@@ -465,9 +465,13 @@ export default function OperationManualPurchase() {
   );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
-  /** The sentence beside a row the tick refuses; null when it may be ticked. */
+  /** The sentence beside a row the tick refuses; null when it may be ticked.
+   *  A row still waiting for approval already says so in the same cell, so
+   *  it gets no second line. */
   const deadReason = (r: RequestRegisterRow) =>
-    manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
+    r.status.kind === "waiting_approval"
+      ? null
+      : manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
   const selectedRows = useMemo(
     () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
     [filtered, selected],
