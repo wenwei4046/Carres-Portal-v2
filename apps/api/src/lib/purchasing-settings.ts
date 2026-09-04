@@ -28,8 +28,9 @@ interface SettingsRow {
   earliest_sell_days: number;
   logistics_call_working_days: number;
   po_days: number[];
-  /** 0422 — CALENDAR days after the Proceed Date; 0 means no floor. */
-  manual_purchase_min_delivery_days: number;
+  /** 0423 — CALENDAR days after the Proceed Date; 0 means no floor. Read
+   *  on its own; absent until the migration is applied. */
+  manual_purchase_min_delivery_days?: number | null;
 }
 
 /**
@@ -45,9 +46,7 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
 }> {
   const { data, error } = await sb
     .from("purchasing_settings")
-    .select(
-      "order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days, manual_purchase_min_delivery_days",
-    )
+    .select("order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days")
     .eq("id", 1)
     .maybeSingle();
   if (error) throw new Error(`purchasing_settings: ${error.message}`);
@@ -58,9 +57,6 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
     earliestSellDays: Number(row.earliest_sell_days),
     logisticsCallWorkingDays: Number(row.logistics_call_working_days),
     poDays: (row.po_days ?? []).map(Number),
-    /* 0422 — calendar days after the Proceed Date. 0 (the default) means
-       no floor, which is exactly the pre-0422 behaviour. */
-    manualPurchaseMinDeliveryDays: Number(row.manual_purchase_min_delivery_days),
   };
   // A row that is not a row (a shape change, a partial select) must SAY so.
   // Letting a NaN through would plan every order against a nonsense date and
@@ -69,7 +65,34 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
     if (Array.isArray(v)) continue;
     if (!Number.isFinite(v)) throw new Error(`purchasing_settings.${k} is not a number`);
   }
-  return numbers;
+  return { ...numbers, manualPurchaseMinDeliveryDays: await loadManualPurchaseMinDays(sb) };
+}
+
+/**
+ * The Manual Purchase floor, read on its own so that it cannot take the
+ * rest of Purchasing down.
+ *
+ * The column arrives with migration 0423. The code that reads it deployed
+ * first (4 Sep 2026), and because it sat in the same SELECT as the four
+ * numbers above, the SO Batch buying list, the orders routes and the POS
+ * gate all failed with "column does not exist" until the SQL was pasted.
+ * A Manual Purchase-only number must never decide whether a customer order
+ * can be planned. A missing column, or a missing value, reads as 0: no
+ * floor, which is the pre-0423 behaviour.
+ */
+async function loadManualPurchaseMinDays(sb: SupabaseClient): Promise<number> {
+  const { data, error } = await sb
+    .from("purchasing_settings")
+    .select("manual_purchase_min_delivery_days")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) {
+    console.warn("purchasing_settings.manual_purchase_min_delivery_days unreadable; using 0", error.message);
+    return 0;
+  }
+  const v = (data as Partial<SettingsRow> | null)?.manual_purchase_min_delivery_days;
+  const n = v == null ? 0 : Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**

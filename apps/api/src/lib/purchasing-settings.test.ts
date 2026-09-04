@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadPurchasingSettings } from "./purchasing-settings";
+import { loadPurchasingNumbers, loadPurchasingSettings } from "./purchasing-settings";
 
 function fakeClient(rows: Record<string, unknown[]>): SupabaseClient {
   return {
@@ -84,5 +84,40 @@ describe("loadPurchasingSettings — Deliver To master data", () => {
         warehouseLinked: false,
       },
     ]);
+  });
+});
+
+describe("loadPurchasingNumbers — the Manual Purchase floor cannot take Purchasing down (2026-09-04)", () => {
+  const core = { order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] };
+
+  it("reads 0 when the 0423 column is not there yet", async () => {
+    /* The row exists but the column does not: exactly production between the
+       deploy and the SQL paste. Every other number still loads. */
+    const n = await loadPurchasingNumbers(fakeClient({ purchasing_settings: [core] }));
+    expect(n.earliestSellDays).toBe(21);
+    expect(n.manualPurchaseMinDeliveryDays).toBe(0);
+  });
+
+  it("reads 0 when the column read itself errors, and the number when it is there", async () => {
+    let calls = 0;
+    const sb = {
+      from() {
+        calls += 1;
+        const mine = calls;
+        const b: Record<string, unknown> = {
+          select: () => b,
+          eq: () => b,
+          maybeSingle: async () =>
+            mine === 1
+              ? { data: core, error: null }
+              : { data: null, error: { message: "column purchasing_settings.manual_purchase_min_delivery_days does not exist" } },
+        };
+        return b;
+      },
+    } as unknown as SupabaseClient;
+    const n = await loadPurchasingNumbers(sb);
+    expect(n.manualPurchaseMinDeliveryDays).toBe(0);
+    const ok = await loadPurchasingNumbers(fakeClient({ purchasing_settings: [{ ...core, manual_purchase_min_delivery_days: 14 }] }));
+    expect(ok.manualPurchaseMinDeliveryDays).toBe(14);
   });
 });
