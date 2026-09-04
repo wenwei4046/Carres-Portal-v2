@@ -1258,8 +1258,24 @@ commitment. `PO Delivery Date` is the original official supplier-facing date on 
 `Supplier Delivery Date` Register column appears only when the supplier has changed that date;
 unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
 any of these dates.
-**Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
-Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
+**Columns — APPROVED 2026-09-04, in this order:** PO No, PO Issued, Supplier, Source, Deliver To,
+PO Delivery Date, Supplier Delivery Date when changed, Order Qty, Received Qty,
+Pending Delivery Qty, PO Version, Sent to Supplier. The Register lists authoritative facts only:
+no `Work` column, no action sentence, no owner avatar or duty holder on any row — actions live in
+My Work, Team Work, the Purchase Order detail and Order Route, unchanged.
+**Quantity facts:** `Order Qty` is the total on the current PO. `Received Qty` is the correct and
+accepted quantity posted through Receiving. `Pending Delivery Qty` = Order Qty − Received Qty,
+pieces of goods, never a money balance; damaged, wrong and extra goods are separate receiving
+facts and never reduce it. The footer totals use these same three words.
+**PO Version fact:** the current OFFICIAL document version, printed `PO V1` · `PO V2` · `PO V3` —
+never `Version 1`, `Current Version` or `PDF Version 1`, and never the WhatsApp/email copy.
+**Sent to Supplier fact:** the latest exact PO version with `confirmed_sent` evidence, with the
+channel and date as its evidence second line (`PO V1` / `WhatsApp · Thu, 4 Sep`); no confirmed
+send ever — including a legacy PO that received goods without one — reads `Not sent`, and missing
+evidence stays visibly missing. Opening, downloading or previewing the PDF proves nothing, and the
+system never claims the supplier read or accepted the PO — only which version Carres sent, through
+which channel, to which recipient, when and by whom. `PO Version` beside `Sent to Supplier` makes
+a version mismatch (`PO V2` vs `PO V1`) immediately visible.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record supplier date or exception → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,

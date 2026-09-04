@@ -54,7 +54,11 @@ export interface PurchaseOrderRegisterFacts {
   quantities: { ordered: number; received: number; open: number };
   currentSend: PurchaseOrderRegisterSend | null;
   latestConfirmedSend: PurchaseOrderRegisterSend | null;
-  supplierHas: string;
+  /** The latest PO version with confirmed-send evidence — `PO V{n}`, or `Not
+   *  sent` when no version has ever been confirmed sent. A PO that received
+   *  goods without a send record stays honestly `Not sent`; missing evidence
+   *  is never fabricated. */
+  sentToSupplier: string;
   documentState: "Not sent to supplier" | "Issued" | "Completed" | "Cancelled";
   operationStatus: PurchaseOrderOperationStatus | null;
   filters: PurchaseOrderRegisterFilter[];
@@ -123,7 +127,7 @@ export function purchaseOrderRegisterFacts(
     quantities: { ordered, received, open },
     currentSend,
     latestConfirmedSend,
-    supplierHas: supplierVersion == null ? "No current PDF" : `Version ${supplierVersion}`,
+    sentToSupplier: supplierVersion == null ? "Not sent" : `PO V${supplierVersion}`,
     documentState: cancelled
       ? "Cancelled"
       : completed
@@ -148,8 +152,8 @@ export function purchaseOrderWork(
   if (facts.operationStatus === "Completed" || facts.operationStatus === "Cancelled") return null;
   if (facts.filters.includes("supplier_update_required")) {
     return {
-      problem: `Version ${facts.version} has not been sent`,
-      action: `Issue Version ${facts.version} to ${input.supplierName}`,
+      problem: `PO V${facts.version} has not been sent`,
+      action: `Issue PO V${facts.version} to ${input.supplierName}`,
     };
   }
   if (facts.filters.includes("pdf_not_sent")) {

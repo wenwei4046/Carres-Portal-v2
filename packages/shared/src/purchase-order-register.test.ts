@@ -51,11 +51,23 @@ describe("Purchase Order Register authority", () => {
     }, "2026-08-28");
 
     expect(facts.filters).toContain("supplier_update_required");
-    expect(facts.supplierHas).toBe("Version 1");
+    expect(facts.sentToSupplier).toBe("PO V1");
     expect(purchaseOrderWork({ ...base, version: 2, sends: base.sends }, facts)).toEqual({
-      problem: "Version 2 has not been sent",
-      action: "Issue Version 2 to Hooka",
+      problem: "PO V2 has not been sent",
+      action: "Issue PO V2 to Hooka",
     });
+  });
+
+  it("received goods without a confirmed-send record stay honestly Not sent", () => {
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      status: "received",
+      lines: [{ qty: 3, receivedQty: 3 }],
+      sends: [],
+    }, "2026-08-28");
+
+    expect(facts.sentToSupplier).toBe("Not sent");
+    expect(facts.latestConfirmedSend).toBeNull();
   });
 
   it("derives ordered, received and open balance from governed line quantities", () => {

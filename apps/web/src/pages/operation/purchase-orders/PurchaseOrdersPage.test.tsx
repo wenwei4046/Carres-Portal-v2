@@ -198,6 +198,7 @@ vi.mock("@/lib/queries", () => ({
 vi.mock("../components/PoIssueEvidence", () => ({
   default: () => <div data-testid="po-issue-evidence">Issue evidence</div>,
   doorsForIssuedPo: () => ({}),
+  CHANNEL_WORD: { whatsapp: "WhatsApp", email: "Email", print: "Printed" },
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
@@ -246,9 +247,16 @@ beforeEach(() => {
 describe("Purchase Orders Register", () => {
   it("uses the governed columns and filter rail, and does not hide old or cancelled POs", () => {
     renderPage();
-    expect(screen.getByTestId("register-grid")).toHaveTextContent(
-      "PO No. | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Ordered | Received | Open Balance | Current Version | Supplier Has | Work",
+    const grid = screen.getByTestId("register-grid");
+    expect(grid).toHaveTextContent(
+      "PO No | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Order Qty | Received Qty | Pending Delivery Qty | PO Version | Sent to Supplier",
     );
+    /* The retired words may not come back: ERP jargon (`Open Balance` reads as
+       money) and the Work column (a Register lists facts; actions live in
+       My Work, Team Work, the PO detail and Order Route). */
+    for (const retired of ["Ordered |", "Open Balance", "Current Version", "Supplier Has", "| Work"]) {
+      expect(grid).not.toHaveTextContent(retired);
+    }
     const rail = within(screen.getByTestId("po-filter-rail"));
     for (const word of [
       "All purchase orders",
@@ -321,12 +329,45 @@ describe("Purchase Orders Register", () => {
     changed.unmount();
   });
 
-  it("shows two-line work copy with structured real-roster owner metadata", () => {
+  it("lists facts only: no action sentence and no owner avatar in any register cell", () => {
     renderPage();
     const row = screen.getByTestId("grid-row-PO-20260828-4827");
-    expect(row).toHaveTextContent("Version 2 has not been sent");
-    expect(row).toHaveTextContent("Issue Version 2 to Hooka");
-    expect(row.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
+    expect(row).not.toHaveTextContent("has not been sent");
+    expect(row).not.toHaveTextContent("Issue");
+    expect(row.querySelector("[data-owner-id]")).toBeNull();
+  });
+
+  it("shows the current official version as PO V{n} and the latest confirmed-sent version beside it", () => {
+    renderPage();
+    const row = screen.getByTestId("grid-row-PO-20260828-4827");
+    /* The official document is V2; only V1 was ever confirmed sent — the
+       mismatch is two visibly different values, `PO V2` against `PO V1`,
+       with the send evidence (channel · date) on the second line. */
+    expect(row).toHaveTextContent("PO V2");
+    expect(row).toHaveTextContent("PO V1");
+    expect(row).toHaveTextContent("WhatsApp · Thu, 27 Aug");
+    expect(row).not.toHaveTextContent("Version 2");
+  });
+
+  it("keeps missing send evidence visibly missing instead of fabricating it", () => {
+    renderPage();
+    /* PO-LEGACY has no confirmed-send record; it reads `Not sent` forever. */
+    expect(screen.getByTestId("grid-row-PO-LEGACY")).toHaveTextContent("Not sent");
+  });
+
+  it("totals the footer with the approved quantity words", () => {
+    renderPage();
+    expect(screen.getByTestId("register-grid")).toHaveTextContent(
+      "2 purchase orders · Order Qty 3 · Received Qty 1 · Pending Delivery Qty 2",
+    );
+  });
+
+  it("keeps the work copy in the PO detail, where actions live", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const work = screen.getByTestId("po-object-work");
+    expect(work).toHaveTextContent("PO V2 has not been sent");
+    expect(work).toHaveTextContent("Issue PO V2 to Hooka");
+    expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
   });
 
   it("keeps every governed source searchable while the register cell stays compact", () => {
@@ -528,7 +569,7 @@ describe("Purchase Order object", () => {
     fireEvent.change(screen.getByLabelText("Why"), {
       target: { value: "Send this line to Penang" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save Version 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Send this line to Penang",
@@ -552,7 +593,7 @@ describe("Purchase Order object", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revise" }));
     fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Customer quantity changed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save Version 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Customer quantity changed",

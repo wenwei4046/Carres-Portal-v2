@@ -680,9 +680,14 @@ directory only and said so.*
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
   readable colour. It is not metadata and may not fall below the accessible contrast floor.
-  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18:** registers list
-  documents; the action clause renders only where actions live (My Work · Team Work · the Order
-  Route · detail panels), never in a register cell.
+  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18; extended 2026-09-04:**
+  registers list documents and authoritative facts; the action clause renders only where actions
+  live (My Work · Team Work · the Order Route · detail panels), never in a register cell — and
+  neither does an owner avatar, an owner name or a duty holder: a Register has no `Work` column.
+  A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
+  instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
+  avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
+  My Work, Team Work, the PO detail and Order Route.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one

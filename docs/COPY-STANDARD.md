@@ -1904,10 +1904,27 @@ roles run their whole lifecycle on it.
 | Demand somebody has consciously reviewed and delayed | region **`Purchasing on Hold`** · row fact **`On hold until {date}`**, carrying **Held by** · **Reason** · **Held time** · **Resume date** | Snoozed · Paused · Excluded · Hidden · Pending |
 | An item whose supplier cannot be worked out | **`Supplier not assigned`** — a FACT, under Missing Configuration. Supporting line: `Assign a supplier before this item can enter the purchasing plan.` | Orphan · Unknown supplier · Invalid SKU · Supplier error |
 
-### The Purchase Orders Register's Work words — owner ruling 2026-08-22
+### The Purchase Orders Register words — owner ruling 2026-09-04 (overwrites the 2026-08-22 Work column)
 
-The column is **`Work`**, not `Current Action`, `Next Action`, `Status`, `Priority` or a
-one-word instruction. It renders the shared structured Action contract in two lines:
+**The Register has NO `Work` column.** A Register lists documents and authoritative facts; actions
+live in My Work, Team Work, the Purchase Order detail and Order Route (the shared UI law in
+`docs/ui/MASTER.md`). No register cell carries an action sentence, an owner avatar, an owner name
+or a duty holder. A cell's second line is supporting EVIDENCE only (`PO V1` / `WhatsApp · Thu, 4
+Sep`), never an instruction (`PO V1` / `Send the new version to supplier` is banned as a cell).
+
+| Fact | Canonical word | Do NOT use |
+|---|---|---|
+| Total quantity on the current PO | **`Order Qty`** | Ordered (as this column) · Qty |
+| Correct and accepted quantity posted through Receiving | **`Received Qty`** | Received (bare) |
+| Order Qty − Received Qty — pieces, never money | **`Pending Delivery Qty`** | Open Balance · Open · Outstanding |
+| The current official document version | **`PO Version`**, valued `PO V1` · `PO V2` · `PO V3` | Current Version · Version 1 · PDF Version 1 |
+| The latest PO version with `confirmed_sent` evidence, channel · date as the evidence line; else `Not sent` | **`Sent to Supplier`** | Supplier Has · No current PDF |
+
+The footer totals speak the same three quantity words. Damaged, wrong and extra goods are separate
+receiving facts and never reduce `Pending Delivery Qty`.
+
+The structured work sentences survive unchanged where actions live — My Work, Team Work, the PO
+detail's work card and Order Route:
 
 | Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
@@ -1915,7 +1932,7 @@ one-word instruction. It renders the shared structured Action contract in two li
 | `Supplier date is missing` | `Ask {supplier} for the delivery date` |
 | `The supplier date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
-| `Version {n} has not been sent` | `Issue Version {n} to {supplier}` |
+| `PO V{n} has not been sent` | `Issue PO V{n} to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
 
 The avatar is metadata, not part of the sentence. The PO and supplier are not repeated where their
