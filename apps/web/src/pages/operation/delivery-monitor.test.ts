@@ -506,6 +506,19 @@ describe("buildMonitorRails", () => {
     expect(rails.logistics.find((r) => r.key === "none")!.count).toBe(4);
   });
 
+  it("REGION keeps the ruled grammar — fixed sub-headings, East Malaysia and Singapore always visible", () => {
+    const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
+    const keys = rails.regions.map((r) => r.key);
+    expect(keys).toContain("__east__");
+    expect(keys).toContain("Sabah");
+    expect(keys).toContain("Sarawak");
+    expect(keys).toContain("__sg__");
+    expect(keys).toContain("Singapore");
+    expect(rails.regions.find((r) => r.key === "__east__")!.heading).toBe(true);
+    // Labuan joins only while it holds a card.
+    expect(keys).not.toContain("Labuan");
+  });
+
   it("keeps the governed roster visible at zero and lists no-logistics last", () => {
     const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
     const labels = rails.logistics.map((r) => r.label);

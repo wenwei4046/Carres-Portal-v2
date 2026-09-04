@@ -334,16 +334,29 @@ export default function OperationDelivery() {
         />
       </RailGroup>
       <RailGroup title={MONITOR_COPY.railRegion}>
-        {rails.regions.map((item) => (
-          <RailItem
-            key={item.key}
-            label={item.label}
-            count={item.count}
-            active={filters.region === item.key}
-            onClick={() => toggleParam("region", item.key)}
-            testId={`delivery-monitor-region-${item.key}`}
-          />
-        ))}
+        {rails.regions.map((item) =>
+          item.heading ? (
+            /* A sub-heading (EAST MALAYSIA · SINGAPORE, owner ruling
+               2026-09-01) separates the different journeys from the plain
+               Peninsular states. It is not a filter and takes no click. */
+            <div
+              key={item.key}
+              className="mt-1 px-2 pt-1 text-label font-medium tracking-wide text-kit-slate-9"
+              data-testid={`delivery-monitor-region-heading-${item.key}`}
+            >
+              {item.label}
+            </div>
+          ) : (
+            <RailItem
+              key={item.key}
+              label={item.label}
+              count={item.count}
+              active={filters.region === item.key}
+              onClick={() => toggleParam("region", item.key)}
+              testId={`delivery-monitor-region-${item.key}`}
+            />
+          ),
+        )}
       </RailGroup>
       <RailGroup title={MONITOR_COPY.railLogistics}>
         {rails.logistics.map((item) => (

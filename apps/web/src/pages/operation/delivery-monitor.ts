@@ -34,7 +34,10 @@ import type { DeliveryWorkStatusKind } from "@carres/shared";
 import {
   buildDeliveryScopeRows,
   regionBucketOf,
+  DW,
+  EAST_MALAYSIA_STATES,
   GOVERNED_LOGISTICS,
+  SINGAPORE_KEY,
   type DeliveryScopeRow,
   type ScopeInputs,
 } from "./delivery-work";
@@ -334,6 +337,9 @@ export interface MonitorRailRow {
   key: string;
   label: string;
   count: number;
+  /** A non-clickable sub-heading row (REGION's `EAST MALAYSIA` / `SINGAPORE`,
+   *  owner ruling 2026-09-01). It filters nothing and counts nothing. */
+  heading?: boolean;
 }
 
 export interface MonitorRails {
@@ -371,15 +377,33 @@ export function buildMonitorRails(
   const forRegion = cards.filter((c) => survives(c, "region"));
   const forLogistics = cards.filter((c) => survives(c, "logistics"));
 
+  /* REGION keeps the workspace rail's OWN ruled grammar (owner ruling
+     2026-09-01): Peninsular states by their own names ordered by count,
+     then the fixed EAST MALAYSIA sub-heading with Sabah and Sarawak always
+     visible (Labuan only while it holds one), then the fixed SINGAPORE
+     sub-heading with Singapore always visible. */
   const regionCounts = new Map<string, number>();
   for (const c of forRegion) {
     if (c.region) regionCounts.set(c.region, (regionCounts.get(c.region) ?? 0) + 1);
   }
   /* A PICKED ROW NEVER DISAPPEARS — a chosen region stays listed at 0. */
   if (filters.region && !regionCounts.has(filters.region)) regionCounts.set(filters.region, 0);
+  const east = new Set<string>(EAST_MALAYSIA_STATES);
   const regions: MonitorRailRow[] = [...regionCounts.entries()]
+    .filter(([key]) => key !== SINGAPORE_KEY && !east.has(key))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([key, count]) => ({ key, label: key, count }));
+  regions.push({ key: "__east__", label: DW.railEastMalaysia, count: 0, heading: true });
+  for (const s of EAST_MALAYSIA_STATES) {
+    if (s === "Labuan" && !(regionCounts.get(s) ?? 0) && filters.region !== s) continue;
+    regions.push({ key: s, label: s, count: regionCounts.get(s) ?? 0 });
+  }
+  regions.push({ key: "__sg__", label: DW.railSingapore, count: 0, heading: true });
+  regions.push({
+    key: SINGAPORE_KEY,
+    label: SINGAPORE_KEY,
+    count: regionCounts.get(SINGAPORE_KEY) ?? 0,
+  });
 
   /* LOGISTICS — the governed roster is ALWAYS visible, count or no count (the
      workspace's own law); an ungoverned partner joins only while it carries a
