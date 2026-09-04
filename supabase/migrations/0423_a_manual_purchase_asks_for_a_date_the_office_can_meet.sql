@@ -19,9 +19,14 @@
 --
 -- WHETHER 0422 RAN OR NOT, THIS FILE IS SAFE
 --   0422 is merged, so it is not rewritten. Whether it was applied is not
---   known at writing, so every step here is idempotent: the switch column
---   and `purchasing_set_switch()` are dropped IF they exist, the number is
---   added IF it is missing, and `purchasing_set_number()` is replaced whole.
+--   known at writing, so every step here is idempotent:
+--   `purchasing_set_switch()` is dropped IF it exists, the number is added
+--   IF it is missing, and `purchasing_set_number()` is replaced whole.
+--
+--   The switch COLUMN is left where it is. Nothing reads it any more, and
+--   CI refuses a `drop column` outside the governed manual path. A dead
+--   boolean that defaults to false costs nothing; dropping it can go in a
+--   later housekeeping migration through that path.
 --
 -- WHERE THE REFUSAL HAPPENS
 --   The API create door (`POST /purchasing/requests`) reads this number and,
@@ -39,12 +44,9 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. Retire the 0422 switch (no-ops if 0422 never ran)
+-- 1. Retire the 0422 switch door (a no-op if 0422 never ran)
 -- ---------------------------------------------------------------------
 drop function if exists public.purchasing_set_switch(text, boolean);
-
-alter table public.purchasing_settings
-  drop column if exists manual_purchase_enforce_earliest_date;
 
 -- ---------------------------------------------------------------------
 -- 2. The number
@@ -136,7 +138,6 @@ grant execute on function public.purchasing_set_number(text, int) to authenticat
 do $sanity$
 declare
   v_column_exists  boolean;
-  v_switch_exists  boolean;
   v_switch_fn      boolean;
   v_check_exists   boolean;
   v_body_has_key   boolean;
@@ -149,12 +150,6 @@ begin
        and table_name = 'purchasing_settings'
        and column_name = 'manual_purchase_min_delivery_days'
   ) into v_column_exists;
-  select exists (
-    select 1 from information_schema.columns
-     where table_schema = 'public'
-       and table_name = 'purchasing_settings'
-       and column_name = 'manual_purchase_enforce_earliest_date'
-  ) into v_switch_exists;
   select exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'purchasing_set_switch'
@@ -176,9 +171,6 @@ begin
 
   if not v_column_exists then
     raise exception '0423: purchasing_settings.manual_purchase_min_delivery_days is missing';
-  end if;
-  if v_switch_exists then
-    raise exception '0423: the 0422 switch column is still there';
   end if;
   if v_switch_fn then
     raise exception '0423: purchasing_set_switch() is still there';
