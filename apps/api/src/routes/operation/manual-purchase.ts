@@ -78,6 +78,14 @@ function todayMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
+/** `iso` + n CALENDAR days — the same day arithmetic `earliest_sell_days`
+ *  is counted in (0422). No working-day walk: the number is calendar days. */
+function plusCalendarDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * THE SERVER DATE PROJECTION (Card 06 §3) — one place stamps every demand
  * line with its date-plan facts, so the Register, the object and the Work
@@ -558,9 +566,11 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
        and the honest date-plan availability fact. */
     todayIso: todayMyt(),
     planUnavailable,
-    /* 0422 — the Purchasing Settings switch. When on, the create form mirrors
-       the server's refusal under the date field; the door refuses regardless. */
-    enforceEarliestDate: settings?.manualPurchaseEnforceEarliestDate === true,
+    /* 0422 — Purchasing Settings' `manual_purchase_min_delivery_days`
+       (calendar days after the Proceed Date). The create form mirrors the
+       door's refusal under the date field; the door refuses regardless.
+       Settings unavailable: 0, no floor — the same answer the door gives. */
+    minDeliveryDays: settings?.manualPurchaseMinDeliveryDays ?? 0,
   });
 });
 
@@ -1116,34 +1126,30 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName, lines,
   } = parsed.data;
 
-  /* ⭐ 0422 — A MANUAL PURCHASE MAY NOT ASK FOR GOODS BEFORE THEY CAN ARRIVE
-     (YH, 2026-09-04). The plan proposes the earliest Delivery Date (the
-     latest line arrival across the picked SKUs); until now nothing refused a
-     date EARLIER than that proposal. When the Purchasing Settings switch is
-     on, this door refuses it BEFORE any row is written, using the SAME
-     arithmetic the `/plan` handler answers with (`datePlanFor` — Law D: one
-     derived fact, one arithmetic).
+  /* ⭐ 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+     (YH, 2026-09-04; owner ruling: a NUMBER, not a switch). Purchasing
+     Settings holds `manual_purchase_min_delivery_days` — CALENDAR days, like
+     `earliest_sell_days`. The floor is the Proceed Date (today in Malaysia,
+     the date this request is created on — the same `todayMyt()` the `/plan`
+     preview shows as Proceed Date) + that many days. 0 means no floor.
+     The lead-time plan's `deliveryDateDefault` stays a proposal only; the
+     two are NOT combined.
 
-     No floor, no refusal: when the settings cannot be loaded, or any picked
-     SKU has no complete lead facts, `deliveryDateDefault` is null and the
-     door lets the create RPC decide as before. Inventing a floor from a
-     partial plan would refuse against a date nobody computed. */
-  if (lines && lines.length > 0) {
-    let settings: LoadedPurchasingSettings | null = null;
+     Refused HERE, before any row is written, in the same words the form
+     prints under the date field. If the settings cannot be loaded there is
+     no number to measure against, so the door lets the create RPC decide
+     as before — it refuses nothing it cannot compute. */
+  {
+    let minDeliveryDays = 0;
     try {
-      settings = await loadPurchasingSettings(sb);
+      minDeliveryDays = (await loadPurchasingSettings(sb)).manualPurchaseMinDeliveryDays;
     } catch (e) {
-      console.error("manual purchase — date plan unavailable", (e as Error).message);
+      console.error("manual purchase — purchasing settings unavailable", (e as Error).message);
     }
-    if (settings?.manualPurchaseEnforceEarliestDate === true) {
-      const plan = await datePlanFor(sb, settings, [...new Set(lines.map((l) => l.sku))]);
-      if (!plan.ok) return c.json(plan.body, plan.status);
-      const earliest = plan.deliveryDateDefault;
-      if (earliest != null && requiredBy < earliest) {
-        return refuse(c, 422, "delivery_date_before_earliest", {
-          date: requiredBy,
-          earliest,
-        });
+    if (minDeliveryDays > 0) {
+      const earliest = plusCalendarDays(todayMyt(), minDeliveryDays);
+      if (requiredBy < earliest) {
+        return refuse(c, 422, "delivery_date_before_earliest", { date: requiredBy, earliest });
       }
     }
   }
@@ -1268,95 +1274,6 @@ manualPurchaseRouter.post("/:id/lines", requireOperation, async (c) => {
 
 /** The create form's plan read may name up to this many distinct SKUs —
  *  far above any real request, far below a scraping loop. */
-/**
- * THE ONE DATE ARITHMETIC of the create lane (Law D). `POST /plan` answers
- * with it, and `POST /` (0422) refuses with it — so the date the form was
- * told is the earliest is the very date the door measures against.
- *
- * Per asked SKU: the Catalog supplier × category, the configured
- * production/transit numbers (null where nobody set one), and the arrival
- * from the ONE forward planner. `deliveryDateDefault` is the LATEST line
- * arrival, and ONLY when every asked SKU resolves and has complete Settings —
- * a partial plan proposes nothing and refuses nothing.
- */
-async function datePlanFor(
-  sb: ReturnType<typeof userClient>,
-  settings: LoadedPurchasingSettings | null,
-  skus: readonly string[],
-  proceedDate: string = todayMyt(),
-): Promise<
-  | {
-      ok: true;
-      lines: Array<{
-        sku: string;
-        supplierId: string | null;
-        supplierName: string | null;
-        category: string | null;
-        productionDays: number | null;
-        transitDays: number | null;
-        arrival: string | null;
-      }>;
-      deliveryDateDefault: string | null;
-    }
-  | { ok: false; status: ReturnType<typeof mapPgError>["status"]; body: ReturnType<typeof mapPgError>["body"] }
-> {
-  /* Read whole and matched here — no free-text SKU in a PostgREST `.in()`
-     (live rows carry a double quote, `Leg 4"`). */
-  const [catRes, supRes] = await Promise.all([
-    sb.from("product_skus").select("sku, supplier_id, product_models(category)"),
-    sb.from("suppliers").select("id, name"),
-  ]);
-  if (catRes.error) return { ok: false, ...mapPgError(catRes.error) };
-  if (supRes.error) return { ok: false, ...mapPgError(supRes.error) };
-  const catalogBySku = new Map(
-    (catRes.data ?? []).map((r) => [
-      r.sku as string,
-      {
-        supplierId: (r.supplier_id as string | null) ?? null,
-        category:
-          ((r.product_models as unknown as { category: string | null } | null)
-            ?.category as string | null) ?? null,
-      },
-    ]),
-  );
-  const supplierName = new Map(
-    (supRes.data ?? []).map((s) => [s.id as string, (s.name as string | null) ?? null]),
-  );
-
-  const lines = skus.map((sku) => {
-    const cat = catalogBySku.get(sku);
-    const supplierId = cat?.supplierId ?? null;
-    const category = cat?.category ?? null;
-    const productionDays =
-      settings != null ? productionWorkingDaysFor(settings, supplierId, category) : null;
-    const transitDays = settings != null ? transitDaysFor(settings, supplierId) : null;
-    return {
-      sku,
-      supplierId,
-      supplierName: supplierId ? (supplierName.get(supplierId) ?? null) : null,
-      category,
-      productionDays,
-      transitDays,
-      /* The ONE forward arithmetic (`expectedArrivalOf`) from the preview
-         Proceed Date — null is a real answer, never a guessed arrival. */
-      arrival:
-        settings != null
-          ? expectedArrivalOf(settings, { supplierId, category, fromIso: proceedDate })
-          : null,
-    };
-  });
-
-  const complete = lines.every((l) => l.arrival != null);
-  const deliveryDateDefault = complete
-    ? lines.reduce<string | null>(
-        (latest, l) => (latest == null || l.arrival! > latest ? l.arrival! : latest),
-        null,
-      )
-    : null;
-
-  return { ok: true, lines, deliveryDateDefault };
-}
-
 const planBody = z
   .object({ skus: z.array(z.string().min(1).max(120)).max(50) })
   .strict();
@@ -1412,14 +1329,67 @@ manualPurchaseRouter.post("/plan", requireOperation, async (c) => {
     console.error("manual purchase — date plan unavailable", (e as Error).message);
   }
 
-  const plan = await datePlanFor(sb, settings, skus, proceedDate);
-  if (!plan.ok) return c.json(plan.body, plan.status);
-  return c.json({
-    proceedDate,
-    lines: plan.lines,
-    deliveryDateDefault: plan.deliveryDateDefault,
-    planUnavailable,
+  /* Read whole and matched here — no free-text SKU in a PostgREST `.in()`
+     (live rows carry a double quote, `Leg 4"`). */
+  const [catRes, supRes] = await Promise.all([
+    sb.from("product_skus").select("sku, supplier_id, product_models(category)"),
+    sb.from("suppliers").select("id, name"),
+  ]);
+  if (catRes.error) {
+    const m = mapPgError(catRes.error);
+    return c.json(m.body, m.status);
+  }
+  if (supRes.error) {
+    const m = mapPgError(supRes.error);
+    return c.json(m.body, m.status);
+  }
+  const catalogBySku = new Map(
+    (catRes.data ?? []).map((r) => [
+      r.sku as string,
+      {
+        supplierId: (r.supplier_id as string | null) ?? null,
+        category:
+          ((r.product_models as unknown as { category: string | null } | null)
+            ?.category as string | null) ?? null,
+      },
+    ]),
+  );
+  const supplierName = new Map(
+    (supRes.data ?? []).map((s) => [s.id as string, (s.name as string | null) ?? null]),
+  );
+
+  const lines = skus.map((sku) => {
+    const cat = catalogBySku.get(sku);
+    const supplierId = cat?.supplierId ?? null;
+    const category = cat?.category ?? null;
+    const productionDays =
+      settings != null ? productionWorkingDaysFor(settings, supplierId, category) : null;
+    const transitDays = settings != null ? transitDaysFor(settings, supplierId) : null;
+    return {
+      sku,
+      supplierId,
+      supplierName: supplierId ? (supplierName.get(supplierId) ?? null) : null,
+      category,
+      productionDays,
+      transitDays,
+      /* The ONE forward arithmetic (`expectedArrivalOf`) from the preview
+         Proceed Date — null is a real answer, never a guessed arrival. */
+      arrival:
+        settings != null
+          ? expectedArrivalOf(settings, { supplierId, category, fromIso: proceedDate })
+          : null,
+    };
   });
+
+  const complete = lines.every((l) => l.arrival != null);
+  const deliveryDateDefault = complete
+    ? lines.reduce<string | null>(
+        (latest, l) => (latest == null || l.arrival! > latest ? l.arrival! : latest),
+        null,
+      )
+    : null;
+
+  return c.json({ proceedDate, lines, deliveryDateDefault, planUnavailable });
 });
 
 const issueBody = z.object({

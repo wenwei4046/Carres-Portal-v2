@@ -15,7 +15,6 @@ import OperationPurchasingSettings from "./OperationPurchasingSettings";
  */
 const settingsQuery = vi.fn();
 const setNumber = vi.fn();
-const setSwitch = vi.fn();
 const setPoDays = vi.fn();
 const setProduction = vi.fn();
 const setWorkWeek = vi.fn();
@@ -33,7 +32,6 @@ vi.mock("@/lib/queries", async () => {
     ...actual,
     usePurchasingSettings: () => settingsQuery(),
     useSetPurchasingNumber: () => mutation(setNumber),
-    useSetPurchasingSwitch: () => mutation(setSwitch),
     useSetPurchasingPoDays: () => mutation(setPoDays),
     useSetProductionDays: () => mutation(setProduction),
     useSetSupplierWorkWeek: () => mutation(setWorkWeek),
@@ -63,7 +61,7 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     earliestSellDays: 21,
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
-    manualPurchaseEnforceEarliestDate: false,
+    manualPurchaseMinDeliveryDays: 0,
     suppliers: [
       { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
       { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
@@ -129,7 +127,6 @@ beforeEach(() => {
   settingsQuery.mockReturnValue({ data: settings(), isLoading: false, error: null });
   setProduction.mockResolvedValue(settings());
   setNumber.mockResolvedValue(settings());
-  setSwitch.mockResolvedValue(settings());
   setPoDays.mockResolvedValue(settings());
   createDestination.mockResolvedValue(settings());
   updateDestination.mockResolvedValue(settings());
@@ -274,42 +271,38 @@ describe("Purchasing → Settings", () => {
     );
   });
 
-  /* 0422 — the earliest-date switch sits directly under the earliest-sell
-     number, renders from the payload, and one tick is one audited write. */
-  it("renders the earliest-date switch from the payload, under the earliest-sell number", () => {
-    render(wrap(<OperationPurchasingSettings />));
-    const row = screen.getByTestId("manual-purchase-enforce-earliest-date");
-    expect(
-      screen.getByText(
-        "Refuse a Manual Purchase whose Delivery Date is earlier than the earliest date",
-      ),
-    ).toBeTruthy();
-    expect(within(row).getByRole("checkbox")).toHaveAttribute("aria-checked", "false");
-    const earliestSell = screen.getByTestId("earliest-sell-days");
-    expect(
-      earliestSell.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("a stored `true` renders the switch on", () => {
+  /* 0422 — the Manual Purchase number sits directly under the earliest-sell
+     number, renders from the payload, and saves through the same door. */
+  it("renders the Manual Purchase earliest-date number from the payload, under the earliest-sell number", () => {
     settingsQuery.mockReturnValue({
-      data: settings({ manualPurchaseEnforceEarliestDate: true }),
+      data: settings({ manualPurchaseMinDeliveryDays: 3 }),
       isLoading: false,
       error: null,
     });
     render(wrap(<OperationPurchasingSettings />));
-    const row = screen.getByTestId("manual-purchase-enforce-earliest-date");
-    expect(within(row).getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByText("Earliest Delivery Date a Manual Purchase may ask for"),
+    ).toBeTruthy();
+    const input = screen.getByTestId("manual-purchase-min-delivery-days") as HTMLInputElement;
+    expect(input.value).toBe("3");
+    expect(input).toHaveAttribute("min", "0");
+    expect(input).toHaveAttribute("max", "365");
+    const earliestSell = screen.getByTestId("earliest-sell-days");
+    expect(
+      earliestSell.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
-  it("ticking the switch PUTs /purchasing/settings/switch with {key, value}", async () => {
+  it("saving the Manual Purchase number PUTs /purchasing/settings/number by key", async () => {
     render(wrap(<OperationPurchasingSettings />));
-    const row = screen.getByTestId("manual-purchase-enforce-earliest-date");
-    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.change(screen.getByTestId("manual-purchase-min-delivery-days"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("manual-purchase-min-delivery-days-save"));
     await waitFor(() =>
-      expect(setSwitch).toHaveBeenCalledWith({
-        key: "manual_purchase_enforce_earliest_date",
-        value: true,
+      expect(setNumber).toHaveBeenCalledWith({
+        key: "manual_purchase_min_delivery_days",
+        value: 3,
       }),
     );
   });

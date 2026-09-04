@@ -43,8 +43,9 @@ export interface PurchasingRefusalFacts {
   actor?: string | null;
   /** The line's own requested quantity — the approved-quantity ceiling. */
   qty?: number | null;
-  /** 0422 — the Delivery Date asked for, and the earliest date the items can
-   *  arrive. Both arrive already formatted for the surface printing them. */
+  /** 0422 — the Delivery Date asked for, and the earliest Delivery Date a
+   *  Manual Purchase may ask for (Proceed Date + the Purchasing Settings
+   *  number). Both arrive already formatted for the surface printing them. */
   date?: string | null;
   earliest?: string | null;
 }
@@ -323,10 +324,10 @@ export function purchasingRefusal(
         wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
       };
-    /* 0422 — the Purchasing Settings switch is on and the asked-for Delivery
-       Date is before the earliest date the picked items can arrive (their
-       production + transit working days, the same arithmetic that proposed
-       the date). The act names the one fix: move the date. */
+    /* 0422 — the asked-for Delivery Date is before the earliest a Manual
+       Purchase may ask for: Proceed Date + `manual_purchase_min_delivery_days`
+       (calendar days, Purchasing Settings). The act names the one fix: move
+       the date. */
     case "delivery_date_before_earliest":
       return {
         wrong: `Delivery Date ${some(facts.date, "asked for")} is earlier than the earliest date ${some(

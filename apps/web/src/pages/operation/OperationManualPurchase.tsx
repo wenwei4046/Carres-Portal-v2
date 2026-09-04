@@ -60,6 +60,7 @@ import {
 } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { addDaysIso } from "@/lib/excel-date-filter";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useAlreadyOnPo,
@@ -757,7 +758,8 @@ export default function OperationManualPurchase() {
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
           supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
-          enforceEarliestDate={q.data?.enforceEarliestDate === true}
+          minDeliveryDays={q.data?.minDeliveryDays ?? 0}
+          todayIso={q.data?.todayIso ?? null}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -1314,15 +1316,20 @@ function CreateRequestWorkspace({
   defaultDestinationId,
   supplierCollections,
   staff,
-  enforceEarliestDate,
+  minDeliveryDays,
+  todayIso,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
   defaultDestinationId: string | null;
   supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
-  /** 0422 — the Purchasing Settings switch, as the Register read it. */
-  enforceEarliestDate: boolean;
+  /** 0422 — Purchasing Settings' calendar days after the Proceed Date, as
+   *  the Register read it. 0 means no floor. */
+  minDeliveryDays: number;
+  /** The server's Malaysia date — the Proceed Date fallback while the plan
+   *  has not answered yet. */
+  todayIso: string | null;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -1485,18 +1492,25 @@ function CreateRequestWorkspace({
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
   const dateOk = deliveryDate !== "";
-  /** 0422 — with the Purchasing Settings switch on, a chosen date before the
-   *  plan's earliest date is refused HERE in the door's own words, so the
-   *  person moves it before Send rather than after a 422. Switch off: the
-   *  earliest date stays a proposal. No plan default (a lead-days gap, or
-   *  the plan unavailable) means no floor and no refusal — the server
-   *  refuses nothing it cannot compute, and neither does this form. */
+  /** 0422 — the earliest Delivery Date a Manual Purchase may ask for is the
+   *  Proceed Date + Purchasing Settings' calendar days. The Proceed Date is
+   *  the one this form already shows from `/plan` (today on the server),
+   *  falling back to the Register's `todayIso`. A chosen date before that
+   *  floor is refused HERE in the door's own words, so the person moves it
+   *  before Send rather than after a 422. 0 days: no floor, no sentence.
+   *  The plan's proposed date is a proposal only and is NOT combined with
+   *  this floor. */
+  const proceedDateIso = plan.data?.proceedDate ?? todayIso;
+  const earliestDeliveryDate =
+    minDeliveryDays > 0 && proceedDateIso != null
+      ? addDaysIso(proceedDateIso, minDeliveryDays)
+      : null;
   const dateTooEarly =
-    enforceEarliestDate && dateOk && planDefault != null && deliveryDate < planDefault;
+    dateOk && earliestDeliveryDate != null && deliveryDate < earliestDeliveryDate;
   const dateTooEarlyWords = dateTooEarly
     ? purchasingRefusal("delivery_date_before_earliest", {
         date: fmtDate(deliveryDate),
-        earliest: fmtDate(planDefault!),
+        earliest: fmtDate(earliestDeliveryDate),
       })
     : null;
 
