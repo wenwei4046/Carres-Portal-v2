@@ -2255,23 +2255,43 @@ library itself (`delivery-reasons.ts`), never as a second list. **No Release, Ap
 button exists anywhere on this surface**: the SYSTEM issues the document
 (`../orders/MASTER.md` §8).
 
-## The Delivery module words (owner ruling 2026-08-24)
+## The Delivery module words (CARD-2026-09-04-delivery-01 — overwrites the 2026-08-24 one-word ruling)
 
-There is one sidebar word and one page title: **Delivery**. `Delivery Work` and `Delivery Orders`
-are not separate destinations. A formal DO remains a Delivery Order and its number remains a door
-inside the one Delivery listing.
+The Delivery module carries TWO navigation destinations under the module word **Delivery**:
+**Monitor** (the calendar, `?tab=delivery`) and **Delivery Orders** (the formal-document
+register). The DO object page and Edit Delivery are doors on cards and rows, never navigation.
+`Delivery Work` remains banned; a formal DO remains a Delivery Order and its number remains a
+door.
 
 | Concept | Canonical word | Do NOT use |
 |---|---|---|
-| Sidebar and page title | **Delivery** | Delivery Work · Delivery Orders · Deliveries |
+| The module | **Delivery** | Delivery Work · Deliveries |
+| The calendar page and its sidebar child | **Monitor** | Schedule · Board · Overview · Dashboard |
+| The register page and its sidebar child | **Delivery Orders** | DO list · Documents |
 | No confirmed operational date | **No confirmed date** | Unscheduled · Pending · No ETA |
 | Confirmed date is behind today with no result | **Overdue** | Date passed · Late delivery |
 | No formal DO exists yet | **No delivery order yet** | Not issued · Create DO · Issue DO |
 | Open the formal document | the actual **DO number** | View DO · Details |
 
-The same row carries the arrangement facts, scoped goods, DO number and Delivery Status. This
-does not merge their authority: Delivery arrangement remains editable operational truth and the
-issued DO remains a formal historical document.
+A Monitor card carries the arrangement facts, DO number and Delivery Status in one place. This
+does not merge their authority: Delivery arrangement remains editable operational truth (edited
+on Edit Delivery, never on Monitor) and the issued DO remains a formal historical document.
+
+**Monitor words — PROPOSAL, not yet owner-accepted.** These strings shipped with the Monitor
+Card and await Jess's word; each is labelled here so no chat mistakes it for ruled vocabulary:
+
+| String | Where it appears | Status |
+|---|---|---|
+| `Monitor` | the page title and sidebar child | **PROPOSAL** |
+| `Calendar` | the DELIVERY SCHEDULE rail's default row (cards inside the visible window) | **PROPOSAL** |
+| `NEEDS CHECKING` | the rail group holding `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` | **PROPOSAL** |
+| `Search deliveries…` | the toolbar search placeholder | **PROPOSAL** |
+| `Previous days` · `Next days` | the range arrows' accessible labels | **PROPOSAL** |
+
+Already governed and merely REUSED by Monitor (not proposals): `No confirmed date` · `Overdue` ·
+`No delivery order yet` · `No logistics picked` · `No deliveries booked this day.` (T10) ·
+`Expected arrival` · `Hide filters` / `Show filters` · the seven operational status words ·
+`Delivered — Proof Required` (Delivery MASTER §15).
 
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and
