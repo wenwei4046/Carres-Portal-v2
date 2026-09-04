@@ -49,6 +49,7 @@ import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
 import poDutyRouter from "./routes/operation/po-duty";
+import workspaceDutiesRouter, { workspaceUnavailabilityRouter } from "./routes/operation/workspace-duties";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -222,6 +223,10 @@ api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 api.route("/operation/staff", opsStaffRouter);
 // 0236 PO duty rotation — GET current holder / PUT manager override
 api.route("/operation/po-duty", poDutyRouter);
+// Workspace owns the one company-wide owner-Duty assignment door. People owns
+// dated unavailability; both feed the same shared resolver.
+api.route("/operation/workspace/duties", workspaceDutiesRouter);
+api.route("/hr/team", workspaceUnavailabilityRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
