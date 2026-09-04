@@ -54,7 +54,10 @@ export const MONITOR_COPY = {
   page: "Monitor",
   docTitle: "Monitor — Carres",
   search: "Search deliveries…",
-  emptyDay: "No deliveries",
+  /** T10's governed empty-day sentence — the Card proposed `No deliveries`,
+   *  but the dictionary already owns this exact concept and a second spelling
+   *  for one fact is the synonym the rules forbid. */
+  emptyDay: "No deliveries booked this day.",
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
   railSchedule: "DELIVERY SCHEDULE",

@@ -275,10 +275,10 @@ describe("the shape", () => {
     expect(screen.getByText(/Thu, 3 Sep\s*–\s*Wed, 9 Sep/)).toBeTruthy();
   });
 
-  it("an empty day says No deliveries", () => {
+  it("an empty day speaks T10's governed sentence", () => {
     wrap(<OperationDelivery />);
     const day = screen.getByTestId("delivery-monitor-day-2026-09-08");
-    expect(within(day).getByText("No deliveries")).toBeTruthy();
+    expect(within(day).getByText("No deliveries booked this day.")).toBeTruthy();
   });
 
   it("draws no hour-by-hour vertical timeline", () => {
