@@ -343,7 +343,7 @@ function mount() {
 
 async function loaded() {
   mount();
-  await screen.findByText("REQ-0001");
+  await screen.findByTestId(`mp-open-${REQ1}`);
 }
 
 async function openWorkspace() {
@@ -373,10 +373,14 @@ function pickDeliveryDate(dayOfMonth = 15) {
 }
 
 describe("the register — one request per row (card §7)", () => {
-  it("lists requests with the REQ- series and the ruled columns", async () => {
+  it("lists requests with NO visible number — Card 08: business facts only", async () => {
     await loaded();
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    // The stored legacy identities exist in the payload and never render.
+    expect(document.body.textContent).not.toContain("REQ-0001");
+    expect(document.body.textContent).not.toContain("MPR");
+    expect(document.body.textContent).not.toContain("Manual Purchase No");
     // `PR-` is refused: 2990s prints it for a purchase return.
     expect(document.body.textContent).not.toMatch(/\bPR-\d/);
   });
@@ -412,7 +416,7 @@ describe("the register — one request per row (card §7)", () => {
     expect(within(grid).queryByText("Purchase Purpose")).toBeNull();
     expect(within(grid).queryByText("Need for")).toBeNull();
     // The object still prints the RETIRED row's own truthful word.
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail").textContent).toContain("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("Showroom Display");
@@ -556,22 +560,22 @@ describe("Card 03 · the left filter rail", () => {
 
   it("the default Register keeps ordered history; `All not ordered` drops it", async () => {
     await loaded();
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
-    expect(screen.queryByText("REQ-0003")).toBeNull();
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
     // A second click clears the row — the permanent Register returns whole.
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("`Approve purchase` is the derived awaiting-approver truth — a filter, not a grant", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
     // Clicking the filter grants nothing: the filtered row still names the
     // REAL owner and this operator still has no Approve control anywhere.
     expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
@@ -581,16 +585,16 @@ describe("Card 03 · the left filter rail", () => {
   it("`Issue PO` filters approved remaining demand", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-work-issue_po"));
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
   });
 
   it("a timing lens sorts earliest Order By first and never blocks issuance", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
     // Early is a FACT, not a gate — nothing on the row loses selection
     // rights it otherwise has (REQ-0001 refuses the tick for approval,
     // exactly as without the filter).
@@ -600,12 +604,12 @@ describe("Card 03 · the left filter rail", () => {
   it("a purpose row narrows; `All purposes` clears only its own section", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-purpose-subsidiary_purchase"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-purpose-all"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("a retired-purpose request lives under `All purposes` and matches no approved row", async () => {
@@ -619,42 +623,42 @@ describe("Card 03 · the left filter rail", () => {
     ]) {
       fireEvent.click(screen.getByTestId(`mp-purpose-${value}`));
       // REQ-0001 (`display`, retired) never answers an approved purpose row.
-      expect(screen.queryByText("REQ-0001"), value).toBeNull();
+      expect(screen.queryByTestId(`mp-open-${REQ1}`), value).toBeNull();
       fireEvent.click(screen.getByTestId(`mp-purpose-${value}`));
     }
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
   });
 
   it("PRODUCT filters by the Catalog's category, never SKU text", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-product-mattress"));
     // `MATTRESS-LOOK-9`'s request does NOT match — Catalog said nothing.
-    expect(screen.queryByText("REQ-0002")).toBeNull();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-product-sofa"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
   });
 
   it("SUPPLIER rows are actual names that filter; sections combine with AND", async () => {
     await loaded();
     // Hooka is only REQ-0003's supplier.
     fireEvent.click(screen.getByTestId("mp-supplier-Hooka"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     // AND with WORK TO DO: Hooka + Approve purchase matches nothing — an
     // unmatched supplier row drops, but the SELECTED one survives with its
     // honest 0.
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
     expect(screen.getByTestId("mp-supplier-Hooka").textContent).toContain("0");
     // Ohana + Approve purchase shows exactly REQ-0001 — the AND of both.
     fireEvent.click(screen.getByTestId("mp-supplier-Ohana"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-supplier-all"));
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("`Hide filters` collapses the whole rail; the toolbar then shows it back", async () => {
@@ -674,7 +678,7 @@ describe("Card 03 · the left filter rail", () => {
     await loaded();
     // REQ-0002's line has no Catalog category; no `Not in catalog` row grew,
     // and the request is simply in the permanent Register.
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
     const rail = screen.getByTestId("manual-purchase-rail");
     expect(rail.textContent).not.toContain("Not in catalog");
   });
@@ -777,7 +781,7 @@ describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
         ...over,
       });
       await loaded();
-      fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+      fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
       await screen.findByTestId("mp-detail");
     }
 
@@ -1073,7 +1077,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests")) {
-        return Promise.resolve({ id: REQ1, req_no: "REQ-0009", approval_required: true });
+        return Promise.resolve({ id: REQ1, req_no: null, approval_required: true });
       }
       return Promise.resolve(respond(url));
     });
@@ -1175,7 +1179,7 @@ describe("the object detail and the decision (slice 2)", () => {
   async function openDetail(canApprove: boolean) {
     seedDetail(canApprove);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
   }
 
@@ -1234,7 +1238,7 @@ describe("the object detail and the decision (slice 2)", () => {
         ]),
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     await waitFor(() =>
       expect((screen.getByTestId("mp-cut-1") as HTMLInputElement).value).toBe("2"),
@@ -1359,7 +1363,7 @@ describe("the object never issues (Card 05)", () => {
   it("`Arrived` cannot be set by any control — no such button exists", async () => {
     seedDetail(true);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.queryByText(/^Arrived$/, { selector: "button" })).toBeNull();
     expect(document.querySelector("[data-testid*='arrived']")).toBeNull();
@@ -1373,7 +1377,7 @@ describe("the object never issues (Card 05)", () => {
       requested_by_name: "Siti",
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ2}`));
     const detail = await screen.findByTestId("mp-detail");
     for (const gone of [
       "mp-issue",
@@ -1618,7 +1622,7 @@ describe("Card 03 §3 · the approval owner's name", () => {
   it("the object detail names the owner while the request waits", async () => {
     seedDetail(false);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-approver")).toHaveTextContent("Jess approves");
   });
@@ -1637,15 +1641,16 @@ describe("Card 03 §3 · the approval owner's name", () => {
 });
 
 /**
- * ⭐ PURCHASING CARD 04 — THE PERMANENT REGISTER
- * (docs/cards/CARD-2026-08-29-purchasing-04-manual-purchase-permanent-register.md).
+ * ⭐ PURCHASING CARD 04 — THE PERMANENT REGISTER — columns corrected by
+ * CARD 08 (2026-09-04): the number column is retired; ten columns remain.
  *
- * Eleven columns in the Card's exact order · newest Requested Date first ·
- * PO No from real lineage only · Items in Catalog human words · the
- * structured For · a read-only expansion · selection admitting only
+ * Ten columns in Card 08's exact order · newest Proceed Date first ·
+ * PO No from real lineage only (`—` before issue) · Items in Catalog human
+ * words · the structured For as the single-click entrance and sticky
+ * business column · a read-only expansion · selection admitting only
  * Ready-to-order remainder · PO Duty existing ONLY beside a selection.
  */
-describe("Card 04 · the eleven columns, in the Card's exact order", () => {
+describe("Card 08 · the ten columns, in the Card's exact order", () => {
   it("renders the exact heads, in order — and none of the banned columns", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
@@ -1655,7 +1660,6 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
     expect(heads).toEqual([
       "Proceed Date",
       "Approval Status",
-      "Manual Purchase No",
       "PO No",
       "Delivery Date",
       "For",
@@ -1682,6 +1686,9 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       "Needed By",
       // Order By drives timing/work; it is NOT another parent column.
       "Order By",
+      // Card 08 — the retired identity words may never return.
+      "Manual Purchase No",
+      "Request No",
     ]) {
       expect(heads, `banned column "${banned}"`).not.toContain(banned);
     }
@@ -1690,12 +1697,14 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
   it("newest Proceed Date leads by default — the actual created_at", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    const order = [...grid.querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    // REQ-0002 (19 Aug 03:00) · REQ-0001 (19 Aug 02:00) · REQ-0003 (18 Aug).
-    expect(order).toEqual(["REQ-0002", "REQ-0001", "REQ-0003"]);
+    const order = [...grid.querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    // REQ2 (19 Aug 03:00) · REQ1 (19 Aug 02:00) · REQ3 (18 Aug).
+    expect(order).toEqual([
+      `mp-open-${REQ2}`,
+      `mp-open-${REQ1}`,
+      `mp-open-${REQ3}`,
+    ]);
   });
 
   it("PO No is real lineage — the actual number clickable, absence named", async () => {
@@ -1709,8 +1718,41 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       "/operation/procurement?po=PO-20260818-9001",
     );
     expect(document.body.textContent).not.toContain("PO-9001,");
-    // A request with no lineage says so in the governed sentence.
-    expect(screen.getAllByText("Not ordered yet").length).toBeGreaterThan(0);
+    // A request with no lineage states the bare fact — Card 08 §3.2: `—`
+    // is a fact, never a button, and never a replacement number.
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("register-column").textContent).not.toContain(
+      "Not ordered yet",
+    );
+  });
+
+  it("several POs read `{n} POs` and open the object's exact linked PO list (Card 08)", async () => {
+    /* REQ3's one line issued across TWO documents — the cell aggregates,
+       and the click opens the object whose Purchase Orders section IS the
+       exact linked list, keyed by the invisible UUID. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/detail/")) {
+        return Promise.resolve(DETAIL);
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({
+          ...REGISTER,
+          lines: REGISTER.lines.map((l) =>
+            l.request_id === REQ3 ? { ...l, po_ids: ["PO-9001", "PO-9002"] } : l,
+          ),
+          pos: [
+            { id: "PO-9001", po_no: "PO-20260818-9001", sent: true },
+            { id: "PO-9002", po_no: "PO-20260818-9002", sent: true },
+          ],
+        });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+    await loaded();
+    const many = screen.getByTestId(`mp-po-list-${REQ3}`);
+    expect(many).toHaveTextContent("2 POs");
+    fireEvent.click(many);
+    await screen.findByTestId("mp-detail");
   });
 
   it("Items speak the Catalog's human words; the SKU stays searchable off-screen", async () => {
@@ -1938,7 +1980,7 @@ describe("Card 05 · the object detail", () => {
   async function openObject(canApprove = false, over: Record<string, unknown> = {}) {
     seedDetail(canApprove, over);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     return await screen.findByTestId("mp-detail");
   }
 
@@ -1966,7 +2008,12 @@ describe("Card 05 · the object detail", () => {
     const detail = await openObject();
     // The shared object header (Law C) with the Register as back destination.
     expect(within(detail).getByLabelText("Manual Purchase")).toBeInTheDocument();
-    expect(within(detail).getByTestId("object-identity")).toHaveTextContent("REQ-0001");
+    /* Card 08 §3.3 — the identity is `{Need for} · {For}` (REQ1's retired
+       purpose prints its own truthful word; its For was never stored), and
+       no number or UUID appears anywhere in the header. */
+    expect(within(detail).getByTestId("object-identity")).toHaveTextContent("Display");
+    expect(within(detail).getByTestId("object-identity").textContent).not.toContain("REQ-");
+    expect(document.title).toBe("Manual Purchase — Carres");
     expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
       "Waiting for approval",
     );
@@ -1984,7 +2031,7 @@ describe("Card 05 · the object detail", () => {
     expect(within(detail).getByTestId("mp-object-position")).toHaveTextContent("2 of 3");
     fireEvent.click(within(detail).getByLabelText("Next Manual Purchase"));
     await waitFor(() =>
-      expect(screen.getByTestId("object-identity")).toHaveTextContent("REQ-0003"),
+      expect(screen.getByTestId("object-identity")).toHaveTextContent("HOUZS Sdn Bhd"),
     );
   });
 
@@ -2213,7 +2260,7 @@ describe("Card 05 · the object detail", () => {
       return Promise.resolve(respond(url));
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByText("This Manual Purchase could not be opened");
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
@@ -2240,21 +2287,19 @@ describe("Card 06 · the Register's date facts and lens order", () => {
     fireEvent.click(screen.getByTestId("mp-work-issue_po")); // clear again
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
     // TO ORDER alone is not a work/timing lens — default newest-first holds.
-    let order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    expect(order).toEqual(["REQ-0002", "REQ-0001"]);
+    let order = [...screen.getByTestId("register-column")
+      .querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([`mp-open-${REQ2}`, `mp-open-${REQ1}`]);
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
     // The WORK lens re-orders: earliest Order By first, null-dated last.
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    expect(order).toEqual(["REQ-0001"]);
+    order = [...screen.getByTestId("register-column")
+      .querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([`mp-open-${REQ1}`]);
   });
 });
 
@@ -2262,7 +2307,7 @@ describe("Card 06 · the object's date facts", () => {
   it("Request reads Proceed Date · Delivery Date with the quiet `Order by {date}` fact", async () => {
     seedDetail(false);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-proceed-date")).toHaveTextContent(
       fmtDate("2026-08-19"),
@@ -2291,7 +2336,7 @@ describe("Card 06 · the object's date facts", () => {
         .map((l) => ({ ...l, order_by: "2026-09-01" })),
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     const timing = screen.getByTestId("mp-detail-order-by");
     expect(timing).toHaveTextContent("Order date passed");
@@ -2308,29 +2353,41 @@ describe("Card 06 · the object's date facts", () => {
         .map((l) => ({ ...l, delivery_date: null, order_by: null })),
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-delivery-date")).toHaveTextContent("Not recorded");
     expect(screen.queryByTestId("mp-detail-order-by")).toBeNull();
   });
 });
 
-describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
-  it("`?mpr={id}` lands directly on the object, and Back restores the Register", async () => {
+describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by UUID", () => {
+  function mountAt(param: string) {
     seedDetail(false);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
+    return render(
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={[`/operation?tab=manual-purchase&mpr=${REQ1}`]}>
+        <MemoryRouter initialEntries={[`/operation?tab=manual-purchase&${param}=${REQ1}`]}>
           <OperationManualPurchase />
         </MemoryRouter>
       </QueryClientProvider>,
     );
+  }
+
+  it("`?mp={id}` lands directly on the object, and Back restores the Register", async () => {
+    mountAt("mp");
     await screen.findByTestId("mp-detail");
-    expect(screen.getByTestId("mp-detail").textContent).toContain("REQ-0001");
+    // The object speaks business facts — never the stored legacy number.
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
+    expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
     fireEvent.click(screen.getByText("Manual Purchase", { selector: "a *, a" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
+  });
+
+  it("`?mpr={id}` survives as a read-only alias for pre-Card-08 bookmarks", async () => {
+    mountAt("mpr");
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
   });
 });
 

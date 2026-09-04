@@ -97,7 +97,7 @@ const REQUESTS = [
     approval_required: true, approved_at: "2026-08-19T03:00:00Z", refused_at: null,
   },
   {
-    id: REQ_B, req_no: "REQ-0002", purpose: "display", destination_id: DEST,
+    id: REQ_B, req_no: null, purpose: "display", destination_id: DEST,
     approval_required: false, approved_at: null, refused_at: null,
   },
 ];
@@ -390,7 +390,7 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
     purpose: string,
     extra: Record<string, unknown> = {},
     rpc = vi.fn().mockResolvedValue({
-      data: { id: REQ_A, req_no: "MPR-20260829-0009", approval_required: true },
+      data: { id: REQ_A, req_no: null, approval_required: true },
       error: null,
     }),
   ) {

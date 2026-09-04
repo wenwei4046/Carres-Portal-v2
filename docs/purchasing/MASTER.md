@@ -248,8 +248,15 @@ purchase links the actual Case, an `Internal Staff Purchase` names the real staf
 emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. A new Manual Purchase is numbered `MPR-YYYYMMDD-RRRR` through the one §6.1
-allocator (0401); pre-0401 `REQ-####` identities are permanent and print exactly as stored.
+vocabulary. **A Manual Purchase has NO visible document number — owner correction
+2026-09-04 (Card 08).** It is an internal way to prepare and approve a purchase, not a
+second supplier document: before `Issue PO` nothing shows, and after it the only visible
+purchasing document identity is the actual `PO No` (`PO-YYYYMMDD-RRRR`, the same formal
+document both buying doors produce). The canonical invisible identity is
+`purchase_requests.id`; migration 0424 retires the MPR allocator default and lets new
+rows carry a null `req_no`. Historical `REQ-####` / `MPR-YYYYMMDD-RRRR` values stay
+stored unchanged as legacy compatibility data — never displayed, never renumbered, and
+no operator-facing surface may consume them.
 An approved Display Request may route to Manual Purchase or Consignment Order; staff do not
 retype it.
 
@@ -391,7 +398,7 @@ PREFIX-YYYYMMDD-RRRR
 ```
 
 - `YYYYMMDD` is the Malaysia server issue date for an external document and creation date for an
-  internal Manual Purchase/Display Request, always with a four-digit year.
+  internal Display Request, always with a four-digit year.
 - `RRRR` is chosen from the unused four-digit codes for that date. It is not a sequence, timestamp,
   customer, supplier or parent-document number.
 - All Carres formal documents share the daily visible-code pool. A database uniqueness rule prevents
@@ -410,7 +417,6 @@ permanent and are NOT renumbered.**
 
 | Prefix | Document |
 |---|---|
-| `MPR` | Manual Purchase |
 | `PO` | Purchase Order |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
@@ -421,7 +427,9 @@ permanent and are NOT renumbered.**
 | `CRTN` | Consignment Return |
 | `CSN` | Consignment Sale Notice |
 
-Internal records still use invisible permanent technical IDs.
+Internal records still use invisible permanent technical IDs. `MPR` is retired (Card 08,
+2026-09-04): a Manual Purchase is an internal preparation record with no visible number;
+its stored historical `MPR-…`/`REQ-…` values are permanent legacy data, never displayed.
 
 ### 6.2 Unit ID
 
@@ -1053,12 +1061,12 @@ rail). The default population is the COMPLETE permanent history, ordered records
 newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
 `Order By` first, then newest Proceed Date.
 
-**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06);
-PRODUCTION-VERIFIED on `87ef0e28` 2026-08-30 together with the date contract below (the
-issued PO's `eta_date` now IS the approved Manual Delivery Date, and the issue partition
-adds Delivery Date — different approved dates create different POs through the one
-`purchasing_issue_pos_batch` door):** Proceed Date ·
-Approval Status · Manual Purchase No · PO No · Delivery Date · For · Items · Qty · Supplier ·
+**Columns, exactly and in this order — owner correction 2026-09-04 (Card 08 removes the
+number column from Card 06's verified order; the date contract stays as verified on
+`87ef0e28` 2026-08-30 — the issued PO's `eta_date` IS the approved Manual Delivery Date,
+and the issue partition adds Delivery Date through the one `purchasing_issue_pos_batch`
+door):** Proceed Date ·
+Approval Status · PO No · Delivery Date · For · Items · Qty · Supplier ·
 Deliver To · Requested By.
 
 - `Proceed Date` is the Malaysia date of the successful `Send for approval` header transaction,
@@ -1077,17 +1085,19 @@ Deliver To · Requested By.
 - `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
   `No approval needed`); while approval is needed a quiet second line names the real
   configured approver — `{name} approves` (Card 03 §3's arithmetic).
-- `Manual Purchase No` is the identity and link, sticky during horizontal scrolling. New
-  requests mint `MPR-YYYYMMDD-RRRR` (§6.1 allocator, 0401); historical numbers print
-  exactly as stored.
+- There is NO number column (Card 08). The row and its deep-link run on the invisible
+  request UUID; `req_no` is legacy database data no operator surface consumes.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
-  `Not ordered yet` · the one clickable number · `{n} POs`. Never a UUID, never a
-  SKU/supplier/date inference.
+  `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
+  exact linked PO list. Never a UUID, never a SKU/supplier/date inference, and never the
+  Manual Purchase identity — a purchase may have no PO or several.
 - `For` is the structured object the purchase serves (§5.2): destination context for
   `Ready Stock` / `Showroom Display`, the linked Service Case, the real staff member, the
-  actual subsidiary, or `Other Purchase`'s required answer. A historical row without the
-  structured fact prints nothing.
+  actual subsidiary, or `Other Purchase`'s required answer. It is the clear single-click
+  entrance to the object and the sticky business column during horizontal scrolling; a
+  historical row without the structured fact prints its purpose word so the entrance
+  never disappears.
 - `Items` speaks Catalog human words through the ONE item-label arithmetic
   (`railItemLabel`): one item's name, or `{first item} + {n} more`; the SKU stays
   searchable and shows in the expansion. `Qty` is the total originally requested
@@ -1127,8 +1137,9 @@ Approval showing `Need approval · Jess approves` with NO money and NO controls,
 yet` lineage, History `Purchase requested` in the three-rank grammar, and `‹ Manual Purchase`
 restoring the Register; the approver money/decision surface and the prev/next stepping were
 proven on the same SHA's seeded dev walk plus the API contract tests — Jess's live positive
-walk remains hers). Clicking `Manual Purchase
-No` opens WORK: one full-width, one-scroll object on the approved Object Header + Summary +
+walk remains hers). Clicking the `For`
+cell opens WORK (Card 08 — the retired number column's one job): one full-width,
+one-scroll object on the approved Object Header + Summary +
 Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
@@ -1136,7 +1147,10 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
 - **Object Header** — the shared object identity header (the Sales Order / Delivery Order
   implementation, Law C): one back destination `Manual Purchase` that restores the complete
   Register state the operator left (the grid stays mounted underneath — rail filters, search,
-  column filters, sort, scroll and expansion survive); the actual `MPR-…` identity; one derived
+  column filters, sort, scroll and expansion survive); the business heading
+  `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context
+  (Card 08 §3.3 — no MPR, no UUID, and a browser title of `Manual Purchase — Carres`);
+  one derived
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
   page title, pseudo-tab, breadcrumb or PDF action; no new edit/delete/undo/take-back door.
@@ -1185,11 +1199,16 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
   `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
   role or an email.
-- **Work Engine boundary — owner-corrected by Card 06 and Duty ruling 2026-09-03:** undecided
-  approval supplies `Approve {MPR}` to the resolved `Purchasing Approver`, due no later than Order By and completed only by
-  the stored decision. Approved remaining demand supplies `Issue the purchase order for {MPR}` to
+- **Work Engine boundary — owner-corrected by Card 06, Duty ruling 2026-09-03 and Card 08
+  §3.4:** undecided
+  approval supplies `Approve purchase` to the resolved `Purchasing Approver`, due no later than Order By and completed only by
+  the stored decision. Approved remaining demand supplies `Issue PO` to
   normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
-  current PO version has confirmed-sent evidence. Both deep-link the exact source; the local
+  current PO version has confirmed-sent evidence. The action sentence carries no MPR, no
+  person's name and no UUID; the row's context line distinguishes the purchase through its
+  business facts — `Manual Purchase · {Need for} · {For} · {supplier}` — while the Work
+  record stays distinct through its structured request UUID. Both deep-link the exact
+  source (`?tab=manual-purchase&mp={uuid}`); the local
   `WORK TO DO` rail filters these same identities and never becomes a second queue or manual Done.
 
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
@@ -1397,8 +1416,8 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve MPR-20260829-2779` | Stored approval or refusal with Primary, Cover and actual actor/time exists |
-| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
+| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
+| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue PO` (same business context; distinct by request UUID) | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
 | Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
 | Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |

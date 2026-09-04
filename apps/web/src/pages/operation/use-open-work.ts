@@ -25,9 +25,13 @@
 import { useMemo } from "react";
 import {
   deliveryQueueLeads,
+  demandPurposeLabelOf,
+  manualPurchaseForOf,
   manualPurchaseLineRemainingOf,
   manualPurchaseOrderByOf,
   manualPurchaseStatusOf,
+  manualPurchaseSupplierSummary,
+  manualPurchaseWorkContext,
   manualPurchaseWorkItems,
   myHolidaySet,
   orderActionLine,
@@ -90,10 +94,10 @@ export function useOpenWorkSet(): OpenWorkSet {
   const stockQ = useOperationStock();
   const partnersQ = useDeliveryPartners();
   const settingsQ = usePurchasingSettings();
-  // Card 06 §7 — the Manual Purchase module supplies its two governed
-  // actions (`Approve {MPR}` · `Issue the purchase order for {MPR}`) from
-  // its own register read; Work composes, stores nothing, and exposes no
-  // manual Done.
+  // Card 06 §7 (wording Card 08 §3.4) — the Manual Purchase module supplies
+  // its two governed actions (`Approve purchase` · `Issue PO`) from its own
+  // register read; Work composes, stores nothing, and exposes no manual
+  // Done.
   const manualQ = useManualPurchaseRegister();
   // §0.1 Action Owner Engine (2026-08-27) — Purchasing's order-track work
   // resolves to the month's PO-duty holder. Fails soft exactly as the duty
@@ -218,16 +222,30 @@ export function useOpenWorkSet(): OpenWorkSet {
     holidayOpts, queueLeads, today, poDuty,
   ]);
 
-  /* ── The Manual Purchase actions (Card 06 §7) ──────────────────────────
+  /* ── The Manual Purchase actions (Card 06 §7; wording Card 08 §3.4) ────
      Approval work belongs to the configured real approver; issuance to the
      month's NORMAL PO Duty holder (Team Work groups by them). Both are due
      no later than the request's server-derived Order By and deep-link the
-     exact MPR. Completion is the stored decision / the current PO version's
+     exact request by its invisible UUID. The row prints business facts —
+     `Manual Purchase · {Need for} · {For} · {supplier}` — never a document
+     number. Completion is the stored decision / the current PO version's
      confirmed-sent evidence — read here, never inferred. */
   const manualItems = useMemo(() => {
     const data = manualQ.data;
     // A partial payload composes nothing rather than crashing the set.
     if (!data?.requests) return [] as WorkRow[];
+    const destNameById = new Map(
+      (data.destinations ?? []).map((d) => [d.id, d.name]),
+    );
+    const supplierNameById = new Map(
+      (data.suppliers ?? []).map((s) => [s.id, s.name]),
+    );
+    const userNameById = new Map(
+      (data.users ?? []).map((u) => [u.id, u.name ?? ""]),
+    );
+    const caseNoById = new Map(
+      (data.serviceCases ?? []).map((sc) => [sc.id, sc.case_no]),
+    );
     const approverRaw =
       (data.approvers ?? []).find((a) => (a.name ?? "").trim() !== "") ?? null;
     const approver = approverRaw
@@ -276,7 +294,26 @@ export function useOpenWorkSet(): OpenWorkSet {
       const workItems = manualPurchaseWorkItems(
         {
           requestId: r.id,
-          reqNo: r.req_no,
+          context: manualPurchaseWorkContext({
+            purposeLabel: demandPurposeLabelOf(r.purpose) ?? r.purpose,
+            forText: manualPurchaseForOf({
+              purpose: r.purpose,
+              destinationName: destNameById.get(r.destination_id) ?? null,
+              serviceCaseNo: r.for_service_case_id
+                ? (caseNoById.get(r.for_service_case_id) ?? null)
+                : null,
+              staffName: r.for_staff_user_id
+                ? (userNameById.get(r.for_staff_user_id) || null)
+                : null,
+              subsidiaryName: r.for_subsidiary_name,
+              why: r.why,
+            }),
+            supplierSummary: manualPurchaseSupplierSummary(
+              live.map((l) =>
+                l.supplier_id ? (supplierNameById.get(l.supplier_id) ?? "") : "",
+              ),
+            ),
+          }),
           status: status.kind,
           remainingQty: live.reduce(
             (n, l) =>

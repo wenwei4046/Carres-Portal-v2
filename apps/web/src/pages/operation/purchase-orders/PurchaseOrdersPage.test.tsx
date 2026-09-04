@@ -40,7 +40,13 @@ const queryData = {
       placed_at: "2026-08-28T08:00:00Z",
       sources: [
         { kind: "sales_order" as const, reference: "SO-4001" },
-        { kind: "manual_purchase" as const, reference: "MPR-20260828-0042" },
+        {
+          kind: "manual_purchase" as const,
+          reference: "Manual Purchase",
+          request_id: "request-1",
+          purpose: "showroom_display",
+          proceed_date: "2026-08-28",
+        },
       ],
       sends: [
         {
@@ -86,7 +92,14 @@ const queryData = {
           ],
           governed_sources: [
             { kind: "sales_order" as const, reference: "SO-4001", qty: 1 },
-            { kind: "manual_purchase" as const, reference: "MPR-20260828-0042", qty: 2 },
+            {
+              kind: "manual_purchase" as const,
+              reference: "Manual Purchase",
+              qty: 2,
+              request_id: "request-1",
+              purpose: "showroom_display",
+              proceed_date: "2026-08-28",
+            },
           ],
         },
       ],
@@ -317,9 +330,12 @@ describe("Purchase Orders Register", () => {
   });
 
   it("keeps every governed source searchable while the register cell stays compact", () => {
+    /* Card 08 §3.5 — the manual source's visible token is the label, never
+       an MPR number; the SO keeps its real number. */
     renderPage();
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("SO-4001 +1");
-    expect(screen.getByTestId("register-search-index")).toHaveTextContent("MPR-20260828-0042");
+    expect(screen.getByTestId("register-search-index")).toHaveTextContent("Manual Purchase");
+    expect(screen.getByTestId("register-search-index")).not.toHaveTextContent("MPR-");
   });
 
   it("opens an object from the live register without changing the page's Hook order", () => {

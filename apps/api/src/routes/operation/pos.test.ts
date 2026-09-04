@@ -301,7 +301,7 @@ describe("GET /api/operation/pos", () => {
         },
       ],
       demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
-      requests: [{ id: "request-1", req_no: "PR-20260828-0042" }],
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z" }],
     });
 
     const jwt = await makeJwt("operation");
@@ -321,9 +321,17 @@ describe("GET /api/operation/pos", () => {
         }>;
       }>;
     };
+    /* Card 08 §3.5 — the visible reference is the LABEL; identity is the
+       request UUID plus the business facts, never a request number. */
     expect(body.pos[0]?.sources).toEqual([
       { kind: "sales_order", reference: "SO-4001" },
-      { kind: "manual_purchase", reference: "PR-20260828-0042" },
+      {
+        kind: "manual_purchase",
+        reference: "Manual Purchase",
+        request_id: "request-1",
+        purpose: "showroom",
+        proceed_date: "2026-08-28",
+      },
     ]);
     expect(body.pos[0]?.purchase_order_lines[0]?.sources).toEqual([
       expect.objectContaining({ so: 4001, qty: 1 }),
@@ -331,7 +339,14 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]?.purchase_order_lines[0]).toEqual(expect.objectContaining({
       governed_sources: [
         { kind: "sales_order", reference: "SO-4001", qty: 1 },
-        { kind: "manual_purchase", reference: "PR-20260828-0042", qty: 1 },
+        {
+          kind: "manual_purchase",
+          reference: "Manual Purchase",
+          qty: 1,
+          request_id: "request-1",
+          purpose: "showroom",
+          proceed_date: "2026-08-28",
+        },
       ],
     }));
     expect(
