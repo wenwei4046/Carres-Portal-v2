@@ -109,7 +109,9 @@ export interface PoSendEvidence {
   acting_name?: string | null;
 }
 
-const CHANNEL_WORD: Record<string, string> = {
+/* The one channel dictionary — the Register's `Sent to Supplier` evidence line
+   reads it too, so the same channel never earns two spellings (Law D). */
+export const CHANNEL_WORD: Record<string, string> = {
   whatsapp: "WhatsApp",
   email: "Email",
   print: "Printed",
