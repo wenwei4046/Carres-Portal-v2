@@ -832,7 +832,7 @@ No unresolved Owner Decision remains.
 This MASTER persists the approved operating model only. It does not authorise Cards,
 implementation sequencing, migration or build work.
 
-## 16 · Production closure — unified Delivery page
+## 16 · Production closure
 
 **DEPLOYED 2026-08-24 — PR #896, main SHA
 `52804c005d7bf53bcbe9e1b1dcdd2b47cd684656`.** The first approved Delivery UI correction is live
@@ -910,5 +910,16 @@ Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy 
 `Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
 an activity fact that confirms nothing and moves no arrangement field.
 
----
-
+**DEPLOYED 2026-09-04 — Delivery CARD 01 · Monitor Calendar, PR #1101, main SHA
+`e04dc00708eb2f40f001b8dedd8a4721a24c3875`, production converged (deploy probe).** The four-page
+map's first page is live: Monitor is the read-only six-operating-day calendar at
+`?tab=delivery` (mobile: one-day list), the Portal sidebar carries the Delivery module with
+Monitor and Delivery Orders, and `/operation/delivery-orders` reaches the existing register
+again instead of redirecting. Every card is one link — an issued DO opens the Delivery Order
+object, a scope without one opens Edit Delivery — and no Delivery writer, evidence change,
+partner file or migration is in the diff. Walked on the seeded dev preview at 1920/1440/1130/
+375px; the walk's own findings (raw partner id on the rail · NEEDS CHECKING hidden behind the
+window · plain REGION rows) were fixed before merge. Named follow-ups, not accidents: a bulk
+`Assign logistics` surface (the retired listing's door), the Delivery Orders register's own
+redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar` ·
+`NEEDS CHECKING` · `Search deliveries…`).
