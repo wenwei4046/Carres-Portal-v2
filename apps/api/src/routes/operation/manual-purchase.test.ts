@@ -1134,7 +1134,7 @@ const CARD06_SETTINGS = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
-  manualPurchaseEnforceEarliestDate: false,
+  manualPurchaseMinDeliveryDays: 0,
   suppliers: [
     { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
   ],
@@ -1845,15 +1845,16 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
 });
 
 /**
- * 0422 — A MANUAL PURCHASE MAY NOT ASK FOR GOODS BEFORE THEY CAN ARRIVE
- * (YH, 2026-09-04).
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch).
  *
- * The plan proposes the earliest Delivery Date; nothing refused an earlier
- * one. With the Purchasing Settings switch on, the create door refuses it
- * BEFORE the create RPC, with the same arithmetic the plan answers with.
- * Switch off, or no floor computable: the door behaves exactly as before.
+ * Purchasing Settings holds `manual_purchase_min_delivery_days` (calendar
+ * days). The floor is the Proceed Date — today, Malaysia — plus that number.
+ * When the number is above 0 and the asked-for date is earlier, the create
+ * door refuses BEFORE the create RPC. 0, or settings unavailable: the door
+ * behaves exactly as before. The lead-time plan is not consulted.
  */
-describe("POST /purchasing/requests — the earliest-date switch (0422)", () => {
+describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purchase may ask for (0422)", () => {
   const HEADER = { purpose: "ready_stock", destinationId: DEST };
   const LINES = [{ sku: "5539-2NA", qty: 1 }];
 
@@ -1895,45 +1896,44 @@ describe("POST /purchasing/requests — the earliest-date switch (0422)", () => 
       error: null,
     });
 
-  it("switch on + a Delivery Date before the earliest → 422, and the RPC is never called", async () => {
+  /** Today in Malaysia + n calendar days — the floor, computed here by hand
+   *  so the route's arithmetic is pinned by value, not trusted. */
+  const mytPlus = (n: number) =>
+    new Date(Date.now() + 8 * 3_600_000 + n * 86_400_000).toISOString().slice(0, 10);
+
+  it("3 days + a Delivery Date before Proceed Date + 3 → 422, and the RPC is never called", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
-      manualPurchaseEnforceEarliestDate: true,
+      manualPurchaseMinDeliveryDays: 3,
     });
     const rpc = created();
-    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    const tooEarly = mytPlus(2);
+    const res = await create({ ...HEADER, requiredBy: tooEarly, lines: LINES }, rpc);
     expect(res.status).toBe(422);
     const body = (await res.json()) as Record<string, string>;
     expect(body.code).toBe("delivery_date_before_earliest");
-    expect(body.date).toBe("2020-01-01");
-    /* The floor is the SAME arithmetic the plan answers with — pinned by
-       value, not by trusting the route. */
-    const earliest = expectedArrivalOf(CARD06_SETTINGS, {
-      supplierId: SUP,
-      category: "sofa",
-      fromIso: new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10),
-    });
-    expect(body.earliest).toBe(earliest);
-    expect(body.message).toContain("2020-01-01");
-    expect(body.action).toContain(earliest!);
+    expect(body.date).toBe(tooEarly);
+    expect(body.earliest).toBe(mytPlus(3));
+    expect(body.message).toContain(tooEarly);
+    expect(body.action).toContain(mytPlus(3));
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("switch on + a Delivery Date on or after the earliest → the RPC is called", async () => {
+  it("3 days + a Delivery Date exactly on Proceed Date + 3 → the RPC is called", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
-      manualPurchaseEnforceEarliestDate: true,
+      manualPurchaseMinDeliveryDays: 3,
     });
     const rpc = created();
-    const res = await create({ ...HEADER, requiredBy: "2099-12-31", lines: LINES }, rpc);
+    const res = await create({ ...HEADER, requiredBy: mytPlus(3), lines: LINES }, rpc);
     expect(res.status).toBe(200);
     expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
   });
 
-  it("switch off → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
+  it("0 days → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
     vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
       ...CARD06_SETTINGS,
-      manualPurchaseEnforceEarliestDate: false,
+      manualPurchaseMinDeliveryDays: 0,
     });
     const rpc = created();
     const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
@@ -1941,7 +1941,7 @@ describe("POST /purchasing/requests — the earliest-date switch (0422)", () => 
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
-  it("switch on but the settings cannot be loaded → no floor, no refusal", async () => {
+  it("the settings cannot be loaded → no number, no floor, no refusal", async () => {
     vi.mocked(loadPurchasingSettings).mockRejectedValueOnce(new Error("purchasing_settings: down"));
     const rpc = created();
     const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);

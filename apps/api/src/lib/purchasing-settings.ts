@@ -28,8 +28,8 @@ interface SettingsRow {
   earliest_sell_days: number;
   logistics_call_working_days: number;
   po_days: number[];
-  /** 0422 — absent until the migration is applied; read as false. */
-  manual_purchase_enforce_earliest_date?: boolean | null;
+  /** 0422 — CALENDAR days after the Proceed Date; 0 means no floor. */
+  manual_purchase_min_delivery_days: number;
 }
 
 /**
@@ -41,12 +41,12 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
   poDays: number[];
-  manualPurchaseEnforceEarliestDate: boolean;
+  manualPurchaseMinDeliveryDays: number;
 }> {
   const { data, error } = await sb
     .from("purchasing_settings")
     .select(
-      "order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days, manual_purchase_enforce_earliest_date",
+      "order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days, manual_purchase_min_delivery_days",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -58,16 +58,15 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
     earliestSellDays: Number(row.earliest_sell_days),
     logisticsCallWorkingDays: Number(row.logistics_call_working_days),
     poDays: (row.po_days ?? []).map(Number),
-    /* 0422 — the switch. Only a stored `true` turns the refusal on; a
-       missing column (migration not applied yet) reads as off, which is
-       exactly the pre-0422 behaviour. */
-    manualPurchaseEnforceEarliestDate: row.manual_purchase_enforce_earliest_date === true,
+    /* 0422 — calendar days after the Proceed Date. 0 (the default) means
+       no floor, which is exactly the pre-0422 behaviour. */
+    manualPurchaseMinDeliveryDays: Number(row.manual_purchase_min_delivery_days),
   };
   // A row that is not a row (a shape change, a partial select) must SAY so.
   // Letting a NaN through would plan every order against a nonsense date and
   // look exactly like a working page.
   for (const [k, v] of Object.entries(numbers)) {
-    if (Array.isArray(v) || typeof v === "boolean") continue;
+    if (Array.isArray(v)) continue;
     if (!Number.isFinite(v)) throw new Error(`purchasing_settings.${k} is not a number`);
   }
   return numbers;

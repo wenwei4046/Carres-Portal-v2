@@ -34,6 +34,7 @@ describe("loadPurchasingSettings — Deliver To master data", () => {
             order_by_buffer_days: 7,
             earliest_sell_days: 21,
             logistics_call_working_days: 1,
+            manual_purchase_min_delivery_days: 0,
             po_days: [1, 3, 5],
           },
         ],

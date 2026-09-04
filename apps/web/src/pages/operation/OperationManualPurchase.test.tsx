@@ -2246,42 +2246,45 @@ describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
 });
 
 /**
- * 0422 — A MANUAL PURCHASE MAY NOT ASK FOR GOODS BEFORE THEY CAN ARRIVE
- * (YH, 2026-09-04). The Register carries the Purchasing Settings switch;
- * when on, the form prints the door's own refusal under Delivery Date and
- * blocks Send. When off, the earliest date stays a proposal only.
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch). The Register
+ * carries Purchasing Settings' `minDeliveryDays` (calendar days). The form
+ * computes floor = Proceed Date (the one `/plan` shows) + that number; a
+ * chosen date before it prints the door's own refusal under Delivery Date
+ * and blocks Send. 0 days: no floor, nothing printed.
  */
-describe("0422 · the earliest-date switch on the create form", () => {
-  /** A far-future floor, so whichever day of the current month the picker
-   *  offers is EARLIER than it — the test does not depend on the run date. */
-  const FLOOR = "2099-01-15";
-  function withSwitch(enforceEarliestDate: boolean) {
+describe("0422 · the earliest Delivery Date a Manual Purchase may ask for, on the create form", () => {
+  /** A far-future Proceed Date, so whichever day of the current month the
+   *  picker offers is EARLIER than Proceed Date + 30 — the test does not
+   *  depend on the run date. */
+  const PROCEED = "2099-01-01";
+  const FLOOR = "2099-01-31";
+  function withMinDays(minDeliveryDays: number, proceedDate = PROCEED) {
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (url.includes("/purchasing/requests/plan")) {
-        const base = planFor(init) as { lines: Array<Record<string, unknown>> };
-        return Promise.resolve({
-          ...base,
-          lines: base.lines.map((l) => ({ ...l, arrival: FLOOR })),
-          deliveryDateDefault: base.lines.length > 0 ? FLOOR : null,
-        });
+        return Promise.resolve({ ...(planFor(init) as object), proceedDate });
       }
       if (url.includes("/purchasing/requests")) {
-        return Promise.resolve({ ...REGISTER, enforceEarliestDate });
+        return Promise.resolve({ ...REGISTER, minDeliveryDays });
       }
       return Promise.resolve(respond(url, init));
     });
   }
 
-  it("switch on: a date before the earliest prints the refusal and blocks Send", async () => {
-    withSwitch(true);
+  it("30 days: a date before Proceed Date + 30 prints the refusal and blocks Send", async () => {
+    withMinDays(30);
     await openWorkspace();
     pickDeliveryDate(5);
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
-    const line = await screen.findByTestId("mp-date-too-early");
+    /* The floor is Proceed Date + 30 — the Proceed Date `/plan` answers
+       with, so wait for that answer rather than the Register's fallback. */
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-date-too-early").textContent).toContain(fmtDate(FLOOR)),
+    );
+    const line = screen.getByTestId("mp-date-too-early");
     // The door's words, with the two dates in the portal's own spelling.
     expect(line.textContent).toContain("is earlier than the earliest date");
-    expect(line.textContent).toContain(fmtDate(FLOOR));
     expect(line.textContent).toContain("then send again.");
     expect(screen.getByTestId("mp-send")).toBeDisabled();
     expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsLaterDate);
@@ -2291,17 +2294,20 @@ describe("0422 · the earliest-date switch on the create form", () => {
     );
   });
 
-  it("switch on: the server's own proposal is never refused", async () => {
-    withSwitch(true);
+  it("the floor is calendar days from the Proceed Date the form shows — not from the plan's proposal", async () => {
+    /* Proceed Date 2020-01-01 + 30 = 2020-01-31: every date the picker
+       offers is later, so a date the plan never proposed is still fine. */
+    withMinDays(30, "2020-01-01");
     await openWorkspace();
+    pickDeliveryDate(5);
     fireEvent.focus(document.getElementById("mp-item-0")!);
     fireEvent.click(pickRow("5539-2NA"));
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
   });
 
-  it("switch off: the same early date stays a proposal only — no sentence, Send live", async () => {
-    withSwitch(false);
+  it("0 days: the same early date is fine — no sentence, Send live", async () => {
+    withMinDays(0);
     await openWorkspace();
     pickDeliveryDate(5);
     fireEvent.focus(document.getElementById("mp-item-0")!);

@@ -6,7 +6,6 @@ import {
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
   purchasingSetSupplierCollectionInput,
-  purchasingSetSwitchInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
   purchasingUpdateDestinationInput,
@@ -24,7 +23,6 @@ import type { AppEnv } from "../../types";
  *
  *   GET  /                  every number, who last changed it, and what it was
  *   PUT  /number            one of the single numbers
- *   PUT  /switch            one of the on/off switches (0422)
  *   PUT  /po-days           the weekdays POs are sent on
  *   PUT  /production-days   one supplier × category (null clears it)
  *   PUT  /work-week         one supplier's working week
@@ -85,23 +83,6 @@ purchasingSettingsRouter.put("/number", requireOperationOrPrincipal, async (c) =
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
   const { error } = await sb.rpc("purchasing_set_number", {
-    p_key: parsed.data.key,
-    p_value: parsed.data.value,
-  });
-  if (error) {
-    const m = mapPgError(error);
-    return c.json(m.body, m.status);
-  }
-  return respondWithSettings(c);
-});
-
-/** 0422 — one on/off switch. The zod enum closes the key list in the
- *  browser's favour; `purchasing_set_switch` closes it again in SQL. */
-purchasingSettingsRouter.put("/switch", requireOperationOrPrincipal, async (c) => {
-  const parsed = await parseJsonBody(c, purchasingSetSwitchInput);
-  if (!parsed.ok) return c.json(parsed.body, parsed.status);
-  const sb = userClient(c.env, c.var.auth.jwt);
-  const { error } = await sb.rpc("purchasing_set_switch", {
     p_key: parsed.data.key,
     p_value: parsed.data.value,
   });
