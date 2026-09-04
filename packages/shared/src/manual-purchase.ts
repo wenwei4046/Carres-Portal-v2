@@ -969,6 +969,30 @@ export function manualPurchaseSelectable(
 }
 
 /**
+ * WHY THE TICK IS DEAD — the sentence a register prints beside a row that
+ * `manualPurchaseSelectable` refuses; `null` when the row may be ticked.
+ * Same two inputs as the gate, so the two can never disagree. The one extra
+ * fact, `approvalKind`, exists for MPR-20260904-8935 (2026-09-04): an
+ * approver cut every line to 0, so the status arithmetic derives
+ * `Not going ahead` while the Approval Status column still says `Approved`.
+ * That row sat greyed with nothing on screen saying why. `Not going ahead.`
+ * beside `Approved` names the state but not the cause; `Approved at 0.` does.
+ * The other kinds print their own status word, full stop.
+ */
+export function manualPurchaseNotSelectableReason(
+  status: ManualPurchaseStatusKind,
+  remainingQty: number,
+  approvalKind?: ManualPurchaseApprovalKind,
+): string | null {
+  if (manualPurchaseSelectable(status, remainingQty)) return null;
+  const approvedAtZero =
+    status === "ready_to_order" ||
+    (status === "not_going_ahead" && approvalKind === "approved");
+  if (approvedAtZero) return "Approved at 0. Nothing to order.";
+  return `${MANUAL_PURCHASE_STATUS_WORDS[status]}.`;
+}
+
+/**
  * HOW MANY PURCHASE ORDERS THE SELECTION ISSUES — the document-partition
  * arithmetic the issue door groups by (0380/0399, widened by Card 06: a
  * document never mixes suppliers, categories, destinations, purposes or

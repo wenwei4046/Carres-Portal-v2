@@ -1167,8 +1167,9 @@ describe("the ONE status arithmetic (Law D)", () => {
  *
  * One scroll, no tabs. Money for the APPROVER only — the server omits the
  * key for everyone else, and the same screen renders minus the money. The
- * Approve control pre-fills `still needed`, never the asked quantity, and
- * `Refuse` cannot be submitted without a reason.
+ * Approve control opens at the REQUESTED quantity (field-guide defect 23:
+ * a `Still Needed` seed raced two reads and could open at 0), and `Refuse`
+ * cannot be submitted without a reason.
  */
 describe("the object detail and the decision (slice 2)", () => {
   async function openDetail(canApprove: boolean) {
@@ -1199,13 +1200,48 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(screen.getByTestId("mp-approve")).toBeInTheDocument();
   });
 
-  it("the Approve control pre-fills `still needed`, not the asked quantity", async () => {
+  it("the Approve control opens at the REQUESTED quantity, never a half-read `Still Needed`", async () => {
     await openDetail(true);
-    // qty 1 · free 2 · already on PO 1 → still needed 0 — the pre-fill the
-    // card demands, because an approver who must subtract will not.
+    // qty 1 · free 2 · already on PO 1 → Still Needed 0 is PRINTED for the
+    // approver to read; the field itself opens at the ask (1), because a
+    // seed built from two reads opened at 0 and was saved as 0 (defect 23).
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
+    expect(screen.getByTestId("mp-approve")).toBeEnabled();
+    expect(screen.queryByTestId("mp-approve-zero")).toBeNull();
+  });
+
+  it("every line at 0 refuses Approve and says to refuse the request instead", async () => {
+    await openDetail(true);
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
+    );
+    fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "0" } });
+    expect(screen.getByTestId("mp-approve")).toBeDisabled();
+    const zero = screen.getByTestId("mp-approve-zero");
+    expect(zero).toHaveTextContent("Every line is approved at 0.");
+    expect(zero).toHaveTextContent("Refuse the request instead.");
+  });
+
+  it("one line at 0 among others is a partial cut — Approve stays live", async () => {
+    seedDetail(true, {
+      lines: REGISTER.lines
+        .filter((l) => l.request_id === REQ1)
+        .flatMap((l) => [
+          { ...l, unit_cost: 850 },
+          { ...l, id: "l1b", sku: "5539-CNR", item_label: "Booqit Corner", qty: 2, unit_cost: 900 },
+        ]),
+    });
+    await loaded();
+    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    await screen.findByTestId("mp-detail");
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-1") as HTMLInputElement).value).toBe("2"),
+    );
+    fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "0" } });
+    expect(screen.getByTestId("mp-approve")).toBeEnabled();
+    expect(screen.queryByTestId("mp-approve-zero")).toBeNull();
   });
 
   it("Refuse cannot be submitted without a reason", async () => {
@@ -1221,7 +1257,7 @@ describe("the object detail and the decision (slice 2)", () => {
   it("approving posts the cuts through the one decide door", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     fireEvent.click(screen.getByTestId("mp-approve"));
     await waitFor(() => {
@@ -1229,7 +1265,7 @@ describe("the object detail and the decision (slice 2)", () => {
       expect(post).toBeTruthy();
       const sent = JSON.parse(String((post![1] as RequestInit).body));
       expect(sent.decision).toBe("approve");
-      expect(sent.cuts).toEqual([{ id: "l1", qty: 0 }]);
+      expect(sent.cuts).toEqual([{ id: "l1", qty: 1 }]);
     });
   });
 
@@ -1242,7 +1278,7 @@ describe("the object detail and the decision (slice 2)", () => {
   it("a refused decide prints the approved two lines, never the raw code word", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
@@ -1267,12 +1303,14 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(err).toHaveTextContent("Only the approver may decide this purchase.");
     expect(err).toHaveTextContent("Ask Jess to approve or refuse it.");
     expect(err.textContent).not.toContain("forbidden");
+    // Defect 23's other half: the failure does not leave Approve greyed.
+    await waitFor(() => expect(screen.getByTestId("mp-approve")).toBeEnabled());
   });
 
   it("a decision stays on the object — no throw back to the Register", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     /* After the door records the decision, the refetched object carries the
        decided facts: controls gone, the actor and time on screen. */
@@ -1757,6 +1795,57 @@ describe("Card 04 · selection and PO Duty", () => {
     expect(screen.getByTestId(`mp-select-${REQ3}`)).toBeDisabled();
   });
 
+  it("a dead tick says why, in the row, beside the status word", async () => {
+    await loaded();
+    const reasons = screen.getAllByTestId("mp-row-dead-reason").map((el) => el.textContent);
+    // REQ-0003 is ordered. REQ-0002 may be ticked, so no sentence. REQ-0001
+    // waits, and its cell already says `Need approval`: no second line.
+    expect(reasons).toEqual(["Ordered."]);
+    expect(
+      screen.getByTestId(`mp-select-${REQ1}`).closest("tr")!.textContent,
+    ).not.toContain("Waiting for approval.");
+  });
+
+  it("MPR-20260904-8935: approved at 0 prints the cause, and no tick is live", async () => {
+    /* One request, approved, every line cut to 0: `Approved` in the column,
+       Approved Qty 0, Still To Order 0 — and a greyed checkbox that said
+       nothing. The register must name the cause on that row. */
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        String(url).includes("/purchasing/requests") &&
+        !String(url).includes("/detail/") &&
+        !String(url).includes("/plan")
+      ) {
+        return Promise.resolve({
+          ...REGISTER,
+          requests: [
+            {
+              ...REGISTER.requests[0],
+              approved_at: "2026-09-04T01:00:00Z",
+              approved_by: "u9",
+            },
+          ],
+          lines: REGISTER.lines
+            .filter((l) => l.request_id === REQ1)
+            .map((l) => ({ ...l, approved_qty: 0, remaining_qty: 1 })),
+        });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
+    expect(screen.getByTestId("mp-row-dead-reason")).toHaveTextContent(
+      "Approved at 0. Nothing to order.",
+    );
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("Approved")).toBeInTheDocument();
+    // Every ROW checkbox is dead (the header's select-all is DataGrid's own).
+    const rowBoxes = grid.querySelectorAll("input[aria-label='Select row']");
+    expect(rowBoxes.length).toBe(1);
+    for (const box of rowBoxes) expect(box).toBeDisabled();
+  });
+
   it("PO Duty exists NOWHERE until a selection; then once, beside Issue PO", async () => {
     await loaded();
     expect(screen.queryByTestId("mp-po-duty")).toBeNull();
@@ -1959,7 +2048,7 @@ describe("Card 05 · the object detail", () => {
       expect(table).toHaveTextContent(head);
     }
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "5" } });
     expect(screen.getByTestId("mp-approve")).toBeDisabled();
