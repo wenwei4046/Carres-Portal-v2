@@ -322,6 +322,34 @@ export const officeReceiveInput = z.object({
   // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
   goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   note: z.string().max(500).optional(),
+  /** 0426 — where the goods PHYSICALLY arrived, when it differs from the
+   *  PO's booked warehouse. Never overwrites Deliver To. */
+  actualSiteId: z.string().uuid().optional(),
+  /** 0426 — arrival evidence supports both photo and video. */
+  arrivalEvidence: z
+    .array(
+      z.object({
+        path: z.string().min(1).max(400),
+        kind: z.enum(["photo", "video"]),
+      }),
+    )
+    .max(30)
+    .optional(),
+  /** 0426 — extra goods, recorded separately; never Inventory, never pending
+   *  arithmetic. */
+  extraLines: z
+    .array(
+      z.object({
+        sku: z.string().min(1).max(120),
+        qty: z.number().int().positive(),
+        note: z.string().max(300).optional(),
+      }),
+    )
+    .max(50)
+    .optional(),
+  /** 0426 — client idempotency key: a retried Save returns the first posting
+   *  instead of minting a second GRN. */
+  saveKey: z.string().uuid().optional(),
   lines: z.array(z.object({
     id: z.string().uuid(),
     receivedNow: z.number().int().nonnegative(),
@@ -330,9 +358,53 @@ export const officeReceiveInput = z.object({
     damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
     wrongItemClaimType: z.string().min(1).max(40).optional(),
     wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+    /** 0426 — one physical result per governed expected Unit
+     *  (ERP-ARCHITECTURE §3.4). Quantity-only lines stay legal for
+     *  governed interchangeable goods. */
+    units: z
+      .array(
+        z.object({
+          unitCode: z.string().min(3).max(30),
+          outcome: z.enum(["received", "received_with_issue", "not_received"]),
+          issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+          note: z.string().max(300).optional(),
+        }),
+      )
+      .max(500)
+      .optional(),
   })).min(1),
 }).strict();
 export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
+
+/** `receivingAmendInput` — POST /api/operation/warehouse-receipts/:id/amend
+ *  (0426 `receiving_amend`). A posted GRN has no ordinary Edit: a correction
+ *  carries its reason, and only the named facts may move. */
+export const receivingAmendInput = z
+  .object({
+    reason: z.string().min(3).max(500),
+    saveKey: z.string().uuid().optional(),
+    goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    doNumber: z.string().min(3).max(60).optional(),
+    actualSiteId: z.string().uuid().nullable().optional(),
+    lines: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          receivedNow: z.number().int().nonnegative(),
+        }),
+      )
+      .max(200)
+      .optional(),
+  })
+  .strict();
+export type ReceivingAmendInput = z.infer<typeof receivingAmendInput>;
+
+/** `receivingVoidInput` — POST /api/operation/warehouse-receipts/:id/void
+ *  (0426 `receiving_void`). Only for a GRN that should never have existed. */
+export const receivingVoidInput = z
+  .object({ reason: z.string().min(3).max(500) })
+  .strict();
+export type ReceivingVoidInput = z.infer<typeof receivingVoidInput>;
 
 /**
  * `adjustStockInput` IS GONE — 0366.

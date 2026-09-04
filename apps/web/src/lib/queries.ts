@@ -518,6 +518,10 @@ export const qk = {
      *  sections can never describe the same delivery differently. */
     poReceiving: (poId: string) =>
       ["operation", "pos", poId, "receiving"] as const,
+    /** 0425/0426 — who may save a Receiving today, and one session's record. */
+    receivingDuty: () => ["operation", "receiving-duty"] as const,
+    receivingSession: (id: string) =>
+      ["operation", "warehouse-receipts", "session", id] as const,
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
@@ -4205,6 +4209,147 @@ export interface WarehouseReceiptQueueRow {
   /** True when checking this in will file supplier claims. Said BEFORE the
    *  button is pressed. */
   opens_claims: boolean;
+  /** 0426 — the Receiving Register's own facts. */
+  grn_no?: string | null;
+  goods_received_at?: string;
+  submitted_from?: "office" | "warehouse";
+  posted_at?: string | null;
+  posted_by_name?: string | null;
+  actual_site_id?: string | null;
+  actual_site_name?: string | null;
+  posted_duty_holder_name?: string | null;
+  posted_duty_cover_name?: string | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  void_at?: string | null;
+  void_by_name?: string | null;
+  void_reason?: string | null;
+  do_file_url?: string | null;
+}
+
+/** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
+ *  (0425). The page CONSUMES the shared resolver's answer; it never reads a
+ *  rota or computes an offset (ERP-ARCHITECTURE Law F.1). */
+export interface ReceivingDutyContext {
+  duty_key: string;
+  normal_user_id: string | null;
+  normal_user_name: string | null;
+  acting_user_id: string | null;
+  acting_user_name: string | null;
+  actor_user_id: string | null;
+  is_cover: boolean;
+  is_superuser: boolean;
+  allowed: boolean;
+  source: "assignment" | "rota" | "not_assigned";
+}
+
+export function useReceivingDuty(
+  opts?: Partial<UseQueryOptions<ReceivingDutyContext>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.receivingDuty(),
+    queryFn: () =>
+      apiFetch<ReceivingDutyContext>("/api/operation/warehouse-receipts/duty"),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+/** GET /api/operation/warehouse-receipts/:id — one Receiving Session / GRN
+ *  record: the row, its per-Unit results, its source PO and its events. */
+export interface ReceivingSessionDetail {
+  receipt: WarehouseReceiptQueueRow & {
+    unit_results: Array<{
+      stock_item_id: string;
+      unit_code: string;
+      outcome: "received" | "received_with_issue" | "not_received";
+      issue_kind: "damaged" | "wrong_item" | null;
+      note: string | null;
+    }>;
+  };
+  po: {
+    id: string;
+    supplier_id: string;
+    warehouse_id: string;
+    purchase_order_lines: Array<{
+      id: string;
+      sku: string;
+      qty: number;
+      received_qty: number;
+      damaged_qty: number;
+      wrong_item_qty: number;
+    }>;
+  } | null;
+  events: ReceivingEvent[];
+}
+
+export function useReceivingSessionDetail(id: string | null) {
+  return useQuery<ReceivingSessionDetail>({
+    queryKey: qk.operation.receivingSession(id ?? ""),
+    queryFn: () =>
+      apiFetch<ReceivingSessionDetail>(
+        `/api/operation/warehouse-receipts/${id}`,
+      ),
+    enabled: !!id,
+  });
+}
+
+/** POST /:id/amend — `Amend Receiving` (0426). */
+export interface ReceivingAmendBody {
+  reason: string;
+  saveKey?: string;
+  goodsReceivedAt?: string;
+  doNumber?: string;
+  actualSiteId?: string | null;
+  lines?: Array<{ id: string; receivedNow: number }>;
+}
+
+export function useReceivingAmendMutation(
+  id: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, ReceivingAmendBody>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, ReceivingAmendBody>({
+    mutationFn: (body) =>
+      apiFetch<unknown>(`/api/operation/warehouse-receipts/${id}/amend`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST /:id/void — `Void Receiving` (0426): only for a GRN that should never
+ *  have existed. Downstream blockers come back as the RPC's named refusal. */
+export function useReceivingVoidMutation(
+  id: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { reason: string }>({
+    mutationFn: (body) =>
+      apiFetch<unknown>(`/api/operation/warehouse-receipts/${id}/void`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export interface WarehouseReceiptsQueueResponse {
@@ -7777,6 +7922,13 @@ export interface ReceivingSessionLine {
   damaged_qty: number;
   wrong_item_qty: number;
   wrong_item_claim_type: string | null;
+  /** 0426 — the exact scanned outcomes, when the line was unit-checked. */
+  units?: Array<{
+    stock_item_id: string;
+    unit_code: string;
+    outcome: "received" | "received_with_issue" | "not_received";
+    issue_kind?: "damaged" | "wrong_item" | null;
+  }>;
 }
 
 /** A Receiving Session as the Workspace reads it. */
@@ -7795,6 +7947,13 @@ export interface ReceivingSession {
   posted_by_name: string | null;
   submitted_by_name: string | null;
   return_reason: string | null;
+  /** 0426 — stamped at posting; null on legacy sessions (derived display). */
+  grn_no?: string | null;
+  actual_site_id?: string | null;
+  arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  void_at?: string | null;
+  void_reason?: string | null;
 }
 
 /** One entry of the ONE history (RECEIVING-INFORMATION-MODEL §6). */
@@ -7817,12 +7976,27 @@ export interface ReceivingEvent {
     entry_source?: "office" | "warehouse";
     claims_linked?: number;
     reason?: string;
+    /** 0426 — the formal number, and Amend's before/after record. */
+    grn_no?: string | null;
+    before?: Record<string, unknown>;
+    after?: Record<string, unknown>;
+    extra_lines?: number;
   };
+}
+
+/** One expected Unit of the PO — minted `incoming` at issue (0382). */
+export interface ReceivingExpectedUnit {
+  id: string;
+  unit_code: string;
+  sku: string;
+  status: string;
 }
 
 export interface PoReceivingResponse {
   sessions: ReceivingSession[];
   events: ReceivingEvent[];
+  /** 0426 — the governed Units this PO expects; empty on legacy POs. */
+  expected_units?: ReceivingExpectedUnit[];
 }
 
 /** GET /api/operation/pos/:id/receiving — the Workspace's Summary + Activity. */

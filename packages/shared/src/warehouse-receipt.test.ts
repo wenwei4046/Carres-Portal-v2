@@ -273,7 +273,9 @@ describe("status words", () => {
     // STATE — and this file was the last place still asserting the old word.
     expect(warehouseReceiptStatusLabel("posted")).toBe("Checked in by Carres");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
-    expect(warehouseReceiptStatusLabel("voided")).toBe("Reversed");
+    // `Voided` joined the dictionary with the 2026-09-04 owner instruction
+    // (`Void Receiving` is the GRN's own act, distinct from Cancel).
+    expect(warehouseReceiptStatusLabel("voided")).toBe("Voided");
     // An unknown key echoes rather than inventing a word.
     expect(warehouseReceiptStatusLabel("checked_in")).toBe("checked_in");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");

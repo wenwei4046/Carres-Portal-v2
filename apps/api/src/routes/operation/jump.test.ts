@@ -179,6 +179,33 @@ describe("GET /api/operation/jump", () => {
     expect(eqs.map((c) => c.args)).toContainEqual(["status", "posted"]);
   });
 
+  it("a stored grn_no wins over the derived number, and the jump opens the Receiving session", async () => {
+    wire({
+      warehouse_receipts: [
+        {
+          id: RECEIPT_ID,
+          // 0426 — the formal number stamped at posting. The derived display
+          // hashes a different tail from the id, so matching THIS number
+          // proves the stored column is what the jump reads.
+          grn_no: "GRN-020826-7777",
+          goods_received_at: "2026-08-02",
+          submitted_at: "2026-08-02T02:00:00Z",
+          purchase_orders: { id: "PO-2051", suppliers: { name: "Ohana" } },
+        },
+      ],
+    });
+    const res = await req("/api/operation/jump?q=GRN-020826-7777", await makeJwt("operation"));
+    const body = (await res.json()) as { documents: Array<Record<string, unknown>> };
+    expect(body.documents[0]).toEqual({
+      type: "GRN",
+      number: "GRN-020826-7777",
+      party: "Ohana",
+      /* The destination is the Receiving workspace's session view — the old
+       * `queue=received&receipt=` deep link is gone. */
+      href: `/operation?tab=receiving&session=${RECEIPT_ID}`,
+    });
+  });
+
   it("an invoice opens the order it belongs to", async () => {
     wire({
       invoices: [
