@@ -354,6 +354,12 @@ export default function OperationApp() {
           tab !== "claims" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" &&
+          /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
+             their own Destination Header; the slim bar would be a second top
+             row (the same defect the Warehouse walks caught, found live on
+             this card's production walk). */
+          tab !== "receiving-report" &&
+          tab !== "staff-duties" &&
           /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
              de-navigated legacy Stock pages and Unit Detail all draw their own
              50px Destination Header (ModuleHeader embeds TopBarIcons), so the
