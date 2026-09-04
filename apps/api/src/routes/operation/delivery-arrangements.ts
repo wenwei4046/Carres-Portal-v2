@@ -228,7 +228,7 @@ deliveryArrangementsRouter.get(
         .in("delivery_order_id", doIds),
       sb
         .from("delivery_handover_events")
-        .select("id, delivery_order_id, kind, proof_path, recorded_at")
+        .select("id, delivery_order_id, kind, proof_path, recorded_at, receiver_name, recorded_by")
         .in("delivery_order_id", doIds),
     ]);
     const factsError =
@@ -289,8 +289,31 @@ deliveryArrangementsRouter.get(
       kind: string;
       proof_path: string | null;
       recorded_at: string;
+      receiver_name: string | null;
+      recorded_by: string | null;
     }>;
     const handoverById = new Map(handovers.map((row) => [row.id, row]));
+    const recorderIds = [
+      ...new Set(handovers.map((row) => row.recorded_by).filter(Boolean)),
+    ] as string[];
+    const recorderName = new Map<string, string>();
+    if (recorderIds.length > 0) {
+      const usersRes = await sb
+        .from("app_users")
+        .select("id, name, email")
+        .in("id", recorderIds);
+      if (usersRes.error) {
+        const m = mapPgError(usersRes.error);
+        return c.json(m.body, m.status);
+      }
+      for (const u of (usersRes.data ?? []) as Array<{
+        id: string;
+        name: string | null;
+        email: string | null;
+      }>) {
+        recorderName.set(u.id, u.name || u.email || "");
+      }
+    }
     const prep = (prepRes.data ?? []) as Array<{
       delivery_order_id: string;
       item_id: string;
@@ -335,6 +358,7 @@ deliveryArrangementsRouter.get(
           : undefined;
         return deliveryWarehouseScheduleEvents({
           unitId: unit.unit_code,
+          deliveryOrderId: deliveryOrder.id,
           orderId: order.id,
           leg: arrangement.leg,
           so: order.so,
@@ -363,6 +387,10 @@ deliveryArrangementsRouter.get(
           unitPackedAt: prepAt("packed"),
           unitHandedOverAt: acceptedEvent?.recorded_at ?? null,
           unitHasEvidence: accepted ? Boolean(acceptedEvent?.proof_path) : false,
+          unitWarehouseOperator: acceptedEvent?.recorded_by
+            ? recorderName.get(acceptedEvent.recorded_by) ?? null
+            : null,
+          unitDeliveryPerson: acceptedEvent?.receiver_name ?? null,
         });
           });
         });

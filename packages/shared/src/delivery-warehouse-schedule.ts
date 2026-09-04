@@ -8,6 +8,8 @@ export type DeliveryWarehouseScheduleEventKind =
 
 export interface DeliveryWarehouseScheduleInput {
   unitId: string;
+  /** The DO document row id — the address the governed act doors take. */
+  deliveryOrderId?: string | null;
   orderId: string;
   leg: number;
   so: number;
@@ -36,6 +38,10 @@ export interface DeliveryWarehouseScheduleInput {
   unitHandedOverAt?: string | null;
   /** This Unit's own accepted-batch evidence (falls back to the DO's). */
   unitHasEvidence?: boolean;
+  /** The signed-in person who recorded the accepted handover batch. */
+  unitWarehouseOperator?: string | null;
+  /** The actual receiver named on the accepted handover batch. */
+  unitDeliveryPerson?: string | null;
 }
 
 export interface DeliveryWarehouseScheduleEvent {
@@ -60,6 +66,8 @@ export interface DeliveryWarehouseScheduleEvent {
   actualArrivalAt: string | null;
   hasEvidence: boolean;
   custody: "on_the_way" | null;
+  /** The DO document row id (null on feeds that predate it). */
+  deliveryOrderId: string | null;
   /** Warehouse Card 03 — per-Unit facts (null when not recorded). */
   soDate: string | null;
   sku: string | null;
@@ -68,6 +76,8 @@ export interface DeliveryWarehouseScheduleEvent {
   unitCheckedAt: string | null;
   unitPackedAt: string | null;
   unitHandedOverAt: string | null;
+  unitWarehouseOperator: string | null;
+  unitDeliveryPerson: string | null;
   deliveryHref: string;
   deliveryOrderHref: string;
   sourceHref: string;
@@ -111,6 +121,7 @@ export function deliveryWarehouseScheduleEvents(
     ? deliveryCustodyProjection(input.actualCollectionAt, input.actualArrivalAt)
     : null;
   const common = {
+    deliveryOrderId: input.deliveryOrderId ?? null,
     soDate: input.soDate ?? null,
     sku: input.sku ?? null,
     productName: input.productName ?? null,
@@ -118,6 +129,8 @@ export function deliveryWarehouseScheduleEvents(
     unitCheckedAt: input.unitCheckedAt ?? null,
     unitPackedAt: input.unitPackedAt ?? null,
     unitHandedOverAt: input.unitHandedOverAt ?? null,
+    unitWarehouseOperator: input.unitWarehouseOperator ?? null,
+    unitDeliveryPerson: input.unitDeliveryPerson ?? null,
     unitId: input.unitId,
     orderId: input.orderId,
     leg: input.leg,

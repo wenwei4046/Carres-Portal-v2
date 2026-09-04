@@ -95,6 +95,8 @@ export function warehouseEmptyDaySentence(dateLabel: string): string {
  */
 export interface WarehouseOutboundCard {
   doNumber: string;
+  /** The DO document row id the governed act doors address, or null. */
+  deliveryOrderId: string | null;
   orderId: string;
   leg: number;
   /** `SO-<n>` — the source document identity. */
@@ -144,6 +146,7 @@ export function warehouseOutboundCards(
       .at(-1);
     cards.push({
       doNumber: first.doNumber,
+      deliveryOrderId: first.deliveryOrderId ?? null,
       orderId: first.orderId,
       leg: first.leg,
       source: first.source,
