@@ -2190,6 +2190,7 @@ export {
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   stillNeededOf,
