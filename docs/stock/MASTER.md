@@ -1,6 +1,6 @@
 # STOCK / WAREHOUSE — MASTER
 
-> **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, 2026-09-01.**
+> **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, re-closed 2026-09-04.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
 
@@ -46,6 +46,12 @@ Purchasing, Delivery, Payments and Service Cases keep their own doors.
 
 Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
+
+**WAREHOUSE DASHBOARD CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Dashboard's
+page-owned filter groups are `OUTBOUND SCHEDULE · SITE · SOURCE`. These are read-only filters over
+the dated Warehouse projection, never new records or destinations. A valid empty day says
+`No outbound handovers on {date}. Choose another date.` The Calendar card uses the owning source's
+actual words and never invents a shorter Warehouse status vocabulary.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
 Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
@@ -322,6 +328,34 @@ The shared six-working-day strip is the Warehouse daily operating spine, not a d
 For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
 5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
 later working date come from the Warehouse calendar rather than staff memory.
+
+**DASHBOARD CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Dashboard is the
+read-only date overview; it does not replace Outbound's exact-Unit work listing. On desktop the six
+operating dates remain one chronological horizontal sequence. Date columns have a readable minimum
+width and the Dashboard work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
+grid whose tall first row pushes later days below the fold. There is one shared vertical scroll,
+not an independent scroll inside every day column. At narrow width the same projection becomes a
+single-day agenda with previous/next date controls; data, permissions and destinations do not
+change.
+
+This card Calendar is the Dashboard's selected `OUTBOUND SCHEDULE` projection. It does not remove
+the same Dashboard's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
+one of those opens that owner's dated rows rather than repainting them as outbound cards.
+
+One Calendar card is one governed outbound source scope, never one whole customer order and never a
+second DO. It shows, in this order: actual handover time when one exists · clickable source document
+(`DO No` for customer delivery) · `From → To` · named Logistics Partner/receiving party · `Units
+required` · `Handed over` · `Not handed over` · the current Warehouse fact or shared Work action.
+The card may aggregate for scanning only when every count drills to the exact Unit IDs. It never
+shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem, or an
+`Edit Delivery` control. A Failed Delivery appears only through the exact governed return/collection
+work that now requires a Warehouse physical act.
+
+Clicking the card opens **Outbound** already scoped to that date and source. It does not make the
+formal DO the Warehouse work surface. The `DO No` inside Outbound remains a door to the read-only
+source document. The signed-in Warehouse operator checks, packs, scans and confirms the handover in
+Outbound; Delivery remains the only owner of its partner/date/time/route editor. Return restores the
+Dashboard date, Site, Source filter and scroll position.
 
 For any selected date, the operator journey is always:
 

@@ -1519,6 +1519,10 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
+| Warehouse Dashboard's outbound-date filter group | **`OUTBOUND SCHEDULE`** | Delivery Schedule · Dispatch · Shipments |
+| Warehouse Dashboard's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
+| Warehouse Dashboard's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
+| Warehouse Dashboard valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
 | Formal Unit verification and correction view | **Counts & Adjustments** | Stocktake · Audit · separate Count Differences page · separate Adjustment Requested page |
