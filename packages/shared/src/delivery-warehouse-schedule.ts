@@ -24,6 +24,18 @@ export interface DeliveryWarehouseScheduleInput {
   actualArrivalAt: string | null;
   hasCollectionEvidence: boolean;
   hasDeliveryEvidence: boolean;
+  /** Warehouse Card 03 — per-Unit facts the Outbound work reads. All
+   *  optional: an absent fact is projected as null, never invented. */
+  soDate?: string | null;
+  sku?: string | null;
+  productName?: string | null;
+  unitScannedAt?: string | null;
+  unitCheckedAt?: string | null;
+  unitPackedAt?: string | null;
+  /** The append-only accepted handover time for THIS exact Unit, or null. */
+  unitHandedOverAt?: string | null;
+  /** This Unit's own accepted-batch evidence (falls back to the DO's). */
+  unitHasEvidence?: boolean;
 }
 
 export interface DeliveryWarehouseScheduleEvent {
@@ -48,6 +60,14 @@ export interface DeliveryWarehouseScheduleEvent {
   actualArrivalAt: string | null;
   hasEvidence: boolean;
   custody: "on_the_way" | null;
+  /** Warehouse Card 03 — per-Unit facts (null when not recorded). */
+  soDate: string | null;
+  sku: string | null;
+  productName: string | null;
+  unitScannedAt: string | null;
+  unitCheckedAt: string | null;
+  unitPackedAt: string | null;
+  unitHandedOverAt: string | null;
   deliveryHref: string;
   deliveryOrderHref: string;
   sourceHref: string;
@@ -91,6 +111,13 @@ export function deliveryWarehouseScheduleEvents(
     ? deliveryCustodyProjection(input.actualCollectionAt, input.actualArrivalAt)
     : null;
   const common = {
+    soDate: input.soDate ?? null,
+    sku: input.sku ?? null,
+    productName: input.productName ?? null,
+    unitScannedAt: input.unitScannedAt ?? null,
+    unitCheckedAt: input.unitCheckedAt ?? null,
+    unitPackedAt: input.unitPackedAt ?? null,
+    unitHandedOverAt: input.unitHandedOverAt ?? null,
     unitId: input.unitId,
     orderId: input.orderId,
     leg: input.leg,
@@ -119,7 +146,7 @@ export function deliveryWarehouseScheduleEvents(
       calendar: "warehouse",
       eventDate: input.collectionDate,
       operationsReadyBy: deliveryOperationsReadyBy(input.collectionDate),
-      hasEvidence: input.hasCollectionEvidence,
+      hasEvidence: input.unitHasEvidence ?? input.hasCollectionEvidence,
     },
   ];
   if (input.customerHandoverDate) {
