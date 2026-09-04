@@ -1523,6 +1523,11 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | Warehouse Dashboard's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
 | Warehouse Dashboard's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
 | Warehouse Dashboard valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
+| The Outbound §3.5.1 tally (Warehouse Card 03) | **`Required {n} · Handed over {n} · Not handed over {n}`** | Progress · Completed · Pending · Done |
+| The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status) |
+| A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting for handover`** | Pending · In progress · Blocked |
+| The evidence-backed handover act (Warehouse Card 03) | **Record handover** | Mark done · Complete · Ship · Dispatch |
+| The DO-object door to the Warehouse work page | **Open Outbound** | Go to warehouse · Handover here |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
 | Formal Unit verification and correction view | **Counts & Adjustments** | Stocktake · Audit · separate Count Differences page · separate Adjustment Requested page |

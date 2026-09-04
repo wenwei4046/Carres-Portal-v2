@@ -240,11 +240,23 @@ count — a discrepancy keeps both facts visible and overwrites neither (the inv
 it should raise is a later slice). Every fact also lands on `order_history` in business words,
 so the Sales Order's History reads the same truth.
 
-**The acts live on the Delivery page's detail** (one next act at a time: `Mark ready for
-handover` · `Record handover` · `Confirm logistics receipt` — COPY-STANDARD registers all
-strings); the DO object page renders the same facts read-only in its **Warehouse handover**
-block and its History, with each recorder named. Picking · Checking · Packing detail steps,
-returned-goods receipt and discrepancy investigation Work remain approved target, not built.
+**EXTENDED 2026-09-04 — Warehouse Card 03 (migration `0424`).** The chain now speaks exact
+Units: the DO's required scope is snapshotted immutably at issue (`delivery_order_units`, from
+the ONE Sales Order allocation), `handed_over` takes MULTIPLE append-only batches naming exact
+Unit IDs (`delivery_handover_event_units`; a Unit is accepted once per scope), each batch
+requires per-Unit `scanned → checked → packed` facts (`delivery_unit_prep`) plus the actual
+receiver and proof, and the same transaction moves ONLY the accepted Units' `Who has it` to the
+partner's governed operating party (`delivery_partners.operating_party_id`, resolved
+server-side — never client text). `ready_for_handover` and `received_by_logistics` stay
+once-per-document; the receipt may name the counterparty's OWN Unit list, preserved beside the
+Warehouse's without overwriting it. Legacy 0363 quantity rows remain readable history and are
+never presented as invented exact IDs.
+
+**The Warehouse acts moved to the approved Warehouse Outbound page** (Stock MASTER §12.6): the
+Delivery/DO surfaces keep `Confirm logistics receipt` (the counterparty's own act) and offer the
+**Open Outbound** door for the physical work; the DO object page renders the chain read-only in
+its **Warehouse handover** block and its History, with each recorder named. Returned-goods
+receipt and discrepancy investigation Work remain approved target, not built.
 
 ## 5 · Customer contact, date, time and ETA
 
