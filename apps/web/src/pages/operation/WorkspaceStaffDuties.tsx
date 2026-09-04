@@ -147,7 +147,7 @@ export default function WorkspaceStaffDuties() {
         ) : !query.data || query.data.duties.length === 0 ? (
           <EmptyState title="No Duties configured" detail="Add approved owner Duties before assigning staff." />
         ) : <>
-          <div className="hidden grid-cols-[minmax(190px,1.2fr)_minmax(170px,1fr)_minmax(170px,1fr)_minmax(220px,1.3fr)_auto] gap-4 border-b border-kit-slate-5 bg-kit-slate-2 px-4 py-2 text-meta font-semibold text-kit-slate-11 lg:grid">
+          <div className="hidden grid-cols-[minmax(190px,1.2fr)_minmax(170px,1fr)_minmax(170px,1fr)_minmax(220px,1.3fr)_auto] gap-4 border-b border-kit-slate-5 bg-kit-slate-3 px-4 py-2 text-meta font-semibold text-kit-slate-11 lg:grid">
             <span>Duty</span><span>Primary</span><span>Buddy</span><span>Effective dates · Today</span><span>Action</span>
           </div>
           {query.data.duties.map((duty) => (
