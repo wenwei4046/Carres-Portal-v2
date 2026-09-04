@@ -228,6 +228,22 @@ export default function OperationDelivery() {
   /* Picking again unpicks — the rail's own toggle grammar. */
   const toggleParam = (key: string, value: string) =>
     setParam(key, searchParams.get(key) === value ? null : value);
+  /* DELIVERY SCHEDULE and NEEDS CHECKING are two views of ONE pick: choosing
+     in one group replaces the other's choice, never composes with it. */
+  const pickSchedule = (value: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("checking");
+    if (value === null || searchParams.get("schedule") === value) next.delete("schedule");
+    else next.set("schedule", value);
+    setSearchParams(next, { replace: false });
+  };
+  const pickChecking = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("schedule");
+    if (searchParams.get("checking") === value) next.delete("checking");
+    else next.set("checking", value);
+    setSearchParams(next, { replace: false });
+  };
 
   /* ── The cards — the workspace's own reads, mapped once ────────────────── */
   const partners = useMemo(() => partnersQ.data?.partners ?? [], [partnersQ.data]);
@@ -291,22 +307,22 @@ export default function OperationDelivery() {
         <RailItem
           label={MONITOR_COPY.calendar}
           count={rails.schedule.calendar}
-          active={filters.schedule === "calendar"}
-          onClick={() => setParam("schedule", null)}
+          active={filters.checking === null && filters.schedule === "calendar"}
+          onClick={() => pickSchedule(null)}
           testId="delivery-monitor-schedule-calendar"
         />
         <RailItem
           label={MONITOR_COPY.noConfirmedDate}
           count={rails.schedule.noConfirmedDate}
-          active={filters.schedule === "no_confirmed_date"}
-          onClick={() => toggleParam("schedule", "no_confirmed_date")}
+          active={filters.checking === null && filters.schedule === "no_confirmed_date"}
+          onClick={() => pickSchedule("no_confirmed_date")}
           testId="delivery-monitor-schedule-no_confirmed_date"
         />
         <RailItem
           label={MONITOR_COPY.overdue}
           count={rails.schedule.overdue}
-          active={filters.schedule === "overdue"}
-          onClick={() => toggleParam("schedule", "overdue")}
+          active={filters.checking === null && filters.schedule === "overdue"}
+          onClick={() => pickSchedule("overdue")}
           testId="delivery-monitor-schedule-overdue"
         />
       </RailGroup>
@@ -315,21 +331,21 @@ export default function OperationDelivery() {
           label={MONITOR_COPY.failed}
           count={rails.checking.failed}
           active={filters.checking === "failed"}
-          onClick={() => toggleParam("checking", "failed")}
+          onClick={() => pickChecking("failed")}
           testId="delivery-monitor-checking-failed"
         />
         <RailItem
           label={MONITOR_COPY.deliveredProofRequired}
           count={rails.checking.deliveredProofRequired}
           active={filters.checking === "delivered_proof_required"}
-          onClick={() => toggleParam("checking", "delivered_proof_required")}
+          onClick={() => pickChecking("delivered_proof_required")}
           testId="delivery-monitor-checking-proof"
         />
         <RailItem
           label={MONITOR_COPY.waitingWarehouse}
           count={rails.checking.waitingWarehouse}
           active={filters.checking === "waiting_warehouse"}
-          onClick={() => toggleParam("checking", "waiting_warehouse")}
+          onClick={() => pickChecking("waiting_warehouse")}
           testId="delivery-monitor-checking-warehouse"
         />
       </RailGroup>
@@ -489,9 +505,11 @@ export default function OperationDelivery() {
               <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-3 py-2 text-body font-semibold text-kit-slate-12">
                 {fmtDate(day)}
               </div>
-              {filters.schedule === "calendar" ? dayCards(day) : flatList}
+              {filters.checking === null && filters.schedule === "calendar"
+                ? dayCards(day)
+                : flatList}
             </div>
-          ) : filters.schedule === "calendar" ? (
+          ) : filters.checking === null && filters.schedule === "calendar" ? (
             /* ── SIX OPERATING-DAY COLUMNS ─────────────────────────────── */
             <div className="min-h-0 flex-1 overflow-auto" aria-busy={isLoading}>
               <div className="grid h-full min-w-[860px] grid-cols-6 divide-x divide-kit-slate-4">

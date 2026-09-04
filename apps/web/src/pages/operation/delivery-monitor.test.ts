@@ -414,7 +414,24 @@ describe("filterDeliveryMonitorCards", () => {
     expect(out.map((c) => c.scopeId)).toEqual(["overdue"]);
   });
 
-  it("checking, region, logistics and search all COMBINE with the schedule", () => {
+  it("a picked checking row answers across ALL dates — an exception is not a calendar question", () => {
+    const withPastFailure = [
+      ...set,
+      datedCard({
+        scopeId: "old-failed",
+        confirmedDate: "2026-08-20",
+        statusKey: "failed",
+        statusLabel: "Failed Delivery",
+      }),
+    ];
+    expect(
+      filterDeliveryMonitorCards(withPastFailure, { ...noFilters, checking: "failed" }, WINDOW)
+        .map((c) => c.scopeId)
+        .sort(),
+    ).toEqual(["failed", "old-failed"]);
+  });
+
+  it("region, logistics and search all COMBINE with the one schedule/checking pick", () => {
     expect(
       filterDeliveryMonitorCards(set, { ...noFilters, checking: "failed" }, WINDOW).map(
         (c) => c.scopeId,
@@ -530,5 +547,18 @@ describe("buildMonitorRails", () => {
     expect(rails.logistics.find((r) => r.label === "AL")!.count).toBe(0);
     expect(rails.logistics[rails.logistics.length - 1]!.key).toBe("none");
     expect(rails.logistics[rails.logistics.length - 1]!.label).toBe(MONITOR_COPY.noLogistics);
+  });
+
+  it("a governed partner the table read missed still lands on its governed row, never a raw id", () => {
+    // A Journey leg carries SSY by id; the partners list does not know that id.
+    const withLeg = [
+      ...set,
+      datedCard({ scopeId: "leg", logisticsPartnerId: "p-ssy", logisticsPartnerName: "SSY" }),
+    ];
+    const rails = buildMonitorRails(withLeg, noFilters, WINDOW, partners);
+    const ssy = rails.logistics.find((r) => r.label === "SSY")!;
+    expect(ssy.count).toBe(1);
+    expect(ssy.key).toBe("p-ssy");
+    expect(rails.logistics.some((r) => r.label === "p-ssy")).toBe(false);
   });
 });

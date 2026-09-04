@@ -295,6 +295,13 @@ function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
     .includes(q);
 }
 
+/**
+ * DELIVERY SCHEDULE and NEEDS CHECKING are two views of ONE pick. An exception
+ * queue is not a calendar question — a Failed Delivery is usually PAST-dated,
+ * and composing it with the visible window would read `0` while the exception
+ * sits one rail group up. So a picked checking row answers across ALL dates,
+ * and the schedule applies only while no checking row is picked.
+ */
 export function filterDeliveryMonitorCards(
   cards: readonly DeliveryMonitorCard[],
   filters: DeliveryMonitorFilters,
@@ -303,8 +310,9 @@ export function filterDeliveryMonitorCards(
   const daySet = new Set(visibleDays);
   return cards.filter(
     (c) =>
-      matchesSchedule(c, filters.schedule, filters.todayIso, daySet) &&
-      matchesChecking(c, filters.checking) &&
+      (filters.checking !== null
+        ? matchesChecking(c, filters.checking)
+        : matchesSchedule(c, filters.schedule, filters.todayIso, daySet)) &&
       (filters.region === null || c.region === filters.region) &&
       matchesLogisticsPartner(c, filters.logisticsPartnerId) &&
       matchesSearch(c, filters.search),
@@ -372,9 +380,14 @@ export function buildMonitorRails(
     c: DeliveryMonitorCard,
     except: "schedule" | "checking" | "region" | "logistics",
   ) =>
+    /* Schedule and checking are ONE pick (see filterDeliveryMonitorCards), so
+       either group's own counts exclude BOTH — a count is what clicking that
+       row will actually show, and clicking it replaces the other group's pick. */
     (except === "schedule" ||
-      matchesSchedule(c, filters.schedule, filters.todayIso, daySet)) &&
-    (except === "checking" || matchesChecking(c, filters.checking)) &&
+      except === "checking" ||
+      (filters.checking !== null
+        ? matchesChecking(c, filters.checking)
+        : matchesSchedule(c, filters.schedule, filters.todayIso, daySet))) &&
     (except === "region" || filters.region === null || c.region === filters.region) &&
     (except === "logistics" || matchesLogisticsPartner(c, filters.logisticsPartnerId)) &&
     matchesSearch(c, filters.search);
@@ -416,6 +429,10 @@ export function buildMonitorRails(
      workspace's own law); an ungoverned partner joins only while it carries a
      card or is the operator's own pick. `No logistics picked` closes the list. */
   const countByPartnerId = new Map<string, number>();
+  /* The display name for an id comes from the partners table first, else from
+     the cards themselves — a Journey leg can carry a partner the table read
+     has not returned, and a raw id must never become a rail label. */
+  const partnerNameById = new Map(partners.map((p) => [p.id, p.name] as const));
   let none = 0;
   for (const c of forLogistics) {
     if (c.logisticsPartnerId === null) none += 1;
@@ -424,11 +441,17 @@ export function buildMonitorRails(
         c.logisticsPartnerId,
         (countByPartnerId.get(c.logisticsPartnerId) ?? 0) + 1,
       );
+      if (!partnerNameById.has(c.logisticsPartnerId) && c.logisticsPartnerName) {
+        partnerNameById.set(c.logisticsPartnerId, c.logisticsPartnerName);
+      }
     }
   }
-  const partnerIdByName = new Map(partners.map((p) => [p.name, p.id] as const));
-  const partnerNameById = new Map(partners.map((p) => [p.id, p.name] as const));
+  const partnerIdByName = new Map(
+    [...partnerNameById.entries()].map(([id, name]) => [name, id] as const),
+  );
   const governedNames = new Set<string>(GOVERNED_LOGISTICS);
+  /* The governed roster matches by NAME: whichever id carries that partner's
+     cards is the row's key, so clicking it filters to those exact cards. */
   const logistics: MonitorRailRow[] = GOVERNED_LOGISTICS.map((name) => {
     const id = partnerIdByName.get(name) ?? name;
     return { key: id, label: name, count: countByPartnerId.get(id) ?? 0 };
