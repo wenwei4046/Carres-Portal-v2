@@ -154,7 +154,7 @@ deliveryArrangementsRouter.get(
       sb
         .from("orders")
         .select(
-          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url",
+          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
         )
         .in("id", orderIds),
       sb
@@ -175,6 +175,8 @@ deliveryArrangementsRouter.get(
       delivered_at: string | null;
       do_file_path: string | null;
       pod_signature_url: string | null;
+      placed_at: string | null;
+      created_at: string | null;
     };
     type DeliveryOrderFact = {
       id: string;
@@ -183,38 +185,70 @@ deliveryArrangementsRouter.get(
       trip_groups: string[] | null;
       voided_at: string | null;
     };
-    type UnitFact = {
-      unit_code: string | null;
-      warehouse_id: string | null;
-      reserved_ref: string | null;
-      sold_order_id: string | null;
-    };
 
     const orders = (ordersRes.data ?? []) as OrderFact[];
     const orderById = new Map(orders.map((row) => [row.id, row]));
-    const soRefs = orders.map((row) => `SO-${row.so}`);
-    const [reservedRes, soldRes] = await Promise.all([
+    const deliveryOrders = (
+      (deliveryOrdersRes.data ?? []) as DeliveryOrderFact[]
+    ).filter((row) => !row.voided_at);
+    const doIds = deliveryOrders.map((row) => row.id);
+    if (doIds.length === 0) return c.json({ events: [] });
+
+    /* The DO's required exact Units come from the ONE recorded scope (0424,
+       delivery_order_units) — never re-derived from reservation refs here.
+       A document with no recorded scope (an old split trip) stays absent:
+       absence is absence, never an invented Unit assignment. */
+    const scopeRes = await sb
+      .from("delivery_order_units")
+      .select("delivery_order_id, item_id")
+      .in("delivery_order_id", doIds);
+    if (scopeRes.error) {
+      const m = mapPgError(scopeRes.error);
+      return c.json(m.body, m.status);
+    }
+    const scopeRows = (scopeRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+    }>;
+    const itemIds = [...new Set(scopeRows.map((row) => row.item_id))];
+    if (itemIds.length === 0) return c.json({ events: [] });
+
+    const [unitsRes, prepRes, eventUnitsRes, handoversRes] = await Promise.all([
       sb
         .from("ops_stock_items")
-        .select("unit_code, warehouse_id, reserved_ref, sold_order_id")
-        .in("reserved_ref", soRefs),
+        .select("id, unit_code, warehouse_id, sku")
+        .in("id", itemIds),
       sb
-        .from("ops_stock_items")
-        .select("unit_code, warehouse_id, reserved_ref, sold_order_id")
-        .in("sold_order_id", orderIds),
+        .from("delivery_unit_prep")
+        .select("delivery_order_id, item_id, fact, recorded_at")
+        .in("delivery_order_id", doIds),
+      sb
+        .from("delivery_handover_event_units")
+        .select("delivery_order_id, item_id, event_id, recorded_side")
+        .in("delivery_order_id", doIds),
+      sb
+        .from("delivery_handover_events")
+        .select("id, delivery_order_id, kind, proof_path, recorded_at, receiver_name, recorded_by")
+        .in("delivery_order_id", doIds),
     ]);
-    const unitsError = reservedRes.error ?? soldRes.error;
-    if (unitsError) {
-      const m = mapPgError(unitsError);
+    const factsError =
+      unitsRes.error ?? prepRes.error ?? eventUnitsRes.error ?? handoversRes.error;
+    if (factsError) {
+      const m = mapPgError(factsError);
       return c.json(m.body, m.status);
     }
 
-    const units = [
-      ...((reservedRes.data ?? []) as UnitFact[]),
-      ...((soldRes.data ?? []) as UnitFact[]),
-    ].filter(
+    type UnitFact = {
+      id: string;
+      unit_code: string | null;
+      warehouse_id: string | null;
+      sku: string | null;
+    };
+    const units = ((unitsRes.data ?? []) as UnitFact[]).filter(
       (row) => !isWarehouse || row.warehouse_id === auth.warehouseId,
     );
+    const unitById = new Map(units.map((row) => [row.id, row]));
+
     const warehouseIds = [
       ...new Set(
         units
@@ -222,64 +256,109 @@ deliveryArrangementsRouter.get(
           .filter((id): id is string => Boolean(id)),
       ),
     ];
-    const deliveryOrders = (
-      (deliveryOrdersRes.data ?? []) as DeliveryOrderFact[]
-    ).filter(
-      (row) =>
-        !row.voided_at &&
-        (!row.trip_groups || row.trip_groups.length === 0),
-    );
-    const doIds = deliveryOrders.map((row) => row.id);
-    const [warehousesRes, handoversRes] = await Promise.all([
+    const skus = [
+      ...new Set(units.map((row) => row.sku).filter((s): s is string => Boolean(s))),
+    ];
+    const [warehousesRes, skusRes] = await Promise.all([
       warehouseIds.length
         ? sb.from("warehouses").select("id, name").in("id", warehouseIds)
         : Promise.resolve({ data: [], error: null }),
-      doIds.length
-        ? sb
-            .from("delivery_handover_events")
-            .select("delivery_order_id, kind, proof_path, recorded_at")
-            .in("delivery_order_id", doIds)
+      skus.length
+        ? sb.from("product_skus").select("sku, variant").in("sku", skus)
         : Promise.resolve({ data: [], error: null }),
     ]);
-    const factsError = warehousesRes.error ?? handoversRes.error;
-    if (factsError) {
-      const m = mapPgError(factsError);
+    const nameError = warehousesRes.error ?? skusRes.error;
+    if (nameError) {
+      const m = mapPgError(nameError);
       return c.json(m.body, m.status);
     }
-
     const warehouseName = new Map(
       ((warehousesRes.data ?? []) as Array<{ id: string; name: string }>).map(
         (row) => [row.id, row.name],
       ),
     );
+    const productName = new Map(
+      ((skusRes.data ?? []) as Array<{ sku: string; variant: string | null }>).map(
+        (row) => [row.sku, row.variant],
+      ),
+    );
+
     const handovers = (handoversRes.data ?? []) as Array<{
+      id: string;
       delivery_order_id: string;
       kind: string;
       proof_path: string | null;
       recorded_at: string;
+      receiver_name: string | null;
+      recorded_by: string | null;
     }>;
-    const seenUnits = new Set<string>();
+    const handoverById = new Map(handovers.map((row) => [row.id, row]));
+    const recorderIds = [
+      ...new Set(handovers.map((row) => row.recorded_by).filter(Boolean)),
+    ] as string[];
+    const recorderName = new Map<string, string>();
+    if (recorderIds.length > 0) {
+      const usersRes = await sb
+        .from("app_users")
+        .select("id, name, email")
+        .in("id", recorderIds);
+      if (usersRes.error) {
+        const m = mapPgError(usersRes.error);
+        return c.json(m.body, m.status);
+      }
+      for (const u of (usersRes.data ?? []) as Array<{
+        id: string;
+        name: string | null;
+        email: string | null;
+      }>) {
+        recorderName.set(u.id, u.name || u.email || "");
+      }
+    }
+    const prep = (prepRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+      fact: string;
+      recorded_at: string;
+    }>;
+    const acceptedUnits = (
+      (eventUnitsRes.data ?? []) as Array<{
+        delivery_order_id: string;
+        item_id: string;
+        event_id: string;
+        recorded_side: string;
+      }>
+    ).filter((row) => row.recorded_side === "warehouse");
+
     const events = arrangements.flatMap((arrangement) => {
       const order = orderById.get(arrangement.order_id);
-      const deliveryOrder = deliveryOrders.find(
-        (row) => row.order_id === arrangement.order_id,
-      );
-      if (!order || !deliveryOrder) return [];
-      const handedOver = handovers.find(
-        (row) =>
-          row.delivery_order_id === deliveryOrder.id &&
-          row.kind === "handed_over",
-      );
-      const orderUnits = units.filter(
-        (row) =>
-          row.sold_order_id === order.id ||
-          row.reserved_ref === `SO-${order.so}`,
-      );
-      return orderUnits.flatMap((unit) => {
-        if (!unit.unit_code || seenUnits.has(unit.unit_code)) return [];
-        seenUnits.add(unit.unit_code);
+      if (!order) return [];
+      return deliveryOrders
+        .filter((row) => row.order_id === arrangement.order_id)
+        .flatMap((deliveryOrder) => {
+          const doScope = scopeRows.filter(
+            (row) => row.delivery_order_id === deliveryOrder.id,
+          );
+          return doScope.flatMap((scope) => {
+        const unit = unitById.get(scope.item_id);
+        if (!unit?.unit_code) return [];
+        const prepAt = (fact: string) =>
+          prep.find(
+            (p) =>
+              p.delivery_order_id === deliveryOrder.id &&
+              p.item_id === scope.item_id &&
+              p.fact === fact,
+          )?.recorded_at ?? null;
+        const accepted = acceptedUnits.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.item_id === scope.item_id,
+        );
+        const acceptedEvent = accepted
+          ? handoverById.get(accepted.event_id)
+          : undefined;
         return deliveryWarehouseScheduleEvents({
           unitId: unit.unit_code,
+          deliveryOrderId: deliveryOrder.id,
           orderId: order.id,
           leg: arrangement.leg,
           so: order.so,
@@ -294,14 +373,27 @@ deliveryArrangementsRouter.get(
           collectionDate: arrangement.confirmed_date as string,
           collectionWindow: arrangement.confirmed_time,
           customerHandoverDate: arrangement.confirmed_date,
-          actualCollectionAt: handedOver?.recorded_at ?? null,
+          actualCollectionAt: acceptedEvent?.recorded_at ?? null,
           actualArrivalAt: order.delivered_at,
-          hasCollectionEvidence: Boolean(handedOver?.proof_path),
+          hasCollectionEvidence: Boolean(acceptedEvent?.proof_path),
           hasDeliveryEvidence: Boolean(
             order.pod_signature_url || order.do_file_path,
           ),
+          soDate: (order.placed_at ?? order.created_at)?.slice(0, 10) ?? null,
+          sku: unit.sku,
+          productName: unit.sku ? productName.get(unit.sku) ?? null : null,
+          unitScannedAt: prepAt("scanned"),
+          unitCheckedAt: prepAt("checked"),
+          unitPackedAt: prepAt("packed"),
+          unitHandedOverAt: acceptedEvent?.recorded_at ?? null,
+          unitHasEvidence: accepted ? Boolean(acceptedEvent?.proof_path) : false,
+          unitWarehouseOperator: acceptedEvent?.recorded_by
+            ? recorderName.get(acceptedEvent.recorded_by) ?? null
+            : null,
+          unitDeliveryPerson: acceptedEvent?.receiver_name ?? null,
         });
-      });
+          });
+        });
     });
     return c.json({ events });
   },

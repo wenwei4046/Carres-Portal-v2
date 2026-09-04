@@ -232,8 +232,8 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // Inventory is Warehouse's first live page — the rail navigated there.
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    // Dashboard is Warehouse's first live page (Card 03) — the rail navigated there.
+    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
   });
 
   it("clicking the open module closes it again", () => {
@@ -260,7 +260,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -1208,14 +1208,18 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("Dashboard, Inbound and Outbound print `Coming soon` and are NOT controls", () => {
+  it("Dashboard and Outbound are live links; Inbound still prints `Coming soon`", () => {
     renderAt("/operation?tab=stock-onhand");
-    for (const key of ["wh-dashboard", "wh-inbound", "wh-outbound"]) {
-      const row = child(key);
-      expect(row.tagName).toBe("SPAN");
-      expect(row.getAttribute("aria-disabled")).toBe("true");
-      expect(within(row).getByText("Coming soon")).toBeInTheDocument();
-    }
+    const dash = child("wh-dashboard") as HTMLAnchorElement;
+    expect(dash.tagName).toBe("A");
+    expect(dash).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
+    const outbound = child("wh-outbound") as HTMLAnchorElement;
+    expect(outbound.tagName).toBe("A");
+    expect(outbound).toHaveAttribute("href", "/operation?tab=warehouse-outbound");
+    const inbound = child("wh-inbound");
+    expect(inbound.tagName).toBe("SPAN");
+    expect(inbound.getAttribute("aria-disabled")).toBe("true");
+    expect(within(inbound).getByText("Coming soon")).toBeInTheDocument();
   });
 
   /* The superseded subtree is GONE from the rail. The pages behind
@@ -1237,13 +1241,14 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
   });
 
   /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
-   * Warehouse names `Inventory` as its landing until Dashboard is built. */
-  it("the collapsed Warehouse icon links to Inventory, and lights on a Warehouse page", () => {
+   * Warehouse names `Dashboard` as its landing (Card 03) — by name, never
+   * derived from row order. */
+  it("the collapsed Warehouse icon links to Dashboard, and lights on a Warehouse page", () => {
     localStorage.setItem("ops-sidebar-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
-      expect(icon).toHaveAttribute("href", "/operation?tab=stock-onhand");
+      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
       expect(icon.className).toContain("bg-kit-blue-3");
     } finally {
       localStorage.removeItem("ops-sidebar-collapsed");

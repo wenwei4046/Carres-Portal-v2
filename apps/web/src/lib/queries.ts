@@ -15,6 +15,7 @@ import {
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
   type JumpSearchResponse,
@@ -6760,7 +6761,33 @@ export function useRecordHandoverEvent(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({
+        queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+      });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Warehouse Card 03 — record scanned / checked / packed for exact Units of
+ *  one DO scope through the governed prep door (0424). Idempotent server-side. */
+export function useRecordOutboundPrep(doId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { result: { recorded: number; alreadyRecorded: number } },
+    ApiError,
+    RecordOutboundPrepInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ result: { recorded: number; alreadyRecorded: number } }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/outbound-prep`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async () => {
+      await qc.invalidateQueries({
+        queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+      });
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
     },
   });
 }

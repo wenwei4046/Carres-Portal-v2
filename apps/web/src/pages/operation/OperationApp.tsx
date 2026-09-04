@@ -78,6 +78,7 @@ import OperationOpsReserved from "./OperationOpsReserved";
 import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
+import WarehouseWorkspace from "./WarehouseWorkspace";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
@@ -359,6 +360,10 @@ export default function OperationApp() {
           tab !== "stock-onhand" &&
           tab !== "stock-plan" &&
           tab !== "movements" &&
+          /* 【WAREHOUSE】 CARD 03 — Dashboard and Outbound draw their own
+             Destination Header; the slim bar would be a second top row. */
+          tab !== "warehouse-dashboard" &&
+          tab !== "warehouse-outbound" &&
           !isStockUnitUrl && <GlobalTopBar />}
         <div
           className={`flex-1 min-h-0 ${
@@ -534,6 +539,11 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
+            {/* 【WAREHOUSE】 CARD 03 — Dashboard Calendar + Outbound share ONE
+                mounted workspace so Back restores the board's filters/scroll. */}
+            {(tab === "warehouse-dashboard" || tab === "warehouse-outbound") && (
+              <WarehouseWorkspace />
+            )}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}

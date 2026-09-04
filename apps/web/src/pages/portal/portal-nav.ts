@@ -122,11 +122,10 @@ export interface PortalModule {
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
  *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Inventory` is the one current Unit Register and the module's landing page
- *  until `Dashboard` is built, at which point that page's own approved scope
- *  may change this destination (Stock MASTER §7: the daily journey OPENS on
- *  Dashboard). */
-export const WAREHOUSE_LANDING_KEY = "stock";
+ *  `Dashboard` is live (Warehouse Card 03) and the daily journey OPENS on it
+ *  (Stock MASTER §7), so the named landing moved from Inventory to Dashboard
+ *  — by name, never derived from row order. */
+export const WAREHOUSE_LANDING_KEY = "wh-dashboard";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
@@ -390,7 +389,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         key: "wh-dashboard",
         label: "Dashboard",
         icon: LayoutDashboard,
-        soon: true,
+        tab: "warehouse-dashboard",
         section: "Warehouse",
       },
       { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, soon: true, section: "Warehouse" },
@@ -399,7 +398,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         key: "wh-outbound",
         label: "Outbound",
         icon: ArrowUpRight,
-        soon: true,
+        tab: "warehouse-outbound",
         section: "Warehouse",
       },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
