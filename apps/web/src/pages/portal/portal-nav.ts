@@ -248,6 +248,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      { key: "staff-duties", label: "Staff & Duties", icon: UserCheck, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //

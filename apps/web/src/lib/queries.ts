@@ -306,6 +306,8 @@ import {
   type SaveDeliveryArrangementInput,
   type SupplierCreateInput,
   type PurchasingSupplierCollectionSetting,
+  type WorkspaceDutyAssignment,
+  type WorkspaceDutyResolution,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -446,6 +448,8 @@ export const qk = {
     staff: ["operation", "staff"] as const,
     /** PO duty rotation (migration 0236) — this month's PO holder. */
     poDuty: ["operation", "po-duty"] as const,
+    /** Workspace owner-Duty authority — date is part of the resolver question. */
+    workspaceDuties: (onDate: string) => ["operation", "workspace-duties", onDate] as const,
     /** Balance job (migration 0184) — the multi-entry payment ledger for an
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
@@ -7006,6 +7010,56 @@ export function useOperationStaff(
     staleTime: 60_000,
     retry: false,
     ...opts,
+  });
+}
+
+export interface WorkspaceDutiesResponse {
+  onDate: string;
+  canEdit: boolean;
+  duties: Array<{
+    key: string;
+    name: string;
+    description: string;
+    assignment: WorkspaceDutyAssignment | null;
+    resolution: WorkspaceDutyResolution;
+  }>;
+  staff: Array<{ userId: string; name: string | null }>;
+}
+
+export function useWorkspaceDuties(onDate: string) {
+  return useQuery({
+    queryKey: qk.operation.workspaceDuties(onDate),
+    queryFn: () => apiFetch<WorkspaceDutiesResponse>(
+      `/api/operation/workspace/duties?on=${encodeURIComponent(onDate)}`,
+    ),
+    retry: false,
+  });
+}
+
+export function useSetWorkspaceDutyAssignment(
+  opts?: Partial<UseMutationOptions<
+    { ok: boolean; assignmentId: string },
+    ApiError,
+    {
+      dutyKey: string;
+      primaryUserId: string;
+      buddyUserId: string | null;
+      startsOn: string;
+      endsOn: string | null;
+    }
+  >>,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dutyKey, ...body }) => apiFetch<{ ok: boolean; assignmentId: string }>(
+      `/api/operation/workspace/duties/${encodeURIComponent(dutyKey)}/assignment`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
   });
 }
 

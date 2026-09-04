@@ -41,6 +41,7 @@ import OperationDelivery from "./OperationDelivery";
 import EditDelivery from "./EditDelivery";
 import OperationPayments from "./OperationPayments";
 import OperationWork from "./OperationWork";
+import WorkspaceStaffDuties from "./WorkspaceStaffDuties";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
 import OperationToOrder from "./OperationToOrder";
@@ -501,6 +502,7 @@ export default function OperationApp() {
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}
             {tab === "work" && <OperationWork />}
+            {tab === "staff-duties" && <WorkspaceStaffDuties />}
             {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
             {tab === "payments" && <OperationPayments />}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
