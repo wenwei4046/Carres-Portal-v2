@@ -262,7 +262,7 @@ describe("buildDeliveryMonitorCards", () => {
 
   it("marks a recorded delivery with an empty photo ledger as proof required", () => {
     const delivered = cards(
-      [order({ id: "a", so: 1301, do_number: "DO-1", delivery_photos: [] })],
+      [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [] } })],
       {
         deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
         attempts: [
@@ -279,7 +279,9 @@ describe("buildDeliveryMonitorCards", () => {
           id: "a",
           so: 1301,
           do_number: "DO-1",
-          delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }],
+          ops_order_control: {
+            delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }],
+          },
         }),
       ],
       {
@@ -293,9 +295,9 @@ describe("buildDeliveryMonitorCards", () => {
   });
 
   it("an UNKNOWN photo ledger claims nothing", () => {
-    // `delivery_photos: undefined` means an older payload — not a missing proof.
+    // No overlay row at all means the answer is UNKNOWN — not a missing proof.
     const out = cards(
-      [order({ id: "a", so: 1301, do_number: "DO-1", delivery_photos: undefined })],
+      [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: null })],
       {
         deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
         attempts: [
@@ -329,8 +331,8 @@ describe("monitorCardHref", () => {
         id: "b",
         so: 1302,
         delivery_stops: [
-          { leg: 1, partner_id: null, partner_name: null, from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: "2026-09-04T04:00:00.000Z", status: "pending" },
-          { leg: 2, partner_id: null, partner_name: null, from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: "2026-09-05T04:00:00.000Z", status: "pending" },
+          { leg: 1, partner_id: "3d0a2b6e-0000-4000-8000-000000000001", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: "2026-09-04T04:00:00.000Z", status: "pending" },
+          { leg: 2, partner_id: "3d0a2b6e-0000-4000-8000-000000000002", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: "2026-09-05T04:00:00.000Z", status: "pending" },
         ],
       }),
     ]);

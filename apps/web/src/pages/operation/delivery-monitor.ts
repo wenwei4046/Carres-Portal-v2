@@ -178,8 +178,12 @@ export interface DeliveryMonitorFilters {
 
 function proofRequiredOf(row: DeliveryScopeRow): boolean {
   if (row.status.kind !== "delivered") return false;
-  const photos = row.o.delivery_photos;
-  /* `undefined` means the payload predates the ledger — UNKNOWN, not missing. */
+  /* The T6 photo ledger rides the list on the ops_order_control overlay
+     (migration 0280). PostgREST may embed it as an object or a one-row array. */
+  const control = row.o.ops_order_control;
+  const overlay = Array.isArray(control) ? control[0] : control;
+  const photos = overlay?.delivery_photos;
+  /* `undefined`/`null` means the answer is UNKNOWN — never a missing proof. */
   if (photos === undefined || photos === null) return false;
   return photos.length === 0;
 }
