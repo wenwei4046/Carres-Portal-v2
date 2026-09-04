@@ -74,11 +74,19 @@ vi.mock("./OperationToOrder", () => ({
 vi.mock("./OperationManualPurchase", () => ({
   default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
 }));
-// CARD-2026-08-21-delivery-02 — Delivery Work draws its own Destination Header
-// and self-fetches; this suite only asks which route mounts it, and whether the
+// CARD-2026-09-04-delivery-01 — Monitor draws its own Destination Header and
+// self-fetches; this suite only asks which route mounts it, and whether the
 // slim global bar stands down when it does.
 vi.mock("./OperationDelivery", () => ({
-  default: () => <div data-testid="delivery-work-stub">delivery-work</div>,
+  default: () => <div data-testid="delivery-monitor-stub">delivery-monitor</div>,
+}));
+// The restored Delivery Orders register and the DO object page both
+// self-fetch; this suite owns only WHICH ROUTE MOUNTS WHICH.
+vi.mock("./DeliveryOrdersRegister", () => ({
+  default: () => <div data-testid="delivery-orders-register-stub">do-register</div>,
+}));
+vi.mock("./DeliveryOrderPage", () => ({
+  default: () => <div data-testid="delivery-order-page-stub">do-object</div>,
 }));
 // Edit Delivery (2026-08-24) self-fetches the arrangement — stubbed; what this
 // suite owns is that the URL actually MOUNTS it, which is precisely what the
@@ -255,26 +263,45 @@ describe("OperationApp — one header on Manual Purchase", () => {
  * suppressed already, which is exactly why one route looked right and its
  * sibling did not.
  */
-describe("OperationApp — one header on Delivery Work", () => {
-  it("?tab=delivery mounts the page and stands the global top bar down", () => {
+describe("OperationApp — one header on Monitor", () => {
+  it("?tab=delivery mounts Monitor and stands the global top bar down", () => {
     renderApp("/operation?tab=delivery");
-    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("delivery-monitor-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+    // Monitor renders ONCE — never twice through two matching branches.
+    expect(screen.getAllByTestId("delivery-monitor-stub")).toHaveLength(1);
   });
 
-  it("its rail choices survive the mount — both filters ride the URL", () => {
-    renderApp("/operation?tab=delivery&date=__no_date&logistics=NETS");
-    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+  it("its rail choices survive the mount — every filter rides the URL", () => {
+    renderApp("/operation?tab=delivery&schedule=no_confirmed_date&logistics=p-nets");
+    expect(screen.getByTestId("delivery-monitor-stub")).toBeInTheDocument();
   });
 });
 
-describe("OperationApp — Delivery is one page", () => {
-  it("the old Delivery Orders list address returns to the unified Delivery page", async () => {
+/**
+ * THE FOUR DELIVERY PAGES (CARD-2026-09-04-delivery-01). Monitor is
+ * `?tab=delivery`; the register address is RESTORED as a real destination —
+ * it no longer redirects into Monitor — and the DO object and Edit Delivery
+ * routes keep reaching their existing components unchanged.
+ */
+describe("OperationApp — the Delivery destinations", () => {
+  it("/operation/delivery-orders mounts the existing register, not a redirect", () => {
     renderApp("/operation/delivery-orders");
-    expect(await screen.findByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("delivery-orders-register-stub")).toBeInTheDocument();
     expect(screen.getByTestId("location-probe")).toHaveTextContent(
-      "/operation?tab=delivery",
+      "/operation/delivery-orders",
     );
+    expect(screen.queryByTestId("delivery-monitor-stub")).not.toBeInTheDocument();
+  });
+
+  it("the register route stands the slim global bar down", () => {
+    renderApp("/operation/delivery-orders");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("/operation/delivery-orders/:doId still mounts the DO object page", () => {
+    renderApp("/operation/delivery-orders/DO-040926-0001");
+    expect(screen.getByTestId("delivery-order-page-stub")).toBeInTheDocument();
   });
 });
 

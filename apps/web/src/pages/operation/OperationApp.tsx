@@ -32,6 +32,7 @@ import OperationDashboard from "./OperationDashboard";
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import DeliveryOrderPage from "./DeliveryOrderPage";
+import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
@@ -410,12 +411,12 @@ export default function OperationApp() {
             />
             <Route path="orders" element={<SalesOrdersRegister />} />
             {/* The Delivery Orders register + the DO object page (blueprint
-                card 2026-08-16). `:doId` accepts the row id or the document
-                number itself, so `DO-…` anywhere in the portal is a door. */}
-            <Route
-              path="delivery-orders"
-              element={<Navigate to="/operation?tab=delivery" replace />}
-            />
+                card 2026-08-16). The register address is a real destination
+                again (CARD-2026-09-04-delivery-01 four-page map) — the
+                2026-08-24 redirect into the unified page is retired with that
+                page. `:doId` accepts the row id or the document number
+                itself, so `DO-…` anywhere in the portal is a door. */}
+            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
             <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
             {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
                 the thing printed on the supplier label and the thing 0366

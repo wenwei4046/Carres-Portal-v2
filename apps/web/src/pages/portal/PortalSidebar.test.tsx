@@ -1159,22 +1159,48 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
  * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
  * simply not NAVIGATION until they are pages.
  */
-describe("PortalSidebar — Delivery is one page", () => {
-  it("shows one plain Delivery door instead of a parent with two children", () => {
+describe("PortalSidebar — the Delivery module's two destinations", () => {
+  /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
+   * Orders → Delivery Order → Edit Delivery. The first two are NAVIGATION;
+   * the object and the writer are reached from cards and rows, never from
+   * the rail. This overwrites the 2026-08-21 one-page ruling. */
+  it("Delivery is a module carrying Monitor and Delivery Orders, in that order", () => {
     renderAt("/operation?tab=delivery");
-    const row = child("delivery");
-    expect(row.tagName).toBe("A");
-    expect(row).toHaveAttribute("href", "/operation?tab=delivery");
-    expect(row.className).toContain("bg-kit-blue-3");
-    expect(row).toHaveTextContent("Delivery");
-    expect(screen.queryByTestId("nav-module-delivery")).toBeNull();
-    expect(screen.queryByTestId("nav-child-delivery-orders")).toBeNull();
+    expect(screen.getByTestId("nav-module-delivery")).toBeInTheDocument();
+    const rows = Array.from(
+      screen
+        .getByTestId("nav-children-delivery")
+        .querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual(["Monitor", "Delivery Orders"]);
+  });
+
+  it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {
+    renderAt("/operation?tab=delivery");
+    const monitor = child("delivery");
+    expect(monitor.tagName).toBe("A");
+    expect(monitor).toHaveAttribute("href", "/operation?tab=delivery");
+    expect(monitor.className).toContain("bg-kit-blue-3");
+    expect(child("delivery-orders").className).not.toContain("bg-kit-blue-3");
+  });
+
+  it("Delivery Orders opens its restored register route and lights only itself", () => {
+    renderAt("/operation/delivery-orders");
+    const register = child("delivery-orders");
+    expect(register).toHaveAttribute("href", "/operation/delivery-orders");
+    expect(register.className).toContain("bg-kit-blue-3");
+    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
+  });
+
+  it("a DO object deep link lights the Delivery Orders row", () => {
+    renderAt("/operation/delivery-orders/DO-040926-0001");
+    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
+    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
   });
 
   it("does not show retired Delivery destinations", () => {
     renderAt("/operation?tab=delivery");
     for (const key of [
-      "delivery-orders",
       "delivery-schedule",
       "delivery-history",
       "delivery-exceptions",
