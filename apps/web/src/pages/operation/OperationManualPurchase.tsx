@@ -31,6 +31,7 @@ import {
   manualPurchaseTimingOf,
   manualPurchaseWorkOrder,
   purchasingRefusal,
+  type PurchasingSupplierCollectionSetting,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
@@ -59,6 +60,7 @@ import {
 } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { addDaysIso } from "@/lib/excel-date-filter";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useAlreadyOnPo,
@@ -68,6 +70,7 @@ import {
   useManualPurchaseDetail,
   useManualPurchasePlan,
   useManualPurchaseRegister,
+  useMoveManualPurchaseDeliverTo,
   type ManualPurchasePlanLine,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
@@ -474,6 +477,35 @@ export default function OperationManualPurchase() {
     setIssueError(null);
     const ids = selectedRows.map((r) => r.id);
     if (ids.length === 0) return;
+    /* ⭐ THE SAME GATE THE SERVER APPLIES, BEFORE THE REQUEST IS SENT (owner,
+       2026-09-03; the SoBatchIssueWorkspace shape). A collected supplier's
+       goods land where Purchasing Settings says; a Manual Purchase that names
+       somewhere else is refused by the issue door with the same two lines
+       this prints. Refusing here saves the round trip and — since a request's
+       Deliver To has no door to move it — says so before anything is tried.
+       `supplierCollections` carries ONLY factory-pickup suppliers
+       (`purchasing-settings.ts`), so no kind gate is needed here, and a
+       payload without the field (an older API) gates nothing. */
+    if (q.data) {
+      const collectionBySupplier = new Map(
+        (q.data.supplierCollections ?? []).map((c) => [c.supplierId, c]),
+      );
+      const destName = new Map(q.data.destinations.map((d) => [d.id, d.name]));
+      for (const row of selectedRows) {
+        for (const wall of row.issueWalls) {
+          const rule = wall.supplierId ? collectionBySupplier.get(wall.supplierId) : undefined;
+          if (rule?.destinationId && rule.destinationId !== wall.destinationId) {
+            setIssueError(
+              purchasingRefusal("supplier_collection_destination_mismatch", {
+                supplier: rule.supplierName || null,
+                destination: destName.get(rule.destinationId) ?? null,
+              }),
+            );
+            return;
+          }
+        }
+      }
+    }
     if (ids.length > 20) {
       /* The one cap this door enforces in the browser. It is a refusal like
          any other, so it wears the refusal shape rather than a lone sentence
@@ -493,9 +525,27 @@ export default function OperationManualPurchase() {
       void q.refetch();
     } catch (e) {
       /* THE APPROVED TWO LINES: the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } })
-        .body;
-      const fallback = purchasingRefusal(body?.code);
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            sku?: string | null;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      /* Every fact the server sent, not just the code. `refuse()` echoes its
+         facts beside `message`, so a code that arrives without a sentence
+         still names the supplier and the destination instead of degrading to
+         `the supplier` (the SoBatchIssueWorkspace shape). */
+      const fallback = purchasingRefusal(body?.code, {
+        sku: body?.sku ?? null,
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
       setIssueError({
         wrong: body?.message ?? fallback.wrong,
         todo: body?.action ?? fallback.todo,
@@ -705,7 +755,11 @@ export default function OperationManualPurchase() {
         <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
+          defaultDestinationId={q.data?.defaultDestinationId ?? null}
+          supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
+          minDeliveryDays={q.data?.minDeliveryDays ?? 0}
+          todayIso={q.data?.todayIso ?? null}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -1251,14 +1305,31 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
 ];
 
 const LINE_GRID = "minmax(0,1fr) 53px minmax(0,1fr) auto";
+/** The picker window. Bounded because `/demand/pick-items` returns every
+ *  supplied SKU (to-order.ts) — the ceiling is a render budget, not a rule.
+ *  The list scrolls inside a `max-h-64` box, so a needle that matches many
+ *  items reaches all of them instead of stopping at the eighth. */
+const PICK_LIMIT = 50;
 
 function CreateRequestWorkspace({
   destinations,
+  defaultDestinationId,
+  supplierCollections,
   staff,
+  minDeliveryDays,
+  todayIso,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
+  defaultDestinationId: string | null;
+  supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
+  /** 0422 — Purchasing Settings' calendar days after the Proceed Date, as
+   *  the Register read it. 0 means no floor. */
+  minDeliveryDays: number;
+  /** The server's Malaysia date — the Proceed Date fallback while the plan
+   *  has not answered yet. */
+  todayIso: string | null;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -1317,7 +1388,6 @@ function CreateRequestWorkspace({
   const createHeader = useCreatePurchaseRequest();
 
   const active = activeId ?? lines[0]?.id;
-  const chosenDest = dest ?? destinations[0]?.id;
 
   /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
      The server previews Proceed Date (its Malaysia date) and, once every
@@ -1336,6 +1406,34 @@ function CreateRequestWorkspace({
       ),
     [plan.data],
   );
+
+  /* ── DELIVER TO IS THE RULE'S WHEN A RULE EXISTS (owner, 2026-09-03) ────
+     A supplier Carres collects from has ONE place its goods land, kept in
+     Purchasing Settings. The issue door refuses any purchase that names
+     somewhere else, and a Manual Purchase has no door to move its Deliver To
+     afterwards — so offering the choice here was offering a dead end (the
+     SoBatchRegister.changeWholeLeaf principle: a governed destination is not
+     the purchase's to move; the operator changes the rule in Settings). The
+     plan already names each picked SKU's supplier, so the rule is derived,
+     never stored: pick a collected item and the field locks; remove it and
+     the choice returns. Two picked items governed to DIFFERENT places cannot
+     be one request (0401 pins one Deliver To per request); that case is left
+     to the issue door's refusal until the owner rules split-or-refuse.
+     Otherwise: the person's choice, then the governed default, then the
+     first destination — the same order SO Batch uses. */
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const sku of pickedSkus) {
+      const supplierId = planBySku.get(sku)?.supplierId;
+      const rule = supplierId ? bySupplier.get(supplierId) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [pickedSkus, planBySku, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const chosenDest =
+    governedRule?.destinationId ?? dest ?? defaultDestinationId ?? destinations[0]?.id;
   /* The server's proposal fills the field only while the person has not
      chosen a date; a chosen date is theirs and is preserved (§3.2). */
   const planDefault = plan.data?.deliveryDateDefault ?? null;
@@ -1394,6 +1492,27 @@ function CreateRequestWorkspace({
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
   const dateOk = deliveryDate !== "";
+  /** 0422 — the earliest Delivery Date a Manual Purchase may ask for is the
+   *  Proceed Date + Purchasing Settings' calendar days. The Proceed Date is
+   *  the one this form already shows from `/plan` (today on the server),
+   *  falling back to the Register's `todayIso`. A chosen date before that
+   *  floor is refused HERE in the door's own words, so the person moves it
+   *  before Send rather than after a 422. 0 days: no floor, no sentence.
+   *  The plan's proposed date is a proposal only and is NOT combined with
+   *  this floor. */
+  const proceedDateIso = plan.data?.proceedDate ?? todayIso;
+  const earliestDeliveryDate =
+    minDeliveryDays > 0 && proceedDateIso != null
+      ? addDaysIso(proceedDateIso, minDeliveryDays)
+      : null;
+  const dateTooEarly =
+    dateOk && earliestDeliveryDate != null && deliveryDate < earliestDeliveryDate;
+  const dateTooEarlyWords = dateTooEarly
+    ? purchasingRefusal("delivery_date_before_earliest", {
+        date: fmtDate(deliveryDate),
+        earliest: fmtDate(earliestDeliveryDate),
+      })
+    : null;
 
   const canSend =
     !saving &&
@@ -1403,6 +1522,7 @@ function CreateRequestWorkspace({
     staffOk &&
     subsidiaryOk &&
     dateOk &&
+    !dateTooEarly &&
     chosenDest != null &&
     submittable.length > 0 &&
     submittable.every(qtyOk) &&
@@ -1421,6 +1541,8 @@ function CreateRequestWorkspace({
       ? MW.sendNeedsLeadDays
       : !dateOk
         ? MW.sendNeedsDate
+        : dateTooEarly
+          ? MW.sendNeedsLaterDate
         : !caseOk
           ? MW.sendNeedsServiceCase
           : !staffOk
@@ -1568,8 +1690,23 @@ function CreateRequestWorkspace({
             id="mp-dest"
             value={chosenDest}
             onValueChange={setDest}
+            disabled={governedRule != null}
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
+          {/* The lock names its rule in the ONE approved sentence for this
+              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
+              line 1) — no new word reaches the screen. */}
+          {governedRule ? (
+            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
+              {
+                purchasingRefusal("supplier_collection_destination_mismatch", {
+                  supplier: governedRule.supplierName || null,
+                  destination:
+                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+                }).wrong
+              }
+            </p>
+          ) : null}
         </div>
         {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
             Malaysia-date preview before Send; the stored hand-off truth
@@ -1583,15 +1720,23 @@ function CreateRequestWorkspace({
         {/* `Delivery Date` — the ONE date input. The server proposes the
             slowest selected line's arrival once lead facts are complete; a
             chosen date is the person's and is never silently overwritten. */}
-        <DatePicker
-          id="mp-delivery-date"
-          label={MW.deliveryDate}
-          value={deliveryDate || null}
-          onChange={(v) => {
-            setDateTouched(true);
-            setDeliveryDate(v ?? "");
-          }}
-        />
+        <div>
+          <DatePicker
+            id="mp-delivery-date"
+            label={MW.deliveryDate}
+            value={deliveryDate || null}
+            onChange={(v) => {
+              setDateTouched(true);
+              setDeliveryDate(v ?? "");
+            }}
+          />
+          {/* 0422 — the door's own refusal, printed before Send is pressed. */}
+          {dateTooEarlyWords ? (
+            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-date-too-early">
+              {dateTooEarlyWords.wrong} {dateTooEarlyWords.todo}
+            </p>
+          ) : null}
+        </div>
         <div>
           <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
           {/* A FACT, never a control — the server stamps created_by itself. */}
@@ -1673,38 +1818,34 @@ function CreateRequestWorkspace({
         </p>
       ) : null}
 
-      {/* ── ITEMS · one row per SKU, the dialog's proven split ── */}
+      {/* ── ITEMS · one row per SKU, the dialog's proven split ──
+          ONE grid holds the caption row and every line, so the four tracks are
+          resolved once and `Note` sits over the note it names. Two grids
+          sharing a template do not share widths — the trailing `auto` track
+          held nothing in the caption row and `Remove` in the lines, and the
+          captions drifted (owner, 2026-09-03). A line is `contents`: its four
+          cells join the grid directly; whatever stacks under it (supplier,
+          lead gap, already-have, error, picker) spans the full row. */}
       <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-lines">
-        <div className="flex items-center justify-between">
-          <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-            {MW.items}
-          </h3>
-          <Button variant="ghost" onClick={addLine} data-testid="mp-line-add">
-            {MW.addLine}
-          </Button>
-        </div>
+        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
+          {MW.items}
+        </h3>
 
         <div
-          className="grid items-center gap-2 text-label text-kit-slate-11"
+          className="grid items-center gap-x-2 gap-y-2"
           style={{ gridTemplateColumns: LINE_GRID }}
         >
-          <span>{W.itemLabel}</span>
-          <span>{W.itemsColQty}</span>
-          <span>{W.remark}</span>
+          <span className="text-label text-kit-slate-11">{W.itemLabel}</span>
+          <span className="text-label text-kit-slate-11">{W.itemsColQty}</span>
+          <span className="text-label text-kit-slate-11">{MW.note}</span>
           <span />
-        </div>
 
-        {lines.map((line, i) => {
-          const picked = items.find((it) => it.sku === line.sku) ?? null;
-          const showPicker = line.id === active && line.sku == null;
-          const done = line.state === "created";
-          return (
-            <div key={line.id} className="flex flex-col gap-1">
-              <div
-                className="grid items-center gap-2"
-                style={{ gridTemplateColumns: LINE_GRID }}
-                data-testid={`mp-line-${i}`}
-              >
+          {lines.map((line, i) => {
+            const picked = items.find((it) => it.sku === line.sku) ?? null;
+            const showPicker = line.id === active && line.sku == null;
+            const done = line.state === "created";
+            return (
+              <div key={line.id} className="contents" data-testid={`mp-line-${i}`}>
                 {/* SKU + Model, never the model word alone — four Booqit
                     variants rendered as the single word `Booqit` is P15's
                     own defect returned (2026-08-19 owner walk). */}
@@ -1729,7 +1870,7 @@ function CreateRequestWorkspace({
                 />
                 <Input
                   id={`mp-note-${i}`}
-                  aria-label={W.remark}
+                  aria-label={MW.note}
                   value={line.note}
                   disabled={done}
                   onChange={(e) => patch(line.id, { note: e.target.value })}
@@ -1745,64 +1886,79 @@ function CreateRequestWorkspace({
                     {MW.remove}
                   </Button>
                 )}
+
+                {/* Everything that stacks under the line spans the row. An
+                    empty stack draws nothing, so it costs no grid gap. */}
+                <div className="col-span-full flex flex-col gap-1 empty:hidden">
+                  {picked?.supplier ? (
+                    <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
+                      {W.supplierLabel}: {picked.supplier}
+                    </p>
+                  ) : null}
+
+                  {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
+                      the governed two lines, and the act deep-links Settings.
+                      Send stays `Send — lead days are not set` until repaired;
+                      nothing substitutes zero or a browser date. */}
+                  {leadGaps
+                    .filter((g) => g.sku === line.sku)
+                    .map((g) => (
+                      <span
+                        key={`${g.sku}-${g.wrong}`}
+                        className="flex min-w-0 flex-col"
+                        data-testid={`mp-lead-gap-${i}`}
+                      >
+                        <span className="text-body font-medium text-kit-red-11">
+                          {g.wrong}
+                        </span>
+                        <Link
+                          to="/operation?tab=purchasing-settings"
+                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                        >
+                          {g.todo}
+                        </Link>
+                      </span>
+                    ))}
+
+                  {picked ? (
+                    <AlreadyHave
+                      sku={picked.sku}
+                      free={picked.free}
+                      qty={Number(line.qty) || 0}
+                      index={i}
+                    />
+                  ) : null}
+
+                  {line.error ? (
+                    <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
+                      {line.error}
+                    </p>
+                  ) : null}
+
+                  {showPicker ? (
+                    <LinePicker
+                      items={items}
+                      needle={line.needle}
+                      loading={pick.isLoading}
+                      onPick={(sku) => patch(line.id, { sku, needle: "" })}
+                    />
+                  ) : null}
+                </div>
               </div>
+            );
+          })}
+        </div>
 
-              {picked?.supplier ? (
-                <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
-                  {W.supplierLabel}: {picked.supplier}
-                </p>
-              ) : null}
-
-              {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
-                  the governed two lines, and the act deep-links Settings.
-                  Send stays `Send — lead days are not set` until repaired;
-                  nothing substitutes zero or a browser date. */}
-              {leadGaps
-                .filter((g) => g.sku === line.sku)
-                .map((g) => (
-                  <span
-                    key={`${g.sku}-${g.wrong}`}
-                    className="flex min-w-0 flex-col"
-                    data-testid={`mp-lead-gap-${i}`}
-                  >
-                    <span className="text-body font-medium text-kit-red-11">
-                      {g.wrong}
-                    </span>
-                    <Link
-                      to="/operation?tab=purchasing-settings"
-                      className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
-                    >
-                      {g.todo}
-                    </Link>
-                  </span>
-                ))}
-
-              {picked ? (
-                <AlreadyHave
-                  sku={picked.sku}
-                  free={picked.free}
-                  qty={Number(line.qty) || 0}
-                  index={i}
-                />
-              ) : null}
-
-              {line.error ? (
-                <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
-                  {line.error}
-                </p>
-              ) : null}
-
-              {showPicker ? (
-                <LinePicker
-                  items={items}
-                  needle={line.needle}
-                  loading={pick.isLoading}
-                  onPick={(sku) => patch(line.id, { sku, needle: "" })}
-                />
-              ) : null}
-            </div>
-          );
-        })}
+        {/* The add control sits where the operator's eye ends — under the last
+            line — and wears the neutral box, not the ghost: in this block it
+            is the only road to a second item, and a boxless grey word next to
+            grey captions read as one more caption (owner, 2026-09-03). Not
+            `primary`: `Send for approval` already holds the screen's one. */}
+        <div className="flex">
+          <Button variant="neutral" onClick={addLine} data-testid="mp-line-add">
+            {MW.addLine}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1874,24 +2030,33 @@ function LinePicker({
 }) {
   const shown = useMemo(() => {
     const n = needle.trim().toLowerCase();
-    if (!n) return items.slice(0, 8);
+    if (!n) return items.slice(0, PICK_LIMIT);
     return items
       .filter(
         (i) => i.label.toLowerCase().includes(n) || i.sku.toLowerCase().includes(n),
       )
-      .slice(0, 8);
+      .slice(0, PICK_LIMIT);
   }, [items, needle]);
 
+  /* The kit's DataTable is its own scroller (`min-h-0 flex-1 overflow-auto`)
+     and needs a parent that BOUNDS its height to shrink against; in an
+     auto-height column `flex-1` resolves to content height and the list
+     never scrolls. The wrapper carries the ceiling ONLY — never a second
+     `overflow-*`, which DataTable.tsx warns scrolls in jsdom and dies in a
+     browser. 256px = the head plus five rows and half of the sixth, the
+     kit's own bounded-list height (DataTable's column filter). */
   return (
-    <DataTable<DemandPickItem>
-      rows={shown}
-      columns={PICK_COLUMNS}
-      rowId={(i) => i.sku}
-      onRowOpen={(i) => onPick(i.sku)}
-      label={W.pickerTableLabel}
-      loading={loading}
-      empty={null}
-    />
+    <div className="flex max-h-64 min-h-0 flex-col">
+      <DataTable<DemandPickItem>
+        rows={shown}
+        columns={PICK_COLUMNS}
+        rowId={(i) => i.sku}
+        onRowOpen={(i) => onPick(i.sku)}
+        label={W.pickerTableLabel}
+        loading={loading}
+        empty={null}
+      />
+    </div>
   );
 }
 
@@ -1996,6 +2161,150 @@ function Fact({
         {children}
       </dd>
     </div>
+  );
+}
+
+/**
+ * THE DELIVER TO DOOR ON AN EXISTING REQUEST (0421).
+ *
+ * MPR-20260903-3381 was refused at Issue with "Set Deliver To to Ohana, then
+ * issue again" and the request had nowhere to do that. This fact swaps into a
+ * choice of open places behind `Change`; `Save` asks the server to move the
+ * header and every live line together. The same rule the create form applies
+ * (1083) applies here: when every live line's supplier is collected to ONE
+ * place, the choice is locked to that place and the approved sentence says
+ * why — so the operator's Save simply moves the request where the issue door
+ * wants it.
+ */
+function DeliverToFact({
+  requestId,
+  destinationId,
+  destinations,
+  live,
+  supplierCollections,
+  movable,
+}: {
+  requestId: string;
+  destinationId: string;
+  destinations: Array<{ id: string; name: string; active?: boolean }>;
+  live: PurchaseRequestLineRow[];
+  supplierCollections: PurchasingSupplierCollectionSetting[];
+  movable: boolean;
+}) {
+  const move = useMoveManualPurchaseDeliverTo();
+  const [editing, setEditing] = useState(false);
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
+
+  const name = destinations.find((d) => d.id === destinationId)?.name ?? "";
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const l of live) {
+      const rule = l.supplier_id ? bySupplier.get(l.supplier_id) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [live, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const value = governedRule?.destinationId ?? chosen ?? destinationId;
+  /* Open places only — plus the request's own, so the field never shows a
+     blank for a place that has since closed. */
+  const options = destinations
+    .filter((d) => d.active !== false || d.id === destinationId)
+    .map((d) => ({ value: d.id, label: d.name }));
+
+  function close() {
+    setEditing(false);
+    setChosen(undefined);
+    setError(null);
+  }
+
+  async function save() {
+    setError(null);
+    try {
+      await move.mutateAsync({ id: requestId, destinationId: value });
+      close();
+    } catch (e) {
+      /* THE APPROVED TWO LINES, with every fact the server sent. */
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      const fallback = purchasingRefusal(body?.code, {
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
+      setError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
+    }
+  }
+
+  if (!editing) {
+    return (
+      <>
+        {name}
+        {movable ? (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="ml-2 text-label text-kit-blue-11 underline-offset-2 hover:underline"
+            data-testid="mp-detail-deliver-to-change"
+          >
+            {MW.change}
+          </button>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <span className="flex flex-col gap-1.5">
+      <Select
+        id="mp-detail-deliver-to-select"
+        value={value}
+        onValueChange={setChosen}
+        disabled={governedRule != null || move.isPending}
+        options={options}
+      />
+      {governedRule ? (
+        <span className="text-meta text-kit-slate-11" data-testid="mp-detail-deliver-to-governed">
+          {
+            purchasingRefusal("supplier_collection_destination_mismatch", {
+              supplier: governedRule.supplierName || null,
+              destination:
+                destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+            }).wrong
+          }
+        </span>
+      ) : null}
+      {error ? (
+        <TwoLines wrong={error.wrong} todo={error.todo} testId="mp-detail-deliver-to-error" />
+      ) : null}
+      <span className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => void save()}
+          disabled={move.isPending}
+          data-testid="mp-detail-deliver-to-save"
+        >
+          {MW.save}
+        </Button>
+        <Button size="sm" variant="neutral" onClick={close} disabled={move.isPending}>
+          {MW.cancel}
+        </Button>
+      </span>
+    </span>
   );
 }
 
@@ -2419,8 +2728,22 @@ function ManualPurchaseObject({
               <Fact label={MW.colFor} testId="mp-detail-for">
                 {forText}
               </Fact>
-              <Fact label={MW.colDeliverTo}>
-                {destName.get(request.destination_id) ?? ""}
+              <Fact label={MW.colDeliverTo} testId="mp-detail-deliver-to">
+                <DeliverToFact
+                  requestId={request.id}
+                  destinationId={request.destination_id}
+                  destinations={d.destinations}
+                  live={live}
+                  supplierCollections={d.supplierCollections ?? []}
+                  /* Movable until a line is on a PO: the RPC refuses the rest
+                     (refused, every line cancelled) and the same arithmetic
+                     hides the door here so it is never offered and refused. */
+                  movable={
+                    status != null &&
+                    (status.kind === "waiting_approval" || status.kind === "ready_to_order") &&
+                    !lines.some((l) => l.po_id != null || (l.po_ids?.length ?? 0) > 0)
+                  }
+                />
               </Fact>
               {/* The real staff display name — never `operation`, an email, a
                   role or `(you)`. A shared-account record whose individual

@@ -49,7 +49,7 @@ const TOP_SKUS_PAYLOAD = {
 };
 
 describe("FinanceReports page", () => {
-  it("renders 4 KPIs from latest month + period dropdown + Export PDF button", async () => {
+  it("renders 4 KPIs from latest month + period dropdown, and no Export button", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("monthly-pl")) return PL_PAYLOAD;
       if (url.includes("top-skus"))   return TOP_SKUS_PAYLOAD;
@@ -68,9 +68,11 @@ describe("FinanceReports page", () => {
     // "Opex" appears in BOTH KPI label AND P&L table column header
     expect(screen.getAllByText("Opex").length).toBeGreaterThanOrEqual(2);
 
-    // Period dropdown + Export button
+    // Period dropdown; the YTD choice carries the business year, not a literal
     expect(screen.getByRole("combobox", { name: "Period" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: `YTD ${new Date().getFullYear()}` })).toBeInTheDocument();
+    // No export exists yet, so no button promises one
+    expect(screen.queryByRole("button", { name: /export/i })).not.toBeInTheDocument();
   });
 
   it("renders P&L table rows + Top SKUs bar list", async () => {

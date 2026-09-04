@@ -437,17 +437,36 @@ describe("Purchase Order object", () => {
 
   /* ⭐ THE FACTS AND THE DOCUMENT ARE READ TOGETHER (YH, 2026-09-03).
      The preview used to sit BELOW every block, so checking a goods line against
-     what the supplier actually received meant scrolling the two apart. Issue and
-     Revise already put them side by side; the Document view now does too. */
-  it("shows the official document beside the facts, not below them", () => {
+     what the supplier actually received meant scrolling the two apart. They are
+     now two panes that each scroll on their own — the Sales Order's shape —
+     and the document is paper, not a framed PDF viewer. */
+  it("shows the official document beside the facts as two self-scrolling panes", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const column = screen.getByTestId("po-document-column");
     expect(within(column).getByLabelText("Official purchase order preview")).toBeInTheDocument();
-    /* The Goods lines table sets `min-w-[900px]`. Without `min-w-0` the grid
-       item sizes to it and the document column collapses — the one failure this
+    expect(within(column).queryByTitle("Official purchase order preview")).toBeNull();
+    const panes = column.parentElement!;
+    expect(panes.className).toContain("lg:flex-row");
+    /* Each pane scrolls on its own, and the page does not. */
+    expect(panes.firstElementChild?.className).toContain("lg:overflow-auto");
+    expect(column.className).toContain("lg:overflow-auto");
+    /* The Goods lines table sets `min-w-[900px]`. Without `min-w-0` the flex
+       item sizes to it and the document pane collapses — the one failure this
        layout has, and the reason the class is asserted rather than eyeballed. */
-    expect(column.parentElement?.className).toContain("lg:grid-cols-2");
-    expect(column.parentElement?.firstElementChild?.className).toContain("min-w-0");
+    expect(panes.firstElementChild?.className).toContain("min-w-0");
+  });
+
+  it("wears the Sales Order's card heading and keeps the long Unit ID list last (2026-09-04)", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const facts = screen.getByTestId("po-document-panes").firstElementChild!;
+    const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    /* Same card as the Sales Order: the mono, tracked heading face. */
+    const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
+    expect(po.className).toContain("font-mono");
+    /* Short cards first; the one-row-per-unit list is scrolled past, not to. */
+    const order = ["Receiving", "Claims and returns", "Unit IDs"].map((t) => heads.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
   it("uses the 50/50 official-document layout only for issue or revision work", () => {

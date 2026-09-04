@@ -2,7 +2,7 @@
 // Register engine (components/register/DataGrid), which already owns search,
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import {
   poDateHistoryOf,
@@ -24,6 +24,11 @@ import {
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
+import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
+/* The Sales Order's card: same heading face, same border, same padding. The
+   PO document is read against the SO every day; two card grammars on two
+   sister pages read as two apps (YH, 2026-09-04). */
+import { Block } from "../SalesOrderWorkspace";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
@@ -813,10 +818,19 @@ function PurchaseOrderObject({
         </nav>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+      {/* The Document view hands the height to its two panes (each scrolls on
+          its own, the SalesOrderWorkspace shape); every other view scrolls the
+          page as before. Below `lg` the panes stack and the page scrolls. */}
+      <main
+        className={
+          view === "Document" && mode === "read"
+            ? "min-h-0 flex-1 overflow-auto lg:overflow-hidden"
+            : "min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
+        }
+      >
         {view === "Document" && mode !== "read" ? (
           <div
-            className="grid min-h-[640px] grid-cols-1 gap-3 min-[1130px]:grid-cols-2"
+            className="grid grid-cols-1 gap-3 min-[1130px]:grid-cols-2"
             data-testid="po-document-split"
             data-layout="50-50"
           >
@@ -973,22 +987,25 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   const po = row.po;
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
   return (
-    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE (YH, 2026-09-03).
-       The official PDF used to sit BELOW every block, so checking a goods line
-       against what the supplier actually received meant scrolling the two apart
-       and holding one in your head. They are now two columns, and the document
-       is sticky — it stays in view for the whole length of the left column.
+    /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE — AS TWO PANES (YH, 2026-09-03).
+       The first cut put them in one grid inside a scrolling page and pinned the
+       document with `sticky`: a bordered box holding an iframe holding the
+       browser's PDF viewer, with its own grey chrome and its own scrollbar,
+       jumping as the page scrolled under it. The Sales Order does not do that.
+       Its facts and its document are two panes that each scroll on their own
+       and the page does not; the document is sheets of paper on the canvas, no
+       box, no caption strip. This is that shape, 50/50 at `lg`; below it the
+       two stack, facts first, and the page scrolls normally.
 
-       `min-w-0` on the left column is load-bearing. A grid item defaults to
+       `min-w-0` on the facts pane is load-bearing. A flex item defaults to
        `min-width: auto`, so the Goods lines table's `min-w-[900px]` would size
-       the COLUMN rather than scroll inside it, and the document would be
-       squeezed to nothing. Below `lg` the two stack, exactly as before. */
-    <div className="mx-auto grid max-w-[1440px] grid-cols-1 items-start gap-3 lg:grid-cols-2">
-      <div className="flex min-w-0 flex-col gap-3">
+       the PANE rather than scroll inside it, and the document would be
+       squeezed to nothing. */
+    <div className="flex h-full min-h-0 flex-col lg:flex-row" data-testid="po-document-panes">
+      <div className="flex min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4 lg:w-1/2 lg:overflow-auto">
       <WorkCard row={row} owner={owner} />
-      <section className="border border-kit-slate-5 bg-white p-4">
-        <h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Purchase order</h2>
-        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Block title="Purchase order">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Supplier" value={row.supplierName} />
           <Fact label="Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={row.source} />
@@ -1002,10 +1019,11 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
         <SupplierDateBlock row={row} onSaved={onSupplierDateSaved} />
-      </section>
-      <section className="overflow-hidden border border-kit-slate-5 bg-white">
-        <h2 className="px-4 py-3 text-label font-semibold uppercase tracking-wide text-kit-slate-9">Goods lines</h2>
-        <div className="overflow-x-auto">
+      </Block>
+      <Block title="Goods lines">
+        {/* The table bleeds to the card edge so its own scroller, not the
+            card, is what moves sideways. */}
+        <div className="-mx-4 -mb-3 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
               <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Ordered</th><th className="px-3 text-right">Received</th><th className="px-3 text-right">Open</th></tr>
@@ -1029,13 +1047,15 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
             </tbody>
           </table>
         </div>
-      </section>
+      </Block>
       {/* Three across fitted the full width; in half of it they were three
-          slivers. Two, and the third wraps. */}
+          slivers. Two, and the third wraps.
+
+          Order: the short cards first, the long list last. Receiving and
+          Claims hold a handful of rows; Unit IDs holds one row per unit and
+          is the card a reader scrolls past, not to (YH, 2026-09-04). No rule
+          in docs/purchasing/MASTER.md or docs/ui/MASTER.md fixes this order. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
-          {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
-        </ConnectionBlock>
         <ConnectionBlock title="Receiving" empty="No receiving session is connected to this PO." hasContent={receiving.length > 0} loading={receivingLoading} problem={receivingError ? "The Receiving connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the receiving connection." onRetry={onRetryReceiving}>
           {receiving.map((receipt) => <ConnectionRow key={receipt.id} primary={receipt.do_number ?? "Supplier DO not recorded"} secondary={`${receipt.status} · ${fmtDate(receipt.goods_received_at)}`} />)}
           {receiving.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=receiving&po=${encodeURIComponent(po.id)}`}>Open Receiving</Link> : null}
@@ -1045,23 +1065,31 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           {returnRows.map((receipt) => <ConnectionRow key={`return-${receipt.id}`} primary="Receiving return" secondary={receipt.return_reason!} />)}
           {claims.length > 0 ? <Link className="mt-2 text-meta font-medium text-kit-blue-11 hover:underline" to={`/operation?tab=claims&po=${encodeURIComponent(po.id)}`}>Open Claims and Returns</Link> : null}
         </ConnectionBlock>
+        <ConnectionBlock title="Unit IDs" empty="No Unit ID is recorded for this PO." hasContent={units.length > 0} loading={unitLoading} problem={unitError ? "The Unit ID connection could not be loaded" : null} action="Try again. If it still fails, ask the system owner to check the PO Unit IDs." onRetry={onRetryUnits}>
+          {units.map((unit) => <ConnectionRow key={unit.unit_code} primary={unit.unit_code} secondary={`${unit.sku} · ${unit.status}`} />)}
+        </ConnectionBlock>
       </div>
       </div>
-      {/* The document column. Sticky so it holds its place while the facts
-          scroll beside it — the whole reason the two are side by side. */}
-      <div className="min-w-0 lg:sticky lg:top-3" data-testid="po-document-column">
+      {/* The document pane. Its own scroller, so the paper holds its place
+          while the facts scroll beside it — the whole reason the two are side
+          by side. */}
+      <aside
+        className="min-h-0 min-w-0 border-t border-kit-slate-5 p-3 sm:p-4 lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto"
+        aria-label="Purchase order document"
+        data-testid="po-document-column"
+      >
         {/* A cancelled purchase order has no official document to preview —
             0402 refuses to print one by design. Saying so beats mounting a frame
             that can only fill with an error strip. */}
         {row.po.status === "cancelled" ? (
-          <section className="border border-kit-slate-5 bg-kit-slate-3 px-3 py-2" data-testid="po-cancelled-no-document">
+          <section className="border border-kit-slate-5 bg-white px-3 py-2" data-testid="po-cancelled-no-document">
             <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</div>
             <div className="mt-1 text-body text-kit-slate-11">A cancelled purchase order has no official document.</div>
           </section>
         ) : (
           <OfficialPreview poId={po.id} />
         )}
-      </div>
+      </aside>
     </div>
   );
 }
@@ -1214,7 +1242,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 function ConnectionBlock({ title, empty, children, hasContent, loading, problem, action, onRetry }: { title: string; empty: string; children: React.ReactNode; hasContent: boolean; loading?: boolean; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="flex min-h-[150px] flex-col border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <Absence>{empty}</Absence>}</div></section>;
+  return <Block title={title}><div className="flex flex-col gap-2">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : loading ? <Absence>Loading…</Absence> : hasContent ? children : <Absence>{empty}</Absence>}</div></Block>;
 }
 
 function ConnectionRow({ primary, secondary }: { primary: string; secondary: string }) {
@@ -1256,24 +1284,23 @@ function RouteProblem({ title, problem, action, onRetry }: { title: string; prob
 }
 
 function OfficialPreview({ poId }: { poId: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    void (async () => {
-      try {
-        const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
-        const blob = await renderPoPdf(data);
-        if (typeof URL.createObjectURL === "function") objectUrl = URL.createObjectURL(blob);
-        if (active) setUrl(objectUrl);
-      } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "The official PDF could not be opened");
-      }
-    })();
-    return () => { active = false; if (objectUrl && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(objectUrl); };
+  /* The same blob `Download PDF` saves, painted as pages. The header already
+     names the PO, so the paper carries no caption strip of its own. */
+  const render = useCallback(async () => {
+    const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+    return renderPoPdf(data);
   }, [poId]);
-  return <section className="flex min-h-[640px] min-w-0 flex-col border border-kit-slate-5 bg-kit-slate-3"><div className="flex h-10 items-center justify-between border-b border-kit-slate-5 bg-white px-3"><span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">Official document</span><span className="font-mono text-meta text-kit-slate-9">{poId}</span></div>{error ? <div className="border-b border-kit-red-9 bg-kit-red-3 px-3 py-2"><div className="text-meta text-kit-red-11">The official PDF could not be opened</div><div className="text-meta text-kit-slate-11">Try again. If it still fails, ask the system owner to check the PO document.</div></div> : null}<iframe title="Official purchase order preview" aria-label="Official purchase order preview" className="min-h-[600px] w-full flex-1 bg-white" src={url ?? "about:blank"} /></section>;
+  const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
+  return (
+    <div className="mx-auto w-full max-w-[700px]">
+      {pdfError ? (
+        <div className="mb-3">
+          <ReadProblem problem="The official PDF could not be opened" action="Try again. If it still fails, ask the system owner to check the PO document." onRetry={retry} />
+        </div>
+      ) : null}
+      <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />
+    </div>
+  );
 }
 
 function RevisionForm({

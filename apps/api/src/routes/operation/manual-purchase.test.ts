@@ -1134,6 +1134,7 @@ const CARD06_SETTINGS = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
+  manualPurchaseMinDeliveryDays: 0,
   suppliers: [
     { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
   ],
@@ -1464,10 +1465,15 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
 describe("POST /purchasing/requests/issue — a refusal says what is wrong and what to do", () => {
   const FALLBACK = purchasingRefusal("__not_a_code__");
 
-  function sbWith(
-    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
-    rpc: ReturnType<typeof vi.fn>,
-  ) {
+  type Over = {
+    requests?: unknown[];
+    lines?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    collections?: unknown[];
+  };
+
+  function sbWith(over: Over, rpc: ReturnType<typeof vi.fn>) {
     return {
       from: vi.fn((table: string) => {
         switch (table) {
@@ -1483,7 +1489,9 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
               ],
             );
           case "suppliers":
-            return tableStub([{ id: SUP, kind: "own_logistics" }]);
+            return tableStub(over.suppliers ?? [{ id: SUP, kind: "own_logistics", name: "Ohana" }]);
+          case "purchasing_supplier_settings":
+            return tableStub(over.collections ?? []);
           case "warehouses":
             return tableStub([
               { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
@@ -1499,10 +1507,7 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     } as unknown as ReturnType<typeof userClient>;
   }
 
-  async function issueAgainst(
-    over: { requests?: unknown[]; lines?: unknown[]; skus?: unknown[] },
-    body: unknown,
-  ) {
+  async function issueAgainst(over: Over, body: unknown) {
     const rpc = vi.fn().mockResolvedValue({ data: { po_ids: [] }, error: null });
     vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
     const jwt = await makeJwt("operation");
@@ -1526,6 +1531,33 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     expect(payload.message, `${code} is not the fallback`).not.toBe(FALLBACK.wrong);
     expect(payload.action, `${code} is not the fallback`).not.toBe(FALLBACK.todo);
   }
+
+  /* ⭐ THE DELIVER TO GATE (owner, 2026-09-03). A supplier Carres collects
+     from has one place its goods land, held in Purchasing Settings. A request
+     that names another Deliver To is refused BEFORE any PO exists, and the
+     refusal names the supplier and the governed place — the sentence the
+     owner met on MPR-20260903-3381. This pre-flight had no test until now. */
+  it("refuses a collected supplier's request that names another Deliver To, before creating anything", async () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+    const { res, rpc, body } = await issueAgainst(
+      {
+        suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+        collections: [
+          {
+            supplier_id: SUP,
+            fixed_destination_id: OHANA,
+            collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+          },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "supplier_collection_destination_mismatch");
+    expect(body.message).toContain("Ohana must be collected to");
+    expect(body.supplier, "the supplier travels as a fact").toBe("Ohana");
+    expect(rpc, "no PO was created").not.toHaveBeenCalled();
+  });
 
   it("names a Manual Purchase that is no longer on the list", async () => {
     const { res, rpc, body } = await issueAgainst(
@@ -1588,6 +1620,112 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     expectSpoken(body, "unresolved_supplier");
     /* The sentence names the SKU rather than saying "an item". */
     expect(body.message).toContain("5539-2NA");
+  });
+
+  /* ⭐ THE DELIVER TO DOOR (0421). MPR-20260903-3381 was told "Set Deliver To
+     to Ohana, then issue again" and had no way to. PUT /:id/deliver-to is
+     that way: it runs the same collection pre-flight as /issue, then asks the
+     RPC, and every refusal leaves with its two lines. */
+  describe("PUT /purchasing/requests/:id/deliver-to", () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+
+    async function moveAgainst(over: Over, rpc: ReturnType<typeof vi.fn>, destinationId = OHANA) {
+      vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`https://api.test/api/operation/purchasing/requests/${REQ_A}/deliver-to`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ destinationId }),
+        }),
+        env as never,
+        { waitUntil() {}, passThroughException() {} } as never,
+      );
+      return { res, rpc, body: (await res.json()) as Record<string, unknown> };
+    }
+
+    it("asks the RPC to move the request, with the request and the place", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, req_no: "REQ-0001", destination_id: OHANA, moved: true },
+        error: null,
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith("purchasing_move_request_destination", {
+        p_id: REQ_A,
+        p_destination_id: OHANA,
+      });
+      expect(body.ok).toBe(true);
+      expect(body.moved).toBe(true);
+    });
+
+    it("a request already on a PO is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is already ordered", details: "request_ordered" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_ordered");
+      expect(body.message).toBe("This request is already ordered. Deliver To cannot move.");
+      expect(body.action).toBe("Revise the purchase order instead.");
+    });
+
+    it("a request with nothing going ahead is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is not going ahead", details: "request_closed" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_closed");
+    });
+
+    it("a collected supplier's request cannot move away from its governed place — refused before the RPC", async () => {
+      const rpc = vi.fn();
+      const KLANG = "cccccccc-0000-0000-0000-000000000009";
+      const { res, body } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        KLANG,
+      );
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "supplier_collection_destination_mismatch");
+      expect(body.message).toContain("Ohana must be collected to");
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("a move TO the governed place passes the pre-flight", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, moved: true },
+        error: null,
+      });
+      const { res } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        OHANA,
+      );
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
@@ -1703,5 +1841,111 @@ describe("POST /purchasing/requests — the whole request, or none of it", () =>
     const { res } = await post(HEADER, rpc);
     expect(res.status).toBe(200);
     expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request");
+  });
+});
+
+/**
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch).
+ *
+ * Purchasing Settings holds `manual_purchase_min_delivery_days` (calendar
+ * days). The floor is the Proceed Date — today, Malaysia — plus that number.
+ * When the number is above 0 and the asked-for date is earlier, the create
+ * door refuses BEFORE the create RPC. 0, or settings unavailable: the door
+ * behaves exactly as before. The lead-time plan is not consulted.
+ */
+describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purchase may ask for (0422)", () => {
+  const HEADER = { purpose: "ready_stock", destinationId: DEST };
+  const LINES = [{ sku: "5539-2NA", qty: 1 }];
+
+  function sbWith(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => rpc(fn, args)),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function create(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(sbWith(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  const created = () =>
+    vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
+      error: null,
+    });
+
+  /** Today in Malaysia + n calendar days — the floor, computed here by hand
+   *  so the route's arithmetic is pinned by value, not trusted. */
+  const mytPlus = (n: number) =>
+    new Date(Date.now() + 8 * 3_600_000 + n * 86_400_000).toISOString().slice(0, 10);
+
+  it("3 days + a Delivery Date before Proceed Date + 3 → 422, and the RPC is never called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const tooEarly = mytPlus(2);
+    const res = await create({ ...HEADER, requiredBy: tooEarly, lines: LINES }, rpc);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body.code).toBe("delivery_date_before_earliest");
+    expect(body.date).toBe(tooEarly);
+    expect(body.earliest).toBe(mytPlus(3));
+    expect(body.message).toContain(tooEarly);
+    expect(body.action).toContain(mytPlus(3));
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("3 days + a Delivery Date exactly on Proceed Date + 3 → the RPC is called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: mytPlus(3), lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+  });
+
+  it("0 days → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 0,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("the settings cannot be loaded → no number, no floor, no refusal", async () => {
+    vi.mocked(loadPurchasingSettings).mockRejectedValueOnce(new Error("purchasing_settings: down"));
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

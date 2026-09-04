@@ -842,6 +842,25 @@ export default function OperationPurchasingSettings({
               <ChangeLine settings={data} settingKey="earliest_sell_days" />
             </NumberRow>
 
+            {/* 0422 — the sibling of the row above: CALENDAR days, same
+                unit, same 0..365, same audited `purchasing_set_number` door.
+                The Manual Purchase create door refuses a Delivery Date
+                earlier than Proceed Date + this; 0 means no floor. */}
+            <NumberRow
+              label="Earliest Delivery Date a Manual Purchase may ask for"
+              hint="A Manual Purchase cannot ask for a Delivery Date closer than this to its Proceed Date."
+              unit="days"
+              value={data.manualPurchaseMinDeliveryDays}
+              min={PURCHASING_NUMBER_RANGE.manual_purchase_min_delivery_days.min}
+              max={PURCHASING_NUMBER_RANGE.manual_purchase_min_delivery_days.max}
+              canEdit={canEdit}
+              pending={setNumber.isPending}
+              testId="manual-purchase-min-delivery-days"
+              onSave={(n) => saveNumber("manual_purchase_min_delivery_days", n)}
+            >
+              <ChangeLine settings={data} settingKey="manual_purchase_min_delivery_days" />
+            </NumberRow>
+
             <NumberRow
               label="Confirm delivery date"
               hint="Working days before the delivery date this call is raised."

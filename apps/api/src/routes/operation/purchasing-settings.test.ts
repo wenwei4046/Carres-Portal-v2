@@ -20,6 +20,7 @@ const response: Omit<PurchasingSettingsResponse, "canEdit"> = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
+  manualPurchaseMinDeliveryDays: 0,
   suppliers: [],
   productionDays: [],
   destinations: [
@@ -155,5 +156,54 @@ describe("Purchasing Settings — supplier collection", () => {
 
     expect(res.status).toBe(422);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("Purchasing Settings — the earliest Delivery Date a Manual Purchase may ask for (0422)", () => {
+  it("is one of the single numbers: PUT /number by key reaches purchasing_set_number", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    vi.mocked(loadPurchasingSettings).mockResolvedValue({
+      ...response,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+
+    const res = await testApp().request("/settings/number", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "manual_purchase_min_delivery_days", value: 3 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_number", {
+      p_key: "manual_purchase_min_delivery_days",
+      p_value: 3,
+    });
+    expect(
+      ((await res.json()) as PurchasingSettingsResponse).manualPurchaseMinDeliveryDays,
+    ).toBe(3);
+  });
+
+  it("refuses a number outside 0..365 before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+
+    const res = await testApp().request("/settings/number", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "manual_purchase_min_delivery_days", value: 366 }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the GET carries the number so the screen renders it from the server's answer", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as never);
+    const res = await testApp().request("/settings");
+    expect(res.status).toBe(200);
+    expect(
+      ((await res.json()) as PurchasingSettingsResponse).manualPurchaseMinDeliveryDays,
+    ).toBe(0);
   });
 });

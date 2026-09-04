@@ -43,6 +43,11 @@ export interface PurchasingRefusalFacts {
   actor?: string | null;
   /** The line's own requested quantity — the approved-quantity ceiling. */
   qty?: number | null;
+  /** 0422 — the Delivery Date asked for, and the earliest Delivery Date a
+   *  Manual Purchase may ask for (Proceed Date + the Purchasing Settings
+   *  number). Both arrive already formatted for the surface printing them. */
+  date?: string | null;
+  earliest?: string | null;
 }
 
 const some = (v: string | null | undefined, fallback: string) =>
@@ -246,6 +251,20 @@ export function purchasingRefusal(
         wrong: "One Manual Purchase was refused.",
         todo: "Go back and untick the refused one, then issue again.",
       };
+    /* The Deliver To door on an existing request (0421). A request whose line
+       is already on a PO keeps its place: the PO names its own destination and
+       changes through Revise. A request with nothing left to deliver has no
+       place to move. */
+    case "request_ordered":
+      return {
+        wrong: "This request is already ordered. Deliver To cannot move.",
+        todo: "Revise the purchase order instead.",
+      };
+    case "request_closed":
+      return {
+        wrong: "This request is not going ahead.",
+        todo: "Raise a new request.",
+      };
     case "nothing_to_issue":
       return {
         wrong: "There is nothing left to buy on these lines.",
@@ -304,6 +323,18 @@ export function purchasingRefusal(
       return {
         wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
+      };
+    /* 0422 — the asked-for Delivery Date is before the earliest a Manual
+       Purchase may ask for: Proceed Date + `manual_purchase_min_delivery_days`
+       (calendar days, Purchasing Settings). The act names the one fix: move
+       the date. */
+    case "delivery_date_before_earliest":
+      return {
+        wrong: `Delivery Date ${some(facts.date, "asked for")} is earlier than the earliest date ${some(
+          facts.earliest,
+          "the items can arrive",
+        )}.`,
+        todo: `Set Delivery Date to ${some(facts.earliest, "the earliest date")} or later, then send again.`,
       };
     case "no_warehouse":
       return {
@@ -429,6 +460,8 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_request",
   "not_ready_to_order",
   "request_refused",
+  "request_ordered",
+  "request_closed",
   "nothing_to_issue",
   "blocked_delivery_date",
   "production_days_required",
@@ -438,6 +471,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "supplier_collection_mismatch",
   "supplier_collection_destination_mismatch",
   "pickup_partner_not_allowed",
+  "delivery_date_before_earliest",
   "no_warehouse",
   "unknown_source_order",
   "source_line_mismatch",

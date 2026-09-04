@@ -680,7 +680,211 @@ describe("Card 03 · the left filter rail", () => {
   });
 });
 
+/* ⭐ DELIVER TO FOLLOWS THE COLLECTION RULE (owner, 2026-09-03). The owner
+   raised MPR-20260903-3381 for Ohana to Carres Klang and was refused at issue
+   with `Ohana must be collected to Ohana.` — and the request's Deliver To has
+   no door to move it. So the form may not offer the dead end, and the Register
+   must say the same sentence BEFORE the round trip. */
+describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
+  const OHANA = "2f181917-f4e1-42b2-9e25-d7ee6785424b";
+  const GOVERNED = {
+    ...REGISTER,
+    destinations: [
+      { id: KLANG, name: "Carres Klang" },
+      { id: OHANA, name: "Ohana" },
+    ],
+    supplierCollections: [
+      { supplierId: "s1", supplierName: "Ohana", destinationId: OHANA, partnerId: "p1" },
+    ],
+  };
+  function withRegister(register: unknown) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        url.includes("/purchasing/requests") &&
+        !url.includes("/plan") &&
+        !url.includes("/detail/") &&
+        !url.includes("/issue") &&
+        !url.includes("/already-have")
+      ) {
+        return Promise.resolve(register);
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("locks the create form's Deliver To to the rule once a collected item is picked, and says why", async () => {
+    withRegister(GOVERNED);
+    await openWorkspace();
+    /* Free until a governed supplier is on the form. */
+    expect(screen.queryByTestId("mp-dest-governed")).toBeNull();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* 5539-2NA's plan names supplier s1, collected to Ohana. */
+    const why = await screen.findByTestId("mp-dest-governed");
+    expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+    const select = document.getElementById("mp-dest")!;
+    expect(select).toHaveTextContent("Ohana");
+    expect(select).toBeDisabled();
+    /* Remove the item — the choice returns. */
+    fireEvent.click(screen.getByTestId("mp-line-remove-0"));
+    await waitFor(() => expect(screen.queryByTestId("mp-dest-governed")).toBeNull());
+  });
+
+  it("starts the create form on the governed default when no rule binds", async () => {
+    withRegister({ ...GOVERNED, defaultDestinationId: OHANA });
+    await openWorkspace();
+    expect(document.getElementById("mp-dest")).toHaveTextContent("Ohana");
+    expect(document.getElementById("mp-dest")).not.toBeDisabled();
+  });
+
+  it("the Register refuses an issue that disagrees with the rule before sending it", async () => {
+    /* REQ2's line is supplier s2 to Carres Klang; govern s2 to Ohana. */
+    withRegister({
+      ...GOVERNED,
+      supplierCollections: [
+        { supplierId: "s2", supplierName: "Office Co", destinationId: OHANA, partnerId: "p1" },
+      ],
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    await screen.findByTestId("mp-selection-bar");
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    expect(err).toHaveTextContent("Office Co must be collected to Ohana.");
+    expect(err).toHaveTextContent("Set Deliver To to Ohana, then issue again.");
+    expect(
+      apiFetch.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/purchasing/requests/issue") &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+      "nothing was sent",
+    ).toBe(false);
+  });
+
+  /* ⭐ THE DOOR ON AN EXISTING REQUEST (0421). The refusal above told the
+     operator to "Set Deliver To to Ohana" — and a request's Deliver To had no
+     door. `Change` beside the fact is that door, until a line is on a PO. */
+  describe("the object's Deliver To may move until a line is ordered", () => {
+    const READY = {
+      ...REGISTER.requests[0],
+      approval_required: false,
+    };
+    async function openObject(over: Record<string, unknown>) {
+      withRegister(GOVERNED);
+      seedDetail(false, {
+        destinations: GOVERNED.destinations,
+        ...over,
+      });
+      await loaded();
+      fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+      await screen.findByTestId("mp-detail");
+    }
+
+    it("a Ready-to-order request offers Change beside Deliver To", async () => {
+      await openObject({ request: READY });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.getByTestId("mp-detail-deliver-to-change")).toHaveTextContent("Change");
+    });
+
+    it("an Ordered request offers no door", async () => {
+      await openObject({
+        request: READY,
+        lines: REGISTER.lines
+          .filter((l) => l.request_id === REQ1)
+          .map((l) => ({ ...l, po_id: "PO-2041", po_ids: ["PO-2041"], issued_qty: 1 })),
+      });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.queryByTestId("mp-detail-deliver-to-change")).toBeNull();
+    });
+
+    it("Save PUTs the chosen place — locked to the supplier's governed place, with the sentence", async () => {
+      /* REQ1's line is supplier s1, collected to Ohana. */
+      await openObject({
+        request: READY,
+        supplierCollections: GOVERNED.supplierCollections,
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      const why = await screen.findByTestId("mp-detail-deliver-to-governed");
+      expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+      const select = document.getElementById("mp-detail-deliver-to-select")!;
+      expect(select).toHaveTextContent("Ohana");
+      expect(select).toBeDisabled();
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      await waitFor(() => {
+        const put = apiFetch.mock.calls.find(
+          ([url, init]) =>
+            String(url).endsWith(`/purchasing/requests/${REQ1}/deliver-to`) &&
+            (init as RequestInit | undefined)?.method === "PUT",
+        );
+        expect(put, "the move was sent").toBeTruthy();
+        expect(JSON.parse(String((put![1] as RequestInit).body))).toEqual({
+          destinationId: OHANA,
+        });
+      });
+      /* Saved: the choice closes back into the fact. */
+      await waitFor(() =>
+        expect(document.getElementById("mp-detail-deliver-to-select")).toBeNull(),
+      );
+    });
+
+    it("a refusal from the door prints the two lines and keeps the choice open", async () => {
+      await openObject({ request: READY });
+      apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/deliver-to") && init?.method === "PUT") {
+          return Promise.reject(
+            Object.assign(new Error("422"), {
+              body: {
+                code: "request_ordered",
+                message: "This request is already ordered. Deliver To cannot move.",
+                action: "Revise the purchase order instead.",
+              },
+            }),
+          );
+        }
+        if (
+          url.includes("/purchasing/requests") &&
+          !url.includes("/plan") &&
+          !url.includes("/detail/") &&
+          !url.includes("/issue") &&
+          !url.includes("/already-have")
+        ) {
+          return Promise.resolve(GOVERNED);
+        }
+        return Promise.resolve(respond(url, init));
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      const err = await screen.findByTestId("mp-detail-deliver-to-error");
+      expect(err).toHaveTextContent("This request is already ordered. Deliver To cannot move.");
+      expect(err).toHaveTextContent("Revise the purchase order instead.");
+      expect(document.getElementById("mp-detail-deliver-to-select")).not.toBeNull();
+    });
+  });
+});
+
 describe("the create workspace — full page, never a dialog (card §3)", () => {
+  it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
+    await openWorkspace();
+    const lines = screen.getByTestId("mp-lines");
+    // The word. COPY-STANDARD rules `Note` for this form's field; `Remark` was
+    // the retired dialog's word and may not survive the port.
+    const caption = screen.getByText("Note");
+    expect(lines.contains(caption)).toBe(true);
+    expect(lines.textContent).not.toContain("Remark");
+    expect(screen.getByLabelText("Note")).toBe(document.getElementById("mp-note-0"));
+    // ONE grid: the caption row and the line share a parent, so the four
+    // tracks are resolved once and the caption sits over the note it names.
+    const line0 = screen.getByTestId("mp-line-0");
+    expect(line0.parentElement).toBe(caption.parentElement);
+    // The add control FOLLOWS the list, where the operator's eye ends.
+    const add = screen.getByTestId("mp-line-add");
+    expect(lines.contains(add)).toBe(true);
+    expect(line0.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(add);
+    expect(screen.getByTestId("mp-line-1").parentElement).toBe(caption.parentElement);
+  });
+
   it("offers exactly the approved six purposes (Cards 03/04)", () => {
     // The list a control may render IS the shared constant (0322's law); the
     // Select renders from it verbatim. Management folds under Internal Staff
@@ -2038,5 +2242,78 @@ describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
     fireEvent.click(screen.getByText("Manual Purchase", { selector: "a *, a" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
+  });
+});
+
+/**
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch). The Register
+ * carries Purchasing Settings' `minDeliveryDays` (calendar days). The form
+ * computes floor = Proceed Date (the one `/plan` shows) + that number; a
+ * chosen date before it prints the door's own refusal under Delivery Date
+ * and blocks Send. 0 days: no floor, nothing printed.
+ */
+describe("0422 · the earliest Delivery Date a Manual Purchase may ask for, on the create form", () => {
+  /** A far-future Proceed Date, so whichever day of the current month the
+   *  picker offers is EARLIER than Proceed Date + 30 — the test does not
+   *  depend on the run date. */
+  const PROCEED = "2099-01-01";
+  const FLOOR = "2099-01-31";
+  function withMinDays(minDeliveryDays: number, proceedDate = PROCEED) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) {
+        return Promise.resolve({ ...(planFor(init) as object), proceedDate });
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, minDeliveryDays });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("30 days: a date before Proceed Date + 30 prints the refusal and blocks Send", async () => {
+    withMinDays(30);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* The floor is Proceed Date + 30 — the Proceed Date `/plan` answers
+       with, so wait for that answer rather than the Register's fallback. */
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-date-too-early").textContent).toContain(fmtDate(FLOOR)),
+    );
+    const line = screen.getByTestId("mp-date-too-early");
+    // The door's words, with the two dates in the portal's own spelling.
+    expect(line.textContent).toContain("is earlier than the earliest date");
+    expect(line.textContent).toContain("then send again.");
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsLaterDate);
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/purchasing/requests"),
+      expect.objectContaining({ method: "POST", body: expect.stringContaining("requiredBy") }),
+    );
+  });
+
+  it("the floor is calendar days from the Proceed Date the form shows — not from the plan's proposal", async () => {
+    /* Proceed Date 2020-01-01 + 30 = 2020-01-31: every date the picker
+       offers is later, so a date the plan never proposed is still fine. */
+    withMinDays(30, "2020-01-01");
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+  });
+
+  it("0 days: the same early date is fine — no sentence, Send live", async () => {
+    withMinDays(0);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
   });
 });

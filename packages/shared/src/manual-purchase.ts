@@ -27,11 +27,19 @@ export const MANUAL_PURCHASE_WORDS = {
    *  form's own top-to-bottom order — lead days first (Card 06). */
   sendNeedsLeadDays: "Send — lead days are not set",
   sendNeedsDate: "Send — pick a date",
+  /** 0422 — the chosen date is before the earliest Delivery Date a Manual
+   *  Purchase may ask for (Proceed Date + the Purchasing Settings number);
+   *  the sentence under the field says so. */
+  sendNeedsLaterDate: "Send — pick a later date",
   sendNeedsWhy: "Send — say what it is for",
   sendNeedsServiceCase: "Send — pick the Service Case",
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
   cancel: "Cancel",
+  /** The Deliver To door on an existing request (0421): the text button that
+   *  opens the choice, and the act that closes it. */
+  change: "Change",
+  save: "Save",
   needFor: "Need for",
   /**
    * THE TWO VISIBLE DATE MEANINGS (Card 06, owner-corrected 2026-08-29 —
@@ -60,6 +68,10 @@ export const MANUAL_PURCHASE_WORDS = {
   items: "ITEMS",
   addLine: "+ Add line",
   remove: "Remove",
+  /** COPY-STANDARD §Manual Purchase: the per-line free-text field is `Note`.
+   *  `Remark` was the retired To Order dialog's word and rode in with the
+   *  port; the state, the input id and the payload always said `note`. */
+  note: "Note",
   alreadyHave: "WHAT WE ALREADY HAVE",
   freeStock: "free stock",
   alreadyOnPo: "already on PO",

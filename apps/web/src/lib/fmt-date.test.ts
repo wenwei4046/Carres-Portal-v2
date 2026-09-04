@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fmtDate, fmtDateShort, fmtMonth } from "./fmt-date";
+import { appTodayIso, fmtDate, fmtDateShort, fmtMonth } from "./fmt-date";
 
 /* THE YEAR RULE is relative to "now", so every expectation here pins the clock.
    Without the pin these assertions would silently change meaning on 1 January
@@ -95,6 +95,30 @@ describe("Carres date formatting", () => {
     // `fmtDayChip` was deleted by the ruling: the year rule made it identical
     // to `fmtDate` except on the one input where it would have been wrong.
     const mod = await import("./fmt-date");
-    expect(Object.keys(mod).sort()).toEqual(["fmtDate", "fmtDateShort", "fmtMonth"]);
+    // appYearNow / appTodayIso are the business-timezone clock, not a spelling.
+    expect(Object.keys(mod).sort()).toEqual([
+      "appTodayIso", "appYearNow", "fmtDate", "fmtDateShort", "fmtMonth",
+    ]);
+  });
+});
+
+describe("appTodayIso — today in the business timezone", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("names the Malaysian day, not the UTC one, in the small hours", () => {
+    // 23:30 UTC on 14 Aug is already 07:30 on 15 Aug in Kuala Lumpur.
+    vi.setSystemTime(new Date("2026-08-14T23:30:00Z"));
+    expect(appTodayIso()).toBe("2026-08-15");
+    expect(new Date().toISOString().slice(0, 10)).toBe("2026-08-14"); // the wrong spelling
+  });
+
+  it("agrees with UTC in the afternoon", () => {
+    vi.setSystemTime(new Date("2026-08-15T06:00:00Z"));
+    expect(appTodayIso()).toBe("2026-08-15");
   });
 });
