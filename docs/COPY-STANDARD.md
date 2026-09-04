@@ -557,9 +557,10 @@ stays open until somebody answers it — so a relative word is only true on the 
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
 
 **The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
-model, 2026-08-29). `Confirm supplier delivery`, `Supplier Delivery Date missing`, `Supplier Delivery Date passed`
-and `Balance date missing` close only when the structured answer/date is stored together with the
-supplier's WhatsApp or equivalent response evidence, recipient/channel, actual actor and time.
+model, 2026-08-29). `Confirm supplier delivery`, `Supplier has not confirmed the PO date`,
+`Supplier delivery date passed` and `Balance date missing` close only when the structured answer/date
+is stored together with the supplier's WhatsApp or equivalent response evidence, recipient/channel,
+actual actor and time.
 Opening WhatsApp or transcribing an unsupported answer is not completion.
 
 **`Confirm balance delivery date` gets no row here and that is a filled answer, not a missing
@@ -611,14 +612,31 @@ Consignment Overview, Consignment Receipts, Report or Settings sidebar destinati
 lives in its authority home: Registers, central Work/Reports/Settings, in-context Catalog governance
 or the one Receiving engine. `purchase_demand` remains an authoritative record, not a page.
 
-**PURCHASE ORDERS LEFT RAIL — owner correction 2026-08-31 (Card 07).** The visible rail never
-calls itself `Filters`; that is the UI mechanism, not the business meaning. Exact groups and rows:
+**ADD SUPPLIER — APPROVED / LOCKED, owner ruling 2026-09-04; in-context Catalog door.** Exact
+visible words, top to bottom:
+
+| Purpose | Exact visible words |
+|---|---|
+| Form and identity | `Add Supplier` · `Supplier Name` |
+| Goods movement | `Delivery Method` · `Supplier delivers` · `We collect` |
+| Existing Catalog classification | `Product Categories` · `Mattress` · `Bedframe` · `Sofa` |
+| One value for every selected category | `Production Days` · `working days` |
+| Factory calendar | `Supplier work week` |
+
+`Product Categories` is multi-select and never a free-text create-category field. Its available
+values are `Mattress` · `Bedframe` · `Sofa`. Selecting a category reveals its own required
+`Production Days`; never show or save one generic supplier lead time. A PO date never appears in
+this form because it belongs to the Purchase Order.
+
+**PURCHASE ORDERS LEFT RAIL — owner corrections 2026-08-31 / 2026-09-04 (Card 07).** The visible
+rail never calls itself `Filters`; that is the UI mechanism, not the business meaning. Exact groups
+and rows:
 
 | Group | Visible rows |
 |---|---|
 | `PURCHASE ORDERS` | `All purchase orders` |
 | `DOCUMENT` | `PDF not sent` · one two-line row: `Version changed` then `Send the new version to supplier` |
-| `DELIVERY DATE` | `Supplier date missing` · `Supplier date passed` |
+| `SUPPLIER REPLY` | `Supplier has not confirmed the PO date` · `Supplier delivery date passed` |
 | `RECEIVING` | `Partly received` · `Completed` |
 
 The version wording is ONE selectable row and ONE count. The two lines are intentional fact/action
@@ -627,11 +645,16 @@ dash, or the ambiguous phrase `supplier update required`; it sounds like Supplie
 be edited. The row only filters; the actual send still completes through current-version
 confirmed-sent evidence.
 
+`Not confirmed` may appear as the `Supplier Delivery Date` cell fact before a reply exists. The
+`Supplier has not confirmed the PO date` rail/work condition starts only after the current PO
+version has confirmed-sent evidence, Pending Delivery Qty is above zero and no evidenced supplier
+answer exists for that version. Never tell staff to chase a supplier before Carres sent the PO.
+
 | Queue tile | Row line | Button | Done message | Empty state |
 |---|---|---|---|---|
 | `Issue PO` | `Issue PO to {supplier}` | `Issue PO` | `PO issued to {supplier}` | `No purchase orders to issue.` |
-| `Supplier Delivery Date missing` | `Ask {supplier} for the delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every issued order has a supplier delivery answer.` |
-| `Supplier Delivery Date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No Supplier Delivery Date has passed.` |
+| `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` | `Record supplier answer` | `Supplier answer recorded` | `Every supplier has confirmed the PO delivery date.` |
+| `Supplier delivery date passed` | `Ask {supplier} when the goods will arrive` | `Record supplier answer` | `Supplier answer recorded` | `No supplier delivery date has passed.` |
 | `Goods to receive` | `Check in {document} from {supplier}` | `Start receiving` | `GRN posted · {n} received · {m} pending delivery` | `No supplier delivery is ready to receive.` |
 | `Balance date missing` | `Ask {supplier} for the balance delivery date` | `Record balance date` | `Balance date recorded` | `Every part receipt has a balance date.` |
 | `Confirm what happens next` | `Call {supplier} — confirm what happens next` | `Record what happens next` | `Supplier answer recorded` | `No claim is waiting for a supplier answer.` |
@@ -684,7 +707,7 @@ interchangeable:
 |---|---|
 | `PO Issued` | when Carres issued the supplier commitment; sits beside `PO No` |
 | `PO Delivery Date` | the original official supplier-facing date on the PO |
-| `Supplier Delivery Date` | a later date actually supplied by the supplier; show the additional Register column only when the supplier changed the PO date; otherwise `Same as PO` |
+| `Supplier Delivery Date` | the supplier's answer to the PO date: `Not confirmed` before evidenced supplier reply; `Same as PO` after the supplier confirms the PO date; otherwise the different date supplied by the supplier |
 | `Goods Received At` | when the goods physically arrived; never keyed/submitted/posted time |
 
 No recorded business date is silently moved to fit a calendar. Purchasing/Operation work uses the
@@ -789,7 +812,7 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The Approval facts | `No approval needed` · `Need approval` + `{name} approves` · `Approved` / `Refused` + the real actor, date/time and (approved) quantity per line, (refused) the reason |
 | The approver's decision line | `SKU` · `Requested Qty` · `Still Needed` · `Approved Qty` (prefilled from Still Needed, whole 0..Requested) · `Transaction Cost` · `Line Total` — read-only approval evidence, never an Operation price control |
 | The decision controls | `Approve` (the one primary) · `Refuse` (neutral) · `Decision reason` (required before the final Refuse) |
-| The Purchase Orders lineage heads | `PO No` · `Ordered Qty` · `Still To Order` · `PO Issued` · `PO Delivery Date` · `Supplier Delivery Date` only when the promise ledger proves a change; unchanged rows read `Same as PO`; no lineage reads `Not ordered yet` |
+| The Purchase Orders lineage heads | `PO No` · `Ordered Qty` · `Still To Order` · `PO Issued` · `PO Delivery Date` · `Supplier Delivery Date`; supplier answer reads `Not confirmed` · `Same as PO` · the changed date; no lineage reads `Not ordered yet` |
 | The History titles (stored facts only) | `Purchase requested` · `Purchase approved` · `Purchase refused` · `Marked not going ahead` · `Purchase order issued` — three-rank grammar, grouped `Today · Yesterday · Earlier`; an event with no stored individual reads `Staff identity not recorded` |
 | The object's loading / failure states | `Opening the Manual Purchase` · `This Manual Purchase could not be opened` + `Try again` |
 | The decision refusals — two lines, fact then act | `Only the approver may decide this purchase.` + `Ask {approver} to approve or refuse it.` — `No purchase approver is set.` + `Ask management to set the purchase approver.` — `This purchase was already decided.` + `Reload the Manual Purchase to see the decision.` — `The decision reason is missing.` + `Type why this purchase is not going ahead.` — `The approved quantity is not valid.` + `Enter a whole number from 0 to {requested quantity}.` — `The decision was not recorded.` + `Reload the Manual Purchase and try once more. Tell IT if it happens again.` |
@@ -1929,8 +1952,8 @@ detail's work card and Order Route:
 | Fact (line 1) | Action (line 2, with structured owner avatar) |
 |---|---|
 | `The PO PDF has not been sent` | `Issue the purchase order to {supplier}` |
-| `Supplier date is missing` | `Ask {supplier} for the delivery date` |
-| `The supplier date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
+| `Supplier has not confirmed the PO date` | `Ask {supplier} to confirm the PO delivery date` |
+| `The supplier delivery date passed on {weekday, date}` | `Ask {supplier} when the goods will arrive` |
 | `The balance delivery date is missing` | `Ask {supplier} for the balance delivery date` |
 | `PO V{n} has not been sent` | `Issue PO V{n} to {supplier}` |
 | `Supplier changed the price` | `Ask the commercial approver to check the new price` |
