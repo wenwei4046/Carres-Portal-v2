@@ -90,6 +90,16 @@ import {
   FilterRailRow,
 } from "./components/workspace-rail";
 
+function addDaysToIso(iso: string, days: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year, month - 1, day + days);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
 /**
  * MANUAL PURCHASE — the request, the approval, the order
  * (PURCHASING CARD 04 — the permanent Register;
@@ -1430,6 +1440,9 @@ function CreateRequestWorkspace({
   /* The server's proposal fills the field only while the person has not
      chosen a date; a chosen date is theirs and is preserved (§3.2). */
   const planDefault = plan.data?.deliveryDateDefault ?? null;
+  const minimumDeliveryDate = plan.data?.proceedDate
+  ? addDaysToIso(plan.data.proceedDate, 14)
+  : undefined;
   useEffect(() => {
     if (!dateTouched && planDefault != null) setDeliveryDate(planDefault);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1710,6 +1723,7 @@ function CreateRequestWorkspace({
           <DatePicker
             id="mp-delivery-date"
             label={MW.deliveryDate}
+            minDate={minimumDeliveryDate}
             value={deliveryDate || null}
             onChange={(v) => {
               setDateTouched(true);
