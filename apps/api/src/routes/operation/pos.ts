@@ -275,13 +275,18 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         .filter((id): id is string => !!id),
     ),
   ];
-  const requestNoById = new Map<string, string>();
+  /* Card 08 §3.5 — a Manual Purchase source has no visible number. The
+     visible reference is the label `Manual Purchase`; identity stays the
+     request UUID, and the business facts (Proceed Date, purpose) travel so
+     detailed source lines can tell two purchases apart. `req_no` is legacy
+     compatibility data and is not read. */
+  const requestFactsById = new Map<string, { proceedDate: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, req_no")
+        .select("id, created_at")
         .in("id", ids)
         .order("id"),
     );
@@ -290,7 +295,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     for (const request of requestResult.data) {
-      requestNoById.set(request.id as string, request.req_no as string);
+      requestFactsById.set(request.id as string, {
+        proceedDate:
+          typeof request.created_at === "string"
+            ? request.created_at.slice(0, 10)
+            : null,
+      });
     }
   }
   const tomorrowAboutByPo = new Map<string, string | null>();
@@ -649,16 +659,21 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    /* Several Manual Purchases share one visible label, so they dedupe by
+       the source UUID, never by the label (Card 08 §3.5). A legacy line
+       whose demand has no request header keeps one label-only source. */
     const manualSources = lines.flatMap((line) => {
       const demandId = line.demand_id;
       if (typeof demandId !== "string") return [];
       const demand = demandById.get(demandId);
       if (!demand) return [];
+      const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
       return [{
         kind: "manual_purchase" as const,
-        reference:
-          (demand.requestId ? requestNoById.get(demand.requestId) : null) ??
-          "Manual Purchase",
+        reference: "Manual Purchase",
+        request_id: demand.requestId,
+        purpose: demand.purpose,
+        proceed_date: facts?.proceedDate ?? null,
       }];
     });
     const sources = [...(salesSourcesByPo.get(row.id as string) ?? []), ...manualSources]
@@ -666,7 +681,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         (source, index, all) =>
           all.findIndex(
             (candidate) =>
-              candidate.kind === source.kind && candidate.reference === source.reference,
+              candidate.kind === source.kind &&
+              (source.kind === "manual_purchase"
+                ? (candidate as { request_id?: string | null }).request_id ===
+                  (source as { request_id?: string | null }).request_id
+                : candidate.reference === source.reference),
           ) === index,
       );
     return {
@@ -685,9 +704,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
           0,
         );
         const demand = typeof l.demand_id === "string" ? demandById.get(l.demand_id) : null;
-        const manualReference = demand
-          ? (demand.requestId ? requestNoById.get(demand.requestId) : null) ?? "Manual Purchase"
-          : null;
+        const manualFacts =
+          demand?.requestId ? requestFactsById.get(demand.requestId) : null;
         return {
           ...l,
           sources: salesLineSources,
@@ -697,12 +715,15 @@ operationPosRouter.get("/", requireOperation, async (c) => {
               reference: `SO-${Number(source.so)}`,
               qty: Number(source.qty ?? 0),
             }]),
-            ...(manualReference ? [{
+            ...(demand ? [{
               kind: "manual_purchase" as const,
-              reference: manualReference,
+              reference: "Manual Purchase",
               // A mixed legacy row can carry both ledgers. Preserve its Manual
               // Purchase reference without claiming the full line twice.
               qty: Math.max(0, Number(l.qty ?? 0) - salesAllocated) || null,
+              request_id: demand.requestId,
+              purpose: demand.purpose,
+              proceed_date: manualFacts?.proceedDate ?? null,
             }] : []),
           ],
           balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,

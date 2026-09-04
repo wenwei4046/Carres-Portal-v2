@@ -3452,12 +3452,20 @@ export interface operationPoListRow {
       so: number | null;
       qty: number;
     }[];
-    /** Exact governed lineage for this line, including Manual Purchase. */
+    /** Exact governed lineage for this line, including Manual Purchase.
+     *  Card 08 §3.5: a Manual Purchase source's visible reference is the
+     *  label `Manual Purchase`; its identity is the invisible request UUID
+     *  plus the business facts beside it — never an MPR number. */
     governed_sources?: Array<{
       kind: "sales_order" | "manual_purchase";
       reference: string;
       /** Null preserves a legacy source link whose exact allocation is unknown. */
       qty: number | null;
+      /** Manual Purchase only — the source request's invisible identity. */
+      request_id?: string | null;
+      /** Manual Purchase only — business facts that distinguish sources. */
+      purpose?: string | null;
+      proceed_date?: string | null;
     }>;
     /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
      *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
@@ -3528,10 +3536,16 @@ export interface operationPoListRow {
   /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
    *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
   urgency?: "critical" | "urgent" | "normal" | null;
-  /** Governed document sources, never inferred from display-only SO mirrors. */
+  /** Governed document sources, never inferred from display-only SO mirrors.
+   *  Card 08 §3.5: Manual Purchase sources carry the label `Manual Purchase`
+   *  as `reference`, stay distinct by `request_id` (never collapsed because
+   *  the label matches), and bring the business facts that tell them apart. */
   sources?: Array<{
     kind: "sales_order" | "manual_purchase";
     reference: string;
+    request_id?: string | null;
+    purpose?: string | null;
+    proceed_date?: string | null;
   }>;
 }
 export interface operationPosListResponse {
@@ -4488,7 +4502,10 @@ export function usePurchasePushLines() {
 
 export interface PurchaseRequestRow {
   id: string;
-  req_no: string;
+  /** Legacy compatibility only (Card 08, 2026-09-04): historical rows keep
+   *  their stored REQ/MPR value; new rows are null. No operator-facing
+   *  component may consume it — the UUID is the identity. */
+  req_no: string | null;
   purpose: string;
   destination_id: string;
   required_by: string | null;
@@ -4709,7 +4726,7 @@ export function useDecidePurchaseRequest() {
       reason?: string | null;
       cuts?: Array<{ id: string; qty: number }> | null;
     }) =>
-      apiFetch<{ id: string; req_no: string; decision: string }>(
+      apiFetch<{ id: string; decision: string }>(
         `/api/operation/purchasing/requests/${input.id}/decide`,
         {
           method: "POST",
@@ -4777,7 +4794,7 @@ export function useCreatePurchaseRequest() {
         note?: string | null;
       }>;
     }) =>
-      apiFetch<{ id: string; req_no: string; approval_required: boolean; line_ids?: string[] }>(
+      apiFetch<{ id: string; approval_required: boolean; line_ids?: string[] }>(
         "/api/operation/purchasing/requests",
         { method: "POST", body: JSON.stringify(body) },
       ),

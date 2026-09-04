@@ -213,7 +213,7 @@ export default function OperationWork() {
      writers are mounted on the DO; a precise working door beats a dead one. */
   const openRow = (i: WorkRow) => {
     if (i.ruleKey.startsWith("manual_purchase.")) {
-      navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`);
+      navigate(`/operation?tab=manual-purchase&mp=${i.orderId}`);
       return;
     }
     if (DELIVERY_ARRANGEMENT_ACTIONS.has(i.ruleKey)) {

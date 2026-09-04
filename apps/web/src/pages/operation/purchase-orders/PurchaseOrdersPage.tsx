@@ -5,6 +5,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import {
+  demandPurposeLabelOf,
+  manualPurchaseSourceLine,
+  manualPurchaseSourceSummary,
   poDateHistoryOf,
   PO_DELAY_REASONS,
   purchaseOrderRegisterFacts,
@@ -114,7 +117,20 @@ function todayMYT(): string {
 function sourceText(po: operationPoListRow): { display: string; search: string } {
   const sources = po.sources ?? [];
   if (sources.length === 0) return { display: "Not recorded", search: "Not recorded" };
-  const refs = sources.map((source) => source.reference);
+  /* Card 08 §3.5 — SO sources keep their real numbers; Manual Purchase
+     sources have no number: one prints `Manual Purchase`, several print
+     `{n} Manual Purchases`, counted by DISTINCT source request UUIDs. */
+  const soRefs = sources
+    .filter((source) => source.kind !== "manual_purchase")
+    .map((source) => source.reference);
+  const manualCount = new Set(
+    sources
+      .filter((source) => source.kind === "manual_purchase")
+      .map((source) => source.request_id ?? source.reference),
+  ).size;
+  const manualLabel = manualPurchaseSourceSummary(manualCount);
+  const refs = [...soRefs, ...(manualLabel ? [manualLabel] : [])];
+  if (refs.length === 0) return { display: "Not recorded", search: "Not recorded" };
   return {
     display: refs.length === 1 ? refs[0]! : `${refs[0]} +${refs.length - 1}`,
     search: refs.join(" "),
@@ -986,6 +1002,14 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
 }) {
   const po = row.po;
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
+  /* Card 08 §3.5 — how many DISTINCT Manual Purchases feed this document.
+     One: the bare label suffices everywhere. Several: each detailed source
+     line adds its business facts so the reader can tell them apart. */
+  const manualSourceCount = new Set(
+    (po.sources ?? [])
+      .filter((source) => source.kind === "manual_purchase")
+      .map((source) => source.request_id ?? source.reference),
+  ).size;
   return (
     /* ⭐ THE FACTS AND THE DOCUMENT, SIDE BY SIDE — AS TWO PANES (YH, 2026-09-03).
        The first cut put them in one grid inside a scrolling page and pinned the
@@ -1033,7 +1057,19 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                 <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
                   <td className="px-3 font-mono">{line.sku}</td>
                   <td className="px-3">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
-                  <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => source.qty == null ? source.reference : `${source.reference} ×${source.qty}`).join(" · ") : <Absence />}</td>
+                  <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => {
+                    /* Card 08 §3.5 — several Manual Purchases behind one
+                       document stay apart by business facts, never by a
+                       number: the purpose and Proceed Date join the label
+                       exactly when the label alone is ambiguous. */
+                    const label = source.kind === "manual_purchase" && manualSourceCount > 1
+                      ? manualPurchaseSourceLine({
+                          purposeLabel: source.purpose ? (demandPurposeLabelOf(source.purpose) ?? source.purpose) : null,
+                          proceedDateLabel: source.proceed_date ? fmtDate(source.proceed_date) : null,
+                        })
+                      : source.reference;
+                    return source.qty == null ? label : `${label} ×${source.qty}`;
+                  }).join(" · ") : <Absence />}</td>
                   <td className="px-3">{
                     line.destination_id
                       ? destinations.find((destination) => destination.id === line.destination_id)?.name ?? <Absence />

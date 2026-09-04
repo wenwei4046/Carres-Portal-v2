@@ -508,7 +508,7 @@ describe("Card 03 §3 · the approval owner's sentence", () => {
 describe("Card 06 §7 · the two Work actions", () => {
   const input = (over: Partial<ManualPurchaseWorkInput>): ManualPurchaseWorkInput => ({
     requestId: "r1",
-    reqNo: "MPR-20260830-1234",
+    context: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
     status: "ready_to_order",
     remainingQty: 2,
     orderBy: "2026-09-03",
@@ -519,7 +519,7 @@ describe("Card 06 §7 · the two Work actions", () => {
   const approver = { userId: "u-jess", name: "Jess" };
   const poDuty = { userId: "u-yj", name: "Yu Jun" };
 
-  it("undecided approval emits `Approve {MPR}` for the configured approver, due Order By", () => {
+  it("undecided approval emits `Approve purchase` for the configured approver, due Order By", () => {
     const items = manualPurchaseWorkItems(
       input({ status: "waiting_approval", remainingQty: 2 }),
       { approver, poDuty },
@@ -529,9 +529,9 @@ describe("Card 06 §7 · the two Work actions", () => {
     expect(items[0]).toMatchObject({
       ruleKey: "manual_purchase.approve",
       module: "purchasing",
-      soRef: "MPR-20260830-1234",
+      soRef: "Manual Purchase \u00b7 Ready Stock \u00b7 Carres Klang \u00b7 Hooka",
       orderId: "r1",
-      action: "Approve MPR-20260830-1234",
+      action: "Approve purchase",
       ownerName: "Jess",
       ownerUserId: "u-jess",
       dueIso: "2026-09-03",
@@ -544,7 +544,7 @@ describe("Card 06 §7 · the two Work actions", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       ruleKey: "manual_purchase.issue_po",
-      action: "Issue the purchase order for MPR-20260830-1234",
+      action: "Issue PO",
       ownerName: "Yu Jun",
       ownerUserId: "u-yj",
       dueIso: "2026-09-03",
@@ -627,7 +627,6 @@ describe("Card 06 · the eleven column words", () => {
     expect([
       MANUAL_PURCHASE_WORDS.colProceedDate,
       MANUAL_PURCHASE_WORDS.colApproval,
-      MANUAL_PURCHASE_WORDS.colMprNo,
       MANUAL_PURCHASE_WORDS.colPoNo,
       MANUAL_PURCHASE_WORDS.colDeliveryDate,
       MANUAL_PURCHASE_WORDS.colFor,
@@ -639,7 +638,6 @@ describe("Card 06 · the eleven column words", () => {
     ]).toEqual([
       "Proceed Date",
       "Approval Status",
-      "Manual Purchase No",
       "PO No",
       "Delivery Date",
       "For",
@@ -702,7 +700,7 @@ describe("Card 04 · the one remainder arithmetic", () => {
 
 describe("Card 04 · the deterministic summaries", () => {
   it("PO No: absence sentence · the one number · a count", () => {
-    expect(manualPurchasePoSummary([])).toBe("Not ordered yet");
+    expect(manualPurchasePoSummary([])).toBe("\u2014");
     expect(manualPurchasePoSummary(["PO-20260829-1234"])).toBe("PO-20260829-1234");
     expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");
   });
@@ -920,5 +918,87 @@ describe("Card 05 · the History record arithmetic", () => {
         reason: "Found in the showroom store",
       }).detail,
     ).toEqual(["5539-2NA — Found in the showroom store"]);
+  });
+});
+
+/**
+ * PURCHASING CARD 08 — the MPR identity is removed. A Manual Purchase has
+ * no visible document number: business facts identify it everywhere, and
+ * the only purchasing document identity is the actual PO No.
+ */
+import {
+  manualPurchaseObjectHeading,
+  manualPurchaseSourceLine,
+  manualPurchaseSourceSummary,
+  manualPurchaseWorkContext,
+} from "./manual-purchase";
+
+describe("Card 08 · no visible number anywhere", () => {
+  it("the governed words carry no MPR and no Manual Purchase No", () => {
+    const words = JSON.stringify(MANUAL_PURCHASE_WORDS);
+    expect(words).not.toContain("MPR");
+    expect(words).not.toContain("Manual Purchase No");
+  });
+
+  it("the Work context speaks business facts, empty facts dropped", () => {
+    expect(
+      manualPurchaseWorkContext({
+        purposeLabel: "Ready Stock",
+        forText: "Carres Klang",
+        supplierSummary: "Nice Future",
+      }),
+    ).toBe("Manual Purchase · Ready Stock · Carres Klang · Nice Future");
+    expect(
+      manualPurchaseWorkContext({
+        purposeLabel: "Service Case",
+        forText: "SC-2041",
+        supplierSummary: "",
+      }),
+    ).toBe("Manual Purchase · Service Case · SC-2041");
+    expect(
+      manualPurchaseWorkContext({
+        purposeLabel: null,
+        forText: null,
+        supplierSummary: null,
+      }),
+    ).toBe("Manual Purchase");
+  });
+
+  it("the two Work action sentences carry no number, name or UUID", () => {
+    expect(MANUAL_PURCHASE_WORDS.workApprove).toBe("Approve purchase");
+    expect(MANUAL_PURCHASE_WORDS.workIssuePo).toBe("Issue PO");
+  });
+
+  it("the object heading is `{Need for} · {For}`, falling back to the page word", () => {
+    expect(
+      manualPurchaseObjectHeading({ purposeLabel: "Ready Stock", forText: "Carres Klang" }),
+    ).toBe("Ready Stock · Carres Klang");
+    expect(
+      manualPurchaseObjectHeading({ purposeLabel: "Service Case", forText: "" }),
+    ).toBe("Service Case");
+    expect(manualPurchaseObjectHeading({ purposeLabel: null, forText: null })).toBe(
+      "Manual Purchase",
+    );
+  });
+
+  it("PO source wording: one `Manual Purchase`, several `{n} Manual Purchases`, zero nothing", () => {
+    expect(manualPurchaseSourceSummary(0)).toBeNull();
+    expect(manualPurchaseSourceSummary(1)).toBe("Manual Purchase");
+    expect(manualPurchaseSourceSummary(3)).toBe("3 Manual Purchases");
+  });
+
+  it("a detailed source line distinguishes by business facts, never a number", () => {
+    expect(
+      manualPurchaseSourceLine({ purposeLabel: "Ready Stock", proceedDateLabel: "Thu, 4 Sep" }),
+    ).toBe("Manual Purchase · Ready Stock · Thu, 4 Sep");
+    expect(
+      manualPurchaseSourceLine({ purposeLabel: null, proceedDateLabel: null }),
+    ).toBe("Manual Purchase");
+  });
+
+  it("`PO No` before issue is the bare fact `—`", () => {
+    expect(manualPurchasePoSummary([])).toBe(MANUAL_PURCHASE_WORDS.poNone);
+    expect(manualPurchasePoSummary(["PO-20260904-1234"])).toBe("PO-20260904-1234");
+    expect(manualPurchasePoSummary(["PO-1", "PO-2", "PO-1"])).toBe("2 POs");
   });
 });

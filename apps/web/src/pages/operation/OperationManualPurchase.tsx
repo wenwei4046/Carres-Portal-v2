@@ -20,6 +20,7 @@ import {
   manualPurchaseItemsSummary,
   manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
+  manualPurchaseObjectHeading,
   manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchasePoSummary,
@@ -100,7 +101,9 @@ import {
  * The permanent right-side Register: one Manual Purchase request per parent
  * row, complete history by default (ordered records included — `All not
  * ordered` is Card 03's explicit rail filter, never a silent default), the
- * eleven governed columns in the Card's exact order, the read-only
+ * ten governed columns in Card 08's exact order (no visible document
+ * number — before `Issue PO` a Manual Purchase has none; after it the only
+ * purchasing identity is the actual `PO No`), the read-only
  * expansion, and selection that admits ONLY `Ready to order` remainder.
  * PO Duty appears nowhere until a selection exists, then once, beside the
  * issue action (the SO Batch sibling grammar).
@@ -154,7 +157,6 @@ interface ExpansionLine {
 
 interface RequestRegisterRow {
   id: string;
-  reqNo: string;
   purpose: string;
   /** Card 06 §3.1 — the actual hand-off fact (`created_at`), immutable. */
   proceedDate: string;
@@ -262,7 +264,6 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
     );
     return {
       id: r.id,
-      reqNo: r.req_no,
       purpose: r.purpose,
       proceedDate: r.created_at,
       approval: manualPurchaseApprovalOf({
@@ -359,19 +360,22 @@ export default function OperationManualPurchase() {
   const navigate = useNavigate();
   const issue = useIssuePurchaseRequests();
 
-  /* Card 06 §7 — a Work action deep-links the exact MPR:
-     `?tab=manual-purchase&mpr={id}` opens the object directly. The param is
-     consumed so `‹ Manual Purchase` returns to the Register, not a loop. */
+  /* Card 06 §7 / Card 08 — a Work action deep-links the exact request by
+     its invisible UUID: `?tab=manual-purchase&mp={id}` opens the object
+     directly (`mpr` survives as a read-only alias for pre-Card-08
+     bookmarks). The param is consumed so `‹ Manual Purchase` returns to
+     the Register, not a loop. */
   const [searchParams, setSearchParams] = useSearchParams();
-  const linkedMpr = searchParams.get("mpr");
+  const linkedRequest = searchParams.get("mp") ?? searchParams.get("mpr");
   useEffect(() => {
-    if (!linkedMpr) return;
-    setMode({ detail: linkedMpr });
+    if (!linkedRequest) return;
+    setMode({ detail: linkedRequest });
     const next = new URLSearchParams(searchParams);
+    next.delete("mp");
     next.delete("mpr");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedMpr]);
+  }, [linkedRequest]);
 
   const rows = useMemo(
     () => (q.data ? buildRows(q.data) : []),
@@ -615,34 +619,14 @@ export default function OperationManualPurchase() {
         filterValue: (r) => r.approval.label,
       },
       {
-        key: "mpr_no",
-        label: MW.colMprNo,
-        width: 168,
-        sortable: true,
-        filterType: "numbering",
-        accessor: (r) => (
-          <button
-            type="button"
-            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-              setMode({ detail: r.id });
-            }}
-          >
-            {r.reqNo}
-          </button>
-        ),
-        searchValue: (r) => r.reqNo,
-        filterValue: (r) => r.reqNo,
-      },
-      {
         key: "po_no",
         label: MW.colPoNo,
         width: 150,
         sortable: true,
         accessor: (r) => {
-          /* ONLY real lineage (Card 04 §3.4): none / the clickable number /
-             `{n} POs` — the exact mapping lives in the expansion. */
+          /* ONLY real lineage (Card 04 §3.4; Card 08 §3.2): `—` is a fact,
+             never a button; ONE PO is the clickable document; several open
+             the object's exact linked PO list. */
           if (r.poNos.length === 1) {
             return (
               <button
@@ -655,6 +639,22 @@ export default function OperationManualPurchase() {
                 }}
               >
                 {r.poNos[0]}
+              </button>
+            );
+          }
+          if (r.poNos.length > 1) {
+            return (
+              <button
+                type="button"
+                className="text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`mp-po-list-${r.id}`}
+                title="Open the linked Purchase Orders"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMode({ detail: r.id });
+                }}
+              >
+                {manualPurchasePoSummary(r.poNos)}
               </button>
             );
           }
@@ -691,13 +691,29 @@ export default function OperationManualPurchase() {
         label: MW.colFor,
         width: 170,
         sortable: true,
+        /* Card 08 §3.2 — `For` is the clear single-click entrance to the
+           Manual Purchase object (the retired number column's one job); the
+           row's deep-link identity stays the invisible UUID. */
         accessor: (r) => (
-          <span className="block truncate" title={r.forText}>
-            {r.forText}
-          </span>
+          <button
+            type="button"
+            className="block max-w-full truncate text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            title={r.forText || purposeLabelOf(r.purpose)}
+            data-testid={`mp-open-${r.id}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMode({ detail: r.id });
+            }}
+          >
+            {/* A historical row whose structured For was never stored still
+                needs its entrance — the purpose word stands in, never a
+                number and never an empty button. */}
+            {r.forText || purposeLabelOf(r.purpose)}
+          </button>
         ),
         searchValue: (r) => r.forText,
         filterValue: (r) => r.forText,
+        exportValue: (r) => r.forText,
       },
       {
         key: "items",
@@ -791,7 +807,7 @@ export default function OperationManualPurchase() {
     );
   }
 
-  /* Card 05 §3 — clicking the MPR number opens WORK: the full-width object
+  /* Card 05 §3 / Card 08 §3.2 — the `For` cell opens WORK: the full-width object
      replaces the Register content. The Register stays MOUNTED underneath
      (visibility only), so `‹ Manual Purchase` restores the complete state
      the operator left — rail filters, search, column filters, sort, scroll
@@ -1025,8 +1041,10 @@ export default function OperationManualPurchase() {
             }
             groupBanner={false}
             /* The identity survives horizontal scrolling — the DataGrid's
-               governed capability, pinned on the Manual Purchase No. */
-            stickyIdentity={{ columnKey: "mpr_no" }}
+               governed capability, pinned on the business fact `For`
+               (Card 08 §3.2: the sticky column is a fact, never a hidden
+               number). */
+            stickyIdentity={{ columnKey: "for" }}
             expandable={{
               renderExpansion: (r) => <RequestExpansion row={r} />,
               testId: (r) => `mp-expand-${r.id}`,
@@ -1122,7 +1140,22 @@ export default function OperationManualPurchase() {
         <ManualPurchaseObject
           key={detailId}
           id={detailId}
-          registerReqNo={detailRow?.reqNo ?? null}
+          registerHeading={
+            detailRow
+              ? {
+                  identity: manualPurchaseObjectHeading({
+                    purposeLabel: purposeLabelOf(detailRow.purpose),
+                    forText: detailRow.forText,
+                  }),
+                  context: [
+                    fmtDate(detailRow.proceedDate.slice(0, 10)),
+                    detailRow.supplierText,
+                  ]
+                    .filter((part) => part !== "")
+                    .join(" · "),
+                }
+              : null
+          }
           position={
             gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
           }
@@ -2465,15 +2498,17 @@ function TwoLines({
 
 function ManualPurchaseObject({
   id,
-  registerReqNo,
+  registerHeading,
   position,
   onStep,
   onBack,
 }: {
   id: string;
-  /** The Register row's own number — the header identity prints instantly
-   *  while the object read is in flight. */
-  registerReqNo: string | null;
+  /** The Register row's own business heading (Card 08 §3.3 — `{Need for} ·
+   *  {For}` plus the quieter `{Proceed Date} · {supplier}` context) — the
+   *  header prints instantly while the object read is in flight. No number,
+   *  no UUID. */
+  registerHeading: { identity: string; context: string } | null;
   /** The filtered Register position (`4 of 69`) — context, never truth;
    *  null when the open object left the filtered list. */
   position: { index: number; total: number } | null;
@@ -2508,7 +2543,44 @@ function ManualPurchaseObject({
   );
 
   const d = q.data;
-  const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+  /* Card 08 §3.3 — the object header speaks business facts only:
+     `{Need for} · {For}` as the identity, `{Proceed Date} · {supplier}` as
+     the quieter context. The loaded object recomputes them from its own
+     read; until it lands, the Register row's hand-off prints. No MPR, no
+     UUID, in the heading or the browser title. */
+  const loadedHeading = (() => {
+    if (!d) return null;
+    const destNameById = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
+    const liveL = d.lines.filter((l) => l.cancelled_at === null);
+    const supNameById = new Map(d.suppliers.map((s) => [s.id, s.name]));
+    return {
+      identity: manualPurchaseObjectHeading({
+        purposeLabel: purposeLabelOf(d.request.purpose),
+        forText: manualPurchaseForOf({
+          purpose: d.request.purpose,
+          destinationName: destNameById.get(d.request.destination_id) ?? null,
+          serviceCaseNo: d.serviceCaseNo,
+          staffName: d.request.for_staff_user_id
+            ? (d.users.find((u) => u.id === d.request.for_staff_user_id)?.name ?? null)
+            : null,
+          subsidiaryName: d.request.for_subsidiary_name,
+          why: d.request.why,
+        }),
+      }),
+      context: [
+        fmtDate(d.request.created_at.slice(0, 10)),
+        manualPurchaseSupplierSummary(
+          liveL.map((l) =>
+            l.supplier_id ? (supNameById.get(l.supplier_id) ?? "") : "",
+          ),
+        ),
+      ]
+        .filter((part) => part !== "")
+        .join(" · "),
+    };
+  })();
+  const heading = loadedHeading ??
+    registerHeading ?? { identity: MW.page, context: "" };
   useEffect(() => {
     if (!d) return;
     setCuts((c) => {
@@ -2577,7 +2649,8 @@ function ManualPurchaseObject({
      another source of row truth. ─────────────────────────────────────── */
   const header = (
     <SalesOrderTabs
-      identity={reqNo}
+      identity={heading.identity}
+      customer={heading.context || null}
       status={
         status ? (
           <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
@@ -2589,7 +2662,7 @@ function ManualPurchaseObject({
         event.preventDefault();
         onBack();
       }}
-      docTitle={reqNo ? `${reqNo} — Carres` : undefined}
+      docTitle={`${MW.page} — Carres`}
       right={
         position ? (
           <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
