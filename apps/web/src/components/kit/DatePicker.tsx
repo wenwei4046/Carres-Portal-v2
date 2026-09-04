@@ -78,6 +78,7 @@ export default function DatePicker({
   error,
   required = false,
   disabled = false,
+  minDate,
   value,
   onChange,
   placeholder = "Pick a date",
@@ -85,18 +86,17 @@ export default function DatePicker({
   id: string;
   label?: string;
   hint?: string;
-  /** Present = the field is refused. The message replaces the hint. */
   error?: string;
   required?: boolean;
   disabled?: boolean;
-  /** `YYYY-MM-DD`, or null when no day is chosen. */
+  minDate?: string;
   value: string | null;
-  /** Picking the chosen day again clears it — the caller gets null. */
   onChange: (iso: string | null) => void;
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = fromIso(value);
+  const firstAllowedDate = fromIso(minDate);
 
   return (
     <FieldFrame id={id} label={label} hint={hint} error={error} required={required}>
@@ -128,13 +128,12 @@ export default function DatePicker({
           mode="single"
           selected={selected}
           defaultMonth={selected}
+          disabled={firstAllowedDate ? { before: firstAllowedDate } : undefined}
           onSelect={(day) => {
             onChange(day ? toIso(day) : null);
             setOpen(false);
           }}
           showOutsideDays
-          /* Monday, matching the calendar the portal already draws by hand in
-           * `ConfirmDateModal` — read off the code rather than picked. */
           weekStartsOn={1}
           classNames={CALENDAR_CLASSNAMES}
         />
