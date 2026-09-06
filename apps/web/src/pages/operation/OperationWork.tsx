@@ -1,24 +1,14 @@
 /**
- * OperationWork — My Work / Team Work (SO V2 Card 10, owner ruling 2026-08-11;
- * display re-ruled by the DELIVERY ORDER BLUEPRINT card §7, owner-approved
- * 2026-08-16 — the Owner Engine two-line grammar).
+ * OperationWork — My Work / Team Work over the one server Work feed.
  *
  * **TWO FILTERS over the ONE open work set — never two datasets, never
  * another dashboard.** This page is ASSEMBLY:
  *
- *   WHAT is open   ← the same `openActionsOf` the Orders list runs, plus the
- *                    composed facts (loan out · Finance exception · the
- *                    never-asked missing delivery date)
- *   WHO + WHEN     ← Card 9's `workItemsForOrder` — owner resolved per RULE
- *                    (§0.1: PO-duty holder · salesperson · PIC) · one clock
- *                    per key · working-days-late over a due that never moves
+ *   WHAT is open   ← owning-module projectors on the Worker
+ *   WHO + WHEN     ← structured normal owner · cover · acting person · due
  *
- * THE TWO-LINE GRAMMAR (card §7, sizes 13/11 — ui/MASTER.md §5):
- *   line 1  the SHORT action sentence — the dictionary's own QUEUE word,
- *           which IS the registered display of the act (one mapping, no
- *           second definition)
- *   line 2  names · document numbers · the due date — `due Wed, 20 Aug`,
- *           or `Late — was due Mon, 18 Aug`. Never stuffed into line 1.
+ * PRESENTATION: object identity, problem fact, action sentence, then timing.
+ * Owner identity is metadata/grouping and never part of the action sentence.
  *
  * MY WORK shows only the signed-in person's actions (the scope answers who —
  * no repeated avatar). TEAM WORK groups per staff: avatar · full name ·
@@ -34,31 +24,15 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { groupWorkItemsByDay, isOpsManager } from "@carres/shared";
+import { groupWorkItemsByDay } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
 import ListPageShell from "@/components/ListPageShell";
-import { useOperationStaff } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 
 type ViewKey = "mine" | "team";
-
-const DELIVERY_ARRANGEMENT_ACTIONS = new Set([
-  "assign_logistics",
-  "confirm_delivery_date",
-  "arrange_new_delivery_date",
-]);
-
-const DELIVERY_ORDER_ACTIONS = new Set([
-  "deliver_today",
-  "issue_delivery_order",
-]);
-const SALES_ORDER_ROUTE_ACTIONS = new Set([
-  "collect_loan_item",
-  "upload_delivery_photo",
-]);
 
 const TONE_DOT: Record<string, string> = {
   danger: "bg-danger",
@@ -68,17 +42,12 @@ const TONE_DOT: Record<string, string> = {
   neutral: "bg-base-300",
 };
 
-/** Line 2 — names · document numbers · due date, in the quieter rank. */
+/** Timing is metadata. Object, problem, and action keep their own ranks. */
 function supportingLine(i: WorkRow): string {
-  const parts: string[] = [];
-  if (i.customer) parts.push(i.customer);
-  parts.push(i.soRef);
   if (i.workingDaysLate > 0 && i.dueIso) {
-    parts.push(`Late — was due ${fmtDate(i.dueIso)}`);
-  } else if (i.dueIso) {
-    parts.push(`due ${fmtDate(i.dueIso)}`);
+    return `Late — was due ${fmtDate(i.dueIso)}`;
   }
-  return parts.join(" · ");
+  return i.dueIso ? `due ${fmtDate(i.dueIso)}` : "No date";
 }
 
 function WorkRowButton({
@@ -100,14 +69,18 @@ function WorkRowButton({
         className={`h-2 w-2 rounded-full shrink-0 ${TONE_DOT[item.broken ? "danger" : item.tone] ?? "bg-base-300"}`}
       />
       <span className="flex-1 min-w-0">
-        {/* Line 1 — the short action sentence: the dictionary's queue word. */}
-        <span className={`${cjkClassName(item.action)} text-body font-semibold text-base-900 block truncate`}>
+        <span className="block truncate text-label font-semibold text-base-500">
+          {item.soRef}
+        </span>
+        <span className={`${cjkClassName(item.problem)} block truncate text-body font-semibold text-base-900`}>
+          {item.problem}
+        </span>
+        <span className={`${cjkClassName(item.action)} block truncate text-body text-base-700`}>
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
           {item.action}
         </span>
-        {/* Line 2 — names · numbers · the due date, 11px regular. */}
         <span
           className={`block truncate text-label font-normal ${
             item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
@@ -123,14 +96,10 @@ function WorkRowButton({
 export default function OperationWork() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const staffQ = useOperationStaff();
 
-  const authRole = useAuth((s) => s.role);
   const authEmail = useAuth((s) => s.user?.email ?? null);
-  const myDuties = staffQ.data?.myDuties;
-  const isManager = isOpsManager(authRole, authEmail, myDuties);
 
-  const { items: allItems, staff, staffById, loading } = useOpenWorkSet();
+  const { items: allItems, staff, staffById, loading, error } = useOpenWorkSet();
 
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
@@ -138,7 +107,7 @@ export default function OperationWork() {
   const [view, setView] = useState<ViewKey | null>(
     linkedScope === "team" ? "team" : linkedScope === "mine" ? "mine" : null,
   );
-  const activeView: ViewKey = view ?? (isManager ? "team" : "mine");
+  const activeView: ViewKey = view ?? "mine";
   const [ownerFocus, setOwnerFocus] = useState<string | null>(linkedOwner);
 
   const myUserId = useMemo(() => {
@@ -208,46 +177,7 @@ export default function OperationWork() {
   const visible = activeView === "mine" ? mine : allItems;
   const lateCount = visible.filter((i) => i.workingDaysLate > 0).length;
 
-  /* A row is a DOOR to the object that owns the act. Delivery arrangement
-     work opens Delivery's editor; trip/result work opens the active DO. The
-     photo and loan rows retain the Sales Order until their existing governed
-     writers are mounted on the DO; a precise working door beats a dead one. */
-  const openRow = (i: WorkRow) => {
-    if (i.ruleKey.startsWith("manual_purchase.")) {
-      navigate(`/operation?tab=manual-purchase&mp=${i.orderId}`);
-      return;
-    }
-    if (i.ruleKey === "receiving.check_in") {
-      // A submitted count opens ITS session; an arrival-day row opens the
-      // exact PO's pre-start Receiving object (the exact write door — never
-      // a module landing page).
-      // A session row carries the session UUID (36 chars); an arrival-day
-      // row carries the PO's own document id.
-      navigate(
-        i.orderId.length === 36
-          ? `/operation?tab=receiving&session=${encodeURIComponent(i.orderId)}`
-          : `/operation?tab=receiving&po=${encodeURIComponent(i.orderId)}`,
-      );
-      return;
-    }
-    if (DELIVERY_ARRANGEMENT_ACTIONS.has(i.ruleKey)) {
-      navigate(`/operation/delivery/edit/${encodeURIComponent(i.orderId)}`);
-      return;
-    }
-    if (DELIVERY_ORDER_ACTIONS.has(i.ruleKey)) {
-      navigate(
-        i.deliveryDoNumber
-          ? `/operation/delivery-orders/${encodeURIComponent(i.deliveryDoNumber)}`
-          : `/operation/delivery/edit/${encodeURIComponent(i.orderId)}`,
-      );
-      return;
-    }
-    if (SALES_ORDER_ROUTE_ACTIONS.has(i.ruleKey)) {
-      navigate(`/operation/old-orders?order=${encodeURIComponent(i.orderId)}`);
-      return;
-    }
-    navigate(`/operation/orders/so/${i.orderId}`);
-  };
+  const openRow = (i: WorkRow) => navigate(i.destination);
 
   return (
     <ListPageShell
@@ -306,6 +236,10 @@ export default function OperationWork() {
       <div className="h-full overflow-y-auto px-5 py-4" data-testid="work-list">
         {loading ? (
           <div className="text-body text-base-400 py-8">Loading…</div>
+        ) : error ? (
+          <div className="text-body text-danger py-8" data-testid="work-error">
+            Work could not be loaded. Try again.
+          </div>
         ) : activeView === "mine" ? (
           myGroups.length === 0 ? (
             <div className="text-body text-base-400 py-8" data-testid="work-empty">

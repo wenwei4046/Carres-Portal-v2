@@ -306,6 +306,7 @@ import {
   type SaveDeliveryArrangementInput,
   type SupplierCreateInput,
   type PurchasingSupplierCollectionSetting,
+  type OperationWorkResponse,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
@@ -417,6 +418,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    work:      () => ["operation", "work"] as const,
     /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
      *  assigned). Polled 15s while the page is open so newly-imported orders
      *  appear without manual refresh. */
@@ -4292,6 +4294,19 @@ export function useWorkspaceDuties(
     queryKey: ["operation", "workspace-duties"],
     queryFn: () =>
       apiFetch<WorkspaceDutiesResponse>("/api/operation/workspace-duties"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** Workspace Work — the one server-composed open set used by My Work,
+ * Team Work, and Quick Rail. No module trigger is recomputed in the browser. */
+export function useOperationWork(
+  opts?: Partial<UseQueryOptions<OperationWorkResponse>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.work(),
+    queryFn: () => apiFetch<OperationWorkResponse>("/api/operation/work"),
     staleTime: 30_000,
     ...opts,
   });
