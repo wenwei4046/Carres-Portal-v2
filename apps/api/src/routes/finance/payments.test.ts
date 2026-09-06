@@ -45,6 +45,60 @@ const APPROVAL_ID = "00000000-0000-0000-0000-000000a99001";
 const ORDER_ID    = "00000000-0000-0000-0000-000000a99002";
 const PO_ID       = "PO-2046";
 
+describe("GET /api/finance/payments/register", () => {
+  function ledger(error: unknown = null) {
+    const rows = [{ id: "p1", receipt_no: "RC-060926-0001", amount: 200,
+      voided_at: "2026-09-06", orders: { id: ORDER_ID, so: 100, customer_name: "Customer" } }];
+    const chain = { select: vi.fn(), order: vi.fn(), range: vi.fn() };
+    chain.select.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    chain.range.mockResolvedValue({ data: error ? null : rows, error, count: 1 });
+    const sb = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return { sb, chain, rows };
+  }
+  async function request(role: string, query = "") {
+    return app.fetch(new Request(`http://t/api/finance/payments/register${query}`, {
+      headers: { Authorization: `Bearer ${await makeJwt(role)}` },
+    }), env);
+  }
+  it.each(["operation", "finance", "principal"])("reads canonical receipts for %s, including void history", async (role) => {
+    const { sb, rows } = ledger();
+    const res = await request(role);
+    expect(res.status).toBe(200);
+    expect(sb.from).toHaveBeenCalledWith("order_payments");
+    expect(await res.json()).toEqual({ rows, total: 1 });
+  });
+  it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading money", async (role) => {
+    const res = await request(role);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("does not turn a failed source read into an empty register", async () => {
+    ledger({ message: "source unavailable", code: "08006" });
+    const res = await request("finance");
+    expect(res.status).toBe(500);
+  });
+  it("resolves the recorder name from staff truth", async () => {
+    const { sb, chain, rows } = ledger();
+    Object.assign(rows[0], { recorded_by: "staff-1" });
+    sb.from.mockImplementation((table) => table === "app_users" ? {
+      select: () => ({ in: async () => ({ data: [{ id: "staff-1", name: "Staff One" }], error: null }) }),
+    } : chain);
+    const res = await request("finance");
+    expect(res.status).toBe(200);
+    expect((await res.json() as { rows: Array<{ recorded_by_name: string }> }).rows[0].recorded_by_name).toBe("Staff One");
+  });
+  it("pages deterministically and refuses invalid offsets", async () => {
+    const { chain } = ledger();
+    expect((await request("finance", "?offset=200&limit=100")).status).toBe(200);
+    expect(chain.range).toHaveBeenCalledWith(200, 299);
+    expect(chain.order).toHaveBeenCalledWith("id", { ascending: false });
+    expect((await request("finance", "?offset=-1")).status).toBe(422);
+    expect((await request("finance", "?limit=1001")).status).toBe(422);
+  });
+});
+
 describe("GET /api/finance/payments", () => {
   it("returns payments list with default order by paid_at desc", async () => {
     const orderFn = vi.fn().mockReturnValue({

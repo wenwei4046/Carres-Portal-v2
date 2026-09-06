@@ -8,6 +8,7 @@ import OperationOrdersControl, {
   buildOrdersPrintHtml,
   catQty,
   nextActionOf,
+  moneyOf,
   openActionsOf,
   stockEtaOf,
   stockReadiness,
@@ -2682,8 +2683,7 @@ describe("nextActionOf (C2)", () => {
   // the ladder's locked rulings. What follows tests the half that is new —
   // that Layer 1 stops one track eating another's work.
   describe("openActionsOf (C2 · Layer 1)", () => {
-    it("the card's own example: no PO + no logistics + owing → THREE open actions", () => {
-      // The old ladder showed the purchasing act and the other two facts vanished.
+    it("unconfirmed goods keep the balance but wait before creating collection work", () => {
       const o = makeRow({
         id: "x",
         so: 1,
@@ -2693,8 +2693,15 @@ describe("nextActionOf (C2)", () => {
       expect(openActionsOf(o, { state: "unknown" }, MS).map((a) => a.key)).toEqual([
         "issue_po",
         "assign_logistics",
-        "collect",
       ]);
+      expect(moneyOf(o)).toMatchObject({ outstanding: 2000, owing: true });
+      const arriving = {
+        ...o,
+        ops_order_control: [{ line_etas: { "mattress:MAT-1": inDays(2) } }],
+      } as operationOrderListRow;
+      expect(openActionsOf(arriving, { state: "awaiting" }, MS).map((a) => a.key))
+        .toContain("collect");
+      expect(moneyOf(arriving).outstanding).toBe(2000);
     });
 
     it("goods still coming no longer hides the delivery call — the live board's shape", () => {
@@ -3238,7 +3245,7 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
   };
 
   /** Three open actions: nothing ordered (goods) · no logistics (delivery) ·
-   *  a priced order with nothing paid (money). The card's own example. */
+   *  a priced order with a known arrival and nothing paid (money). */
   const THREE = makeRow({
     id: "three",
     so: 3001,
@@ -3248,6 +3255,7 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
     delivery_date: iso(10),
     order_lines: [{ sku: "mattress:MAT-1", qty: 1, unit_price: 2455 }],
     paid: 0,
+    ops_order_control: { line_etas: { "mattress:MAT-1": iso(3) } },
   });
   /** One open action: goods are in, the money is settled, no logistics yet. */
   const ONE = makeRow({
@@ -3304,6 +3312,16 @@ describe("Actions column · +N and the delivering FACT (C3)", () => {
     wrap(<OperationOrdersControl />);
     expect(within(row(3002)).getByText("Assign logistics")).toBeInTheDocument();
     expect(within(row(3002)).queryByTestId("next-more")).toBeNull();
+  });
+
+  it("unconfirmed arrival adds no hidden collection action to the row or drawer", () => {
+    listHookState.data = { orders: [{ ...THREE, ops_order_control: [] }] };
+    wrap(<OperationOrdersControl />);
+    const cell = row(3001);
+    expect(within(cell).queryByTestId("next-more")).toBeNull();
+    fireEvent.click(cell);
+    const journey = JSON.parse(screen.getByTestId("drawer-stub").getAttribute("data-journey")!);
+    expect(journey.openActions.some((action: { key: string }) => action.key === "collect")).toBe(false);
   });
 
   it("the count always equals C2's row count — 1 + N is the drawer's list length", () => {

@@ -23,15 +23,17 @@
  * trigger below; the WORDS come from `order-action-words` and are never spelt
  * here.
  *
- * **Independence is about OUTPUTS, not inputs.** Two triggers deliberately read
- * a signal owned by another track, and both are pre-existing locked rules, not
- * new couplings:
+ * **Independence is about OUTPUTS, not inputs.** Triggers may read source facts
+ * owned by another track:
  *   · the past-deadline escalation is scoped to "something has been ordered"
  *     (Loo, freeze gate 2026-07-12) so it can never leapfrog the purchasing
  *     act (`Issue PO`);
  *   · the money LOCK is a GATE (Law 4: "Money still LOCKS"), which C2 kept and
  *     C3 moved onto `collect` — the action that clears it — when the resting
- *     `Confirm delivery` it used to ride was retired.
+ *     `Confirm delivery` it used to ride was retired;
+ *   · Payment MASTER §16 requires goods ready or a confirmed arrival before
+ *     customer collection. Waiting leaves the balance intact. Shared Work
+ *     raises any real Finance Exception independently of customer collection.
  * Neither REMOVES another track's action from the list, which is what Law 1
  * forbids.
  *
@@ -40,6 +42,7 @@
  */
 
 import type { OrderActionKey } from "./order-action-words";
+import { paymentCollectionReadiness } from "./payment-collection";
 
 /**
  * How long one person's claim on an action survives without being refreshed.
@@ -406,6 +409,10 @@ function deliveryAction(s: OrderActionSignals): OrderOpenAction | null {
  */
 function moneyAction(s: OrderActionSignals): OrderOpenAction | null {
   if (!s.moneyOwing) return null;
+  // Payment MASTER §16: an outstanding balance alone is not permission to
+  // contact the customer while goods and arrival are unconfirmed. Work adds
+  // any real Finance Exception independently; this never clears that hold.
+  if (paymentCollectionReadiness(s) === "wait") return null;
   // The 🔒 now means Finance said stop (decision A) — a plain balance shows an
   // open collect with no lock, because collecting no longer stands between the
   // goods and the truck.
@@ -465,7 +472,7 @@ const DISPLAY_RANK: Record<OrderActionKey, number> = {
   confirm_delivery_date: 41,
   issue_delivery_order: 42,
   // 5 · money — last on purpose, and it is not a demotion: 催钱前先看货. It is
-  // always in this list and always in the Owing filter.
+  // in this list when collection is ready. Waiting money remains a money fact.
   collect: 50,
   // The blueprint card's two composed WORK items (2026-08-16). The ladder
   // itself never raises them (one action per track is its law); the Work feed
