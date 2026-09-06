@@ -977,6 +977,20 @@ Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy 
 `Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
 an activity fact that confirms nothing and moves no arrangement field.
 
+**DEPLOYED 2026-09-06 — Monitor work lists + Delivery Orders Register correction, PR #1109,
+main SHA `22bf71493b5c6f12c946c3898a2cf13477ca33eb`, all three canonical surfaces converged on
+that exact SHA (deploy probes).** The 2026-09-06 owner UI correction in §8 is live and was
+verified through an authenticated Operations session on production: one WORK TO DO rail group;
+REGION as flat direct state names with real counts; LOGISTICS listing only carrying partners
+plus `No logistics picked`; the spanning empty-range state printing the REAL 86-deliveries
+count with its `Open No confirmed date` door; the `No confirmed date · No logistics picked`
+combined summary narrowing 86 → 35 with `Clear filters`; select-all over the 35 visible rows
+producing `35 delivery scopes selected · Clear · Assign logistics` in place; and the Delivery
+Orders register on the full Register grammar with its WORK TO DO / DOCUMENT STATUS rail and
+`Print {N} delivery orders` selection output. No migration, no RLS change, no new writer — the
+one governed assignment door is reused. Named follow-up, not an accident: the `Check delivery
+proof` queue waits for the §6 proof-review record to exist.
+
 **DEPLOYED 2026-09-04 — Delivery CARD 01 · Monitor Calendar, PR #1101, main SHA
 `e04dc00708eb2f40f001b8dedd8a4721a24c3875`, production converged (deploy probe).** The four-page
 map's first page is live: Monitor is the read-only six-operating-day calendar at
