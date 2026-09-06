@@ -407,30 +407,60 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**MONITOR — the internal Operations calendar (CARD-2026-09-04-delivery-01, BUILT).** Monitor
-replaces the unified planning listing of 2026-08-24 and answers the operator's morning question:
-*what customer deliveries are planned across the next operating days, and which existing record do
-I open to continue the work?*
+**MONITOR — calendar planning + selectable operational work lists (owner UI correction
+2026-09-06, overwriting the 2026-09-04 calendar-only composition).** Monitor answers the
+operator's morning question — *what customer deliveries are planned, and which record do I open
+or act on?* — through **two projections of the SAME canonical scope rows**:
 
 ```
-one 50px Destination Header  ·  Monitor
-page-owned 240px rail        ·  DELIVERY SCHEDULE + NEEDS CHECKING + REGION + LOGISTICS
-one toolbar                  ·  ‹ six-day range › + Search
-six operating-day columns    ·  Sunday omitted; cards stack inside each day
+one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
+page-owned 240px FilterRail  ·  WORK TO DO + REGION + LOGISTICS (shared FilterRail grammar)
+Calendar (untouched)         ·  ‹ six-day range › + Search · six operating-day columns,
+                                delivery cards, NO checkboxes, no batch selection
+every operational pick       ·  the standard selectable Register work list (shared DataGrid):
+                                selection ☐ · ▸ expansion · SO No · Customer · Requested
+                                Delivery Date · Delivery Location · State · Logistics Partner ·
+                                Confirmed Delivery · Confirmed Time · Goods · DO No ·
+                                Delivery Status — sticky identity, real horizontal scrolling
 ```
 
-**Monitor writes NOTHING.** No inline edit, assignment, upload, result, proof review, selection,
-bulk action or drag/drop reschedule. Every card is ONE accessible link: an issued DO opens the
-formal Delivery Order object; a scope without one says `No delivery order yet` and opens Edit
+A work queue (`No confirmed date` · `Overdue` · `Failed Delivery` · `Delivered — Proof
+Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an operational
+question, and its answer is the Register grammar every other module answers with — **never a
+full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
+read-only. `SO No` opens the Sales Order, `DO No` opens the Delivery Order, double-click opens
+Edit Delivery.
+
+**BULK INITIAL LOGISTICS ASSIGNMENT LIVES ON MONITOR (owner correction 2026-09-06)** — the
+planning population includes delivery scopes that have no formal DO yet, so the journey is
+`Monitor → No logistics picked → select visible rows → Assign logistics`. Selection follows the
+shared engine: every row has a checkbox; the header checkbox selects only the visible filtered
+rows; changing a filter clears the selection; the selection toolbar replaces the normal toolbar
+at the same height and reads `{N} delivery scopes selected · Clear · Assign logistics`. The
+write goes through the ONE governed assignment door (coverage-checked partners, Klang Valley
+pre-selects NETS, history preserved). **Bulk assignment is offered only while every selected
+row is unassigned**; a selected row that already carries a partner turns the act into the
+governed **`Change logistics`** (reason + append-only history), one row at a time — an
+uncontrolled batch replacement of assigned partners does not exist. `Edit Delivery` is offered
+for exactly ONE selected row, never many. Every combined narrowing prints above the work list
+(`No confirmed date · No logistics picked`) with `Clear filters`, and every pick rides the URL.
+
+**The CALENDAR still writes nothing** — no inline edit, upload, result, proof review, selection
+or drag/drop reschedule. Every card is ONE accessible link: an issued DO opens the formal
+Delivery Order object; a scope without one says `No delivery order yet` and opens Edit
 Delivery. There is no `New DO`, `Issue`, `Release` or `Approve` — §3's ruling stands: **the
-SYSTEM issues the Delivery Order** when the governed gate becomes true.
+SYSTEM issues the Delivery Order** when the governed gate becomes true. A fully empty visible
+range shows ONE spanning state — `No deliveries are scheduled from {first} to {last}.`, the
+REAL `{n} deliveries need a confirmed date.` count when true, and the `Open No confirmed date`
+door — never the same absence repeated in every column; an individually empty day says
+`No deliveries`.
 
 - **Six consecutive OPERATING days, Sunday omitted.** The default window opens one operating day
   before business today (yesterday's deliveries are still being closed out); previous/next moves
-  exactly six operating days. On Friday 4 Sep 2026 the range is Thu 3 – Wed 9, omitting Sun 6.
+  exactly six operating days. On Sunday 6 Sep 2026 the range is Sat 5 – Fri 11, omitting Sun 6.
 - **No hour-by-hour vertical timeline.** The planned window is text; card height never implies
   duration. Cards order by window start, then customer (locale-aware), then stable scope id. An
-  empty day says `No deliveries`.
+  empty day says `No deliveries` (owner correction 2026-09-06).
 - **One card shows only:** planned window · DO No (or `No delivery order yet`) · Customer ·
   City/locality · Goods summary · Logistics Partner · Expected arrival when recorded · ONE
   derived delivery status. **Never** a customer or partner phone, money, internal owner, driver,
@@ -440,29 +470,64 @@ SYSTEM issues the Delivery Order** when the governed gate becomes true.
   nothing**: no failure, no "result needed", no invented status reads the clock.
   `Delivered — Proof Required` is derived only from a RECORDED delivery result whose photo
   ledger is known and empty — never from time.
-- **The URL is the state** (`?start=` · `?schedule=` · `?checking=` · `?region=` ·
-  `?logistics=` · `?q=`), so refresh, share and Back all restore the same calendar.
+- **The URL is the state** (`?start=` · `?view=` · `?region=` · `?logistics=` · `?q=`), so
+  refresh, share and Back all restore the same view; the retired `?schedule=`/`?checking=`
+  spellings still resolve so an old shared link keeps answering.
 - **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
   the rail becomes the filter drawer, the visible range becomes one selected operating day with a
   sticky date heading and 44px rows, previous/next skips Sunday, and the cards and href
   arithmetic are identical to desktop.
 
 **The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
-`RailGroup`/`RailItem` recipe every Register page uses (the FilterRail law). Four single-pick
-groups that COMBINE; each group's counts are computed over the cards the other groups already
-narrowed (Architecture Law D). `DELIVERY SCHEDULE` holds `Calendar` (cards inside the visible
-window), `No confirmed date` and **`Overdue`** — never `Today`, never `Tomorrow`. `NEEDS
-CHECKING` holds `Failed Delivery`, `Delivered — Proof Required` and `Waiting for warehouse` —
-each a recorded fact, never a clock inference. `REGION` and `LOGISTICS` keep their ruled
-grammars below.
+`FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px
+minimum rows, wrapping labels, right-aligned counts, blue active row, `Hide filters` /
+`Show filters` collapse remembered by the browser; on a phone the rail becomes the filter
+drawer). **Three single-pick groups that COMBINE**; each group's counts are computed over the
+cards the other groups already narrowed (Architecture Law D):
 
-**DELIVERY ORDERS — the restored register.** `/operation/delivery-orders` reaches the existing
-formal-document register again (the 2026-08-24 redirect into the unified page is retired with
-that page). This Card restored the route only; the register's fields, rail, layout and actions
-are unchanged, and its redesign is its own later Card. The document-status vocabulary stays the
-register's own (`Created → Out for delivery → Delivered`, `Delivery exception` with its ONE
-reason, `Cancelled`), and **`Created` may not appear on Monitor** — the operational and document
-vocabularies never borrow each other's words.
+- **`WORK TO DO` is ONE group (owner correction 2026-09-06 — never split into "Delivery
+  Schedule" and "Needs Checking"):** `Calendar` · `No confirmed date` · **`Overdue`** ·
+  `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`,
+  never `Tomorrow`; every queue a recorded fact, never a clock inference.
+- **`REGION`** — `All regions`, then the direct rows ruled below.
+- **`LOGISTICS`** — `All logistics`, then the partner rows ruled below.
+
+**DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
+correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**
+`/operation/delivery-orders` is the shared Register engine top to bottom: row checkboxes ·
+header select-all over the visible filtered rows · the in-place same-height selection toolbar ·
+▸ expansion showing THIS TRIP's goods lines read-only (the one `trip_groups` derivation the DO
+page and the print path already run) · sticky `DO No` identity with real horizontal scrolling ·
+search · governed per-column filters · Export · Columns · the fixed 32px result footer.
+
+- **Default columns, in order:** `DO No` · `DO date` · `SO No` · `Customer` ·
+  `Delivery Location` · `Logistics Partner` · `Confirmed Delivery` · `Delivery Result` ·
+  `Proof Status` · `Status`. In the chooser, off by default: `Requested Delivery Date` ·
+  `Confirmed Time` · `Goods` · `Created`. The ambiguous `Delivery date` label is retired for
+  **`Confirmed Delivery`**, `Confirmed Time` is its own column, and the customer date keeps its
+  governed word `Requested Delivery Date`.
+- **The `SO No` cell is identity only** — the inline `Order Route` second-line action is
+  retired; the route stays one right-click away in the governed context menu.
+- **Its page-owned 240px FilterRail** carries `WORK TO DO` — the queues canonical data can
+  honestly compute: `Record delivery result` (derived `Out for delivery`, no result yet) ·
+  `Upload delivery photo` (recorded Delivered/Partially Delivered whose photo ledger is KNOWN
+  and empty — an unknown ledger claims nothing) · `Upload signed Delivery Order` (the same
+  recorded result with no signed document on file). One document sits in at most ONE primary
+  queue, in that priority; finished work leaves the queue and the document stays in the status
+  views forever. **`Check delivery proof` is deliberately NOT a queue yet** — no canonical
+  proof-review record exists (§6's Proof Accepted / More Proof Required / Proof Rejected is
+  approved target, not built), and a queue is never faked. `DOCUMENT STATUS` lists `All` plus
+  the ladder's own five words.
+- **Selection is document-oriented output only:** `{N} delivery orders selected · Clear ·
+  Print {N} delivery orders` (each document's governed single-DO page, assembled server-side
+  under RLS, one file) plus the shared selected-row Excel export. **`Assign logistics` never
+  appears here** — initial assignment is Monitor's journey, because Monitor's population
+  includes scopes without a DO.
+
+The document-status vocabulary stays the register's own (`Created → Out for delivery →
+Delivered`, `Delivery exception` with its ONE reason, `Cancelled`), and **`Created` may not
+appear on Monitor** — the operational and document vocabularies never borrow each other's
+words.
 
 **THE ARRANGEMENT OWNERSHIP RULING (owner, 2026-08-24) STANDS UNCHANGED:**
 
@@ -472,11 +537,11 @@ vocabularies never borrow each other's words.
 > the owner of the commercial customer promise** — the customer, the address, the building facts and
 > the customer-requested `Requested Delivery Date` — and Delivery may never write one of them.
 
-What changed is WHERE the writes are made: they live on **Edit Delivery** (and the governed
-partner door), never on Monitor. The retired listing's multi-scope `Assign logistics` selection
-door left with that listing — **a bulk assignment surface is an open gap named for a later
-Delivery Card**, and the governed `Change logistics` rules below still bind every partner write
-wherever it is made.
+What changed is WHERE the writes are made: the arrangement lives on **Edit Delivery** (and the
+governed partner door). **The bulk `Assign logistics` gap is CLOSED (owner correction
+2026-09-06):** Monitor's work list is the one bulk initial-assignment surface, through the same
+governed door — and the `Change logistics` rules below still bind every partner write wherever
+it is made.
 
 The arrangement is its OWN record (`ops_delivery_arrangements`, migration 0386) keyed by the scope
 `(order_id, leg)` — never `orders.delivery_partner_id`, which is a Sales Order column and could
@@ -489,26 +554,28 @@ its address stays **Sales-owned Work** and must not appear here as a card of `No
 before the correction, 59 of 90 rows carried no location at all, which is two thirds of a logistics
 screen that no logistics operator could act on.
 
-**`REGION` (owner ruling 2026-09-01)** answers *where is each delivery going?* in the words the
-address actually carries, wherever the Delivery rail draws it:
+**`REGION` (owner correction 2026-09-06, overwriting the 2026-09-01 sub-heading grammar)**
+answers *where is each delivery going?* with **direct state/jurisdiction names only, derived
+from the real records** — Johor, Kedah, Kelantan, Kuala Lumpur, Melaka, Pahang, Penang,
+Putrajaya, Sabah, Sarawak, Selangor, Singapore and the rest as the data genuinely carries them:
 
-- **Peninsular states are listed by their own names, never merged and never bucketed under an
-  `Other`** — a state appears while it genuinely holds a scope (the same admission rule the
-  LOGISTICS rail applies to a partner outside the governed roster), ordered by count.
-- **`EAST MALAYSIA` is a fixed sub-heading with Sabah and Sarawak beneath it, always visible** —
-  it is a DIFFERENT journey (HOUZS owns it beyond the handover), not just another state.
-- **`SINGAPORE` is a fixed sub-heading with Singapore beneath it, always visible** — the two-leg
-  journey's home. **Leg 1 (KL → JB) counts under Johor** — the truck the planner sees on the JB
-  run — **and leg 2 under Singapore.**
+- **One flat list.** No `EAST MALAYSIA`, `WEST MALAYSIA` or `SINGAPORE` sub-group headings, no
+  `Other` bucket, no state split into extra categories, and no fixed zero-count filler rows —
+  a state appears while it genuinely holds a matching scope, ordered by count; a picked state
+  stays visible at 0 until it is unpicked. **The East Malaysia BUSINESS boundary is untouched:**
+  HOUZS still owns the onward journey beyond the handover (§15) — that is an operating ruling,
+  not a rail heading.
+- **Leg 1 of a Singapore journey (KL → JB) still counts under Johor and leg 2 under Singapore.**
 - State detection reuses the ONE address classifier; a delivery whose address resolves to no
   state joins no region row and shows while no region is picked — fixing its address is Sales
   work through `Open Sales Order to change`.
 
-`LOGISTICS` lists the governed partners
-**NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**, then any other
-partner while it is genuinely carrying a scope, then `No logistics picked`. Picking an active row
-again unpicks it — there is no separate `All` row on a single-pick rail. Counts are **delivery
-scopes or Journey legs, never whole Sales Orders.**
+**`LOGISTICS` (same correction)** lists `All logistics`, then only the partners **genuinely
+carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT · EU · SSY ·
+HOUZS) among those present, then others by name, a picked partner staying visible at 0 — then
+**`No logistics picked`** always, because it is the bulk-assignment journey's entry. A long
+list of irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
+Journey legs, never whole Sales Orders.**
 
 **One card = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
 cards, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the

@@ -144,6 +144,17 @@ describe("GET /api/operation/delivery-orders — the register", () => {
     expect([401, 403]).toContain(res.status);
   });
 
+  it("the register read carries the proof + goods facts its WORK TO DO rail counts (correction 2026-09-06)", async () => {
+    const { from } = mockSb([{ data: [DO_ROW] }, { data: [] }, { data: [] }]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const chain = from.mock.results[0]!.value as { select: ReturnType<typeof vi.fn> };
+    const selected = String(chain.select.mock.calls[0]![0]);
+    expect(selected).toContain("do_file_path");
+    expect(selected).toContain("order_lines(id, sku, qty, attrs)");
+    expect(selected).toContain("ops_order_control(delivery_photos)");
+  });
+
   it("computes nothing server-side — no owner, action or status field rides a row", async () => {
     mockSb([{ data: [DO_ROW] }, { data: [] }]);
     const res = await call("", "operation");

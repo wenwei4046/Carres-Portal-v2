@@ -6770,6 +6770,23 @@ export interface DeliveryOrderRow {
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
+    /** The signed DO on file (0087) — the `Upload signed Delivery Order`
+     *  queue's canonical fact (register correction 2026-09-06). */
+    do_file_path?: string | null;
+    /** The order's goods lines — the register expansion derives THIS TRIP's
+     *  lines from them via `trip_groups` (one arithmetic with the DO page). */
+    order_lines?: Array<{
+      id?: string;
+      sku: string;
+      qty: number;
+      attrs?: Record<string, unknown> | null;
+    }>;
+    /** T6 (0280) — the delivery-photo ledger; PostgREST may embed the overlay
+     *  as an object or a one-row array. null/absent = UNKNOWN, never empty. */
+    ops_order_control?:
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }[]
+      | null;
   };
 }
 export interface DeliveryOrderAttemptRow {

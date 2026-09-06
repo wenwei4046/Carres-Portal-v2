@@ -2303,21 +2303,34 @@ A Monitor card carries the arrangement facts, DO number and Delivery Status in o
 does not merge their authority: Delivery arrangement remains editable operational truth (edited
 on Edit Delivery, never on Monitor) and the issued DO remains a formal historical document.
 
-**Monitor words — PROPOSAL, not yet owner-accepted.** These strings shipped with the Monitor
-Card and await Jess's word; each is labelled here so no chat mistakes it for ruled vocabulary:
+**Monitor + Delivery Orders register words — owner UI correction 2026-09-06.** The correction
+ruled these strings (the 2026-09-04 `NEEDS CHECKING` / `DELIVERY SCHEDULE` proposals are
+RETIRED — the rail is ONE `WORK TO DO` group):
 
 | String | Where it appears | Status |
 |---|---|---|
-| `Monitor` | the page title and sidebar child | **PROPOSAL** |
-| `Calendar` | the DELIVERY SCHEDULE rail's default row (cards inside the visible window) | **PROPOSAL** |
-| `NEEDS CHECKING` | the rail group holding `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` | **PROPOSAL** |
-| `Search deliveries…` | the toolbar search placeholder | **PROPOSAL** |
-| `Previous days` · `Next days` | the range arrows' accessible labels | **PROPOSAL** |
+| `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
+| `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
+| `Calendar` | the WORK TO DO default row (cards inside the visible window) | **RULED 2026-09-06** |
+| `All regions` · `All logistics` | the two group-clearing rows | **RULED 2026-09-06** |
+| `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
+| `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
+| `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
+| `Open No confirmed date` | that state's one door | **RULED 2026-09-06** |
+| `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
+| `{N} delivery scopes selected` · `{N} delivery orders selected` | the two selection toolbars' count sentences | **RULED 2026-09-06** |
+| `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
+| `Record delivery result` · `Upload delivery photo` · `Upload signed Delivery Order` | the register's WORK TO DO queues (`Check delivery proof` joins only when a proof-review record exists) | **RULED 2026-09-06** |
+| `DOCUMENT STATUS` | the register rail's status group | **RULED 2026-09-06** |
+| `Search deliveries…` | the toolbar search placeholder | kept |
+| `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 
-Already governed and merely REUSED by Monitor (not proposals): `No confirmed date` · `Overdue` ·
-`No delivery order yet` · `No logistics picked` · `No deliveries booked this day.` (T10) ·
-`Expected arrival` · `Hide filters` / `Show filters` · the seven operational status words ·
-`Delivered — Proof Required` (Delivery MASTER §15).
+Already governed and merely REUSED (not new words): `No confirmed date` · `Overdue` ·
+`No delivery order yet` · `No logistics picked` · `Expected arrival` · `Hide filters` /
+`Show filters` · the seven operational status words · `Delivered — Proof Required` (Delivery
+MASTER §15) · `Requested Delivery Date` · `Confirmed Delivery` · `Confirmed Time` ·
+`Not delivered yet` · `No delivery photo yet` · `Delivery photo saved` ·
+`Signed document on file` / `No signed document yet` (the DO object's own shipped pair).
 
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and
