@@ -140,7 +140,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             aria-label={`${fmtDate(iso)}${dayCount(iso) ? ` · ${dayCount(iso)} dated` : ""}`}
             className={`relative rounded-control py-1 text-body font-normal ${
               iso === selectedDateIso ? "bg-kit-blue-3 text-kit-blue-11 font-semibold"
-              : nonWorking(iso) ? "text-base-400" : "text-base-800 hover:bg-base-50"}`}>
+              : nonWorking(iso) ? "text-base-400" : "text-base-800 hover:bg-hovertint"}`}>
             {Number(iso.slice(8, 10))}
             {dayCount(iso) > 0 && <span aria-hidden
               className="absolute inset-x-0 bottom-0 mx-auto h-1 w-1 rounded-full bg-kit-blue-9" />}
@@ -158,7 +158,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
             onClick={() => onFilter(key)}
             aria-current={filter === key ? "true" : undefined}
             className={`block w-full rounded-control px-2 py-1.5 text-left text-body ${
-              filter === key ? "bg-kit-blue-3 text-kit-blue-11 font-semibold" : "hover:bg-base-50"}`}>
+              filter === key ? "bg-kit-blue-3 text-kit-blue-11 font-semibold" : "hover:bg-hovertint"}`}>
             {word}
           </button>)}
         </div></SectionCard>
@@ -195,7 +195,7 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
                   onClick={() => onOpenInvoice(e.row)}
                   data-testid={highlighted ? "calendar-highlight" : undefined}
                   className={`block w-full rounded-control border px-1.5 py-1 text-left ${
-                    highlighted ? "border-kit-blue-9 bg-kit-blue-3" : "border-base-200 bg-white hover:bg-base-50"}`}>
+                    highlighted ? "border-kit-blue-9 bg-kit-blue-3" : "border-base-200 bg-white hover:bg-hovertint"}`}>
                   <span className="block text-label font-normal">{KIND_WORD[e.kind]}{highlighted ? " · selected" : ""}</span>
                   <span className="block text-body font-semibold">
                     {e.row.orders ? `SO-${e.row.orders.so}` : "SO not available"} · {e.row.orders?.customer_name ?? "Customer not available"}
