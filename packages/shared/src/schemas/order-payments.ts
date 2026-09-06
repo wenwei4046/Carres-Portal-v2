@@ -11,7 +11,10 @@ import { z } from "zod";
  * collect-before-delivery gate. See `docs/superpowers/plans/2026-06-26-balance-job.md`.
  */
 
-/** How the money came in. */
+/** How the money came in. 0430 adds the governed manual methods from
+ *  payment/MASTER.md §16 — duitnow_qr · credit_card · debit_card — matching
+ *  the widened SQL dictionary and column CHECK. `online` remains
+ *  provider-recorded (Stripe) and is never a manual selection. */
 export const PAYMENT_METHODS = [
   "cash",
   "bank",
@@ -19,6 +22,9 @@ export const PAYMENT_METHODS = [
   "cheque",
   "online",
   "other",
+  "duitnow_qr",
+  "credit_card",
+  "debit_card",
 ] as const;
 export type OrderPaymentMethod = (typeof PAYMENT_METHODS)[number];
 

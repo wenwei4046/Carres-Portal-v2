@@ -111,27 +111,31 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
   return c.json({ payment: out.payment, ordersPaid: out.orders_paid }, 201);
 });
 
-// DELETE /:id/payments/:pid — VOID a mis-keyed entry. Principal only (a junior
-// operator records; only the principal reverses), mirroring the waiver gate.
-// CARD 4 (0343): a void is a STAMP, never a delete — the row survives with
-// voided_at/by, and the RPC reverses exactly the orders.paid contribution the
-// record made. The wire contract ({ok:true}) is unchanged.
+// DELETE /:id/payments/:pid — VOID a mis-keyed entry. 0430: the reason is
+// REQUIRED and the authority is the Payment Approver duty (Shared Duty
+// Resolver) or principal — the SQL door decides; this route only shapes the
+// request. CARD 4 (0343): a void is a STAMP, never a delete — the row
+// survives with voided_at/by, and the RPC reverses exactly the orders.paid
+// contribution the record made. The wire contract ({ok:true}) is unchanged.
+const voidPaymentInput = z.object({
+  reason: z.string().trim().min(1, "A reason is required to void a payment.").max(500),
+});
 orderPaymentsRouter.delete("/:id/payments/:pid", async (c) => {
   const auth = c.var.auth;
-  if (auth.role !== "principal") {
-    throw new HTTPException(403, { message: "Principal only" });
-  }
+  requireOperationOrPrincipal(auth.role);
 
   const idCheck = ORDER_ID.safeParse(c.req.param("id"));
   const pidCheck = PAYMENT_ID.safeParse(c.req.param("pid"));
   if (!idCheck.success || !pidCheck.success) {
     throw new HTTPException(404, { message: "Payment not found" });
   }
+  const parsed = await parseJsonBody(c, voidPaymentInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
 
   const sb = userClient(c.env, auth.jwt);
   const { error } = await sb.rpc("payment_void", {
     p_payment_id: pidCheck.data,
-    p_reason: null,
+    p_reason: parsed.data.reason,
   });
   if (error) {
     const m = mapPgError(error);

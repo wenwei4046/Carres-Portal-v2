@@ -290,27 +290,42 @@ confirmation creates it; delivered balances stay collectible. No money arithmeti
 gate changed. An authenticated owner walk of the live page is still owed; exact-SHA and bundle
 evidence are the current production proof.
 
-### BUILD in progress — invoice lifecycle and the Invoices Register, 2026-09-06
+### Deployed — invoice lifecycle and the Invoices Register, 2026-09-06
 
-Migration `0429` (branch evidence; verified on production in a rolled-back transaction with
-negative controls, not yet applied) gives `invoices` its governed lifecycle: kind
+Migration `0429` is APPLIED (tracker tail confirmed) and PR #1108 merged as `60e8814c`;
+the ERP page, POS page and API Worker converged that exact SHA and the served bundle carries
+the Invoices Register's own strings. `invoices` now carries the governed lifecycle: kind
 (Sales/Storage/Additional Storage), draft → issued → voided status, immutable issue snapshot,
 void reason/actors and the replacement lineage; one live Sales Invoice per order; allocations
 may name an invoice. `payment_invoice_prepare` drafts idempotently, `payment_invoice_issue`
 mints the governed `INV-DDMMYY-NNNN` number and freezes the snapshot, and
 `payment_invoice_void_replace` — Payment Approver duty via the Shared Duty Resolver, or
 principal — voids with a required reason and drafts the linked replacement. The dispatch
-trigger now adopts a prepared live invoice instead of minting a twin, and mints on the
-governed scheme when none exists. The branch also builds the §16 Invoices Register (eight
-approved columns; Goods/arrival/timing derived through the one shared
-`orderMoney`/`collectionClock` arithmetic), read-only Inspect, and the one-scroll invoice
-object with honest empty states for the document and Communication History.
+trigger adopts a prepared live invoice instead of minting a twin. `Finance → Invoices` opens
+the §16 Register (eight approved columns; Needed/Goods/arrival/timing derived through the one
+shared `orderMoney`/`collectionClock` arithmetic), read-only Inspect, and the one-scroll
+invoice object with honest empty states. The rolled-back production probe's negative controls
+were run before apply; an authenticated owner walk is still owed.
 
-Record-payment flow, WhatsApp messages/templates, bank routing, Settings, Reports, Stripe
-convergence, storage journeys, responsive 390px/200% verification and the retirement of the
-rejected Refund/Bank Matching surfaces remain unfinished target work. The complete approved
-customer Important Notes wording has not been located in the repository and has been requested
-from its owner; it must not be invented or shortened during implementation.
+### BUILD in progress — record payment, and a void wears its reason, 2026-09-06
+
+Migration `0430` (branch evidence; verified on production in a rolled-back transaction with
+negative controls, not yet applied) makes the void law governed: `payment_void` requires a
+reason and gates on Payment Approver duty (Shared Duty Resolver) or principal, and the posting
+service + column CHECK speak the §16 manual methods (`duitnow_qr` · `credit_card` ·
+`debit_card`) with the arithmetic byte-for-byte 0351. The branch adds the §16 Record payment
+composition on the Invoice object — 50/50 action-and-receipt-preview, the six manual methods
+with their required evidence words, Review stating `This records customer money.` / `This does
+not confirm the bank account.`, one idempotency key per opening, upload-first posting through
+the canonical door, and typed input retained on failure. The void doors in the order drawer
+and control panel now ask the reason inline. `/finance/*` admits operation staff to the
+Payments and Invoices destinations only (Payment MASTER §12); finance-only pages bounce them.
+
+WhatsApp messages/templates, bank routing, Settings, Reports, Stripe convergence, storage
+journeys, full responsive 390px/200% verification and the retirement of the rejected
+Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
+Important Notes wording has not been located in the repository and has been requested from its
+owner; it must not be invented or shortened during implementation.
 
 ### Approved target / not claimed built by this scope
 

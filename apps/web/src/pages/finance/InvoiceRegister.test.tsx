@@ -1,13 +1,25 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import InvoiceRegister from "./InvoiceRegister";
 
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
   refetch: vi.fn(), error: null as Error | null }));
-vi.mock("@/lib/queries", () => ({ useInvoiceRegister: () => state }));
+vi.mock("@/lib/queries", () => ({
+  useInvoiceRegister: () => state,
+  useRecordPayment: () => ({ mutate: vi.fn(), isPending: false }),
+  qk: { finance: {
+    invoiceRegister: () => ["finance", "invoice-register"],
+    paymentRegister: () => ["finance", "payment-register"],
+  } },
+}));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+const auth = vi.hoisted(() => ({ role: "finance" as string }));
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
+}));
 
 function iso(daysFromToday: number): string {
   const d = new Date();
@@ -69,7 +81,14 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function show() { return render(<MemoryRouter><InvoiceRegister /></MemoryRouter>); }
+function show() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter><InvoiceRegister /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe("Invoices Register", () => {
   it("shows the eight approved columns in order", () => {
@@ -112,6 +131,25 @@ describe("Invoices Register", () => {
     // The waiting order says Wait and forbids the blind chase in plain words.
     expect(screen.getByText("Do not ask the customer to pay yet.", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("RC-040926-1207", { exact: false })).toBeInTheDocument();
+  });
+  it("the Record payment door opens only for staff the posting door admits", () => {
+    auth.role = "operation";
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
+    expect(screen.getByTestId("invoice-record-payment")).toBeInTheDocument();
+    // The 50/50 composition: the action form and the customer document preview.
+    expect(screen.getByTestId("invoice-receipt-preview")).toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("finance reads money; it does not post normal collection (§12)", () => {
+    auth.role = "finance";
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
   });
   it("shows a failed source with recovery rather than a zero total", () => {
     state.isError = true;

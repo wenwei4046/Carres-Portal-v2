@@ -14,9 +14,12 @@ import { useAuth } from "@/lib/auth";
 import FinanceApp from "@/pages/finance/FinanceApp";
 import "@/index.css";
 
+/** ?role=operation walks the collection staff view (Record payment door);
+ *  default finance walks the read-only money view. */
+const ROLE = new URLSearchParams(window.location.search).get("role") ?? "finance";
 useAuth.setState({
-  role: "finance",
-  user: { email: "finance@carres.co" } as never,
+  role: ROLE as never,
+  user: { email: `${ROLE}@carres.co` } as never,
 });
 
 const ORDER = { id: "o-1319", so: 1319, customer_name: "LIM KUAN YANG" };
@@ -82,8 +85,8 @@ function soon(days: number): string {
 }
 
 const INVOICE_BASE = {
-  kind: "sales", tax_amount: 0, void_reason: null, replaces_invoice_id: null,
-  created_at: "2026-09-06T00:00:00Z",
+  kind: "sales", amount: 5400, tax_amount: 0, void_reason: null,
+  replaces_invoice_id: null, created_at: "2026-09-06T00:00:00Z",
 };
 const INVOICE_ORDER = {
   id: ORDER.id, so: ORDER.so, customer_name: ORDER.customer_name,
@@ -104,7 +107,7 @@ const INVOICES = [
     orders: { ...INVOICE_ORDER,
       ops_order_control: [{ balance: null, confirmed_date: soon(10),
         line_etas: null, line_stock_status: { "MS01-K": "ready" } }] } },
-  { ...INVOICE_BASE, id: "i-2", invoice_no: null, status: "draft",
+  { ...INVOICE_BASE, id: "i-2", invoice_no: null, status: "draft", amount: 2100,
     issued_at: null, voided_at: null, order_id: ORDER_2.id,
     orders: { ...INVOICE_ORDER, id: ORDER_2.id, so: ORDER_2.so,
       customer_name: ORDER_2.customer_name, paid: 500,

@@ -14,6 +14,7 @@ import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
 const METHODS: Record<string, string> = {
   bank: "Bank transfer", bank_transfer: "Bank transfer", cash: "Cash", card: "Card",
   cheque: "Cheque", online: "Online payment", other: "Other",
+  duitnow_qr: "DuitNow QR", credit_card: "Credit card", debit_card: "Debit card",
 };
 
 /** The canonical read-only register. Writes remain in the Invoice action context. */
