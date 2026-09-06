@@ -17,30 +17,16 @@
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 import {
-  buildDateRail,
   buildDeliveryScopeRows,
-  buildLogisticsRail,
   confirmedDeliveryOf,
-  dateBucketOf,
   legWorkStatusOf,
   entersDeliveryWork,
   deliveryEntryBlockers,
-  nearTermDates,
-  matchesDate,
-  matchesLogistics,
-  matchesRegion,
-  buildRegionRail,
   regionBucketOf,
   SINGAPORE_KEY,
   scopeFooter,
-  OVERDUE_KEY,
   DW,
-  GOVERNED_LOGISTICS,
-  NO_DATE_KEY,
-  NO_LOGISTICS_KEY,
-} from "./delivery-work";
-
-const TODAY = "2026-08-21";
+  } from "./delivery-work";
 
 function order(
   over: Partial<operationOrderListRow> & { id: string; so: number },
@@ -216,179 +202,6 @@ describe("Confirmed Delivery has one arithmetic", () => {
   });
 });
 
-describe("the DELIVERY DATE rail", () => {
-  const rows = build([
-    order({ id: "a", so: 1301 }),
-    order({
-      id: "b",
-      so: 1302,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-19" },
-    }),
-    order({
-      id: "c",
-      so: 1303,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "d",
-      so: 1304,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-22" },
-    }),
-  ]);
-
-  it("buckets a scope by its confirmed date, and a past date is `Overdue`", () => {
-    expect(dateBucketOf(rows.find((r) => r.so === 1301)!, TODAY)).toBe(NO_DATE_KEY);
-    expect(dateBucketOf(rows.find((r) => r.so === 1302)!, TODAY)).toBe(OVERDUE_KEY);
-    // `Overdue`, never `Date passed` — the rail is a work queue (owner 2026-08-24).
-    expect(DW.overdue).toBe("Overdue");
-    expect(dateBucketOf(rows.find((r) => r.so === 1303)!, TODAY)).toBe("2026-08-25");
-  });
-
-  it("orders itself: no date, then Overdue, then real days ascending", () => {
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    expect(rail[0]!.label).toBe(DW.noConfirmedDate);
-    expect(rail[1]!.label).toBe(DW.overdue);
-    expect(rail.slice(2).map((r) => r.label)).toEqual([...rail.slice(2)].map((r) => r.label).sort());
-    expect(rail[0]!.count).toBe(1);
-    expect(rail[1]!.count).toBe(1);
-    expect(rail.find((r) => r.label === "printed:2026-08-22")?.count).toBe(1);
-    expect(rail.find((r) => r.label === "printed:2026-08-25")?.count).toBe(1);
-  });
-
-  it("⭐ shows the near-term operating dates even at ZERO — a planner needs the empty day", () => {
-    // A rail that lists only the days already holding work cannot be used to
-    // plan, but Sunday is closed and must not be offered as empty capacity.
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    for (const iso of nearTermDates(TODAY)) {
-      expect(rail.find((r) => r.label === `printed:${iso}`)).toBeDefined();
-    }
-    expect(rail.find((r) => r.label === "printed:2026-08-23")).toBeUndefined();
-  });
-
-  it("the near-term window starts today and runs seven operating days", () => {
-    expect(nearTermDates(TODAY)).toEqual([
-      "2026-08-21",
-      "2026-08-22",
-      "2026-08-24",
-      "2026-08-25",
-      "2026-08-26",
-      "2026-08-27",
-      "2026-08-28",
-    ]);
-  });
-
-  it("crosses a month end and skips a Sunday start", () => {
-    expect(nearTermDates("2026-08-30", 3)).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
-  });
-
-  it("keeps a PICKED day on the rail after its last scope moves away", () => {
-    /* Otherwise the row vanishes while its choice is still on the URL, and the
-       operator is left with an empty listing and no control to undo it. */
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`, new Set(["2026-09-01"]));
-    const stranded = rail.find((r) => r.label === "printed:2026-09-01");
-    expect(stranded).toBeDefined();
-    expect(stranded!.count).toBe(0);
-  });
-
-  it("never prints a relative day word", () => {
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    for (const item of rail) {
-      expect(item.label).not.toMatch(/\bToday\b|\bTomorrow\b/i);
-    }
-  });
-});
-
-describe("the LOGISTICS rail", () => {
-  it("keeps every governed partner visible at zero, in the ruled order", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), []);
-    expect(rail.slice(0, 7).map((r) => r.label)).toEqual([...GOVERNED_LOGISTICS]);
-    expect(rail.slice(0, 7).every((r) => r.count === 0)).toBe(true);
-  });
-
-  it("names the scopes nobody is carrying rather than hiding them under All", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), []);
-    const none = rail.find((r) => r.key === NO_LOGISTICS_KEY);
-    expect(none?.label).toBe(DW.noLogistics);
-    expect(none?.count).toBe(1);
-  });
-
-  it("admits an ungoverned partner only while it is carrying something", () => {
-    const partners = [
-      { id: "p-tsdd", name: "TSDD" },
-      { id: "p-quiet", name: "QUIET CO" },
-    ];
-    const rows = build([
-      order({ id: "a", so: 1301, delivery_partners: { id: "p-tsdd", name: "TSDD" } }),
-    ]);
-    const rail = buildLogisticsRail(rows, partners);
-    expect(rail.find((r) => r.label === "TSDD")?.count).toBe(1);
-    expect(rail.find((r) => r.label === "QUIET CO")).toBeUndefined();
-  });
-
-  it("keeps a PICKED ungoverned partner on the rail after its last scope moves away", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), [], new Set(["TSDD"]));
-    const stranded = rail.find((r) => r.label === "TSDD");
-    expect(stranded).toBeDefined();
-    expect(stranded!.count).toBe(0);
-  });
-
-  it("counts the NETS scopes assigned through triage, not only the formal ones", () => {
-    const rows = buildDeliveryScopeRows({
-      orders: [order({ id: "a", so: 1301, ops_assigned_logistic: "p-nets" })],
-      deliveryOrders: [],
-      attempts: [],
-      handoverEvents: [],
-      partnerNameById: new Map([["p-nets", "NETS"]]),
-    });
-    expect(buildLogisticsRail(rows, []).find((r) => r.label === "NETS")?.count).toBe(1);
-  });
-});
-
-describe("the two filters combine", () => {
-  const rows = build([
-    order({
-      id: "a",
-      so: 1301,
-      delivery_partners: { id: "p-nets", name: "NETS" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "b",
-      so: 1302,
-      delivery_partners: { id: "p-al", name: "AL" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "c",
-      so: 1303,
-      delivery_partners: { id: "p-nets", name: "NETS" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-26" },
-    }),
-  ]);
-
-  it("asks ONE question of the date and the partner together", () => {
-    const date = new Set(["2026-08-25"]);
-    const logistics = new Set(["NETS"]);
-    const shown = rows.filter(
-      (r) => matchesDate(r, date, TODAY) && matchesLogistics(r, logistics),
-    );
-    expect(shown.map((r) => r.so)).toEqual([1301]);
-  });
-
-  it("treats an empty pick as every value, on both rails", () => {
-    const none = new Set<string>();
-    expect(rows.filter((r) => matchesDate(r, none, TODAY))).toHaveLength(3);
-    expect(rows.filter((r) => matchesLogistics(r, none))).toHaveLength(3);
-  });
-});
-
-/**
- * ⭐ THE ENTRY RULE — owner ruling 2026-08-24.
- *
- * "Do not dump every incomplete Sales Order into Delivery Work. Missing
- *  address/location remains Sales-owned Work and must not appear here as rows
- *  filled with `Not given`."
- */
 describe("the entry rule keeps Sales work out of Delivery Work", () => {
   it("admits a scope carrying a place, the building facts and goods", () => {
     expect(entersDeliveryWork(order({ id: "a", so: 1301 }))).toBe(true);
@@ -567,39 +380,7 @@ describe("the footer counts scopes, never orders", () => {
   });
 });
 
-describe("nearTermDates — holidays leave the generated window (owner ruling 2026-09-01)", () => {
-  it("skips a public holiday and still returns seven operating days", () => {
-    // 2026-08-21 = Friday. Make Monday 24th a holiday: the window walks past
-    // it and picks up the following Saturday to stay seven days long.
-    const holidays = new Set(["2026-08-24"]);
-    expect(nearTermDates(TODAY, 7, holidays)).toEqual([
-      "2026-08-21",
-      "2026-08-22",
-      "2026-08-25",
-      "2026-08-26",
-      "2026-08-27",
-      "2026-08-28",
-      "2026-08-29",
-    ]);
-  });
-
-  it("a scope genuinely confirmed on a holiday still reaches the rail — evidence is never hidden", () => {
-    const holidays = new Set(["2026-08-25"]);
-    const rows = build([
-      order({ id: "a", so: 1301, ops_assigned_logistic: "NETS", customer_confirmed_delivery_date: "2026-08-25" } as never),
-    ]);
-    // The date came from the row's own count, not the generated window.
-    const rail = buildDateRail(rows, TODAY, (iso) => iso, new Set(), holidays);
-    const generated = nearTermDates(TODAY, 7, holidays);
-    expect(generated).not.toContain("2026-08-25");
-    // The row's bucket may be its own confirmed day or No confirmed date
-    // depending on which column the fixture feeds; the invariant under test is
-    // only that the GENERATED window excluded the holiday.
-    expect(rail.length).toBeGreaterThan(0);
-  });
-});
-
-describe("REGION rail — states by their own names (owner ruling 2026-09-01)", () => {
+describe("REGION classification — direct state names (owner correction 2026-09-06)", () => {
   it("classifies a whole-order scope by its address state", () => {
     const rows = build([order({ id: "a", so: 1301 })]); // Selangor fixture
     expect(regionBucketOf(rows[0]!)).toBe("Selangor");
@@ -641,45 +422,5 @@ describe("REGION rail — states by their own names (owner ruling 2026-09-01)", 
     expect(regionBucketOf(leg2)).toBe(SINGAPORE_KEY);
   });
 
-  it("lists Peninsular states plainly, then EAST MALAYSIA and SINGAPORE headings — no Other, no merge", () => {
-    const rows = build([
-      order({ id: "a", so: 1301 }), // Selangor
-      order({ id: "b", so: 1302, customer_address: "8 Jalan Satu, 25000 Kuantan, Pahang", customer_address_city: "Kuantan", customer_address_state: "Pahang" }),
-      order({ id: "c", so: 1303, customer_address: "3 Jalan Dua, 25000 Kuantan, Pahang", customer_address_city: "Kuantan", customer_address_state: "Pahang" }),
-      order({ id: "d", so: 1304, customer_address: "5 Jalan Tiga, 88000 Kota Kinabalu, Sabah", customer_address_city: "Kota Kinabalu", customer_address_state: "Sabah" }),
-    ]);
-    const rail = buildRegionRail(rows);
-    const labels = rail.map((i) => i.label);
-    expect(labels).not.toContain("Other");
-    expect(labels).not.toContain("Other states");
-    expect(labels).not.toContain("Melaka & Johor");
-    // Peninsular by count: Pahang(2) before Selangor(1).
-    expect(labels.indexOf("Pahang")).toBeLessThan(labels.indexOf("Selangor"));
-    // The two fixed sub-headings, in order, with their states beneath.
-    const east = rail.find((i) => i.heading && i.label === DW.railEastMalaysia);
-    const sg = rail.find((i) => i.heading && i.label === DW.railSingapore);
-    expect(east).toBeDefined();
-    expect(sg).toBeDefined();
-    expect(labels.indexOf(DW.railEastMalaysia)).toBeLessThan(labels.indexOf("Sabah"));
-    expect(rail.find((i) => i.label === "Sabah")?.count).toBe(1);
-    expect(rail.find((i) => i.label === "Sarawak")?.count).toBe(0); // visible at zero
-    expect(rail.find((i) => i.label === SINGAPORE_KEY && !i.heading)?.count).toBe(0);
-  });
 
-  it("a state with no scopes does not appear — an empty state is not a planning fact", () => {
-    const rail = buildRegionRail(build([order({ id: "a", so: 1301 })]));
-    expect(rail.find((i) => i.label === "Kelantan")).toBeUndefined();
-  });
-
-  it("keeps a PICKED state at zero until the operator unpicks it", () => {
-    const rail = buildRegionRail(build([order({ id: "a", so: 1301 })]), new Set(["Pahang"]));
-    expect(rail.find((i) => i.label === "Pahang")?.count).toBe(0);
-  });
-
-  it("matchesRegion: empty set passes everything; a filter drops the unresolvable row", () => {
-    const rows = build([order({ id: "a", so: 1301 })]);
-    expect(matchesRegion(rows[0]!, new Set())).toBe(true);
-    expect(matchesRegion(rows[0]!, new Set(["Selangor"]))).toBe(true);
-    expect(matchesRegion(rows[0]!, new Set(["Pahang"]))).toBe(false);
-  });
 });

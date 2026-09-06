@@ -58,9 +58,12 @@ function outboundActorOf(c: Context<AppEnv>):
  */
 const deliveryOrdersRouter = new Hono<AppEnv>();
 
-/** The order fields the register's columns print — nothing more. */
+/** The order fields the register's columns print — nothing more. The 2026-09-06
+ *  register correction added the proof facts its WORK TO DO rail counts
+ *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
+ *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd)";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
 
 deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);

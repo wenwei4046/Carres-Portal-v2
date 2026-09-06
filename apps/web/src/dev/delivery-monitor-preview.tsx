@@ -15,6 +15,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import OperationDelivery from "@/pages/operation/OperationDelivery";
+import DeliveryOrdersRegister from "@/pages/operation/DeliveryOrdersRegister";
 import "@/index.css";
 
 useAuth.setState({
@@ -171,7 +172,7 @@ const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
         logistics_partner: "NETS",
         voided_at: null,
         void_reason: null,
-        orders: { id: "a", so: 1322, customer_name: "kong chai yin" },
+        orders: { id: "a", so: 1322, customer_name: "kong chai yin", customer_address_city: "Klang", customer_address_state: "Selangor", delivery_date: "2026-09-04", delivery_date_tbd: false, do_file_path: null, order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1 }], ops_order_control: null },
       },
       {
         id: "do-row-2",
@@ -183,7 +184,7 @@ const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
         logistics_partner: "NETS",
         voided_at: null,
         void_reason: null,
-        orders: { id: "d", so: 1325, customer_name: "lim wei jie" },
+        orders: { id: "d", so: 1325, customer_name: "lim wei jie", customer_address_city: "Klang", customer_address_state: "Selangor", delivery_date: "2026-09-02", delivery_date_tbd: false, do_file_path: null, order_lines: [{ id: "l-4", sku: "mattress:M1401F-K", qty: 1 }], ops_order_control: { delivery_photos: [] } },
       },
       {
         id: "do-row-3",
@@ -195,7 +196,7 @@ const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
         logistics_partner: "HOUZS",
         voided_at: null,
         void_reason: null,
-        orders: { id: "e", so: 1326, customer_name: "farah binti azman" },
+        orders: { id: "e", so: 1326, customer_name: "farah binti azman", customer_address_city: "Kota Kinabalu", customer_address_state: "Sabah", delivery_date: null, delivery_date_tbd: true, do_file_path: null, order_lines: [{ id: "l-5", sku: "sofa:S200-3", qty: 1 }], ops_order_control: null },
       },
     ],
     attempts: [
@@ -230,6 +231,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <Routes>
+          <Route path="/operation/delivery-orders" element={<DeliveryOrdersRegister />} />
           <Route path="*" element={<OperationDelivery />} />
         </Routes>
       </BrowserRouter>

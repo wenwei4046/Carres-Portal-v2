@@ -1,6 +1,6 @@
 /**
- * DELIVERY MONITOR — the calendar arithmetic behind the Monitor page.
- * `CARD-2026-09-04-delivery-01-monitor-calendar` · `docs/delivery/MASTER.md`.
+ * DELIVERY MONITOR — the arithmetic behind the Monitor page.
+ * Owner UI correction 2026-09-06 · `docs/delivery/MASTER.md` §8.
  *
  * PURE. No React, no I/O, no clock of its own — every function that needs
  * "today" is handed it, so the browser, the tests and a CI runner in UTC can
@@ -8,25 +8,23 @@
  *
  * ── WHAT THIS FILE OWNS ─────────────────────────────────────────────────────
  *
- * ONE question: *which deliveries are planned across the visible operating
- * days, and which existing record does each one open?* The six-day window, the
- * card mapping, the filters, the rail counts and the one href arithmetic all
- * live here, so the rail count and the calendar it filters cannot be two
- * different numbers (Architecture Law D).
+ * ONE question: *which deliveries are planned, and which record does each one
+ * open?* Monitor projects the SAME canonical scope rows two ways (owner
+ * correction 2026-09-06):
+ *
+ *     Calendar          day columns and cards — planning by day
+ *     every other view  the standard selectable work list (DataGrid rows)
+ *
+ * The six-day window, the card mapping, the filters, the rail counts and the
+ * one href arithmetic all live here, so the rail count and the listing it
+ * filters cannot be two different numbers (Architecture Law D).
  *
  * ── WHAT IT DELIBERATELY DOES NOT OWN ───────────────────────────────────────
  *
  * It writes nothing and derives no second truth. The scope rows come from
- * `delivery-work.ts` — the SAME `buildDeliveryScopeRows` the planning
- * workspace runs, entry rule and status ladder included — and this file only
- * arranges what those owners already say. A planned window ending proves
- * nothing: no rung of any status here reads the clock.
- *
- * ── MONITOR IS A DISPLAY, NEVER A WRITER ────────────────────────────────────
- *
- * Every card is one read-only door: an issued DO opens the Delivery Order
- * object; a scope without one opens Edit Delivery. Monitor never issues,
- * assigns, uploads or reschedules — the governed writers own those acts.
+ * `delivery-work.ts` — the SAME `buildDeliveryScopeRows` entry rule and status
+ * ladder — and this file only arranges what those owners already say. A
+ * planned window ending proves nothing: no rung of any status reads the clock.
  */
 
 import type { DeliveryArrangementRow } from "@carres/shared";
@@ -34,34 +32,29 @@ import type { DeliveryWorkStatusKind } from "@carres/shared";
 import {
   buildDeliveryScopeRows,
   regionBucketOf,
-  DW,
-  EAST_MALAYSIA_STATES,
   GOVERNED_LOGISTICS,
-  SINGAPORE_KEY,
   type DeliveryScopeRow,
   type ScopeInputs,
 } from "./delivery-work";
 
 /**
- * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD).
- *
- * Reused governed strings keep their governed spelling; the strings this Card
- * proposes (`Monitor` · `Calendar` · `No deliveries` · `NEEDS CHECKING` ·
- * `Delivered — Proof Required`) are registered as PROPOSAL copy in
- * `docs/COPY-STANDARD.md` until the owner accepts them.
+ * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
+ * The 2026-09-06 owner correction ruled `WORK TO DO` (one group, never split
+ * into "Delivery Schedule" and "Needs Checking"), `All regions` ·
+ * `All logistics`, the short empty-day `No deliveries`, the spanning
+ * empty-range sentence and `Clear filters`. Reused governed strings keep
+ * their governed spelling.
  */
 export const MONITOR_COPY = {
   page: "Monitor",
   docTitle: "Monitor — Carres",
   search: "Search deliveries…",
-  /** T10's governed empty-day sentence — the Card proposed `No deliveries`,
-   *  but the dictionary already owns this exact concept and a second spelling
-   *  for one fact is the synonym the rules forbid. */
-  emptyDay: "No deliveries booked this day.",
+  /** Owner correction 2026-09-06 — the short per-day absence; the spanning
+   *  sentence below owns the fully-empty range. */
+  emptyDay: "No deliveries",
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
-  railSchedule: "DELIVERY SCHEDULE",
-  railChecking: "NEEDS CHECKING",
+  railWork: "WORK TO DO",
   railRegion: "REGION",
   railLogistics: "LOGISTICS",
   calendar: "Calendar",
@@ -70,12 +63,17 @@ export const MONITOR_COPY = {
   failed: "Failed Delivery",
   deliveredProofRequired: "Delivered — Proof Required",
   waitingWarehouse: "Waiting for warehouse",
+  allRegions: "All regions",
+  allLogistics: "All logistics",
   noLogistics: "No logistics picked",
   noDeliveryOrder: "No delivery order yet",
   hideFilters: "Hide filters",
   showFilters: "Show filters",
   previousDays: "Previous days",
   nextDays: "Next days",
+  clearFilters: "Clear filters",
+  openNoConfirmedDate: "Open No confirmed date",
+  emptyList: "No delivery scopes",
 } as const;
 
 /** Desktop shows six operating days; Sunday is never one of them. */
@@ -113,7 +111,6 @@ function previousOperatingDay(dateIso: string): string {
  * The default window opens ONE operating day before today: yesterday's
  * deliveries are still being closed out (results, proof), and hiding them
  * would push the operator to the Overdue queue for ordinary morning work.
- * On Friday 4 Sep the range is Thu 3 – Wed 9 (the Card's fixture).
  */
 export function defaultMonitorWindowStart(todayIso: string): string {
   return previousOperatingDay(todayIso);
@@ -131,7 +128,7 @@ export function previousOperatingWindowStart(firstDate: string, count = MONITOR_
   return cursor;
 }
 
-/** One calendar card — a read-only mapping of facts other owners recorded. */
+/** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
   /** Stable identity — the scope row's own key (order id, or `id#legN`). */
   scopeId: string;
@@ -160,20 +157,66 @@ export interface DeliveryMonitorCard {
    * planned window ending. An UNKNOWN ledger (older payload) claims nothing.
    */
   proofRequired: boolean;
+  /** The full scope row behind the card — the work list's own columns and the
+   *  governed `Assign logistics` door read it; the calendar card never does. */
+  scope: DeliveryScopeRow;
 }
 
 /** The source is the workspace's own canonical reads — nothing new is fetched. */
 export type DeliveryMonitorSource = ScopeInputs;
 
+/**
+ * ONE single-pick WORK TO DO group (owner correction 2026-09-06 — never split
+ * into "Delivery Schedule" and "Needs Checking"). `calendar` is the default.
+ */
+export type MonitorWorkView =
+  | "calendar"
+  | "no_confirmed_date"
+  | "overdue"
+  | "failed"
+  | "delivered_proof_required"
+  | "waiting_warehouse";
+
+export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
+  "calendar",
+  "no_confirmed_date",
+  "overdue",
+  "failed",
+  "delivered_proof_required",
+  "waiting_warehouse",
+];
+
+export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
+  calendar: MONITOR_COPY.calendar,
+  no_confirmed_date: MONITOR_COPY.noConfirmedDate,
+  overdue: MONITOR_COPY.overdue,
+  failed: MONITOR_COPY.failed,
+  delivered_proof_required: MONITOR_COPY.deliveredProofRequired,
+  waiting_warehouse: MONITOR_COPY.waitingWarehouse,
+};
+
 export interface DeliveryMonitorFilters {
-  schedule: "calendar" | "no_confirmed_date" | "overdue";
-  checking: "failed" | "delivered_proof_required" | "waiting_warehouse" | null;
+  view: MonitorWorkView;
   region: string | null;
   /** A partner id, `"none"` for scopes nobody carries, or null for all. */
   logisticsPartnerId: string | "none" | null;
   search: string;
   /** Business today — `Overdue` is a question about it, answered here once. */
   todayIso: string;
+}
+
+/**
+ * THE PROJECTION RULE (owner correction 2026-09-06). Calendar day columns
+ * render ONLY for the untouched Calendar view: any operational pick — a work
+ * queue, a region, a logistics row — is an operational question, and its
+ * answer is the standard selectable work list, never a card wall.
+ */
+export function isCalendarProjection(filters: DeliveryMonitorFilters): boolean {
+  return (
+    filters.view === "calendar" &&
+    filters.region === null &&
+    filters.logisticsPartnerId === null
+  );
 }
 
 function proofRequiredOf(row: DeliveryScopeRow): boolean {
@@ -189,10 +232,10 @@ function proofRequiredOf(row: DeliveryScopeRow): boolean {
 }
 
 /**
- * Every open delivery scope as one calendar card. The rows, the entry rule and
- * the status ladder are `delivery-work.ts`'s — the ONE arithmetic the planning
- * workspace already runs — so Monitor and the workspace cannot disagree about
- * which scopes exist or where each one stands.
+ * Every open delivery scope as one card. The rows, the entry rule and the
+ * status ladder are `delivery-work.ts`'s — the ONE arithmetic — so Monitor
+ * and every other Delivery surface cannot disagree about which scopes exist
+ * or where each one stands.
  */
 export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): DeliveryMonitorCard[] {
   const rows = buildDeliveryScopeRows(input);
@@ -220,6 +263,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       statusKey: row.status.kind,
       statusLabel: row.status.label,
       proofRequired: proofRequiredOf(row),
+      scope: row,
     };
   });
 }
@@ -239,36 +283,30 @@ export function monitorCardHref(card: DeliveryMonitorCard): string {
 
 /* ── The filters — each one answers, and they COMBINE ──────────────────── */
 
-function matchesSchedule(
+function matchesView(
   card: DeliveryMonitorCard,
-  schedule: DeliveryMonitorFilters["schedule"],
+  view: MonitorWorkView,
   todayIso: string,
   visibleDaySet: ReadonlySet<string>,
 ): boolean {
-  switch (schedule) {
+  switch (view) {
     case "no_confirmed_date":
       return card.confirmedDate === null;
     case "overdue":
       return card.confirmedDate !== null && card.confirmedDate < todayIso;
-    default:
-      return card.confirmedDate !== null && visibleDaySet.has(card.confirmedDate);
-  }
-}
-
-function matchesChecking(
-  card: DeliveryMonitorCard,
-  checking: DeliveryMonitorFilters["checking"],
-): boolean {
-  switch (checking) {
-    case null:
-      return true;
     case "failed":
       return card.statusKey === "failed";
     case "delivered_proof_required":
       return card.proofRequired;
     case "waiting_warehouse":
       return card.statusKey === "waiting_warehouse";
+    default:
+      return card.confirmedDate !== null && visibleDaySet.has(card.confirmedDate);
   }
+}
+
+function matchesRegion(card: DeliveryMonitorCard, picked: string | null): boolean {
+  return picked === null || card.region === picked;
 }
 
 function matchesLogisticsPartner(
@@ -285,6 +323,7 @@ function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
   if (!q) return true;
   return [
     card.customerName,
+    `SO-${card.scope.so}`,
     card.doNumber ?? "",
     card.locality ?? "",
     card.goodsSummary,
@@ -295,14 +334,8 @@ function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
     .includes(q);
 }
 
-/**
- * DELIVERY SCHEDULE and NEEDS CHECKING are two views of ONE pick. An exception
- * queue is not a calendar question — a Failed Delivery is usually PAST-dated,
- * and composing it with the visible window would read `0` while the exception
- * sits one rail group up. So a picked checking row answers across ALL dates,
- * and the schedule applies only while no checking row is picked.
- */
-export function filterDeliveryMonitorCards(
+/** The Calendar projection's cards: inside the visible window, plus search. */
+export function filterMonitorCalendarCards(
   cards: readonly DeliveryMonitorCard[],
   filters: DeliveryMonitorFilters,
   visibleDays: readonly string[],
@@ -310,10 +343,31 @@ export function filterDeliveryMonitorCards(
   const daySet = new Set(visibleDays);
   return cards.filter(
     (c) =>
-      (filters.checking !== null
-        ? matchesChecking(c, filters.checking)
-        : matchesSchedule(c, filters.schedule, filters.todayIso, daySet)) &&
-      (filters.region === null || c.region === filters.region) &&
+      c.confirmedDate !== null &&
+      daySet.has(c.confirmedDate) &&
+      matchesSearch(c, filters.search),
+  );
+}
+
+/**
+ * The WORK LIST's rows. A work queue is an operational question and answers
+ * across ALL dates (a Failed Delivery is usually past-dated; hiding it behind
+ * the window would read `0` while the exception is real). The untouched
+ * `calendar` view constrains nothing here — a region or logistics pick alone
+ * lists every matching open scope.
+ */
+export function filterMonitorListRows(
+  cards: readonly DeliveryMonitorCard[],
+  filters: DeliveryMonitorFilters,
+  visibleDays: readonly string[],
+): DeliveryMonitorCard[] {
+  const daySet = new Set(visibleDays);
+  return cards.filter(
+    (c) =>
+      (filters.view === "calendar"
+        ? true
+        : matchesView(c, filters.view, filters.todayIso, daySet)) &&
+      matchesRegion(c, filters.region) &&
       matchesLogisticsPartner(c, filters.logisticsPartnerId) &&
       matchesSearch(c, filters.search),
   );
@@ -346,20 +400,61 @@ export function groupCardsByDay(
   return grouped;
 }
 
+/* ── The calendar's empty range — ONE spanning sentence, never six copies ── */
+
+/**
+ * The whole visible range holding nothing prints one spanning state (owner
+ * correction 2026-09-06), never the same absence repeated in every column.
+ * The caller supplies the printed date strings — `fmt-date.ts` owns spelling.
+ */
+export function emptyRangeSentence(
+  visibleDays: readonly string[],
+  fmt: (iso: string) => string,
+): string {
+  const first = visibleDays[0];
+  const last = visibleDays[visibleDays.length - 1];
+  if (!first || !last) return "No deliveries are scheduled.";
+  return `No deliveries are scheduled from ${fmt(first)} to ${fmt(last)}.`;
+}
+
+/** `86 deliveries need a confirmed date.` — printed only from the REAL count. */
+export function needConfirmedDateSentence(n: number): string {
+  return n === 1
+    ? "1 delivery needs a confirmed date."
+    : `${n} deliveries need a confirmed date.`;
+}
+
+/* ── The active-filter summary above the work list ───────────────────────── */
+
+/**
+ * Every active pick, in rail order, so a combined narrowing (86 → 35) is
+ * visible above the rows it produced rather than only in a rail row the
+ * operator may have scrolled past. Empty = the unfiltered work view.
+ */
+export function activeFilterLabels(
+  filters: DeliveryMonitorFilters,
+  partnerNameOf: (id: string) => string | null,
+): string[] {
+  const out: string[] = [];
+  if (filters.view !== "calendar") out.push(MONITOR_VIEW_LABEL[filters.view]);
+  if (filters.region !== null) out.push(filters.region);
+  if (filters.logisticsPartnerId === "none") out.push(MONITOR_COPY.noLogistics);
+  else if (filters.logisticsPartnerId !== null) {
+    out.push(partnerNameOf(filters.logisticsPartnerId) ?? filters.logisticsPartnerId);
+  }
+  return out;
+}
+
 /* ── The rail counts — Law D: what clicking each row will actually give ── */
 
 export interface MonitorRailRow {
   key: string;
   label: string;
   count: number;
-  /** A non-clickable sub-heading row (REGION's `EAST MALAYSIA` / `SINGAPORE`,
-   *  owner ruling 2026-09-01). It filters nothing and counts nothing. */
-  heading?: boolean;
 }
 
 export interface MonitorRails {
-  schedule: { calendar: number; noConfirmedDate: number; overdue: number };
-  checking: { failed: number; deliveredProofRequired: number; waitingWarehouse: number };
+  work: Record<MonitorWorkView, number>;
   regions: MonitorRailRow[];
   logistics: MonitorRailRow[];
 }
@@ -367,7 +462,17 @@ export interface MonitorRails {
 /**
  * Every group's counts are computed over the cards the OTHER groups have
  * already narrowed, so a count is always "what I will get if I click this" —
- * never a number that disagrees with the calendar under it.
+ * never a number that disagrees with the listing under it.
+ *
+ * REGION (owner correction 2026-09-06): direct state/jurisdiction names only,
+ * derived from the real records — no EAST MALAYSIA / WEST MALAYSIA / SINGAPORE
+ * sub-headings, no `Other` bucket, no fixed zero rows. A picked region stays
+ * listed at 0 until it is unpicked.
+ *
+ * LOGISTICS (same correction): only partners genuinely carrying a matching
+ * scope (governed roster order first, then others by name), the operator's own
+ * pick even at 0, and `No logistics picked` always — it is the bulk-assignment
+ * journey's entry.
  */
 export function buildMonitorRails(
   cards: readonly DeliveryMonitorCard[],
@@ -376,62 +481,51 @@ export function buildMonitorRails(
   partners: readonly { id: string; name: string }[],
 ): MonitorRails {
   const daySet = new Set(visibleDays);
-  const survives = (
-    c: DeliveryMonitorCard,
-    except: "schedule" | "checking" | "region" | "logistics",
-  ) =>
-    /* Schedule and checking are ONE pick (see filterDeliveryMonitorCards), so
-       either group's own counts exclude BOTH — a count is what clicking that
-       row will actually show, and clicking it replaces the other group's pick. */
-    (except === "schedule" ||
-      except === "checking" ||
-      (filters.checking !== null
-        ? matchesChecking(c, filters.checking)
-        : matchesSchedule(c, filters.schedule, filters.todayIso, daySet))) &&
-    (except === "region" || filters.region === null || c.region === filters.region) &&
+  const survives = (c: DeliveryMonitorCard, except: "view" | "region" | "logistics") =>
+    (except === "view" ||
+      filters.view === "calendar" ||
+      matchesView(c, filters.view, filters.todayIso, daySet)) &&
+    (except === "region" || matchesRegion(c, filters.region)) &&
     (except === "logistics" || matchesLogisticsPartner(c, filters.logisticsPartnerId)) &&
     matchesSearch(c, filters.search);
 
-  const forSchedule = cards.filter((c) => survives(c, "schedule"));
-  const forChecking = cards.filter((c) => survives(c, "checking"));
+  const forWork = cards.filter((c) => survives(c, "view"));
   const forRegion = cards.filter((c) => survives(c, "region"));
   const forLogistics = cards.filter((c) => survives(c, "logistics"));
 
-  /* REGION keeps the workspace rail's OWN ruled grammar (owner ruling
-     2026-09-01): Peninsular states by their own names ordered by count,
-     then the fixed EAST MALAYSIA sub-heading with Sabah and Sarawak always
-     visible (Labuan only while it holds one), then the fixed SINGAPORE
-     sub-heading with Singapore always visible. */
+  /* The Calendar row previews what clicking it shows: the six-day window when
+     no other pick holds (the calendar projection), else the full work list. */
+  const calendarCount =
+    filters.region === null && filters.logisticsPartnerId === null
+      ? forWork.filter((c) => c.confirmedDate !== null && daySet.has(c.confirmedDate)).length
+      : forWork.length;
+
+  const work: Record<MonitorWorkView, number> = {
+    calendar: calendarCount,
+    no_confirmed_date: forWork.filter((c) => c.confirmedDate === null).length,
+    overdue: forWork.filter(
+      (c) => c.confirmedDate !== null && c.confirmedDate < filters.todayIso,
+    ).length,
+    failed: forWork.filter((c) => c.statusKey === "failed").length,
+    delivered_proof_required: forWork.filter((c) => c.proofRequired).length,
+    waiting_warehouse: forWork.filter((c) => c.statusKey === "waiting_warehouse").length,
+  };
+
+  /* REGION — flat direct names from the data, ordered by count then name. */
   const regionCounts = new Map<string, number>();
   for (const c of forRegion) {
     if (c.region) regionCounts.set(c.region, (regionCounts.get(c.region) ?? 0) + 1);
   }
   /* A PICKED ROW NEVER DISAPPEARS — a chosen region stays listed at 0. */
   if (filters.region && !regionCounts.has(filters.region)) regionCounts.set(filters.region, 0);
-  const east = new Set<string>(EAST_MALAYSIA_STATES);
   const regions: MonitorRailRow[] = [...regionCounts.entries()]
-    .filter(([key]) => key !== SINGAPORE_KEY && !east.has(key))
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([key, count]) => ({ key, label: key, count }));
-  regions.push({ key: "__east__", label: DW.railEastMalaysia, count: 0, heading: true });
-  for (const s of EAST_MALAYSIA_STATES) {
-    if (s === "Labuan" && !(regionCounts.get(s) ?? 0) && filters.region !== s) continue;
-    regions.push({ key: s, label: s, count: regionCounts.get(s) ?? 0 });
-  }
-  regions.push({ key: "__sg__", label: DW.railSingapore, count: 0, heading: true });
-  regions.push({
-    key: SINGAPORE_KEY,
-    label: SINGAPORE_KEY,
-    count: regionCounts.get(SINGAPORE_KEY) ?? 0,
-  });
 
-  /* LOGISTICS — the governed roster is ALWAYS visible, count or no count (the
-     workspace's own law); an ungoverned partner joins only while it carries a
-     card or is the operator's own pick. `No logistics picked` closes the list. */
+  /* LOGISTICS — partners actually carrying a matching scope. The display name
+     for an id comes from the partners table first, else from the cards — a raw
+     id must never become a rail label. */
   const countByPartnerId = new Map<string, number>();
-  /* The display name for an id comes from the partners table first, else from
-     the cards themselves — a Journey leg can carry a partner the table read
-     has not returned, and a raw id must never become a rail label. */
   const partnerNameById = new Map(partners.map((p) => [p.id, p.name] as const));
   let none = 0;
   for (const c of forLogistics) {
@@ -446,50 +540,27 @@ export function buildMonitorRails(
       }
     }
   }
-  const partnerIdByName = new Map(
-    [...partnerNameById.entries()].map(([id, name]) => [name, id] as const),
-  );
-  const governedNames = new Set<string>(GOVERNED_LOGISTICS);
-  /* The governed roster matches by NAME: whichever id carries that partner's
-     cards is the row's key, so clicking it filters to those exact cards. */
-  const logistics: MonitorRailRow[] = GOVERNED_LOGISTICS.map((name) => {
-    const id = partnerIdByName.get(name) ?? name;
-    return { key: id, label: name, count: countByPartnerId.get(id) ?? 0 };
-  });
-  const extraIds = new Set<string>([
+  const ids = new Set<string>([
     ...countByPartnerId.keys(),
     ...(filters.logisticsPartnerId && filters.logisticsPartnerId !== "none"
       ? [filters.logisticsPartnerId]
       : []),
   ]);
-  for (const row of logistics) extraIds.delete(row.key);
-  const extras = [...extraIds]
-    .map((id) => ({
-      key: id,
-      label: partnerNameById.get(id) ?? id,
-      count: countByPartnerId.get(id) ?? 0,
-    }))
-    .filter((r) => !governedNames.has(r.label))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  logistics.push(...extras);
+  const rowsById = [...ids].map((id) => ({
+    key: id,
+    label: partnerNameById.get(id) ?? id,
+    count: countByPartnerId.get(id) ?? 0,
+  }));
+  /* Governed roster order first (NETS · AL · TEOW · TT · EU · SSY · HOUZS),
+     then anyone else by name — the ruled reading order, applied only to the
+     partners genuinely present. */
+  const rank = new Map(GOVERNED_LOGISTICS.map((name, i) => [name, i] as const));
+  const logistics = rowsById.sort((a, b) => {
+    const ra = rank.get(a.label as (typeof GOVERNED_LOGISTICS)[number]) ?? 99;
+    const rb = rank.get(b.label as (typeof GOVERNED_LOGISTICS)[number]) ?? 99;
+    return ra - rb || a.label.localeCompare(b.label);
+  });
   logistics.push({ key: "none", label: MONITOR_COPY.noLogistics, count: none });
 
-  return {
-    schedule: {
-      calendar: forSchedule.filter(
-        (c) => c.confirmedDate !== null && daySet.has(c.confirmedDate),
-      ).length,
-      noConfirmedDate: forSchedule.filter((c) => c.confirmedDate === null).length,
-      overdue: forSchedule.filter(
-        (c) => c.confirmedDate !== null && c.confirmedDate < filters.todayIso,
-      ).length,
-    },
-    checking: {
-      failed: forChecking.filter((c) => c.statusKey === "failed").length,
-      deliveredProofRequired: forChecking.filter((c) => c.proofRequired).length,
-      waitingWarehouse: forChecking.filter((c) => c.statusKey === "waiting_warehouse").length,
-    },
-    regions,
-    logistics,
-  };
+  return { work, regions, logistics };
 }
