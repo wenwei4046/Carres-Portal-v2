@@ -2961,5 +2961,8 @@ export * from "./work-engine";
 // Workspace foundation — company-wide owner-Duty assignments, cover resolution,
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
+// Workspace Work — the one server/client wire contract. Owning modules keep
+// trigger and completion truth; this only carries their open-action projection.
+export * from "./operation-work";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
