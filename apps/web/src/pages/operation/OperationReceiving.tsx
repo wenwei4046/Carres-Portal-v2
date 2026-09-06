@@ -709,7 +709,7 @@ export default function OperationReceiving() {
                       onClick={() =>
                         setOffset(Math.max(0, offset - page.limit))
                       }
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-8 disabled:hover:bg-white"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
                     >
                       Previous
                     </button>
@@ -718,7 +718,7 @@ export default function OperationReceiving() {
                       data-testid="grn-page-next"
                       disabled={to >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
-                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-8 disabled:hover:bg-white"
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
                     >
                       Next
                     </button>
