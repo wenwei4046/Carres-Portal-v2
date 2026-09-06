@@ -53,7 +53,9 @@ everything back. Partial payment keeps the remainder open.
 
 `Finance → Payments` has **Payments** and **Invoices** listings. Payment actions live only in
 shared **Work → My Work / Team Work**. Settings and Reports use their shared destinations.
-There is no Payment Monitor, Dashboard, module-local Work page, KPI preamble or left filter rail.
+There is no Payment Monitor, Dashboard, module-local Work page or KPI preamble. Payments and
+Invoices Registers have no left filter rail. The Calendar view uses the dated owner ruling in
+§17; this does not create another Work owner or replace the Registers.
 
 Shared Payment Work sorts by risk: delivery tomorrow and unpaid; storage holding the DO; missed promise;
 balance entering its collection window; then balance with no delivery date. A row shows SO,
@@ -211,8 +213,9 @@ collection`, `1 customer promise was missed`. `8 open · 2 late` is forbidden.
 ## 11 · History, calendar and reports
 
 History is append-only/filterable by date, customer, SO, amount, method, invoice, receipt, actor and
-exception, and links immutable documents/source SO. Calendar shows only dated promise/deadline,
-free end, charge start and approved-free end. Payment record is not a calendar event. Quick Rail
+exception, and links immutable documents/source SO. Calendar shows dated promise/deadline,
+free end, charge start and approved-free end, plus read-only Expected arrival and Customer Delivery
+context under §17. Payment record is not a calendar event. Quick Rail
 uses concrete copy and source deep-link.
 
 One read-only customer statement derives invoices, allocations, payments, voids and amount needed.
@@ -491,3 +494,37 @@ Shared Reports → Payment: Money received; Customer balances; Storage charged a
 Storage waived; Payment corrections; Money needing review. No Refund, Bank Matching or Negative
 Payment report. Loading, empty, error, stale and permission states use Primary School English.
 Upload, Review, Record, Send, Back and recovery remain usable at 390px and 200% zoom.
+
+## 17 · Calendar navigation — owner-approved target, 2026-09-06
+
+**RULING / APPROVED TARGET, NOT CLAIMED BUILT.** The owner approved the recommendation:
+click a customer or document to inspect the relevant collection object; click a date to see its
+schedule. This supersedes the earlier suggestion that clicking a customer automatically switches
+to Calendar and chooses Delivery before Expected arrival. It qualifies the earlier blanket
+no-left-rail wording only for the Calendar view. Payments / Invoices remain Registers.
+
+| Selection | Required result |
+|---|---|
+| Customer / SO / Invoice in the collection listing | Open the corresponding order's collection details, including money needed, goods arrival and delivery facts; preserve the selected SO identity when a customer has several orders |
+| Customer Delivery date | Open Calendar at that date's fixed workweek and highlight the selected SO |
+| Expected arrival date | Open Calendar at that date's fixed workweek and highlight the selected SO; explicitly label Expected arrival |
+| Date in the left month calendar | Show the fixed workweek containing that date |
+| Record without a relevant date | Keep it available in the listing, explain the missing date, and never invent a calendar position |
+
+The Calendar view uses the owner-described shared composition: 240px page rail with a complete
+month fixed at its top, month arrows moving one month at a time, and business filters scrolling
+vertically below it independently. Sunday remains visible and is muted when non-working. The
+selected date uses the standard blue selection token. A work indicator must have a textual or
+accessible explanation and must not rely on colour alone. The right side shows a fixed workweek,
+without infinite horizontal scrolling. Choosing a business listing filter keeps the month visible;
+choosing a month date returns to Calendar. Apply the shared responsive authority at narrow widths.
+
+Expected arrival, Customer Delivery and collection follow-up are distinct date types. Read arrival
+and delivery facts from their authoritative modules; never create editable copies in Payment.
+Appearance on an Expected arrival date does not itself create a collection deadline or chase.
+Preserve the shared collection clock and readiness rules, including Wait when goods are not ready
+and arrival is unconfirmed. Do not merge two dated facts for one SO into two apparent payments.
+
+This ruling specifies Payment's Calendar interaction and source boundaries. It does not introduce
+a Payment Monitor, module-local Work queue, new sidebar destination or changes to other modules.
+Implementation and production verification remain required; this documentation is not delivery proof.
