@@ -50,17 +50,30 @@ const CLASSNAMES = {
   weekday: "p-0.5 font-normal uppercase",
   week: "",
   day: "p-0 text-center align-top",
-  day_button:
-    "flex h-9 w-[30px] flex-col items-center justify-start rounded-control pt-0.5 " +
-    "text-body text-kit-slate-12 hover:bg-kit-slate-3 " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
-  today: "font-medium text-kit-blue-11",
-  selected:
-    "[&>button]:bg-kit-blue-9 [&>button]:text-white [&>button]:hover:brightness-95",
+  // The day BUTTON's skin lives on the custom DayButton below, composed from
+  // its modifiers — a td-level `[&>button]` override loses to the button's own
+  // hover class and paints white text on the grey hover tint.
+  day_button: "",
+  today: "[&>button]:font-medium [&>button]:text-kit-blue-11",
   outside: "text-kit-slate-9",
   disabled: "opacity-40",
   hidden: "invisible",
 };
+
+/** The day button's own skin — precedence is explicit: the SELECTED day wears
+ *  the governed blue; a muted non-working Sunday stays readable; everything
+ *  else hovers grey. */
+function dayButtonClass(mods: { selected?: boolean; nonworking?: boolean }): string {
+  return [
+    "flex h-9 w-[30px] flex-col items-center justify-start rounded-control pt-0.5 text-body",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9",
+    mods.selected
+      ? "bg-kit-blue-9 text-white hover:brightness-95"
+      : mods.nonworking
+        ? "text-kit-slate-9 hover:bg-kit-slate-3"
+        : "text-kit-slate-12 hover:bg-kit-slate-3",
+  ].join(" ");
+}
 
 export default function MonthCalendar({
   month,
@@ -118,13 +131,14 @@ export default function MonthCalendar({
         modifiersClassNames={{ nonworking: "[&>button]:text-kit-slate-9" }}
         classNames={CLASSNAMES}
         components={{
-          DayButton: ({ day, modifiers: _m, ...button }) => {
+          DayButton: ({ day, modifiers, ...button }) => {
             const iso = dayToIso(day.date);
             const count = markers[iso] ?? 0;
             const word = markerWord ?? "expected supplier arrival";
             return (
               <button
                 {...button}
+                className={dayButtonClass(modifiers)}
                 aria-label={
                   count > 0
                     ? `${iso} — ${count} ${word}${count === 1 ? "" : "s"}`
