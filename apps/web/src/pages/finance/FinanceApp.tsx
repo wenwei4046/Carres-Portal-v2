@@ -5,7 +5,7 @@ import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
 import FinanceAP from "./FinanceAP";
 import PaymentRegister from "./PaymentRegister";
-import FinanceInvoices from "./FinanceInvoices";
+import InvoiceRegister from "./InvoiceRegister";
 import FinanceRefunds from "./FinanceRefunds";
 import FinanceRecon from "./FinanceRecon";
 import FinanceReports from "./FinanceReports";
@@ -38,7 +38,7 @@ export default function FinanceApp() {
           {/* Payment MASTER §16 — Finance → Payments is the canonical
               receipt Register; the Phase-5 bucket page is retired. */}
           <Route path="payments"  element={<PaymentRegister />} />
-          <Route path="invoices"  element={<FinanceInvoices />} />
+          <Route path="invoices"  element={<InvoiceRegister />} />
           <Route path="refunds"   element={<FinanceRefunds />} />
           <Route path="recon"     element={<FinanceRecon />} />
           <Route path="reports"   element={<FinanceReports />} />

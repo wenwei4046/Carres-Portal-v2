@@ -588,6 +588,7 @@ export const qk = {
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
+    invoiceRegister: () => ["finance", "invoice-register"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -8518,6 +8519,31 @@ export function usePaymentRegister() {
         rows.push(...page.rows);
       } while (rows.length < total);
       if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Payments changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
+  });
+}
+
+/** The Invoices Register — the same fail-closed complete read as Payments:
+ *  a page that cannot be completed is an error, never a shorter list. */
+export function useInvoiceRegister() {
+  return useQuery({
+    queryKey: qk.finance.invoiceRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-invoice-register").InvoiceRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-invoice-register").InvoiceRegisterPage>(
+          `/api/finance/invoices/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Invoices could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Invoices changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Invoices could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Invoices changed. Try again.");
       return rows;
     },
     staleTime: 15_000,
