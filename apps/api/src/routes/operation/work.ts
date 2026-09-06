@@ -1,6 +1,13 @@
 import {
   operationWorkItemFromProjection,
   operationWorkResponseSchema,
+  demandPurposeLabelOf,
+  manualPurchaseForOf,
+  manualPurchaseLineRemainingOf,
+  manualPurchaseOrderByOf,
+  manualPurchaseStatusOf,
+  manualPurchaseSupplierSummary,
+  manualPurchaseWorkContext,
   manualPurchaseWorkItems,
   receivingWorkItems,
   workItemsForOrder,
@@ -20,6 +27,106 @@ export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+interface ManualPurchaseRegisterSource {
+  requests: Array<{
+    id: string;
+    purpose: string;
+    destination_id: string | null;
+    why: string | null;
+    approval_required: boolean;
+    approved_at: string | null;
+    refused_at: string | null;
+    refuse_reason: string | null;
+    for_service_case_id: string | null;
+    for_staff_user_id: string | null;
+    for_subsidiary_name: string | null;
+  }>;
+  lines: Array<{
+    request_id: string;
+    qty: number;
+    approved_qty: number | null;
+    issued_qty: number;
+    cancelled_at: string | null;
+    po_id: string | null;
+    po_ids?: string[];
+    received?: boolean;
+    supplier_id: string | null;
+    order_by: string | null;
+  }>;
+  destinations: Array<{ id: string; name: string }>;
+  suppliers: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string | null }>;
+  serviceCases: Array<{ id: string; case_no: string }>;
+  pos: Array<{ id: string; sent: boolean }>;
+}
+
+export function manualPurchaseWorkInputsFromRegister(
+  data: ManualPurchaseRegisterSource,
+): Array<ManualPurchaseWorkInput & { recipient: string | null }> {
+  const destination = new Map(data.destinations.map((row) => [row.id, row.name]));
+  const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
+  const user = new Map(data.users.map((row) => [row.id, row.name]));
+  const serviceCase = new Map(data.serviceCases.map((row) => [row.id, row.case_no]));
+  const sent = new Map(data.pos.map((row) => [row.id, row.sent]));
+  return data.requests.map((request) => {
+    const lines = data.lines.filter((line) => line.request_id === request.id);
+    const live = lines.filter((line) => line.cancelled_at === null);
+    const poIds = [...new Set(live.flatMap((line) => line.po_ids ?? (line.po_id ? [line.po_id] : [])))];
+    const supplierNames = live.map((line) =>
+      line.supplier_id ? (supplier.get(line.supplier_id) ?? "") : "",
+    );
+    return {
+      requestId: request.id,
+      context: manualPurchaseWorkContext({
+        purposeLabel: demandPurposeLabelOf(request.purpose) ?? request.purpose,
+        forText: manualPurchaseForOf({
+          purpose: request.purpose,
+          destinationName: request.destination_id
+            ? (destination.get(request.destination_id) ?? null)
+            : null,
+          serviceCaseNo: request.for_service_case_id
+            ? (serviceCase.get(request.for_service_case_id) ?? null)
+            : null,
+          staffName: request.for_staff_user_id
+            ? (user.get(request.for_staff_user_id) ?? null)
+            : null,
+          subsidiaryName: request.for_subsidiary_name,
+          why: request.why,
+        }),
+        supplierSummary: manualPurchaseSupplierSummary(supplierNames),
+      }),
+      status: manualPurchaseStatusOf({
+        approvalRequired: request.approval_required,
+        approvedAt: request.approved_at,
+        refusedAt: request.refused_at,
+        refuseReason: request.refuse_reason,
+        lines: lines.map((line) => ({
+          qty: line.qty,
+          approvedQty: line.approved_qty,
+          issuedQty: line.issued_qty,
+          cancelledAt: line.cancelled_at,
+          poId: line.po_id,
+          received: line.received ?? false,
+        })),
+      }).kind,
+      remainingQty: live.reduce(
+        (total, line) =>
+          total +
+          manualPurchaseLineRemainingOf({
+            qty: line.qty,
+            approvedQty: line.approved_qty,
+            issuedQty: line.issued_qty,
+          }),
+        0,
+      ),
+      orderBy: manualPurchaseOrderByOf(live.map((line) => line.order_by)),
+      hasPos: poIds.length > 0,
+      posAllSent: poIds.length > 0 && poIds.every((id) => sent.get(id) === true),
+      recipient: manualPurchaseSupplierSummary(supplierNames),
+    };
+  });
 }
 
 const ORDER_PROBLEM: Record<string, string> = {

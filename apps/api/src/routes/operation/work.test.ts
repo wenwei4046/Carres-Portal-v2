@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
 import {
   composeOperationWorkResponse,
+  manualPurchaseWorkInputsFromRegister,
   projectManualPurchaseWork,
   projectReceivingWork,
   projectSalesOrderWork,
@@ -185,5 +186,45 @@ describe("operation Work response composition", () => {
     expect(askDate?.object.label).toBe("SO-1318");
     expect(askDate?.problem).toBe("No delivery date");
     expect(askDate?.destination).toBe("/operation/orders/so/order-1318");
+  });
+
+  it("derives Manual Purchase projector input from the module register facts", () => {
+    const inputs = manualPurchaseWorkInputsFromRegister({
+      requests: [{
+        id: "request-2",
+        purpose: "ready_stock",
+        destination_id: "destination-1",
+        why: "Printer toner",
+        approval_required: false,
+        approved_at: null,
+        refused_at: null,
+        refuse_reason: null,
+        for_service_case_id: null,
+        for_staff_user_id: null,
+        for_subsidiary_name: null,
+      }],
+      lines: [{
+        request_id: "request-2",
+        qty: 2,
+        approved_qty: 2,
+        issued_qty: 0,
+        cancelled_at: null,
+        po_id: null,
+        po_ids: [],
+        supplier_id: "supplier-1",
+        order_by: "2026-09-08",
+      }],
+      destinations: [{ id: "destination-1", name: "Klang" }],
+      suppliers: [{ id: "supplier-1", name: "Nice Future" }],
+      users: [],
+      serviceCases: [],
+      pos: [],
+    });
+
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.status).toBe("ready_to_order");
+    expect(inputs[0]?.remainingQty).toBe(2);
+    expect(inputs[0]?.recipient).toBe("Nice Future");
+    expect(inputs[0]?.context).toContain("Ready Stock");
   });
 });
