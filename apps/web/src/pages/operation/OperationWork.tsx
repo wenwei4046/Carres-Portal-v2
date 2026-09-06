@@ -104,6 +104,7 @@ export default function OperationWork() {
   // The rail deep-links into a person's work: `?tab=work&scope=team&owner=…`.
   const linkedScope = params.get("scope");
   const linkedOwner = params.get("owner");
+  const linkedWhen = params.get("when");
   const [view, setView] = useState<ViewKey | null>(
     linkedScope === "team" ? "team" : linkedScope === "mine" ? "mine" : null,
   );
@@ -117,10 +118,27 @@ export default function OperationWork() {
   }, [staff, authEmail]);
 
   /** My Work — only the signed-in person's actions. */
-  const mine = useMemo(
+  const mineAll = useMemo(
     () => (myUserId ? allItems.filter((i) => i.ownerId === myUserId) : []),
     [allItems, myUserId],
   );
+  const mine = useMemo(() => {
+    if (linkedWhen === "overdue") {
+      return mineAll.filter((item) => item.workingDaysLate > 0);
+    }
+    if (linkedWhen === "today") {
+      return mineAll.filter(
+        (item) => item.workingDaysLate === 0 && item.dueIso === new Date().toISOString().slice(0, 10),
+      );
+    }
+    if (linkedWhen === "later") {
+      const today = new Date().toISOString().slice(0, 10);
+      return mineAll.filter(
+        (item) => item.workingDaysLate === 0 && (item.dueIso === null || item.dueIso > today),
+      );
+    }
+    return mineAll;
+  }, [linkedWhen, mineAll]);
   const myGroups = useMemo(() => groupWorkItemsByDay(mine), [mine]);
 
   /** Team Work — grouped per RESOLVED owner (§0.1 Action Owner Engine,

@@ -159,7 +159,7 @@ Core admission covers Sales Orders, Purchasing, Receiving, Stock/Warehouse, Deli
 Service Cases and Issue Tracker. Catalog, Guarantee and Rental may join later; they do not block
 honest Work for admitted modules.
 
-## 10 · Measured implementation truth — 2026-09-04
+## 10 · Measured implementation truth — 2026-09-06
 
 - Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
   audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
@@ -171,9 +171,13 @@ honest Work for admitted modules.
 - `/api/operation/po-duty` remains only as the response-shape adapter listed in the Purchasing
   MASTER. Remaining Purchasing screens and the PO-day reminder must move to the Workspace contract
   before that adapter is deleted.
-- Current Work is still substantially Order/client-composition based; it is not yet the one
-  server-composed cross-module feed.
-- Purchasing/Receiving have a Work implementation plan; plan text is not production proof.
+- `GET /api/operation/work` is now the one server-composed feed for admitted Sales Orders,
+  Manual Purchase and Receiving actions. It reuses the owning modules' reads and projectors;
+  invalid source data fails visibly instead of presenting a false clear desk.
+- My Work, Team Work and the Quick Rail My Work counts read that same cached response. The
+  retired browser composition and Quick Rail Team/duty editor have been removed.
+- My Work is the default for everyone. It routes by acting person; Team Work groups by normal
+  owner and shows dated cover evidence without rewriting ownership.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
@@ -182,8 +186,8 @@ honest Work for admitted modules.
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
 3. Remove legacy PIC/duty fallbacks.
-4. Build one server-composed feed and migrate My Work/Team Work.
-5. Make module rails preview that feed and retire duplicate generated tasks.
+4. Admit the remaining qualified modules to the server feed.
+5. Retire remaining duplicate generated-task paths after source-by-source proof.
 6. Emit Notifications from Work transitions.
 7. Last, complete and owner-review Dashboard against production data.
 
