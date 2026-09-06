@@ -11,6 +11,7 @@ import {
   invoicePrepareInput,
   invoiceRegisterQuery,
   invoiceVoidReplaceInput,
+  recordMessageInput,
 } from "@carres/shared/payment-invoice-register";
 import { orderMoney } from "@carres/shared/order-money";
 import { requireFinance } from "../../lib/auth-guards";
@@ -61,10 +62,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const INVOICE_REGISTER_SELECT =
   "id,invoice_no,status,kind,amount,tax_amount,issued_at,voided_at,void_reason," +
   "replaces_invoice_id,created_at,order_id," +
-  "orders(id,so,customer_name,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
+  "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
   "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
   "order_payments(id,receipt_no,amount,paid_on,voided_at)," +
-  "order_lines(qty,unit_price),order_addons(qty,unit_price)," +
+  "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
+  "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
   "ops_order_control(balance,confirmed_date,line_etas,line_stock_status))";
 
 financeInvoicesRouter.get("/register", async (c) => {
@@ -201,6 +203,44 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   const { data, error } = await sb.rpc("payment_invoice_issue", {
     p_invoice_id: id,
     p_snapshot: snapshot,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/** The message-sent door (0434): opening WhatsApp is neither sent nor read —
+ *  the record requires the sent screenshot; SQL keeps the immutable ledger. */
+financeInvoicesRouter.post("/:id/record-message", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot record messages." });
+  }
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" }, 422);
+  }
+  const body = await parseJsonBody(c, recordMessageInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data: invoice, error: invErr } = await sb
+    .from("invoices").select("id,order_id").eq("id", id).maybeSingle();
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  if (!invoice) {
+    return c.json({ error: "not_found", code: "not_found", message: "Invoice not found." }, 404);
+  }
+  const { data, error } = await sb.rpc("payment_record_message_sent", {
+    p_order_id: (invoice as { order_id: string }).order_id,
+    p_invoice_id: id,
+    p_kind: body.data.kind,
+    p_message_text: body.data.messageText,
+    p_template_key: body.data.templateKey ?? null,
+    p_screenshot_url: body.data.screenshotUrl,
   });
   if (error) {
     const m = mapPgError(error);

@@ -321,11 +321,11 @@ door, and typed input retained on failure. The void doors in the order drawer an
 panel ask the reason inline. `/finance/*` admits operation staff to the Payments and Invoices
 destinations only (§12); finance-only pages bounce them.
 
-### BUILD in progress — Payment Settings foundation, 2026-09-06
+### Merged — Payment Settings foundation, 2026-09-06
 
-Migration `0431` (branch evidence; verified on production in a rolled-back transaction — the
-manager gate refuses a non-manager, saves keep old/new/actor in the change log, and the last
-Active method cannot be switched off; not yet applied) gives `Settings → Payment` its storage:
+Migration `0431` is APPLIED and PR #1112 merged as `f43bdbf9` (the rolled-back production
+probe proved the manager gate refuses a non-manager, saves keep old/new/actor in the change
+log, and the last Active method cannot be switched off). `Settings → Payment` has its storage:
 receiving bank accounts keyed by the governed routing source (PJ own-showroom → Hong Leong
 Bank · Dealer → RHB — the BANKS are seeded approved truth, the account numbers are the
 manager's to enter), the six §16 manual methods with Active flags (`online` deliberately has
@@ -335,11 +335,28 @@ method toggles, the two storage cards, and the numbering summary that says only 
 example and `Numbers are created automatically.` Record payment's method list now reads the
 Active set. No approver name, Payment Duty or roster appears in Payment Settings.
 
-WhatsApp messages/templates, message assembly with bank routing, Reports, Stripe convergence,
-storage journeys, full responsive 390px/200% verification and the retirement of the rejected
-Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
-Important Notes wording has not been located in the repository and has been requested from its
-owner; it must not be invented or shortened during implementation.
+### BUILD in progress — a sent message is recorded with its proof, 2026-09-06
+
+Migration `0434` (branch evidence; verified on production in a rolled-back transaction — a
+screenshotless record is refused, a cross-order invoice is refused, and a real record lands
+with its proof, the order-history fact and the shared chase stamp; not yet applied) creates
+`payment_communications`, the append-only sent-message ledger, and
+`payment_record_message_sent`, its one recording door. The Invoice object gains
+`Ask the customer to pay` — the door exists only when the shared clock says due or late, never
+while `Wait` — opening the 50/50 message composition: editable ordinary wording beside the
+real message the customer receives, Copy message → Open WhatsApp → Upload sent screenshot →
+Record message sent. Opening WhatsApp records nothing. Communication History renders the
+ledger. The message body is the CURRENT locked customer template (Jess 2026-07-13); the
+complete §16 payment message swaps in when its owner-approved Important Notes wording
+arrives — the bottom rules are never invented or shortened. `waLink` converged from two
+page-local copies into the one shared implementation.
+
+WhatsApp template library, message assembly with bank routing and Partner contact, invoice
+document/Print from the snapshot, Reports, Stripe convergence, storage journeys, full
+responsive 390px/200% verification and the retirement of the rejected Refund/Bank Matching
+surfaces remain unfinished target work. The complete approved customer Important Notes wording
+has not been located in the repository and has been requested from its owner; it must not be
+invented or shortened during implementation.
 
 ### Approved target / not claimed built by this scope
 

@@ -151,6 +151,36 @@ describe("Invoices Register", () => {
     fireEvent.click(screen.getByText("Open invoice"));
     expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
   });
+  it("the chase door never opens on a waiting invoice (催钱前先看货)", () => {
+    auth.role = "operation";
+    show();
+    // Row i1 waits: goods not ready, no arrival.
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[0]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.getByText("Do not ask the customer to pay yet.", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask the customer to pay" })).not.toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("a due invoice offers the chase door and renders the sent-message history", () => {
+    auth.role = "operation";
+    state.data = [row({ id: "i2", invoice_no: "INV-060926-0001", status: "issued",
+      issued_at: "2026-09-06", delivery_date: iso(14),
+      control: { line_stock_status: { A: "ready" } } })];
+    const orders = (state.data[0] as InvoiceRegisterRow).orders!;
+    orders.payment_communications = [{
+      id: "c1", kind: "reminder", message_text: "Hi, just a friendly reminder…",
+      template_key: "customer_reminder", sent_screenshot_url: "orders-attachments/x.png",
+      recorded_at: "2026-09-06T03:00:00Z",
+    }];
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[0]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.getByRole("button", { name: "Ask the customer to pay" })).toBeInTheDocument();
+    expect(screen.getByText("Reminder sent")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ask the customer to pay" }));
+    expect(screen.getByTestId("invoice-ask-to-pay")).toBeInTheDocument();
+    auth.role = "finance";
+  });
   it("shows a failed source with recovery rather than a zero total", () => {
     state.isError = true;
     state.data = [];

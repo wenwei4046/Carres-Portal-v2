@@ -10,6 +10,7 @@ import {
 } from "@carres/shared/payment-invoice-register";
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
+import InvoiceAskToPay from "./InvoiceAskToPay";
 import { useAuth } from "@/lib/auth";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
@@ -111,9 +112,15 @@ export default function InvoiceRegister() {
   // full-width scroll. The door shows only for staff the posting door admits.
   const role = useAuth((s) => s.role);
   const [recording, setRecording] = useState(false);
+  const [asking, setAsking] = useState(false);
   const canRecord = (role === "operation" || role === "principal")
     && !!invoice && invoice.status !== "voided"
     && invoiceNeeded(invoice).known && invoiceNeeded(invoice).outstanding > 0;
+  const invoiceTiming = invoice ? invoicePaymentTiming(invoice, today, opts).timing : null;
+  // §16 — the chase door exists only when the shared clock says the money is
+  // genuinely askable: never while Wait, never with no anchor, never when paid.
+  const canAsk = canRecord && !!invoiceTiming
+    && (invoiceTiming.kind === "due" || invoiceTiming.kind === "late");
   return <div className="flex h-full min-h-0 flex-col">
     {invoice ? <SalesOrderTabs identity={identityOf(invoice)}
       customer={invoice.orders?.customer_name} backLabel="Invoices" backTo="?"
@@ -129,7 +136,12 @@ export default function InvoiceRegister() {
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
     </div> : selected ? invoice ? recording && canRecord
       ? <InvoiceRecordPayment invoice={invoice} onClose={() => setRecording(false)} />
-      : <InvoiceObject invoice={invoice} today={today} opts={opts} />
+      : asking && canAsk
+        ? <InvoiceAskToPay invoice={invoice}
+            tone={invoiceTiming?.kind === "late" ? "chase" : "reminder"}
+            onClose={() => setAsking(false)} />
+        : <InvoiceObject invoice={invoice} today={today} opts={opts}
+            onAsk={canAsk ? () => setAsking(true) : undefined} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
     : <ListPageShell register>
@@ -175,8 +187,9 @@ function Inspect({ row, today, opts, onOpen }: {
 
 /** One continuous scroll — Money → Goods and Delivery → What to do → Invoice
  *  → Related Payments → Communication History (payment/MASTER.md §16). */
-function InvoiceObject({ invoice, today, opts }: {
+function InvoiceObject({ invoice, today, opts, onAsk }: {
   invoice: InvoiceRegisterRow; today: string; opts: { holidays?: Set<string> };
+  onAsk?: () => void;
 }) {
   const f = factsOf(invoice, today, opts);
   const partner = invoice.orders?.delivery_partners?.name ?? invoice.orders?.ops_assigned_logistic ?? null;
@@ -206,9 +219,11 @@ function InvoiceObject({ invoice, today, opts }: {
         </> : f.timing.kind === "late" ? <>
           <p>{rm(f.money.outstanding)} should have been paid</p>
           <p className="text-label font-normal">Ask the customer to pay · Record the result.</p>
+          {onAsk && <button className="btn-primary mt-2" onClick={onAsk}>Ask the customer to pay</button>}
         </> : <>
           <p>{rm(f.money.outstanding)} needed by {fmtDate(f.timing.dueIso)}</p>
           <p className="text-label font-normal">Ask the customer to pay · Record the result.</p>
+          {onAsk && <button className="btn-primary mt-2" onClick={onAsk}>Ask the customer to pay</button>}
         </>}
       </Facts>
       <Facts title="Invoice">
@@ -227,9 +242,35 @@ function InvoiceObject({ invoice, today, opts }: {
         </p>) : <p>No payments recorded for this order yet.</p>}
       </Facts>
       <Facts title="Communication History">
-        <p>No messages recorded yet.</p>
+        <Communications invoice={invoice} />
       </Facts>
     </div>
+  </div>;
+}
+
+const MESSAGE_KIND_WORD: Record<string, string> = {
+  payment_request: "Payment message sent",
+  reminder: "Reminder sent",
+  receipt: "Receipt sent",
+  storage: "Storage message sent",
+  other: "Message sent",
+};
+
+/** The immutable sent-message ledger (0434), newest first — the three-rank
+ *  record grammar: what happened · when · the message that actually went. */
+function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
+  const rows = (invoice.orders?.payment_communications ?? [])
+    .slice()
+    .sort((a, b) => (a.recorded_at < b.recorded_at ? 1 : -1));
+  if (!rows.length) return <p>No messages recorded yet.</p>;
+  return <div className="space-y-2">
+    {rows.map((m) => <details key={m.id}>
+      <summary className="cursor-pointer">
+        <span className="font-semibold">{MESSAGE_KIND_WORD[m.kind] ?? "Message sent"}</span>
+        <span className="ml-2 text-meta font-normal">{fmtDate(m.recorded_at, { time: true })}</span>
+      </summary>
+      <pre className="mt-1 whitespace-pre-wrap font-sans text-label font-normal">{m.message_text}</pre>
+    </details>)}
   </div>;
 }
 

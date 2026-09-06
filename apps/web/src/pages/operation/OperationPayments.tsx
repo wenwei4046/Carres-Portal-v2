@@ -31,6 +31,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { cjkClassName } from "@/lib/cjk";
 import { rm } from "@/lib/format-currency";
+import { waLink } from "@/lib/wa-link";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import { orderStatusPill } from "@/lib/status-pill";
@@ -214,22 +215,7 @@ function messageCopiedAgo(iso: string | null): string | null {
   return `Message copied ${days}d ago`;
 }
 
-/** Phone → wa.me base link (MY-aware). Local copy of OrderDetailDrawer.waLink so
- *  this page doesn't pull in the 6k-line drawer. */
-function waLink(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const first = phone.split(/[|,/]/)[0] ?? "";
-  let d = first.replace(/\D/g, "");
-  if (!d) return null;
-  if (d.startsWith("60")) {
-    /* already international */
-  } else if (d.startsWith("0")) {
-    d = `60${d.slice(1)}`;
-  } else {
-    d = `60${d}`;
-  }
-  return `https://wa.me/${d}`;
-}
+// waLink moved to the ONE shared implementation (@/lib/wa-link).
 
 // ── Stock & delivery ─────────────────────────────────────────────────────────
 type StockState = "ready" | "waiting" | "no_eta" | "late" | "none";
