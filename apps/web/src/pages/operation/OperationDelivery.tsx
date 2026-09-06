@@ -346,16 +346,19 @@ export default function OperationDelivery() {
       next.delete("logistics");
     });
 
-  const filters: DeliveryMonitorFilters = useMemo(
-    () => ({
+  const filters: DeliveryMonitorFilters = useMemo(() => {
+    const base = {
       view,
       region,
       logisticsPartnerId: logistics,
-      search: q,
+      search: "",
       todayIso: today,
-    }),
-    [view, region, logistics, q, today],
-  );
+    };
+    /* `?q=` narrows the CALENDAR only. The work list's one search is the
+       grid's own box — an invisible second narrowing from a carried-over URL
+       would make the listing look complete while it is not. */
+    return { ...base, search: isCalendarProjection(base) ? q : "" };
+  }, [view, region, logistics, q, today]);
   const calendarMode = isCalendarProjection(filters);
 
   /* ── The cards — the workspace's own reads, mapped once ────────────────── */

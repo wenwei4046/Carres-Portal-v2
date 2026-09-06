@@ -593,6 +593,18 @@ describe("the URL is the state", () => {
     expect(screen.getByText("SO-1323")).toBeTruthy();
     expect(screen.queryByText("SO-1322")).toBeNull();
   });
+
+  it("a carried-over ?q= never narrows the WORK LIST invisibly — the grid's own search is the one search there", () => {
+    /* A dateless scope whose customer does NOT match the carried-over q. */
+    ordersState.data!.orders.push(
+      order({ id: "c", so: 1324, customer_name: "tan mei ling" }),
+    );
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&q=aida");
+    /* If the page had also applied q, SO-1324 would silently vanish while
+       the grid's own search box read empty — the hidden-filter defect. */
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByText("SO-1324")).toBeTruthy();
+  });
 });
 
 describe("mobile is a one-day list", () => {
