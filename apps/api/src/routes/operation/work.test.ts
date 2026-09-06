@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { OperationWorkItem } from "@carres/shared";
-import { composeOperationWorkResponse, projectReceivingWork } from "./work";
+import {
+  composeOperationWorkResponse,
+  projectManualPurchaseWork,
+  projectReceivingWork,
+} from "./work";
 
 const base: OperationWorkItem = {
   id: "orders:SO-1318:missing_delivery_date",
@@ -95,5 +99,48 @@ describe("operation Work response composition", () => {
       "/operation?tab=receiving&session=receipt-1",
     );
     expect(items[0]?.problem).toBe("Goods arrived · GRN not posted");
+  });
+
+  it("keeps Manual Purchase approval and PO issuance as separately owned actions", () => {
+    const common = {
+      requestId: "request-1",
+      context: "Manual Purchase · Office use · Klang · Nice Future",
+      remainingQty: 2,
+      orderBy: "2026-09-06",
+      hasPos: false,
+      posAllSent: false,
+    } as const;
+    const poDuty = {
+      dutyKey: "po_duty",
+      onDate: "2026-09-06",
+      normalOwner: { userId: "shasha", name: "Shasha" },
+      buddy: { userId: "yujun", name: "Yu Jun" },
+      activeCover: { userId: "yujun", name: "Yu Jun" },
+      actingPerson: { userId: "yujun", name: "Yu Jun" },
+      state: "covered" as const,
+      assignmentId: "assignment-1",
+    };
+    const approval = projectManualPurchaseWork({
+      requests: [{ ...common, status: "waiting_approval" }],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty,
+      today: "2026-09-06",
+    });
+    const issuance = projectManualPurchaseWork({
+      requests: [{ ...common, status: "ready_to_order" }],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty,
+      today: "2026-09-06",
+    });
+
+    expect(approval[0]?.action).toBe("Approve purchase");
+    expect(approval[0]?.owner.acting?.userId).toBe("jess");
+    expect(approval[0]?.completionFact).toContain("stored approval or refusal");
+    expect(issuance[0]?.action).toBe("Issue PO");
+    expect(issuance[0]?.owner.normal?.userId).toBe("shasha");
+    expect(issuance[0]?.owner.acting?.userId).toBe("yujun");
+    expect(issuance[0]?.destination).toBe(
+      "/operation?tab=manual-purchase&mp=request-1",
+    );
   });
 });

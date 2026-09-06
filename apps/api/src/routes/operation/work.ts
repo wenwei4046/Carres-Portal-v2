@@ -1,7 +1,9 @@
 import {
   operationWorkItemFromProjection,
   operationWorkResponseSchema,
+  manualPurchaseWorkItems,
   receivingWorkItems,
+  type ManualPurchaseWorkInput,
   type ReceivingWorkSource,
   type OperationWorkItem,
   type OperationWorkResponse,
@@ -13,6 +15,41 @@ export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+export function projectManualPurchaseWork(input: {
+  requests: readonly (ManualPurchaseWorkInput & { recipient?: string | null })[];
+  approver: { userId: string; name: string | null } | null;
+  poDuty: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  return input.requests.flatMap((request) =>
+    manualPurchaseWorkItems(
+      request,
+      {
+        approver: input.approver,
+        poDuty: input.poDuty?.normalOwner ?? null,
+        poDutyResolution: input.poDuty,
+      },
+      input.today,
+    ).map((item) => {
+      const approval = item.ruleKey === "manual_purchase.approve";
+      return operationWorkItemFromProjection(item, {
+        object: {
+          kind: "manual_purchase",
+          id: request.requestId,
+          label: request.context,
+        },
+        problem: approval ? "Approval required" : "Purchase order required",
+        recipient: request.recipient ?? null,
+        requiredResult: approval
+          ? "Purchase decision recorded"
+          : "Current PO version sent to supplier",
+        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}`,
+        today: input.today,
+      });
+    }),
+  );
 }
 
 export function projectReceivingWork(input: {
