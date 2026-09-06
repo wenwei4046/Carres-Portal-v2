@@ -1391,8 +1391,11 @@ evidence appended append-only, idempotent retry `already_saved`, and an out-of-a
 refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
 `Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
 destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
-server-side pagination — ships with this revision of this section; its production proof is
-recorded on merge.** The operating rule is:
+server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `00bf3ced`,
+both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
+zero retired/view-switch words, and a read-only authenticated walk proving the fixed calendar,
+the date-pick filter round-trip, only-present categories, `Showing 1–7 of 7` server paging and
+the intact 50/50 GRN object (evidence in CARD-2026-09-04-receiving-01).** The operating rule is:
 
 ```text
 Warehouse submits count                (or Operation enters goods directly)
