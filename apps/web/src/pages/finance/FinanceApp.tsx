@@ -4,7 +4,7 @@ import PortalSidebar from "@/pages/portal/PortalSidebar";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
 import FinanceAP from "./FinanceAP";
-import FinancePayments from "./FinancePayments";
+import PaymentRegister from "./PaymentRegister";
 import FinanceInvoices from "./FinanceInvoices";
 import FinanceRefunds from "./FinanceRefunds";
 import FinanceRecon from "./FinanceRecon";
@@ -35,7 +35,9 @@ export default function FinanceApp() {
           <Route path="dashboard" element={<FinanceDashboard />} />
           <Route path="ar"        element={<FinanceAR />} />
           <Route path="ap"        element={<FinanceAP />} />
-          <Route path="payments"  element={<FinancePayments />} />
+          {/* Payment MASTER §16 — Finance → Payments is the canonical
+              receipt Register; the Phase-5 bucket page is retired. */}
+          <Route path="payments"  element={<PaymentRegister />} />
           <Route path="invoices"  element={<FinanceInvoices />} />
           <Route path="refunds"   element={<FinanceRefunds />} />
           <Route path="recon"     element={<FinanceRecon />} />

@@ -478,7 +478,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       },
       {
         key: "payments",
-        label: "Order Payments",
+        // Payment MASTER §16 — the destination word is `Payments`; the row
+        // opens the canonical receipt Register.
+        label: "Payments",
         icon: Wallet,
         financePath: "/finance/payments",
       },
