@@ -31,6 +31,8 @@ import {
   WAREHOUSE_OFF_DAYS,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
+import { loadPurchasingSettings } from "../../lib/purchasing-settings";
+import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import operationOrdersRouter from "./orders";
 import operationStockRouter from "./stock";
@@ -56,6 +58,7 @@ interface SalesOrderModuleRow {
   delivery_date: string | null;
   delivery_date_tbd?: boolean | null;
   placed_at: string;
+  delivered_at?: string | null;
   do_number?: string | null;
   paid?: number | string | null;
   ops_assigned_logistic?: string | null;
@@ -179,7 +182,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
           row.status !== "delivered",
         promisedDateIso: row.delivery_date_tbd ? null : row.delivery_date,
         confirmedDateIso: control?.confirmed_date ?? null,
-        deliveredAtIso: row.status === "delivered" ? row.placed_at : null,
+        deliveredAtIso: row.delivered_at ?? null,
         delayDetectedAtIso: control?.delay_detected_at ?? null,
         delayDecisionAtIso: control?.delay_decision_at ?? null,
         poIssuedAtIso: poDates[0] ?? null,
@@ -589,7 +592,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/workspace-duties", workspaceDutiesRouter);
   internal.route("/staff", opsStaffRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -618,6 +621,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         "/staff",
         c,
       ),
+      loadPurchasingSettings(userClient(c.env, c.var.auth.jwt)),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -633,7 +637,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     staff: staff.staff,
     dutyResolutions,
     today,
-    safetyDays: null,
+    safetyDays: purchasingSettings.orderByBufferDays,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),
