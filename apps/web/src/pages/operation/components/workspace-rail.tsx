@@ -116,11 +116,18 @@ export function RailItem({
  */
 export function FilterRail({
   children,
+  header,
   testId,
   onHide,
   header,
 }: {
   children: ReactNode;
+  /**
+   * A FIXED block above the scrolling filters (owner correction 2026-09-06 —
+   * Receiving's month Calendar stays put while CATEGORY/SUPPLIER/… scroll
+   * independently beneath it). Absent, the rail is one scroll as before.
+   */
+  header?: ReactNode;
   testId?: string;
   onHide?: () => void;
   /**
@@ -158,7 +165,10 @@ export function FilterRail({
   return (
     <aside
       data-testid={testId}
-      className="relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
+      className={[
+        "relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white",
+        header ? "" : "gap-5 overflow-y-auto p-3",
+      ].join(" ")}
     >
       {onHide && (
         <button
@@ -171,7 +181,24 @@ export function FilterRail({
           <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
         </button>
       )}
-      {children}
+      {header ? (
+        <>
+          <div
+            className="shrink-0 border-b border-kit-slate-4 p-3"
+            data-testid={testId ? `${testId}-fixed` : undefined}
+          >
+            {header}
+          </div>
+          <div
+            className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
+            data-testid={testId ? `${testId}-scroll` : undefined}
+          >
+            {children}
+          </div>
+        </>
+      ) : (
+        children
+      )}
     </aside>
   );
 }

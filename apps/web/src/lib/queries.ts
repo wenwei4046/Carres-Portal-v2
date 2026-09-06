@@ -513,6 +513,11 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
+    /** The paged GRN Register (owner correction 2026-09-06) — one key per
+     *  filter/page combination, under the same invalidation root as the
+     *  queue: a check-in mints the row this register must show. */
+    grnRegister: (filters: Record<string, string | number | null>) =>
+      ["operation", "warehouse-receipts", "grn", filters] as const,
     /** Slice B — one PO's Receiving Sessions + their event ledger. The
      *  Workspace's Summary and Activity both read this ONE call, so the two
      *  sections can never describe the same delivery differently. */
@@ -4243,6 +4248,12 @@ export interface WarehouseReceiptQueueRow {
    *  2026-09-06) — computed server-side through the ONE shared ladder from
    *  the catalog's answer; the rail only counts them. */
   categories?: string[];
+  /** The linked PO's governed `Supplier Delivery Date` (ISO) — the ONE reply
+   *  arithmetic (`poSupplierDeliveryDateOf`), resolved server-side. */
+  supplier_delivery_date?: string | null;
+  /** The Product cell's words — the GRN paper's own line description
+   *  (`product_skus.variant`, else the SKU), distinct, server-resolved. */
+  product_labels?: string[];
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4510,6 +4521,57 @@ export function useOperationWarehouseReceipts(
         // history in one fetch (the server hard-caps the limit).
         `/api/operation/warehouse-receipts?status=${status}&limit=1000`,
       ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** The paged GRN Register's ask and answer (owner correction 2026-09-06). */
+export interface GrnRegisterFilters {
+  offset: number;
+  category: string | null;
+  supplier: string | null;
+  site: string | null;
+  /** The rail Calendar's picked `Supplier Delivery Date` (ISO). */
+  expected: string | null;
+  q: string;
+}
+export interface GrnRegisterResponse {
+  receipts: WarehouseReceiptQueueRow[];
+  page: { offset: number; limit: number; total: number };
+  facets: {
+    category: Record<string, number>;
+    supplier: Record<string, number>;
+    site: Record<string, number>;
+  };
+  counts: { waiting: number };
+}
+
+/**
+ * The GRN Register, paged on the SERVER — `Showing 1–50 of 10,000` and every
+ * rail count are the truth about the WHOLE filtered result set, computed by
+ * the one shared arithmetic (`buildGrnRegisterView`) behind `?scope=grn`.
+ * `keepPreviousData` holds the current page while the next one loads so
+ * Previous/Next never blinks the register empty.
+ */
+export function useOperationGrnRegister(
+  filters: GrnRegisterFilters,
+  opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
+) {
+  const params = new URLSearchParams({ scope: "grn" });
+  if (filters.offset > 0) params.set("offset", String(filters.offset));
+  if (filters.category) params.set("category", filters.category);
+  if (filters.supplier) params.set("supplier", filters.supplier);
+  if (filters.site) params.set("site", filters.site);
+  if (filters.expected) params.set("expected", filters.expected);
+  if (filters.q.trim()) params.set("q", filters.q.trim());
+  return useQuery({
+    queryKey: qk.operation.grnRegister({ ...filters }),
+    queryFn: () =>
+      apiFetch<GrnRegisterResponse>(
+        `/api/operation/warehouse-receipts?${params.toString()}`,
+      ),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     ...opts,
   });
