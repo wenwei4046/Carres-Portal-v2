@@ -29,6 +29,13 @@ export const invoiceVoidReplaceInput = z.object({
   reason: z.string().trim().min(1, "A reason is required to void an invoice.").max(500),
 });
 
+export const recordMessageInput = z.object({
+  kind: z.enum(["payment_request", "reminder", "receipt", "storage", "other"]),
+  messageText: z.string().trim().min(1, "The sent message text is required.").max(4000),
+  templateKey: z.string().trim().max(80).nullish(),
+  screenshotUrl: z.string().trim().min(1, "The sent screenshot is required.").max(300),
+});
+
 export type InvoiceStatus = "draft" | "issued" | "voided";
 export type InvoiceKind = "sales" | "storage" | "additional_storage";
 
@@ -50,6 +57,8 @@ export interface InvoiceRegisterRow {
     id: string;
     so: number;
     customer_name: string;
+    customer_phone?: string | null;
+    source_ref?: string[] | string | null;
     status: string;
     paid: number | string | null;
     delivery_date: string | null;
@@ -61,7 +70,11 @@ export interface InvoiceRegisterRow {
       id: string; receipt_no: string | null; amount: number;
       paid_on: string; voided_at: string | null;
     }>;
-    order_lines: Array<{ qty: number; unit_price: number | string | null }>;
+    payment_communications?: Array<{
+      id: string; kind: string; message_text: string; template_key: string | null;
+      sent_screenshot_url: string; recorded_at: string;
+    }>;
+    order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
     order_addons: Array<{ qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
