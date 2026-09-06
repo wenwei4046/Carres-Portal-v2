@@ -1,6 +1,7 @@
 import { addWorkingDays, countWorkingDays } from "./working-days";
 import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 import type { WorkItem } from "./work-engine";
 
 /**
@@ -185,7 +186,7 @@ export function purchaseOrderWork(
 /** Purchasing supplies the same reply facts to central Work; no local queue. */
 export function purchaseOrderReplyWorkItems(
   input: PurchaseOrderRegisterInput,
-  owner: { userId: string; name: string | null } | null,
+  owner: WorkspaceDutyResolution | null,
   today: string,
   holidays: ReadonlySet<string> = myHolidaySet(),
 ): WorkItem[] {
@@ -208,8 +209,15 @@ export function purchaseOrderReplyWorkItems(
   return [{
     ruleKey: passed ? "purchasing.supplier_date_passed" : "purchasing.supplier_reply",
     module: "purchasing", soRef: input.id, orderId: input.id,
-    action: copy.action, ownerName: owner?.name ?? null, ownerUserId: owner?.userId ?? null,
-    ...(owner ? {} : { ownerDuty: "PO Duty" }),
+    action: copy.action,
+    ownerRule: "po_duty", ownerDutyKey: "po_duty",
+    normalOwner: owner?.normalOwner ?? null,
+    activeCover: owner?.activeCover ?? null,
+    actingPerson: owner?.actingPerson ?? null,
+    ownerState: owner?.state ?? "not_assigned",
+    ownerName: owner?.actingPerson?.name ?? null,
+    ownerUserId: owner?.actingPerson?.userId ?? null,
+    ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
     tone: passed ? "warning" : "info", locked: false, broken: false,
     dueIso: due, workingDaysLate: due && due < today ? countWorkingDays(due, today, options) : 0,
   }];

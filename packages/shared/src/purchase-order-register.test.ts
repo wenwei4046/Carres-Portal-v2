@@ -135,7 +135,9 @@ describe("Purchase Order Register authority", () => {
 
 describe("shared supplier reply Work", () => {
   const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", poVersion: 1, sentAt: "2026-09-03T17:00:00Z" };
-  const owner = { userId: "po-duty", name: "Jess" };
+  const person = { userId: "po-duty", name: "Jess" };
+  const owner = { dutyKey: "po_duty", onDate: "2026-09-08", normalOwner: person,
+    actingPerson: person, activeCover: null, buddy: null, state: "primary" as const, assignmentId: "assignment" };
   it("starts on the Malaysia send day and resending does not reset its clock", () => {
     const items = purchaseOrderReplyWorkItems({ ...base, sends: [sent, { ...sent, sentAt: "2026-09-07T01:00:00Z" }] }, owner, "2026-09-08", new Set());
     expect(items).toHaveLength(1);
@@ -145,6 +147,12 @@ describe("shared supplier reply Work", () => {
     for (const patch of [{ version: 2 }, { lines: [{ qty: 3, receivedQty: 3 }] }, { supplierDate: "2026-09-10" }]) {
       expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent], ...patch }, owner, "2026-09-08", new Set())).toEqual([]);
     }
+  });
+  it("routes to active cover while retaining the normal owner for Team Work", () => {
+    const cover = { userId: "cover", name: "Cover" };
+    const [item] = purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, { ...owner, activeCover: cover, actingPerson: cover, state: "covered" }, "2026-09-08", new Set());
+    expect(item).toMatchObject({ ownerUserId: "cover", normalOwner: person, activeCover: cover, ownerDutyKey: "po_duty", ownerState: "covered" });
+    expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, null, "2026-09-08", new Set())[0]).toMatchObject({ ownerUserId: null, normalOwner: null, ownerState: "not_assigned" });
   });
   it("rolls an office holiday forward without changing the supplier date", () => {
     const input = { ...base, sends: [sent], supplierDate: "2026-09-05" };

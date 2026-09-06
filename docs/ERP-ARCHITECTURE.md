@@ -239,12 +239,13 @@ no canonical module MASTER; that is a current authority gap, not permission for 
 invent Catalog truth.** Receiving and Supplier Claim remain responsibilities governed inside the
 Purchasing MASTER until an approved re-ruling gives either a separate MASTER.
 
-Workspace is deliberately absent from this ownership table. Dashboard and Work are cross-module
-projections and own no business outcome. The complete Workspace document remains
-`docs/workspace/BLUEPRINT.md` **PROPOSAL FOR OWNER REVIEW**, except for the approved
-Purchasing/Receiving/GRN/Claim/Return projection slice recorded in this Architecture and the
-Purchasing MASTER. Approval of that slice does not approve unrelated Dashboard or Workspace
-proposal sections.
+Workspace is deliberately absent from this business-record ownership table. Dashboard and Work are
+cross-module projections and own no business outcome. `docs/workspace/MASTER.md` is the single
+Workspace authority. Its Staff & Duties, Shared Duty Resolver, one cross-module Work boundary and
+staged delivery sequence are **APPROVED / LOCKED**; Dashboard composition remains downstream of
+production-verified module projections. The Purchasing/Receiving/GRN/Claim/Return projection slice
+is governed by this Architecture and the Purchasing MASTER. Approval of that slice does not claim
+that Dashboard or every module projection is built.
 
 ---
 
