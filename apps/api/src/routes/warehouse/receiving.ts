@@ -81,6 +81,9 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
     p_do_number: body.doNumber,
     p_do_file_path: body.doFilePath,
     p_note: body.note ?? null,
+    // 0426 — arrival photo/video evidence and extra goods ride the count.
+    p_arrival_evidence: body.arrivalEvidence ?? [],
+    p_extra_lines: body.extraLines ?? [],
     p_lines: body.lines.map((l) => ({
       id: l.id,
       received_now: l.receivedNow ?? 0,
@@ -92,6 +95,13 @@ warehouseReceivingRouter.post("/receipts", requireWarehouse, async (c) => {
       // them in objects here would look tidier and file a photo-less claim.
       damaged_photos: l.damagedPhotos ?? [],
       wrong_item_photos: l.wrongItemPhotos ?? [],
+      // 0426 — one physical result per governed expected Unit.
+      units: (l.units ?? []).map((u) => ({
+        unit_code: u.unitCode,
+        outcome: u.outcome,
+        issue_kind: u.issueKind ?? null,
+        note: u.note ?? null,
+      })),
     })),
   });
   if (error) {

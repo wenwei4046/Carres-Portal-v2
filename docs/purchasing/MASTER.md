@@ -248,8 +248,20 @@ purchase links the actual Case, an `Internal Staff Purchase` names the real staf
 emergency purpose, extra question, queue or approval/issue bypass. The four pre-ruling purposes
 (`Display` · `Warranty` · `Office` · `Spare Parts`) are retired: no
 door accepts them for a new request and no historical row is relabelled into the new
-vocabulary. A new Manual Purchase is numbered `MPR-YYYYMMDD-RRRR` through the one §6.1
-allocator (0401); pre-0401 `REQ-####` identities are permanent and print exactly as stored.
+vocabulary. **A Manual Purchase has NO visible document number — owner correction
+2026-09-04 (Card 08); PRODUCTION-VERIFIED on `bc96a1e3`/`23ab3121` 2026-09-04** (0424
+applied through the governed path after the compatible app deployed; walked
+authenticated as `operation@`: a new Manual Purchase was created with `req_no NULL`,
+no number shown or announced anywhere, `—` in its PO No cell, business-fact object
+heading, and the two historical rows keeping their stored `MPR-…` values untouched).
+It is an internal way to prepare and approve a purchase, not a
+second supplier document: before `Issue PO` nothing shows, and after it the only visible
+purchasing document identity is the actual `PO No` (`PO-YYYYMMDD-RRRR`, the same formal
+document both buying doors produce). The canonical invisible identity is
+`purchase_requests.id`; migration 0424 retires the MPR allocator default and lets new
+rows carry a null `req_no`. Historical `REQ-####` / `MPR-YYYYMMDD-RRRR` values stay
+stored unchanged as legacy compatibility data — never displayed, never renumbered, and
+no operator-facing surface may consume them.
 An approved Display Request may route to Manual Purchase or Consignment Order; staff do not
 retype it.
 
@@ -322,6 +334,40 @@ Staff never guess a SKU, supplier or document.
   Purchasing sidebar page.
 - When resolved, the original row continues; it is not re-entered.
 
+**APPROVED / LOCKED — owner ruling 2026-09-04.** The in-context `Add Supplier` door records one
+complete governed supplier setup, top to bottom:
+
+```text
+Supplier Name
+Delivery Method
+  Supplier delivers
+  We collect
+Product Categories
+Production Days       one required value for every selected category
+Supplier work week
+Add Supplier
+```
+
+`Product Categories` is a multi-select of the three governed Purchasing production categories:
+`Mattress` · `Bedframe` · `Sofa`. It is never a free-text category creator. Every selected category
+requires its own `Production Days`; one generic supplier lead time is forbidden. For this setup
+door, the selected categories are the authority for which Supplier × Category Production Days rows
+must exist; the form does not wait for a SKU to be linked before those values can be stored.
+
+**APPROVED TARGET / NOT BUILT.** One new server/database transaction must write the Supplier
+identity, delivery method, selected categories, `Supplier work week` and each selected category's
+Production Days. It either saves the complete supplier setup or saves nothing; a sequence of
+separate browser writes may not leave a partial supplier. This supersedes SKU-derived setup for
+this door, while SKU relationships remain the authority for which specific goods that supplier may
+supply. The form never asks for a PO Delivery Date: that date belongs to each Purchase Order, not
+Supplier Master.
+
+**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** the form and API submit
+one complete setup to `catalog_create_supplier_setup`. Owner-approved migration `0428` was applied
+at 07:35:20 UTC after production rollback assertions and a negative control passed. All six
+function hashes and the tracker SQL SHA-256 match the committed approved file; no fixture rows
+remain. PR #1105 carries the dependent application and deployment proof.
+
 ### 5.6 Issue means the PDF was actually sent
 
 Opening WhatsApp, email or a PDF is not issue. The system generates the numbered version in the
@@ -360,15 +406,58 @@ does not decide it.
   communication history and completes nothing; a `confirmed_sent` for an EARLIER version stays
   history and never completes the current one.
 
-### 5.7 PO states and balances
+### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
+
+**HOW IT IS ENFORCED — BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
+
+- **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**
+  `purchase_orders.official_delivery_date` is stamped from the birth `eta_date` by trigger at
+  INSERT; once it holds a value no UPDATE may change it. `eta_date` stays the LIVE planning
+  arrival (the ready-date door may recompute it); the register's `PO Delivery Date`, the PDF's
+  `Deliver by` and every reply comparison read the immutable original. Pre-0428 records were
+  recovered from evidence, not invented: a PO whose eta no door ever moved kept it as the
+  original; a PO the legacy delayed door rewrote took the date the earliest delayed reply moved
+  FROM; a PO the ready-date door recomputed stays NULL — **an unknown original is recorded as
+  unknown, never replaced by today's planning date.**
+- **THE SERVER CLASSIFIES THE SUPPLIER ANSWER.** The reply wire carries ONE date. Compared with
+  the recorded original it is written as `confirmed`, `earlier`, `delayed` (later — and only then
+  is a governed reason required; none is ever pre-selected) or `reported` (original unknown). A
+  browser's own classification is ignored. An earlier date is not a delay. Every reply still
+  carries channel, recipient, supplier reporter, actual recorder, evidence file, reported time,
+  the exact PO version and duty/cover, enforced by trigger on the table itself.
+- **REPLIES STAY READABLE BY VERSION, AND ONLY EVIDENCE QUALIFIES.** A previous-version reply
+  never confirms the current version. A pre-evidence reply on a never-revised PO is linked to
+  version 1 (the only link its evidence supports) and is shown as *recorded without evidence* —
+  a recorded answer is not a proven absence, and an unevidenced answer is not the governed
+  Supplier Delivery Date.
+- **ONE ARRIVAL-PLANNING ARITHMETIC (Architecture Law D).** `purchasing_project_line_etas`
+  recomputes each affected customer (order, SKU) arrival as the LATEST effective supplier date
+  across ALL open POs still owing units for that order line, from the exact `po_line_sources`
+  lineage — never from SO numbers or SKU similarity, and never from whichever reply was recorded
+  last. The reply door and the balance-date door both call it; the SO-ref-inferring
+  `purchasing_push_supplier_date` projection is retired. It writes goods-arrival planning only;
+  the customer promise is a separate Sales fact it never touches.
+- **THE SENT DOCUMENT IS KEPT, PER VERSION.** The first confirmed send of a version freezes the
+  full `purchasing_po_document` payload in `po_version_documents`; a resend of the same version
+  reuses the same recorded facts, and Revisions can reprint exactly what the supplier received
+  (`print-data?version=N`). A version sent before keeping began answers with a named absence —
+  history is never reconstructed or back-invented.
+- **A RECEIPT IS NOT A BUY.** A demand an open PO already fully covers stays visible as a
+  receipt but is refused at the issue door BY NAME (`already_on_po`). Production carried the
+  proof this rule was missing: six open POs each sourcing the same 1-unit line of SO-1340.
+
+### 5.8 PO states and balances
+
+**APPROVED / LOCKED — owner correction 2026-09-04.**
 
 The operator sees facts, not a vague workflow:
 
 ```text
 Not sent to supplier
 Issued
-Supplier Delivery Date missing
+Supplier has not confirmed the PO date
 Supplier Delivery Date changed
+Supplier delivery date passed
 Partly received
 Completed
 Cancelled
@@ -376,9 +465,11 @@ Cancelled
 
 Each line retains Order Qty, Received Qty and Pending Delivery Qty. Receiving records Damaged Qty,
 Wrong Item Qty and Extra Qty separately; damaged, wrong and extra goods do not reduce Pending
-Delivery Qty and never create available stock. A supplier date may split by quantity. A late,
-missing or changed promise creates supplier-contact work; it never rewrites the original PO
-Delivery Date or the customer promise.
+Delivery Qty and never create available stock. A supplier date may split by quantity. An
+unconfirmed, passed or changed supplier promise creates supplier-contact work; it never rewrites
+the original PO Delivery Date or the customer promise. Confirmation work begins only after the
+current PO version has confirmed-sent evidence, Pending Delivery Qty is above zero and no supplier
+answer exists for that version.
 
 ---
 
@@ -391,7 +482,7 @@ PREFIX-YYYYMMDD-RRRR
 ```
 
 - `YYYYMMDD` is the Malaysia server issue date for an external document and creation date for an
-  internal Manual Purchase/Display Request, always with a four-digit year.
+  internal Display Request, always with a four-digit year.
 - `RRRR` is chosen from the unused four-digit codes for that date. It is not a sequence, timestamp,
   customer, supplier or parent-document number.
 - All Carres formal documents share the daily visible-code pool. A database uniqueness rule prevents
@@ -410,7 +501,6 @@ permanent and are NOT renumbered.**
 
 | Prefix | Document |
 |---|---|
-| `MPR` | Manual Purchase |
 | `PO` | Purchase Order |
 | `GRN` | Goods Receipt |
 | `SC` | Supplier Claim |
@@ -421,7 +511,9 @@ permanent and are NOT renumbered.**
 | `CRTN` | Consignment Return |
 | `CSN` | Consignment Sale Notice |
 
-Internal records still use invisible permanent technical IDs.
+Internal records still use invisible permanent technical IDs. `MPR` is retired (Card 08,
+2026-09-04): a Manual Purchase is an internal preparation record with no visible number;
+its stored historical `MPR-…`/`REQ-…` values are permanent legacy data, never displayed.
 
 ### 6.2 Unit ID
 
@@ -511,7 +603,7 @@ Staff selects purpose
 PO/CO carries the official Deliver To and original PO Delivery Date
 → supplier provides its Supplier DO and may provide a changed Supplier Delivery Date
 → Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
-→ record Goods Received At as the physical receipt date
+→ record Goods received on as the physical arrival date, and Goods arrived at as the physical arrival location
 → record Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty
 → attach Supplier DO/evidence and exact Unit IDs where required
 → finish physical receiving; Carres creates the numbered GRN
@@ -638,8 +730,8 @@ summary. Action ownership uses structured avatar metadata.
 Official UI language is English at primary-school reading level.
 
 ```text
-Supplier date is missing
-[YJ] Ask Dorsettloft for the delivery date
+Supplier has not confirmed the PO date
+[YJ] Ask Dorsettloft to confirm the PO delivery date
 ```
 
 Line 1 is the authoritative blocking fact. Line 2 is a smaller 11px action. The avatar is structured
@@ -1057,12 +1149,13 @@ rail). The default population is the COMPLETE permanent history, ordered records
 newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
 `Order By` first, then newest Proceed Date.
 
-**Columns, exactly and in this order — owner correction 2026-08-29 (Card 06);
-PRODUCTION-VERIFIED on `87ef0e28` 2026-08-30 together with the date contract below (the
-issued PO's `eta_date` now IS the approved Manual Delivery Date, and the issue partition
-adds Delivery Date — different approved dates create different POs through the one
-`purchasing_issue_pos_batch` door):** Proceed Date ·
-Approval Status · Manual Purchase No · PO No · Delivery Date · For · Items · Qty · Supplier ·
+**Columns, exactly and in this order — owner correction 2026-09-04 (Card 08 removes the
+number column from Card 06's verified order); PRODUCTION-VERIFIED on `23ab3121`
+2026-09-04 (the date contract stays as verified on
+`87ef0e28` 2026-08-30 — the issued PO's `eta_date` IS the approved Manual Delivery Date,
+and the issue partition adds Delivery Date through the one `purchasing_issue_pos_batch`
+door):** Proceed Date ·
+Approval Status · PO No · Delivery Date · For · Items · Qty · Supplier ·
 Deliver To · Requested By.
 
 - `Proceed Date` is the Malaysia date of the successful `Send for approval` header transaction,
@@ -1081,17 +1174,19 @@ Deliver To · Requested By.
 - `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
   `No approval needed`); while approval is needed a quiet second line names the real
   configured approver — `{name} approves` (Card 03 §3's arithmetic).
-- `Manual Purchase No` is the identity and link, sticky during horizontal scrolling. New
-  requests mint `MPR-YYYYMMDD-RRRR` (§6.1 allocator, 0401); historical numbers print
-  exactly as stored.
+- There is NO number column (Card 08). The row and its deep-link run on the invisible
+  request UUID; `req_no` is legacy database data no operator surface consumes.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the
   demand's own `po_id` as pre-0361 fallback) resolved to actual `purchase_orders.po_no`:
-  `Not ordered yet` · the one clickable number · `{n} POs`. Never a UUID, never a
-  SKU/supplier/date inference.
+  `—` (a fact, not a button) · the one clickable number · `{n} POs` opening the object's
+  exact linked PO list. Never a UUID, never a SKU/supplier/date inference, and never the
+  Manual Purchase identity — a purchase may have no PO or several.
 - `For` is the structured object the purchase serves (§5.2): destination context for
   `Ready Stock` / `Showroom Display`, the linked Service Case, the real staff member, the
-  actual subsidiary, or `Other Purchase`'s required answer. A historical row without the
-  structured fact prints nothing.
+  actual subsidiary, or `Other Purchase`'s required answer. It is the clear single-click
+  entrance to the object and the sticky business column during horizontal scrolling; a
+  historical row without the structured fact prints its purpose word so the entrance
+  never disappears.
 - `Items` speaks Catalog human words through the ONE item-label arithmetic
   (`railItemLabel`): one item's name, or `{first item} + {n} more`; the SKU stays
   searchable and shows in the expansion. `Qty` is the total originally requested
@@ -1131,8 +1226,9 @@ Approval showing `Need approval · Jess approves` with NO money and NO controls,
 yet` lineage, History `Purchase requested` in the three-rank grammar, and `‹ Manual Purchase`
 restoring the Register; the approver money/decision surface and the prev/next stepping were
 proven on the same SHA's seeded dev walk plus the API contract tests — Jess's live positive
-walk remains hers). Clicking `Manual Purchase
-No` opens WORK: one full-width, one-scroll object on the approved Object Header + Summary +
+walk remains hers). Clicking the `For`
+cell opens WORK (Card 08 — the retired number column's one job): one full-width,
+one-scroll object on the approved Object Header + Summary +
 Sections + History template. No tabs, no drawer, no split preview, no PDF and no narrow
 720/900px islands. Sections, exactly and in this order:
 `Request → Items Requested → What We Already Have → Approval → Purchase Orders → History`.
@@ -1140,7 +1236,10 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
 - **Object Header** — the shared object identity header (the Sales Order / Delivery Order
   implementation, Law C): one back destination `Manual Purchase` that restores the complete
   Register state the operator left (the grid stays mounted underneath — rail filters, search,
-  column filters, sort, scroll and expansion survive); the actual `MPR-…` identity; one derived
+  column filters, sort, scroll and expansion survive); the business heading
+  `{Need for} · {For}` with the quieter `{Proceed Date} · {supplier summary}` context
+  (Card 08 §3.3 — no MPR, no UUID, and a browser title of `Manual Purchase — Carres`);
+  one derived
   state pill (`manualPurchaseStatusOf`); the filtered Register position `{n} of {m}` with
   keyboard-operable previous/next when the object is in the filtered list. No duplicate Back,
   page title, pseudo-tab, breadcrumb or PDF action; no new edit/delete/undo/take-back door.
@@ -1169,8 +1268,9 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
 - **Purchase Orders** — read-only exact lineage: `PO No` (a door to the exact PO) ·
   `Ordered Qty` · `Still To Order` · `PO Issued` (`placed_at`) · `PO Delivery Date` (the
   ORIGINAL supplier-facing date — the promise ledger's first held date when the supplier moved
-  it, else the issue-stamped date) · `Supplier Delivery Date` only when that ledger proves a
-  change (unchanged reads `Same as PO`). No lineage reads `Not ordered yet`. **The PO number
+  it, else the issue-stamped date) · `Supplier Delivery Date` as `Not confirmed` until supplier
+  evidence exists, `Same as PO` when the supplier confirms the PO date, or the supplier's changed
+  date. No lineage reads `Not ordered yet`. **The PO number
   IS `purchase_orders.id`** — no `po_no` column exists; Card 05 fixed the latent register read
   that selected one (it would have 400'd the whole Register on first lineage).
 - **History** — the final section: `Today · Yesterday · Earlier`, the locked three-rank record
@@ -1189,11 +1289,16 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   approver) · `no_purchase_approver` · `already_decided` · `reason_required` ·
   `invalid_cut_qty` · `decision_not_recorded` — never raw PostgreSQL text, `forbidden`, a
   role or an email.
-- **Work Engine boundary — owner-corrected by Card 06 and Duty ruling 2026-09-03:** undecided
-  approval supplies `Approve {MPR}` to the resolved `Purchasing Approver`, due no later than Order By and completed only by
-  the stored decision. Approved remaining demand supplies `Issue the purchase order for {MPR}` to
+- **Work Engine boundary — owner-corrected by Card 06, Duty ruling 2026-09-03 and Card 08
+  §3.4:** undecided
+  approval supplies `Approve purchase` to the resolved `Purchasing Approver`, due no later than Order By and completed only by
+  the stored decision. Approved remaining demand supplies `Issue PO` to
   normal PO Duty/cover (Operations Superusers may act), due on Order By and completed only when the
-  current PO version has confirmed-sent evidence. Both deep-link the exact source; the local
+  current PO version has confirmed-sent evidence. The action sentence carries no MPR, no
+  person's name and no UUID; the row's context line distinguishes the purchase through its
+  business facts — `Manual Purchase · {Need for} · {For} · {supplier}` — while the Work
+  record stays distinct through its structured request UUID. Both deep-link the exact
+  source (`?tab=manual-purchase&mp={uuid}`); the local
   `WORK TO DO` rail filters these same identities and never becomes a second queue or manual Done.
 
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
@@ -1220,9 +1325,9 @@ DOCUMENT
   Version changed
   Send the new version to supplier   ← line 2 of the same row/count
 
-DELIVERY DATE
-  Supplier date missing
-  Supplier date passed
+SUPPLIER REPLY
+  Supplier has not confirmed the PO date
+  Supplier delivery date passed
 
 RECEIVING
   Partly received
@@ -1233,44 +1338,222 @@ The version row is one `supplier_update_required` filter, not two rows. Its fact
 deliberate separate lines; the em dash and the ambiguous phrase `supplier update required` never
 render. Grouping changes no population, filter key, count, permission or completion fact.
 **Date facts:** `PO Issued` sits beside `PO No` and means when Carres issued the current supplier
-commitment. `PO Delivery Date` is the original official supplier-facing date on the PO. A separate
-`Supplier Delivery Date` Register column appears only when the supplier has changed that date;
-unchanged rows read `Same as PO`. `Goods Received At` belongs to Receiving and never substitutes for
-any of these dates.
-**Columns:** PO No., PO Issued, Supplier, Source, Deliver To, PO Delivery Date, Supplier Delivery
-Date when changed, Ordered, Received, Pending Delivery Qty, Current Version, Supplier Has.
+commitment. `PO Delivery Date` is the original official supplier-facing date on the PO and therefore
+is never described as missing merely because the supplier has not replied. `Supplier Delivery Date`
+reads `Not confirmed` until supplier-answer evidence exists, `Same as PO` when the supplier confirms
+the PO date, and the supplier's actual date when it differs. `Not confirmed` is a cell fact; it
+becomes a rail/work condition only after the current PO version has confirmed-sent evidence and
+Pending Delivery Qty is above zero. `Goods received on` belongs to Receiving and never substitutes
+for any of these dates.
+**Columns — APPROVED 2026-09-04, in this order:** PO No, PO Issued, Supplier, Source, Deliver To,
+PO Delivery Date, Supplier Delivery Date, Order Qty, Received Qty,
+Pending Delivery Qty, PO Version, Sent to Supplier. The Register lists authoritative facts only:
+no `Work` column, no action sentence, no owner avatar or duty holder on any row — actions live in
+My Work, Team Work, the Purchase Order detail and Order Route, unchanged.
+**Quantity facts:** `Order Qty` is the total on the current PO. `Received Qty` is the correct and
+accepted quantity posted through Receiving. `Pending Delivery Qty` = Order Qty − Received Qty,
+pieces of goods, never a money balance; damaged, wrong and extra goods are separate receiving
+facts and never reduce it. The footer totals use these same three words.
+**PO Version fact:** the current OFFICIAL document version, printed `PO V1` · `PO V2` · `PO V3` —
+never `Version 1`, `Current Version` or `PDF Version 1`, and never the WhatsApp/email copy.
+**Sent to Supplier fact:** the latest exact PO version with `confirmed_sent` evidence, with the
+channel and date as its evidence second line (`PO V1` / `WhatsApp · Thu, 4 Sep`); no confirmed
+send ever — including a legacy PO that received goods without one — reads `Not sent`, and missing
+evidence stays visibly missing. Opening, downloading or previewing the PDF proves nothing, and the
+system never claims the supplier read or accepted the PO — only which version Carres sent, through
+which channel, to which recipient, when and by whom. `PO Version` beside `Sent to Supplier` makes
+a version mismatch (`PO V2` vs `PO V1`) immediately visible.
+**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** migration `0428`
+preserves an immutable original PO date and requires an append-only current-version reply with
+channel/evidence/reporter/recorder/time and shared duty/cover. Production rollback verification
+proved atomic supplier setup, role/send/version/evidence guards, preserved known and unknown
+original dates, exact persisted source planning without changing an unrelated order, and a
+negative control that fails when the send guard is removed. All six committed function bodies
+were reconciled before and after apply; tracker version `20260906073520` stores the exact approved
+SQL SHA-256 `c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`.
+Earlier records receive no invented dates or reply evidence. PR #1105 carries the Register,
+reply form and shared Work projection; application deployment proof remains pending.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
-outbound fact → record supplier date or exception → monitor receipt balance.
+outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
 History, Order Route.
 **Exceptions:** supplier fabric/model unavailable, delayed/split promise, quantity change,
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN seam — OWNER CORRECTION 2026-08-29
+### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
-This section supersedes the stale `Goods Receipts` rail, status legend, `Source`, `Arrival Date`,
-`Expected`, `Accepted`, `Rejected` and Receiving `Work` column proposal that formerly lived here.
-The separate Receiving owner review owns its final page presentation; Purchasing binds these shared
-facts only:
+The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
+(CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
+**State: PRODUCTION-VERIFIED 2026-09-06 — migrations 0425/0426/0427 APPLIED (tracker
+20260904125205 / 20260904125800 / 0427_an_amendment_may_correct_the_papers_evidence; 0427 was
+functionally proven in a rolled-back production transaction before apply). Correction PR #1106
+merged `f755dea8`, deployed, both canonical surfaces reporting that exact SHA; the served bundle
+carries every corrected word and zero retired words; committed production smoke on
+GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
+evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
+refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
+`Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
+destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
+server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `00bf3ced`,
+both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
+zero retired/view-switch words, and a read-only authenticated walk proving the fixed calendar,
+the date-pick filter round-trip, only-present categories, `Showing 1–7 of 7` server paging and
+the intact 50/50 GRN object (evidence in CARD-2026-09-04-receiving-01).** The operating rule is:
 
-- Navigation/workspace is `Receiving`. The supplier gives the Supplier DO; Carres creates the Goods
-  Receipt and numbered GRN only after physical receiving.
-- One Receiving engine handles PO and CO arrivals. SO Batch Purchase and Manual Purchase both pass
-  through the one PO authority and this same Receiving engine; no Manual receipt lane exists.
-- Source `Deliver To` is authoritative. The normal default is the configured Carres warehouse; a
-  showroom is an explicit source exception.
-- `Goods Received At` is the physical receipt date only. It never means keyed, submitted or posted
-  time and never replaces PO Issued, PO Delivery Date or Supplier Delivery Date.
-- Quantity words are `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
-  `Pending Delivery Qty`. Extra quantity is recorded separately. Damaged/wrong/extra never reduce
-  Pending Delivery Qty and never create available stock.
-- Supplier DO, channel/evidence, recorder and event times remain auditable. Finishing receiving
-  creates the GRN once and moves only valid received goods into Stock custody.
-- Receiving-owned work deep-links the exact PO/Receiving Session. A Purchasing supplier chase
-  deep-links the exact PO. Merely opening WhatsApp/email completes nothing.
+```text
+Warehouse submits count                (or Operation enters goods directly)
+→ Operation reviews Receiving
+→ Save Receiving
+→ GRN created (allocate_formal_document_code('GRN'), stored grn_no)
+→ Inventory updated automatically at Goods arrived at
+```
 
-No migration or Receiving implementation is authorised by this 2026-08-29 seam record.
+- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
+  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
+  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
+  proposal is superseded. The page is: left, the 240px rail with the full month Calendar FIXED
+  on top and the business filters scrolling independently beneath it; right, always the complete
+  GRN Register. The right side never becomes a weekly calendar and never shows work cards —
+  daily Receiving actions stay in My Work / Team Work.
+- **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
+  Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
+  review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
+  in Work and deep-links to its Receiving review; it becomes a Register row only when
+  `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
+  waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
+- **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
+  database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
+  name.
+- **THE RAIL MONTH CALENDAR (owner correction 2026-09-06, second ruling).** The full month
+  Calendar stays fixed at the top of the rail; the ‹ › arrows move exactly one month. Sunday
+  stays visible for understanding the month and wears the muted non-working state — Receiving
+  follows the Warehouse working calendar, Monday–Saturday. A date with expected supplier
+  arrivals prints a visible COUNT (colour is never the only signal, and the day's aria sentence
+  says it in words); expected dates come from the linked POs' governed `Supplier Delivery Date`
+  (`poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
+  marks a day, and a fully received or closed PO stops being expected). Selecting a date filters
+  the SAME right-hand GRN Register by that Supplier Delivery Date; selecting it again, or
+  `Clear filters`, restores the complete listing. The Calendar shows no work cards.
+- **The Filter Rail (owner correction §2)** holds, beneath the Calendar: `CATEGORY` ·
+  `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED AT` (the receiving
+  locations present in the records) · `Clear filters`. CATEGORY shows ONLY the governed rows
+  actually present in the Receiving result set, in the shared display order (`Mattress` ·
+  `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
+  protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
+  table's `Goods received on` column owns detailed date filtering. Re-clicking the active row
+  clears its section. Category comes from the governed catalog truth through the ONE shared
+  ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
+  never derives its own category from SKU text.
+- **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
+  renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
+  Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
+  result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
+  `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
+  filters, Columns and Export stay; a changed filter or search term returns to page 1.
+- **Register columns** lead with identity and the arrival story: `GRN No` · `Supplier Delivery
+  Date` (the linked PO's governed supplier answer — the same date the Calendar filters by;
+  `Not confirmed` while no evidenced reply exists) · `Goods received on` · `PO/CO No` ·
+  `Supplier` · `Product` (the GRN paper's own line words — `product_skus.variant`, else the
+  SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` · `Status`, with `Supplier DO No.`
+  and the damaged/wrong/extra quantity facts behind them.
+- **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
+  instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
+  `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`
+  and `Goods Received At` are retired from every Receiving surface, filter, table, export, GRN
+  and report; `Delivery Location` stays reserved for the customer's delivery address.
+- **The formal GRN document (owner correction §4).** Every GRN renders as a real official A4
+  `GOODS RECEIVED NOTE` (SO-PDF-STANDARD chrome, money-free, browser-rendered like the SO/DO/PO)
+  with Print and Download PDF: Carres identity, GRN number, linked PO/CO, Supplier, Supplier DO
+  No., the three location/date facts, description + SKU + governed Category per line, the five
+  quantity words, exact-Unit outcomes, extra goods, evidence references, the duty-evidence trio
+  with dated cover and actual actor, and amendment/cancellation marking printed ON the paper. A
+  GRN number without this document is not sufficient.
+- **The GRN object is 50/50 (owner correction §5)** — the shared Sales Order formal-object
+  grammar adapted for GRN facts: left = Receiving Record (facts · Unit results · Receiving
+  Summary · Evidence · History · `[Amend Receiving]` `[More ▾]`); right = the OFFICIAL GRN
+  PREVIEW through the real renderer, with `[Print]` `[Download PDF]`. One Object Header (GRN
+  number · supplier/source · status), no duplicated title. Mobile stacks Record above Preview.
+  `Void Receiving` lives in `More ▾` — not a normal primary action.
+- **Amend Receiving is 50/50 with a LIVE preview (owner correction §6).** The left half becomes
+  the governed correction form (`Original → Corrected` · reason · evidence) while the right half
+  previews the proposed document — same GRN number, amendment clearly marked, `UNSAVED`
+  watermark as screen chrome only. Amendable, subject to downstream safety checks:
+  `Goods received on`, `Goods arrived at`, Supplier DO number and evidence (0427: a corrected
+  signed DO replaces the paper on record with before/after preserved; arrival evidence is
+  APPEND-ONLY), and Unit outcomes/quantities where stock/claim/downstream rules permit. NOT
+  amendable: the GRN number, the source PO/CO, the Supplier — wrong identities go through
+  `Void Receiving` and a fresh Receiving from the correct source. Every amendment preserves
+  original facts, before/after, reason, evidence, the duty trio, time, and the append-only
+  history; every amendment prints on the document.
+- **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
+  the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
+  doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
+  and `operation_receive_po_with_do`. Every posting/review door is gated on
+  `receiving_actor_context()` (0425): **GRN Duty, its dated cover, or an Operations Superuser** —
+  at page, API and SQL. The posting stores the duty-evidence trio (normal holder · dated cover ·
+  actual actor), never one overwritten name. GRN Duty resolves through the ONE Shared Duty
+  Resolver `workspace_resolve_duty()` (Law F.1): an effective-dated `workspace_duty_assignments`
+  record, or an honest `not_assigned` answer — **a rota recommendation is never silently turned
+  into an assignment (owner correction 2026-09-04)**. While nobody holds the duty, the pages say
+  so plainly and protected posting refuses (`no_grn_duty_holder`); the manager assigns the holder
+  in `Workspace → Staff & Duties`.
+- **The GRN number is STORED at posting** — `warehouse_receipts.grn_no`, drawn from the daily
+  formal-document pool (0381), `GRN-YYYYMMDD-RRRR`. Sessions posted before 0426 keep their
+  derived display through `receivingDisplayNo`. `Jump to…` matches the stored number first.
+- **Save Receiving is idempotent** (`save_key`): a retried uncertain response returns the first
+  posting — never a second GRN, Unit receipt or stock movement. A retried check-in of a posted
+  session returns the first result.
+- **Per-Unit outcomes** (ERP-ARCHITECTURE §3.4): a governed expected Unit records exactly
+  `Received · Received with issue · Not received` (`receiving_unit_results`); posting flips the
+  EXACT named Units (received → free at Goods arrived at; with-issue → the claim hold). Quantities
+  are DERIVED from the outcomes; a line without minted Units keeps the lawful quantity inputs.
+  Duplicate scans, foreign Units and already-received Units refuse by name. The external
+  Warehouse count uses the same outcomes: `warehouse_incoming_pos()` lists the expected Units,
+  the count modal records one physical result per Unit, and the submission carries the per-Unit
+  outcomes plus arrival photo/video evidence.
+- **Stock posts by Units only (0366 unit authority).** The receive engine flips/mints
+  `ops_stock_items`; `stock_balances` is DERIVED by the rollup triggers and is never written
+  directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
+  exact-Unit binding, owned by the Stock reserve door. (0426 corrects the live engine, which
+  still carried both pre-0366 writes and would have refused any stock-posting receive.)
+- **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
+  marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
+  named, and the posting creates no AP consequence — supplier ownership is preserved, never
+  silently converted to Carres-owned.
+- **`Goods arrived at` never overwrites `Deliver To`.** Both facts are stored and displayed;
+  valid received Units enter Inventory at Goods arrived at. `Arrival evidence` supports photo
+  AND video beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters
+  Inventory or the pending arithmetic.
+- Quantity words stay `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
+  `Pending Delivery Qty`; damaged/wrong/extra never reduce Pending Delivery Qty and never create
+  available stock. `Goods received on` is the physical arrival date only.
+- **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) requires a reason,
+  records before/after in an append-only `amended` event, recalculates the PO counters and stock
+  safely, and refuses by name when goods moved on (`threads_block_amend` · `units_block_amend`).
+  Damaged/wrong corrections belong to their claims, not to Amend. `Void Receiving`
+  (`receiving_void`) is only for a GRN that should never have existed: full exact reversal when
+  safe, a named blocker otherwise (`claims_block_void` · `threads_block_void` ·
+  `units_block_void`), the record and number preserved forever. Every physical arrival creates a
+  NEW session and a NEW GRN — a later arrival is never edited into an earlier one.
+- **Work**: the `Goods to receive` queue projects into My Work / Team Work from two triggers only
+  — a submitted Warehouse count, and an arrived supplier date with goods still owed (outstanding
+  quantity alone never makes a row). Owner = the resolved GRN Duty; completion = the posted
+  session; lateness counts on the Warehouse calendar (Mon–Sat).
+- **`Workspace → Staff & Duties`** is the ONE assignment surface: the resolution today
+  (holder / `{cover} covering for {holder}` / `Nobody holds GRN Duty.`), effective-dated
+  assignment, dated cover, immutable history; the manager gate mirrors the SQL door and the page
+  never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
+  central report: every non-draft session with its GRN, source, site facts, totals from the
+  shared arithmetics, submitter/poster, and the `Still owed by suppliers` pending section.
+- **The Warehouse boundary (owner correction §7).** The 50/50 GRN screen belongs to
+  Operation / GRN Duty. Warehouse may only scan Units, record count/outcomes, upload arrival
+  photo/video, and return the count to Carres. Warehouse cannot create, amend or void the GRN,
+  and cannot directly update Inventory — enforced at web, API (`requireOperation`) and SQL
+  (`receiving_require_post_authority`).
+- The GRN Duty reviewer may verify/correct `Goods arrived at` on a submitted Warehouse count at
+  check-in; `Deliver To` is never overwritten. No Manual receipt lane exists; no approved
+  Receiving scope is deferred to a later card.
 
 ### 9.5 Supplier Claims
 
@@ -1401,10 +1684,10 @@ invoice/settlement.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
-| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve MPR-20260829-2779` | Stored approval or refusal with Primary, Cover and actual actor/time exists |
-| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order for MPR-20260829-2779` | Current PO version has confirmed-sent evidence and actual actor |
+| Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |
+| Approved Manual Purchase has remaining demand; due on its Order By | Normal PO Duty/cover; Operations Superuser may act | `Issue PO` (same business context; distinct by request UUID) | Current PO version has confirmed-sent evidence and actual actor |
 | Approved demand ready | Normal PO Duty/cover; Operations Superuser may act | `Issue the purchase order to Hooka` | Current PDF version sent, outbound fact and actual actor exist |
-| Supplier date missing | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact PO |
+| Supplier has not confirmed the PO date | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka to confirm the PO delivery date` | Actual supplier answer, channel, evidence, recorder and times exist on the exact sent PO version |
 | Arrival due next Office work day | Normal PO Duty/cover; Operations Superuser may act | `Confirm Hooka's Fri, 28 Aug arrival` | Actual supplier answer/date, channel, evidence, recorder and times exist on the exact PO |
 | Required arrival at risk | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka if the goods can arrive by Fri, 28 Aug` | Governed supplier answer/exception, evidence and actual actor exist on the exact PO |
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
@@ -1423,7 +1706,7 @@ proof, linked object and read-only foreign-module state. It never edits another 
 Calendar displays only governed work dates with actual weekday + calendar date. Purchasing /
 Operation uses the Office calendar (Mon–Fri); Receiving / GRN / Warehouse uses the Warehouse
 calendar (Mon–Sat). Sunday and Selangor public holidays are excluded. Recorded business dates are
-never silently moved: PO Delivery Date, Supplier Delivery Date and Goods Received At remain the
+never silently moved: PO Delivery Date, Supplier Delivery Date and Goods received on remain the
 dates actually stated/observed. A computed work due date may use its governed calendar only when
 the rule and resulting date are visible.
 
@@ -1441,11 +1724,16 @@ Settings lives under the global header gear and requires authorised roles. It in
 - document number format/version and locked Unit ID family;
 - a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
+- `/api/operation/po-duty` is a one-release response-shape adapter only. It reads and writes the
+  shared Workspace Duty resolver and must be deleted when `PurchaseOrdersPage`,
+  `SalesOrderWorkspace`, `OperationOrdersControl`, the Quick Rail `TeamPanel`, and the PO-day
+  reminder consume the Workspace Duty contract directly; no caller may restore a direct
+  `ops_po_duty` or cover-table read behind it.
 - approval limits and Manual Purchase purposes;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
   consequence, Unit-scan requirement and signed-DO evidence controls;
-- supplier channels, contacts, lead/production days and calendars;
+- supplier channels, contacts, `Supplier work week` and Supplier × Product Category Production Days;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
 - supplier Unit-label capability (package, physical Unit, future machine-readable support);
@@ -1464,7 +1752,7 @@ Reports are generated from authoritative records and open in central Reports or 
 
 - demand remaining/covered/ordered by source;
 - purchase quantity and open balance by supplier/SKU/destination;
-- missing, changed and passed supplier dates;
+- unconfirmed, changed and passed supplier delivery dates;
 - partial receipts, quantity/condition differences and missing delivery notes;
 - supplier delivery, claim, return and repair performance;
 - supplier-owned Units by showroom, label state and age;

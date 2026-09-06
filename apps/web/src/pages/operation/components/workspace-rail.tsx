@@ -118,11 +118,54 @@ export function FilterRail({
   children,
   testId,
   onHide,
+  header,
 }: {
   children: ReactNode;
   testId?: string;
   onHide?: () => void;
+  /**
+   * Owner correction 2026-09-06 (Delivery Monitor + Receiving — the two
+   * corrections landed the same day and share this one slot): a FIXED region
+   * above the scrolling filter groups — the rail's month calendar lives
+   * here. It never scrolls away; the groups below scroll independently.
+   * Absent = the rail renders byte-identically to before (one scroll area,
+   * nothing added). The two regions carry `{testId}-fixed` / `{testId}-scroll`
+   * so a page can assert the independence.
+   */
+  header?: ReactNode;
 }) {
+  if (header) {
+    return (
+      <aside
+        data-testid={testId}
+        className="relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white"
+      >
+        {onHide && (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Hide filters"
+            title="Hide filters"
+            className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+          >
+            <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
+          </button>
+        )}
+        <div
+          className="shrink-0 border-b border-kit-slate-5 p-3"
+          data-testid={testId ? `${testId}-fixed` : undefined}
+        >
+          {header}
+        </div>
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
+          data-testid={testId ? `${testId}-scroll` : undefined}
+        >
+          {children}
+        </div>
+      </aside>
+    );
+  }
   return (
     <aside
       data-testid={testId}

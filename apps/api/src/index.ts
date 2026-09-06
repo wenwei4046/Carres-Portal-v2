@@ -34,6 +34,7 @@ import supplierClaimsRouter from "./routes/operation/supplier-claims";
 // R6 — the ops half: review what the warehouse filed, then replay it through
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
+import workspaceDutiesRouter from "./routes/operation/workspace-duties";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
@@ -75,6 +76,7 @@ import pickupEventsRouter from "./routes/pickup-events/print";
 import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
+import paymentSettingsRouter from "./routes/finance/payment-settings";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
@@ -252,6 +254,7 @@ api.route("/pickup-events", pickupEventsRouter);
 api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
+api.route("/finance/payment-settings", paymentSettingsRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
@@ -279,6 +282,7 @@ api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
+api.route("/operation/workspace-duties", workspaceDutiesRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);

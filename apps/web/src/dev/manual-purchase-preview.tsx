@@ -4,8 +4,9 @@
  * The REAL `OperationManualPurchase`, the REAL stylesheet; only the
  * register read is seeded (window.fetch answers the page's own API paths),
  * because the live screen is behind a login and live data cannot be made
- * to hold every column state at once: MPR- and historical REQ- numbers,
- * all four Approval facts, `Not ordered yet` / one clickable PO / `2 POs`,
+ * to hold every column state at once: new null `req_no` beside stored
+ * legacy REQ-/MPR- values (kept in the database, never displayed — Card
+ * 08), all four Approval facts, `—` / one clickable PO / `2 POs`,
  * every structured For, one item and `+ n more`, one supplier and
  * `2 suppliers`, and a selectable Ready-to-order remainder for the
  * PO-Duty-beside-Issue bar.
@@ -81,14 +82,14 @@ const REGISTER = {
   requests: [
     // ① Other Purchase · Need approval (+ `Jess approves`) · Not ordered yet.
     req({
-      id: R1, req_no: "MPR-20260829-4821", purpose: "other_purchase",
+      id: R1, req_no: null, purpose: "other_purchase",
       why: "Spare castors for the delivery van",
       approval_required: true, required_by: "2026-09-05",
       created_at: "2026-08-29T03:10:00Z",
     }),
     // ② Service Case · Approved · Ready to order (SELECTABLE) · 2 items.
     req({
-      id: R2, req_no: "MPR-20260829-1207", purpose: "service_case",
+      id: R2, req_no: null, purpose: "service_case",
       for_service_case_id: SC_1, approval_required: true,
       approved_at: "2026-08-29T04:00:00Z", required_by: "2026-09-10",
       created_at: "2026-08-29T02:00:00Z",
@@ -103,7 +104,7 @@ const REGISTER = {
     }),
     // ④ Ready Stock · No approval needed · fully ordered on TWO POs.
     req({
-      id: R4, req_no: "MPR-20260828-7719", purpose: "ready_stock",
+      id: R4, req_no: null, purpose: "ready_stock",
       required_by: "2026-09-01", created_at: "2026-08-28T06:00:00Z",
     }),
     // ⑤ Internal Staff Purchase · Approved · part issued (one PO + remainder).
@@ -115,7 +116,7 @@ const REGISTER = {
     }),
     // ⑥ Subsidiary Purchase · 2 suppliers · Multiple destinations.
     req({
-      id: R6, req_no: "MPR-20260827-0201", purpose: "subsidiary_purchase",
+      id: R6, req_no: null, purpose: "subsidiary_purchase",
       for_subsidiary_name: "HOUZS Sdn Bhd", required_by: "2026-09-20",
       created_at: "2026-08-27T02:00:00Z",
     }),
@@ -289,7 +290,7 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     ] });
   }
   if (url.includes("/purchasing/requests/") && url.includes("/decide")) {
-    return answer({ id: "x", req_no: "MPR", decision: "approved" });
+    return answer({ id: "x", req_no: null, decision: "approved" });
   }
   if (url.includes("/purchasing/requests/issue")) {
     return answer({ poIds: [], documents: 1 });

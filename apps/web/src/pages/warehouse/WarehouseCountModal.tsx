@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  RECEIVING_UNIT_OUTCOME_LABEL,
   warehouseReceiptProblems,
   warehouseReceiptProblemText,
   wrongItemClaimTypesFor,
+  type ReceivingArrivalEvidence,
+  type ReceivingUnitOutcome,
   type WarehouseIncomingPo,
   type WarehouseReceiptLineDraft,
 } from "@carres/shared";
 import { ApiError } from "@/lib/api";
 import { useWarehouseSubmitReceiptMutation } from "@/lib/queries";
+import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import {
@@ -58,6 +62,15 @@ interface Props {
 
 const GRID = "1fr 76px 78px 72px 76px";
 
+/** One physical result per governed expected Unit — the same three outcomes
+ *  the ops Session records (ERP-ARCHITECTURE §3.4). */
+type UnitState = {
+  outcome: ReceivingUnitOutcome;
+  issueKind: "damaged" | "wrong_item";
+};
+
+type ExpectedUnit = NonNullable<WarehouseIncomingPo["expected_units"]>[number];
+
 export default function WarehouseCountModal({ po, onClose }: Props) {
   const lines = po.lines ?? [];
 
@@ -70,6 +83,9 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
   const [doNumber, setDoNumber] = useState("");
   const [note, setNote] = useState("");
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
+  const [arrivalEvidence, setArrivalEvidence] = useState<
+    ReceivingArrivalEvidence[]
+  >([]);
 
   const submit = useWarehouseSubmitReceiptMutation();
 
@@ -79,21 +95,93 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     return Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
   }
 
+  /** The governed Units still expected, grouped by line SKU — the exact IDs
+   *  the supplier was told to write on the packages. */
+  const unitsBySku = useMemo(() => {
+    const m = new Map<string, ExpectedUnit[]>();
+    for (const u of po.expected_units ?? []) {
+      if (u.status !== "incoming") continue;
+      const list = m.get(u.sku) ?? [];
+      list.push(u);
+      m.set(u.sku, list);
+    }
+    return m;
+  }, [po.expected_units]);
+
+  /** Prefilled `received` up to the line's remaining count — a complete
+   *  delivery is zero typing — and `not_received` beyond it (the same rule
+   *  the ops Session applies). */
+  const [unitStates, setUnitStates] = useState<Record<string, UnitState>>(() => {
+    const o: Record<string, UnitState> = {};
+    for (const l of po.lines ?? []) {
+      const units = (po.expected_units ?? []).filter(
+        (u) => u.sku === l.sku && u.status === "incoming",
+      );
+      const cap = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
+      units.forEach((u, i) => {
+        o[u.id] = {
+          outcome: i < cap ? "received" : "not_received",
+          issueKind: "damaged",
+        };
+      });
+    }
+    return o;
+  });
+  const setUnit = (id: string, patch: Partial<UnitState>) =>
+    setUnitStates((s) => ({
+      ...s,
+      [id]: {
+        ...(s[id] ?? { outcome: "not_received", issueKind: "damaged" }),
+        ...patch,
+      },
+    }));
+
+  /** A unit-checked line DERIVES its three numbers from the unit outcomes —
+   *  one arithmetic, shared with the payload and the evidence gate. A line
+   *  without governed Units keeps the typed counts. */
   const draftLines: WarehouseReceiptLineDraft[] = useMemo(
     () =>
-      lines.map((l) => ({
-        id: l.id,
-        sku: l.sku,
-        pendingDelivery: pendingOf(l),
-        receivedNow: recv[l.id] || 0,
-        damagedQty: dmg[l.id] || 0,
-        damagedPhotos: dmgPhotos[l.id] ?? [],
-        wrongItemQty: wrong[l.id] || 0,
-        wrongItemClaimType: wrongType[l.id] ?? null,
-        wrongItemPhotos: wrongPhotos[l.id] ?? [],
-        category: l.category,
-      })),
-    [lines, recv, dmg, wrong, dmgPhotos, wrongType, wrongPhotos],
+      lines.map((l) => {
+        const units = unitsBySku.get(l.sku) ?? [];
+        let receivedNow = recv[l.id] || 0;
+        let damagedQty = dmg[l.id] || 0;
+        let wrongItemQty = wrong[l.id] || 0;
+        if (units.length > 0) {
+          receivedNow = 0;
+          damagedQty = 0;
+          wrongItemQty = 0;
+          for (const u of units) {
+            const st = unitStates[u.id];
+            if (!st || st.outcome === "not_received") continue;
+            if (st.outcome === "received") receivedNow += 1;
+            else if (st.issueKind === "wrong_item") wrongItemQty += 1;
+            else damagedQty += 1;
+          }
+        }
+        return {
+          id: l.id,
+          sku: l.sku,
+          pendingDelivery: pendingOf(l),
+          receivedNow,
+          damagedQty,
+          damagedPhotos: dmgPhotos[l.id] ?? [],
+          wrongItemQty,
+          wrongItemClaimType: wrongType[l.id] ?? null,
+          wrongItemPhotos: wrongPhotos[l.id] ?? [],
+          category: l.category,
+        };
+      }),
+    [
+      lines,
+      recv,
+      dmg,
+      wrong,
+      dmgPhotos,
+      wrongType,
+      wrongPhotos,
+      unitsBySku,
+      unitStates,
+    ],
   );
 
   /** ONE gate — the same function the server mirrors statement for statement,
@@ -103,6 +191,9 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     [doNumber, doFilePath, draftLines],
   );
   const ready = problems.length === 0 && !submit.isPending;
+
+  /** The ONE per-line view the rows, the claim panels and the payload read. */
+  const viewBy = new Map(draftLines.map((d) => [d.id, d]));
 
   const totals = draftLines.reduce(
     (acc, l) => ({
@@ -145,27 +236,50 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
         doNumber: doNumber.trim(),
         doFilePath,
         note: note.trim() || undefined,
+        ...(arrivalEvidence.length > 0 ? { arrivalEvidence } : {}),
         lines: draftLines
           .filter(
             (l) => l.receivedNow > 0 || l.damagedQty > 0 || l.wrongItemQty > 0,
           )
-          .map((l) => ({
-            id: l.id,
-            receivedNow: l.receivedNow,
-            ...(l.damagedQty > 0
-              ? {
-                  damagedQty: l.damagedQty,
-                  damagedPhotos: [...l.damagedPhotos],
-                }
-              : {}),
-            ...(l.wrongItemQty > 0
-              ? {
-                  wrongItemQty: l.wrongItemQty,
-                  wrongItemClaimType: l.wrongItemClaimType ?? undefined,
-                  wrongItemPhotos: [...l.wrongItemPhotos],
-                }
-              : {}),
-          })),
+          .map((l) => {
+            const units = unitsBySku.get(l.sku) ?? [];
+            return {
+              id: l.id,
+              receivedNow: l.receivedNow,
+              // The unit outcomes ride the line — the derived numbers above
+              // and this list can never disagree (one arithmetic).
+              ...(units.length > 0
+                ? {
+                    units: units.map((u) => {
+                      const st = unitStates[u.id] ?? {
+                        outcome: "not_received" as const,
+                        issueKind: "damaged" as const,
+                      };
+                      return {
+                        unitCode: u.unit_code,
+                        outcome: st.outcome,
+                        ...(st.outcome === "received_with_issue"
+                          ? { issueKind: st.issueKind }
+                          : {}),
+                      };
+                    }),
+                  }
+                : {}),
+              ...(l.damagedQty > 0
+                ? {
+                    damagedQty: l.damagedQty,
+                    damagedPhotos: [...l.damagedPhotos],
+                  }
+                : {}),
+              ...(l.wrongItemQty > 0
+                ? {
+                    wrongItemQty: l.wrongItemQty,
+                    wrongItemClaimType: l.wrongItemClaimType ?? undefined,
+                    wrongItemPhotos: [...l.wrongItemPhotos],
+                  }
+                : {}),
+            };
+          }),
       });
       // COPY-STANDARD's done message for this direction of the pair, with the
       // PO and the DO it is about.
@@ -202,8 +316,13 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
         {lines.map((l) => {
           const pending = pendingOf(l);
-          const disabled = pending === 0;
-          const hasIssue = (dmg[l.id] || 0) > 0 || (wrong[l.id] || 0) > 0;
+          const units = unitsBySku.get(l.sku) ?? [];
+          const hasUnits = units.length > 0;
+          const disabled = pending === 0 && !hasUnits;
+          const v = viewBy.get(l.id);
+          const damagedNow = v?.damagedQty ?? 0;
+          const wrongNow = v?.wrongItemQty ?? 0;
+          const hasIssue = damagedNow > 0 || wrongNow > 0;
           return (
             <div key={l.id} className="border-t border-base-100">
               <div
@@ -219,61 +338,140 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                 <div className="font-mono text-meta text-right font-semibold">
                   {pending}
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  max={allowance(l.id, pending, "recv")}
-                  value={recv[l.id] || 0}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    setNum(
-                      setRecv,
-                      l.id,
-                      parseInt(e.target.value, 10) || 0,
-                      allowance(l.id, pending, "recv"),
-                    )
-                  }
-                  aria-label={`Good units for ${l.sku}`}
-                  data-testid={`warehouse-good-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={allowance(l.id, pending, "dmg")}
-                  value={dmg[l.id] || 0}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    setNum(
-                      setDmg,
-                      l.id,
-                      parseInt(e.target.value, 10) || 0,
-                      allowance(l.id, pending, "dmg"),
-                    )
-                  }
-                  aria-label={`Damaged units for ${l.sku}`}
-                  data-testid={`warehouse-damaged-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={allowance(l.id, pending, "wrong")}
-                  value={wrong[l.id] || 0}
-                  disabled={disabled}
-                  onChange={(e) =>
-                    setNum(
-                      setWrong,
-                      l.id,
-                      parseInt(e.target.value, 10) || 0,
-                      allowance(l.id, pending, "wrong"),
-                    )
-                  }
-                  aria-label={`Wrong item units for ${l.sku}`}
-                  data-testid={`warehouse-wrong-${l.sku}`}
-                  className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
-                />
+                {hasUnits ? (
+                  /* The three numbers are DERIVED from the unit outcomes below
+                     — read-only here, so the row and the outcomes can never
+                     disagree. */
+                  <div
+                    className="font-mono text-meta text-right"
+                    style={{ gridColumn: "3 / 6" }}
+                    data-testid={`warehouse-derived-${l.sku}`}
+                  >
+                    {v?.receivedNow ?? 0} good
+                    {damagedNow > 0 ? ` · ${damagedNow} damaged` : ""}
+                    {wrongNow > 0 ? ` · ${wrongNow} wrong item` : ""}
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      max={allowance(l.id, pending, "recv")}
+                      value={recv[l.id] || 0}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        setNum(
+                          setRecv,
+                          l.id,
+                          parseInt(e.target.value, 10) || 0,
+                          allowance(l.id, pending, "recv"),
+                        )
+                      }
+                      aria-label={`Good units for ${l.sku}`}
+                      data-testid={`warehouse-good-${l.sku}`}
+                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={allowance(l.id, pending, "dmg")}
+                      value={dmg[l.id] || 0}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        setNum(
+                          setDmg,
+                          l.id,
+                          parseInt(e.target.value, 10) || 0,
+                          allowance(l.id, pending, "dmg"),
+                        )
+                      }
+                      aria-label={`Damaged units for ${l.sku}`}
+                      data-testid={`warehouse-damaged-${l.sku}`}
+                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={allowance(l.id, pending, "wrong")}
+                      value={wrong[l.id] || 0}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        setNum(
+                          setWrong,
+                          l.id,
+                          parseInt(e.target.value, 10) || 0,
+                          allowance(l.id, pending, "wrong"),
+                        )
+                      }
+                      aria-label={`Wrong item units for ${l.sku}`}
+                      data-testid={`warehouse-wrong-${l.sku}`}
+                      className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta text-right bg-white outline-none focus:border-base-500"
+                    />
+                  </>
+                )}
               </div>
+
+              {/* One row per governed expected Unit: the code the supplier was
+                  told to write on the package, and what became of it. Wrapping
+                  flex rows with big selects — this form lives on a phone. */}
+              {units.map((u) => {
+                const st = unitStates[u.id] ?? {
+                  outcome: "not_received" as const,
+                  issueKind: "damaged" as const,
+                };
+                return (
+                  <div
+                    key={u.id}
+                    className="flex flex-wrap items-center gap-2 px-3.5 py-2 border-t border-dashed border-base-100"
+                    data-testid={`warehouse-unit-${u.unit_code}`}
+                  >
+                    <span className="font-mono text-meta text-base-700 min-w-[96px]">
+                      {u.unit_code}
+                    </span>
+                    <select
+                      value={st.outcome}
+                      onChange={(e) =>
+                        setUnit(u.id, {
+                          outcome: e.target.value as ReceivingUnitOutcome,
+                        })
+                      }
+                      aria-label={`Outcome for ${u.unit_code}`}
+                      data-testid={`warehouse-unit-outcome-${u.unit_code}`}
+                      className="flex-1 min-w-[150px] px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
+                    >
+                      {(
+                        [
+                          "received",
+                          "received_with_issue",
+                          "not_received",
+                        ] as const
+                      ).map((o) => (
+                        <option key={o} value={o}>
+                          {RECEIVING_UNIT_OUTCOME_LABEL[o]}
+                        </option>
+                      ))}
+                    </select>
+                    {st.outcome === "received_with_issue" && (
+                      <select
+                        value={st.issueKind}
+                        onChange={(e) =>
+                          setUnit(u.id, {
+                            issueKind: e.target.value as
+                              | "damaged"
+                              | "wrong_item",
+                          })
+                        }
+                        aria-label={`Issue kind for ${u.unit_code}`}
+                        data-testid={`warehouse-unit-issue-${u.unit_code}`}
+                        className="px-2 py-1.5 border border-base-300 rounded-[4px] text-meta bg-white outline-none focus:border-base-500"
+                      >
+                        <option value="damaged">Damaged</option>
+                        <option value="wrong_item">Wrong item</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* R2's claim panel, unchanged: it exists only once a problem has
                   actually been reported, so a clean delivery never sees it. */}
@@ -286,7 +484,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                     Photos Carres will show the factory
                   </div>
 
-                  {(dmg[l.id] || 0) > 0 && (
+                  {damagedNow > 0 && (
                     <ClaimPhotoUploadField
                       poId={po.po_id}
                       doNumber={doNumber || "count"}
@@ -294,12 +492,12 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                       onChange={(paths) =>
                         setDmgPhotos((prev) => ({ ...prev, [l.id]: paths }))
                       }
-                      label={`Photo of the damage (${dmg[l.id]} unit${(dmg[l.id] || 0) === 1 ? "" : "s"})`}
+                      label={`Photo of the damage (${damagedNow} unit${damagedNow === 1 ? "" : "s"})`}
                       testId={`warehouse-damaged-photos-${l.sku}`}
                     />
                   )}
 
-                  {(wrong[l.id] || 0) > 0 && (
+                  {wrongNow > 0 && (
                     <>
                       <div className="flex items-center gap-2 flex-wrap">
                         <label
@@ -335,7 +533,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
                         onChange={(paths) =>
                           setWrongPhotos((prev) => ({ ...prev, [l.id]: paths }))
                         }
-                        label={`Photo of the wrong item (${wrong[l.id]} unit${(wrong[l.id] || 0) === 1 ? "" : "s"})`}
+                        label={`Photo of the wrong item (${wrongNow} unit${wrongNow === 1 ? "" : "s"})`}
                         testId={`warehouse-wrong-photos-${l.sku}`}
                       />
                     </>
@@ -380,6 +578,24 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
             poId={po.po_id}
             doNumber={doNumber || "count"}
             onUploaded={(path) => setDoFilePath(path)}
+          />
+        </div>
+        {/* Arrival evidence is a DIFFERENT fact from the signed DO: what the
+            truck/pallet looked like when it arrived. Photo and video both
+            count (owner instruction §5C); optional, never a gate. */}
+        <div className="px-3 py-2.5 border border-dashed border-base-300 rounded-[4px] bg-white">
+          <div className="text-label text-base-600 mb-2 font-body">
+            Arrival evidence{" "}
+            <span className="text-base-400">
+              (photo or video of the goods as they arrived · ≤10 MB each)
+            </span>
+          </div>
+          <ArrivalEvidenceUploadField
+            poId={po.po_id}
+            doNumber={doNumber}
+            entries={arrivalEvidence}
+            onChange={setArrivalEvidence}
+            testId="warehouse-arrival-evidence"
           />
         </div>
         <div>

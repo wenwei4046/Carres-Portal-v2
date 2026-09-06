@@ -680,9 +680,14 @@ directory only and said so.*
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
   readable colour. It is not metadata and may not fall below the accessible contrast floor.
-  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18:** registers list
-  documents; the action clause renders only where actions live (My Work · Team Work · the Order
-  Route · detail panels), never in a register cell.
+  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18; extended 2026-09-04:**
+  registers list documents and authoritative facts; the action clause renders only where actions
+  live (My Work · Team Work · the Order Route · detail panels), never in a register cell — and
+  neither does an owner avatar, an owner name or a duty holder: a Register has no `Work` column.
+  A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
+  instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
+  avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
+  My Work, Team Work, the PO detail and Order Route.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -1013,6 +1018,20 @@ against the Register; at narrower desktop widths the Register scrolls horizontal
 rail is never squeezed below 240px. The rail is navigation, not batch selection — it carries
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
+
+**LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
+Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
+block: the header stays put while the filter groups scroll independently beneath it, separated
+by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
+month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
+it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
+instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
+it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
+keeps Sunday visible in the muted non-working state, and marks a day by printing a COUNT under
+the date with the same fact in the day's aria sentence — colour is never the only signal.
+Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the kit's exported
+DatePicker skin, dot markers, opens the week) predates the kit component by hours and migrates
+onto it in its own card — §6.1's second-occurrence rule; nobody draws a third month grid.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width

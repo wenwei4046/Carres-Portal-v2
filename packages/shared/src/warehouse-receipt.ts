@@ -29,6 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
+import { goodsCategoryWordOf } from "./line-category";
 import {
   receiveLineClaimProblems,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
@@ -69,7 +70,13 @@ export type WarehouseReceiptStatus =
 
 /** The words on screen. `Waiting Carres check` names WHO the receipt is waiting
  *  for — "Pending" would leave a warehouse clerk wondering whether they still
- *  have something to do (they do not). */
+ *  have something to do (they do not).
+ *
+ *  DOCUMENT STATUS WORDS (owner correction 2026-09-06): a GRN on the Register
+ *  is `Valid` or `Cancelled` — clear document words, the same pair every
+ *  formal document speaks. `Posted` / `Voided` remain internal database
+ *  statuses and never reach a normal user's screen; `Void Receiving` stays
+ *  the ACT's name (a door, not a status). */
 export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   WarehouseReceiptStatus,
   string
@@ -77,8 +84,8 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   draft: "Not sent yet",
   submitted: "Waiting Carres check",
   returned: "Sent back to recount",
-  posted: "Checked in by Carres",
-  voided: "Reversed",
+  posted: "Valid",
+  voided: "Cancelled",
 };
 
 export function warehouseReceiptStatusLabel(
@@ -325,6 +332,24 @@ export interface WarehouseReceiptRow {
     qty: number;
     status: string;
   }>;
+  /** 0426 — the formal GRN number stamped at posting. Null before posting and
+   *  on legacy sessions (those keep the derived display). */
+  grn_no?: string | null;
+  /** Where the goods PHYSICALLY arrived; null = the PO's booked warehouse.
+   *  Never overwrites Deliver To. */
+  actual_site_id?: string | null;
+  actual_site_name?: string | null;
+  arrival_evidence?: ReceivingArrivalEvidence[];
+  extra_lines?: ReceivingExtraLine[];
+  /** Evidence trio at posting: normal GRN Duty · dated cover · actual actor
+   *  (posted_by). Never collapsed into one name. */
+  posted_duty_holder_name?: string | null;
+  posted_duty_cover_name?: string | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  void_at?: string | null;
+  void_by_name?: string | null;
+  void_reason?: string | null;
+  unit_results?: ReceivingUnitResult[];
 }
 
 /** One open PO bound for this warehouse, as `warehouse_incoming_pos` returns
@@ -346,6 +371,14 @@ export interface WarehouseIncomingPo {
   eta_date: string | null;
   sup_status: string;
   lines: WarehouseIncomingLine[];
+  /** 0426 — the governed expected Units still incoming: the exact IDs the
+   *  supplier was told to write on the packages. One physical result each. */
+  expected_units?: Array<{
+    id: string;
+    unit_code: string;
+    sku: string;
+    status: string;
+  }>;
   /** Non-null when a count is already waiting for Carres — the PO must not
    *  offer a second form. */
   open_receipt_id: string | null;
@@ -379,4 +412,320 @@ export function receivingRecordNo(
   const date = r.goods_received_at ?? (r.submitted_at ?? "").slice(0, 10);
   if (!date) return "—";
   return docNumber({ prefix: "GRN", date, seed: r.id, revision });
+}
+
+// ── The 2026-09-04 owner instruction — stored GRN, Actual Site, unit
+//    outcomes, extra goods, amend/void ───────────────────────────────────────
+
+/**
+ * The number a Receiving Record shows.
+ *
+ * 0426 stamps the FORMAL `GRN-YYYYMMDD-RRRR` from the daily document pool at
+ * posting; sessions posted before it keep the derived legacy display. One
+ * function, so no surface can print two numbers for one delivery.
+ */
+export function receivingDisplayNo(r: {
+  id: string;
+  grn_no?: string | null;
+  goods_received_at?: string;
+  submitted_at?: string;
+}): string {
+  const stored = (r.grn_no ?? "").trim();
+  if (stored) return stored;
+  return receivingRecordNo(r);
+}
+
+/**
+ * One physical result per governed Unit (ERP-ARCHITECTURE §3.4, owner ruling
+ * 2026-09-01): `Expected Units = Received Units + Not received Units`, and
+ * `Received with issue` is a SUBSET of received — never counted twice.
+ */
+export type ReceivingUnitOutcome =
+  | "received"
+  | "received_with_issue"
+  | "not_received";
+
+export const RECEIVING_UNIT_OUTCOME_LABEL: Record<ReceivingUnitOutcome, string> =
+  {
+    received: "Received",
+    received_with_issue: "Received with issue",
+    not_received: "Not received",
+  };
+
+export interface ReceivingUnitResult {
+  stock_item_id: string;
+  unit_code: string;
+  outcome: ReceivingUnitOutcome;
+  issue_kind?: "damaged" | "wrong_item" | null;
+  note?: string | null;
+}
+
+/** Arrival evidence supports both photo and video (owner instruction §5C). */
+export interface ReceivingArrivalEvidence {
+  path: string;
+  kind: "photo" | "video";
+}
+
+/** Extra goods are recorded separately: they never enter Inventory and never
+ *  alter ordered/pending arithmetic (owner instruction §6). */
+export interface ReceivingExtraLine {
+  sku: string;
+  qty: number;
+  note?: string | null;
+}
+
+export function receivingExtraQty(
+  lines: readonly ReceivingExtraLine[] | null | undefined,
+): number {
+  return (lines ?? []).reduce((n, l) => n + Math.max(0, num(l.qty)), 0);
+}
+
+/**
+ * RECEIVING SUMMARY — the five governed quantity words for a source's lines
+ * (`purchasing/MASTER.md` §5.8 / COPY-STANDARD): each fact prints its own
+ * number; the operator never subtracts. Damaged/wrong never reduce
+ * `Pending Delivery Qty`.
+ */
+export interface ReceivingSummary {
+  orderQty: number;
+  receivedQty: number;
+  damagedQty: number;
+  wrongItemQty: number;
+  pendingDeliveryQty: number;
+}
+
+export function receivingSummaryOf(
+  poLines: readonly {
+    qty: number;
+    received_qty: number;
+    damaged_qty?: number | null;
+    wrong_item_qty?: number | null;
+  }[],
+): ReceivingSummary {
+  let orderQty = 0;
+  let receivedQty = 0;
+  let damagedQty = 0;
+  let wrongItemQty = 0;
+  for (const l of poLines) {
+    orderQty += Math.max(0, num(l.qty));
+    receivedQty += Math.max(0, num(l.received_qty));
+    damagedQty += Math.max(0, num(l.damaged_qty));
+    wrongItemQty += Math.max(0, num(l.wrong_item_qty));
+  }
+  return {
+    orderQty,
+    receivedQty,
+    damagedQty,
+    wrongItemQty,
+    pendingDeliveryQty: Math.max(0, orderQty - receivedQty),
+  };
+}
+
+/** `Pending Delivery Qty after save: {n}` — the quiet line beside Save. */
+export function pendingDeliveryAfterSave(
+  lines: readonly {
+    pendingDelivery: number;
+    receivedNow: number;
+  }[],
+): number {
+  return lines.reduce(
+    (n, l) => n + Math.max(0, l.pendingDelivery - Math.max(0, l.receivedNow)),
+    0,
+  );
+}
+
+/**
+ * THE RECEIVING BUTTON LAW (COPY-STANDARD): the Save button names the FIRST
+ * missing fact, top to bottom — `Save — add a DO number` · `Save — upload
+ * signed DO` · `Save — count at least one unit` — or reads `Save Receiving`
+ * when nothing is missing. ONE copy, shared by the button, the tests and the
+ * server's twin refusals.
+ */
+export function receivingSaveBlocker(d: {
+  doNumber: string;
+  doFilePath: string | null;
+  counted: number;
+  overCounted: boolean;
+  claimProblems: readonly ReceiveLineClaimProblem[];
+}): string | null {
+  if (d.doNumber.trim().length < WAREHOUSE_DO_NUMBER_MIN)
+    return "Save — add a DO number";
+  if (!d.doFilePath) return "Save — upload signed DO";
+  if (d.counted === 0) return "Save — count at least one unit";
+  if (d.overCounted)
+    return "Save — lower Receive now, the line counts more than is owed";
+  if (d.claimProblems.length > 0)
+    return `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
+  return null;
+}
+
+/**
+ * THE RECEIVING RAIL'S CATEGORY VOCABULARY (owner correction 2026-09-06).
+ *
+ * Exactly these five rows, in exactly this order — the shared display order
+ * every Operation page speaks (mattress → bedframe → sofa → pillow →
+ * protector; `lineSortRank`'s own sequence). No `Any`, no `All …`, no
+ * `Accessory`, no `Topper`/`Footrest`/`Service`, no invented category. A
+ * receiving whose goods answer none of these five simply lights no row.
+ */
+export const RECEIVING_CATEGORY_ROWS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+] as const;
+
+export type ReceivingCategoryRow = (typeof RECEIVING_CATEGORY_ROWS)[number];
+
+/**
+ * The category words ONE receiving record answers to — derived through the
+ * governed shared ladder (`goodsCategoryWordOf`: recorded → catalog →
+ * classifier), never a receiving-local SKU rule. Only lines the delivery
+ * actually counted (good, damaged or wrong) speak; a zero line is the PO's
+ * fact, not this arrival's. Returned in the rail's own order, unique.
+ *
+ * `categoryBySku` is the catalog's answer (`product_models.category` via the
+ * one shared reader); an absent SKU falls to the ladder's measured-gap branch
+ * exactly as the Sales Orders register does.
+ */
+export function receiptCategoryWords(
+  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  categoryBySku: ReadonlyMap<string, string>,
+): ReceivingCategoryRow[] {
+  const seen = new Set<string>();
+  for (const l of lines ?? []) {
+    if (
+      countedOnLine({
+        receivedNow: num(l.received_now),
+        damagedQty: num(l.damaged_qty),
+        wrongItemQty: num(l.wrong_item_qty),
+      }) <= 0
+    )
+      continue;
+    seen.add(
+      goodsCategoryWordOf({
+        sku: l.sku,
+        category: categoryBySku.get(l.sku) ?? null,
+      }),
+    );
+  }
+  return RECEIVING_CATEGORY_ROWS.filter((w) => seen.has(w));
+}
+
+/** The governed labels for who saved a posting (never a rewritten owner). */
+export const RECEIVING_AUTHORITY_LABEL: Record<string, string> = {
+  grn_duty: "GRN Duty",
+  cover: "GRN Duty cover",
+  superuser: "Operations Superuser",
+};
+
+// ── The Work Engine feed (owner-approved 2026-08-29 slice) ──────────────────
+
+/** The five governed strings for the receiving queue (COPY-STANDARD's
+ *  Purchasing action table — the canonical home; never respelled). */
+export const RECEIVING_WORK_WORDS = {
+  queue: "Goods to receive",
+  /** Row line — composed as `Check in {document} from {supplier}`. */
+  rowLine: (document: string, supplier: string) =>
+    `Check in ${document} from ${supplier}`,
+  button: "Start receiving",
+  done: (received: number, pending: number) =>
+    `GRN posted · ${received} received · ${pending} pending delivery`,
+  empty: "No supplier delivery is ready to receive.",
+} as const;
+
+export interface ReceivingWorkSource {
+  /** Warehouse counts waiting for the Carres check — always executable. */
+  submitted: readonly {
+    id: string;
+    po_id: string;
+    supplier_name: string | null;
+    goods_received_at?: string;
+    submitted_at: string;
+  }[];
+  /** Open POs whose supplier date has arrived and which still owe goods —
+   *  the arrival/physical trigger (the anti-spam rule: outstanding quantity
+   *  alone never makes a row). */
+  arrivalsDue: readonly {
+    po_id: string;
+    supplier_name: string | null;
+    eta_date: string | null;
+    pending_qty: number;
+  }[];
+}
+
+/**
+ * The Receiving projection into My Work / Team Work. Pure; the caller
+ * resolves GRN Duty through the shared resolver and passes it in — a page
+ * never resolves duty itself (Law F.1).
+ */
+export function receivingWorkItems(
+  src: ReceivingWorkSource,
+  ctx: { grnDuty: { userId: string; name: string | null } | null },
+  todayIso: string,
+  workingDaysLate: (dueIso: string) => number,
+): Array<{
+  ruleKey: "receiving.check_in";
+  module: "receiving";
+  soRef: string;
+  orderId: string;
+  action: string;
+  ownerName: string | null;
+  ownerUserId: string | null;
+  ownerDuty?: string;
+  tone: "warning" | "info";
+  locked: boolean;
+  broken: boolean;
+  dueIso: string | null;
+  workingDaysLate: number;
+  /** The exact deep link — the session when one exists, else the source PO. */
+  receiptId: string | null;
+  poId: string;
+}> {
+  const today = todayIso.slice(0, 10);
+  const owner = ctx.grnDuty
+    ? { ownerName: ctx.grnDuty.name, ownerUserId: ctx.grnDuty.userId }
+    : { ownerName: null, ownerUserId: null, ownerDuty: "GRN Duty" };
+  const out: ReturnType<typeof receivingWorkItems> = [];
+  const covered = new Set<string>();
+  for (const r of src.submitted) {
+    covered.add(r.po_id);
+    const due = r.goods_received_at ?? r.submitted_at.slice(0, 10);
+    out.push({
+      ruleKey: "receiving.check_in",
+      module: "receiving",
+      soRef: `Receiving · ${r.supplier_name ?? r.po_id}`,
+      orderId: r.id,
+      action: RECEIVING_WORK_WORDS.rowLine(r.po_id, r.supplier_name ?? "the supplier"),
+      ...owner,
+      tone: "warning",
+      locked: false,
+      broken: false,
+      dueIso: due,
+      workingDaysLate: due && today > due ? workingDaysLate(due) : 0,
+      receiptId: r.id,
+      poId: r.po_id,
+    });
+  }
+  for (const p of src.arrivalsDue) {
+    if (covered.has(p.po_id)) continue;
+    if (!p.eta_date || p.eta_date > today || p.pending_qty <= 0) continue;
+    out.push({
+      ruleKey: "receiving.check_in",
+      module: "receiving",
+      soRef: `Receiving · ${p.supplier_name ?? p.po_id}`,
+      orderId: p.po_id,
+      action: RECEIVING_WORK_WORDS.rowLine(p.po_id, p.supplier_name ?? "the supplier"),
+      ...owner,
+      tone: "info",
+      locked: false,
+      broken: false,
+      dueIso: p.eta_date,
+      workingDaysLate: today > p.eta_date ? workingDaysLate(p.eta_date) : 0,
+      receiptId: null,
+      poId: p.po_id,
+    });
+  }
+  return out;
 }

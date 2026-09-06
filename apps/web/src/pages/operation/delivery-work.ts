@@ -74,12 +74,6 @@ export const DW = {
   railRegion: "REGION",
   railLogistics: "LOGISTICS",
   railAll: "All",
-  /** Sub-headings inside REGION (owner ruling 2026-09-01): East Malaysia is a
-   *  different journey (HOUZS owns it beyond the handover), and Singapore is
-   *  the two-leg journey — each stands visibly apart from the plain
-   *  Peninsular states, which are listed by their own names, never merged. */
-  railEastMalaysia: "EAST MALAYSIA",
-  railSingapore: "SINGAPORE",
   /** A scope Delivery has not yet fixed an operational date for. */
   noConfirmedDate: "No confirmed date",
   /**
@@ -147,12 +141,6 @@ export const GOVERNED_LOGISTICS = [
   "SSY",
   "HOUZS",
 ] as const;
-
-/** The rail key for a scope nobody is carrying yet. */
-export const NO_LOGISTICS_KEY = "__none";
-/** The two dateless rail buckets. Every other key is a real ISO date. */
-export const NO_DATE_KEY = "__no_date";
-export const OVERDUE_KEY = "__overdue";
 
 /** One parent row: a delivery scope, or one leg of a Delivery Journey. */
 export interface DeliveryScopeRow {
@@ -544,193 +532,17 @@ export function buildDeliveryScopeRows({
   return rows;
 }
 
-/** Which rail bucket a scope's confirmed date falls in. */
-export function dateBucketOf(row: DeliveryScopeRow, todayIso: string): string {
-  if (!row.confirmedIso) return NO_DATE_KEY;
-  return row.confirmedIso < todayIso ? OVERDUE_KEY : row.confirmedIso;
-}
-
-export interface RailItem {
-  key: string;
-  label: string;
-  count: number;
-  /** A non-clickable sub-heading row inside a rail group (REGION's
-   *  `EAST MALAYSIA` / `SINGAPORE`). It filters nothing and counts nothing. */
-  heading?: boolean;
-}
-
-/**
- * THE DELIVERY DATE RAIL — two named facts, then the real calendar.
+/* ── THE REGION CLASSIFICATION — the ONE address classifier ─────────────────
  *
- * `No confirmed date` first because it is the largest pile of work on a manual
- * planning screen, `Overdue` second because it is the loudest, then one row
- * per actual day, ascending. **Never `Today`, never `Tomorrow`** (owner ruling
- * 2026-08-15): the operator reads the weekday off the date itself, so the date
- * has to say which day it is. The caller supplies the printed date string —
- * this file decides the ORDER and the COUNTS, `fmt-date.ts` decides the
- * spelling, and neither borrows the other's job.
+ * `regionBucketOf` answers *which direct state/jurisdiction is this scope
+ * going to?* (owner correction 2026-09-06: the rail lists these names FLAT —
+ * the EAST MALAYSIA / SINGAPORE sub-heading grammar is retired). Detection
+ * reuses `@/lib/region` (state names, aliases, postcodes); a Journey leg is
+ * classified by its DESTINATION — leg 1 of a Singapore journey is a KL → JB
+ * run and counts under Johor. A row whose address resolves to no state joins
+ * no region row and stays reachable while no region is picked; fixing its
+ * address is Sales work through `Open Sales Order to change`.
  */
-/**
- * How many days ahead the rail always shows, work or no work. Owner ruling
- * 2026-08-24: *"Show the near-term operating dates even when count is zero."*
- *
- * A planning rail that lists only the days that already hold something can
- * never be used to PLAN — the operator cannot see that Thursday is empty,
- * because Thursday is not on it. Seven days is the horizon the team books
- * within (production/booking lead times, `docs/purchasing/MASTER.md`), and it
- * is a constant here rather than a setting because nobody has asked to tune it.
- */
-export const NEAR_TERM_DAYS = 7;
-
-/** The next `NEAR_TERM_DAYS` Delivery operating dates, excluding Sunday. */
-export function nearTermDates(
-  todayIso: string,
-  days = NEAR_TERM_DAYS,
-  /* Owner ruling 2026-09-01: logistics runs six days — a Sunday or a Malaysian
-     public holiday is never GENERATED as a plannable choice (ACTION-FLOW Law 2A,
-     the Delivery calendar). A scope genuinely recorded on one still reaches the
-     rail through its own count: evidence is never hidden, only the empty
-     generated choice is. */
-  holidays: ReadonlySet<string> = new Set(),
-): string[] {
-  const out: string[] = [];
-  const [y, m, d] = todayIso.slice(0, 10).split("-").map(Number);
-  const wanted = Math.max(0, Math.trunc(days));
-  /* The i < 60 guard is a runaway stop, far beyond any real run of closed days. */
-  for (let i = 0; out.length < wanted && i < 60; i += 1) {
-    /* UTC arithmetic on a bare date: adding a day must never be a timezone
-       question, and `Date.UTC` is the one place in this file that touches a
-       clock-shaped API without asking what time it is. */
-    const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + i));
-    const iso = t.toISOString().slice(0, 10);
-    if (t.getUTCDay() !== 0 && !holidays.has(iso)) out.push(iso);
-  }
-  return out;
-}
-
-export function buildDateRail(
-  rows: DeliveryScopeRow[],
-  todayIso: string,
-  fmt: (iso: string) => string,
-  /* ⭐ A PICKED ROW NEVER DISAPPEARS. The rail draws only the days that hold
-     scopes, so a day whose last scope moves away would vanish while its choice
-     was still on the URL — leaving an empty listing and no visible control to
-     undo it. A chosen day stays on the rail at 0 until the operator unpicks it. */
-  picked: ReadonlySet<string> = new Set(),
-  /** Malaysian public holidays — excluded from the GENERATED window only. */
-  holidays: ReadonlySet<string> = new Set(),
-): RailItem[] {
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    const key = dateBucketOf(r, todayIso);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const days = [
-    ...new Set([
-      ...counts.keys(),
-      /* The near-term operating window is ALWAYS on the rail — an empty
-         Thursday is a fact a planner needs, not a row to hide. */
-      ...nearTermDates(todayIso, NEAR_TERM_DAYS, holidays),
-      ...[...picked].filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY),
-    ]),
-  ]
-    .filter((k) => k !== NO_DATE_KEY && k !== OVERDUE_KEY)
-    .sort();
-  return [
-    { key: NO_DATE_KEY, label: DW.noConfirmedDate, count: counts.get(NO_DATE_KEY) ?? 0 },
-    { key: OVERDUE_KEY, label: DW.overdue, count: counts.get(OVERDUE_KEY) ?? 0 },
-    ...days.map((iso) => ({ key: iso, label: fmt(iso), count: counts.get(iso) ?? 0 })),
-  ];
-}
-
-/**
- * THE LOGISTICS RAIL — the governed roster first, always, then whoever else is
- * genuinely carrying something.
- *
- * `All` leads and is active when nothing is picked. The seven governed partners
- * follow in the owner's ruled order and stay visible at zero. A partner outside
- * that list appears only while it holds a scope — that is what "future active
- * governed partners" buys without turning the rail into a copy of the partner
- * table. `No logistics picked` is last and appears only when scopes have none;
- * it is the workspace's first real question, and without it those scopes are
- * reachable from `All` alone.
- */
-export function buildLogisticsRail(
-  rows: DeliveryScopeRow[],
-  partners: { id: string; name: string }[],
-  /* Same rule as the date rail: an ungoverned partner is admitted only while
-     it is carrying something, EXCEPT while it is the operator's own choice. */
-  picked: ReadonlySet<string> = new Set(),
-): RailItem[] {
-  const countByName = new Map<string, number>();
-  let none = 0;
-  for (const r of rows) {
-    if (!r.logisticsName) {
-      none += 1;
-      continue;
-    }
-    countByName.set(r.logisticsName, (countByName.get(r.logisticsName) ?? 0) + 1);
-  }
-  const governed = new Set<string>(GOVERNED_LOGISTICS);
-  const items: RailItem[] = GOVERNED_LOGISTICS.map((name) => ({
-    key: name,
-    label: name,
-    count: countByName.get(name) ?? 0,
-  }));
-  const extra = [...new Set([...partners.map((p) => p.name), ...picked])]
-    .filter(
-      (name) =>
-        name !== NO_LOGISTICS_KEY &&
-        !governed.has(name) &&
-        ((countByName.get(name) ?? 0) > 0 || picked.has(name)),
-    )
-    .sort((a, b) => a.localeCompare(b))
-    .map((name) => ({ key: name, label: name, count: countByName.get(name) ?? 0 }));
-  const tail =
-    none > 0 || picked.has(NO_LOGISTICS_KEY)
-      ? [{ key: NO_LOGISTICS_KEY, label: DW.noLogistics, count: none }]
-      : [];
-  return [...items, ...extra, ...tail];
-}
-
-/** Does this row survive the picked date buckets? Empty set = every date. */
-export function matchesDate(
-  row: DeliveryScopeRow,
-  picked: ReadonlySet<string>,
-  todayIso: string,
-): boolean {
-  return picked.size === 0 || picked.has(dateBucketOf(row, todayIso));
-}
-
-/** Does this row survive the picked partners? Empty set = every partner. */
-export function matchesLogistics(row: DeliveryScopeRow, picked: ReadonlySet<string>): boolean {
-  if (picked.size === 0) return true;
-  return picked.has(row.logisticsName ?? NO_LOGISTICS_KEY);
-}
-
-/* ── THE REGION RAIL — owner ruling 2026-09-01 ──────────────────────────────
- *
- * The rail's third group answers *where is each scope going?* in the words the
- * address actually carries:
- *
- *   - Peninsular states are listed BY THEIR OWN NAMES, never merged and never
- *     bucketed under an `Other` — a row appears while its state genuinely
- *     holds a scope (the same admission rule the LOGISTICS rail applies to a
- *     partner outside the governed roster).
- *   - `EAST MALAYSIA` is a fixed sub-heading with Sabah and Sarawak beneath it,
- *     always visible: it is a DIFFERENT journey (HOUZS owns it beyond the
- *     handover, owner ruling 2026-09-01), not just another state.
- *   - `SINGAPORE` is a fixed sub-heading with Singapore beneath it, always
- *     visible: the two-leg journey's home. Leg 1 (KL → JB) counts under
- *     Johor — the truck the planner sees on the JB run — and leg 2 under
- *     Singapore.
- *
- * State detection reuses the ONE classifier (`@/lib/region` — state names,
- * aliases, postcodes). A row whose address resolves to no state joins no
- * region row and stays reachable through `All`; fixing its address is Sales
- * work through `Open Sales Order to change`.
- */
-export const EAST_MALAYSIA_STATES = ["Sabah", "Sarawak", "Labuan"] as const;
 export const SINGAPORE_KEY = "Singapore";
 
 /** The customer's own state — the STRUCTURED column first (a native order
@@ -769,45 +581,6 @@ export function regionBucketOf(row: DeliveryScopeRow): string | null {
     return customerRegionOf(row.o);
   }
   return customerRegionOf(row.o);
-}
-
-export function buildRegionRail(
-  rows: DeliveryScopeRow[],
-  /* Same law as the other two rails: a picked row never disappears — a chosen
-     state stays listed at 0 until the operator unpicks it. */
-  picked: ReadonlySet<string> = new Set(),
-): RailItem[] {
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    const key = regionBucketOf(r);
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const east = new Set<string>(EAST_MALAYSIA_STATES);
-  const peninsular = [...new Set([...counts.keys(), ...picked])]
-    .filter((k) => k !== SINGAPORE_KEY && !east.has(k))
-    .sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a.localeCompare(b));
-  const items: RailItem[] = peninsular.map((k) => ({
-    key: k,
-    label: k,
-    count: counts.get(k) ?? 0,
-  }));
-  items.push({ key: "__east__", label: DW.railEastMalaysia, count: 0, heading: true });
-  for (const s of EAST_MALAYSIA_STATES) {
-    /* Sabah and Sarawak are always visible; Labuan only while it holds one. */
-    if (s === "Labuan" && !(counts.get(s) ?? 0) && !picked.has(s)) continue;
-    items.push({ key: s, label: s, count: counts.get(s) ?? 0 });
-  }
-  items.push({ key: "__sg__", label: DW.railSingapore, count: 0, heading: true });
-  items.push({ key: SINGAPORE_KEY, label: SINGAPORE_KEY, count: counts.get(SINGAPORE_KEY) ?? 0 });
-  return items;
-}
-
-/** Does this row survive the picked regions? Empty set = everywhere. A row
- *  that resolves to no region joins no row and survives only the empty set. */
-export function matchesRegion(row: DeliveryScopeRow, picked: ReadonlySet<string>): boolean {
-  if (picked.size === 0) return true;
-  const key = regionBucketOf(row);
-  return key != null && picked.has(key);
 }
 
 /**

@@ -122,15 +122,19 @@ export interface PortalModule {
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
  *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Inventory` is the one current Unit Register and the module's landing page
- *  until `Dashboard` is built, at which point that page's own approved scope
- *  may change this destination (Stock MASTER §7: the daily journey OPENS on
- *  Dashboard). */
-export const WAREHOUSE_LANDING_KEY = "stock";
+ *  `Dashboard` is live (Warehouse Card 03) and the daily journey OPENS on it
+ *  (Stock MASTER §7), so the named landing moved from Inventory to Dashboard
+ *  — by name, never derived from row order. */
+export const WAREHOUSE_LANDING_KEY = "wh-dashboard";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
+  /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
+   * Orders → Delivery Order → Edit Delivery. The first two are navigation,
+   * so Delivery is a module again; the object and the writer stay doors on
+   * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
+  { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
@@ -249,6 +253,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
+       * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
+       * Receiving & GRN card). Modules reference duties; they never keep a
+       * second person list. */
+      { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
@@ -288,7 +297,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        *   `Purchase Demands`       `purchase_demand` is hidden canonical truth,
        *                            not a page an operator is sent to
        *   `Consignment Overview`   the Stock Register reports supplier-owned
-       *   `Consignment Receipts`   Units, and `Goods Receipts` is the ONE
+       *   `Consignment Receipts`   Units, and `Receiving` is the ONE
        *                            physical receipt engine
        *   `Report` + its hairline  reports are central / Register exports
        *
@@ -336,7 +345,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * the rest of receiving (returns to warehouse, put-away) will land. It
        * receives purchased AND consignment goods — there is no second receipt
        * engine (`docs/purchasing/MASTER.md` §4). */
-      { key: "receiving", label: "Goods Receipts", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
+      /* `Receiving` is the exact destination word (owner correction 2026-08-29,
+       * ERP-ARCHITECTURE §2.1): it names the physical operation. `Goods
+       * Receipts` is retired as navigation — the GRN stays the DOCUMENT's
+       * noun, never a page name. */
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },
@@ -359,16 +372,26 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      /* THE DELIVERY MODULE'S PAGES — TWO, and both of them open
-       * Owner ruling 2026-08-24: arrangement and formal DO truth share one
-       * Delivery listing. A one-page destination is a direct row, not a
-       * chevron that reveals one child of the same name. The historical DO
-       * object path remains a valid deep link and lights this same row. */
+      /* THE DELIVERY MODULE'S PAGES — TWO NAVIGATION DESTINATIONS
+       * (CARD-2026-09-04-delivery-01). Monitor is the calendar the operator
+       * plans the day on; Delivery Orders is the restored formal-document
+       * register. The DO object page and Edit Delivery are reached from
+       * cards and rows, never from the rail. Monitor leads: it is the
+       * module's flagship and the collapsed icon's landing (first live row). */
       {
         key: "delivery",
-        label: "Delivery",
+        label: "Monitor",
         icon: Route,
-        activeFor: ["tab:delivery", "path:/operation/delivery-orders"],
+        activeFor: ["tab:delivery"],
+        section: "Delivery",
+      },
+      {
+        key: "delivery-orders",
+        label: "Delivery Orders",
+        icon: FileText,
+        path: "/operation/delivery-orders",
+        activeFor: ["path:/operation/delivery-orders"],
+        section: "Delivery",
       },
       /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner-approved Blueprint,
        * 2026-09-01 — Stock MASTER §2, ERP-ARCHITECTURE §2.1;
@@ -390,7 +413,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         key: "wh-dashboard",
         label: "Dashboard",
         icon: LayoutDashboard,
-        soon: true,
+        tab: "warehouse-dashboard",
         section: "Warehouse",
       },
       { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, soon: true, section: "Warehouse" },
@@ -399,7 +422,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         key: "wh-outbound",
         label: "Outbound",
         icon: ArrowUpRight,
-        soon: true,
+        tab: "warehouse-outbound",
         section: "Warehouse",
       },
       { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
@@ -455,7 +478,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       },
       {
         key: "payments",
-        label: "Order Payments",
+        // Payment MASTER §16 — the destination word is `Payments`; the row
+        // opens the canonical receipt Register.
+        label: "Payments",
         icon: Wallet,
         financePath: "/finance/payments",
       },

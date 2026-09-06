@@ -301,19 +301,36 @@ describe("POST /:id/payments", () => {
 // DELETE /api/operation/orders/:id/payments/:pid
 // =====================================================================
 describe("DELETE /:id/payments/:pid", () => {
-  it("403 for operation role (principal only)", async () => {
-    const jwt = await makeJwt("operation");
+  it("403 for a dealer before anything reads", async () => {
+    const jwt = await makeJwt("dealer");
     const res = await app.fetch(
       new Request(`http://t/api/operation/orders/${ORDER_ID}/payments/${PAY_ID}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "keyed twice" }),
       }),
       env,
     );
     expect(res.status).toBe(403);
   });
 
-  it("200 — principal voids through payment_void; the row is never deleted (CARD 4)", async () => {
+  it("422 — a void with no reason is refused before SQL (0430)", async () => {
+    const sb = makeSb({}, { data: null, error: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("principal");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments/${PAY_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "  " }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.calls.rpc).toHaveLength(0);
+  });
+
+  it("200 — the reason reaches payment_void; the row is never deleted (CARD 4 · 0430)", async () => {
     const sb = makeSb(
       {},
       { data: { payment_id: PAY_ID, orders_paid: 2000 }, error: null },
@@ -323,7 +340,8 @@ describe("DELETE /:id/payments/:pid", () => {
     const res = await app.fetch(
       new Request(`http://t/api/operation/orders/${ORDER_ID}/payments/${PAY_ID}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${jwt}` },
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "keyed twice" }),
       }),
       env,
     );
@@ -332,7 +350,23 @@ describe("DELETE /:id/payments/:pid", () => {
     expect(sb.calls.deletes).toBe(0);
     const rpc = sb.calls.rpc[0] as { name: string; args: Record<string, unknown> };
     expect(rpc.name).toBe("payment_void");
-    expect(rpc.args).toMatchObject({ p_payment_id: PAY_ID });
+    expect(rpc.args).toMatchObject({ p_payment_id: PAY_ID, p_reason: "keyed twice" });
+  });
+
+  it("operation reaches the SQL door, which decides by Payment Approver duty (0430)", async () => {
+    const sb = makeSb({}, { data: null, error: { code: "42501", message: "forbidden" } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments/${PAY_ID}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "keyed twice" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect((sb.calls.rpc[0] as { name: string }).name).toBe("payment_void");
   });
 });
 

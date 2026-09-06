@@ -39,9 +39,29 @@ export const recordHandoverInput = z
     note: z.string().trim().max(500).optional(),
     /** Object key under handover/{delivery_order_id}/ — required for Handed Over. */
     proofPath: z.string().min(1).max(500).optional(),
+    /** Warehouse Card 03 — the exact Unit IDs this batch physically hands
+     *  over. Required for `handed_over` on a DO with a recorded exact-Unit
+     *  scope; the server refuses codes outside that scope and Units already
+     *  accepted (a partial batch changes only its own Units). */
+    unitCodes: z.array(z.string().trim().min(1).max(40)).min(1).max(200).optional(),
   })
   .strict();
 export type RecordHandoverInput = z.infer<typeof recordHandoverInput>;
+
+/** The three per-Unit preparation facts, in their governed order. */
+export const WAREHOUSE_PREP_FACTS = ["scanned", "checked", "packed"] as const;
+export type WarehousePrepFact = (typeof WAREHOUSE_PREP_FACTS)[number];
+
+/** POST /api/operation/delivery-orders/:id/outbound-prep —
+ *  record scan / check / pack for exact Units of one DO scope. Duplicate
+ *  facts are reconciled idempotently by the governed door. */
+export const recordOutboundPrepInput = z
+  .object({
+    fact: z.enum(WAREHOUSE_PREP_FACTS),
+    unitCodes: z.array(z.string().trim().min(1).max(40)).min(1).max(200),
+  })
+  .strict();
+export type RecordOutboundPrepInput = z.infer<typeof recordOutboundPrepInput>;
 
 /** POST /api/operation/delivery-orders/:id/handover-proof/sign-upload —
  *  same photo family as the delivery photo (0280): photos only, 10 MiB. */

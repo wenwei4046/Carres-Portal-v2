@@ -43,8 +43,9 @@ export interface PurchasingRefusalFacts {
   actor?: string | null;
   /** The line's own requested quantity — the approved-quantity ceiling. */
   qty?: number | null;
-  /** 0422 — the Delivery Date asked for, and the earliest date the items can
-   *  arrive. Both arrive already formatted for the surface printing them. */
+  /** 0422 — the Delivery Date asked for, and the earliest Delivery Date a
+   *  Manual Purchase may ask for (Proceed Date + the Purchasing Settings
+   *  number). Both arrive already formatted for the surface printing them. */
   date?: string | null;
   earliest?: string | null;
 }
@@ -219,6 +220,14 @@ export function purchasingRefusal(
         wrong: "The same buying line is on two purchase orders.",
         todo: "Go back to buying and tick the line once.",
       };
+    /* 0430 — a fully covered line stays VISIBLE as a receipt (T6), but it may
+       never be issued again: production minted six purchase orders for one
+       1-unit demand because nothing downstream of the receipt refused it. */
+    case "already_on_po":
+      return {
+        wrong: `An open purchase order${facts.po ? ` (${facts.po})` : ""} already covers this line.`,
+        todo: "Nothing to buy here. Check the covering purchase order instead.",
+      };
     case "sofa_merge":
       return {
         wrong: "One sofa purchase order carries one customer order.",
@@ -323,10 +332,10 @@ export function purchasingRefusal(
         wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
       };
-    /* 0422 — the Purchasing Settings switch is on and the asked-for Delivery
-       Date is before the earliest date the picked items can arrive (their
-       production + transit working days, the same arithmetic that proposed
-       the date). The act names the one fix: move the date. */
+    /* 0422 — the asked-for Delivery Date is before the earliest a Manual
+       Purchase may ask for: Proceed Date + `manual_purchase_min_delivery_days`
+       (calendar days, Purchasing Settings). The act names the one fix: move
+       the date. */
     case "delivery_date_before_earliest":
       return {
         wrong: `Delivery Date ${some(facts.date, "asked for")} is earlier than the earliest date ${some(
@@ -455,6 +464,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_build",
   "duplicate_demand",
   "duplicate_build",
+  "already_on_po",
   "sofa_merge",
   "unknown_request",
   "not_ready_to_order",

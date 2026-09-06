@@ -14,6 +14,7 @@ import {
   autoBedSkuDescription,
   canonicalSize,
   supplierSlug,
+  supplierCreateInput,
   guaranteeVisitsTotal,
   type GuaranteeKind,
 } from "@carres/shared";
@@ -181,7 +182,14 @@ export default function NewSkuModal({
   const [newSupplierName, setNewSupplierName] = useState("");
   const [newSupplierKind, setNewSupplierKind] =
     useState<"own_logistics" | "factory_pickup">("factory_pickup");
-  const [newSupplierCats, setNewSupplierCats] = useState<ProductCategory[]>([]);
+  const [newSupplierCats, setNewSupplierCats] = useState<Array<"mattress" | "bedframe" | "sofa">>([]);
+  const [newSupplierDays, setNewSupplierDays] = useState<Record<string, string>>({});
+  const [newSupplierOffDays, setNewSupplierOffDays] = useState<number[]>([0]);
+  const supplierSetup = supplierCreateInput.safeParse({
+    name: newSupplierName, kind: newSupplierKind, catCovered: newSupplierCats,
+    productionDays: newSupplierCats.map(category => ({ category, workingDays: Number(newSupplierDays[category]) })),
+    offDays: newSupplierOffDays,
+  });
   /* ⭐ A DUPLICATE IS CAUGHT BEFORE THE ROUND-TRIP, AND IS NOT A DEAD END
    * (2026-08-25). The server refuses a second supplier with the same derived
    * slug, correctly — but a red toast saying "already a supplier, pick it from
@@ -290,12 +298,14 @@ export default function NewSkuModal({
             setNewSupplierName("");
             /* Pre-tick the category being keyed: it is the answer nine times
                out of ten, and it is the one fact this modal already knows. */
-            setNewSupplierCats(effectiveCategory ? [effectiveCategory] : []);
+            setNewSupplierCats(effectiveCategory === "mattress" || effectiveCategory === "bedframe" || effectiveCategory === "sofa" ? [effectiveCategory] : []);
+            setNewSupplierDays({});
+            setNewSupplierOffDays([0]);
           }}
           className="mt-1.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2"
           data-testid="new-sku-supplier-add-open"
         >
-          + New supplier
+          Add Supplier
         </button>
       )}
       {isPrincipal && newSupplierOpen && (
@@ -304,7 +314,7 @@ export default function NewSkuModal({
           data-testid="new-sku-supplier-add"
         >
           <label className="block">
-            <span className="label block mb-1">New supplier name</span>
+            <span className="label block mb-1">Supplier Name</span>
             <input
               value={newSupplierName}
               onChange={(e) => setNewSupplierName(e.target.value)}
@@ -314,7 +324,7 @@ export default function NewSkuModal({
             />
           </label>
           <label className="block">
-            <span className="label block mb-1">How the goods leave the factory</span>
+            <span className="label block mb-1">Delivery Method</span>
             <select
               value={newSupplierKind}
               onChange={(e) =>
@@ -323,14 +333,14 @@ export default function NewSkuModal({
               data-testid="new-sku-supplier-add-kind"
               className={INPUT_CLS}
             >
-              <option value="factory_pickup">We collect from the factory</option>
-              <option value="own_logistics">They deliver to us</option>
+              <option value="own_logistics">Supplier delivers</option>
+              <option value="factory_pickup">We collect</option>
             </select>
           </label>
           <div className="block">
-            <span className="label block mb-1">What they supply</span>
+            <span className="label block mb-1">Product Categories</span>
             <div className="flex flex-wrap gap-1.5">
-              {PRODUCT_CATEGORIES.map((cat) => {
+              {(["mattress", "bedframe", "sofa"] as const).map((cat) => {
                 const on = newSupplierCats.includes(cat);
                 return (
                   <button
@@ -354,11 +364,30 @@ export default function NewSkuModal({
                 );
               })}
             </div>
-            <div className="mt-1 text-meta text-base-500">
-              Ticking a category lets Carres pick this supplier on its own. You can always choose
-              them by hand instead.
-            </div>
+
           </div>
+          {newSupplierCats.map(cat => (
+            <label className="block" key={cat}>
+              <span className="label block mb-1">{CATEGORY_LABEL[cat]} · Production Days</span>
+              <input type="number" min={1} max={180} step={1} required
+                value={newSupplierDays[cat] ?? ""}
+                onChange={e => setNewSupplierDays(prev => ({ ...prev, [cat]: e.target.value }))}
+                data-testid={`new-sku-supplier-add-days-${cat}`} className={INPUT_CLS} />
+              <span className="text-meta text-base-500">working days</span>
+            </label>
+          ))}
+          <fieldset>
+            <legend className="label block mb-1">Supplier work week</legend>
+            <div className="flex flex-wrap gap-2">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, day) => (
+                <label key={day} className="text-meta">
+                  <input type="checkbox" checked={!newSupplierOffDays.includes(day)}
+                    onChange={() => setNewSupplierOffDays(prev => prev.includes(day)
+                      ? prev.filter(value => value !== day) : [...prev, day])} /> {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           {existingSupplierMatch && (
             <div
               className="flex flex-wrap items-center gap-2 text-meta text-base-700"
@@ -386,17 +415,14 @@ export default function NewSkuModal({
             <button
               type="button"
               disabled={
-                newSupplierName.trim().length < 2 ||
+                !supplierSetup.success ||
                 createSupplier.isPending ||
                 existingSupplierMatch !== null
               }
               onClick={async () => {
                 try {
-                  const { supplier } = await createSupplier.mutateAsync({
-                    name: newSupplierName.trim(),
-                    kind: newSupplierKind,
-                    catCovered: newSupplierCats,
-                  });
+                  if (!supplierSetup.success) return;
+                  const { supplier } = await createSupplier.mutateAsync(supplierSetup.data);
                   /* Select it immediately — the keyer asked for this supplier
                      because they are keying its SKU right now. */
                   setSupplierId(supplier.id);
@@ -410,7 +436,7 @@ export default function NewSkuModal({
               className="btn-primary text-meta"
               data-testid="new-sku-supplier-add-save"
             >
-              {createSupplier.isPending ? "Adding…" : "Add supplier"}
+              {createSupplier.isPending ? "Adding…" : "Add Supplier"}
             </button>
             <button
               type="button"

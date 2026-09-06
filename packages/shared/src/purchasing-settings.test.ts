@@ -32,7 +32,7 @@ const SETTINGS: PurchasingSettings = {
   orderByBufferDays: 7,
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
-  manualPurchaseEnforceEarliestDate: false,
+  manualPurchaseMinDeliveryDays: 0,
   poDays: [1, 3, 5],
   suppliers: [
     { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
@@ -217,11 +217,12 @@ describe("the wire refuses what the database would refuse", () => {
     ).toBe(false);
   });
 
-  it("only the three single numbers are settable by key", () => {
+  it("only the four single numbers are settable by key", () => {
     expect(PURCHASING_NUMBER_KEYS).toEqual([
       "order_by_buffer_days",
       "earliest_sell_days",
       "logistics_call_working_days",
+      "manual_purchase_min_delivery_days",
     ]);
     expect(isPurchasingNumberKey("production_days")).toBe(false);
     expect(purchasingSetNumberInput.safeParse({ key: "po_days", value: 3 }).success).toBe(false);

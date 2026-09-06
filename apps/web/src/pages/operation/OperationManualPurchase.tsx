@@ -21,12 +21,14 @@ import {
   manualPurchaseItemsSummary,
   manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
+  manualPurchaseObjectHeading,
   manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchasePoSummary,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseStatusOf,
   manualPurchaseSupplierSummary,
   manualPurchaseTimingOf,
@@ -61,6 +63,7 @@ import {
 } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { addDaysIso } from "@/lib/excel-date-filter";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useAlreadyOnPo,
@@ -109,7 +112,9 @@ function addDaysToIso(iso: string, days: number): string {
  * The permanent right-side Register: one Manual Purchase request per parent
  * row, complete history by default (ordered records included — `All not
  * ordered` is Card 03's explicit rail filter, never a silent default), the
- * eleven governed columns in the Card's exact order, the read-only
+ * ten governed columns in Card 08's exact order (no visible document
+ * number — before `Issue PO` a Manual Purchase has none; after it the only
+ * purchasing identity is the actual `PO No`), the read-only
  * expansion, and selection that admits ONLY `Ready to order` remainder.
  * PO Duty appears nowhere until a selection exists, then once, beside the
  * issue action (the SO Batch sibling grammar).
@@ -163,7 +168,6 @@ interface ExpansionLine {
 
 interface RequestRegisterRow {
   id: string;
-  reqNo: string;
   purpose: string;
   /** Card 06 §3.1 — the actual hand-off fact (`created_at`), immutable. */
   proceedDate: string;
@@ -271,7 +275,6 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
     );
     return {
       id: r.id,
-      reqNo: r.req_no,
       purpose: r.purpose,
       proceedDate: r.created_at,
       approval: manualPurchaseApprovalOf({
@@ -368,19 +371,22 @@ export default function OperationManualPurchase() {
   const navigate = useNavigate();
   const issue = useIssuePurchaseRequests();
 
-  /* Card 06 §7 — a Work action deep-links the exact MPR:
-     `?tab=manual-purchase&mpr={id}` opens the object directly. The param is
-     consumed so `‹ Manual Purchase` returns to the Register, not a loop. */
+  /* Card 06 §7 / Card 08 — a Work action deep-links the exact request by
+     its invisible UUID: `?tab=manual-purchase&mp={id}` opens the object
+     directly (`mpr` survives as a read-only alias for pre-Card-08
+     bookmarks). The param is consumed so `‹ Manual Purchase` returns to
+     the Register, not a loop. */
   const [searchParams, setSearchParams] = useSearchParams();
-  const linkedMpr = searchParams.get("mpr");
+  const linkedRequest = searchParams.get("mp") ?? searchParams.get("mpr");
   useEffect(() => {
-    if (!linkedMpr) return;
-    setMode({ detail: linkedMpr });
+    if (!linkedRequest) return;
+    setMode({ detail: linkedRequest });
     const next = new URLSearchParams(searchParams);
+    next.delete("mp");
     next.delete("mpr");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedMpr]);
+  }, [linkedRequest]);
 
   const rows = useMemo(
     () => (q.data ? buildRows(q.data) : []),
@@ -474,6 +480,13 @@ export default function OperationManualPurchase() {
   );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
+  /** The sentence beside a row the tick refuses; null when it may be ticked.
+   *  A row still waiting for approval already says so in the same cell, so
+   *  it gets no second line. */
+  const deadReason = (r: RequestRegisterRow) =>
+    r.status.kind === "waiting_approval"
+      ? null
+      : manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
   const selectedRows = useMemo(
     () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
     [filtered, selected],
@@ -597,31 +610,24 @@ export default function OperationManualPurchase() {
                 {approverLine}
               </span>
             ) : null}
+            {/* A DEAD TICK SAYS WHY (MPR-20260904-8935, 2026-09-04). The row
+                read `Approved`, Approved Qty 0, Still To Order 0, and its
+                checkbox was greyed with nothing on screen naming the cause —
+                the SO Batch Deliver To cell's defect (#1056), met again here.
+                The sentence comes from the same two facts the tick reads, so
+                it can never disagree with the checkbox. */}
+            {deadReason(r) ? (
+              <span
+                className="block text-label font-normal text-kit-amber-11"
+                data-testid="mp-row-dead-reason"
+              >
+                {deadReason(r)}
+              </span>
+            ) : null}
           </span>
         ),
         searchValue: (r) => r.approval.label,
         filterValue: (r) => r.approval.label,
-      },
-      {
-        key: "mpr_no",
-        label: MW.colMprNo,
-        width: 168,
-        sortable: true,
-        filterType: "numbering",
-        accessor: (r) => (
-          <button
-            type="button"
-            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-              setMode({ detail: r.id });
-            }}
-          >
-            {r.reqNo}
-          </button>
-        ),
-        searchValue: (r) => r.reqNo,
-        filterValue: (r) => r.reqNo,
       },
       {
         key: "po_no",
@@ -629,8 +635,9 @@ export default function OperationManualPurchase() {
         width: 150,
         sortable: true,
         accessor: (r) => {
-          /* ONLY real lineage (Card 04 §3.4): none / the clickable number /
-             `{n} POs` — the exact mapping lives in the expansion. */
+          /* ONLY real lineage (Card 04 §3.4; Card 08 §3.2): `—` is a fact,
+             never a button; ONE PO is the clickable document; several open
+             the object's exact linked PO list. */
           if (r.poNos.length === 1) {
             return (
               <button
@@ -643,6 +650,22 @@ export default function OperationManualPurchase() {
                 }}
               >
                 {r.poNos[0]}
+              </button>
+            );
+          }
+          if (r.poNos.length > 1) {
+            return (
+              <button
+                type="button"
+                className="text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`mp-po-list-${r.id}`}
+                title="Open the linked Purchase Orders"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMode({ detail: r.id });
+                }}
+              >
+                {manualPurchasePoSummary(r.poNos)}
               </button>
             );
           }
@@ -679,13 +702,29 @@ export default function OperationManualPurchase() {
         label: MW.colFor,
         width: 170,
         sortable: true,
+        /* Card 08 §3.2 — `For` is the clear single-click entrance to the
+           Manual Purchase object (the retired number column's one job); the
+           row's deep-link identity stays the invisible UUID. */
         accessor: (r) => (
-          <span className="block truncate" title={r.forText}>
-            {r.forText}
-          </span>
+          <button
+            type="button"
+            className="block max-w-full truncate text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            title={r.forText || purposeLabelOf(r.purpose)}
+            data-testid={`mp-open-${r.id}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMode({ detail: r.id });
+            }}
+          >
+            {/* A historical row whose structured For was never stored still
+                needs its entrance — the purpose word stands in, never a
+                number and never an empty button. */}
+            {r.forText || purposeLabelOf(r.purpose)}
+          </button>
         ),
         searchValue: (r) => r.forText,
         filterValue: (r) => r.forText,
+        exportValue: (r) => r.forText,
       },
       {
         key: "items",
@@ -767,7 +806,8 @@ export default function OperationManualPurchase() {
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
           supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
-          enforceEarliestDate={q.data?.enforceEarliestDate === true}
+          minDeliveryDays={q.data?.minDeliveryDays ?? 0}
+          todayIso={q.data?.todayIso ?? null}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -777,7 +817,7 @@ export default function OperationManualPurchase() {
     );
   }
 
-  /* Card 05 §3 — clicking the MPR number opens WORK: the full-width object
+  /* Card 05 §3 / Card 08 §3.2 — the `For` cell opens WORK: the full-width object
      replaces the Register content. The Register stays MOUNTED underneath
      (visibility only), so `‹ Manual Purchase` restores the complete state
      the operator left — rail filters, search, column filters, sort, scroll
@@ -1011,8 +1051,10 @@ export default function OperationManualPurchase() {
             }
             groupBanner={false}
             /* The identity survives horizontal scrolling — the DataGrid's
-               governed capability, pinned on the Manual Purchase No. */
-            stickyIdentity={{ columnKey: "mpr_no" }}
+               governed capability, pinned on the business fact `For`
+               (Card 08 §3.2: the sticky column is a fact, never a hidden
+               number). */
+            stickyIdentity={{ columnKey: "for" }}
             expandable={{
               renderExpansion: (r) => <RequestExpansion row={r} />,
               testId: (r) => `mp-expand-${r.id}`,
@@ -1108,7 +1150,22 @@ export default function OperationManualPurchase() {
         <ManualPurchaseObject
           key={detailId}
           id={detailId}
-          registerReqNo={detailRow?.reqNo ?? null}
+          registerHeading={
+            detailRow
+              ? {
+                  identity: manualPurchaseObjectHeading({
+                    purposeLabel: purposeLabelOf(detailRow.purpose),
+                    forText: detailRow.forText,
+                  }),
+                  context: [
+                    fmtDate(detailRow.proceedDate.slice(0, 10)),
+                    detailRow.supplierText,
+                  ]
+                    .filter((part) => part !== "")
+                    .join(" · "),
+                }
+              : null
+          }
           position={
             gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
           }
@@ -1324,15 +1381,20 @@ function CreateRequestWorkspace({
   defaultDestinationId,
   supplierCollections,
   staff,
-  enforceEarliestDate,
+  minDeliveryDays,
+  todayIso,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
   defaultDestinationId: string | null;
   supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
-  /** 0422 — the Purchasing Settings switch, as the Register read it. */
-  enforceEarliestDate: boolean;
+  /** 0422 — Purchasing Settings' calendar days after the Proceed Date, as
+   *  the Register read it. 0 means no floor. */
+  minDeliveryDays: number;
+  /** The server's Malaysia date — the Proceed Date fallback while the plan
+   *  has not answered yet. */
+  todayIso: string | null;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -1498,18 +1560,25 @@ function CreateRequestWorkspace({
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
   const dateOk = deliveryDate !== "";
-  /** 0422 — with the Purchasing Settings switch on, a chosen date before the
-   *  plan's earliest date is refused HERE in the door's own words, so the
-   *  person moves it before Send rather than after a 422. Switch off: the
-   *  earliest date stays a proposal. No plan default (a lead-days gap, or
-   *  the plan unavailable) means no floor and no refusal — the server
-   *  refuses nothing it cannot compute, and neither does this form. */
+  /** 0422 — the earliest Delivery Date a Manual Purchase may ask for is the
+   *  Proceed Date + Purchasing Settings' calendar days. The Proceed Date is
+   *  the one this form already shows from `/plan` (today on the server),
+   *  falling back to the Register's `todayIso`. A chosen date before that
+   *  floor is refused HERE in the door's own words, so the person moves it
+   *  before Send rather than after a 422. 0 days: no floor, no sentence.
+   *  The plan's proposed date is a proposal only and is NOT combined with
+   *  this floor. */
+  const proceedDateIso = plan.data?.proceedDate ?? todayIso;
+  const earliestDeliveryDate =
+    minDeliveryDays > 0 && proceedDateIso != null
+      ? addDaysIso(proceedDateIso, minDeliveryDays)
+      : null;
   const dateTooEarly =
-    enforceEarliestDate && dateOk && planDefault != null && deliveryDate < planDefault;
+    dateOk && earliestDeliveryDate != null && deliveryDate < earliestDeliveryDate;
   const dateTooEarlyWords = dateTooEarly
     ? purchasingRefusal("delivery_date_before_earliest", {
         date: fmtDate(deliveryDate),
-        earliest: fmtDate(planDefault!),
+        earliest: fmtDate(earliestDeliveryDate),
       })
     : null;
 
@@ -2381,12 +2450,10 @@ function ApprovalLineRow({
   index: number;
 }) {
   const onPo = useAlreadyOnPo(line.sku);
+  /* `Still Needed` is printed for the approver to read, never typed in for
+     them — the Approved Qty is seeded by the object from the requested
+     quantity (see `ManualPurchaseObject`). */
   const still = stillNeededOf(line.qty, free, onPo.data?.alreadyOnPo ?? 0);
-  const seeded = value !== undefined;
-  useEffect(() => {
-    if (!seeded && onPo.data) onChange(String(still));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onPo.data]);
   const qty = Number(value);
   const cost = line.unit_cost ?? null;
   return (
@@ -2458,15 +2525,17 @@ function TwoLines({
 
 function ManualPurchaseObject({
   id,
-  registerReqNo,
+  registerHeading,
   position,
   onStep,
   onBack,
 }: {
   id: string;
-  /** The Register row's own number — the header identity prints instantly
-   *  while the object read is in flight. */
-  registerReqNo: string | null;
+  /** The Register row's own business heading (Card 08 §3.3 — `{Need for} ·
+   *  {For}` plus the quieter `{Proceed Date} · {supplier}` context) — the
+   *  header prints instantly while the object read is in flight. No number,
+   *  no UUID. */
+  registerHeading: { identity: string; context: string } | null;
   /** The filtered Register position (`4 of 69`) — context, never truth;
    *  null when the open object left the filtered list. */
   position: { index: number; total: number } | null;
@@ -2485,7 +2554,14 @@ function ManualPurchaseObject({
   const navigate = useNavigate();
   const decide = useDecidePurchaseRequest();
 
-  /** The approver's per-line numbers — seeded once from `Still Needed`. */
+  /** The approver's per-line numbers, seeded once per line from the REQUESTED
+   *  quantity the moment the detail read lands. Field-guide defect 23: this
+   *  used to be seeded inside each row from `Still Needed`, which is
+   *  `qty − free − already on PO` — two separate reads (the pick-items list and
+   *  the already-have read), and the seed fired when the SECOND arrived using
+   *  whatever the FIRST had returned by then. So the field could open at 0 from
+   *  a half-read, and a click on Approve saved that 0 as the decision. The
+   *  request's own ask is one fact from one read; the approver cuts it down. */
   const [cuts, setCuts] = useState<Record<string, string>>({});
   const [refusing, setRefusing] = useState(false);
   const [refuseReason, setRefuseReason] = useState("");
@@ -2494,7 +2570,54 @@ function ManualPurchaseObject({
   );
 
   const d = q.data;
-  const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+  /* Card 08 §3.3 — the object header speaks business facts only:
+     `{Need for} · {For}` as the identity, `{Proceed Date} · {supplier}` as
+     the quieter context. The loaded object recomputes them from its own
+     read; until it lands, the Register row's hand-off prints. No MPR, no
+     UUID, in the heading or the browser title. */
+  const loadedHeading = (() => {
+    if (!d) return null;
+    const destNameById = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
+    const liveL = d.lines.filter((l) => l.cancelled_at === null);
+    const supNameById = new Map(d.suppliers.map((s) => [s.id, s.name]));
+    return {
+      identity: manualPurchaseObjectHeading({
+        purposeLabel: purposeLabelOf(d.request.purpose),
+        forText: manualPurchaseForOf({
+          purpose: d.request.purpose,
+          destinationName: destNameById.get(d.request.destination_id) ?? null,
+          serviceCaseNo: d.serviceCaseNo,
+          staffName: d.request.for_staff_user_id
+            ? (d.users.find((u) => u.id === d.request.for_staff_user_id)?.name ?? null)
+            : null,
+          subsidiaryName: d.request.for_subsidiary_name,
+          why: d.request.why,
+        }),
+      }),
+      context: [
+        fmtDate(d.request.created_at.slice(0, 10)),
+        manualPurchaseSupplierSummary(
+          liveL.map((l) =>
+            l.supplier_id ? (supNameById.get(l.supplier_id) ?? "") : "",
+          ),
+        ),
+      ]
+        .filter((part) => part !== "")
+        .join(" · "),
+    };
+  })();
+  const heading = loadedHeading ??
+    registerHeading ?? { identity: MW.page, context: "" };
+  useEffect(() => {
+    if (!d) return;
+    setCuts((c) => {
+      const next = { ...c };
+      for (const l of d.lines) {
+        if (l.cancelled_at === null && next[l.id] === undefined) next[l.id] = String(l.qty);
+      }
+      return next;
+    });
+  }, [d]);
 
   const status = d
     ? manualPurchaseStatusOf({
@@ -2553,7 +2676,8 @@ function ManualPurchaseObject({
      another source of row truth. ─────────────────────────────────────── */
   const header = (
     <SalesOrderTabs
-      identity={reqNo}
+      identity={heading.identity}
+      customer={heading.context || null}
       status={
         status ? (
           <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
@@ -2565,7 +2689,7 @@ function ManualPurchaseObject({
         event.preventDefault();
         onBack();
       }}
-      docTitle={reqNo ? `${reqNo} — Carres` : undefined}
+      docTitle={`${MW.page} — Carres`}
       right={
         position ? (
           <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
@@ -2676,6 +2800,11 @@ function ManualPurchaseObject({
       const n = Number(cuts[l.id]);
       return cuts[l.id] !== undefined && Number.isInteger(n) && n >= 0 && n <= l.qty;
     });
+  /* Approving EVERY line at 0 is a refusal wearing the wrong button: the
+     status arithmetic derives `Not going ahead` from it, with no reason on
+     record (MPR-20260904-8935). One line at 0 among others is a legitimate
+     partial cut and stays allowed. */
+  const allZero = cutsReady && live.every((l) => Number(cuts[l.id]) === 0);
 
   /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
   const haveRows: Array<{ sku: string; requestedQty: number }> = [];
@@ -2942,6 +3071,13 @@ function ManualPurchaseObject({
                     todo={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).todo}
                   />
                 ) : null}
+                {allZero ? (
+                  <TwoLines
+                    testId="mp-approve-zero"
+                    wrong="Every line is approved at 0."
+                    todo="Refuse the request instead."
+                  />
+                ) : null}
                 {decideError ? (
                   <TwoLines
                     testId="mp-decide-error"
@@ -2989,7 +3125,7 @@ function ManualPurchaseObject({
                   {/* The ONE primary action in this section (Card 05 §3.5). */}
                   <Button
                     variant="primary"
-                    disabled={!cutsReady}
+                    disabled={!cutsReady || allZero}
                     loading={decide.isPending}
                     onClick={() => void submitDecision("approve")}
                     data-testid="mp-approve"

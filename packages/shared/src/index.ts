@@ -93,11 +93,6 @@ export {
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
   purchasingSetWorkWeekInput,
-  PURCHASING_SWITCH_KEYS,
-  isPurchasingSwitchKey,
-  purchasingSetSwitchInput,
-  type PurchasingSwitchKey,
-  type PurchasingSetSwitchInput,
   type PurchasingCategory,
   type PurchasingNumberKey,
   type PurchasingProductionDays,
@@ -503,6 +498,12 @@ export {
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
+  // 0426 — Amend / Void doors for a posted GRN.
+  receivingAmendInput,
+  receivingVoidInput,
+  // 0425 — Workspace → Staff & Duties.
+  workspaceAssignDutyInput,
+  workspaceCoverDutyInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -985,6 +986,10 @@ export {
   poArrivalGapOf,
   poCurrentActionOf,
   poDateHistoryOf,
+  poSupplierReplyOf,
+  poSupplierDeliveryDateOf,
+  poReplyDateOf,
+  poRecordedReplyOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,
@@ -1147,7 +1152,39 @@ export {
   type WarehouseIncomingLine,
   type WarehouseIncomingPo,
   type WarehouseIncomingResponse,
+  // 0426 · the 2026-09-04 owner instruction — stored GRN, Actual Site, unit
+  // outcomes, extra goods, the save-blocker law and the Work feed.
+  receivingDisplayNo,
+  receivingSummaryOf,
+  receivingExtraQty,
+  pendingDeliveryAfterSave,
+  receivingSaveBlocker,
+  receivingWorkItems,
+  RECEIVING_UNIT_OUTCOME_LABEL,
+  RECEIVING_AUTHORITY_LABEL,
+  RECEIVING_WORK_WORDS,
+  // 2026-09-06 owner correction — the Register is the GRN record; the rail
+  // speaks exactly five governed category rows through the shared ladder.
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
+  type ReceivingCategoryRow,
+  type ReceivingUnitOutcome,
+  type ReceivingUnitResult,
+  type ReceivingArrivalEvidence,
+  type ReceivingExtraLine,
+  type ReceivingSummary,
+  type ReceivingWorkSource,
 } from "./warehouse-receipt";
+// 2026-09-06 owner correction (Receiving page) — server-side GRN Register
+// pagination/facets and the rail Calendar's expected-arrival markers, one
+// arithmetic for the Worker and the page's tests alike.
+export {
+  buildGrnRegisterView,
+  expectedArrivalCounts,
+  type GrnRegisterFactRow,
+  type GrnRegisterSelection,
+  type GrnRegisterView,
+} from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
@@ -1811,6 +1848,11 @@ export {
   lineKind,
   lineSortRank,
   defaultLineLocation,
+  // The governed category-word ladder (2026-09-06) — extracted from the SO
+  // register footer so Receiving and Sales Orders speak one rule.
+  GOODS_CATEGORY_WORDS,
+  goodsCategoryWordOf,
+  type GoodsCategoryWord,
   type CoreCat,
   type LineClass,
   type ItemKind,
@@ -2039,10 +2081,14 @@ export {
   DELIVERY_HANDOVER_KINDS,
   handoverGoodsLineSchema,
   recordHandoverInput,
+  recordOutboundPrepInput,
   signHandoverProofUploadInput,
+  WAREHOUSE_PREP_FACTS,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type RecordOutboundPrepInput,
   type SignHandoverProofUploadInput,
+  type WarehousePrepFact,
 } from "./schemas/delivery-handover";
 export {
   isWorkingDay,
@@ -2061,6 +2107,16 @@ export {
   type DeliveryWarehouseScheduleEventKind,
   type DeliveryWarehouseScheduleInput,
 } from "./delivery-warehouse-schedule";
+export {
+  WAREHOUSE_DASHBOARD_DATE_COUNT,
+  WAREHOUSE_OFF_DAYS,
+  warehouseEmptyDaySentence,
+  warehouseOperatingDates,
+  warehouseOutboundCards,
+  warehouseRangeShift,
+  warehouseUnitPendingReason,
+  type WarehouseOutboundCard,
+} from "./warehouse-outbound";
 export {
   MY_HOLIDAYS_2026,
   MY_HOLIDAYS_2027_EARLY,
@@ -2174,6 +2230,10 @@ export {
   manualPurchaseRailModel,
   manualPurchaseWorkOrder,
   manualPurchaseWorkItems,
+  manualPurchaseWorkContext,
+  manualPurchaseObjectHeading,
+  manualPurchaseSourceSummary,
+  manualPurchaseSourceLine,
   manualPurchaseLineRemainingOf,
   manualPurchasePoSummary,
   manualPurchaseItemsSummary,
@@ -2181,6 +2241,7 @@ export {
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   stillNeededOf,
@@ -2921,5 +2982,12 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Workspace foundation — company-wide owner-Duty assignments, cover resolution,
+// and immutable actor evidence. Capability/permission duties remain separate.
+export * from "./workspace-duty";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
+
+export { recordSupplierReplyInput } from "./schemas/operation";
+
+export { purchaseOrderReplyWorkItems } from "./purchase-order-register";

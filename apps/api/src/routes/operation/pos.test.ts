@@ -301,7 +301,7 @@ describe("GET /api/operation/pos", () => {
         },
       ],
       demands: [{ id: "demand-1", request_id: "request-1", purpose: "showroom" }],
-      requests: [{ id: "request-1", req_no: "PR-20260828-0042" }],
+      requests: [{ id: "request-1", created_at: "2026-08-28T02:00:00Z" }],
     });
 
     const jwt = await makeJwt("operation");
@@ -321,9 +321,17 @@ describe("GET /api/operation/pos", () => {
         }>;
       }>;
     };
+    /* Card 08 §3.5 — the visible reference is the LABEL; identity is the
+       request UUID plus the business facts, never a request number. */
     expect(body.pos[0]?.sources).toEqual([
       { kind: "sales_order", reference: "SO-4001" },
-      { kind: "manual_purchase", reference: "PR-20260828-0042" },
+      {
+        kind: "manual_purchase",
+        reference: "Manual Purchase",
+        request_id: "request-1",
+        purpose: "showroom",
+        proceed_date: "2026-08-28",
+      },
     ]);
     expect(body.pos[0]?.purchase_order_lines[0]?.sources).toEqual([
       expect.objectContaining({ so: 4001, qty: 1 }),
@@ -331,7 +339,14 @@ describe("GET /api/operation/pos", () => {
     expect(body.pos[0]?.purchase_order_lines[0]).toEqual(expect.objectContaining({
       governed_sources: [
         { kind: "sales_order", reference: "SO-4001", qty: 1 },
-        { kind: "manual_purchase", reference: "PR-20260828-0042", qty: 1 },
+        {
+          kind: "manual_purchase",
+          reference: "Manual Purchase",
+          qty: 1,
+          request_id: "request-1",
+          purpose: "showroom",
+          proceed_date: "2026-08-28",
+        },
       ],
     }));
     expect(
@@ -2725,5 +2740,40 @@ describe("opening an app records an OPEN, and completes nothing", () => {
     // The open door does not touch the evidence function, and vice versa.
     const openBlock = src.slice(src.indexOf('post("/:id/sends"'), src.indexOf('post("/:id/confirm-sent"'));
     expect(openBlock).not.toContain("purchasing_confirm_po_sent");
+  });
+});
+
+
+describe("POST evidenced supplier reply", () => {
+  /* 0430 — ONE date on the wire; the server classifies it. `answer` and the
+     firstDate/newDate pair are gone from the schema. */
+  const input = { poVersion: 2, supplierDate: "2026-09-10", channel: "whatsapp", recipient: "Factory group", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T01:00:00Z" };
+  async function post(body: unknown, role = "operation") {
+    return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/tomorrow-delivery", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("submits the exact version and evidence through one caller-authenticated RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { reply_id: "reply" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    expect((await post(input)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_reply", { p_po_id: "PO-TEST", p_reply: input });
+  });
+  it("rejects incomplete evidence before any database call", async () => {
+    for (const key of ["poVersion", "supplierDate", "channel", "recipient", "evidence", "reportedBy", "reportedAt"]) {
+      const body = { ...input } as Record<string, unknown>; delete body[key];
+      expect((await post(body)).status).toBe(422);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("surfaces a concurrent revision as a named refusal", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "stale_po_version", message: "Open the current PO and record the supplier answer." } }) } as any);
+    const response = await post(input);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "stale_po_version" });
+  });
+  it("rejects a dealer", async () => {
+    expect((await post(input, "dealer")).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
   });
 });

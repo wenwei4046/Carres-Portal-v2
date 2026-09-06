@@ -2,11 +2,16 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   caseProductCategory,
+  pendingDeliveryAfterSave,
   poLineReportable,
-  poReceivingProgress,
   receiveLineClaimProblems,
+  receivingSaveBlocker,
+  receivingSummaryOf,
+  RECEIVING_UNIT_OUTCOME_LABEL,
   wrongItemClaimTypesFor,
-  RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
+  type ReceivingArrivalEvidence,
+  type ReceivingExtraLine,
+  type ReceivingUnitOutcome,
 } from "@carres/shared";
 import { fmtDateShort } from "@/lib/fmt-date";
 import {
@@ -14,54 +19,41 @@ import {
   usePoReceiving,
   type operationPoListRow,
   type ReceivingEvent,
+  type ReceivingExpectedUnit,
   type SupplierRow,
 } from "@/lib/queries";
 import DOFileUploadField from "@/components/DOFileUploadField";
 import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
+import ArrivalEvidenceUploadField from "@/components/ArrivalEvidenceUploadField";
 import { DOC_BTN, DOC_TH, DocSection as Section, Prop } from "./workspace-doc";
 
 /**
- * ReceivingWorkspace — Slice B, the Office Receiving Workspace for ONE PO.
+ * ReceivingWorkspace — the pre-start Receiving object and the active Session
+ * (owner instruction 2026-09-04 §5B/§5C).
  *
  * ```
- * Read Mode → [ Start Receiving ] → Receiving Mode → Save → Posted
+ * Pre-start object → [ Start Receiving ] → Session → Save Receiving → posted GRN
  * ```
  *
- * Approved by Jess 2026-08-03. It is the Purchase Orders Workspace's shape,
- * because the Purchasing module has ONE Workspace template — a continuous
- * working document, hairline small-caps sections, 24px property rows, ONE loud
- * element. Only the CONTENT differs, and here the content answers Receiving's
- * own four questions:
+ * The Session is FULL-WIDTH, ONE SCROLL (UI MASTER §4.1 — a Goods Receipt
+ * never splits), in the instruction's order: header/source facts · Receiving
+ * Details · Unit checking · exceptions and evidence · Receiving Summary ·
+ * posting consequences · sticky action area.
  *
- *   RECEIVING SUMMARY  "what has this PO taken in?"     Received · Outstanding
- *   ITEMS              "what is on it?"                 read → count
- *   EXCEPTIONS         "what went wrong?"               display + door only
- *   ACTIVITY           "what has happened?"             the event ledger
- *
- * `Start Receiving` is a PRIMARY ACTION, never a section: an operator's whole
- * job here is one press, and a section is a place, not a decision.
- *
- * Three rules this file exists to keep structural:
- *
- * 1. **The form asks "Receive this time", never "total so far"**
- *    (RECEIVING-INFORMATION-MODEL §7.1). Every input on the screen is a DELTA;
- *    the cumulative figure is the engine's and is only ever displayed.
- * 2. **The supplier's DO number is theirs.** It starts empty and has no
- *    suggestion. The retired ReceivePOModal seeded it with
- *    `"DO-" + random(5200..5999)` — a reference the supplier has never heard
- *    of, which also defeated the duplicate guard that reads it.
- * 3. **The disabled Save and the server's 422 read the SAME rule.** The claim
- *    gate is the shared `receiveLineClaimProblems`, whose twin runs inside
- *    `warehouse_receipt_validate_lines` (0314 §6). One copy of the law, two
- *    places that ask it.
- *
- * Deliberately NOT here, and each is a later slice, not an oversight:
- * Warehouse Review · Amend · Void · a Claims form · session-level photos
- * beyond the signed DO (0314 built no `photos[]`, and a control with no store
- * is banned). The Activity entries therefore carry no `⋯` menu: two of its
- * three items would do nothing.
+ * Structural rules this file keeps:
+ * 1. **The form asks "Receive this time", never "total so far"** — every
+ *    input is a DELTA; the cumulative figure is the engine's.
+ * 2. **The supplier's DO number is theirs.** No default, no suggestion.
+ * 3. **The disabled Save and the server's refusal read the SAME rule** —
+ *    `receivingSaveBlocker` + `receiveLineClaimProblems`, whose twins run in
+ *    `warehouse_receipt_validate_lines` (0314 §6 / 0426 §3).
+ * 4. **One physical result per governed Unit** (ERP-ARCHITECTURE §3.4):
+ *    `Received · Received with issue · Not received`, the quantities DERIVED
+ *    from the outcomes so the two can never disagree. A line without minted
+ *    Units keeps the lawful quantity inputs.
+ * 5. **Save is idempotent** — one `saveKey` per Session entry; a retried
+ *    uncertain response returns the first posting instead of a second GRN.
  */
-
 
 /** Today in MYT — the app's zone, never the browser's. The SERVER still owns
  *  the bounds; this only seeds the field. */
@@ -90,23 +82,41 @@ const EMPTY_COUNT: Count = {
   wrongItemPhotos: [],
 };
 
+interface UnitState {
+  outcome: ReceivingUnitOutcome;
+  issueKind: "damaged" | "wrong_item";
+}
+
 export default function ReceivingWorkspace({
   po,
   supplier,
   warehouseName,
+  warehouses = [],
+  dutyAllowed = true,
+  dutyKnown = true,
   receiving,
   onReceiving,
+  onPosted,
 }: {
   po: operationPoListRow;
   supplier: SupplierRow | undefined;
   warehouseName: string;
-  /** Receiving Mode is the PAGE's state, because it decides the whole stage:
-   *  the listing steps aside and the workspace takes the screen. */
+  /** Actual Site choices — the governed warehouses. */
+  warehouses?: Array<{ id: string; name: string }>;
+  /** The resolved GRN authority's answer (0425) — the page consumes it, it
+   *  never computes it. */
+  dutyAllowed?: boolean;
+  /** False while the resolver is still answering — neither the button nor
+   *  the refusal shows until the answer exists (a refusal that flickers at a
+   *  permitted operator is a false sentence). */
+  dutyKnown?: boolean;
   receiving: boolean;
   onReceiving: (on: boolean) => void;
+  /** Called with the posted session id, so the page can open the GRN. */
+  onPosted?: (receiptId: string) => void;
 }) {
   const lines = useMemo(() => po.purchase_order_lines ?? [], [po]);
-  const progress = poReceivingProgress(lines);
+  const summary = receivingSummaryOf(lines);
   const supplierName = supplier?.name ?? po.supplier_id;
   const receivingQ = usePoReceiving(po.id);
 
@@ -117,51 +127,58 @@ export default function ReceivingWorkspace({
           po={po}
           supplierName={supplierName}
           warehouseName={warehouseName}
+          warehouses={warehouses}
+          expectedUnits={receivingQ.data?.expected_units ?? []}
           onDone={() => onReceiving(false)}
+          onPosted={onPosted}
         />
       ) : (
         <ReadMode
           po={po}
           supplierName={supplierName}
           warehouseName={warehouseName}
+          dutyAllowed={dutyAllowed}
+          dutyKnown={dutyKnown}
           onStart={() => onReceiving(true)}
           events={receivingQ.data?.events ?? []}
           loadingEvents={receivingQ.isLoading}
-          outstanding={progress.ordered - progress.received}
-          progress={progress}
+          expectedUnits={receivingQ.data?.expected_units ?? []}
+          summary={summary}
         />
       )}
     </div>
   );
 }
 
-/* ── READ MODE ─────────────────────────────────────────────────────────── */
+/* ── PRE-START OBJECT ──────────────────────────────────────────────────── */
 
 function ReadMode({
   po,
   supplierName,
   warehouseName,
+  dutyAllowed,
+  dutyKnown,
   onStart,
   events,
   loadingEvents,
-  outstanding,
-  progress,
+  expectedUnits,
+  summary,
 }: {
   po: operationPoListRow;
   supplierName: string;
   warehouseName: string;
+  dutyAllowed: boolean;
+  dutyKnown: boolean;
   onStart: () => void;
   events: ReceivingEvent[];
   loadingEvents: boolean;
-  outstanding: number;
-  progress: ReturnType<typeof poReceivingProgress>;
+  expectedUnits: ReceivingExpectedUnit[];
+  summary: ReturnType<typeof receivingSummaryOf>;
 }) {
   const lines = po.purchase_order_lines ?? [];
   const closed = po.status !== "open";
+  const incoming = expectedUnits.filter((u) => u.status === "incoming");
 
-  // EXCEPTIONS exists only when exceptions exist (§7.7). It DISPLAYS what is
-  // held and doors into Claims — it is never an input section, because the
-  // quantities are recorded on the item rows.
   const problems = lines.filter(
     (l) => (l.damaged_qty ?? 0) > 0 || (l.wrong_item_qty ?? 0) > 0,
   );
@@ -176,34 +193,60 @@ function ReadMode({
             </span>
           </Prop>
           <Prop label="Supplier">{supplierName}</Prop>
-          <Prop label="Delivery To">{warehouseName}</Prop>
+          <Prop label="Deliver To">{warehouseName}</Prop>
+          {po.eta_date ? (
+            <Prop label="Expected arrival">
+              <span className="tabular-nums">{fmtDateShort(po.eta_date)}</span>
+            </Prop>
+          ) : null}
         </div>
         <span className="text-page font-semibold font-mono text-kit-slate-12 shrink-0">
           {po.id}
         </span>
       </div>
 
-      {/* RECEIVING SUMMARY — never "Progress" (Jess). Outstanding is printed
-          rather than left as `4 − 3`: an operator should not do arithmetic to
-          learn what is still owed. */}
+      {/* RECEIVING SUMMARY — the five governed quantity words. Each fact
+          prints its own number; the operator never subtracts (owner
+          correction 2026-08-29). */}
       <Section title="Receiving Summary">
-        <Prop label="Received">
-          <span className="tabular-nums" data-testid="receiving-summary-received">
-            {progress.received} / {progress.ordered}
+        <Prop label="Order Qty">
+          <span className="tabular-nums" data-testid="summary-order-qty">
+            {summary.orderQty}
           </span>
         </Prop>
-        <Prop label="Outstanding">
+        <Prop label="Received Qty">
+          <span className="tabular-nums" data-testid="summary-received-qty">
+            {summary.receivedQty}
+          </span>
+        </Prop>
+        <Prop label="Damaged Qty">
           <span
-            className={outstanding > 0 ? "tabular-nums" : "tabular-nums text-kit-slate-9"}
-            data-testid="receiving-summary-outstanding"
+            className={summary.damagedQty > 0 ? "tabular-nums text-kit-red-11" : "tabular-nums text-kit-slate-9"}
+            data-testid="summary-damaged-qty"
           >
-            {outstanding}
+            {summary.damagedQty}
+          </span>
+        </Prop>
+        <Prop label="Wrong Item Qty">
+          <span
+            className={summary.wrongItemQty > 0 ? "tabular-nums text-kit-red-11" : "tabular-nums text-kit-slate-9"}
+            data-testid="summary-wrong-qty"
+          >
+            {summary.wrongItemQty}
+          </span>
+        </Prop>
+        <Prop label="Pending Delivery Qty">
+          <span
+            className={summary.pendingDeliveryQty > 0 ? "tabular-nums" : "tabular-nums text-kit-slate-9"}
+            data-testid="summary-pending-qty"
+          >
+            {summary.pendingDeliveryQty}
           </span>
         </Prop>
 
         {/* The ONE loud element. Absent once the PO owes nothing — a button
             that can only refuse is not an action. */}
-        {!closed && outstanding > 0 && (
+        {!closed && summary.pendingDeliveryQty > 0 && dutyAllowed && (
           <button
             type="button"
             onClick={onStart}
@@ -213,28 +256,26 @@ function ReadMode({
             Start Receiving
           </button>
         )}
+        {!closed && summary.pendingDeliveryQty > 0 && dutyKnown && !dutyAllowed && (
+          /* The same rule the SQL door holds (0426): the fact, then who may.
+             A button the server would refuse is never offered. */
+          <div className="mt-2 text-label text-kit-slate-9" data-testid="receiving-duty-refusal">
+            Only GRN duty may save a receiving.
+          </div>
+        )}
         {closed && (
           <div className="mt-2 text-label text-kit-slate-9">
             This purchase order is closed.
           </div>
         )}
-
-        {/* P3's two supplier calls STOOD HERE UNTIL Q14 (2026-08-05) and this
-            page may not grow them back. Loo's role-anchor: work done by ASKING
-            THE SUPPLIER for something is the buyer's, work done by HANDLING THE
-            GOODS is Receiving's — so both calls, and both their doors, are
-            Purchase Orders'. The tomorrow call had a SECOND door here writing
-            the same endpoint as the register's; the balance call had its ONLY
-            one, which is why the register's had to be built before these came
-            out. Their home is the row expand on `OperationPurchaseOrders`. */}
       </Section>
 
       <Section title="Items">
         <div className={DOC_TH}>
           <span className="w-4 font-medium">#</span>
           <span className="flex-1 font-medium">Description</span>
-          <span className="w-12 text-right font-medium">Ordered</span>
-          <span className="w-12 text-right font-medium">Received</span>
+          <span className="w-14 text-right font-medium">Order Qty</span>
+          <span className="w-14 text-right font-medium">Received Qty</span>
         </div>
         {lines.map((l, i) => (
           <div
@@ -246,27 +287,32 @@ function ReadMode({
             <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
               {l.sku}
             </span>
-            <span className="w-12 text-right tabular-nums text-kit-slate-12">
+            <span className="w-14 text-right tabular-nums text-kit-slate-12">
               {l.qty}
             </span>
-            <span className="w-12 text-right tabular-nums text-kit-slate-9">
+            <span className="w-14 text-right tabular-nums text-kit-slate-9">
               {l.received_qty}
             </span>
           </div>
         ))}
-        <div className="flex gap-2 py-1.5 text-body border-b border-kit-slate-5">
-          <span className="w-4" />
-          <span className="flex-1 text-label uppercase tracking-wide text-kit-slate-9">
-            Total
-          </span>
-          <span className="w-12 text-right font-semibold tabular-nums text-kit-slate-12">
-            {progress.ordered}
-          </span>
-          <span className="w-12 text-right font-semibold tabular-nums text-kit-slate-12">
-            {progress.received}
-          </span>
-        </div>
       </Section>
+
+      {/* The governed expected Units — what the supplier was told to label.
+          Facts, not controls; the outcomes are recorded in the Session. */}
+      {incoming.length > 0 && (
+        <Section title="Expected Units">
+          <div className="flex flex-wrap gap-1.5" data-testid="expected-units">
+            {incoming.map((u) => (
+              <span
+                key={u.id}
+                className="rounded-full border border-kit-slate-5 px-2 py-0.5 font-mono text-label text-kit-slate-11"
+              >
+                {u.unit_code}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {problems.length > 0 && (
         <Section title="Exceptions">
@@ -287,14 +333,7 @@ function ReadMode({
             </div>
           ))}
           {/* A door, never a form: the claim already exists — the receive that
-              recorded the problem opened it in the same transaction.
-              ⛔ A ROUTER LINK, NOT AN ANCHOR (YH, 2026-09-01). This was
-              `<a href="/operation/purchasing/claims">` — an address no route
-              matches — so the browser left the app, the SPA reloaded from
-              scratch and fell back to the default tab. Exceptions is the ONE
-              place on this page that names a supplier claim, and its only
-              door landed on the Operation Dashboard. The working address is
-              `/operation?tab=claims`. */}
+              recorded the problem opened it in the same transaction. */}
           <Link
             to="/operation?tab=claims"
             className="mt-1.5 inline-block text-body text-kit-blue-11 hover:underline"
@@ -310,9 +349,6 @@ function ReadMode({
         {loadingEvents ? (
           <div className="text-label text-kit-slate-9">Loading…</div>
         ) : events.length === 0 ? (
-          /* "Nothing received yet" would read as "the goods have not come"
-             (Jess, 2026-08-03). What is empty is the RECORD, so that is what
-             the sentence says. */
           <div className="text-label text-kit-slate-9" data-testid="receiving-activity-empty">
             No receiving activity yet.
           </div>
@@ -338,11 +374,10 @@ function ReadMode({
 /**
  * One ledger entry, in words. Every fact comes from the payload — the Event
  * Payload Dictionary (§6.1) is what makes this readable without opening the
- * session, and `posted` carries the business date, the count and the source
- * since Jess's 2026-08-03 ruling.
+ * session; `posted` carries the GRN number since 0426.
  */
-function eventSentence(e: ReceivingEvent): string {
-  const who = e.actor_name ?? "Someone";
+export function eventSentence(e: ReceivingEvent): string {
+  const who = e.actor_name ?? "Staff identity not recorded";
   const p = e.payload ?? {};
   const units =
     p.units_counted != null
@@ -352,6 +387,7 @@ function eventSentence(e: ReceivingEvent): string {
     case "posted":
       return [
         `Posted by ${who}`,
+        p.grn_no ?? null,
         p.do_number ? `DO ${p.do_number}` : null,
         units,
         p.goods_received_at
@@ -380,18 +416,24 @@ function eventSentence(e: ReceivingEvent): string {
   }
 }
 
-/* ── RECEIVING MODE ────────────────────────────────────────────────────── */
+/* ── THE ACTIVE SESSION ────────────────────────────────────────────────── */
 
 function ReceivingMode({
   po,
   supplierName,
   warehouseName,
+  warehouses,
+  expectedUnits,
   onDone,
+  onPosted,
 }: {
   po: operationPoListRow;
   supplierName: string;
   warehouseName: string;
+  warehouses: Array<{ id: string; name: string }>;
+  expectedUnits: ReceivingExpectedUnit[];
   onDone: () => void;
+  onPosted?: (receiptId: string) => void;
 }) {
   const lines = useMemo(() => po.purchase_order_lines ?? [], [po]);
 
@@ -401,91 +443,142 @@ function ReceivingMode({
   const [doFilePath, setDoFilePath] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  /** `Deliver To` is the instruction; `Actual Site` is where the goods
+   *  physically arrived. "" = the PO's own booked warehouse. */
+  const [actualSiteId, setActualSiteId] = useState<string>("");
+  const [arrivalEvidence, setArrivalEvidence] = useState<
+    ReceivingArrivalEvidence[]
+  >([]);
+  const [extraLines, setExtraLines] = useState<ReceivingExtraLine[]>([]);
+  /** ONE key per Session entry — the idempotency contract (0426): a retried
+   *  uncertain Save returns the first posting, never a second GRN. */
+  const [saveKey] = useState(() => crypto.randomUUID());
 
-  /** Prefilled at each line's remaining qty — a complete delivery is zero
-   *  typing (§7.2, copied from 2990's ready-to-review draft). */
+  /** The governed Units still expected, grouped by line SKU. */
+  const unitsBySku = useMemo(() => {
+    const m = new Map<string, ReceivingExpectedUnit[]>();
+    for (const u of expectedUnits) {
+      if (u.status !== "incoming") continue;
+      const list = m.get(u.sku) ?? [];
+      list.push(u);
+      m.set(u.sku, list);
+    }
+    return m;
+  }, [expectedUnits]);
+
+  /** One physical result per governed Unit. Prefilled `received` up to the
+   *  line's remaining count — a complete delivery is zero typing — and
+   *  `not_received` beyond it. */
+  const [unitStates, setUnitStates] = useState<Record<string, UnitState>>(() => {
+    const o: Record<string, UnitState> = {};
+    for (const l of po.purchase_order_lines ?? []) {
+      const units = (expectedUnits ?? []).filter(
+        (u) => u.sku === l.sku && u.status === "incoming",
+      );
+      const cap = poLineReportable(l);
+      units.forEach((u, i) => {
+        o[u.id] = {
+          outcome: i < cap ? "received" : "not_received",
+          issueKind: "damaged",
+        };
+      });
+    }
+    return o;
+  });
+  const setUnit = (id: string, patch: Partial<UnitState>) =>
+    setUnitStates((s) => ({
+      ...s,
+      [id]: { ...(s[id] ?? { outcome: "not_received", issueKind: "damaged" }), ...patch },
+    }));
+
+  /** Legacy quantity counts, for lines with no governed Units. For a
+   *  unit-checked line the quantities are DERIVED from the outcomes. */
   const [counts, setCounts] = useState<Record<string, Count>>(() => {
     const o: Record<string, Count> = {};
-    for (const l of lines)
+    for (const l of po.purchase_order_lines ?? [])
       o[l.id] = { ...EMPTY_COUNT, receivedNow: poLineReportable(l) };
     return o;
   });
   const setCount = (id: string, patch: Partial<Count>) =>
     setCounts((c) => ({ ...c, [id]: { ...(c[id] ?? EMPTY_COUNT), ...patch } }));
 
+  /** The ONE per-line view both the button gate and the payload read. */
+  const lineViews = lines.map((l) => {
+    const units = unitsBySku.get(l.sku) ?? [];
+    const c = counts[l.id] ?? EMPTY_COUNT;
+    if (units.length === 0) {
+      return { line: l, units: [] as ReceivingExpectedUnit[], ...c };
+    }
+    let receivedNow = 0;
+    let damagedQty = 0;
+    let wrongItemQty = 0;
+    for (const u of units) {
+      const st = unitStates[u.id];
+      if (!st || st.outcome === "not_received") continue;
+      if (st.outcome === "received") receivedNow += 1;
+      else if (st.issueKind === "wrong_item") wrongItemQty += 1;
+      else damagedQty += 1;
+    }
+    return {
+      line: l,
+      units,
+      receivedNow,
+      damagedQty,
+      wrongItemQty,
+      damagedPhotos: c.damagedPhotos,
+      wrongItemClaimType: c.wrongItemClaimType,
+      wrongItemPhotos: c.wrongItemPhotos,
+    };
+  });
+
   const save = useOfficeReceiveMutation(po.id, {
-    onSuccess: onDone,
+    onSuccess: (data) => {
+      const receiptId = (data as { receipt_id?: string } | null)?.receipt_id;
+      onDone();
+      if (receiptId && onPosted) onPosted(receiptId);
+    },
     onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
   });
 
-  const counted = lines.reduce((s, l) => {
-    const c = counts[l.id] ?? EMPTY_COUNT;
-    return s + c.receivedNow + c.damagedQty + c.wrongItemQty;
-  }, 0);
-
-  /** What is still owed AFTER this save — stated quietly, never as a popup:
-   *  a short receipt is normal and a routine confirm trains people to click
-   *  OK (§7.4). */
-  const remainingAfter = lines.reduce(
-    (s, l) => s + Math.max(0, poLineReportable(l) - (counts[l.id]?.receivedNow ?? 0)),
+  const counted = lineViews.reduce(
+    (s, v) => s + v.receivedNow + v.damagedQty + v.wrongItemQty,
     0,
   );
 
-  /** The claim gate — the SAME function the RPC's twin runs, so the disabled
-   *  button and the server's refusal can never disagree. */
-  const claimProblems = lines.flatMap((l) => {
-    const c = counts[l.id] ?? EMPTY_COUNT;
-    return receiveLineClaimProblems({
-      category: caseProductCategory(l.sku),
-      damagedQty: c.damagedQty,
-      wrongItemQty: c.wrongItemQty,
-      damagedPhotos: c.damagedPhotos,
-      wrongItemClaimType: c.wrongItemClaimType || null,
-      wrongItemPhotos: c.wrongItemPhotos,
-    });
-  });
+  const pendingAfter = pendingDeliveryAfterSave(
+    lineViews.map((v) => ({
+      pendingDelivery: poLineReportable(v.line),
+      receivedNow: v.receivedNow,
+    })),
+  );
 
-  /**
-   * The button says what is MISSING (Jess: "Save Button 动态提示 很好").
-   * Input ORDER is free — only completeness is frozen (§7.6) — so this reads
-   * the state, never a step counter.
-   */
-  /**
-   * ⛔ THE COUNTS MUST ADD UP, AND THE BUTTON MUST KNOW IT (YH, 2026-09-02,
-   * defect 8).
-   *
-   * The gate below tested the DO number, the photo, a non-zero count and the
-   * claim rules - and never that a line's THREE counts add up to what the line
-   * still owes. The server does (`line_over_reported`, 0314). So the button
-   * looked ready, the operator pressed it, and the save came back refused.
-   *
-   * Damage is the normal reason anybody is on this screen, so this is the
-   * common path, not an edge: type 1 into Dmgd, leave `Receive now` at the
-   * prefilled remainder, and the line now counts one unit more than the PO
-   * owes. The counts are lost with the driver waiting, and the refusal names a
-   * SKU without ever saying the fix is to lower `Receive now`.
-   *
-   * This file's own contract claims the button and the server read the same
-   * rule. That was true of photos and claim types and false of quantities.
-   * It is true of quantities now, and the message names the control to change.
-   */
-  const overCounted = lines.find((l) => {
-    const c = counts[l.id] ?? EMPTY_COUNT;
-    return c.receivedNow + c.damagedQty + c.wrongItemQty > poLineReportable(l);
-  });
+  /** The claim gate — the SAME function the RPC's twin runs. */
+  const claimProblems = lineViews.flatMap((v) =>
+    receiveLineClaimProblems({
+      category: caseProductCategory(v.line.sku),
+      damagedQty: v.damagedQty,
+      wrongItemQty: v.wrongItemQty,
+      damagedPhotos: v.damagedPhotos,
+      wrongItemClaimType: v.wrongItemClaimType || null,
+      wrongItemPhotos: v.wrongItemPhotos,
+    }),
+  );
 
-  const blocker: string | null =
-    doNumber.trim().length < 3
-      ? "Save — add a DO number"
-      : !doFilePath
-        ? "Save — upload signed DO"
-        : counted === 0
-          ? "Save — count at least one unit"
-          : overCounted
-            ? "Save — lower Receive now, the line counts more than is owed"
-            : claimProblems.length > 0
-              ? `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[claimProblems[0]].toLowerCase()}`
-              : null;
+  const overCounted = lineViews.some(
+    (v) =>
+      v.receivedNow + v.damagedQty + v.wrongItemQty >
+      poLineReportable(v.line),
+  );
+
+  /** THE RECEIVING BUTTON LAW — one shared copy (COPY-STANDARD): the button
+   *  names the FIRST missing fact, top to bottom. */
+  const blocker = receivingSaveBlocker({
+    doNumber,
+    doFilePath,
+    counted,
+    overCounted,
+    claimProblems,
+  });
 
   function submit() {
     if (blocker || !doFilePath || save.isPending) return;
@@ -495,23 +588,53 @@ function ReceivingMode({
       doFilePath,
       goodsReceivedAt,
       note: note.trim() || undefined,
-      lines: lines
-        .map((l) => {
-          const c = counts[l.id] ?? EMPTY_COUNT;
-          return {
-            id: l.id,
-            receivedNow: c.receivedNow,
-            damagedQty: c.damagedQty || undefined,
-            wrongItemQty: c.wrongItemQty || undefined,
-            damagedPhotos: c.damagedPhotos.length ? c.damagedPhotos : undefined,
-            wrongItemClaimType: c.wrongItemClaimType || undefined,
-            wrongItemPhotos: c.wrongItemPhotos.length
-              ? c.wrongItemPhotos
-              : undefined,
-          };
-        })
-        // A line counting nothing is not part of this delivery.
-        .filter((l) => l.receivedNow + (l.damagedQty ?? 0) + (l.wrongItemQty ?? 0) > 0),
+      actualSiteId:
+        actualSiteId && actualSiteId !== po.warehouse_id
+          ? actualSiteId
+          : undefined,
+      arrivalEvidence: arrivalEvidence.length ? arrivalEvidence : undefined,
+      extraLines: extraLines.filter((x) => x.sku.trim() !== "" && x.qty > 0)
+        .length
+        ? extraLines
+            .filter((x) => x.sku.trim() !== "" && x.qty > 0)
+            .map((x) => ({ sku: x.sku.trim(), qty: x.qty, note: x.note ?? undefined }))
+        : undefined,
+      saveKey,
+      lines: lineViews
+        .map((v) => ({
+          id: v.line.id,
+          receivedNow: v.receivedNow,
+          damagedQty: v.damagedQty || undefined,
+          wrongItemQty: v.wrongItemQty || undefined,
+          damagedPhotos: v.damagedPhotos.length ? v.damagedPhotos : undefined,
+          wrongItemClaimType: v.wrongItemClaimType || undefined,
+          wrongItemPhotos: v.wrongItemPhotos.length
+            ? v.wrongItemPhotos
+            : undefined,
+          units: v.units.length
+            ? v.units.map((u) => {
+                const st = unitStates[u.id] ?? {
+                  outcome: "not_received" as const,
+                  issueKind: "damaged" as const,
+                };
+                return {
+                  unitCode: u.unit_code,
+                  outcome: st.outcome,
+                  issueKind:
+                    st.outcome === "received_with_issue"
+                      ? st.issueKind
+                      : undefined,
+                };
+              })
+            : undefined,
+        }))
+        // A line counting nothing — and naming no unit result — is not part
+        // of this delivery.
+        .filter(
+          (l) =>
+            l.receivedNow + (l.damagedQty ?? 0) + (l.wrongItemQty ?? 0) > 0 ||
+            (l.units?.some((u) => u.outcome !== "not_received") ?? false),
+        ),
     });
   }
 
@@ -519,7 +642,8 @@ function ReceivingMode({
     "h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9";
 
   return (
-    <div data-testid="receiving-mode">
+    <div data-testid="receiving-mode" className="pb-20">
+      {/* 1 · header and source facts */}
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1 text-body text-kit-slate-12">
           {supplierName} → {warehouseName}
@@ -529,19 +653,47 @@ function ReceivingMode({
         </span>
       </div>
 
+      {/* 2 · Receiving Details */}
       <Section title="Receiving Details">
         <div className="flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Goods Received At
+            Goods received on
           </span>
           <input
             type="date"
             value={goodsReceivedAt}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
-            aria-label="Goods Received At"
+            aria-label="Goods received on"
             data-testid="goods-received-at"
             className={FIELD}
           />
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+            Deliver To
+          </span>
+          <span className="text-body text-kit-slate-12">{warehouseName}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+            Goods arrived at
+          </span>
+          {/* Where the goods PHYSICALLY arrived. It never overwrites
+              `Deliver To` — both facts are preserved (owner correction
+              2026-09-06 §3; the retired label was `Actual Site`). */}
+          <select
+            value={actualSiteId || po.warehouse_id}
+            onChange={(e) => setActualSiteId(e.target.value)}
+            aria-label="Goods arrived at"
+            data-testid="actual-site"
+            className={FIELD}
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
@@ -568,6 +720,20 @@ function ReceivingMode({
             />
           </span>
         </div>
+        <div className="mt-1 flex items-start gap-2 text-body leading-6">
+          <span className="w-32 shrink-0 text-label text-kit-slate-9">
+            Arrival evidence
+          </span>
+          <span className="min-w-0 flex-1">
+            <ArrivalEvidenceUploadField
+              poId={po.id}
+              doNumber={doNumber}
+              entries={arrivalEvidence}
+              onChange={setArrivalEvidence}
+              testId="arrival-evidence"
+            />
+          </span>
+        </div>
         <div className="mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
             Note (optional)
@@ -583,76 +749,140 @@ function ReceivingMode({
         </div>
       </Section>
 
+      {/* 3 · Unit checking — one physical result per governed Unit; a line
+             with no minted Units keeps the quantity inputs. */}
       <Section title="Items">
-        <div className={DOC_TH}>
-          <span className="flex-1 font-medium">Description</span>
-          <span className="w-10 text-right font-medium">Ord</span>
-          <span className="w-10 text-right font-medium">Recv</span>
-          <span className="w-14 text-right font-medium">Receive now</span>
-          <span className="w-10 text-right font-medium">Dmgd</span>
-          <span className="w-10 text-right font-medium">Wrong</span>
-        </div>
-        {lines.map((l) => {
-          const c = counts[l.id] ?? EMPTY_COUNT;
+        {lineViews.map((v) => {
+          const l = v.line;
           const cap = poLineReportable(l);
           const wrongTypes = wrongItemClaimTypesFor(caseProductCategory(l.sku));
-          const clamp = (v: string) =>
-            Math.max(0, Math.min(cap, Number(v) || 0));
+          const clamp = (x: string) => Math.max(0, Math.min(cap, Number(x) || 0));
+          const c = counts[l.id] ?? EMPTY_COUNT;
           return (
             <div key={l.id} className="border-b border-kit-slate-4 py-1.5">
               <div className="flex items-center gap-2 text-body">
                 <span className="flex-1 min-w-0 font-mono text-kit-slate-12 truncate">
                   {l.sku}
                 </span>
-                <span className="w-10 text-right tabular-nums text-kit-slate-12">
+                <span className="w-14 text-right tabular-nums text-kit-slate-12">
                   {l.qty}
                 </span>
-                <span className="w-10 text-right tabular-nums text-kit-slate-9">
+                <span className="w-14 text-right tabular-nums text-kit-slate-9">
                   {l.received_qty}
                 </span>
-                <input
-                  type="number"
-                  min={0}
-                  max={cap}
-                  value={c.receivedNow}
-                  onChange={(e) =>
-                    setCount(l.id, { receivedNow: clamp(e.target.value) })
-                  }
-                  aria-label={`Receive now ${l.sku}`}
-                  data-testid={`receive-now-${l.id}`}
-                  className={`${FIELD} w-14 text-right tabular-nums`}
-                />
-                {/* Fixed inputs, never a "+ Problem?" disclosure: a damaged
-                    unit is a normal outcome of a delivery, not an advanced
-                    option somebody has to go looking for. */}
-                <input
-                  type="number"
-                  min={0}
-                  max={cap}
-                  value={c.damagedQty}
-                  onChange={(e) =>
-                    setCount(l.id, { damagedQty: clamp(e.target.value) })
-                  }
-                  aria-label={`Damaged ${l.sku}`}
-                  data-testid={`damaged-${l.id}`}
-                  className={`${FIELD} w-10 text-right tabular-nums`}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={cap}
-                  value={c.wrongItemQty}
-                  onChange={(e) =>
-                    setCount(l.id, { wrongItemQty: clamp(e.target.value) })
-                  }
-                  aria-label={`Wrong item ${l.sku}`}
-                  data-testid={`wrong-${l.id}`}
-                  className={`${FIELD} w-10 text-right tabular-nums`}
-                />
+                {v.units.length === 0 ? (
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      max={cap}
+                      value={c.receivedNow}
+                      onChange={(e) =>
+                        setCount(l.id, { receivedNow: clamp(e.target.value) })
+                      }
+                      aria-label={`Receive now ${l.sku}`}
+                      data-testid={`receive-now-${l.id}`}
+                      className={`${FIELD} w-14 text-right tabular-nums`}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={cap}
+                      value={c.damagedQty}
+                      onChange={(e) =>
+                        setCount(l.id, { damagedQty: clamp(e.target.value) })
+                      }
+                      aria-label={`Damaged ${l.sku}`}
+                      data-testid={`damaged-${l.id}`}
+                      className={`${FIELD} w-10 text-right tabular-nums`}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={cap}
+                      value={c.wrongItemQty}
+                      onChange={(e) =>
+                        setCount(l.id, { wrongItemQty: clamp(e.target.value) })
+                      }
+                      aria-label={`Wrong item ${l.sku}`}
+                      data-testid={`wrong-${l.id}`}
+                      className={`${FIELD} w-10 text-right tabular-nums`}
+                    />
+                  </>
+                ) : (
+                  <span
+                    className="shrink-0 tabular-nums text-meta text-kit-slate-9"
+                    data-testid={`derived-${l.id}`}
+                  >
+                    {v.receivedNow} received
+                    {v.damagedQty + v.wrongItemQty > 0
+                      ? ` · ${v.damagedQty + v.wrongItemQty} with issue`
+                      : ""}
+                  </span>
+                )}
               </div>
 
-              {/* Evidence appears only once a number asks for it. */}
-              {c.damagedQty > 0 && (
+              {/* One row per expected Unit: `Received · Received with issue ·
+                  Not received` (ERP-ARCHITECTURE §3.4). */}
+              {v.units.map((u) => {
+                const st = unitStates[u.id] ?? {
+                  outcome: "not_received" as const,
+                  issueKind: "damaged" as const,
+                };
+                return (
+                  <div
+                    key={u.id}
+                    className="mt-1 flex flex-wrap items-center gap-2 pl-2 text-body"
+                    data-testid={`unit-${u.unit_code}`}
+                  >
+                    <span className="w-32 shrink-0 font-mono text-meta text-kit-slate-11">
+                      {u.unit_code}
+                    </span>
+                    <select
+                      value={st.outcome}
+                      onChange={(e) =>
+                        setUnit(u.id, {
+                          outcome: e.target.value as ReceivingUnitOutcome,
+                        })
+                      }
+                      aria-label={`Outcome ${u.unit_code}`}
+                      data-testid={`unit-outcome-${u.unit_code}`}
+                      className={FIELD}
+                    >
+                      {(
+                        [
+                          "received",
+                          "received_with_issue",
+                          "not_received",
+                        ] as const
+                      ).map((o) => (
+                        <option key={o} value={o}>
+                          {RECEIVING_UNIT_OUTCOME_LABEL[o]}
+                        </option>
+                      ))}
+                    </select>
+                    {st.outcome === "received_with_issue" && (
+                      <select
+                        value={st.issueKind}
+                        onChange={(e) =>
+                          setUnit(u.id, {
+                            issueKind: e.target.value as "damaged" | "wrong_item",
+                          })
+                        }
+                        aria-label={`Issue kind ${u.unit_code}`}
+                        data-testid={`unit-issue-${u.unit_code}`}
+                        className={FIELD}
+                      >
+                        <option value="damaged">Damaged</option>
+                        <option value="wrong_item">Wrong item</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* 4 · evidence appears only once a fact asks for it. */}
+              {v.damagedQty > 0 && (
                 <div className="mt-1 pl-2 border-l-2 border-kit-red-9">
                   <ClaimPhotoUploadField
                     poId={po.id}
@@ -664,7 +894,7 @@ function ReceivingMode({
                   />
                 </div>
               )}
-              {c.wrongItemQty > 0 && (
+              {v.wrongItemQty > 0 && (
                 <div className="mt-1 pl-2 border-l-2 border-kit-red-9">
                   <div className="flex items-center gap-2 text-body leading-6">
                     <span className="text-label text-kit-slate-9">
@@ -704,15 +934,87 @@ function ReceivingMode({
         })}
       </Section>
 
-      {/* Quiet, near Save — never a popup (§7.4). */}
-      {remainingAfter > 0 && (
-        <div
-          className="mt-2 text-label text-kit-slate-9"
-          data-testid="remaining-after-save"
+      {/* 4b · Extra goods — recorded separately: never Inventory, never the
+             pending arithmetic. First check whether they belong to another
+             PO/CO (owner instruction §6). */}
+      <Section title="Extra goods">
+        <p className="text-label text-kit-slate-9">
+          Goods that are not on this purchase order. Check another PO first —
+          extra goods never enter Inventory.
+        </p>
+        {extraLines.map((x, i) => (
+          <div key={i} className="mt-1 flex items-center gap-2" data-testid={`extra-line-${i}`}>
+            <input
+              type="text"
+              value={x.sku}
+              onChange={(e) =>
+                setExtraLines((xs) =>
+                  xs.map((y, j) => (j === i ? { ...y, sku: e.target.value } : y)),
+                )
+              }
+              aria-label={`Extra goods SKU ${i + 1}`}
+              placeholder="SKU or item"
+              className={`${FIELD} flex-1`}
+            />
+            <input
+              type="number"
+              min={1}
+              value={x.qty}
+              onChange={(e) =>
+                setExtraLines((xs) =>
+                  xs.map((y, j) =>
+                    j === i ? { ...y, qty: Math.max(1, Number(e.target.value) || 1) } : y,
+                  ),
+                )
+              }
+              aria-label={`Extra Qty ${i + 1}`}
+              className={`${FIELD} w-16 text-right tabular-nums`}
+            />
+            <button
+              type="button"
+              onClick={() => setExtraLines((xs) => xs.filter((_, j) => j !== i))}
+              className="text-label text-kit-slate-9 hover:text-kit-slate-12"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setExtraLines((xs) => [...xs, { sku: "", qty: 1 }])}
+          data-testid="add-extra-line"
+          className="mt-1 text-body text-kit-blue-11 hover:underline"
         >
-          Remaining after save: {remainingAfter} (stays on this PO)
+          + Add line
+        </button>
+      </Section>
+
+      {/* 5 · Receiving Summary (live) + 6 · what saving will do */}
+      <Section title="Receiving Summary">
+        <Prop label="Received Qty">
+          <span className="tabular-nums" data-testid="live-received-qty">
+            {lineViews.reduce((s, v) => s + v.receivedNow, 0)}
+          </span>
+        </Prop>
+        <Prop label="Damaged Qty">
+          <span className="tabular-nums">
+            {lineViews.reduce((s, v) => s + v.damagedQty, 0)}
+          </span>
+        </Prop>
+        <Prop label="Wrong Item Qty">
+          <span className="tabular-nums">
+            {lineViews.reduce((s, v) => s + v.wrongItemQty, 0)}
+          </span>
+        </Prop>
+        <div className="mt-2 text-label text-kit-slate-9" data-testid="posting-consequences">
+          Valid received Units enter Inventory at{" "}
+          {warehouses.find((w) => w.id === (actualSiteId || po.warehouse_id))
+            ?.name ?? warehouseName}
+          . Units not received stay Incoming on this PO. Damaged, wrong and
+          extra goods never become available stock. A claim opens only when a
+          recorded issue needs one.
         </div>
-      )}
+      </Section>
 
       {err && (
         <div className="mt-2 text-label text-kit-red-11" data-testid="receiving-error">
@@ -720,7 +1022,9 @@ function ReceivingMode({
         </div>
       )}
 
-      <div className="mt-2 flex items-center gap-2">
+      {/* 7 · sticky action area — the live pending figure beside the one
+             primary action, on desktop and mobile alike. */}
+      <div className="sticky bottom-0 mt-3 flex items-center gap-2 border-t border-kit-slate-5 bg-white py-2">
         <button
           type="button"
           onClick={onDone}
@@ -729,12 +1033,18 @@ function ReceivingMode({
         >
           Cancel
         </button>
+        <span
+          className="ml-auto text-label text-kit-slate-9 tabular-nums"
+          data-testid="pending-after-save"
+        >
+          Pending Delivery Qty after save: {pendingAfter}
+        </span>
         <button
           type="button"
           onClick={submit}
           disabled={blocker != null || save.isPending}
           data-testid="receiving-save"
-          className={`${DOC_BTN} ml-auto disabled:opacity-40`}
+          className={`${DOC_BTN} disabled:opacity-40`}
         >
           {save.isPending ? "Saving…" : (blocker ?? "Save Receiving")}
         </button>

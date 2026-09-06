@@ -232,8 +232,8 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // Inventory is Warehouse's first live page — the rail navigated there.
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    // Dashboard is Warehouse's first live page (Card 03) — the rail navigated there.
+    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
   });
 
   it("clicking the open module closes it again", () => {
@@ -260,7 +260,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("stock").className).toContain("bg-kit-blue-3");
+    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -612,7 +612,7 @@ describe("PortalSidebar — the Purchasing map", () => {
       "SO Batch Purchase",
       "Manual Purchase",
       "Purchase Orders",
-      "Goods Receipts",
+      "Receiving",
       "Supplier Claims",
       "Purchase Returns",
       "Repair Orders",
@@ -682,8 +682,10 @@ describe("PortalSidebar — the Purchasing map", () => {
 
   it("the rail word is `Manual Purchase`, in BUY, and the old word is gone", () => {
     renderAt("/operation?tab=receiving");
-    expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
-    expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
+    expect(screen.getByText("Receiving")).toBeInTheDocument();
+    // `Goods Receipts` retired as navigation (owner instruction 2026-09-04;
+    // ERP-ARCHITECTURE §2.1 — the GRN is a document, never a page name).
+    expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
     fireEvent.click(group_("purchasing-buy"));
     const buy = screen.getByTestId("nav-group-children-purchasing-buy");
@@ -743,7 +745,7 @@ describe("PortalSidebar — the Purchasing map", () => {
     }
   });
 
-  it("a nested path page wins — Goods Receipts does not light next to Purchase Orders", () => {
+  it("a nested path page wins — Receiving does not light next to Purchase Orders", () => {
     renderAt("/operation/procurement");
     expect(child("purchase-orders").className).toContain("bg-kit-blue-3");
     expect(screen.queryByTestId("nav-child-receiving")).not.toBeInTheDocument();
@@ -800,7 +802,7 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
     expect(module_("purchasing").className).not.toContain("bg-kit-blue-3");
     expect(child("receiving").className).toContain("bg-kit-blue-3");
 
-    fireEvent.click(module_("purchasing")); // shut it, still on Goods Receipts
+    fireEvent.click(module_("purchasing")); // shut it, still on Receiving
     expect(module_("purchasing").className).toContain("bg-kit-blue-3");
     expect(module_("purchasing").querySelector(".bg-kit-blue-9")).not.toBeNull();
   });
@@ -859,7 +861,7 @@ describe("PortalSidebar — the Purchasing parent toggles without navigating", (
   });
 
   /* GOODS RECEIPTS — the one-page drawer. RECEIVE must force itself open. */
-  it("arriving at Goods Receipts opens Purchasing + RECEIVE and lights ONE row", () => {
+  it("arriving at Receiving opens Purchasing + RECEIVE and lights ONE row", () => {
     renderAt("/operation?tab=receiving");
     expect(module_("purchasing").getAttribute("aria-expanded")).toBe("true");
     expect(group_("purchasing-receive").getAttribute("aria-expanded")).toBe("true");
@@ -992,7 +994,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       const icon = screen.getByTitle("Purchasing") as HTMLAnchorElement;
       // Named, never derived: the landing page does not move when row order does.
       expect(icon).toHaveAttribute("href", "/operation?tab=purchase");
-      // Standing on Goods Receipts still lights the module's one icon.
+      // Standing on Receiving still lights the module's one icon.
       expect(icon.className).toContain("bg-kit-blue-3");
       expect(icon.querySelector(".bg-kit-blue-9")).not.toBeNull();
     } finally {
@@ -1007,7 +1009,7 @@ describe("PortalSidebar — the Purchasing drawers", () => {
       expect(screen.getByTitle("Purchasing")).toBeInTheDocument();
       expect(screen.queryByTestId("nav-group-purchasing-buy")).not.toBeInTheDocument();
       expect(screen.queryByText("BUY")).not.toBeInTheDocument();
-      expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
+      expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
       expect(screen.queryByText("Manual Purchase")).not.toBeInTheDocument();
       expect(screen.queryByText("SHOWROOM")).not.toBeInTheDocument();
     } finally {
@@ -1159,22 +1161,48 @@ describe("PortalSidebar — Purchasing remembers its drawers", () => {
  * (`docs/delivery/MASTER.md` §7 still holds them as approved targets); they are
  * simply not NAVIGATION until they are pages.
  */
-describe("PortalSidebar — Delivery is one page", () => {
-  it("shows one plain Delivery door instead of a parent with two children", () => {
+describe("PortalSidebar — the Delivery module's two destinations", () => {
+  /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
+   * Orders → Delivery Order → Edit Delivery. The first two are NAVIGATION;
+   * the object and the writer are reached from cards and rows, never from
+   * the rail. This overwrites the 2026-08-21 one-page ruling. */
+  it("Delivery is a module carrying Monitor and Delivery Orders, in that order", () => {
     renderAt("/operation?tab=delivery");
-    const row = child("delivery");
-    expect(row.tagName).toBe("A");
-    expect(row).toHaveAttribute("href", "/operation?tab=delivery");
-    expect(row.className).toContain("bg-kit-blue-3");
-    expect(row).toHaveTextContent("Delivery");
-    expect(screen.queryByTestId("nav-module-delivery")).toBeNull();
-    expect(screen.queryByTestId("nav-child-delivery-orders")).toBeNull();
+    expect(screen.getByTestId("nav-module-delivery")).toBeInTheDocument();
+    const rows = Array.from(
+      screen
+        .getByTestId("nav-children-delivery")
+        .querySelectorAll("[data-testid^='nav-child-']"),
+    ).map((el) => el.textContent?.replace("Coming soon", "").trim());
+    expect(rows).toEqual(["Monitor", "Delivery Orders"]);
+  });
+
+  it("Monitor opens ?tab=delivery and is the ONLY active row there", () => {
+    renderAt("/operation?tab=delivery");
+    const monitor = child("delivery");
+    expect(monitor.tagName).toBe("A");
+    expect(monitor).toHaveAttribute("href", "/operation?tab=delivery");
+    expect(monitor.className).toContain("bg-kit-blue-3");
+    expect(child("delivery-orders").className).not.toContain("bg-kit-blue-3");
+  });
+
+  it("Delivery Orders opens its restored register route and lights only itself", () => {
+    renderAt("/operation/delivery-orders");
+    const register = child("delivery-orders");
+    expect(register).toHaveAttribute("href", "/operation/delivery-orders");
+    expect(register.className).toContain("bg-kit-blue-3");
+    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
+  });
+
+  it("a DO object deep link lights the Delivery Orders row", () => {
+    renderAt("/operation/delivery-orders/DO-040926-0001");
+    expect(child("delivery-orders").className).toContain("bg-kit-blue-3");
+    expect(child("delivery").className).not.toContain("bg-kit-blue-3");
   });
 
   it("does not show retired Delivery destinations", () => {
     renderAt("/operation?tab=delivery");
     for (const key of [
-      "delivery-orders",
       "delivery-schedule",
       "delivery-history",
       "delivery-exceptions",
@@ -1208,14 +1236,18 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("Dashboard, Inbound and Outbound print `Coming soon` and are NOT controls", () => {
+  it("Dashboard and Outbound are live links; Inbound still prints `Coming soon`", () => {
     renderAt("/operation?tab=stock-onhand");
-    for (const key of ["wh-dashboard", "wh-inbound", "wh-outbound"]) {
-      const row = child(key);
-      expect(row.tagName).toBe("SPAN");
-      expect(row.getAttribute("aria-disabled")).toBe("true");
-      expect(within(row).getByText("Coming soon")).toBeInTheDocument();
-    }
+    const dash = child("wh-dashboard") as HTMLAnchorElement;
+    expect(dash.tagName).toBe("A");
+    expect(dash).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
+    const outbound = child("wh-outbound") as HTMLAnchorElement;
+    expect(outbound.tagName).toBe("A");
+    expect(outbound).toHaveAttribute("href", "/operation?tab=warehouse-outbound");
+    const inbound = child("wh-inbound");
+    expect(inbound.tagName).toBe("SPAN");
+    expect(inbound.getAttribute("aria-disabled")).toBe("true");
+    expect(within(inbound).getByText("Coming soon")).toBeInTheDocument();
   });
 
   /* The superseded subtree is GONE from the rail. The pages behind
@@ -1237,13 +1269,14 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
   });
 
   /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
-   * Warehouse names `Inventory` as its landing until Dashboard is built. */
-  it("the collapsed Warehouse icon links to Inventory, and lights on a Warehouse page", () => {
+   * Warehouse names `Dashboard` as its landing (Card 03) — by name, never
+   * derived from row order. */
+  it("the collapsed Warehouse icon links to Dashboard, and lights on a Warehouse page", () => {
     localStorage.setItem("ops-sidebar-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
-      expect(icon).toHaveAttribute("href", "/operation?tab=stock-onhand");
+      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
       expect(icon.className).toContain("bg-kit-blue-3");
     } finally {
       localStorage.removeItem("ops-sidebar-collapsed");

@@ -1,3 +1,9 @@
+import { addWorkingDays, countWorkingDays } from "./working-days";
+import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { myHolidaySet } from "./my-holidays";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
+import type { WorkItem } from "./work-engine";
+
 /**
  * Purchase Order Register facts from persisted document, send and receiving
  * evidence. Opening an external app is history; only `confirmed_sent` for the
@@ -54,7 +60,11 @@ export interface PurchaseOrderRegisterFacts {
   quantities: { ordered: number; received: number; open: number };
   currentSend: PurchaseOrderRegisterSend | null;
   latestConfirmedSend: PurchaseOrderRegisterSend | null;
-  supplierHas: string;
+  /** The latest PO version with confirmed-send evidence — `PO V{n}`, or `Not
+   *  sent` when no version has ever been confirmed sent. A PO that received
+   *  goods without a send record stays honestly `Not sent`; missing evidence
+   *  is never fabricated. */
+  sentToSupplier: string;
   documentState: "Not sent to supplier" | "Issued" | "Completed" | "Cancelled";
   operationStatus: PurchaseOrderOperationStatus | null;
   filters: PurchaseOrderRegisterFilter[];
@@ -123,7 +133,7 @@ export function purchaseOrderRegisterFacts(
     quantities: { ordered, received, open },
     currentSend,
     latestConfirmedSend,
-    supplierHas: supplierVersion == null ? "No current PDF" : `Version ${supplierVersion}`,
+    sentToSupplier: supplierVersion == null ? "Not sent" : `PO V${supplierVersion}`,
     documentState: cancelled
       ? "Cancelled"
       : completed
@@ -148,8 +158,8 @@ export function purchaseOrderWork(
   if (facts.operationStatus === "Completed" || facts.operationStatus === "Cancelled") return null;
   if (facts.filters.includes("supplier_update_required")) {
     return {
-      problem: `Version ${facts.version} has not been sent`,
-      action: `Issue Version ${facts.version} to ${input.supplierName}`,
+      problem: `PO V${facts.version} has not been sent`,
+      action: `Issue PO V${facts.version} to ${input.supplierName}`,
     };
   }
   if (facts.filters.includes("pdf_not_sent")) {
@@ -160,15 +170,55 @@ export function purchaseOrderWork(
   }
   if (facts.filters.includes("supplier_date_missing")) {
     return {
-      problem: "The supplier date is missing",
-      action: `Ask ${input.supplierName} for the delivery date`,
+      problem: "Supplier has not confirmed the PO date",
+      action: `Ask ${input.supplierName} to confirm the PO delivery date`,
     };
   }
   if (facts.filters.includes("supplier_date_passed")) {
     return {
-      problem: `The supplier date has passed and ${facts.quantities.open} are still open`,
+      problem: "Supplier delivery date passed",
       action: `Ask ${input.supplierName} when the goods will arrive`,
     };
   }
   return null;
+}
+
+/** Purchasing supplies the same reply facts to central Work; no local queue. */
+export function purchaseOrderReplyWorkItems(
+  input: PurchaseOrderRegisterInput,
+  owner: WorkspaceDutyResolution | null,
+  today: string,
+  holidays: ReadonlySet<string> = myHolidaySet(),
+): WorkItem[] {
+  const facts = purchaseOrderRegisterFacts(input, today);
+  const missing = facts.filters.includes("supplier_date_missing");
+  const passed = facts.filters.includes("supplier_date_passed");
+  if (!missing && !passed) return [];
+  const copy = purchaseOrderWork(input, facts)!;
+  const firstSend = input.sends.filter(send => send.kind === "confirmed_sent" && send.poVersion === facts.version)
+    .sort((a, b) => a.sentAt.localeCompare(b.sentAt))[0];
+  // Reply work starts on the sent day; a passed promise starts on that date.
+  // Move only the computed work day to the next Office working day.
+  let due = passed ? input.supplierDate ?? null : firstSend
+    ? new Date(Date.parse(firstSend.sentAt) + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    : null;
+  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  if (due && (PURCHASING_OFFICE_OFF_DAYS.includes(new Date(`${due}T00:00:00Z`).getUTCDay()) || holidays.has(due))) {
+    due = addWorkingDays(due, 1, options);
+  }
+  return [{
+    ruleKey: passed ? "purchasing.supplier_date_passed" : "purchasing.supplier_reply",
+    module: "purchasing", soRef: input.id, orderId: input.id,
+    action: copy.action,
+    ownerRule: "po_duty", ownerDutyKey: "po_duty",
+    normalOwner: owner?.normalOwner ?? null,
+    activeCover: owner?.activeCover ?? null,
+    actingPerson: owner?.actingPerson ?? null,
+    ownerState: owner?.state ?? "not_assigned",
+    ownerName: owner?.actingPerson?.name ?? null,
+    ownerUserId: owner?.actingPerson?.userId ?? null,
+    ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
+    tone: passed ? "warning" : "info", locked: false, broken: false,
+    dueIso: due, workingDaysLate: due && due < today ? countWorkingDays(due, today, options) : 0,
+  }];
 }

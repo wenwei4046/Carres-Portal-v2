@@ -19,8 +19,11 @@ const KID = "k1";
 let signKey: KeyLike;
 let publicJwk: JWK;
 
-async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
+async function makeJwt(role: string, warehouseId?: string) {
+  return new SignJWT({
+    email: `${role}@x`,
+    app_metadata: { role, ...(warehouseId ? { warehouse_id: warehouseId } : {}) },
+  })
     .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
     .setSubject("11111111-1111-1111-1111-000000000001")
     .setIssuedAt()
@@ -108,8 +111,8 @@ function mockSb(
   return { from, rpc };
 }
 
-async function call(path: string, role: string, init?: RequestInit) {
-  const jwt = await makeJwt(role);
+async function call(path: string, role: string, init?: RequestInit, warehouseId?: string) {
+  const jwt = await makeJwt(role, warehouseId);
   return app.fetch(
     new Request(`http://t/api/operation/delivery-orders${path}`, {
       ...init,
@@ -139,6 +142,17 @@ describe("GET /api/operation/delivery-orders — the register", () => {
     mockSb([]);
     const res = await call("", "supplier");
     expect([401, 403]).toContain(res.status);
+  });
+
+  it("the register read carries the proof + goods facts its WORK TO DO rail counts (correction 2026-09-06)", async () => {
+    const { from } = mockSb([{ data: [DO_ROW] }, { data: [] }, { data: [] }]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const chain = from.mock.results[0]!.value as { select: ReturnType<typeof vi.fn> };
+    const selected = String(chain.select.mock.calls[0]![0]);
+    expect(selected).toContain("do_file_path");
+    expect(selected).toContain("order_lines(id, sku, qty, attrs)");
+    expect(selected).toContain("ops_order_control(delivery_photos)");
   });
 
   it("computes nothing server-side — no owner, action or status field rides a row", async () => {
@@ -269,6 +283,60 @@ describe("POST /:id/handover — the §4 chain door (0363)", () => {
     expect(body.message).toContain("does not belong to this delivery order");
   });
 
+  it("passes the batch's exact Unit IDs to the governed door (0424)", async () => {
+    const { rpc } = mockSb(
+      [
+        {
+          data: {
+            id: DO_ID,
+            trip_groups: null,
+            orders: { order_lines: [{ sku: "JAGER-SS", qty: 2 }] },
+          },
+        },
+      ],
+      [{ data: { id: "ev3", kind: "handed_over", acceptedUnits: 1, requiredUnits: 2 } }],
+    );
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "handed_over",
+        receiverName: "Ahmad",
+        proofPath: `handover/${DO_ID}/proof.jpg`,
+        unitCodes: ["U1-260-019"],
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith(
+      "delivery_handover_record",
+      expect.objectContaining({ p_unit_codes: ["U1-260-019"] }),
+    );
+  });
+
+  it("admits a warehouse login bound to a warehouse — the RPC owns the Site boundary", async () => {
+    const { rpc } = mockSb([], [{ data: { id: "ev4", kind: "ready_for_handover" } }]);
+    // A warehouse login's ancillary reads use admin; give it the same mock.
+    vi.mocked(adminClient).mockReturnValue(
+      (vi.mocked(userClient).mock.results[0]?.value ?? { from: vi.fn() }) as never,
+    );
+    const res = await call(
+      `/${DO_ID}/handover`,
+      "warehouse",
+      { method: "POST", body: JSON.stringify({ kind: "ready_for_handover" }) },
+      "wh-own",
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalled();
+  });
+
+  it("refuses a warehouse login that is not bound to a warehouse", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/handover`, "warehouse", {
+      method: "POST",
+      body: JSON.stringify({ kind: "ready_for_handover" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it("the door's own refusals reach the operator in words (out-of-order chain)", async () => {
     const { rpc } = mockSb(
       [],
@@ -295,6 +363,55 @@ describe("POST /:id/handover — the §4 chain door (0363)", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("handover_out_of_order");
+  });
+});
+
+describe("POST /:id/outbound-prep — scan / check / pack exact Units (0424)", () => {
+  const DO_ID = "00000000-0000-0000-0000-0000000d0001";
+
+  it("records the fact through the governed prep door", async () => {
+    const { rpc } = mockSb([], [{ data: { recorded: 2, alreadyRecorded: 0 } }]);
+    const res = await call(`/${DO_ID}/outbound-prep`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ fact: "scanned", unitCodes: ["U1-260-019", "U1-260-020"] }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("delivery_outbound_prep_record", {
+      p_do_id: DO_ID,
+      p_fact: "scanned",
+      p_unit_codes: ["U1-260-019", "U1-260-020"],
+    });
+  });
+
+  it("refuses an unknown preparation fact before any call is made", async () => {
+    const { rpc } = mockSb([]);
+    const res = await call(`/${DO_ID}/outbound-prep`, "operation", {
+      method: "POST",
+      body: JSON.stringify({ fact: "labelled", unitCodes: ["U1-260-019"] }),
+    });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a role outside operation/principal/warehouse", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/outbound-prep`, "supplier", {
+      method: "POST",
+      body: JSON.stringify({ fact: "scanned", unitCodes: ["U1-260-019"] }),
+    });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  it("admits a bound warehouse login — the RPC re-checks its Site", async () => {
+    const { rpc } = mockSb([], [{ data: { recorded: 1, alreadyRecorded: 0 } }]);
+    const res = await call(
+      `/${DO_ID}/outbound-prep`,
+      "warehouse",
+      { method: "POST", body: JSON.stringify({ fact: "scanned", unitCodes: ["U1-260-019"] }) },
+      "wh-own",
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalled();
   });
 });
 

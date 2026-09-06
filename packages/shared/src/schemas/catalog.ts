@@ -1416,14 +1416,27 @@ export const supplierCreateInput = z
   .object({
     name: z.string().trim().min(2).max(80),
     kind: z.enum(["own_logistics", "factory_pickup"]),
-    /* The categories this supplier can be auto-resolved for. Empty is legal —
-     * an explicit pick on the SKU still routes to it — so a keyer is never
-     * blocked by a question they cannot answer yet. */
-    catCovered: z.array(productCategorySchema).max(20).default([]),
-    contact: z.string().trim().max(200).optional(),
-    leadTime: z.string().trim().max(60).optional(),
+    catCovered: z.array(z.enum(["mattress", "bedframe", "sofa"])).min(1).max(3),
+    productionDays: z.array(z.object({
+      category: z.enum(["mattress", "bedframe", "sofa"]),
+      workingDays: z.number().int().min(1).max(180),
+    }).strict()).min(1).max(3),
+    offDays: z.array(z.number().int().min(0).max(6)).min(1).max(6),
   })
-  .strict();
+  .strict().superRefine((input, ctx) => {
+  const categories = new Set(input.catCovered);
+  if (categories.size !== input.catCovered.length ||
+      input.productionDays.length !== categories.size ||
+      new Set(input.productionDays.map(row => row.category)).size !== categories.size ||
+      input.productionDays.some(row => !categories.has(row.category))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["productionDays"],
+      message: "Add Production Days for every selected category." });
+  }
+  if (new Set(input.offDays).size !== input.offDays.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["offDays"],
+      message: "Choose each day once." });
+  }
+});
 export type SupplierCreateInput = z.infer<typeof supplierCreateInput>;
 
 /** The stable slug for a supplier name: lowercase, punctuation folded to single

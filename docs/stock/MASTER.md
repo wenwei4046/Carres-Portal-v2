@@ -1,6 +1,6 @@
 # STOCK / WAREHOUSE — MASTER
 
-> **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, 2026-09-01.**
+> **APPROVED / LOCKED — complete owner-reviewed Warehouse Blueprint, re-closed 2026-09-04.**
 > This is the only Warehouse operating model. It overwrites the former On hand, Ready stock
 > planning and Held stock model. Current code is evidence only, never target authority.
 
@@ -46,6 +46,12 @@ Purchasing, Delivery, Payments and Service Cases keep their own doors.
 
 Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
+
+**WAREHOUSE DASHBOARD CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Dashboard's
+page-owned filter groups are `OUTBOUND SCHEDULE · SITE · SOURCE`. These are read-only filters over
+the dated Warehouse projection, never new records or destinations. A valid empty day says
+`No outbound handovers on {date}. Choose another date.` The Calendar card uses the owning source's
+actual words and never invents a shorter Warehouse status vocabulary.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
 Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
@@ -322,6 +328,34 @@ The shared six-working-day strip is the Warehouse daily operating spine, not a d
 For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
 5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
 later working date come from the Warehouse calendar rather than staff memory.
+
+**DASHBOARD CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Dashboard is the
+read-only date overview; it does not replace Outbound's exact-Unit work listing. On desktop the six
+operating dates remain one chronological horizontal sequence. Date columns have a readable minimum
+width and the Dashboard work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
+grid whose tall first row pushes later days below the fold. There is one shared vertical scroll,
+not an independent scroll inside every day column. At narrow width the same projection becomes a
+single-day agenda with previous/next date controls; data, permissions and destinations do not
+change.
+
+This card Calendar is the Dashboard's selected `OUTBOUND SCHEDULE` projection. It does not remove
+the same Dashboard's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
+one of those opens that owner's dated rows rather than repainting them as outbound cards.
+
+One Calendar card is one governed outbound source scope, never one whole customer order and never a
+second DO. It shows, in this order: actual handover time when one exists · clickable source document
+(`DO No` for customer delivery) · `From → To` · named Logistics Partner/receiving party · `Units
+required` · `Handed over` · `Not handed over` · the current Warehouse fact or shared Work action.
+The card may aggregate for scanning only when every count drills to the exact Unit IDs. It never
+shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem, or an
+`Edit Delivery` control. A Failed Delivery appears only through the exact governed return/collection
+work that now requires a Warehouse physical act.
+
+Clicking the card opens **Outbound** already scoped to that date and source. It does not make the
+formal DO the Warehouse work surface. The `DO No` inside Outbound remains a door to the read-only
+source document. The signed-in Warehouse operator checks, packs, scans and confirms the handover in
+Outbound; Delivery remains the only owner of its partner/date/time/route editor. Return restores the
+Dashboard date, Site, Source filter and scroll position.
 
 For any selected date, the operator journey is always:
 
@@ -1730,6 +1764,64 @@ Header and none suppressed the slim global bar; all four do now, with a dashboar
 The rail group and column that said `Attention` say **`Needs checking`** (§2's rejected-word
 list, applied). Column/rail re-architecture to §12.1's defaults remains the next Inventory
 slice, deliberately.
+
+### 13.7 · BUILT — Dashboard Calendar → exact-Unit Outbound handover (CARD 03, 0424)
+
+`CARD-2026-09-04-warehouse-03-dashboard-outbound` shipped the vertical slice: Dashboard
+Calendar → scoped Outbound → exact-Unit scan/check/pack → evidence-backed partial or complete
+handover → atomic `Who has it` update.
+
+**The exact-Unit transaction (migration `0424`).** `delivery_order_units` snapshots the DO's
+required scope from the ONE Sales Order allocation at issue (a trigger on the one issuing path;
+live whole-order documents backfilled deterministically — zero live split documents existed, so
+nothing was guessed). `delivery_unit_prep` records per-Unit `scanned → checked → packed`
+append-only and idempotently. `delivery_handover_event_units` records which exact Units each
+accepted batch moved (`recorded_side` keeps the Logistics receipt's OWN list beside the
+Warehouse's); a Unit is accepted once per scope and holds at most one live delivery claim. The
+ONE extended door `delivery_handover_record` validates scope · Site · holder · prep · receiver ·
+proof, appends the batch and moves ONLY the accepted Units' `holder_party_id` to the partner's
+governed operating party (`delivery_partners.operating_party_id` — NETS links to 0366's
+`nets_delivery` seed by CODE; every other partner minted its own delivery-operator identity 1:1;
+the client never sends the holder). 0366's lineage trigger records each `holder_changed`. Every
+refusal branch — duplicate · wrong Site · wrong DO · wrong holder · voided · missing proof ·
+out-of-order · unauthorised role · warehouse recording the logistics receipt — was proven
+against production in rolled-back probes before merge, ending `PROBE_COMPLETE_ALL_PASS`.
+
+**The surfaces.** `?tab=warehouse-dashboard` is the read-only Calendar (six operating dates in
+ONE horizontal sequence, shared vertical scroll, one-day agenda below 1280px, the governed empty
+sentence, rail `OUTBOUND SCHEDULE · SITE · SOURCE` with no dead one-option group) and became
+the module's NAMED landing (`WAREHOUSE_LANDING_KEY`). `?tab=warehouse-outbound` is the dated
+work listing with the §12.6 defaults and the exact-Unit drill-down; card click opens it scoped,
+`DO No` opens the formal read-only document, and one mounted workspace keeps the board's
+filters/scroll across Back. The Warehouse acts LEFT the Delivery surfaces: the DO object offers
+the `Open Outbound` door and keeps only `Confirm logistics receipt`. The external Warehouse
+shell gained `/warehouse/outbound` — the minimum responsive handover door over the SAME feed and
+the SAME governed writers, Site-narrowed server-side. The schedule feed now reads
+`delivery_order_units` as the required-scope authority and carries per-Unit prep/handover facts;
+`warehouseOutboundCards()` in `packages/shared` is the ONE card arithmetic
+(`required = handed over + not handed over`, §3.5.1).
+
+**Production proof — 2026-09-04.** Merged as `71f0bfd4` (PR #1091); `0424` applied through the
+governed path (tracker tail `0424_outbound_hands_over_exact_units_and_the_holder_moves`;
+backfill produced both live DOs' scopes, 0 split documents surfaced, all 12 partners resolve a
+holder, NETS → the `nets_delivery` seed). `erp.carresofficial.com/__carres_deploy.json`
+reported exactly `71f0bfd4` after the deploy run succeeded. Authenticated walk as
+`operation@carres.com` on that SHA: Dashboard rendered the approved rail and six-date board
+with the exact empty sentence; saving a NETS arrangement on SO-1321 through Edit Delivery made
+the `DO-170826-5050` card appear under Fri, 4 Sep reading `Required 1 · Handed over 0 · Not
+handed over 1`; the card opened Outbound scoped by URL; scan → check → pack recorded through
+the prep door (duplicate scan reconciled); `Record handover` with the actual receiver and an
+uploaded proof landed the batch — the card re-read `12:53 · Required 1 · Handed over 1 · Not
+handed over 0`, `ops_stock_items.holder_party_id` moved to **NETS Delivery** with one
+`holder_changed` lineage event and the stored proof; `DO No` opened the formal read-only
+document whose header now offers only `Confirm logistics receipt` and whose Warehouse handover
+block and History print the fact with recorder/duty/receiver; browser Back restored Outbound
+then the Dashboard. Narrow/mobile agenda verified at 375px against the identical code (the
+committed dev preview): one-day agenda, `[Filters]` drawer, horizontally self-scrolling Unit
+table — the walk found and fixed the rail crushing the agenda (`build/warehouse-03-walk-fixes`).
+Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every refusal branch
+and the partial-batch holder transition were proven on production in rolled-back probes before
+merge (`PROBE_COMPLETE_ALL_PASS`).
 
 ## 14 · Whole-domain completion gate
 

@@ -254,11 +254,16 @@ describe("DeliveryOrderPage", () => {
     expect(document.querySelectorAll("input, textarea, select").length).toBe(0);
   });
 
-  it("puts the next warehouse handover action in the DO object header", () => {
+  it("the DO object header offers the DOOR to Outbound while goods are not handed over", () => {
+    // Warehouse Card 03: the Warehouse acts moved to the Outbound page — the
+    // object header links there instead of recording the act itself.
     mount(payload());
-    expect(
-      screen.getByTestId("do-object-primary-action"),
-    ).toHaveTextContent("Mark ready for handover");
+    const door = screen.getByTestId("do-object-primary-action");
+    expect(door).toHaveTextContent("Open Outbound");
+    expect(door).toHaveAttribute(
+      "href",
+      expect.stringContaining("tab=warehouse-outbound"),
+    );
   });
 
   it("offers no handover writer after all three facts are recorded", () => {

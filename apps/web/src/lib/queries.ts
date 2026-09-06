@@ -15,6 +15,7 @@ import {
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
   type JumpSearchResponse,
@@ -232,7 +233,6 @@ import {
   type PurchasingSettingsResponse,
   type PurchasingCreateDestinationInput,
   type PurchasingSetNumberInput,
-  type PurchasingSetSwitchInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
   type PurchasingSetWorkWeekInput,
@@ -513,11 +513,20 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
+    /** The paged GRN Register (owner correction 2026-09-06) — one key per
+     *  filter/page combination, under the same invalidation root as the
+     *  queue: a check-in mints the row this register must show. */
+    grnRegister: (filters: Record<string, string | number | null>) =>
+      ["operation", "warehouse-receipts", "grn", filters] as const,
     /** Slice B — one PO's Receiving Sessions + their event ledger. The
      *  Workspace's Summary and Activity both read this ONE call, so the two
      *  sections can never describe the same delivery differently. */
     poReceiving: (poId: string) =>
       ["operation", "pos", poId, "receiving"] as const,
+    /** 0425/0426 — who may save a Receiving today, and one session's record. */
+    receivingDuty: () => ["operation", "receiving-duty"] as const,
+    receivingSession: (id: string) =>
+      ["operation", "warehouse-receipts", "session", id] as const,
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
@@ -583,6 +592,8 @@ export const qk = {
       ["finance", "recon-suggest", bankStmtId] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
+    paymentRegister: () => ["finance", "payment-register"] as const,
+    invoiceRegister: () => ["finance", "invoice-register"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -3385,6 +3396,7 @@ export interface operationPoListRow {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  official_delivery_date?: string | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
    *  after a supplier answered. It is NOT `eta_date`, which is our own
@@ -3453,12 +3465,20 @@ export interface operationPoListRow {
       so: number | null;
       qty: number;
     }[];
-    /** Exact governed lineage for this line, including Manual Purchase. */
+    /** Exact governed lineage for this line, including Manual Purchase.
+     *  Card 08 §3.5: a Manual Purchase source's visible reference is the
+     *  label `Manual Purchase`; its identity is the invisible request UUID
+     *  plus the business facts beside it — never an MPR number. */
     governed_sources?: Array<{
       kind: "sales_order" | "manual_purchase";
       reference: string;
       /** Null preserves a legacy source link whose exact allocation is unknown. */
       qty: number | null;
+      /** Manual Purchase only — the source request's invisible identity. */
+      request_id?: string | null;
+      /** Manual Purchase only — business facts that distinguish sources. */
+      purpose?: string | null;
+      proceed_date?: string | null;
     }>;
     /** Register (Jess, 2026-08-02) — the EXCEL rows this PO line becomes:
      *  one entry per SO × SKU, each carrying the SALESPERSON's remark from
@@ -3506,6 +3526,16 @@ export interface operationPoListRow {
   /** The supplier-date field's own history (0306 ledger, newest first) —
    *  it renders BESIDE the field, never in the Activity timeline. */
   promises?: {
+    po_version?: number | null;
+    channel?: string | null;
+    recipient?: string | null;
+    evidence?: string | null;
+    reported_by?: string | null;
+    reported_at?: string | null;
+    recorded_by?: string | null;
+    recorded_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
     kind: string;
     answer: string;
     about_date: string | null;
@@ -3529,10 +3559,16 @@ export interface operationPoListRow {
   /** 2026-05-18 (Loo C+D) — worst-case urgency across source SOs. NULL when
    *  the PO has no source SOs (stockpile) or all delivery_date are NULL. */
   urgency?: "critical" | "urgent" | "normal" | null;
-  /** Governed document sources, never inferred from display-only SO mirrors. */
+  /** Governed document sources, never inferred from display-only SO mirrors.
+   *  Card 08 §3.5: Manual Purchase sources carry the label `Manual Purchase`
+   *  as `reference`, stay distinct by `request_id` (never collapsed because
+   *  the label matches), and bring the business facts that tell them apart. */
   sources?: Array<{
     kind: "sales_order" | "manual_purchase";
     reference: string;
+    request_id?: string | null;
+    purpose?: string | null;
+    proceed_date?: string | null;
   }>;
 }
 export interface operationPosListResponse {
@@ -4191,6 +4227,280 @@ export interface WarehouseReceiptQueueRow {
   /** True when checking this in will file supplier claims. Said BEFORE the
    *  button is pressed. */
   opens_claims: boolean;
+  /** 0426 — the Receiving Register's own facts. */
+  grn_no?: string | null;
+  goods_received_at?: string;
+  submitted_from?: "office" | "warehouse";
+  posted_at?: string | null;
+  posted_by_name?: string | null;
+  actual_site_id?: string | null;
+  actual_site_name?: string | null;
+  posted_duty_holder_name?: string | null;
+  posted_duty_cover_name?: string | null;
+  posted_authority?: "grn_duty" | "cover" | "superuser" | null;
+  arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  void_at?: string | null;
+  void_by_name?: string | null;
+  void_reason?: string | null;
+  do_file_url?: string | null;
+  /** The governed category words this receiving answers to (owner correction
+   *  2026-09-06) — computed server-side through the ONE shared ladder from
+   *  the catalog's answer; the rail only counts them. */
+  categories?: string[];
+  /** The linked PO's governed `Supplier Delivery Date` (ISO) — the ONE reply
+   *  arithmetic (`poSupplierDeliveryDateOf`), resolved server-side. */
+  supplier_delivery_date?: string | null;
+  /** The Product cell's words — the GRN paper's own line description
+   *  (`product_skus.variant`, else the SKU), distinct, server-resolved. */
+  product_labels?: string[];
+}
+
+/** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
+ *  (0425). The page CONSUMES the shared resolver's answer; it never reads a
+ *  rota or computes an offset (ERP-ARCHITECTURE Law F.1). */
+export interface ReceivingDutyContext {
+  duty_key: string;
+  normal_user_id: string | null;
+  normal_user_name: string | null;
+  acting_user_id: string | null;
+  acting_user_name: string | null;
+  actor_user_id: string | null;
+  is_cover: boolean;
+  is_superuser: boolean;
+  allowed: boolean;
+  source: "assignment" | "not_assigned";
+}
+
+/** `Workspace → Staff & Duties` (0425) — the duty catalogue, each with its
+ *  resolution today, its assignment history and covers. `can_assign` is the
+ *  SAME gate the write doors raise, as a fact. */
+export interface WorkspaceDutyAssignment {
+  id: string;
+  duty_key: string;
+  holder_id: string;
+  holder_name: string | null;
+  effective_from: string;
+  effective_until: string | null;
+  assigned_by_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+export interface WorkspaceDutyCover {
+  id: string;
+  duty_key: string;
+  normal_user_id: string;
+  normal_user_name: string | null;
+  acting_user_id: string;
+  acting_user_name: string | null;
+  starts_on: string;
+  ends_on: string;
+  reason: string | null;
+  assigned_by_name: string | null;
+  created_at: string;
+}
+export interface WorkspaceDutiesResponse {
+  can_assign: boolean;
+  duties: Array<{
+    key: string;
+    label: string;
+    resolution: ReceivingDutyContext & {
+      normal_user_name: string | null;
+      acting_user_name: string | null;
+    };
+    assignments: WorkspaceDutyAssignment[];
+    covers: WorkspaceDutyCover[];
+  }>;
+}
+
+export function useWorkspaceDuties(
+  opts?: Partial<UseQueryOptions<WorkspaceDutiesResponse>>,
+) {
+  return useQuery({
+    queryKey: ["operation", "workspace-duties"],
+    queryFn: () =>
+      apiFetch<WorkspaceDutiesResponse>("/api/operation/workspace-duties"),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useWorkspaceAssignDutyMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      unknown,
+      ApiError,
+      {
+        dutyKey: string;
+        holderId: string;
+        effectiveFrom: string;
+        effectiveUntil?: string;
+        note?: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) =>
+      apiFetch<unknown>("/api/operation/workspace-duties/assign", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useWorkspaceCoverDutyMutation(
+  opts?: Partial<
+    UseMutationOptions<
+      unknown,
+      ApiError,
+      {
+        dutyKey: string;
+        actingUserId: string;
+        startsOn: string;
+        endsOn: string;
+        reason?: string;
+      }
+    >
+  >,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) =>
+      apiFetch<unknown>("/api/operation/workspace-duties/cover", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+export function useReceivingDuty(
+  opts?: Partial<UseQueryOptions<ReceivingDutyContext>>,
+) {
+  return useQuery({
+    queryKey: qk.operation.receivingDuty(),
+    queryFn: () =>
+      apiFetch<ReceivingDutyContext>("/api/operation/warehouse-receipts/duty"),
+    staleTime: 60_000,
+    ...opts,
+  });
+}
+
+/** GET /api/operation/warehouse-receipts/:id — one Receiving Session / GRN
+ *  record: the row, its per-Unit results, its source PO and its events. */
+export interface ReceivingSessionDetail {
+  receipt: WarehouseReceiptQueueRow & {
+    unit_results: Array<{
+      stock_item_id: string;
+      unit_code: string;
+      outcome: "received" | "received_with_issue" | "not_received";
+      issue_kind: "damaged" | "wrong_item" | null;
+      note: string | null;
+    }>;
+  };
+  po: {
+    id: string;
+    supplier_id: string;
+    warehouse_id: string;
+    purchase_order_lines: Array<{
+      id: string;
+      sku: string;
+      qty: number;
+      received_qty: number;
+      damaged_qty: number;
+      wrong_item_qty: number;
+    }>;
+  } | null;
+  /** The formal GRN document's product facts — catalog description + the
+   *  governed category word, resolved server-side (2026-09-06). */
+  line_info?: Record<string, { description: string | null; category: string }>;
+  events: ReceivingEvent[];
+}
+
+export function useReceivingSessionDetail(id: string | null) {
+  return useQuery<ReceivingSessionDetail>({
+    queryKey: qk.operation.receivingSession(id ?? ""),
+    queryFn: () =>
+      apiFetch<ReceivingSessionDetail>(
+        `/api/operation/warehouse-receipts/${id}`,
+      ),
+    enabled: !!id,
+  });
+}
+
+/** POST /:id/amend — `Amend Receiving` (0426). */
+export interface ReceivingAmendBody {
+  reason: string;
+  saveKey?: string;
+  goodsReceivedAt?: string;
+  doNumber?: string;
+  actualSiteId?: string | null;
+  /** 0427 — a corrected signed-DO file; the old path is preserved in the
+   *  amendment's before/after. */
+  doFilePath?: string;
+  /** 0427 — additional arrival evidence; append-only. */
+  arrivalEvidenceAdd?: Array<{ path: string; kind: "photo" | "video" }>;
+  lines?: Array<{ id: string; receivedNow: number }>;
+}
+
+export function useReceivingAmendMutation(
+  id: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, ReceivingAmendBody>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, ReceivingAmendBody>({
+    mutationFn: (body) =>
+      apiFetch<unknown>(`/api/operation/warehouse-receipts/${id}/amend`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** POST /:id/void — `Void Receiving` (0426): only for a GRN that should never
+ *  have existed. Downstream blockers come back as the RPC's named refusal. */
+export function useReceivingVoidMutation(
+  id: string,
+  opts?: Partial<UseMutationOptions<unknown, ApiError, { reason: string }>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { reason: string }>({
+    mutationFn: (body) =>
+      apiFetch<unknown>(`/api/operation/warehouse-receipts/${id}/void`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: qk.operation.receivingSession(id) });
+      await qc.invalidateQueries({ queryKey: ["operation", "warehouse-receipts"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "pos"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
 }
 
 export interface WarehouseReceiptsQueueResponse {
@@ -4207,8 +4517,61 @@ export function useOperationWarehouseReceipts(
     queryKey: qk.operation.warehouseReceipts(status),
     queryFn: () =>
       apiFetch<WarehouseReceiptsQueueResponse>(
-        `/api/operation/warehouse-receipts?status=${status}`,
+        // The Register virtualises its rows, so it may list a large GRN
+        // history in one fetch (the server hard-caps the limit).
+        `/api/operation/warehouse-receipts?status=${status}&limit=1000`,
       ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** The paged GRN Register's ask and answer (owner correction 2026-09-06). */
+export interface GrnRegisterFilters {
+  offset: number;
+  category: string | null;
+  supplier: string | null;
+  site: string | null;
+  /** The rail Calendar's picked `Supplier Delivery Date` (ISO). */
+  expected: string | null;
+  q: string;
+}
+export interface GrnRegisterResponse {
+  receipts: WarehouseReceiptQueueRow[];
+  page: { offset: number; limit: number; total: number };
+  facets: {
+    category: Record<string, number>;
+    supplier: Record<string, number>;
+    site: Record<string, number>;
+  };
+  counts: { waiting: number };
+}
+
+/**
+ * The GRN Register, paged on the SERVER — `Showing 1–50 of 10,000` and every
+ * rail count are the truth about the WHOLE filtered result set, computed by
+ * the one shared arithmetic (`buildGrnRegisterView`) behind `?scope=grn`.
+ * `keepPreviousData` holds the current page while the next one loads so
+ * Previous/Next never blinks the register empty.
+ */
+export function useOperationGrnRegister(
+  filters: GrnRegisterFilters,
+  opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
+) {
+  const params = new URLSearchParams({ scope: "grn" });
+  if (filters.offset > 0) params.set("offset", String(filters.offset));
+  if (filters.category) params.set("category", filters.category);
+  if (filters.supplier) params.set("supplier", filters.supplier);
+  if (filters.site) params.set("site", filters.site);
+  if (filters.expected) params.set("expected", filters.expected);
+  if (filters.q.trim()) params.set("q", filters.q.trim());
+  return useQuery({
+    queryKey: qk.operation.grnRegister({ ...filters }),
+    queryFn: () =>
+      apiFetch<GrnRegisterResponse>(
+        `/api/operation/warehouse-receipts?${params.toString()}`,
+      ),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     ...opts,
   });
@@ -4229,7 +4592,7 @@ export function useWarehouseReceiptReviewMutation(
     UseMutationOptions<
       Record<string, unknown>,
       ApiError,
-      { receiptId: string; reason?: string }
+      { receiptId: string; reason?: string; actualSiteId?: string }
     >
   >,
 ) {
@@ -4237,7 +4600,7 @@ export function useWarehouseReceiptReviewMutation(
   return useMutation<
     Record<string, unknown>,
     ApiError,
-    { receiptId: string; reason?: string }
+    { receiptId: string; reason?: string; actualSiteId?: string }
   >({
     mutationFn: ({ receiptId, ...body }) =>
       apiFetch<Record<string, unknown>>(
@@ -4489,7 +4852,10 @@ export function usePurchasePushLines() {
 
 export interface PurchaseRequestRow {
   id: string;
-  req_no: string;
+  /** Legacy compatibility only (Card 08, 2026-09-04): historical rows keep
+   *  their stored REQ/MPR value; new rows are null. No operator-facing
+   *  component may consume it — the UUID is the identity. */
+  req_no: string | null;
   purpose: string;
   destination_id: string;
   required_by: string | null;
@@ -4582,10 +4948,11 @@ export interface ManualPurchaseRegisterPayload {
    *  and whether the server date plan could be loaded at all. */
   todayIso?: string;
   planUnavailable?: boolean;
-  /** 0422 — the Purchasing Settings switch: when true the create form refuses
-   *  a Delivery Date earlier than the plan's earliest date, mirroring the
-   *  door. Absent (older API) reads as off — proposal only. */
-  enforceEarliestDate?: boolean;
+  /** 0422 — Purchasing Settings' `manual_purchase_min_delivery_days`:
+   *  CALENDAR days after the Proceed Date. The create form refuses a
+   *  Delivery Date earlier than Proceed Date + this, mirroring the door.
+   *  0 (or absent, older API) means no floor. */
+  minDeliveryDays?: number;
 }
 
 export interface ManualPurchaseDetailPayload {
@@ -4709,7 +5076,7 @@ export function useDecidePurchaseRequest() {
       reason?: string | null;
       cuts?: Array<{ id: string; qty: number }> | null;
     }) =>
-      apiFetch<{ id: string; req_no: string; decision: string }>(
+      apiFetch<{ id: string; decision: string }>(
         `/api/operation/purchasing/requests/${input.id}/decide`,
         {
           method: "POST",
@@ -4777,7 +5144,7 @@ export function useCreatePurchaseRequest() {
         note?: string | null;
       }>;
     }) =>
-      apiFetch<{ id: string; req_no: string; approval_required: boolean; line_ids?: string[] }>(
+      apiFetch<{ id: string; approval_required: boolean; line_ids?: string[] }>(
         "/api/operation/purchasing/requests",
         { method: "POST", body: JSON.stringify(body) },
       ),
@@ -4870,17 +5237,23 @@ export function usePurchasingSettings(
  * situations: the supplier tells us early, or nobody told us and we phoned.
  * The operator keys a DATE; the answer word is derived — the same date the
  * PO already holds is `shipping` (the promise stands), a different one is
- * `delayed` and must carry a reason. 0306/0310's RPC does the rest in one
- * transaction: ledger row · the PO's date · the push into Delay planning ·
- * the history sentence.
+ * `delayed` and must carry a reason. The current RPC requires version and
+ * reply evidence, preserves the original PO date, and updates the exact
+ * linked Sales lines' arrival planning in the same transaction.
  */
 export function useRecordSupplierDate(poId: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: {
-      answer: "shipping" | "delayed";
-      firstDate?: string;
-      newDate?: string;
+      poVersion?: number;
+      channel?: "whatsapp" | "email" | "phone" | "in_person";
+      recipient?: string;
+      evidence?: string;
+      reportedBy?: string;
+      reportedAt?: string;
+      /* 0430 — ONE date; the server classifies the answer against the PO's
+         recorded original date. The browser never writes "delayed". */
+      supplierDate: string;
       reason?: string;
       remarks?: string;
     }) =>
@@ -5025,10 +5398,6 @@ function usePurchasingSettingsMutation<TInput>(path: string) {
 
 export function useSetPurchasingNumber() {
   return usePurchasingSettingsMutation<PurchasingSetNumberInput>("/number");
-}
-/** 0422 — one on/off switch, by key. */
-export function useSetPurchasingSwitch() {
-  return usePurchasingSettingsMutation<PurchasingSetSwitchInput>("/switch");
 }
 export function useSetPurchasingPoDays() {
   return usePurchasingSettingsMutation<PurchasingSetPoDaysInput>("/po-days");
@@ -6464,6 +6833,23 @@ export interface DeliveryOrderRow {
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
+    /** The signed DO on file (0087) — the `Upload signed Delivery Order`
+     *  queue's canonical fact (register correction 2026-09-06). */
+    do_file_path?: string | null;
+    /** The order's goods lines — the register expansion derives THIS TRIP's
+     *  lines from them via `trip_groups` (one arithmetic with the DO page). */
+    order_lines?: Array<{
+      id?: string;
+      sku: string;
+      qty: number;
+      attrs?: Record<string, unknown> | null;
+    }>;
+    /** T6 (0280) — the delivery-photo ledger; PostgREST may embed the overlay
+     *  as an object or a one-row array. null/absent = UNKNOWN, never empty. */
+    ops_order_control?:
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }[]
+      | null;
   };
 }
 export interface DeliveryOrderAttemptRow {
@@ -6764,7 +7150,33 @@ export function useRecordHandoverEvent(
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({
+        queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+      });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** Warehouse Card 03 — record scanned / checked / packed for exact Units of
+ *  one DO scope through the governed prep door (0424). Idempotent server-side. */
+export function useRecordOutboundPrep(doId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    { result: { recorded: number; alreadyRecorded: number } },
+    ApiError,
+    RecordOutboundPrepInput
+  >({
+    mutationFn: (input) =>
+      apiFetch<{ result: { recorded: number; alreadyRecorded: number } }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/outbound-prep`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: async () => {
+      await qc.invalidateQueries({
+        queryKey: ["operation", "delivery-arrangements", "warehouse-schedule"],
+      });
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
     },
   });
 }
@@ -7064,6 +7476,7 @@ function invalidateOrderMoney(
 ) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.operation.orderPayments(orderId), exact: true }),
+    qc.invalidateQueries({ queryKey: qk.finance.paymentRegister(), exact: true }),
     qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true }),
     qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
     qc.invalidateQueries({ queryKey: ["operation", "payments"] }),
@@ -7090,17 +7503,18 @@ export function useRecordPayment(
   });
 }
 
-/** Void a mis-keyed ledger entry (principal only — server-enforced). */
+/** Void a mis-keyed ledger entry. The reason is REQUIRED (0430) and the
+ *  server gate is the Payment Approver duty or principal — SQL-enforced. */
 export function useVoidPayment(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, string>>,
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, { paymentId: string; reason: string }>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ ok: true }, ApiError, string>({
-    mutationFn: (paymentId) =>
+  return useMutation<{ ok: true }, ApiError, { paymentId: string; reason: string }>({
+    mutationFn: ({ paymentId, reason }) =>
       apiFetch<{ ok: true }>(
         `/api/operation/orders/${orderId}/payments/${paymentId}`,
-        { method: "DELETE" },
+        { method: "DELETE", body: JSON.stringify({ reason }) },
       ),
     ...opts,
     onSuccess: async (...args) => {
@@ -7737,6 +8151,13 @@ export interface ReceivingSessionLine {
   damaged_qty: number;
   wrong_item_qty: number;
   wrong_item_claim_type: string | null;
+  /** 0426 — the exact scanned outcomes, when the line was unit-checked. */
+  units?: Array<{
+    stock_item_id: string;
+    unit_code: string;
+    outcome: "received" | "received_with_issue" | "not_received";
+    issue_kind?: "damaged" | "wrong_item" | null;
+  }>;
 }
 
 /** A Receiving Session as the Workspace reads it. */
@@ -7755,6 +8176,13 @@ export interface ReceivingSession {
   posted_by_name: string | null;
   submitted_by_name: string | null;
   return_reason: string | null;
+  /** 0426 — stamped at posting; null on legacy sessions (derived display). */
+  grn_no?: string | null;
+  actual_site_id?: string | null;
+  arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  void_at?: string | null;
+  void_reason?: string | null;
 }
 
 /** One entry of the ONE history (RECEIVING-INFORMATION-MODEL §6). */
@@ -7777,12 +8205,27 @@ export interface ReceivingEvent {
     entry_source?: "office" | "warehouse";
     claims_linked?: number;
     reason?: string;
+    /** 0426 — the formal number, and Amend's before/after record. */
+    grn_no?: string | null;
+    before?: Record<string, unknown>;
+    after?: Record<string, unknown>;
+    extra_lines?: number;
   };
+}
+
+/** One expected Unit of the PO — minted `incoming` at issue (0382). */
+export interface ReceivingExpectedUnit {
+  id: string;
+  unit_code: string;
+  sku: string;
+  status: string;
 }
 
 export interface PoReceivingResponse {
   sessions: ReceivingSession[];
   events: ReceivingEvent[];
+  /** 0426 — the governed Units this PO expects; empty on legacy POs. */
+  expected_units?: ReceivingExpectedUnit[];
 }
 
 /** GET /api/operation/pos/:id/receiving — the Workspace's Summary + Activity. */
@@ -8136,6 +8579,54 @@ export function useFinanceReconSuggest(
     enabled: !!bankStmtId,
     staleTime: 30_000,
     ...opts,
+  });
+}
+
+export function usePaymentRegister() {
+  return useQuery({
+    queryKey: qk.finance.paymentRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-register").PaymentRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-register").PaymentRegisterPage>(
+          `/api/finance/payments/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Payments could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Payments changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Payments could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Payments changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
+  });
+}
+
+/** The Invoices Register — the same fail-closed complete read as Payments:
+ *  a page that cannot be completed is an error, never a shorter list. */
+export function useInvoiceRegister() {
+  return useQuery({
+    queryKey: qk.finance.invoiceRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-invoice-register").InvoiceRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-invoice-register").InvoiceRegisterPage>(
+          `/api/finance/invoices/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Invoices could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Invoices changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Invoices could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Invoices changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
   });
 }
 

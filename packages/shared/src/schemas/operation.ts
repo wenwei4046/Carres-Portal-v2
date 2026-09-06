@@ -1,3 +1,4 @@
+import { PO_DELAY_REASONS } from "../po-workspace";
 import { z } from 'zod';
 
 /**
@@ -322,6 +323,34 @@ export const officeReceiveInput = z.object({
   // ISO yyyy-mm-dd. Bounds are the server's — a browser clock is not evidence.
   goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   note: z.string().max(500).optional(),
+  /** 0426 — where the goods PHYSICALLY arrived, when it differs from the
+   *  PO's booked warehouse. Never overwrites Deliver To. */
+  actualSiteId: z.string().uuid().optional(),
+  /** 0426 — arrival evidence supports both photo and video. */
+  arrivalEvidence: z
+    .array(
+      z.object({
+        path: z.string().min(1).max(400),
+        kind: z.enum(["photo", "video"]),
+      }),
+    )
+    .max(30)
+    .optional(),
+  /** 0426 — extra goods, recorded separately; never Inventory, never pending
+   *  arithmetic. */
+  extraLines: z
+    .array(
+      z.object({
+        sku: z.string().min(1).max(120),
+        qty: z.number().int().positive(),
+        note: z.string().max(300).optional(),
+      }),
+    )
+    .max(50)
+    .optional(),
+  /** 0426 — client idempotency key: a retried Save returns the first posting
+   *  instead of minting a second GRN. */
+  saveKey: z.string().uuid().optional(),
   lines: z.array(z.object({
     id: z.string().uuid(),
     receivedNow: z.number().int().nonnegative(),
@@ -330,9 +359,92 @@ export const officeReceiveInput = z.object({
     damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
     wrongItemClaimType: z.string().min(1).max(40).optional(),
     wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+    /** 0426 — one physical result per governed expected Unit
+     *  (ERP-ARCHITECTURE §3.4). Quantity-only lines stay legal for
+     *  governed interchangeable goods. */
+    units: z
+      .array(
+        z.object({
+          unitCode: z.string().min(3).max(30),
+          outcome: z.enum(["received", "received_with_issue", "not_received"]),
+          issueKind: z.enum(["damaged", "wrong_item"]).optional(),
+          note: z.string().max(300).optional(),
+        }),
+      )
+      .max(500)
+      .optional(),
   })).min(1),
 }).strict();
 export type OfficeReceiveInput = z.infer<typeof officeReceiveInput>;
+
+/** `receivingAmendInput` — POST /api/operation/warehouse-receipts/:id/amend
+ *  (0426 `receiving_amend`). A posted GRN has no ordinary Edit: a correction
+ *  carries its reason, and only the named facts may move. */
+export const receivingAmendInput = z
+  .object({
+    reason: z.string().min(3).max(500),
+    saveKey: z.string().uuid().optional(),
+    goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    doNumber: z.string().min(3).max(60).optional(),
+    actualSiteId: z.string().uuid().nullable().optional(),
+    /** A corrected signed-DO file (0427) — the old path is preserved in the
+     *  amendment's before/after, never deleted. */
+    doFilePath: z.string().min(3).max(300).optional(),
+    /** Additional arrival evidence (0427) — APPEND-ONLY; an amendment never
+     *  removes recorded evidence. */
+    arrivalEvidenceAdd: z
+      .array(
+        z.object({
+          path: z.string().min(3).max(300),
+          kind: z.enum(["photo", "video"]),
+        }),
+      )
+      .max(20)
+      .optional(),
+    lines: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          receivedNow: z.number().int().nonnegative(),
+        }),
+      )
+      .max(200)
+      .optional(),
+  })
+  .strict();
+export type ReceivingAmendInput = z.infer<typeof receivingAmendInput>;
+
+/** `receivingVoidInput` — POST /api/operation/warehouse-receipts/:id/void
+ *  (0426 `receiving_void`). Only for a GRN that should never have existed. */
+export const receivingVoidInput = z
+  .object({ reason: z.string().min(3).max(500) })
+  .strict();
+export type ReceivingVoidInput = z.infer<typeof receivingVoidInput>;
+
+/** `Workspace → Staff & Duties` (0425) — assign one primary holder. The SQL
+ *  door owns every rule (manager gate, active staff, no self-assignment). */
+export const workspaceAssignDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    holderId: z.string().uuid(),
+    effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    note: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceAssignDutyInput = z.infer<typeof workspaceAssignDutyInput>;
+
+/** `Workspace → Staff & Duties` (0425) — a dated buddy cover. */
+export const workspaceCoverDutyInput = z
+  .object({
+    dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    actingUserId: z.string().uuid(),
+    startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    reason: z.string().max(300).optional(),
+  })
+  .strict();
+export type WorkspaceCoverDutyInput = z.infer<typeof workspaceCoverDutyInput>;
 
 /**
  * `adjustStockInput` IS GONE — 0366.
@@ -879,3 +991,22 @@ export const OperationReceiveThreadsInput = z.object({
   signed: z.literal(true),
 }).strict();
 export type OperationReceiveThreadsInput = z.infer<typeof OperationReceiveThreadsInput>;
+
+/** The exact sent PO and the outside answer, recorded together.
+ *
+ * 0430 — the wire carries ONE date. The browser no longer classifies the
+ * answer: the server compares `supplierDate` with the PO's recorded original
+ * and writes `confirmed` · `earlier` · `delayed` (with the reason) · or
+ * `reported` when the original is genuinely unknown. A `reason` travels only
+ * when the operator was shown the delay question. */
+export const recordSupplierReplyInput = z.object({
+  poVersion: z.number().int().positive(),
+  supplierDate: z.string().date(),
+  reason: z.enum(PO_DELAY_REASONS).optional(),
+  remarks: z.string().trim().max(500).optional(),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  recipient: z.string().trim().min(1).max(200),
+  evidence: z.string().trim().min(1).max(2000),
+  reportedBy: z.string().trim().min(1).max(200),
+  reportedAt: z.string().datetime({ offset: true }),
+}).strict();

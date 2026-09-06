@@ -1,11 +1,12 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
+import { useAuth } from "@/lib/auth";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
 import FinanceAP from "./FinanceAP";
-import FinancePayments from "./FinancePayments";
-import FinanceInvoices from "./FinanceInvoices";
+import PaymentRegister from "./PaymentRegister";
+import InvoiceRegister from "./InvoiceRegister";
 import FinanceRefunds from "./FinanceRefunds";
 import FinanceRecon from "./FinanceRecon";
 import FinanceReports from "./FinanceReports";
@@ -26,23 +27,32 @@ import FinanceRentalApprover from "./FinanceRentalApprover";
  * `/finance/ar` and have the sidebar highlight the right tab.
  */
 export default function FinanceApp() {
+  // Payment MASTER §12 — operation staff (Payment Duty, Delivery Operation)
+  // reach ONLY the Payments and Invoices destinations here; every finance-only
+  // page bounces them to Payments instead of rendering finance controls.
+  const role = useAuth((s) => s.role);
+  const financeOnly = (page: React.ReactNode) =>
+    role === "operation" ? <Navigate to="/finance/payments" replace /> : page;
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <PortalSidebar />
       <main className="flex-1 min-w-0">
         <Routes>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<FinanceDashboard />} />
-          <Route path="ar"        element={<FinanceAR />} />
-          <Route path="ap"        element={<FinanceAP />} />
-          <Route path="payments"  element={<FinancePayments />} />
-          <Route path="invoices"  element={<FinanceInvoices />} />
-          <Route path="refunds"   element={<FinanceRefunds />} />
-          <Route path="recon"     element={<FinanceRecon />} />
-          <Route path="reports"   element={<FinanceReports />} />
+          <Route index element={role === "operation"
+            ? <Navigate to="payments" replace /> : <Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
+          <Route path="ar"        element={financeOnly(<FinanceAR />)} />
+          <Route path="ap"        element={financeOnly(<FinanceAP />)} />
+          {/* Payment MASTER §16 — Finance → Payments is the canonical
+              receipt Register; the Phase-5 bucket page is retired. */}
+          <Route path="payments"  element={<PaymentRegister />} />
+          <Route path="invoices"  element={<InvoiceRegister />} />
+          <Route path="refunds"   element={financeOnly(<FinanceRefunds />)} />
+          <Route path="recon"     element={financeOnly(<FinanceRecon />)} />
+          <Route path="reports"   element={financeOnly(<FinanceReports />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
-          <Route path="rental-approver" element={<FinanceRentalApprover />} />
-          <Route path="*"         element={<Navigate to="dashboard" replace />} />
+          <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>
     </div>

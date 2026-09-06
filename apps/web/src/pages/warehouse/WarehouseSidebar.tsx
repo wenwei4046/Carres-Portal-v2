@@ -19,6 +19,7 @@ import { useWarehouseIncoming } from "@/lib/queries";
 const NAV_ITEMS = [
   { to: "/warehouse/incoming", label: "Incoming", icon: "↘", badge: true },
   { to: "/warehouse/receipts", label: "My receiving", icon: "▤", badge: false },
+  { to: "/warehouse/outbound", label: "Outbound", icon: "↗", badge: false },
 ];
 
 export default function WarehouseSidebar() {

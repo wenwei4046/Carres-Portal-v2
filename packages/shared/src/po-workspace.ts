@@ -376,6 +376,16 @@ export function poCurrentActionOf(
  * is our guess, not their promise).
  */
 export interface PoDatePromise {
+  po_version?: number | null;
+  channel?: string | null;
+  recipient?: string | null;
+  evidence?: string | null;
+  reported_by?: string | null;
+  reported_at?: string | null;
+  recorded_by?: string | null;
+  recorded_by_name?: string | null;
+  duty_name?: string | null;
+  acting_name?: string | null;
   kind: string;
   answer: string;
   about_date: string | null;
@@ -384,6 +394,45 @@ export interface PoDatePromise {
   reason: string | null;
   remarks?: string | null;
   recorded_at: string;
+}
+
+/** The one date a reply names, whatever its era's vocabulary. The legacy
+ *  `shipping` rows kept the date in `about_date`; everything since 0430
+ *  (`confirmed` · `earlier` · `delayed` · `reported`) writes `new_date`. */
+export function poReplyDateOf(row: PoDatePromise): string | null {
+  if (row.kind !== "tomorrow_delivery") return null;
+  return row.answer === "shipping" ? row.about_date : (row.new_date ?? null);
+}
+
+/** Only an evidenced answer about this exact document version is a reply. */
+export function poSupplierReplyOf(promises: readonly PoDatePromise[] | null | undefined, version: number) {
+  return [...(promises ?? [])].filter(row =>
+    row.kind === "tomorrow_delivery" && row.po_version === version &&
+    row.channel?.trim() && row.recipient?.trim() && row.evidence?.trim() &&
+    row.reported_by?.trim() && row.reported_at && row.recorded_by && row.recorded_at &&
+    poReplyDateOf(row)
+  ).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+}
+
+/**
+ * The latest reply RECORDED against this exact version, evidence or not.
+ *
+ * 0430 — a pre-evidence reply (recorded before 0428's evidence law) is a real
+ * business fact somebody wrote down; hiding it printed "the supplier has said
+ * nothing" over a recorded answer. It never QUALIFIES as the governed supplier
+ * date — `poSupplierReplyOf` stays the only authority for that — but a surface
+ * must be able to say "a reply was recorded without evidence" instead of
+ * claiming a proven absence.
+ */
+export function poRecordedReplyOf(promises: readonly PoDatePromise[] | null | undefined, version: number) {
+  return [...(promises ?? [])].filter(row =>
+    row.kind === "tomorrow_delivery" && row.po_version === version && poReplyDateOf(row)
+  ).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+}
+
+export function poSupplierDeliveryDateOf(promises: readonly PoDatePromise[] | null | undefined, version: number): string | null {
+  const reply = poSupplierReplyOf(promises, version);
+  return reply ? poReplyDateOf(reply) : null;
 }
 
 export interface PoDateHistoryEntry {
@@ -436,14 +485,10 @@ function dateEntriesOf(
   const entries: PoDateHistoryEntry[] = [];
   for (const r of rows) {
     // A ready date IS the answer, so it always names its new date. On the
-    // arrival kind a delay names the NEW date and a confirmation names the
-    // date it was about.
-    const date =
-      kind === "ready_date"
-        ? r.new_date
-        : r.answer === "delayed"
-          ? r.new_date
-          : r.about_date;
+    // arrival kind the one reply-date rule (`poReplyDateOf`) reads both the
+    // legacy vocabulary and 0430's `confirmed` · `earlier` · `delayed` ·
+    // `reported`.
+    const date = kind === "ready_date" ? r.new_date : poReplyDateOf(r);
     if (!date) continue;
     // A repeated confirmation of the SAME date is not a new date — it is the
     // same promise restated, so it never earns an ordinal.

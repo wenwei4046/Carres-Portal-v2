@@ -259,56 +259,55 @@ describe("POST /assign — one partner onto one or many scopes", () => {
 });
 
 describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
-  it("projects one assigned exact Unit onto the real Saturday pickup with Friday readiness", async () => {
+  /** The feed's fixed query order (0424): arrangements · orders ·
+   *  delivery orders · SCOPE (delivery_order_units) · units · prep ·
+   *  event units · handover events · warehouses · product names. */
+  const ARRANGEMENT_ROW = {
+    id: "arr-1",
+    order_id: ORDER_A,
+    leg: 0,
+    partner_id: NETS,
+    confirmed_date: "2026-09-05",
+    confirmed_time: "Morning (9am–12pm)",
+    expected_arrival: "11:00:00",
+    logistics_note: null,
+    reply_proof_path: "arrangements/arr-1/reply.jpg",
+    driver_name: "Ahmad",
+    vehicle: "VAN-7",
+    updated_at: "2026-09-01T00:00:00Z",
+    updated_by: "user-1",
+    delivery_partners: { id: NETS, name: "NETS" },
+  };
+  const ORDER_ROW = {
+    id: ORDER_A,
+    so: 1322,
+    customer_address: "12 Jalan Meru, Klang",
+    delivered_at: null,
+    do_file_path: null,
+    pod_signature_url: null,
+    placed_at: "2026-08-30T02:00:00Z",
+    created_at: "2026-08-29T02:00:00Z",
+  };
+  const DO_ROW = {
+    id: "do-1",
+    order_id: ORDER_A,
+    do_number: "DO-010926-1322",
+    trip_groups: null,
+    voided_at: null,
+  };
+
+  it("projects the DO's recorded exact-Unit scope onto the real Saturday pickup with Friday readiness", async () => {
     const { inserts, upserts } = mockSb([
-      {
-        data: [{
-          id: "arr-1",
-          order_id: ORDER_A,
-          leg: 0,
-          partner_id: NETS,
-          confirmed_date: "2026-09-05",
-          confirmed_time: "Morning (9am–12pm)",
-          expected_arrival: "11:00:00",
-          logistics_note: null,
-          reply_proof_path: "arrangements/arr-1/reply.jpg",
-          driver_name: "Ahmad",
-          vehicle: "VAN-7",
-          updated_at: "2026-09-01T00:00:00Z",
-          updated_by: "user-1",
-          delivery_partners: { id: NETS, name: "NETS" },
-        }],
-      },
-      {
-        data: [{
-          id: ORDER_A,
-          so: 1322,
-          customer_address: "12 Jalan Meru, Klang",
-          delivered_at: null,
-          do_file_path: null,
-          pod_signature_url: null,
-        }],
-      },
-      {
-        data: [{
-          id: "do-1",
-          order_id: ORDER_A,
-          do_number: "DO-010926-1322",
-          trip_groups: null,
-          voided_at: null,
-        }],
-      },
-      {
-        data: [{
-          unit_code: "CAR-000123",
-          warehouse_id: "wh-1",
-          reserved_ref: "SO-1322",
-          sold_order_id: null,
-        }],
-      },
-      { data: [] },
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
+      { data: [{ delivery_order_id: "do-1", item_id: "item-1" }] },
+      { data: [{ id: "item-1", unit_code: "CAR-000123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
+      { data: [] }, // prep
+      { data: [] }, // event units
+      { data: [] }, // handover events
       { data: [{ id: "wh-1", name: "Carres Klang" }] },
-      { data: [] },
+      { data: [{ sku: "SOFA-X", variant: "Sofa X (Grey)" }] },
     ]);
 
     const res = await call("/warehouse-schedule", "operation");
@@ -330,6 +329,11 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
       hasEvidence: false,
       custody: null,
       deliveryOrderHref: "/operation/delivery-orders/DO-010926-1322",
+      soDate: "2026-08-30",
+      sku: "SOFA-X",
+      productName: "Sofa X (Grey)",
+      unitScannedAt: null,
+      unitHandedOverAt: null,
     });
     expect(body.events[1]).toMatchObject({
       title: "Customer handover",
@@ -340,6 +344,79 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
     expect(upserts).toEqual([]);
   });
 
+  it("a document with no recorded scope stays absent — never an invented Unit assignment", async () => {
+    mockSb([
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [{ ...DO_ROW, trip_groups: ["ROOM_1"] }] },
+      { data: [] }, // no scope rows recorded for the split document
+    ]);
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: unknown[] };
+    expect(body.events).toEqual([]);
+  });
+
+  it("projects per-Unit prep and the accepted batch's own handover time", async () => {
+    mockSb([
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1" },
+          { delivery_order_id: "do-1", item_id: "item-2" },
+        ],
+      },
+      {
+        data: [
+          { id: "item-1", unit_code: "U1-260-019", warehouse_id: "wh-1", sku: "SOFA-X" },
+          { id: "item-2", unit_code: "U1-260-020", warehouse_id: "wh-1", sku: "SOFA-X" },
+        ],
+      },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "scanned", recorded_at: "2026-09-04T10:00:00Z" },
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "checked", recorded_at: "2026-09-04T10:05:00Z" },
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "packed", recorded_at: "2026-09-04T10:10:00Z" },
+        ],
+      },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1", event_id: "ev-1", recorded_side: "warehouse" },
+        ],
+      },
+      {
+        data: [
+          { id: "ev-1", delivery_order_id: "do-1", kind: "handed_over", proof_path: "handover/do-1/p.jpg", recorded_at: "2026-09-04T11:18:00Z" },
+        ],
+      },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "operation");
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    const pickups = body.events.filter((e) => e.title === "Customer delivery pickup");
+    expect(pickups).toHaveLength(2);
+    const handed = pickups.find((e) => e.unitId === "U1-260-019");
+    const waiting = pickups.find((e) => e.unitId === "U1-260-020");
+    expect(handed).toMatchObject({
+      unitScannedAt: "2026-09-04T10:00:00Z",
+      unitCheckedAt: "2026-09-04T10:05:00Z",
+      unitPackedAt: "2026-09-04T10:10:00Z",
+      unitHandedOverAt: "2026-09-04T11:18:00Z",
+      hasEvidence: true,
+    });
+    // The Unit NOT in the batch keeps null facts — a partial handover
+    // changes only the accepted exact Units.
+    expect(waiting).toMatchObject({
+      unitScannedAt: null,
+      unitHandedOverAt: null,
+      hasEvidence: false,
+    });
+  });
+
   it("does not expose the internal Warehouse feed to a Partner role", async () => {
     mockSb([]);
     const res = await call("/warehouse-schedule", "partner");
@@ -348,60 +425,24 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
 
   it("lets a Warehouse login read only exact Units physically assigned to its own Warehouse", async () => {
     mockSb([
+      { data: [{ ...ARRANGEMENT_ROW, logistics_note: "internal note must not ride the projection", reply_proof_path: null }] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
       {
-        data: [{
-          id: "arr-1",
-          order_id: ORDER_A,
-          leg: 0,
-          partner_id: NETS,
-          confirmed_date: "2026-09-05",
-          confirmed_time: "Morning (9am–12pm)",
-          expected_arrival: "11:00:00",
-          logistics_note: "internal note must not ride the projection",
-          reply_proof_path: null,
-          driver_name: "Ahmad",
-          vehicle: "VAN-7",
-          updated_at: "2026-09-01T00:00:00Z",
-          updated_by: "user-1",
-          delivery_partners: { id: NETS, name: "NETS" },
-        }],
-      },
-      {
-        data: [{
-          id: ORDER_A,
-          so: 1322,
-          customer_address: "12 Jalan Meru, Klang",
-          delivered_at: null,
-          do_file_path: null,
-          pod_signature_url: null,
-        }],
-      },
-      {
-        data: [{
-          id: "do-1",
-          order_id: ORDER_A,
-          do_number: "DO-010926-1322",
-          trip_groups: null,
-          voided_at: null,
-        }],
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-own" },
+          { delivery_order_id: "do-1", item_id: "item-other" },
+        ],
       },
       {
         data: [
-          {
-            unit_code: "CAR-OWN-001",
-            warehouse_id: "wh-own",
-            reserved_ref: "SO-1322",
-            sold_order_id: null,
-          },
-          {
-            unit_code: "CAR-OTHER-002",
-            warehouse_id: "wh-other",
-            reserved_ref: "SO-1322",
-            sold_order_id: null,
-          },
+          { id: "item-own", unit_code: "CAR-OWN-001", warehouse_id: "wh-own", sku: null },
+          { id: "item-other", unit_code: "CAR-OTHER-002", warehouse_id: "wh-other", sku: null },
         ],
       },
-      { data: [] },
+      { data: [] }, // prep
+      { data: [] }, // event units
+      { data: [] }, // handover events
       {
         data: [
           { id: "wh-own", name: "Own Warehouse" },

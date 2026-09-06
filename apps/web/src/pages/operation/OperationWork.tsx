@@ -162,7 +162,7 @@ export default function OperationWork() {
     const byOwner = new Map<string, WorkRow[]>();
     for (const i of allItems) {
       const key =
-        i.ownerId ??
+        i.normalOwnerId ??
         (i.ownerName
           ? `person:${i.ownerName}`
           : `duty:${i.ownerDuty ?? "No owner yet"}`);
@@ -191,6 +191,7 @@ export default function OperationWork() {
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),
         late: items.filter((i) => i.workingDaysLate > 0).length,
+        coverName: items.find((i) => i.activeCover)?.activeCover?.name ?? null,
       };
     });
     // People first (by printed name — coverage, never a ranking), duties last.
@@ -212,8 +213,25 @@ export default function OperationWork() {
      photo and loan rows retain the Sales Order until their existing governed
      writers are mounted on the DO; a precise working door beats a dead one. */
   const openRow = (i: WorkRow) => {
+    if (i.ruleKey === "purchasing.supplier_reply" || i.ruleKey === "purchasing.supplier_date_passed") {
+      navigate(`/operation?tab=purchase-orders&po=${encodeURIComponent(i.orderId)}`);
+      return;
+    }
     if (i.ruleKey.startsWith("manual_purchase.")) {
-      navigate(`/operation?tab=manual-purchase&mpr=${i.orderId}`);
+      navigate(`/operation?tab=manual-purchase&mp=${i.orderId}`);
+      return;
+    }
+    if (i.ruleKey === "receiving.check_in") {
+      // A submitted count opens ITS session; an arrival-day row opens the
+      // exact PO's pre-start Receiving object (the exact write door — never
+      // a module landing page).
+      // A session row carries the session UUID (36 chars); an arrival-day
+      // row carries the PO's own document id.
+      navigate(
+        i.orderId.length === 36
+          ? `/operation?tab=receiving&session=${encodeURIComponent(i.orderId)}`
+          : `/operation?tab=receiving&po=${encodeURIComponent(i.orderId)}`,
+      );
       return;
     }
     if (DELIVERY_ARRANGEMENT_ACTIONS.has(i.ruleKey)) {
@@ -345,6 +363,11 @@ export default function OperationWork() {
                   {g.items.length} action{g.items.length === 1 ? "" : "s"} to do
                   {g.late > 0 && <span className="text-danger"> · {g.late} late</span>}
                 </span>
+                {g.coverName && (
+                  <span className="text-label font-normal text-kit-amber-11">
+                    Cover today: {g.coverName}
+                  </span>
+                )}
               </h2>
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (

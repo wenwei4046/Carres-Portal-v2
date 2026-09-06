@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+fix/zul-dev-branch
 import { loadPurchasingSettings, loadPurchasingNumbers } from "./purchasing-settings";
 
 describe("purchasing numbers schema compatibility", () => {
@@ -33,6 +34,9 @@ describe("purchasing numbers schema compatibility", () => {
   });
 });
 
+import { loadPurchasingNumbers, loadPurchasingSettings } from "./purchasing-settings";
+ main
+
 function fakeClient(rows: Record<string, unknown[]>): SupabaseClient {
   return {
     from(table: string) {
@@ -65,6 +69,7 @@ describe("loadPurchasingSettings — Deliver To master data", () => {
             order_by_buffer_days: 7,
             earliest_sell_days: 21,
             logistics_call_working_days: 1,
+            manual_purchase_min_delivery_days: 0,
             po_days: [1, 3, 5],
           },
         ],
@@ -115,4 +120,51 @@ describe("loadPurchasingSettings — Deliver To master data", () => {
       },
     ]);
   });
+});
+
+describe("loadPurchasingNumbers — the Manual Purchase floor cannot take Purchasing down (2026-09-04)", () => {
+  const core = { order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] };
+
+  it("reads 0 when the 0423 column is not there yet", async () => {
+    /* The row exists but the column does not: exactly production between the
+       deploy and the SQL paste. Every other number still loads. */
+    const n = await loadPurchasingNumbers(fakeClient({ purchasing_settings: [core] }));
+    expect(n.earliestSellDays).toBe(21);
+    expect(n.manualPurchaseMinDeliveryDays).toBe(0);
+  });
+
+  it("reads 0 when the column read itself errors, and the number when it is there", async () => {
+    let calls = 0;
+    const sb = {
+      from() {
+        calls += 1;
+        const mine = calls;
+        const b: Record<string, unknown> = {
+          select: () => b,
+          eq: () => b,
+          maybeSingle: async () =>
+            mine === 1
+              ? { data: core, error: null }
+              : { data: null, error: { message: "column purchasing_settings.manual_purchase_min_delivery_days does not exist" } },
+        };
+        return b;
+      },
+    } as unknown as SupabaseClient;
+    const n = await loadPurchasingNumbers(sb);
+    expect(n.manualPurchaseMinDeliveryDays).toBe(0);
+    const ok = await loadPurchasingNumbers(fakeClient({ purchasing_settings: [{ ...core, manual_purchase_min_delivery_days: 14 }] }));
+    expect(ok.manualPurchaseMinDeliveryDays).toBe(14);
+  });
+});
+
+
+it("keeps selected Supplier setup categories maintainable before any SKU exists", async () => {
+  const settings = await loadPurchasingSettings(fakeClient({
+    purchasing_settings: [{ order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] }],
+    suppliers: [{ id: "supplier-1", name: "Factory", kind: "own_logistics", cat_covered: ["mattress", "sofa"] }],
+    product_skus: [],
+    purchasing_supplier_settings: [{ supplier_id: "supplier-1", off_days: [0, 6] }],
+    purchasing_production_days: [{ supplier_id: "supplier-1", category: "mattress", working_days: 7 }, { supplier_id: "supplier-1", category: "sofa", working_days: 14 }],
+  }));
+  expect(settings.suppliers).toEqual([expect.objectContaining({ id: "supplier-1", categories: ["mattress", "sofa"], offDays: [0, 6] })]);
 });

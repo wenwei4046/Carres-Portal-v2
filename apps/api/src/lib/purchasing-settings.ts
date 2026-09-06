@@ -28,8 +28,9 @@ interface SettingsRow {
   earliest_sell_days: number;
   logistics_call_working_days: number;
   po_days: number[];
-  /** 0422 — absent until the migration is applied; read as false. */
-  manual_purchase_enforce_earliest_date?: boolean | null;
+  /** 0423 — CALENDAR days after the Proceed Date; 0 means no floor. Read
+   *  on its own; absent until the migration is applied. */
+  manual_purchase_min_delivery_days?: number | null;
 }
 
 /**
@@ -41,13 +42,11 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
   poDays: number[];
-  manualPurchaseEnforceEarliestDate: boolean;
+  manualPurchaseMinDeliveryDays: number;
 }> {
   let { data, error } = await sb
     .from("purchasing_settings")
-    .select(
-      "order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days, manual_purchase_enforce_earliest_date",
-    )
+    .select("order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days")
     .eq("id", 1)
     .maybeSingle();
   // Pre-0422 schemas reject the select before the optional-field default
@@ -72,19 +71,42 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
     earliestSellDays: Number(row.earliest_sell_days),
     logisticsCallWorkingDays: Number(row.logistics_call_working_days),
     poDays: (row.po_days ?? []).map(Number),
-    /* 0422 — the switch. Only a stored `true` turns the refusal on; a
-       missing column (migration not applied yet) reads as off, which is
-       exactly the pre-0422 behaviour. */
-    manualPurchaseEnforceEarliestDate: row.manual_purchase_enforce_earliest_date === true,
   };
   // A row that is not a row (a shape change, a partial select) must SAY so.
   // Letting a NaN through would plan every order against a nonsense date and
   // look exactly like a working page.
   for (const [k, v] of Object.entries(numbers)) {
-    if (Array.isArray(v) || typeof v === "boolean") continue;
+    if (Array.isArray(v)) continue;
     if (!Number.isFinite(v)) throw new Error(`purchasing_settings.${k} is not a number`);
   }
-  return numbers;
+  return { ...numbers, manualPurchaseMinDeliveryDays: await loadManualPurchaseMinDays(sb) };
+}
+
+/**
+ * The Manual Purchase floor, read on its own so that it cannot take the
+ * rest of Purchasing down.
+ *
+ * The column arrives with migration 0423. The code that reads it deployed
+ * first (4 Sep 2026), and because it sat in the same SELECT as the four
+ * numbers above, the SO Batch buying list, the orders routes and the POS
+ * gate all failed with "column does not exist" until the SQL was pasted.
+ * A Manual Purchase-only number must never decide whether a customer order
+ * can be planned. A missing column, or a missing value, reads as 0: no
+ * floor, which is the pre-0423 behaviour.
+ */
+async function loadManualPurchaseMinDays(sb: SupabaseClient): Promise<number> {
+  const { data, error } = await sb
+    .from("purchasing_settings")
+    .select("manual_purchase_min_delivery_days")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) {
+    console.warn("purchasing_settings.manual_purchase_min_delivery_days unreadable; using 0", error.message);
+    return 0;
+  }
+  const v = (data as Partial<SettingsRow> | null)?.manual_purchase_min_delivery_days;
+  const n = v == null ? 0 : Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**
@@ -105,7 +127,7 @@ export async function loadPurchasingSettings(
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name, kind"),
+    sb.from("suppliers").select("id, name, kind, cat_covered"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
     sb
       .from("purchasing_supplier_settings")
@@ -139,6 +161,16 @@ export async function loadPurchasingSettings(
       const set = catsBySupplier.get(supplierId) ?? new Set<PurchasingCategory>();
       set.add(c);
       catsBySupplier.set(supplierId, set);
+    }
+  }
+
+  // Setup categories remain maintainable before any SKU has been linked.
+  for (const supplier of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
+    for (const category of (supplier.cat_covered ?? []) as string[]) {
+      if (!isPurchasingCategory(category)) continue;
+      const categories = catsBySupplier.get(supplier.id as string) ?? new Set<PurchasingCategory>();
+      categories.add(category);
+      catsBySupplier.set(supplier.id as string, categories);
     }
   }
 
