@@ -2336,7 +2336,9 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
 | `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
 | `Calendar` | the WORK TO DO default row (cards inside the visible window) | **RULED 2026-09-06** |
+| `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
 | `All regions` · `All logistics` | the two group-clearing rows | **RULED 2026-09-06** |
+| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
 | `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
 | `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |

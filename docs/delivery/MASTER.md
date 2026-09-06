@@ -414,15 +414,29 @@ or act on?* — through **two projections of the SAME canonical scope rows**:
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-page-owned 240px FilterRail  ·  WORK TO DO + REGION + LOGISTICS (shared FilterRail grammar)
-Calendar (untouched)         ·  ‹ six-day range › + Search · six operating-day columns,
-                                delivery cards, NO checkboxes, no batch selection
+page-owned 240px FilterRail  ·  the COMPLETE MONTH CALENDAR fixed on top, then
+                                WORK TO DO + REGION + LOGISTICS scrolling below it
+Calendar (untouched)         ·  ‹ fixed operating week › + Search · week-aligned day
+                                columns, delivery cards, NO checkboxes, no batch selection
 every operational pick       ·  the standard selectable Register work list (shared DataGrid):
-                                selection ☐ · ▸ expansion · SO No · Customer · Requested
-                                Delivery Date · Delivery Location · State · Logistics Partner ·
+                                selection ☐ · ▸ expansion · SO No · Customer · State ·
+                                Delivery Location · Requested Delivery Date ·
                                 Confirmed Delivery · Confirmed Time · Goods · DO No ·
-                                Delivery Status — sticky identity, real horizontal scrolling
+                                Logistics Partner · Delivery Status — sticky identity,
+                                real horizontal scrolling
 ```
+
+**THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
+region is the complete current month — never a one-week strip, never the Portal sidebar:
+month arrows move exactly one month; the selected date wears the governed blue selected
+state; today stays distinguishable from the selection; Sundays — the non-operating day —
+stay visible in the governed muted treatment and take no click; a date holding confirmed
+deliveries carries a dot mark (shape, never colour alone); the arithmetic is real and
+locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
+pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
+independently BELOW it; scrolling them never removes the month from view. **Clicking a date
+opens the fixed operating week containing it in the right workspace** — the operational
+picks clear so the week actually appears.
 
 A work queue (`No confirmed date` · `Overdue` · `Failed Delivery` · `Delivered — Proof
 Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an operational
@@ -455,9 +469,12 @@ REAL `{n} deliveries need a confirmed date.` count when true, and the `Open No c
 door — never the same absence repeated in every column; an individually empty day says
 `No deliveries`.
 
-- **Six consecutive OPERATING days, Sunday omitted.** The default window opens one operating day
-  before business today (yesterday's deliveries are still being closed out); previous/next moves
-  exactly six operating days. On Sunday 6 Sep 2026 the range is Sat 5 – Fri 11, omitting Sun 6.
+- **THE FIXED OPERATING WEEK (owner correction 2026-09-06, superseding the rolling six-day
+  window).** Desktop shows the week-aligned Mon–Sat containing the selected date, fitting its
+  available width — no unlimited horizontal date scrolling; previous/next REPLACES the whole
+  displayed work week (six operating days). A tablet shows the fixed three-day half-week
+  (Mon–Wed / Thu–Sat), previous/next replacing the visible window. The default selected date
+  is business today, a Sunday snapping forward to Monday.
 - **No hour-by-hour vertical timeline.** The planned window is text; card height never implies
   duration. Cards order by window start, then customer (locale-aware), then stable scope id. An
   empty day says `No deliveries` (owner correction 2026-09-06).
@@ -470,13 +487,15 @@ door — never the same absence repeated in every column; an individually empty 
   nothing**: no failure, no "result needed", no invented status reads the clock.
   `Delivered — Proof Required` is derived only from a RECORDED delivery result whose photo
   ledger is known and empty — never from time.
-- **The URL is the state** (`?start=` · `?view=` · `?region=` · `?logistics=` · `?q=`), so
-  refresh, share and Back all restore the same view; the retired `?schedule=`/`?checking=`
-  spellings still resolve so an old shared link keeps answering.
+- **The URL is the state** — ONE selected date (`?date=`) drives every viewport's window,
+  plus `?view=` · `?region=` · `?logistics=` · `?q=`, so refresh, share and Back all restore
+  the same view; the retired `?schedule=`/`?checking=`/`?start=`/`?day=` spellings still
+  resolve so an old shared link keeps answering.
 - **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
   the rail becomes the filter drawer, the visible range becomes one selected operating day with a
-  sticky date heading and 44px rows, previous/next skips Sunday, and the cards and href
-  arithmetic are identical to desktop.
+  sticky date heading and 44px rows, previous/next skips Sunday, **the full month opens through
+  the kit's one standard date control (UI-KIT §11)**, and the cards and href arithmetic are
+  identical to desktop.
 
 **The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
 `FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px
@@ -486,9 +505,10 @@ drawer). **Three single-pick groups that COMBINE**; each group's counts are comp
 cards the other groups already narrowed (Architecture Law D):
 
 - **`WORK TO DO` is ONE group (owner correction 2026-09-06 — never split into "Delivery
-  Schedule" and "Needs Checking"):** `Calendar` · `No confirmed date` · **`Overdue`** ·
-  `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`,
-  never `Tomorrow`; every queue a recorded fact, never a clock inference.
+  Schedule" and "Needs Checking"):** `Calendar` · **`All delivery work`** (every open scope,
+  the unfiltered selectable listing) · `No confirmed date` · **`Overdue`** · `Failed Delivery`
+  · `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`, never `Tomorrow`;
+  every queue a recorded fact, never a clock inference.
 - **`REGION`** — `All regions`, then the direct rows ruled below.
 - **`LOGISTICS`** — `All logistics`, then the partner rows ruled below.
 

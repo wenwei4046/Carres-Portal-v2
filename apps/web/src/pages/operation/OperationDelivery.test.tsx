@@ -166,11 +166,14 @@ function wrap(node: React.ReactNode, initialEntry = "/operation?tab=delivery") {
   );
 }
 
-let mediaMatches = false;
+let viewportWidth = 1440;
 beforeEach(() => {
-  mediaMatches = false;
+  viewportWidth = 1440;
   window.matchMedia = ((query: string) => ({
-    matches: mediaMatches,
+    matches: (() => {
+      const m = /max-width:\s*(\d+)px/.exec(query);
+      return m ? viewportWidth <= Number(m[1]) : false;
+    })(),
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -307,26 +310,60 @@ describe("the shape", () => {
     expect(within(rail).queryByText("HOUZS")).toBeNull();
   });
 
-  it("on Friday 4 Sep the six columns run Thu 3 – Wed 9 and omit Sunday 6", () => {
+  it("on Friday 4 Sep the FIXED operating week runs Mon 31 Aug – Sat 5 Sep, Sunday omitted", () => {
     wrap(<OperationDelivery />);
     for (const day of [
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
       "2026-09-03",
       "2026-09-04",
       "2026-09-05",
-      "2026-09-07",
-      "2026-09-08",
-      "2026-09-09",
     ]) {
       expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
     }
     expect(screen.queryByTestId("delivery-monitor-day-2026-09-06")).toBeNull();
     // The toolbar states the range in the governed date spelling.
-    expect(screen.getByText(/Thu, 3 Sep\s*–\s*Wed, 9 Sep/)).toBeTruthy();
+    expect(screen.getByText(/Mon, 31 Aug\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+  });
+
+  it("the rail carries the COMPLETE month calendar fixed above the scrolling filters", () => {
+    wrap(<OperationDelivery />);
+    const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    /* Month arrows move exactly one month. */
+    fireEvent.click(within(calendar).getByRole("button", { name: "Previous month" }));
+    expect(within(calendar).getByText(/August 2026/i)).toBeTruthy();
+    fireEvent.click(within(calendar).getByRole("button", { name: "Next month" }));
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    /* The calendar lives in the rail's FIXED header, not the scroll region —
+       scrolling the filters cannot remove it. */
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    const scrollRegion = rail.querySelector(".overflow-y-auto");
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion!.contains(calendar)).toBe(false);
+    /* Sunday — the non-operating day — is visible but not a choice. */
+    const sunday = within(calendar).getByText("6").closest("button");
+    expect(sunday?.disabled).toBe(true);
+  });
+
+  it("clicking a rail date opens the fixed operating week containing it", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    fireEvent.click(within(calendar).getByText("15"));
+    const probe = screen.getByTestId("location-probe").textContent ?? "";
+    expect(probe).toContain("date=2026-09-15");
+    /* The operational pick clears so the week actually appears — here an
+       empty one, so its ONE spanning state names Mon 14 – Sat 19. */
+    expect(probe).not.toContain("view=");
+    expect(
+      screen.getByText("No deliveries are scheduled from Mon, 14 Sep to Sat, 19 Sep."),
+    ).toBeTruthy();
   });
 
   it("an individual empty day says the short `No deliveries` (owner correction 2026-09-06)", () => {
     wrap(<OperationDelivery />);
-    const day = screen.getByTestId("delivery-monitor-day-2026-09-08");
+    const day = screen.getByTestId("delivery-monitor-day-2026-09-02");
     expect(within(day).getByText("No deliveries")).toBeTruthy();
   });
 
@@ -344,7 +381,7 @@ describe("the spanning empty range", () => {
     wrap(<OperationDelivery />);
     const empty = screen.getByTestId("delivery-monitor-empty-range");
     expect(
-      within(empty).getByText("No deliveries are scheduled from Thu, 3 Sep to Wed, 9 Sep."),
+      within(empty).getByText("No deliveries are scheduled from Mon, 31 Aug to Sat, 5 Sep."),
     ).toBeTruthy();
     /* The REAL confirmed-date count, and its door. */
     expect(within(empty).getByText("1 delivery needs a confirmed date.")).toBeTruthy();
@@ -541,23 +578,23 @@ describe("bulk logistics assignment on the work list", () => {
 describe("the URL is the state", () => {
   beforeEach(seedTwoScopes);
 
-  it("next moves six operating days and writes the first date to the URL", () => {
+  it("next REPLACES the displayed work week and writes the date to the URL", () => {
     wrap(<OperationDelivery />);
     fireEvent.click(screen.getByRole("button", { name: "Next days" }));
-    expect(screen.getByTestId("location-probe").textContent).toContain("start=2026-09-10");
-    /* The moved-to window holds nothing — the ONE spanning empty state names
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-11");
+    /* The moved-to week holds nothing — the ONE spanning empty state names
        the new range instead of drawing six empty columns. */
-    expect(screen.queryByTestId("delivery-monitor-day-2026-09-03")).toBeNull();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
     expect(
-      screen.getByText("No deliveries are scheduled from Thu, 10 Sep to Wed, 16 Sep."),
+      screen.getByText("No deliveries are scheduled from Mon, 7 Sep to Sat, 12 Sep."),
     ).toBeTruthy();
   });
 
-  it("a shared URL restores the same window — Back lands where it left", () => {
+  it("a shared URL restores the same week — the retired ?start= spelling included", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&start=2026-08-27");
     expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
     expect(
-      screen.getByText("No deliveries are scheduled from Thu, 27 Aug to Wed, 2 Sep."),
+      screen.getByText("No deliveries are scheduled from Mon, 24 Aug to Sat, 29 Aug."),
     ).toBeTruthy();
   });
 
@@ -609,7 +646,7 @@ describe("the URL is the state", () => {
 
 describe("mobile is a one-day list", () => {
   beforeEach(() => {
-    mediaMatches = true;
+    viewportWidth = 375;
     seedTwoScopes();
   });
 
@@ -634,10 +671,16 @@ describe("mobile is a one-day list", () => {
   it("previous/next moves one operating day and skips Sunday", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&day=2026-09-05");
     fireEvent.click(screen.getByRole("button", { name: "Next days" }));
-    // Saturday 5 → Monday 7, never Sunday 6.
-    expect(screen.getByTestId("location-probe").textContent).toContain("day=2026-09-07");
+    // Saturday 5 → Monday 7, never Sunday 6 (the retired ?day= resolved in).
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-07");
     fireEvent.click(screen.getByRole("button", { name: "Previous days" }));
-    expect(screen.getByTestId("location-probe").textContent).toContain("day=2026-09-05");
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-05");
+  });
+
+  it("the full month opens through the kit's standard date control", () => {
+    wrap(<OperationDelivery />);
+    const control = screen.getByTestId("delivery-monitor-date-control");
+    expect(within(control).getByRole("button")).toBeTruthy();
   });
 
   it("a Sunday deep link lands on the next operating day", () => {
@@ -666,5 +709,38 @@ describe("mobile is a one-day list", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&logistics=none");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-daily")).toBeNull();
+  });
+});
+
+describe("tablet is a fixed three-day window", () => {
+  beforeEach(() => {
+    viewportWidth = 1024;
+    seedTwoScopes();
+  });
+
+  it("shows the aligned half-week containing the date — never a horizontal scroll", () => {
+    wrap(<OperationDelivery />);
+    // Friday 4 Sep sits in the Thu–Sat half of its operating week.
+    for (const day of ["2026-09-03", "2026-09-04", "2026-09-05"]) {
+      expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("delivery-monitor-day-2026-08-31")).toBeNull();
+    expect(screen.getByText(/Thu, 3 Sep\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+  });
+
+  it("previous/next replaces the visible three-day window", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("button", { name: "Previous days" }));
+    // Fri − 3 operating days = Tue, the Mon–Wed half — which holds nothing,
+    // so its ONE spanning state names exactly that three-day range.
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-01");
+    expect(
+      screen.getByText("No deliveries are scheduled from Mon, 31 Aug to Wed, 2 Sep."),
+    ).toBeTruthy();
+  });
+
+  it("the rail month calendar stays available on the tablet too", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-month-calendar")).toBeTruthy();
   });
 });
