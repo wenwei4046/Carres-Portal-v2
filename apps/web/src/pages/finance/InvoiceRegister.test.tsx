@@ -181,6 +181,31 @@ describe("Invoices Register", () => {
     expect(screen.getByTestId("invoice-ask-to-pay")).toBeInTheDocument();
     auth.role = "finance";
   });
+  it("a date cell opens the Calendar at that week with the exact SO highlighted (§17)", () => {
+    show();
+    // Row 2 (issued) carries a customer delivery date button.
+    const dateButtons = screen.getAllByRole("button", { name: /Open Calendar · Customer Delivery/ });
+    fireEvent.click(dateButtons[0]);
+    expect(screen.getByTestId("invoice-calendar")).toBeInTheDocument();
+    expect(screen.getAllByTestId("calendar-highlight")[0]).toHaveTextContent("SO-1300");
+    // The month stays a complete month, and the register is one click back.
+    expect(screen.getByTestId("calendar-month")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Invoices" }));
+    expect(screen.queryByTestId("invoice-calendar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("invoice-register-summary")).toBeInTheDocument();
+  });
+  it("a record without a date keeps its honest words and no calendar door (§17)", () => {
+    state.data = [row({ id: "i1" })]; // no delivery date, no ETA
+    show();
+    expect(screen.getByText("No delivery date")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open Calendar/ })).not.toBeInTheDocument();
+  });
+  it("Customer, SO and Invoice No open the collection details, never the Calendar (§17)", () => {
+    show();
+    fireEvent.click(screen.getAllByRole("button", { name: /LIM KUAN YANG/ })[0]);
+    expect(screen.getByTestId("invoice-object-scroll")).toBeInTheDocument();
+    expect(screen.queryByTestId("invoice-calendar")).not.toBeInTheDocument();
+  });
   it("shows a failed source with recovery rather than a zero total", () => {
     state.isError = true;
     state.data = [];

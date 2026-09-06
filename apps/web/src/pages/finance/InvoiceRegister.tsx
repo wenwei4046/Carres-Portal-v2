@@ -11,7 +11,12 @@ import {
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
+import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
+import { renderInvoicePdf } from "@/lib/pdf/render";
+import type { InvoiceTemplateData } from "@/lib/pdf/types";
+import { toast } from "sonner";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -74,19 +79,43 @@ export default function InvoiceRegister() {
   const close = () => setParams((before) => {
     const next = new URLSearchParams(before); next.delete("invoice"); return next;
   });
+  // §17 — a date cell is a door into the Calendar view at that date's fixed
+  // workweek, carrying the exact SO to highlight. A record without a usable
+  // date stays in the listing with its honest words and no door.
+  const openCalendar = (r: InvoiceRegisterRow, dateIso: string, from: CalendarEntryKind) =>
+    setParams((before) => {
+      const next = new URLSearchParams(before);
+      next.set("view", "calendar");
+      next.set("date", dateIso);
+      next.set("so", r.order_id);
+      next.set("from", from);
+      return next;
+    });
+  const closeCalendar = () => setParams((before) => {
+    const next = new URLSearchParams(before);
+    next.delete("view"); next.delete("date"); next.delete("so"); next.delete("from");
+    return next;
+  });
   const columns = useMemo<DataGridColumn<InvoiceRegisterRow>[]>(() => [
-    { key: "invoice", label: "Invoice No", width: 190, accessor: (r) => <span>
+    // §17 — Customer / SO / Invoice open the collection details (never an
+    // automatic switch to Calendar); the exact row keeps the exact SO.
+    { key: "invoice", label: "Invoice No", width: 190, accessor: (r) => <button type="button"
+      className="text-left hover:underline" onClick={() => open(r)}>
       {identityOf(r)}
       {STATUS_MARK[r.status] && <span className="ml-2 text-label">{STATUS_MARK[r.status]}</span>}
-    </span>, searchValue: (r) => r.invoice_no ?? "Draft", filterValue: (r) => r.invoice_no ?? "Draft",
+    </button>, searchValue: (r) => r.invoice_no ?? "Draft", filterValue: (r) => r.invoice_no ?? "Draft",
       filterType: "numbering",
       exportValue: (r) => `${identityOf(r)}${STATUS_MARK[r.status] ? ` · ${STATUS_MARK[r.status]}` : ""}` },
     { key: "customer", label: "Customer", width: 210,
-      accessor: (r) => r.orders?.customer_name ?? "Customer not available",
-      searchValue: (r) => r.orders?.customer_name ?? "" },
+      accessor: (r) => <button type="button" className="text-left hover:underline"
+        onClick={() => open(r)}>{r.orders?.customer_name ?? "Customer not available"}</button>,
+      searchValue: (r) => r.orders?.customer_name ?? "",
+      exportValue: (r) => r.orders?.customer_name ?? "Customer not available" },
     { key: "so", label: "SO No", width: 100,
-      accessor: (r) => r.orders ? `SO-${r.orders.so}` : "SO not available",
-      searchValue: (r) => r.orders ? `SO-${r.orders.so}` : "" },
+      accessor: (r) => <button type="button" className="text-left hover:underline"
+        onClick={() => open(r)}>{r.orders ? `SO-${r.orders.so}` : "SO not available"}</button>,
+      searchValue: (r) => r.orders ? `SO-${r.orders.so}` : "",
+      exportValue: (r) => r.orders ? `SO-${r.orders.so}` : "SO not available" },
     { key: "needed", label: "Needed", width: 130, align: "right",
       accessor: (r) => factsOf(r, today, opts).neededWord,
       numberValue: (r) => invoiceNeeded(r).outstanding, filterType: "number",
@@ -94,11 +123,23 @@ export default function InvoiceRegister() {
     { key: "goods", label: "Goods", width: 190, accessor: (r) => invoiceGoodsWord(r),
       searchValue: (r) => invoiceGoodsWord(r) },
     { key: "arrival", label: "Expected arrival", width: 150,
-      accessor: (r) => factsOf(r, today, opts).arrivalWord,
+      accessor: (r) => {
+        const iso = invoiceGoodsFacts(r).arrivalIso;
+        const word = factsOf(r, today, opts).arrivalWord;
+        return iso ? <button type="button" className="text-left hover:underline"
+          aria-label={`Open Calendar · Expected arrival ${word}`}
+          onClick={() => openCalendar(r, iso, "arrival")}>{word}</button> : word;
+      },
       dateValue: (r) => invoiceGoodsFacts(r).arrivalIso, filterType: "date",
       exportValue: (r) => factsOf(r, today, opts).arrivalWord },
     { key: "delivery", label: "Customer Delivery", width: 160,
-      accessor: (r) => factsOf(r, today, opts).deliveryWord,
+      accessor: (r) => {
+        const iso = invoiceCustomerDelivery(r).dateIso;
+        const word = factsOf(r, today, opts).deliveryWord;
+        return iso ? <button type="button" className="text-left hover:underline"
+          aria-label={`Open Calendar · Customer Delivery ${word}`}
+          onClick={() => openCalendar(r, iso, "delivery")}>{word}</button> : word;
+      },
       dateValue: (r) => invoiceCustomerDelivery(r).dateIso, filterType: "date",
       exportValue: (r) => factsOf(r, today, opts).deliveryWord },
     { key: "timing", label: "Payment Timing", width: 180,
@@ -113,10 +154,29 @@ export default function InvoiceRegister() {
   const role = useAuth((s) => s.role);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
+  // §17 — the Calendar view's business filter; the month always stays visible.
+  const [calendarFilter, setCalendarFilter] = useState<"all" | CalendarEntryKind>("all");
   const canRecord = (role === "operation" || role === "principal")
     && !!invoice && invoice.status !== "voided"
     && invoiceNeeded(invoice).known && invoiceNeeded(invoice).outstanding > 0;
   const invoiceTiming = invoice ? invoicePaymentTiming(invoice, today, opts).timing : null;
+  // §16 — Print is a DIRECT output action: an issued invoice prints from its
+  // immutable snapshot; a voided one keeps its paper and says VOIDED.
+  const [printing, setPrinting] = useState(false);
+  const printInvoice = async (row: InvoiceRegisterRow) => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      const res = await apiFetch<{ document: InvoiceTemplateData }>(
+        `/api/finance/invoices/${row.id}/document`);
+      const blob = await renderInvoicePdf(res.document);
+      window.open(URL.createObjectURL(blob), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The invoice document could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
   // §16 — the chase door exists only when the shared clock says the money is
   // genuinely askable: never while Wait, never with no anchor, never when paid.
   const canAsk = canRecord && !!invoiceTiming
@@ -127,9 +187,13 @@ export default function InvoiceRegister() {
       onBack={(event) => { event.preventDefault(); setRecording(false); close(); }}
       status={STATUS_MARK[invoice.status] ? <span>{STATUS_MARK[invoice.status]}</span> : undefined}
       navigation={<span className="text-body">{invoice.orders ? `SO-${invoice.orders.so}` : "SO not available"}</span>}
-      right={canRecord && !recording
-        ? <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>
-        : undefined}
+      right={<span className="flex items-center gap-2">
+        {invoice.invoice_no && !recording && !asking &&
+          <button className="btn-secondary" disabled={printing}
+            onClick={() => void printInvoice(invoice)}>Print</button>}
+        {canRecord && !recording && !asking &&
+          <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
+      </span>}
     /> : <ModuleHeader destinationHeader testId="invoices-destination-header" word="Invoices" docTitle="Invoices — Carres" />}
     {query.isError ? <div role="alert" className="p-6 text-body">
       <p>Invoices could not be loaded. Try again.</p>
@@ -144,6 +208,19 @@ export default function InvoiceRegister() {
             onAsk={canAsk ? () => setAsking(true) : undefined} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
+    : params.get("view") === "calendar"
+    ? <InvoiceCalendar rows={query.data ?? []}
+        selectedDateIso={params.get("date") ?? today}
+        highlightOrderId={params.get("so")}
+        highlightKind={(params.get("from") === "arrival" || params.get("from") === "delivery")
+          ? params.get("from") as CalendarEntryKind : null}
+        filter={calendarFilter}
+        onPickDate={(iso) => setParams((before) => {
+          const next = new URLSearchParams(before); next.set("date", iso); return next;
+        })}
+        onFilter={setCalendarFilter}
+        onOpenInvoice={(r) => { closeCalendar(); open(r); }}
+        onBack={closeCalendar} />
     : <ListPageShell register>
       <DataGrid rows={query.data ?? []} columns={columns} rowKey={(r) => r.id}
         storageKey="carres.invoice.register.v1" appearance="reference" exportName="Invoices"
@@ -233,7 +310,9 @@ function InvoiceObject({ invoice, today, opts, onAsk }: {
           : "Draft — it can still be edited and issued."}</p>
         <p>{rm(invoice.amount)}{Number(invoice.tax_amount) > 0 ? ` · Tax ${rm(Number(invoice.tax_amount))}` : ""}</p>
         {invoice.replaces_invoice_id && <p>This invoice replaces a voided invoice.</p>}
-        <p>Invoice document is not available yet.</p>
+        {invoice.invoice_no
+          ? <p>Print opens the invoice document.</p>
+          : <p>A draft has no document yet. Issue the invoice first.</p>}
       </Facts>
       <Facts title="Related Payments">
         {payments.length ? payments.map((p) => <p key={p.id}>
