@@ -85,7 +85,7 @@ function step(iso: IsoDate, dir: 1 | -1): IsoDate {
  * `{date}` is the formatted date the operator chose.
  */
 export function warehouseEmptyDaySentence(dateLabel: string): string {
-  return `No outbound handovers on ${dateLabel}. Choose another date.`;
+  return `No pickups on ${dateLabel}. Choose another date.`;
 }
 
 /**
@@ -106,7 +106,14 @@ export interface WarehouseOutboundCard {
   fromLocation: string;
   toCustomer: string;
   logisticsPartner: string;
+  /** The individual the Partner assigned — a separate stored fact, never
+   *  merged into the company name. Null until the Partner assigns one. */
+  driverName: string | null;
+  vehicle: string | null;
   expectedCollectionWindow: string | null;
+  /** The driver's own independent collection confirmation for this DO scope
+   *  (the arrangement's fact), or null. Never the warehouse's loading fact. */
+  actualCollectionAt: string | null;
   /** The LATEST accepted physical handover in this scope, or null. */
   actualHandoverAt: string | null;
   /** Exact Unit rows — the drill-down every count owes (§3.5.1). */
@@ -155,7 +162,10 @@ export function warehouseOutboundCards(
       fromLocation: first.fromLocation,
       toCustomer: first.toCustomer,
       logisticsPartner: first.logisticsPartner,
+      driverName: first.driverName ?? null,
+      vehicle: first.vehicle ?? null,
       expectedCollectionWindow: first.expectedCollectionWindow,
+      actualCollectionAt: first.actualCollectionAt ?? null,
       actualHandoverAt: latest ?? null,
       units,
       unitsRequired: units.length,
@@ -190,5 +200,5 @@ export function warehouseUnitPendingReason(
   if (!u.unitScannedAt) return "Not scanned yet";
   if (!u.unitCheckedAt) return "Not checked yet";
   if (!u.unitPackedAt) return "Not packed yet";
-  return "Waiting for handover";
+  return "Waiting to be loaded";
 }
