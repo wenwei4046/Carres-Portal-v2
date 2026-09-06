@@ -6,6 +6,8 @@ import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk, useRecordPayment } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import InvoiceSendReceipt from "./InvoiceSendReceipt";
+import type { PaymentTemplateRow } from "@carres/shared/payment-templates";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
 import { fmtDate } from "@/lib/fmt-date";
@@ -62,6 +64,12 @@ export default function InvoiceRecordPayment({ invoice, onClose }: {
   const [step, setStep] = useState<"edit" | "review" | "done">("edit");
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ receiptNo: string | null; stillNeeded: number } | null>(null);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+  const templatesQuery = useQuery<{ templates: PaymentTemplateRow[] }>({
+    queryKey: ["finance", "payment-templates"],
+    queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
+    staleTime: 60_000,
+  });
   const idempotencyKey = useRef(crypto.randomUUID());
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Payment was not recorded — ${e.message}`),
@@ -150,14 +158,35 @@ export default function InvoiceRecordPayment({ invoice, onClose }: {
   }
 
   if (step === "done" && result) {
+    // §16 — after successful posting: Payment recorded · Receipt number ·
+    // Amount still needed · Send receipt. The receipt wording is the
+    // manager's template; a full payment recommends `Payment received`, a
+    // partial one `Partial payment received`. No template = the honest
+    // sentence, never invented copy.
+    const heads = (templatesQuery.data?.templates ?? []).filter((t) => t.is_head && t.active);
+    const wanted = result.stillNeeded <= 0 ? "payment_received" : "partial_payment_received";
+    const receiptTemplates = [
+      ...heads.filter((t) => t.purpose === wanted && t.is_default),
+      ...heads.filter((t) => t.purpose === wanted && !t.is_default),
+      ...heads.filter((t) => (t.purpose === "payment_received" || t.purpose === "partial_payment_received")
+        && t.purpose !== wanted),
+    ];
+    if (sendingReceipt && receiptTemplates.length > 0) {
+      return <InvoiceSendReceipt invoice={invoice} templates={receiptTemplates}
+        receiptNo={result.receiptNo} amount={amt} stillNeeded={result.stillNeeded}
+        onClose={onClose} />;
+    }
     return <div className="flex-1 overflow-auto p-4" data-testid="invoice-record-done">
       <SectionCard><div className="p-4 text-body">
         <h2 className="text-strong mb-2">Payment recorded</h2>
         <p>{result.receiptNo ?? "Receipt number missing"}</p>
         <p>Amount still needed: {rm(result.stillNeeded)}</p>
-        <p className="text-label font-normal mt-1">
-          Receipt sending starts from the Receipt section once messages are built.
-        </p>
+        {receiptTemplates.length > 0
+          ? <button className="btn-primary mt-3 mr-2"
+              onClick={() => setSendingReceipt(true)}>Send receipt</button>
+          : <p className="text-label font-normal mt-1">
+              No receipt template yet. Ask a manager to add the approved wording in Settings.
+            </p>}
         <button className="btn-secondary mt-3" onClick={onClose}>Back to invoice</button>
       </div></SectionCard>
     </div>;
