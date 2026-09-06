@@ -116,25 +116,21 @@ export function RailItem({
  */
 export function FilterRail({
   children,
-  header,
   testId,
   onHide,
   header,
 }: {
   children: ReactNode;
-  /**
-   * A FIXED block above the scrolling filters (owner correction 2026-09-06 —
-   * Receiving's month Calendar stays put while CATEGORY/SUPPLIER/… scroll
-   * independently beneath it). Absent, the rail is one scroll as before.
-   */
-  header?: ReactNode;
   testId?: string;
   onHide?: () => void;
   /**
-   * Owner correction 2026-09-06 (Delivery Monitor): a FIXED region above the
-   * scrolling filter groups — the rail's month calendar lives here. It never
-   * scrolls away; the groups below scroll independently. Absent = the rail
-   * renders byte-identically to before (one scroll area, nothing added).
+   * Owner correction 2026-09-06 (Delivery Monitor + Receiving — the two
+   * corrections landed the same day and share this one slot): a FIXED region
+   * above the scrolling filter groups — the rail's month calendar lives
+   * here. It never scrolls away; the groups below scroll independently.
+   * Absent = the rail renders byte-identically to before (one scroll area,
+   * nothing added). The two regions carry `{testId}-fixed` / `{testId}-scroll`
+   * so a page can assert the independence.
    */
   header?: ReactNode;
 }) {
@@ -155,8 +151,16 @@ export function FilterRail({
             <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
           </button>
         )}
-        <div className="shrink-0 border-b border-kit-slate-5 p-3">{header}</div>
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3">
+        <div
+          className="shrink-0 border-b border-kit-slate-5 p-3"
+          data-testid={testId ? `${testId}-fixed` : undefined}
+        >
+          {header}
+        </div>
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
+          data-testid={testId ? `${testId}-scroll` : undefined}
+        >
           {children}
         </div>
       </aside>
@@ -165,10 +169,7 @@ export function FilterRail({
   return (
     <aside
       data-testid={testId}
-      className={[
-        "relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white",
-        header ? "" : "gap-5 overflow-y-auto p-3",
-      ].join(" ")}
+      className="relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
     >
       {onHide && (
         <button
@@ -181,24 +182,7 @@ export function FilterRail({
           <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
         </button>
       )}
-      {header ? (
-        <>
-          <div
-            className="shrink-0 border-b border-kit-slate-4 p-3"
-            data-testid={testId ? `${testId}-fixed` : undefined}
-          >
-            {header}
-          </div>
-          <div
-            className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
-            data-testid={testId ? `${testId}-scroll` : undefined}
-          >
-            {children}
-          </div>
-        </>
-      ) : (
-        children
-      )}
+      {children}
     </aside>
   );
 }
