@@ -64,7 +64,7 @@ function makeSb(
       const cfg = tables[table] ?? {};
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
-      for (const m of ["eq", "in", "order", "limit"]) builder[m] = vi.fn(chain);
+      for (const m of ["eq", "in", "order", "limit", "range"]) builder[m] = vi.fn(chain);
       // GET /:id reads one row — resolves to the table's `single` config.
       builder.maybeSingle = vi.fn(() =>
         Promise.resolve(cfg.single ?? { data: null, error: null }),
@@ -276,6 +276,127 @@ describe("GET /api/operation/warehouse-receipts", () => {
     );
     const builder = spy.mock.results[0].value as { eq: ReturnType<typeof vi.fn> };
     expect(builder.eq).toHaveBeenCalledWith("status", "submitted");
+  });
+});
+
+describe("GET /?scope=grn — the paged GRN Register", () => {
+  const POSTED = {
+    ...RECEIPT_ROW,
+    status: "posted",
+    grn_no: "GRN-20260906-1234",
+    goods_received_at: "2026-09-01",
+  };
+
+  it("answers a PAGE — rows, facets, the whole-set total — with the governed supplier date and product words attached", async () => {
+    const sb = makeSb({
+      warehouse_receipts: { list: { data: [POSTED], error: null }, count: 0 },
+      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+      purchase_orders: {
+        list: {
+          data: [
+            {
+              id: "PO-1001",
+              version: 1,
+              supplier_id: "s1",
+              suppliers: { name: "Ohana" },
+            },
+          ],
+          error: null,
+        },
+      },
+      po_supplier_promises: {
+        list: {
+          data: [
+            {
+              po_id: "PO-1001",
+              kind: "tomorrow_delivery",
+              answer: "confirmed",
+              about_date: null,
+              new_date: "2026-09-08",
+              po_version: 1,
+              channel: "whatsapp",
+              recipient: "Ohana group",
+              evidence: "evidence/reply.jpg",
+              reported_by: "Factory PIC",
+              reported_at: "2026-09-01T02:00:00Z",
+              recorded_by: USER,
+              recorded_at: "2026-09-01T03:00:00Z",
+            },
+          ],
+          error: null,
+        },
+      },
+      product_skus: {
+        list: { data: [{ sku: "MS01-K", variant: "Dream King" }], error: null },
+      },
+      app_users: { list: { data: [], error: null } },
+    });
+    // Capture the scan's own filters — `from()` mints a fresh builder per
+    // call, so the assertion must listen at the door, not on a later builder.
+    const inCalls: unknown[][] = [];
+    const origFrom = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const b = origFrom(table);
+      if (table === "warehouse_receipts") {
+        const origIn = b.in as (...a: unknown[]) => unknown;
+        b.in = vi.fn((...a: unknown[]) => {
+          inCalls.push(a);
+          return origIn(...a);
+        });
+      }
+      return b;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      "/api/operation/warehouse-receipts?scope=grn",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, never>;
+    expect(body.page).toEqual({ offset: 0, limit: 50, total: 1 });
+    const rows = body.receipts as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    // The governed Supplier Delivery Date — the ONE reply arithmetic, and the
+    // GRN paper's own product word — never a second spelling.
+    expect(rows[0]!.supplier_delivery_date).toBe("2026-09-08");
+    expect(rows[0]!.product_labels).toEqual(["Dream King"]);
+    expect(rows[0]!.supplier_name).toBe("Ohana");
+    const facets = body.facets as Record<string, Record<string, number>>;
+    expect(facets.supplier).toEqual({ Ohana: 1 });
+    expect(facets.site).toEqual({ "Carres Klang": 1 });
+    // The scan asked for the Register BOUNDARY — posted/voided only.
+    expect(inCalls).toContainEqual(["status", ["posted", "voided"]]);
+  });
+
+  it("a picked Supplier Delivery Date that matches nothing answers an EMPTY page, total 0", async () => {
+    const sb = makeSb({
+      warehouse_receipts: { list: { data: [POSTED], error: null }, count: 0 },
+      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+      purchase_orders: {
+        list: {
+          data: [
+            { id: "PO-1001", version: 1, supplier_id: "s1", suppliers: { name: "Ohana" } },
+          ],
+          error: null,
+        },
+      },
+      po_supplier_promises: { list: { data: [], error: null } },
+      product_skus: { list: { data: [], error: null } },
+      app_users: { list: { data: [], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      "/api/operation/warehouse-receipts?scope=grn&expected=2026-09-08",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, never>;
+    // No evidenced supplier reply → no GRN carries that date; the register
+    // answers honestly rather than ignoring the filter.
+    expect(body.page).toEqual({ offset: 0, limit: 50, total: 0 });
+    expect(body.receipts).toEqual([]);
   });
 });
 

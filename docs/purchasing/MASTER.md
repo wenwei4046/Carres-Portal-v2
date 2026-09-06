@@ -1389,7 +1389,10 @@ carries every corrected word and zero retired words; committed production smoke 
 GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
 evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
 refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
-`Workspace → Staff & Duties`.** The operating rule is:
+`Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
+destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
+server-side pagination — ships with this revision of this section; its production proof is
+recorded on merge.** The operating rule is:
 
 ```text
 Warehouse submits count                (or Operation enters goods directly)
@@ -1399,6 +1402,13 @@ Warehouse submits count                (or Operation enters goods directly)
 → Inventory updated automatically at Goods arrived at
 ```
 
+- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
+  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
+  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
+  proposal is superseded. The page is: left, the 240px rail with the full month Calendar FIXED
+  on top and the business filters scrolling independently beneath it; right, always the complete
+  GRN Register. The right side never becomes a weekly calendar and never shows work cards —
+  daily Receiving actions stay in My Work / Team Work.
 - **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
   Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
   review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
@@ -1408,15 +1418,38 @@ Warehouse submits count                (or Operation enters goods directly)
 - **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
   database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
   name.
-- **The Filter Rail (owner correction §2)** holds exactly: `CATEGORY` (the five governed rows —
-  `Mattress` · `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`, the shared display order;
-  `MP` always prints as `Mattress protector`) · `SUPPLIER` (the suppliers present in the
-  records) · `GOODS ARRIVED AT` (the receiving locations present in the records) ·
-  `Clear filters`. No `Any`, no `All …`, no invented category, no rail date filter — the
-  table's `Goods received on` column owns date filtering. Re-clicking the active row clears its
-  section; counts are real counts from the current result set. Category comes from the governed
-  catalog truth through the ONE shared ladder (`goodsCategoryWordOf`, the same rule the Sales
-  Orders register speaks); Receiving never derives its own category from SKU text.
+- **THE RAIL MONTH CALENDAR (owner correction 2026-09-06, second ruling).** The full month
+  Calendar stays fixed at the top of the rail; the ‹ › arrows move exactly one month. Sunday
+  stays visible for understanding the month and wears the muted non-working state — Receiving
+  follows the Warehouse working calendar, Monday–Saturday. A date with expected supplier
+  arrivals prints a visible COUNT (colour is never the only signal, and the day's aria sentence
+  says it in words); expected dates come from the linked POs' governed `Supplier Delivery Date`
+  (`poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
+  marks a day, and a fully received or closed PO stops being expected). Selecting a date filters
+  the SAME right-hand GRN Register by that Supplier Delivery Date; selecting it again, or
+  `Clear filters`, restores the complete listing. The Calendar shows no work cards.
+- **The Filter Rail (owner correction §2)** holds, beneath the Calendar: `CATEGORY` ·
+  `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED AT` (the receiving
+  locations present in the records) · `Clear filters`. CATEGORY shows ONLY the governed rows
+  actually present in the Receiving result set, in the shared display order (`Mattress` ·
+  `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
+  protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
+  table's `Goods received on` column owns detailed date filtering. Re-clicking the active row
+  clears its section. Category comes from the governed catalog truth through the ONE shared
+  ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
+  never derives its own category from SKU text.
+- **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
+  renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
+  Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
+  result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
+  `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
+  filters, Columns and Export stay; a changed filter or search term returns to page 1.
+- **Register columns** lead with identity and the arrival story: `GRN No` · `Supplier Delivery
+  Date` (the linked PO's governed supplier answer — the same date the Calendar filters by;
+  `Not confirmed` while no evidenced reply exists) · `Goods received on` · `PO/CO No` ·
+  `Supplier` · `Product` (the GRN paper's own line words — `product_skus.variant`, else the
+  SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` · `Status`, with `Supplier DO No.`
+  and the damaged/wrong/extra quantity facts behind them.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`

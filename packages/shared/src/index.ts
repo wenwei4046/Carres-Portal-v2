@@ -1175,6 +1175,16 @@ export {
   type ReceivingSummary,
   type ReceivingWorkSource,
 } from "./warehouse-receipt";
+// 2026-09-06 owner correction (Receiving page) — server-side GRN Register
+// pagination/facets and the rail Calendar's expected-arrival markers, one
+// arithmetic for the Worker and the page's tests alike.
+export {
+  buildGrnRegisterView,
+  expectedArrivalCounts,
+  type GrnRegisterFactRow,
+  type GrnRegisterSelection,
+  type GrnRegisterView,
+} from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
