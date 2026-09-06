@@ -130,7 +130,7 @@ export default function PaymentSettings() {
                     : "The account is not entered yet. Ask a manager to add it."}
                 </div>
               </div>
-              {editing !== a.route_source && <Button variant="secondary" onClick={() => {
+              {editing !== a.route_source && <Button variant="neutral" onClick={() => {
                 setEditing(a.route_source);
                 setAccountName(a.account_name ?? "");
                 setAccountNo(a.account_no ?? "");
@@ -147,7 +147,7 @@ export default function PaymentSettings() {
                     routeSource: a.route_source, bankName: a.bank_name,
                     accountName: accountName.trim(), accountNo: accountNo.trim(),
                   })}>Save account</Button>
-                <Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button variant="neutral" onClick={() => setEditing(null)}>Cancel</Button>
               </div>
             </div>}
           </div>)}
