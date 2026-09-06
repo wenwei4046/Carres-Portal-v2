@@ -201,6 +201,60 @@ export type PoTemplateData = {
   terms: string | null;
 };
 
+/**
+ * GOODS RECEIVED NOTE — the formal receiving document (owner correction
+ * 2026-09-06). Money-free like the PO and the DO: a receiving document talks
+ * quantity and identity, never price. The five quantity words are the
+ * governed set (`purchasing/MASTER.md` §5.7); `Deliver To` is where the PO
+ * instructed the supplier to deliver, `Goods arrived at` is where the goods
+ * physically arrived, `Goods received on` is the physical arrival date —
+ * three different facts, all printed.
+ */
+export type GrnTemplateData = {
+  grn_no: string;
+  /** `Valid` | `Cancelled` — the document status words. */
+  status_label: string;
+  /** The linked source document — a PO, or a CO when consignment. */
+  source: { po_number: string; is_consignment: boolean };
+  supplier: { name: string };
+  supplier_do_no: string;
+  deliver_to: string;
+  goods_arrived_at: string;
+  /** ISO date — the physical arrival date. */
+  goods_received_on: string | null;
+  lines: Array<{
+    sku: string;
+    /** Human words first (catalog variant); the caller falls back to the SKU. */
+    description: string;
+    /** The governed category word from the one shared ladder. */
+    category: string;
+    order_qty: number;
+    received_qty: number;
+    damaged_qty: number;
+    wrong_item_qty: number;
+    pending_delivery_qty: number;
+  }>;
+  /** Exact-Unit outcomes, when governed Units exist — the scan record is
+   *  part of the paper. */
+  unit_results?: Array<{ unit_code: string; outcome_label: string }>;
+  /** Extra goods — recorded separately, never Inventory, never pending. */
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  /** Evidence references — counts, not URLs (paper carries no dead links). */
+  evidence?: { photos: number; videos: number; do_file: boolean } | null;
+  /** The duty-evidence trio — normal holder · dated cover · actual actor. */
+  duty: {
+    holder_name: string | null;
+    cover_name: string | null;
+    actor_name: string | null;
+    authority_label: string | null;
+    posted_on: string | null;
+  };
+  /** Append-only amendment marking — printed on the paper itself. */
+  amendments?: Array<{ date: string; reason: string | null; by: string | null }>;
+  /** Cancellation marking — the record survives, plainly marked. */
+  cancelled?: { date: string | null; reason: string | null; by: string | null } | null;
+};
+
 export type SalesOrderTemplateData = {
   so_number: string;
   issue_date: string;

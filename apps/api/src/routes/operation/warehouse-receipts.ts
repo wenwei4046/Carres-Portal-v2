@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  goodsCategoryWordOf,
+  receiptCategoryWords,
   receivingAmendInput,
   receivingVoidInput,
   warehouseReceiptOpensClaims,
@@ -10,6 +12,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { skuCategories } from "../../lib/sku-categories";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -38,6 +41,9 @@ import type { AppEnv } from "../../types";
 const warehouseReceiptsRouter = new Hono<AppEnv>();
 
 const DEFAULT_LIMIT = 200;
+/** The Register may ask for more (`?limit=`) — it virtualises its rows, so a
+ *  large GRN history stays scrollable without a second fetch. Hard-capped. */
+const MAX_LIMIT = 1000;
 /** Long enough to open the paper, short enough that a copied link dies. */
 const SIGNED_URL_TTL_SECONDS = 3600;
 
@@ -87,7 +93,12 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     // submitted stamp only breaks ties.
     .order("goods_received_at", { ascending: false })
     .order("submitted_at", { ascending: false })
-    .limit(DEFAULT_LIMIT);
+    .limit(
+      Math.min(
+        Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
+        MAX_LIMIT,
+      ),
+    );
   if (status !== "all") q = q.eq("status", status);
 
   const { data, error } = await q;
@@ -188,11 +199,22 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       userNames.set(u.id as string, u.name as string);
   }
 
+  // The rail's CATEGORY facet (owner correction 2026-09-06): the catalog's
+  // answer through the ONE shared reader, folded by the ONE shared ladder —
+  // Receiving never derives its own category from SKU text.
+  const allSkus = rows.flatMap((r) =>
+    ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+      (l) => l.sku,
+    ),
+  );
+  const catalogCategories = await skuCategories(sb, allSkus);
+
   return c.json({
     receipts: rows.map((r) => {
       const lines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
       return {
         ...r,
+        categories: receiptCategoryWords(lines, catalogCategories),
         warehouse_name: warehouseNames.get(r.warehouse_id as string) ?? null,
         supplier_name: supplierByPo.get(r.po_id as string) ?? null,
         submitted_by_name: r.submitted_by
@@ -347,7 +369,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .order("event_at", { ascending: false }),
     sb
       .from("purchase_orders")
-      .select("id, supplier_id, warehouse_id, destination_id, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)")
+      .select("id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)")
       .eq("id", r.po_id as string)
       .maybeSingle(),
   ]);
@@ -381,6 +403,39 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     const { data: whs } = await sb.from("warehouses").select("id, name").in("id", whIds);
     for (const w of whs ?? []) whNames.set(w.id as string, w.name as string);
   }
+  // The formal GRN document's product facts: the human description (the same
+  // `product_skus.variant` lookup the DO print path uses) and the governed
+  // category word through the ONE shared ladder — never a SKU-text rule of
+  // Receiving's own.
+  const receiptLines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
+  const extraLines = (Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
+    sku: string;
+  }>;
+  const docSkus = [
+    ...new Set([
+      ...receiptLines.map((l) => l.sku),
+      ...extraLines.map((x) => x.sku),
+    ]),
+  ];
+  const lineInfo: Record<string, { description: string | null; category: string }> = {};
+  if (docSkus.length > 0) {
+    const catalog = await skuCategories(sb, docSkus);
+    const descriptions = new Map<string, string>();
+    const { data: skuRows } = await sb
+      .from("product_skus")
+      .select("sku, variant")
+      .in("sku", docSkus);
+    for (const row2 of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>) {
+      if (row2.variant) descriptions.set(row2.sku, row2.variant);
+    }
+    for (const sku of docSkus) {
+      lineInfo[sku] = {
+        description: descriptions.get(sku) ?? null,
+        category: goodsCategoryWordOf({ sku, category: catalog.get(sku) ?? null }),
+      };
+    }
+  }
+
   let doUrl: string | null = null;
   if (typeof r.do_file_path === "string" && r.do_file_path.length > 0) {
     try {
@@ -418,6 +473,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       do_file_url: doUrl,
       unit_results: units ?? [],
     },
+    line_info: lineInfo,
     po: po ?? null,
     events: ((evs ?? []) as Array<Record<string, unknown>>).map((e) => ({
       ...e,
@@ -439,6 +495,9 @@ warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
   if (d.goodsReceivedAt !== undefined) changes.goods_received_at = d.goodsReceivedAt;
   if (d.doNumber !== undefined) changes.do_number = d.doNumber;
   if (d.actualSiteId !== undefined) changes.actual_site_id = d.actualSiteId;
+  if (d.doFilePath !== undefined) changes.do_file_path = d.doFilePath;
+  if (d.arrivalEvidenceAdd !== undefined)
+    changes.arrival_evidence_add = d.arrivalEvidenceAdd;
   if (d.lines !== undefined)
     changes.lines = d.lines.map((l) => ({ id: l.id, received_now: l.receivedNow }));
   const sb = userClient(c.env, c.var.auth.jwt);

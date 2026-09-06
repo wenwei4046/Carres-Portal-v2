@@ -77,6 +77,7 @@ const POSTED_ROW = {
   ],
   summary: "3 good · 1 damaged",
   opens_claims: true,
+  categories: ["Mattress"],
 };
 
 const SUBMITTED_ROW = {
@@ -108,6 +109,7 @@ const SUBMITTED_ROW = {
   ],
   summary: "2 good",
   opens_claims: false,
+  categories: ["Bedframe"],
 };
 
 const VOIDED_ROW = {
@@ -134,6 +136,7 @@ const VOIDED_ROW = {
   ],
   summary: "1 good",
   opens_claims: false,
+  categories: ["Sofa"],
 };
 
 const PO_OPEN = {
@@ -221,6 +224,12 @@ const DETAIL = {
         wrong_item_qty: 0,
       },
     ],
+  },
+  line_info: {
+    "MS01-K King Mattress": {
+      description: "Mattress Forte King",
+      category: "Mattress",
+    },
   },
   events: [
     {

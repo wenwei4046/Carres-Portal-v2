@@ -243,13 +243,13 @@ describe("the receiving records", () => {
     expect(within(row).getByText("Waiting Carres check")).toBeTruthy();
   });
 
-  it("a voided session stays on the report, marked Voided", () => {
+  it("a voided session stays on the report, marked Cancelled (owner status words 2026-09-06)", () => {
     mockData();
     render(wrap(<OperationReceivingReport />));
     const row = screen
       .getByTestId("receiving-report-session-s3")
       .closest("tr") as HTMLElement;
-    expect(within(row).getByText("Voided")).toBeTruthy();
+    expect(within(row).getByText("Cancelled")).toBeTruthy();
     // History never deletes — the voided GRN number still prints.
     expect(within(row).getByText("GRN-20260810-9001")).toBeTruthy();
   });

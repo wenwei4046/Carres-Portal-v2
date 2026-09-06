@@ -119,3 +119,51 @@ probes against production before apply. Delivery ends only at: green CI → 0425
 through the governed path → merge → deploy → authenticated production smoke (Session → Save
 Receiving → numbered GRN → Inventory/Pending consequences; NETS flow, evidence, Actual Site,
 partial, issues, consignment, Amend, Void) → MASTER production-verified → Card complete.
+
+## Owner-approved production UI correction — 2026-09-06 (same Card, continued)
+
+The owner reviewed the shipped surfaces and issued one correction instruction; this Card
+continues under it (no new Card). Scope and rulings:
+
+1. **Register boundary** — `Receiving` is the formal GRN Register (`Valid` / `Cancelled`
+   rows only); My Work / Team Work own what staff must receive or review. The permanent
+   state rail (`All receiving` · `Count waiting for check` · `Sent back to recount` ·
+   `Posted` · `Voided`) is removed; a submitted count deep-links to its review and never
+   becomes a Register row. `Posted`/`Voided` stay internal database statuses.
+2. **Filter Rail** — exactly `CATEGORY` (Mattress · Bedframe · Sofa · Pillow ·
+   Mattress protector, shared-ladder order, catalog-governed, `MP` never printed) ·
+   `SUPPLIER` · `GOODS ARRIVED AT` · `Clear filters`. No `Any`/`All …`/invented category;
+   no rail date filter — the `Goods received on` column owns dates. The category ladder was
+   EXTRACTED to `@carres/shared` (`goodsCategoryWordOf`) so Sales Orders and Receiving speak
+   one rule (Law D); the list API resolves each record's words server-side
+   (`receiptCategoryWords` + the one catalog reader).
+3. **Corrected words** — `Deliver To` · `Goods arrived at` · `Goods received on`;
+   `Actual Site`, `Delivery Location`, `Goods Received At` retired everywhere (register,
+   object, session, review, report, SQL refusal sentences, COPY-STANDARD, MASTER). A source
+   scan in the Receiving suite keeps the retired words out of every branch.
+4. **Formal GRN document** — `grn-template.tsx` (SO-PDF-STANDARD chrome, money-free A4
+   `GOODS RECEIVED NOTE`) with identity, GRN No, linked PO/CO, Supplier, Supplier DO No.,
+   the three location/date facts, description + SKU + governed Category, the five quantity
+   words with totals, exact-Unit outcomes, extra goods, evidence references, the
+   duty-evidence trio, and AMENDED/CANCELLED marking printed on the paper. Data flows
+   through ONE pure builder (`grn-template-data.ts`) feeding preview, Print and Download.
+5. **GRN object 50/50** — Receiving Record left; OFFICIAL GRN PREVIEW right
+   (`usePdfCanvases` painting the real renderer) with `[Print]` `[Download PDF]`; one
+   Object Header; mobile stacks; `Void Receiving` moved into `More ▾`.
+6. **Amend 50/50** — the left half becomes the governed `Original → Corrected` form while
+   the right half live-previews the proposed document (same number, amendment marked,
+   `UNSAVED` watermark as chrome). Amendable: date, physical arrival location, Supplier DO
+   number **and evidence** — migration **0427** extends `receiving_amend` with
+   `do_file_path` (replace; before/after preserved) and `arrival_evidence_add`
+   (append-only). Not amendable: GRN number, source PO/CO, Supplier.
+7. **Warehouse boundary** re-asserted at web/API/SQL and covered by tests (warehouse role
+   403 on review/amend/void).
+8. **Verification** — regression suites updated/added: the exact five category rows and
+   order · no invented category · no state rail · corrected words (render + source scan) ·
+   Valid/Cancelled presentation · register lists GRNs only · 50/50 view · Amend 50/50 live
+   preview with watermark · More ▾ void walk · duty gates · API categories/line_info/limit
+   cap/evidence-amend mapping · shared ladder + status words. Register fetch limit raised
+   (`?limit`, hard cap 1000) with virtualised rows for large record counts.
+
+Delivery evidence (merge SHA, deploy SHA, 0427 apply, production walk) is recorded at the
+foot of this section on closure.

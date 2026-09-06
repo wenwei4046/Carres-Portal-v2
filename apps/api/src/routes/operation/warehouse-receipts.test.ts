@@ -747,3 +747,162 @@ describe("POST /:id/void", () => {
     expect(body.code).toBe("units_moved_on");
   });
 });
+
+/* ═══ The 2026-09-06 owner correction — categories, limit, evidence amend ══ */
+
+describe("GET / — the rail's governed categories (owner correction 2026-09-06)", () => {
+  it("resolves each receipt's category words from the CATALOG through the one shared ladder", async () => {
+    const tables = {
+      ...opsTables({ ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260906-0001" }),
+      product_skus: {
+        list: {
+          data: [{ sku: "MS01-K", product_models: { category: "mattress" } }],
+          error: null,
+        },
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as any);
+    const res = await req(
+      "/api/operation/warehouse-receipts?status=posted",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      receipts: Array<{ categories?: string[] }>;
+    };
+    expect(body.receipts[0].categories).toEqual(["Mattress"]);
+  });
+
+  it("caps ?limit at the hard maximum — a URL cannot ask for the whole table", async () => {
+    const limits: number[] = [];
+    const sb = makeSb(opsTables());
+    const origFrom = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const builder = origFrom(table) as Record<string, unknown> & {
+        limit: (n: number) => unknown;
+      };
+      if (table === "warehouse_receipts") {
+        const origLimit = builder.limit;
+        builder.limit = (n: number) => {
+          limits.push(n);
+          return (origLimit as (n: number) => unknown)(n);
+        };
+      }
+      return builder;
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    await req(
+      "/api/operation/warehouse-receipts?limit=999999",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(limits).toContain(1000);
+    expect(limits.every((n) => n <= 1000)).toBe(true);
+  });
+});
+
+describe("GET /:id — the GRN document's product facts (line_info)", () => {
+  it("carries the catalog description and the governed category word per SKU", async () => {
+    const tables = {
+      warehouse_receipts: {
+        single: {
+          data: { ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260906-0002" },
+          error: null,
+        },
+      },
+      receiving_unit_results: { list: { data: [], error: null } },
+      receiving_events: { list: { data: [], error: null } },
+      purchase_orders: {
+        single: {
+          data: {
+            id: "PO-1001",
+            supplier_id: "s1",
+            warehouse_id: WH,
+            is_consignment: false,
+            suppliers: { name: "Ohana" },
+            purchase_order_lines: [],
+          },
+          error: null,
+        },
+      },
+      app_users: { list: { data: [], error: null } },
+      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+      product_skus: {
+        list: {
+          data: [
+            {
+              sku: "MS01-K",
+              variant: "Mattress Forte K",
+              product_models: { category: "mattress" },
+            },
+          ],
+          error: null,
+        },
+      },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}`,
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      line_info: Record<string, { description: string | null; category: string }>;
+    };
+    // ⚠️ the mocked product_skus list answers BOTH the catalog-category read
+    // and the variant read with the same rows — which is exactly what the
+    // route does against the real table.
+    expect(body.line_info["MS01-K"]).toEqual({
+      description: "Mattress Forte K",
+      category: "Mattress",
+    });
+  });
+});
+
+describe("POST /:id/amend — the paper's evidence (0427)", () => {
+  it("maps doFilePath and arrivalEvidenceAdd onto p_changes", async () => {
+    const sb = makeSb(opsTables(), { data: { status: "posted" } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "clerk photographed the wrong DO",
+        doFilePath: "PO-1001/corrected-do.jpg",
+        arrivalEvidenceAdd: [{ path: "PO-1001/arrival-2.jpg", kind: "photo" }],
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("receiving_amend", {
+      p_receipt_id: RECEIPT,
+      p_reason: "clerk photographed the wrong DO",
+      p_changes: {
+        do_file_path: "PO-1001/corrected-do.jpg",
+        arrival_evidence_add: [{ path: "PO-1001/arrival-2.jpg", kind: "photo" }],
+      },
+      p_save_key: null,
+    });
+  });
+});
+
+describe("the Warehouse boundary — it counts; it never posts, amends or voids", () => {
+  it("403 for the warehouse on amend and void", async () => {
+    const jwt = await makeJwt("warehouse");
+    for (const door of ["amend", "void"]) {
+      const res = await req(
+        `/api/operation/warehouse-receipts/${RECEIPT}/${door}`,
+        "POST",
+        jwt,
+        { reason: "should never reach the engine" },
+      );
+      expect(res.status).toBe(403);
+    }
+  });
+});
