@@ -997,6 +997,21 @@ Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy 
 `Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
 an activity fact that confirms nothing and moves no arrangement field.
 
+**DEPLOYED 2026-09-06 — Monitor month calendar + fixed windows, PR #1119, main SHA
+`88c76100fd7a40623c1904030869c36031303de8`, all three canonical surfaces converged (deploy
+probes).** The §8 month-calendar correction is live and was verified through an authenticated
+Operations session on production: the complete SEPTEMBER 2026 month fixed at the rail's top
+(Sunday-first per the owner's sketch, selected date blue, today distinguishable, Sundays
+muted and unclickable, the work-day DOT visible on the real Thu 27 Aug confirmed delivery);
+month arrows browsing to AUGUST 2026 and back; clicking 27 opening the fixed operating week
+Mon 24 – Sat 29 Aug with its real card and partner, the picks cleared and `?date=2026-08-27`
+on the URL; `All delivery work` listing all 87 real scopes in the corrected column order with
+the month still in view. Windows verified at all three breakpoints on the seeded preview
+(desktop week · tablet Thu–Sat half-week · phone one-day list with the kit date control).
+Local full-suite runs that night were polluted by overlapping sibling vitest processes (the
+rotating purchasing failures never reproduced twice and passed 126/126 solo and 235/235 on
+clean main); CI's clean runner passed the full suite before merge.
+
 **DEPLOYED 2026-09-06 — Monitor work lists + Delivery Orders Register correction, PR #1109,
 main SHA `22bf71493b5c6f12c946c3898a2cf13477ca33eb`, all three canonical surfaces converged on
 that exact SHA (deploy probes).** The 2026-09-06 owner UI correction in §8 is live and was
