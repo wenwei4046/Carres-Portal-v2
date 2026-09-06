@@ -1,10 +1,12 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PaymentRegister from "./PaymentRegister";
 
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
-  refetch: vi.fn(), error: null as Error | null }));
+  refetch: vi.fn(), error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})) }));
+vi.mock("xlsx", () => ({ utils: { json_to_sheet: state.sheet, book_new: () => ({}),
+  book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 vi.mock("@/lib/queries", () => ({ usePaymentRegister: () => state }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 const payment = {
@@ -20,6 +22,7 @@ beforeEach(() => {
   state.isError = false;
   state.isLoading = false;
   state.error = null;
+  state.sheet.mockClear();
   localStorage.clear();
 });
 function show() { return render(<MemoryRouter><PaymentRegister /></MemoryRouter>); }
@@ -65,5 +68,14 @@ describe("Payments Register", () => {
     expect(screen.queryByTestId("payment-register-summary")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(state.refetch).toHaveBeenCalled();
+  });
+  it("keeps the VOIDED mark when exporting an original receipt amount", async () => {
+    show();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Export Excel (1)" }));
+    await waitFor(() => expect(state.sheet).toHaveBeenCalled());
+    expect(state.sheet.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ "Receipt No": "RC-060926-0002 · VOIDED", Amount: "100" }),
+    ]);
   });
 });

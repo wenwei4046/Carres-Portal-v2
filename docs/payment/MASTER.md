@@ -282,7 +282,8 @@ The delivery branch adds a read-only canonical receipt Register endpoint and rea
 voids and allocation history, resolves recorded actors from shared staff, pages explicitly, and
 refuses failed or incomplete source reads instead of reporting a false zero. The draft Register
 uses the shared grid, sticky Receipt No, six approved columns, view-scoped selection/export and
-void-aware footer total. Its Inspect is read-only; the draft object uses one continuous scroll.
+void-aware footer total. Exports retain the VOIDED mark beside the original receipt number and
+amount. Its Inspect is read-only; the draft object uses one continuous scroll.
 
 The delivery branch also makes the existing shared Order/Work action engine check collection
 readiness. A live order with goods not ready and no usable arrival date creates no collection

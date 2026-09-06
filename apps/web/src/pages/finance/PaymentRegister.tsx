@@ -31,7 +31,8 @@ export default function PaymentRegister() {
     { key: "receipt", label: "Receipt No", width: 200, accessor: (r) => <span>
       {r.receipt_no ?? "Receipt number missing"}
       {!isLivePayment(r) && <span className="ml-2 text-label">VOIDED</span>}
-    </span>, searchValue: (r) => r.receipt_no ?? "", filterValue: (r) => r.receipt_no ?? "", filterType: "numbering" },
+    </span>, searchValue: (r) => r.receipt_no ?? "", filterValue: (r) => r.receipt_no ?? "", filterType: "numbering",
+      exportValue: (r) => `${r.receipt_no ?? "Receipt number missing"}${isLivePayment(r) ? "" : " · VOIDED"}` },
     { key: "paid", label: "Paid Date", width: 150, accessor: (r) => fmtDate(r.paid_on),
       dateValue: (r) => r.paid_on, filterType: "date", exportValue: (r) => fmtDate(r.paid_on) },
     { key: "customer", label: "Customer", width: 220, accessor: (r) => r.orders?.customer_name ?? "Customer not available",
