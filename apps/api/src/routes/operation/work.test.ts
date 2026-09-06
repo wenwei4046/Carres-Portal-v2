@@ -3,6 +3,7 @@ import type { OperationWorkItem } from "@carres/shared";
 import {
   composeOperationWorkResponse,
   manualPurchaseWorkInputsFromRegister,
+  receivingWorkSourceFromModuleFacts,
   projectManualPurchaseWork,
   projectReceivingWork,
   projectSalesOrderWork,
@@ -226,5 +227,50 @@ describe("operation Work response composition", () => {
     expect(inputs[0]?.remainingQty).toBe(2);
     expect(inputs[0]?.recipient).toBe("Nice Future");
     expect(inputs[0]?.context).toContain("Ready Stock");
+  });
+
+  it("derives Receiving source only from submitted counts and open PO arrival facts", () => {
+    const source = receivingWorkSourceFromModuleFacts({
+      receipts: [{
+        id: "receipt-1",
+        po_id: "PO-1",
+        supplier_name: "Nice Future",
+        status: "submitted",
+        goods_received_at: "2026-09-06",
+        submitted_at: "2026-09-06T08:00:00Z",
+      }, {
+        id: "receipt-2",
+        po_id: "PO-2",
+        supplier_name: "Done Supplier",
+        status: "posted",
+        goods_received_at: "2026-09-05",
+        submitted_at: "2026-09-05T08:00:00Z",
+      }],
+      pos: [{
+        id: "PO-3",
+        status: "open",
+        supplier_id: "supplier-3",
+        eta_date: "2026-09-06",
+        purchase_order_lines: [{ qty: 5, received_qty: 2 }],
+      }, {
+        id: "PO-4",
+        status: "received",
+        supplier_id: "supplier-4",
+        eta_date: "2026-09-06",
+        purchase_order_lines: [{ qty: 5, received_qty: 0 }],
+      }],
+      suppliers: [
+        { id: "supplier-3", name: "Arrival Supplier" },
+        { id: "supplier-4", name: "Closed Supplier" },
+      ],
+    });
+
+    expect(source.submitted.map((row) => row.id)).toEqual(["receipt-1"]);
+    expect(source.arrivalsDue).toEqual([{
+      po_id: "PO-3",
+      supplier_name: "Arrival Supplier",
+      eta_date: "2026-09-06",
+      pending_qty: 3,
+    }]);
   });
 });

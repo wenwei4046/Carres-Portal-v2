@@ -62,6 +62,52 @@ interface ManualPurchaseRegisterSource {
   pos: Array<{ id: string; sent: boolean }>;
 }
 
+export function receivingWorkSourceFromModuleFacts(data: {
+  receipts: Array<{
+    id: string;
+    po_id: string;
+    supplier_name: string | null;
+    status: string;
+    goods_received_at?: string;
+    submitted_at: string;
+  }>;
+  pos: Array<{
+    id: string;
+    status: string;
+    supplier_id: string | null;
+    eta_date: string | null;
+    purchase_order_lines?: Array<{ qty: number; received_qty: number }>;
+  }>;
+  suppliers: Array<{ id: string; name: string | null }>;
+}): ReceivingWorkSource {
+  const supplier = new Map(data.suppliers.map((row) => [row.id, row.name]));
+  return {
+    submitted: data.receipts
+      .filter((row) => row.status === "submitted")
+      .map((row) => ({
+        id: row.id,
+        po_id: row.po_id,
+        supplier_name: row.supplier_name,
+        goods_received_at: row.goods_received_at,
+        submitted_at: row.submitted_at,
+      })),
+    arrivalsDue: data.pos
+      .filter((row) => row.status === "open")
+      .map((row) => ({
+        po_id: row.id,
+        supplier_name: row.supplier_id
+          ? (supplier.get(row.supplier_id) ?? null)
+          : null,
+        eta_date: row.eta_date,
+        pending_qty: (row.purchase_order_lines ?? []).reduce(
+          (total, line) =>
+            total + Math.max(0, Number(line.qty) - Number(line.received_qty)),
+          0,
+        ),
+      })),
+  };
+}
+
 export function manualPurchaseWorkInputsFromRegister(
   data: ManualPurchaseRegisterSource,
 ): Array<ManualPurchaseWorkInput & { recipient: string | null }> {
