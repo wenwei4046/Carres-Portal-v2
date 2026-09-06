@@ -107,23 +107,14 @@ operationSuppliersRouter.post("/", async (c) => {
     );
   }
 
-  const { data, error } = await sb
-    .from("suppliers")
-    .insert({
-      name: parsed.data.name,
-      slug,
-      kind: parsed.data.kind,
-      cat_covered: parsed.data.catCovered,
-      contact: parsed.data.contact ?? null,
-      lead_time: parsed.data.leadTime ?? null,
-    })
-    /* The SAME projection the list route returns, so the row handed back IS a
-       supplier row the caller can drop straight into its picker — never a
-       narrower lookalike the client has to reconcile. */
-    .select(
-      "id, name, slug, kind, cat_covered, lead_time, contact, contact_email, whatsapp_group_url",
-    )
-    .maybeSingle();
+  const { data, error } = await sb.rpc("catalog_create_supplier_setup", {
+    p_name: parsed.data.name,
+    p_slug: slug,
+    p_kind: parsed.data.kind,
+    p_categories: parsed.data.catCovered,
+    p_production_days: parsed.data.productionDays,
+    p_off_days: parsed.data.offDays,
+  });
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);

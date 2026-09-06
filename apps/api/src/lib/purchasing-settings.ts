@@ -113,7 +113,7 @@ export async function loadPurchasingSettings(
       .from("product_skus")
       .select("supplier_id, product_models!inner(category)")
       .not("supplier_id", "is", null),
-    sb.from("suppliers").select("id, name, kind"),
+    sb.from("suppliers").select("id, name, kind, cat_covered"),
     sb.from("purchasing_production_days").select("supplier_id, category, working_days"),
     sb
       .from("purchasing_supplier_settings")
@@ -147,6 +147,16 @@ export async function loadPurchasingSettings(
       const set = catsBySupplier.get(supplierId) ?? new Set<PurchasingCategory>();
       set.add(c);
       catsBySupplier.set(supplierId, set);
+    }
+  }
+
+  // Setup categories remain maintainable before any SKU has been linked.
+  for (const supplier of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
+    for (const category of (supplier.cat_covered ?? []) as string[]) {
+      if (!isPurchasingCategory(category)) continue;
+      const categories = catsBySupplier.get(supplier.id as string) ?? new Set<PurchasingCategory>();
+      categories.add(category);
+      catsBySupplier.set(supplier.id as string, categories);
     }
   }
 

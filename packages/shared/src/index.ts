@@ -986,6 +986,8 @@ export {
   poArrivalGapOf,
   poCurrentActionOf,
   poDateHistoryOf,
+  poSupplierReplyOf,
+  poSupplierDeliveryDateOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,
@@ -2973,3 +2975,7 @@ export * from "./work-engine";
 export * from "./workspace-duty";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
+
+export { recordSupplierReplyInput } from "./schemas/operation";
+
+export { purchaseOrderReplyWorkItems } from "./purchase-order-register";

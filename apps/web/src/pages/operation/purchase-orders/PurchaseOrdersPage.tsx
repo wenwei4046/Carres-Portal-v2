@@ -8,7 +8,9 @@ import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
   manualPurchaseSourceSummary,
-  poDateHistoryOf,
+  poSupplierDeliveryDateOf,
+  poSupplierReplyOf,
+  recordSupplierReplyInput,
   PO_DELAY_REASONS,
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
@@ -24,7 +26,9 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import ClaimPhotoUploadField from "@/components/ClaimPhotoUploadField";
 import { apiFetch } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { fmtDate } from "@/lib/fmt-date";
 import { renderPoPdf } from "@/lib/pdf/render";
 import { usePdfCanvases } from "@/lib/pdf/use-pdf-canvases";
@@ -71,10 +75,10 @@ const RAIL_GROUPS: Array<{ heading: string; rows: RailRow[] }> = [
     ],
   },
   {
-    heading: "DELIVERY DATE",
+    heading: "SUPPLIER REPLY",
     rows: [
-      { key: "supplier_date_missing", label: "Supplier date missing" },
-      { key: "supplier_date_passed", label: "Supplier date passed" },
+      { key: "supplier_date_missing", label: "Supplier has not confirmed the PO date" },
+      { key: "supplier_date_passed", label: "Supplier delivery date passed" },
     ],
   },
   {
@@ -138,7 +142,7 @@ function sourceText(po: operationPoListRow): { display: string; search: string }
 }
 
 function supplierDateOf(po: operationPoListRow): string | null {
-  return poDateHistoryOf(po.promises ?? []).currentDate;
+  return poSupplierDeliveryDateOf(po.promises, po.version ?? 1);
 }
 
 function toRegisterInput(po: operationPoListRow, supplierName: string): PurchaseOrderRegisterInput {
@@ -447,10 +451,10 @@ export default function PurchaseOrdersPage() {
       label: "PO Delivery Date",
       width: 150,
       sortable: true,
-      accessor: (row) => row.po.eta_date ? fmtDate(row.po.eta_date) : <Absence />,
-      searchValue: (row) => row.po.eta_date ?? "Not recorded",
-      filterValue: (row) => row.po.eta_date ?? "Not recorded",
-      dateValue: (row) => row.po.eta_date,
+      accessor: (row) => row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : <Absence />,
+      searchValue: (row) => row.po.official_delivery_date ?? "Not recorded",
+      filterValue: (row) => row.po.official_delivery_date ?? "Not recorded",
+      dateValue: (row) => row.po.official_delivery_date,
       filterType: "date",
       /* ⛔ A DATE COLUMN SORTS BY DATE (defect 26). Without this the grid falls
          back to comparing the RENDERED text — and these render as "Wed, 12
@@ -460,7 +464,7 @@ export default function PurchaseOrdersPage() {
          to answer it produced a meaningless order that still looked plausible,
          because dates do increase inside each weekday block. ISO, so the
          string comparison IS the chronological one. */
-      sortFn: (a, b) => (a.po.eta_date ?? "").localeCompare(b.po.eta_date ?? ""),
+      sortFn: (a, b) => (a.po.official_delivery_date ?? "").localeCompare(b.po.official_delivery_date ?? ""),
     },
     {
       key: "supplier_delivery_date",
@@ -469,7 +473,7 @@ export default function PurchaseOrdersPage() {
       width: 166,
       sortable: true,
       /* ⛔ NO PROMISE ON FILE IS NOT A CONFIRMED DATE (YH, 2026-09-01).
-         The test was `!row.supplierDate || row.supplierDate === row.po.eta_date`,
+         The test was `!row.supplierDate || row.supplierDate === row.po.official_delivery_date`,
          and the first half turned "the supplier has said nothing" into "the
          supplier confirmed our date" — asserted on the same row whose Work
          column says the date is MISSING. A buyer skips the chase call; a
@@ -478,20 +482,20 @@ export default function PurchaseOrdersPage() {
          it. Absence first, THEN the equality. */
       accessor: (row) =>
         !row.supplierDate
-          ? <Absence />
-          : row.supplierDate === row.po.eta_date
+          ? <Absence>Not confirmed</Absence>
+          : row.supplierDate === row.po.official_delivery_date
             ? "Same as PO"
             : fmtDate(row.supplierDate),
       searchValue: (row) =>
         !row.supplierDate
-          ? "Not recorded"
-          : row.supplierDate === row.po.eta_date
+          ? "Not confirmed"
+          : row.supplierDate === row.po.official_delivery_date
             ? "Same as PO"
             : row.supplierDate,
       filterValue: (row) =>
         !row.supplierDate
-          ? "Not recorded"
-          : row.supplierDate === row.po.eta_date
+          ? "Not confirmed"
+          : row.supplierDate === row.po.official_delivery_date
             ? "Same as PO"
             : row.supplierDate,
       /* The real date, always — a row that prints `Same as PO` still HAS one,
@@ -1041,15 +1045,15 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
           <Fact label="Deliver To" value={row.deliverTo} />
           <Fact label="Source" value={row.source} />
           <Fact label="PO Issued" value={row.facts.currentSend ? fmtDate(row.facts.currentSend.sentAt, { time: true }) : "Not sent"} />
-          <Fact label="PO Delivery Date" value={row.po.eta_date ? fmtDate(row.po.eta_date) : "Not recorded"} />
+          <Fact label="PO Delivery Date" value={row.po.official_delivery_date ? fmtDate(row.po.official_delivery_date) : "Not recorded"} />
           {/* Same law as the register column: absence FIRST, then equality.
               `Same as PO` is a claim about what the supplier said. */}
-          <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not recorded" : row.supplierDate === row.po.eta_date ? "Same as PO" : fmtDate(row.supplierDate)} />
+          <Fact label="Supplier Delivery Date" value={!row.supplierDate ? "Not confirmed" : row.supplierDate === row.po.official_delivery_date ? "Same as PO" : fmtDate(row.supplierDate)} />
           <Fact label="PO Version" value={`PO V${row.facts.version}`} />
           <Fact label="Sent to Supplier" value={row.facts.sentToSupplier} />
           <Fact label="Status" value={row.facts.operationStatus ?? row.facts.documentState} />
         </dl>
-        <SupplierDateBlock row={row} onSaved={onSupplierDateSaved} />
+        <SupplierDateBlock key={`${row.id}:${row.facts.version}`} row={row} onSaved={onSupplierDateSaved} />
       </Block>
       <Block title="Goods lines">
         {/* The table bleeds to the card edge so its own scroller, not the
@@ -1156,52 +1160,47 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  * wallpaper. The RPC, the route and the hook all existed and were tested; only
  * this was missing.
  *
- * TWO ANSWERS, BECAUSE THE DOOR HAS TWO. A first confirmation is `shipping`
- * and needs only the date. CHANGING a date already on file is a `delayed`
- * answer, and the API requires a reason for it - moving a promise silently is
- * the thing the promise ledger exists to prevent. The form asks for exactly
- * what the answer it is about to send requires, and says which it is.
+ * A supplier can confirm the original PO date or give a different date with a
+ * reason. Both answers require evidence tied to the exact sent version.
  */
 function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => void }) {
   const [date, setDate] = useState("");
   const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
   const [remarks, setRemarks] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  const [channel, setChannel] = useState<"whatsapp" | "email" | "phone" | "in_person">("whatsapp");
+  const [recipient, setRecipient] = useState("");
+  const [evidence, setEvidence] = useState("");
+  const [reportedBy, setReportedBy] = useState("");
+  const [reportedAt, setReportedAt] = useState("");
   const record = useRecordSupplierDate(row.id);
 
-  /* Nothing to promise on a document that is finished or withdrawn. */
-  if (row.facts.operationStatus === "Completed" || row.facts.operationStatus === "Cancelled") {
-    return null;
-  }
-
+  const canRecord = !!row.facts.currentSend && row.facts.quantities.open > 0 && row.facts.operationStatus !== "Cancelled";
   const known = row.supplierDate;
-  const changing = known != null && date !== "" && date !== known;
-  const ready = date !== "" && date !== known && !record.isPending;
+  const savedReply = poSupplierReplyOf(row.po.promises, row.facts.version);
+  if (!row.facts.currentSend || (!canRecord && !savedReply)) return null;
+  const changing = date !== "" && row.po.official_delivery_date != null && date !== row.po.official_delivery_date;
+  const replyInput = recordSupplierReplyInput.safeParse({
+    poVersion: row.facts.version,
+    answer: changing ? "delayed" : "shipping",
+    ...(changing ? { newDate: date, reason } : { firstDate: date }),
+    remarks: remarks.trim() || undefined,
+    channel, recipient, evidence, reportedBy,
+    reportedAt: reportedAt && Number.isFinite(Date.parse(reportedAt)) ? new Date(reportedAt).toISOString() : "",
+  });
+  const ready = date !== "" && replyInput.success && !record.isPending;
 
   function save() {
     if (!ready) return;
     setProblem(null);
-    /* The SAME arithmetic the retired legacy form used, kept deliberately:
-       no date on file is a first confirmation (`shipping` + `firstDate`);
-       moving one that exists is a `delayed` answer and carries its category.
-       Getting this pair wrong records the supplier's real date as a promise
-       about our own estimate and then drops it. */
-    const input = changing
-      ? {
-          answer: "delayed" as const,
-          newDate: date,
-          reason,
-          remarks: remarks.trim() || undefined,
-        }
-      : {
-          answer: "shipping" as const,
-          firstDate: date,
-          remarks: remarks.trim() || undefined,
-        };
+    if (!replyInput.success) return;
+    const input = replyInput.data;
     record.mutate(input, {
       onSuccess: () => {
         setDate("");
         setRemarks("");
+        setEvidence("");
+        setReportedAt("");
         onSaved();
       },
       onError: (e: unknown) => {
@@ -1214,14 +1213,25 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
   return (
     <div className="mt-4 border-t border-kit-slate-4 pt-3" data-testid="po-supplier-date">
       <div className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-        Supplier delivery date
+        SUPPLIER REPLY
       </div>
       <p className="mt-1 text-meta text-kit-slate-11">
         {known
-          ? `${row.supplierName} has promised ${fmtDate(known)}. Recording a different date files a delay, and needs a reason.`
-          : `${row.supplierName} has not given a date. Record the one they gave you.`}
+          ? `Supplier Delivery Date · ${fmtDate(known)}`
+          : "Supplier has not confirmed the PO date"}
       </p>
-      <div className="mt-2 flex flex-wrap items-end gap-2">
+      {savedReply ? (
+        <div className="mt-2 text-meta text-kit-slate-11">
+          <p>{savedReply.channel} · {savedReply.recipient} · Reported by {savedReply.reported_by} · {fmtDate(savedReply.reported_at!, { time: true })}</p>
+          <p>Recorded by {savedReply.recorded_by_name ?? "Not recorded"} · {fmtDate(savedReply.recorded_at, { time: true })}{savedReply.duty_name ? ` · PO Duty ${savedReply.duty_name}` : ""}{savedReply.acting_name ? ` · Covered by ${savedReply.acting_name}` : ""}</p>
+          <button type="button" className="text-kit-blue-11 underline" onClick={async () => {
+            const { data, error } = await supabase.storage.from("delivery-orders").createSignedUrl(savedReply.evidence!, 3600);
+            if (error || !data?.signedUrl) { setProblem("The reply evidence could not be opened"); return; }
+            window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+          }}>Reply evidence</button>
+        </div>
+      ) : null}
+      {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-label text-kit-slate-9">Date</span>
           <input
@@ -1258,6 +1268,29 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
             className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
           />
         </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-label text-kit-slate-9">Channel</span>
+          <select value={channel} onChange={e => setChannel(e.target.value as typeof channel)} className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta">
+            <option value="whatsapp">WhatsApp</option><option value="email">Email</option>
+            <option value="phone">Phone</option><option value="in_person">In person</option>
+          </select>
+        </label>
+        {([
+          ["Recipient", recipient, setRecipient],
+          ["Reported by", reportedBy, setReportedBy],
+        ] as const).map(([label, value, setValue]) => (
+          <label key={label} className="flex flex-col gap-1">
+            <span className="text-label text-kit-slate-9">{label}</span>
+            <input value={value} onChange={e => setValue(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
+          </label>
+        ))}
+        <ClaimPhotoUploadField poId={row.id} doNumber={`PO-V${row.facts.version}-reply`}
+          paths={evidence ? [evidence] : []} onChange={paths => setEvidence(paths[paths.length - 1] ?? "")}
+          label="Reply evidence" testId="po-supplier-reply-evidence" />
+        <label className="flex flex-col gap-1">
+          <span className="text-label text-kit-slate-9">Reported at</span>
+          <input type="datetime-local" value={reportedAt} onChange={e => setReportedAt(e.target.value)} required className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta" />
+        </label>
         <button
           type="button"
           disabled={!ready}
@@ -1265,18 +1298,9 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           data-testid="po-supplier-date-save"
           className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-semibold text-white disabled:bg-kit-slate-5 disabled:text-kit-slate-9"
         >
-          {/* A dead button names what is missing - this page's own rule. */}
-          {record.isPending
-            ? "Recording..."
-            : date === ""
-              ? "Record - pick a date"
-              : date === known
-                ? "Record - that is the date on file"
-                : changing
-                  ? "Record the new date"
-                  : "Record the date"}
+          {record.isPending ? "Recording..." : "Record supplier answer"}
         </button>
-      </div>
+      </div> : null}
       {problem ? (
         <div className="mt-2 text-meta text-kit-red-11" data-testid="po-supplier-date-problem">{problem}</div>
       ) : null}

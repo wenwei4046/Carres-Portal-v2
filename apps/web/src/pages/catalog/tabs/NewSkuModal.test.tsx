@@ -924,6 +924,8 @@ describe("NewSkuModal — adding a supplier without losing the SKU", () => {
     fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
       target: { value: "Hookka Two" },
     });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-days-mattress"), { target: { value: "7" } });
     expect(save.disabled).toBe(false);
   });
 
@@ -933,6 +935,7 @@ describe("NewSkuModal — adding a supplier without losing the SKU", () => {
     fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
       target: { value: "  Hookka Two  " },
     });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-days-mattress"), { target: { value: "7" } });
     fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
 
     await waitFor(() =>
@@ -940,6 +943,8 @@ describe("NewSkuModal — adding a supplier without losing the SKU", () => {
         name: "Hookka Two",
         kind: "factory_pickup",
         catCovered: ["mattress"],
+        productionDays: [{ category: "mattress", workingDays: 7 }],
+        offDays: [0],
       }),
     );
     /* The keyer asked for this supplier BECAUSE they are writing its SKU right
@@ -958,6 +963,7 @@ describe("NewSkuModal — adding a supplier without losing the SKU", () => {
     fireEvent.change(screen.getByTestId("new-sku-supplier-add-name"), {
       target: { value: "Hookka Two" },
     });
+    fireEvent.change(screen.getByTestId("new-sku-supplier-add-days-mattress"), { target: { value: "7" } });
     fireEvent.click(screen.getByTestId("new-sku-supplier-add-save"));
 
     await waitFor(() => expect(mockCreateSupplierMutateAsync).toHaveBeenCalled());
@@ -1054,7 +1060,7 @@ describe("NewSkuModal — a duplicate supplier is caught early and is not a dead
     });
     expect(screen.queryByTestId("new-sku-supplier-add-duplicate")).not.toBeInTheDocument();
     expect((screen.getByTestId("new-sku-supplier-add-save") as HTMLButtonElement).disabled).toBe(
-      false,
+      true,
     );
   });
 });

@@ -1009,12 +1009,15 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
             ]);
           case "purchase_orders":
             return tableStub([
-              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", eta_date: "2026-09-08" },
+              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", official_delivery_date: "2026-09-01", eta_date: "2026-09-08", version: 1 },
             ]);
           case "po_supplier_promises":
             // The supplier moved the date: the ledger holds the date we HELD.
             return tableStub([
               { po_id: PO_D, previous_date: "2026-09-01", new_date: "2026-09-08",
+                kind: "tomorrow_delivery", answer: "delayed", po_version: 1, channel: "whatsapp",
+                recipient: "Factory", evidence: "reply.png", reported_by: "Factory staff",
+                reported_at: "2026-09-02T01:00:00Z", recorded_by: U_JESS,
                 recorded_at: "2026-09-02T02:00:00Z" },
             ]);
           case "purchasing_destinations":

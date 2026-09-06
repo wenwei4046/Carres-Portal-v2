@@ -11,7 +11,7 @@ import {
   officeReceiveInput,
   recordBalanceDateInput,
   recordReadyDateInput,
-  recordTomorrowDeliveryInput,
+  recordSupplierReplyInput,
   confirmPoSentInput,
   recordSendInput,
   revisePoInput,
@@ -149,7 +149,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -327,7 +327,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
           // client never received), and the date history prints `remarks` beside
           // the countable `reason` (0310). Found while wiring Q5's ready date;
           // fixed rather than left, since both are one word in this string.
-          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
+          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, duty_user_id, acting_user_id",
         )
         .in("po_id", ids)
         .order("recorded_at", { ascending: false })
@@ -610,6 +610,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             const row = r as Record<string, unknown>;
             return [row.sent_by, row.duty_user_id, row.acting_user_id];
           })
+          .concat([...promisesByPo.values()].flatMap(rows => rows.flatMap(row =>
+            [row.recorded_by, row.duty_user_id, row.acting_user_id])))
           .filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     ];
@@ -631,6 +633,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         const label =
           ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
         if (label) actorName.set(u.id as string, label);
+      }
+    }
+    for (const replies of promisesByPo.values()) {
+      for (const reply of replies) {
+        reply.recorded_by_name = actorName.get(reply.recorded_by as string) ?? null;
+        reply.duty_name = actorName.get(reply.duty_user_id as string) ?? null;
+        reply.acting_name = actorName.get(reply.acting_user_id as string) ?? null;
       }
     }
     for (const r of sendRows) {
@@ -1901,6 +1910,9 @@ operationPosRouter.post("/:id/chase-event", requireOperation, async (c) => {
 // so an operator meets a sentence rather than a Postgres string
 // (`attribution_becomes_a_constraint`'s lesson, 0296).
 const SUPPLIER_CALL_422: Record<string, string> = {
+  po_not_sent: "po_not_sent",
+  reply_evidence_required: "reply_evidence_required",
+  stale_po_version: "stale_po_version",
   invalid_input: "invalid_input",
   new_date_required: "new_date_required",
   po_not_open: "po_not_open",
@@ -1942,31 +1954,16 @@ function mapSupplierCallError(
   return c.json(m.body, m.status);
 }
 
-// ----- POST /:id/tomorrow-delivery -----
-// `Call {supplier} — confirm tomorrow's delivery`, counted per PO. Two answers
-// and no third (§3): shipping, or delayed with a new date. A DELAYED answer
-// moves the PO's expected arrival AND reaches `ops_order_control.line_etas`,
-// which is what opens **Delay planning** by itself — the Orders flow's stage 1,
-// unchanged. Purchasing never invents a second delay conversation and never
-// opens a call to the customer.
+// Record the answer to the exact sent PO version with outside evidence.
+// The transaction preserves the original document date and projects only goods
+// arrival planning to the Sales lines explicitly linked to this PO.
 operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
+  const parsed = await parseJsonBody(c, recordSupplierReplyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  // Remarks + the first-confirm date ride the extended RPC (draft migration —
-  // until it is applied this door serves the 0306 signature only, which is why
-  // the extras are omitted when absent rather than sent as nulls).
-  const extras: Record<string, unknown> = {};
-  if (parsed.data.remarks != null) extras.p_remarks = parsed.data.remarks;
-  const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
+  const { data, error } = await sb.rpc("purchasing_record_supplier_reply", {
     p_po_id: c.req.param("id"),
-    p_answer: parsed.data.answer,
-    p_new_date:
-      parsed.data.answer === "delayed"
-        ? parsed.data.newDate
-        : (parsed.data.firstDate ?? null),
-    p_reason: parsed.data.reason ?? null,
-    ...extras,
+    p_reply: parsed.data,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });
