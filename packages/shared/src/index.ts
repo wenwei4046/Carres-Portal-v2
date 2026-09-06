@@ -2964,5 +2964,6 @@ export * from "./workspace-duty";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
+export * from "./sales-order-work-source";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
