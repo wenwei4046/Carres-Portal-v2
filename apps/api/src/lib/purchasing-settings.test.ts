@@ -121,3 +121,15 @@ describe("loadPurchasingNumbers — the Manual Purchase floor cannot take Purcha
     expect(ok.manualPurchaseMinDeliveryDays).toBe(14);
   });
 });
+
+
+it("keeps selected Supplier setup categories maintainable before any SKU exists", async () => {
+  const settings = await loadPurchasingSettings(fakeClient({
+    purchasing_settings: [{ order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] }],
+    suppliers: [{ id: "supplier-1", name: "Factory", kind: "own_logistics", cat_covered: ["mattress", "sofa"] }],
+    product_skus: [],
+    purchasing_supplier_settings: [{ supplier_id: "supplier-1", off_days: [0, 6] }],
+    purchasing_production_days: [{ supplier_id: "supplier-1", category: "mattress", working_days: 7 }, { supplier_id: "supplier-1", category: "sofa", working_days: 14 }],
+  }));
+  expect(settings.suppliers).toEqual([expect.objectContaining({ id: "supplier-1", categories: ["mattress", "sofa"], offDays: [0, 6] })]);
+});

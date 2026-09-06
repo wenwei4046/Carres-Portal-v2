@@ -13,6 +13,8 @@ let connectionLoading = false;
 let connectionEmpty = false;
 let receivingReturnReason: string | null = null;
 type TestPromise = {
+  po_version?: number; channel?: string; recipient?: string; evidence?: string;
+  reported_by?: string; reported_at?: string; recorded_by?: string;
   kind: string;
   answer: string;
   about_date: string | null;
@@ -32,6 +34,7 @@ const queryData = {
       sup_status: "pending",
       so: null,
       so_refs: null,
+      official_delivery_date: "2026-09-10",
       eta_date: "2026-09-10",
       expected_ready_date: null,
       purpose: "customer_sales",
@@ -63,7 +66,9 @@ const queryData = {
         },
       ],
       promises: [{
-        kind: "tomorrow_delivery",
+      po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+      reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
+      kind: "tomorrow_delivery",
         answer: "shipping",
         about_date: "2026-09-10",
         previous_date: null,
@@ -217,6 +222,7 @@ function renderPage(path = "/operation/procurement") {
 
 beforeEach(() => {
   navigate.mockReset();
+  supplierDateMutate.mockReset();
   auditError = false;
   connectionError = false;
   requiredLoading = false;
@@ -232,7 +238,12 @@ beforeEach(() => {
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
   queryData.pos[0]!.eta_date = "2026-09-10";
+  queryData.pos[0]!.official_delivery_date = "2026-09-10";
+  queryData.pos[0]!.sends[0]!.po_version = 1;
+  queryData.pos[0]!.version = 2;
   queryData.pos[0]!.promises.splice(0, queryData.pos[0]!.promises.length, {
+    po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+    reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
     kind: "tomorrow_delivery",
     answer: "shipping",
     about_date: "2026-09-10",
@@ -261,8 +272,8 @@ describe("Purchase Orders Register", () => {
     for (const word of [
       "All purchase orders",
       "PDF not sent",
-      "Supplier date missing",
-      "Supplier date passed",
+      "Supplier has not confirmed the PO date",
+      "Supplier delivery date passed",
       "Partly received",
       "Completed",
     ]) expect(rail.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
@@ -278,7 +289,7 @@ describe("Purchase Orders Register", () => {
     expect(railEl.textContent).not.toContain("Filters");
     expect(railEl.textContent).not.toContain("—");
     expect(railEl.textContent).not.toContain("supplier update required");
-    const headings = ["PURCHASE ORDERS", "DOCUMENT", "DELIVERY DATE", "RECEIVING"];
+    const headings = ["PURCHASE ORDERS", "DOCUMENT", "SUPPLIER REPLY", "RECEIVING"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
     const order = headings.map((heading) => railEl.textContent!.indexOf(heading));
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -316,6 +327,8 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("Same as PO");
 
     queryData.pos[0]!.promises.push({
+      po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+      reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
       kind: "tomorrow_delivery",
       answer: "delayed",
       about_date: "2026-09-10",
@@ -394,60 +407,53 @@ describe("Purchase Orders Register", () => {
   });
 });
 
-describe("the supplier delivery date has a door (defect 5)", () => {
-  /* The register counted this work in two rail rows and two Work sentences -
-     "Ask {supplier} for the delivery date" - and there was nowhere on the live
-     surface to record the answer. The only writer was called from a form inside
-     the retired legacy tree, below that file's live re-export, so it rendered
-     nowhere and made the door look wired. These tests replace the six that used
-     to drive that unreachable form. */
+vi.mock("@/components/ClaimPhotoUploadField", () => ({
+  default: ({ onChange }: { onChange: (paths: string[]) => void }) =>
+    <button onClick={() => onChange(["PO-20260828-4827/reply.png"])}>Upload reply evidence</button>,
+}));
 
-  it("offers the block on the Document view and names the supplier", () => {
+describe("the evidenced supplier reply door", () => {
+  function sent() { queryData.pos[0]!.sends[0]!.po_version = 2; }
+  function evidence() {
+    fireEvent.change(screen.getByLabelText("Recipient"), { target: { value: "Factory group" } });
+    fireEvent.change(screen.getByLabelText("Reported by"), { target: { value: "Factory staff" } });
+    fireEvent.change(screen.getByLabelText("Reported at"), { target: { value: "2026-08-28T10:00" } });
+    fireEvent.click(screen.getByText("Upload reply evidence"));
+  }
+  it("never offers supplier confirmation before this version was sent", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    const block = screen.getByTestId("po-supplier-date");
-    expect(block).toBeInTheDocument();
-    expect(block).toHaveTextContent("Supplier delivery date");
+    expect(screen.queryByTestId("po-supplier-date")).not.toBeInTheDocument();
   });
-
-  it("a dead button names what is missing, which is this page's own rule", () => {
+  it("requires evidence and records a different first reply as the actual different date", () => {
+    sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    const save = screen.getByTestId("po-supplier-date-save");
-    expect(save).toBeDisabled();
-    expect(save).toHaveTextContent("Record - pick a date");
-  });
-
-  it("moving a date already on file posts `delayed` and carries its category", async () => {
-    /* This PO holds a supplier promise, so a different date is a DELAY, not a
-       first confirmation. Getting that pair wrong records the supplier's real
-       date as a promise about our own estimate and then drops it. */
-    renderPage("/operation/procurement?po=PO-20260828-4827");
-    fireEvent.change(screen.getByTestId("po-supplier-date-input"), {
-      target: { value: "2099-12-31" },
-    });
-
-    /* A moved promise must say why, and the category is a locked list. */
-    const reason = screen.getByTestId("po-supplier-date-reason") as HTMLSelectElement;
-    expect(reason.tagName).toBe("SELECT");
-    expect(reason.value).toBe("Production Delay");
-
-    const save = screen.getByTestId("po-supplier-date-save");
-    expect(save).toBeEnabled();
-    expect(save).toHaveTextContent("Record the new date");
-    fireEvent.click(save);
-
-    await waitFor(() => expect(supplierDateMutate).toHaveBeenCalled());
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
+    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
+    evidence();
+    fireEvent.click(screen.getByTestId("po-supplier-date-save"));
     expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
-      answer: "delayed",
-      newDate: "2099-12-31",
-      reason: "Production Delay",
+      poVersion: 2, answer: "delayed", newDate: "2026-09-15", reason: "Production Delay",
+      channel: "whatsapp", recipient: "Factory group", evidence: "PO-20260828-4827/reply.png",
+      reportedBy: "Factory staff",
     });
   });
-
-  it("the reason is the locked CATEGORY, never free text", () => {
-    /* Jess locked the list on 2026-08-02 so the ledger can be counted; the
-       story goes in Remarks, never inside the category. */
+  it("discards an unfinished reply when the official version changes", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    const view = renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
+    evidence();
+    queryData.pos[0]!.version = 3;
+    queryData.pos[0]!.sends[0]!.po_version = 3;
+    view.rerender(<MemoryRouter initialEntries={["/operation/procurement?po=PO-20260828-4827"]}><PurchaseOrdersPage /></MemoryRouter>);
+    expect(screen.getByTestId("po-supplier-date-input")).toHaveValue("");
+    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
+  });
+  it("can confirm the original PO date without changing it", () => {
+    sent(); queryData.pos[0]!.promises = [];
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.getByTestId("po-supplier-date-remarks")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-10" } });
+    evidence(); fireEvent.click(screen.getByTestId("po-supplier-date-save"));
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({ answer: "shipping", firstDate: "2026-09-10", poVersion: 2 });
   });
 });
 

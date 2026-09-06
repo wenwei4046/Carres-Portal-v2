@@ -37,6 +37,8 @@ import {
   myHolidaySet,
   orderActionLine,
   receivingWorkItems,
+  purchaseOrderReplyWorkItems,
+  poSupplierDeliveryDateOf,
   WAREHOUSE_OFF_DAYS,
   workItemsForOrder,
   type OpsStaffMember,
@@ -217,6 +219,8 @@ export function useOpenWorkSet(): OpenWorkSet {
       const state = logisticStateOf(o, partnerNameById);
       const money = moneyOf(o);
       for (const it of workItems) {
+        // The exact PO/version feed owns supplier replies, once per PO.
+        if (it.ruleKey === "confirm_ready_date") continue;
         out.push({
           ...it,
           line: orderActionLine(it.ruleKey as Parameters<typeof orderActionLine>[0], {
@@ -403,7 +407,7 @@ export function useOpenWorkSet(): OpenWorkSet {
           supplier_name: p.supplier_id
             ? (supplierNameById.get(p.supplier_id) ?? null)
             : null,
-          eta_date: p.eta_date ?? null,
+          eta_date: poSupplierDeliveryDateOf(p.promises, p.version ?? 1) ?? p.eta_date ?? null,
           pending_qty: (p.purchase_order_lines ?? []).reduce(
             (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),
             0,
@@ -445,9 +449,23 @@ export function useOpenWorkSet(): OpenWorkSet {
     today,
   ]);
 
+  const supplierReplyItems = useMemo<WorkRow[]>(() => (posQ.data?.pos ?? []).flatMap(po => {
+    const input = {
+      id: po.id, supplierName: supplierNameById.get(po.supplier_id) ?? "Supplier",
+      status: po.status, version: po.version,
+      supplierDate: poSupplierDeliveryDateOf(po.promises, po.version ?? 1),
+      lines: po.purchase_order_lines.map(line => ({ qty: line.qty, receivedQty: line.received_qty })),
+      sends: (po.sends ?? []).map(send => ({ kind: send.kind, channel: send.channel,
+        sentAt: send.sent_at, poVersion: send.po_version, recipient: send.recipient })),
+    };
+    return purchaseOrderReplyWorkItems(input, poDuty, today, holidayOpts.holidays).map(item => ({
+      ...item, line: item.action, customer: null, ownerId: item.ownerUserId, deliveryDoNumber: null,
+    }));
+  }), [posQ.data, supplierNameById, poDuty, today, holidayOpts]);
+
   const allItems = useMemo(
-    () => [...items, ...manualItems, ...receivingItems],
-    [items, manualItems, receivingItems],
+    () => [...items, ...manualItems, ...receivingItems, ...supplierReplyItems],
+    [items, manualItems, receivingItems, supplierReplyItems],
   );
 
   return {

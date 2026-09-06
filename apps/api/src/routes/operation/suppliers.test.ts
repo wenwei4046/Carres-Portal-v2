@@ -146,15 +146,12 @@ describe("POST /api/operation/suppliers", () => {
             maybeSingle: async () => ({ data: opts.clash ?? null, error: null }),
           }),
         }),
-        insert: (body: Record<string, unknown>) => {
-          opts.records?.push(body);
-          return {
-            select: () => ({
-              maybeSingle: async () => ({ data: opts.inserted ?? null, error: null }),
-            }),
-          };
-        },
       }),
+      rpc: async (name: string, body: Record<string, unknown>) => {
+        expect(name).toBe("catalog_create_supplier_setup");
+        opts.records?.push(body);
+        return { data: opts.inserted ?? null, error: null };
+      },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   }
@@ -171,7 +168,7 @@ describe("POST /api/operation/suppliers", () => {
     );
   }
 
-  const OK = { name: "Hookka", kind: "factory_pickup", catCovered: ["sofa"] };
+  const OK = { name: "Hookka", kind: "factory_pickup", catCovered: ["sofa"], productionDays: [{ category: "sofa", workingDays: 14 }], offDays: [0] };
 
   it("creates the supplier and DERIVES its slug from the name", async () => {
     const records: Record<string, unknown>[] = [];
@@ -185,7 +182,7 @@ describe("POST /api/operation/suppliers", () => {
        across environments (0032), so a keyer who has never heard the word
        cannot mistype it — and `HoOKkA` folds to the SAME slug the 0032 backfill
        wrote, so a supplier added today reads like one added by that migration. */
-    expect(records[0]).toMatchObject({ name: "HoOKkA", slug: "hookka" });
+    expect(records[0]).toMatchObject({ p_name: "HoOKkA", p_slug: "hookka", p_production_days: OK.productionDays, p_off_days: [0] });
   });
 
   it("⭐ refuses a name that already exists, naming the supplier rather than the column", async () => {
@@ -219,19 +216,15 @@ describe("POST /api/operation/suppliers", () => {
     expect(vi.mocked(userClient)).not.toHaveBeenCalled();
   });
 
-  it("accepts a supplier that covers nothing yet", async () => {
-    /* Empty `cat_covered` is legal: auto-resolve will never pick them, but an
-       explicit pick on the SKU still routes to them. A keyer is not blocked by
-       a question they cannot answer while looking at one quotation. */
+  it("rejects incomplete category setup without writing anything", async () => {
     const records: Record<string, unknown>[] = [];
-    mockSb({
-      clash: null,
-      inserted: { id: "00000000-0000-0000-0000-000000000c10", name: "Hookka" },
-      records,
-    });
-    const res = await post("principal", { name: "Hookka", kind: "own_logistics", catCovered: [] });
-    expect(res.status).toBe(201);
-    expect(records[0]).toMatchObject({ cat_covered: [], kind: "own_logistics" });
+    mockSb({ records });
+    for (const body of [
+      { ...OK, catCovered: [] }, { ...OK, productionDays: [] },
+      { ...OK, catCovered: ["service"] }, { ...OK, offDays: [] },
+      { ...OK, catCovered: ["sofa", "mattress"] },
+    ]) expect((await post("principal", body)).status).toBe(422);
+    expect(records).toEqual([]);
   });
 
   it("rejects an unknown key rather than dropping it", async () => {

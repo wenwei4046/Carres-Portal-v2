@@ -212,6 +212,10 @@ export default function OperationWork() {
      photo and loan rows retain the Sales Order until their existing governed
      writers are mounted on the DO; a precise working door beats a dead one. */
   const openRow = (i: WorkRow) => {
+    if (i.ruleKey === "purchasing.supplier_reply" || i.ruleKey === "purchasing.supplier_date_passed") {
+      navigate(`/operation?tab=purchase-orders&po=${encodeURIComponent(i.orderId)}`);
+      return;
+    }
     if (i.ruleKey.startsWith("manual_purchase.")) {
       navigate(`/operation?tab=manual-purchase&mp=${i.orderId}`);
       return;

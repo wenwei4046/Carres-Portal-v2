@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
+  purchaseOrderReplyWorkItems,
   type PurchaseOrderRegisterInput,
 } from "./purchase-order-register";
 
@@ -110,7 +111,7 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.filters).toContain("supplier_date_passed");
     expect(purchaseOrderWork(input, facts)).toEqual({
-      problem: "The supplier date has passed and 3 are still open",
+      problem: "Supplier delivery date passed",
       action: "Ask Hooka when the goods will arrive",
     });
   });
@@ -128,5 +129,26 @@ describe("Purchase Order Register authority", () => {
     expect(purchaseOrderWork(base, completed)).toBeNull();
     expect(cancelled.operationStatus).toBe("Cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
+  });
+});
+
+
+describe("shared supplier reply Work", () => {
+  const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", poVersion: 1, sentAt: "2026-09-03T17:00:00Z" };
+  const owner = { userId: "po-duty", name: "Jess" };
+  it("starts on the Malaysia send day and resending does not reset its clock", () => {
+    const items = purchaseOrderReplyWorkItems({ ...base, sends: [sent, { ...sent, sentAt: "2026-09-07T01:00:00Z" }] }, owner, "2026-09-08", new Set());
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ dueIso: "2026-09-04", workingDaysLate: 2, ownerUserId: "po-duty", ruleKey: "purchasing.supplier_reply", action: "Ask Hooka to confirm the PO delivery date" });
+  });
+  it("does not chase an unsent revision, completed goods, or a current future reply", () => {
+    for (const patch of [{ version: 2 }, { lines: [{ qty: 3, receivedQty: 3 }] }, { supplierDate: "2026-09-10" }]) {
+      expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent], ...patch }, owner, "2026-09-08", new Set())).toEqual([]);
+    }
+  });
+  it("rolls an office holiday forward without changing the supplier date", () => {
+    const input = { ...base, sends: [sent], supplierDate: "2026-09-05" };
+    expect(purchaseOrderReplyWorkItems(input, owner, "2026-09-09", new Set(["2026-09-07"]))[0]).toMatchObject({ dueIso: "2026-09-08", ruleKey: "purchasing.supplier_date_passed" });
+    expect(input.supplierDate).toBe("2026-09-05");
   });
 });

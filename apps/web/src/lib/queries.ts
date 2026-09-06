@@ -3389,6 +3389,7 @@ export interface operationPoListRow {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  official_delivery_date?: string | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
    *  after a supplier answered. It is NOT `eta_date`, which is our own
@@ -3518,6 +3519,16 @@ export interface operationPoListRow {
   /** The supplier-date field's own history (0306 ledger, newest first) —
    *  it renders BESIDE the field, never in the Activity timeline. */
   promises?: {
+    po_version?: number | null;
+    channel?: string | null;
+    recipient?: string | null;
+    evidence?: string | null;
+    reported_by?: string | null;
+    reported_at?: string | null;
+    recorded_by?: string | null;
+    recorded_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
     kind: string;
     answer: string;
     about_date: string | null;
@@ -5148,14 +5159,20 @@ export function usePurchasingSettings(
  * situations: the supplier tells us early, or nobody told us and we phoned.
  * The operator keys a DATE; the answer word is derived — the same date the
  * PO already holds is `shipping` (the promise stands), a different one is
- * `delayed` and must carry a reason. 0306/0310's RPC does the rest in one
- * transaction: ledger row · the PO's date · the push into Delay planning ·
- * the history sentence.
+ * `delayed` and must carry a reason. The current RPC requires version and
+ * reply evidence, preserves the original PO date, and updates the exact
+ * linked Sales lines' arrival planning in the same transaction.
  */
 export function useRecordSupplierDate(poId: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: {
+      poVersion?: number;
+      channel?: "whatsapp" | "email" | "phone" | "in_person";
+      recipient?: string;
+      evidence?: string;
+      reportedBy?: string;
+      reportedAt?: string;
       answer: "shipping" | "delayed";
       firstDate?: string;
       newDate?: string;

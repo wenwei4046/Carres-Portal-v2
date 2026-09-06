@@ -8,6 +8,8 @@ import {
   manualPurchaseLineRemainingOf,
   orderByFromDeliveryDate,
   productionWorkingDaysFor,
+  poSupplierDeliveryDateOf,
+  type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
   railItemLabel,
@@ -699,16 +701,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     serviceCaseNo = (sc?.case_no as string | null) ?? null;
   }
 
-  /**
-   * THE EXACT PO FACTS (Card 05 §3.6; MASTER §9.3). `PO Issued` is the
-   * actual issue timestamp (`placed_at`). `eta_date` is stamped at issue
-   * (0318) and the supplier-date doors (0306/0310) move it, appending the
-   * held date to the promise ledger — so the ORIGINAL supplier-facing
-   * `PO Delivery Date` is the earliest date-moving promise's
-   * `previous_date` when one exists, else the current `eta_date`; and a
-   * `Supplier Delivery Date` exists ONLY when that ledger proves the
-   * supplier changed it. Read from the exact linked PO, never inferred.
-   */
+  // Original PO date and supplier answer have separate authorities. Only an
+  // evidenced reply to the current version counts; legacy dates are not guessed.
   let pos: Array<{
     id: string;
     po_no: string;
@@ -720,12 +714,11 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   if (enriched.pos.length > 0) {
     const poIds = enriched.pos.map((p) => p.id);
     const [poRes, promRes] = await Promise.all([
-      sb.from("purchase_orders").select("id, placed_at, eta_date").in("id", poIds),
+      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version").in("id", poIds),
       sb
         .from("po_supplier_promises")
-        .select("po_id, previous_date, new_date, recorded_at")
+        .select("po_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by")
         .in("po_id", poIds)
-        .not("new_date", "is", null)
         .order("recorded_at", { ascending: true }),
     ]);
     if (poRes.error) {
@@ -736,23 +729,17 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
       const m = mapPgError(promRes.error);
       return c.json(m.body, m.status);
     }
-    const firstPromiseByPo = new Map<string, { previous_date: string | null }>();
-    for (const p of promRes.data ?? []) {
-      if (!firstPromiseByPo.has(p.po_id as string)) {
-        firstPromiseByPo.set(p.po_id as string, {
-          previous_date: (p.previous_date as string | null) ?? null,
-        });
-      }
-    }
     pos = (poRes.data ?? []).map((p) => {
-      const eta = (p.eta_date as string | null) ?? null;
-      const first = firstPromiseByPo.get(p.id as string);
+      const replies = (promRes.data ?? []).filter(row => row.po_id === p.id) as unknown as PoDatePromise[];
+      const originalDate = (p.official_delivery_date as string | null) ?? null;
+      const supplierDate = poSupplierDeliveryDateOf(replies, Number(p.version ?? 1));
       return {
         id: p.id as string,
         po_no: p.id as string,
         placed_at: (p.placed_at as string | null) ?? null,
-        po_delivery_date: first ? (first.previous_date ?? eta) : eta,
-        supplier_delivery_date: first ? eta : null,
+        po_delivery_date: originalDate,
+        // This compact connected-document view adds a column only for a change.
+        supplier_delivery_date: supplierDate !== originalDate ? supplierDate : null,
         ordered_qty: enriched.orderedByPo.get(p.id as string) ?? 0,
       };
     });

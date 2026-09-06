@@ -1,3 +1,4 @@
+import { PO_DELAY_REASONS } from "../po-workspace";
 import { z } from 'zod';
 
 /**
@@ -976,3 +977,25 @@ export const OperationReceiveThreadsInput = z.object({
   signed: z.literal(true),
 }).strict();
 export type OperationReceiveThreadsInput = z.infer<typeof OperationReceiveThreadsInput>;
+
+/** The exact sent PO and the outside answer, recorded together. */
+export const recordSupplierReplyInput = z.object({
+  poVersion: z.number().int().positive(),
+  answer: z.enum(["shipping", "delayed"]),
+  firstDate: z.string().date().optional(),
+  newDate: z.string().date().optional(),
+  reason: z.enum(PO_DELAY_REASONS).optional(),
+  remarks: z.string().trim().max(500).optional(),
+  channel: z.enum(["whatsapp", "email", "phone", "in_person"]),
+  recipient: z.string().trim().min(1).max(200),
+  evidence: z.string().trim().min(1).max(2000),
+  reportedBy: z.string().trim().min(1).max(200),
+  reportedAt: z.string().datetime({ offset: true }),
+}).strict().superRefine((input, ctx) => {
+  if (input.answer === "shipping" && input.newDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["newDate"], message: "Record one supplier date." });
+  }
+  if (input.answer === "delayed" && (!input.newDate || !input.reason)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["newDate"], message: "Record the new date and reason." });
+  }
+});
