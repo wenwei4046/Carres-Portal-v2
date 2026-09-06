@@ -1529,7 +1529,8 @@ it is in the wrong element.
 delay" — the word on screen is `Delay planning`)
 
 **`Inventory` is no longer banned globally — owner ruling 2026-09-01.** It is the approved
-Warehouse master Register destination under `Dashboard · Inbound · Inventory · Outbound`. It does
+Warehouse master Register destination under `Monitor · Inbound · Inventory · Outbound`
+(the Warehouse map's words since the 2026-09-06 owner replacement Card). It does
 not become a synonym for Finance valuation, Purchasing planning or another module's goods pool.
 
 **`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
@@ -1592,14 +1593,24 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
-| Warehouse Dashboard's outbound-date filter group | **`OUTBOUND SCHEDULE`** | Delivery Schedule · Dispatch · Shipments |
-| Warehouse Dashboard's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
-| Warehouse Dashboard's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
-| Warehouse Dashboard valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
-| The Outbound §3.5.1 tally (Warehouse Card 03) | **`Required {n} · Handed over {n} · Not handed over {n}`** | Progress · Completed · Pending · Done |
-| The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status) |
-| A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting for handover`** | Pending · In progress · Blocked |
-| The evidence-backed handover act (Warehouse Card 03) | **Record handover** | Mark done · Complete · Ship · Dispatch |
+| The Warehouse Calendar-summary page (2026-09-06 replacement Card) | **Monitor** — the same word Delivery's calendar page speaks; the ERP keeps ONE global `Dashboard` | Dashboard (as a Warehouse page) · Schedule · Board · Overview |
+| Monitor's two event directions, as group words | **`ARRIVAL` · `PICKUP`** | Incoming/Outgoing (as group headers) · In/Out |
+| Monitor ARRIVAL event names | **`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` · `Return from repair`** | Inbound delivery · Receipt · GRN (as an event name) |
+| Monitor PICKUP event names | **`Customer-delivery pickup` · `Transfer pickup` · `Supplier-return pickup` · `Repair pickup`** | Dispatch · Shipment · Collection (bare) |
+| A Monitor event's time — every time says what it means | **`Supplier arrival 09:00–10:00` · `Driver pickup 14:30`**, or exactly **`Time not provided`** | a bare `09:00` · TBD · Unknown |
+| Monitor valid empty date | **`No arrivals or pickups on {date}. Choose another date.`** | No handovers · Empty · Nothing |
+| Outbound's pickup-status filter group | **`PICKUP STATUS`** | OUTBOUND SCHEDULE (retired with the Monitor split) · Status |
+| Warehouse rails' governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
+| Warehouse rails' source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
+| Outbound valid empty date | **`No pickups on {date}. Choose another date.`** | No outbound handovers (retired 2026-09-06) · Empty · Nothing |
+| The exact goods a pickup takes, as the work heading | **`Goods scheduled for pickup`** — listing exact Unit IDs and products | Units to give · Items · Load list |
+| The transport company and the person, ALWAYS separate fields | **`Logistics Partner` · `Assigned Driver` · `Vehicle`**; unassigned reads **`Waiting for {partner} to assign a driver`** | NETS driver (merged identity) · Driver (as the company) · an invented driver name |
+| The Outbound §3.5.1 tally | **`Required {n} · Loaded {n} · Not loaded {n}`** | Handed over (retired 2026-09-06) · Progress · Completed · Pending · Done |
+| The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status — `loaded` is the ACT sentence and evidence line below, never a stored status word) |
+| A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting to be loaded`** | Pending · In progress · Blocked · Waiting for handover (retired 2026-09-06) |
+| The evidence-backed loading act (2026-09-06 replacement Card) | **`Record {n} Units loaded to {person}`** | Record handover (retired) · Mark done · Complete · Ship · Dispatch |
+| The two evidence records, never merged | **`Warehouse loaded`** (the identified operator's exact-Unit submission) · **`Driver collected`** (the driver's own confirmation) | Handover · Receiver · a single combined confirmation |
+| A load/collection mismatch — per exact Unit, never generic | **`{unit} was not confirmed by {person}. It remains with {site}.`** | Needs checking · Mismatch · Discrepancy |
 | The DO-object door to the Warehouse work page | **Open Outbound** | Go to warehouse · Handover here |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
