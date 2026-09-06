@@ -3,8 +3,9 @@ import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register
 import { invoiceNeeded } from "@carres/shared/payment-invoice-register";
 import type { OrderPaymentMethod } from "@carres/shared";
 import { SectionCard } from "@/components/SectionPanel";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk, useRecordPayment } from "@/lib/queries";
+import { apiFetch } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
 import { fmtDate } from "@/lib/fmt-date";
@@ -65,6 +66,21 @@ export default function InvoiceRecordPayment({ invoice, onClose }: {
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Payment was not recorded — ${e.message}`),
   });
+  // §16 — only Active manual methods are selectable. Until the settings read
+  // answers (or if it fails), the full governed six stand in: a settings
+  // hiccup must not stop money from being recorded.
+  const settings = useQuery<{ manual_methods: Array<{ method: string; active: boolean }> }>({
+    queryKey: ["finance", "payment-settings"],
+    queryFn: () => apiFetch("/api/finance/payment-settings"),
+    staleTime: 60_000,
+  });
+  const methods = useMemo(() => {
+    const rows = settings.data?.manual_methods;
+    if (!rows?.length) return MANUAL_METHODS;
+    const active = new Set(rows.filter((r) => r.active).map((r) => r.method));
+    const filtered = MANUAL_METHODS.filter((m) => active.has(m.value));
+    return filtered.length ? filtered : MANUAL_METHODS;
+  }, [settings.data]);
 
   const spec = useMemo(() => MANUAL_METHODS.find((m) => m.value === method)!, [method]);
   const amt = Number(amount);
@@ -169,7 +185,7 @@ export default function InvoiceRecordPayment({ invoice, onClose }: {
             <select value={method}
               onChange={(e) => { setMethod(e.target.value as OrderPaymentMethod); setFile(null); }}
               aria-label="Payment method" className={inputCls}>
-              {MANUAL_METHODS.map((m) => (
+              {methods.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>

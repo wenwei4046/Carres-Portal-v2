@@ -307,22 +307,36 @@ shared `orderMoney`/`collectionClock` arithmetic), read-only Inspect, and the on
 invoice object with honest empty states. The rolled-back production probe's negative controls
 were run before apply; an authenticated owner walk is still owed.
 
-### BUILD in progress — record payment, and a void wears its reason, 2026-09-06
+### Deployed — record payment, and a void wears its reason, 2026-09-06
 
-Migration `0430` (branch evidence; verified on production in a rolled-back transaction with
-negative controls, not yet applied) makes the void law governed: `payment_void` requires a
-reason and gates on Payment Approver duty (Shared Duty Resolver) or principal, and the posting
-service + column CHECK speak the §16 manual methods (`duitnow_qr` · `credit_card` ·
-`debit_card`) with the arithmetic byte-for-byte 0351. The branch adds the §16 Record payment
-composition on the Invoice object — 50/50 action-and-receipt-preview, the six manual methods
-with their required evidence words, Review stating `This records customer money.` / `This does
-not confirm the bank account.`, one idempotency key per opening, upload-first posting through
-the canonical door, and typed input retained on failure. The void doors in the order drawer
-and control panel now ask the reason inline. `/finance/*` admits operation staff to the
-Payments and Invoices destinations only (Payment MASTER §12); finance-only pages bounce them.
+Migration `0430` is APPLIED and PR #1110 merged as `124140a5` (deploy convergence in
+progress at this edit; the closure note carries the proof). `payment_void` requires a reason
+and gates on Payment Approver duty (Shared Duty Resolver) or principal; the posting service +
+column CHECK speak the §16 manual methods (`duitnow_qr` · `credit_card` · `debit_card`) with
+the arithmetic byte-for-byte 0351. The Invoice object carries the §16 Record payment
+composition — 50/50 action-and-receipt-preview, the six manual methods with their required
+evidence words, Review stating `This records customer money.` / `This does not confirm the
+bank account.`, one idempotency key per opening, upload-first posting through the canonical
+door, and typed input retained on failure. The void doors in the order drawer and control
+panel ask the reason inline. `/finance/*` admits operation staff to the Payments and Invoices
+destinations only (§12); finance-only pages bounce them.
 
-WhatsApp messages/templates, bank routing, Settings, Reports, Stripe convergence, storage
-journeys, full responsive 390px/200% verification and the retirement of the rejected
+### BUILD in progress — Payment Settings foundation, 2026-09-06
+
+Migration `0431` (branch evidence; verified on production in a rolled-back transaction — the
+manager gate refuses a non-manager, saves keep old/new/actor in the change log, and the last
+Active method cannot be switched off; not yet applied) gives `Settings → Payment` its storage:
+receiving bank accounts keyed by the governed routing source (PJ own-showroom → Hong Leong
+Bank · Dealer → RHB — the BANKS are seeded approved truth, the account numbers are the
+manager's to enter), the six §16 manual methods with Active flags (`online` deliberately has
+no row), and append-only effective-dated §7 storage rules seeded with the approved rates. The
+Settings Workspace gains the Payment section: readable summaries, focused bank-account Edit,
+method toggles, the two storage cards, and the numbering summary that says only the next
+example and `Numbers are created automatically.` Record payment's method list now reads the
+Active set. No approver name, Payment Duty or roster appears in Payment Settings.
+
+WhatsApp messages/templates, message assembly with bank routing, Reports, Stripe convergence,
+storage journeys, full responsive 390px/200% verification and the retirement of the rejected
 Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation.
