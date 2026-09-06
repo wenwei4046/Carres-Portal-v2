@@ -41,6 +41,8 @@ import {
   workItemsForOrder,
   type OpsStaffMember,
   type WorkItem,
+  type WorkOwnerRule,
+  type WorkspaceDutyResolution,
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import { personLabel } from "@/lib/staff-avatar";
@@ -56,6 +58,7 @@ import {
   useOperationWarehouseReceipts,
   usePurchasingSettings,
   useReceivingDuty,
+  useWorkspaceDuties,
 } from "@/lib/queries";
 import {
   logisticStateOf,
@@ -75,6 +78,8 @@ export interface WorkRow extends WorkItem {
    *  the PO-duty holder for Purchasing's work, else the PIC. Null for a named
    *  non-account owner (a salesperson) and for a duty word. */
   ownerId: string | null;
+  /** Team Work groups by the normal owner; cover never rewrites it. */
+  normalOwnerId: string | null;
   /** Delivery's active document door. Null means the work belongs to the
    *  arrangement/scope rather than an issued Delivery Order. */
   deliveryDoNumber: string | null;
@@ -106,10 +111,12 @@ export function useOpenWorkSet(): OpenWorkSet {
   // register read; Work composes, stores nothing, and exposes no manual
   // Done.
   const manualQ = useManualPurchaseRegister();
+  const today = todayIso();
   // §0.1 Action Owner Engine (2026-08-27) — Purchasing's order-track work
   // resolves to the month's PO-duty holder. Fails soft exactly as the duty
   // hook always has: dormant layer → no holder → the duty word stands.
   const poDutyQ = useOperationPoDuty();
+  const workspaceDutiesQ = useWorkspaceDuties();
   // Receiving's feed (2026-09-04 card): submitted counts + arrival-day POs,
   // owner from the ONE shared resolver — never a rota read (Law F.1).
   const receiptsQ = useOperationWarehouseReceipts("submitted");
@@ -157,13 +164,49 @@ export function useOpenWorkSet(): OpenWorkSet {
     };
   }, [poDutyQ.data]);
 
+  const dutyResolutions = useMemo(() => {
+    const resolve = (key: string): WorkspaceDutyResolution | undefined => {
+      const duty = workspaceDutiesQ.data?.duties.find((item) => item.key === key);
+      if (!duty) return undefined;
+      const r = duty.resolution;
+      const normalOwner = r.normal_user_id
+        ? { userId: r.normal_user_id, name: r.normal_user_name }
+        : null;
+      const activeCover = r.is_cover && r.acting_user_id
+        ? { userId: r.acting_user_id, name: r.acting_user_name }
+        : null;
+      const actingId = r.actor_user_id ?? r.acting_user_id ?? r.normal_user_id;
+      const actingPerson = actingId
+        ? {
+            userId: actingId,
+            name: activeCover?.userId === actingId ? activeCover.name : normalOwner?.name ?? null,
+          }
+        : null;
+      const assignment = duty.assignments.find((item) =>
+        item.effective_from <= today &&
+        (item.effective_until === null || item.effective_until >= today));
+      return {
+        dutyKey: key,
+        onDate: today,
+        normalOwner,
+        buddy: activeCover,
+        activeCover,
+        actingPerson,
+        state: normalOwner ? (activeCover ? "covered" : "primary") : "not_assigned",
+        assignmentId: assignment?.id ?? null,
+      };
+    };
+    return {
+      po_duty: resolve("po_duty"),
+      payment_duty: resolve("payment_duty"),
+    } satisfies Partial<Record<WorkOwnerRule, WorkspaceDutyResolution | undefined>>;
+  }, [workspaceDutiesQ.data, today]);
+
   const holidayOpts = useMemo(() => ({ holidays: myHolidaySet() }), []);
   const queueLeads = useMemo(
     () => (settingsQ.data ? deliveryQueueLeads(settingsQ.data) : undefined),
     [settingsQ.data],
   );
-  const today = todayIso();
-
   const items = useMemo(() => {
     const out: WorkRow[] = [];
     for (const o of orders) {
@@ -187,6 +230,7 @@ export function useOpenWorkSet(): OpenWorkSet {
           picName: ownerMember ? personLabel(ownerMember.name, ownerMember.email) : null,
           picUserId: ownerId,
           poDuty,
+          dutyResolutions,
           salespersonName: o.salespersons?.name ?? null,
           // §0.1 row 1 — the 3 nobody asked, never the 8 who answered "not
           // yet" (owner ruling 2026-08-15), and never a finished order.
@@ -233,13 +277,14 @@ export function useOpenWorkSet(): OpenWorkSet {
              for Purchasing's work, else the PIC; never the PIC borrowed for
              another rule's item. */
           ownerId: it.ownerUserId,
+          normalOwnerId: it.normalOwner?.userId ?? null,
         });
       }
     }
     return out;
   }, [
     orders, availableBySku, staffById, partnerNameById,
-    holidayOpts, queueLeads, today, poDuty,
+    holidayOpts, queueLeads, today, poDuty, dutyResolutions,
   ]);
 
   /* ── The Manual Purchase actions (Card 06 §7; wording Card 08 §3.4) ────
@@ -351,7 +396,7 @@ export function useOpenWorkSet(): OpenWorkSet {
             linkedPoIds.length > 0 &&
             linkedPoIds.every((id) => sentByPo.get(id) === true),
         },
-        { approver, poDuty },
+        { approver, poDuty, poDutyResolution: dutyResolutions.po_duty },
         mpToday,
         holidayOpts,
       );
@@ -361,12 +406,13 @@ export function useOpenWorkSet(): OpenWorkSet {
           line: it.action,
           customer: null,
           ownerId: it.ownerUserId,
+          normalOwnerId: it.normalOwner?.userId ?? null,
           deliveryDoNumber: null,
         });
       }
     }
     return out;
-  }, [manualQ.data, poDuty, holidayOpts, today]);
+  }, [manualQ.data, poDuty, dutyResolutions.po_duty, holidayOpts, today]);
 
   /* Receiving's projection (owner-approved 2026-08-29 slice; wired by the
      2026-09-04 card). Two triggers only — a submitted Warehouse count, and a
@@ -379,13 +425,21 @@ export function useOpenWorkSet(): OpenWorkSet {
     const receipts = receiptsQ.data?.receipts ?? [];
     const pos = posQ.data?.pos ?? [];
     const duty = receivingDutyQ.data;
+    const normalOwner = duty?.normal_user_id
+      ? { userId: duty.normal_user_id, name: duty.normal_user_name }
+      : null;
+    const activeCover = duty?.is_cover && duty.acting_user_id
+      ? { userId: duty.acting_user_id, name: duty.acting_user_name }
+      : null;
+    const actingId = duty?.actor_user_id ?? duty?.acting_user_id ?? duty?.normal_user_id ?? null;
+    const actingPerson = actingId
+      ? {
+          userId: actingId,
+          name: activeCover?.userId === actingId ? activeCover.name : normalOwner?.name ?? null,
+        }
+      : null;
     const grnDuty =
-      duty?.normal_user_id != null
-        ? {
-            userId: duty.acting_user_id ?? duty.normal_user_id,
-            name: duty.acting_user_name ?? duty.normal_user_name,
-          }
-        : null;
+      actingPerson;
     const src = {
       submitted: receipts
         .filter((r) => r.status === "submitted")
@@ -422,6 +476,12 @@ export function useOpenWorkSet(): OpenWorkSet {
         soRef: it.soRef,
         orderId: it.orderId,
         action: it.action,
+        ownerRule: "grn_duty",
+        ownerDutyKey: "grn_duty",
+        normalOwner,
+        activeCover,
+        actingPerson,
+        ownerState: normalOwner ? (activeCover ? "covered" : "primary") : "not_assigned",
         ownerName: it.ownerName,
         ownerUserId: it.ownerUserId,
         ...(it.ownerDuty ? { ownerDuty: it.ownerDuty } : {}),
@@ -433,6 +493,7 @@ export function useOpenWorkSet(): OpenWorkSet {
         line: it.action,
         customer: null,
         ownerId: it.ownerUserId,
+        normalOwnerId: normalOwner?.userId ?? null,
         deliveryDoNumber: null,
       }),
     );
@@ -454,6 +515,9 @@ export function useOpenWorkSet(): OpenWorkSet {
     items: allItems,
     staff,
     staffById,
+    // The Work destination is a composition of independent module reads.
+    // A slower optional projection must not hide already-known work from the
+    // other modules behind a page-wide loading state.
     loading: ordersQ.isLoading || staffQ.isLoading,
   };
 }

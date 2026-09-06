@@ -161,8 +161,18 @@ honest Work for admitted modules.
 
 ## 10 · Measured implementation truth — 2026-09-04
 
-- Staff & Duties and the Shared Duty Resolver are approved, not yet complete production convergence.
-- Current Work is still substantially Order/client-composition based with legacy owner fallbacks.
+- Migration 0425's shared Duty registry/resolver, effective primary assignment, dated cover,
+  audit evidence, guarded API and the one `Workspace → Staff & Duties` UI are production-proven
+  for GRN Duty. The same catalogue now exposes the other approved cross-module Duty names; their
+  module consumers remain implementation evidence until each module is production-verified.
+- Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
+  cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
+  Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
+- `/api/operation/po-duty` remains only as the response-shape adapter listed in the Purchasing
+  MASTER. Remaining Purchasing screens and the PO-day reminder must move to the Workspace contract
+  before that adapter is deleted.
+- Current Work is still substantially Order/client-composition based; it is not yet the one
+  server-composed cross-module feed.
 - Purchasing/Receiving have a Work implementation plan; plan text is not production proof.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.

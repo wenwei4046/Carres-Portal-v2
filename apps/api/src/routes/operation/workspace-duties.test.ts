@@ -202,22 +202,33 @@ describe("GET /api/operation/workspace-duties", () => {
       duties: Array<Record<string, unknown>>;
     };
     expect(body.can_assign).toBe(true);
-    expect(body.duties).toHaveLength(1);
-    expect(body.duties[0]).toMatchObject({ key: "grn_duty", label: "GRN Duty" });
-    expect(body.duties[0].resolution).toMatchObject({
+    expect(body.duties.map((d) => d.key)).toEqual([
+      "po_duty",
+      "grn_duty",
+      "payment_duty",
+      "storage_waiver_approver",
+      "purchasing_approver",
+      "delivery_charge_approver",
+      "payment_approver",
+      "stock_adjustment_approver",
+      "service_case_approver",
+    ]);
+    const grnDuty = body.duties.find((d) => d.key === "grn_duty")!;
+    expect(grnDuty).toMatchObject({ key: "grn_duty", label: "GRN Duty" });
+    expect(grnDuty.resolution).toMatchObject({
       normal_user_id: HOLDER,
       normal_user_name: "Aina",
       acting_user_id: COVER,
       acting_user_name: "Buddy cover",
       is_cover: true,
     });
-    const assignments = body.duties[0].assignments as Array<Record<string, unknown>>;
+    const assignments = grnDuty.assignments as Array<Record<string, unknown>>;
     expect(assignments[0]).toMatchObject({
       holder_name: "Aina",
       assigned_by_name: "Jess",
       note: "first holder",
     });
-    const covers = body.duties[0].covers as Array<Record<string, unknown>>;
+    const covers = grnDuty.covers as Array<Record<string, unknown>>;
     expect(covers[0]).toMatchObject({
       acting_user_name: "Buddy cover",
       normal_user_name: "Aina",
