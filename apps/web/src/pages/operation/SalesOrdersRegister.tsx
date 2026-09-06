@@ -43,7 +43,7 @@
 // around the one the engine already draws.
 import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { accShort, lineClass, lineKind } from "@carres/shared";
+import { GOODS_CATEGORY_WORDS, goodsCategoryWordOf } from "@carres/shared";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -739,22 +739,7 @@ export default function SalesOrdersRegister() {
  * Anything not positively recognised is `Other goods` — governed, honest, and
  * still counted.
  */
-const FOOTER_WORDS = [
-  "Mattress",
-  "Bedframe",
-  "Sofa",
-  "Pillow",
-  "Mattress protector",
-  "Topper",
-  "Footrest",
-  // A line the ORDER or the CATALOG says is an accessory, whose TYPE nothing
-  // recognises. Already a ruled word — the SO document's own fallback prints it
-  // (`categoryWord`) — so the footer saying `Other goods` over the same line
-  // was the register disagreeing with the document it summarises.
-  "Accessory",
-  "Service",
-  "Other goods",
-] as const;
+const FOOTER_WORDS = GOODS_CATEGORY_WORDS;
 
 /**
  * ⭐ THE FOOTER READS THE SAME LADDER AS THE DOCUMENT (2026-08-24).
@@ -776,38 +761,9 @@ const FOOTER_WORDS = [
  * above, by construction, and inventing a new word here would be writing
  * dictionary. numbers are QUANTITIES (`line.qty`), not row counts — unchanged.
  */
-function footerWord(line: {
-  sku: string;
-  attrs?: Record<string, unknown> | null;
-  category?: string | null;
-}): (typeof FOOTER_WORDS)[number] {
-  const sku = line.sku;
-  if (lineKind(sku) === "service") return "Service";
-  const recorded = (
-    (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
-    (typeof line.category === "string" ? line.category : "")
-  )
-    .trim()
-    .toLowerCase();
-  if (recorded === "mattress") return "Mattress";
-  if (recorded === "bedframe") return "Bedframe";
-  if (recorded === "sofa") return "Sofa";
-  if (recorded === "service") return "Service";
-  if (recorded === "accessory") {
-    const short = accShort(sku);
-    return (FOOTER_WORDS as readonly string[]).includes(short)
-      ? (short as (typeof FOOTER_WORDS)[number])
-      : "Accessory";
-  }
-  const cls = lineClass(sku);
-  if (cls === "mattress") return "Mattress";
-  if (cls === "bedframe") return "Bedframe";
-  if (cls === "sofa") return "Sofa";
-  const short = accShort(sku);
-  return (FOOTER_WORDS as readonly string[]).includes(short)
-    ? (short as (typeof FOOTER_WORDS)[number])
-    : "Other goods";
-}
+/** The ladder itself moved to `@carres/shared` (2026-09-06) when the Receiving
+ *  rail needed the same answer — one rule, two registers (Law D). */
+const footerWord = goodsCategoryWordOf;
 
 function RegisterResultSummary({
   filtered,

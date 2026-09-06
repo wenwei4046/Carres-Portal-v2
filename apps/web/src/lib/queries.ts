@@ -4227,6 +4227,10 @@ export interface WarehouseReceiptQueueRow {
   void_by_name?: string | null;
   void_reason?: string | null;
   do_file_url?: string | null;
+  /** The governed category words this receiving answers to (owner correction
+   *  2026-09-06) — computed server-side through the ONE shared ladder from
+   *  the catalog's answer; the rail only counts them. */
+  categories?: string[];
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4397,6 +4401,9 @@ export interface ReceivingSessionDetail {
       wrong_item_qty: number;
     }>;
   } | null;
+  /** The formal GRN document's product facts — catalog description + the
+   *  governed category word, resolved server-side (2026-09-06). */
+  line_info?: Record<string, { description: string | null; category: string }>;
   events: ReceivingEvent[];
 }
 
@@ -4418,6 +4425,11 @@ export interface ReceivingAmendBody {
   goodsReceivedAt?: string;
   doNumber?: string;
   actualSiteId?: string | null;
+  /** 0427 — a corrected signed-DO file; the old path is preserved in the
+   *  amendment's before/after. */
+  doFilePath?: string;
+  /** 0427 — additional arrival evidence; append-only. */
+  arrivalEvidenceAdd?: Array<{ path: string; kind: "photo" | "video" }>;
   lines?: Array<{ id: string; receivedNow: number }>;
 }
 
@@ -4482,7 +4494,9 @@ export function useOperationWarehouseReceipts(
     queryKey: qk.operation.warehouseReceipts(status),
     queryFn: () =>
       apiFetch<WarehouseReceiptsQueueResponse>(
-        `/api/operation/warehouse-receipts?status=${status}`,
+        // The Register virtualises its rows, so it may list a large GRN
+        // history in one fetch (the server hard-caps the limit).
+        `/api/operation/warehouse-receipts?status=${status}&limit=1000`,
       ),
     staleTime: 30_000,
     ...opts,

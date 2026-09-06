@@ -557,7 +557,7 @@ Staff selects purpose
 PO/CO carries the official Deliver To and original PO Delivery Date
 → supplier provides its Supplier DO and may provide a changed Supplier Delivery Date
 → Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
-→ record Goods Received At as the physical receipt date
+→ record Goods received on as the physical arrival date, and Goods arrived at as the physical arrival location
 → record Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty
 → attach Supplier DO/evidence and exact Unit IDs where required
 → finish physical receiving; Carres creates the numbered GRN
@@ -1293,7 +1293,7 @@ is never described as missing merely because the supplier has not replied. `Supp
 reads `Not confirmed` until supplier-answer evidence exists, `Same as PO` when the supplier confirms
 the PO date, and the supplier's actual date when it differs. `Not confirmed` is a cell fact; it
 becomes a rail/work condition only after the current PO version has confirmed-sent evidence and
-Pending Delivery Qty is above zero. `Goods Received At` belongs to Receiving and never substitutes
+Pending Delivery Qty is above zero. `Goods received on` belongs to Receiving and never substitutes
 for any of these dates.
 **Columns — APPROVED 2026-09-04, in this order:** PO No, PO Issued, Supplier, Source, Deliver To,
 PO Delivery Date, Supplier Delivery Date, Order Qty, Received Qty,
@@ -1325,29 +1325,75 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN — owner instruction 2026-09-04, PRODUCTION-VERIFIED
+### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
-(CARD-2026-09-04-receiving-01). **State: PRODUCTION-VERIFIED 2026-09-04 — migrations 0425/0426
-APPLIED (tracker 20260904125205 / 20260904125800), PR #1099 merged `7a897494`, deployed, and
-smoked in production with committed test records: GRN-20260904-0210 (posted → amended → voided),
--1064 (damaged claim minted, void refused `claims_block_void`), -8882 (consignment received as
-`supplier_consignment`), -9649 (staged NETS submitted count checked in with Actual Site). All
-posted under the Operations Superuser exception; GRN Duty is honestly unassigned until the
-manager assigns it in `Workspace → Staff & Duties`.** The operating rule is:
+(CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
+**State: PRODUCTION-VERIFIED 2026-09-06 — migrations 0425/0426/0427 APPLIED (tracker
+20260904125205 / 20260904125800 / 0427_an_amendment_may_correct_the_papers_evidence; 0427 was
+functionally proven in a rolled-back production transaction before apply). Correction PR #1106
+merged `f755dea8`, deployed, both canonical surfaces reporting that exact SHA; the served bundle
+carries every corrected word and zero retired words; committed production smoke on
+GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
+evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
+refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
+`Workspace → Staff & Duties`.** The operating rule is:
 
 ```text
-Operation enters/checks goods in the Receiving Session
+Warehouse submits count                (or Operation enters goods directly)
+→ Operation reviews Receiving
 → Save Receiving
-→ the system posts the numbered GRN (allocate_formal_document_code('GRN'), stored grn_no)
-→ valid received Units update Inventory automatically at the Actual Site
+→ GRN created (allocate_formal_document_code('GRN'), stored grn_no)
+→ Inventory updated automatically at Goods arrived at
 ```
 
-- Navigation/workspace is `Receiving` (the `Goods Receipts` rail label is retired). The Register
-  is the governed template: 240px `FilterRail` (state · supplier · site facets, never
-  `Today`/`Overdue`), full-width register `DataGrid`, status footer, no `Work` column, no owner
-  avatar on rows. Opening a row shows the Receiving object or the formal GRN by state. Empty
-  history reads `No receiving activity yet.`
+- **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
+  Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
+  review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
+  in Work and deep-links to its Receiving review; it becomes a Register row only when
+  `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
+  waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
+- **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
+  database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
+  name.
+- **The Filter Rail (owner correction §2)** holds exactly: `CATEGORY` (the five governed rows —
+  `Mattress` · `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`, the shared display order;
+  `MP` always prints as `Mattress protector`) · `SUPPLIER` (the suppliers present in the
+  records) · `GOODS ARRIVED AT` (the receiving locations present in the records) ·
+  `Clear filters`. No `Any`, no `All …`, no invented category, no rail date filter — the
+  table's `Goods received on` column owns date filtering. Re-clicking the active row clears its
+  section; counts are real counts from the current result set. Category comes from the governed
+  catalog truth through the ONE shared ladder (`goodsCategoryWordOf`, the same rule the Sales
+  Orders register speaks); Receiving never derives its own category from SKU text.
+- **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
+  instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
+  `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`
+  and `Goods Received At` are retired from every Receiving surface, filter, table, export, GRN
+  and report; `Delivery Location` stays reserved for the customer's delivery address.
+- **The formal GRN document (owner correction §4).** Every GRN renders as a real official A4
+  `GOODS RECEIVED NOTE` (SO-PDF-STANDARD chrome, money-free, browser-rendered like the SO/DO/PO)
+  with Print and Download PDF: Carres identity, GRN number, linked PO/CO, Supplier, Supplier DO
+  No., the three location/date facts, description + SKU + governed Category per line, the five
+  quantity words, exact-Unit outcomes, extra goods, evidence references, the duty-evidence trio
+  with dated cover and actual actor, and amendment/cancellation marking printed ON the paper. A
+  GRN number without this document is not sufficient.
+- **The GRN object is 50/50 (owner correction §5)** — the shared Sales Order formal-object
+  grammar adapted for GRN facts: left = Receiving Record (facts · Unit results · Receiving
+  Summary · Evidence · History · `[Amend Receiving]` `[More ▾]`); right = the OFFICIAL GRN
+  PREVIEW through the real renderer, with `[Print]` `[Download PDF]`. One Object Header (GRN
+  number · supplier/source · status), no duplicated title. Mobile stacks Record above Preview.
+  `Void Receiving` lives in `More ▾` — not a normal primary action.
+- **Amend Receiving is 50/50 with a LIVE preview (owner correction §6).** The left half becomes
+  the governed correction form (`Original → Corrected` · reason · evidence) while the right half
+  previews the proposed document — same GRN number, amendment clearly marked, `UNSAVED`
+  watermark as screen chrome only. Amendable, subject to downstream safety checks:
+  `Goods received on`, `Goods arrived at`, Supplier DO number and evidence (0427: a corrected
+  signed DO replaces the paper on record with before/after preserved; arrival evidence is
+  APPEND-ONLY), and Unit outcomes/quantities where stock/claim/downstream rules permit. NOT
+  amendable: the GRN number, the source PO/CO, the Supplier — wrong identities go through
+  `Void Receiving` and a fresh Receiving from the correct source. Every amendment preserves
+  original facts, before/after, reason, evidence, the duty trio, time, and the append-only
+  history; every amendment prints on the document.
 - **One engine, three doors, one authority.** Office direct receiving (`office_receive_post`),
   the external Warehouse two-step (`warehouse_submit_receipt` → GRN Duty review), and the review
   doors (`warehouse_receipt_check_in` / `_return`) all pass `warehouse_receipt_validate_lines`
@@ -1368,7 +1414,7 @@ Operation enters/checks goods in the Receiving Session
   session returns the first result.
 - **Per-Unit outcomes** (ERP-ARCHITECTURE §3.4): a governed expected Unit records exactly
   `Received · Received with issue · Not received` (`receiving_unit_results`); posting flips the
-  EXACT named Units (received → free at the Actual Site; with-issue → the claim hold). Quantities
+  EXACT named Units (received → free at Goods arrived at; with-issue → the claim hold). Quantities
   are DERIVED from the outcomes; a line without minted Units keeps the lawful quantity inputs.
   Duplicate scans, foreign Units and already-received Units refuse by name. The external
   Warehouse count uses the same outcomes: `warehouse_incoming_pos()` lists the expected Units,
@@ -1383,13 +1429,13 @@ Operation enters/checks goods in the Receiving Session
   marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
   named, and the posting creates no AP consequence — supplier ownership is preserved, never
   silently converted to Carres-owned.
-- **`Actual Site` never overwrites `Deliver To`.** Both facts are stored and displayed; valid
-  received Units enter Inventory at the Actual Site. `Arrival evidence` supports photo AND video
-  beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters Inventory or
-  the pending arithmetic.
+- **`Goods arrived at` never overwrites `Deliver To`.** Both facts are stored and displayed;
+  valid received Units enter Inventory at Goods arrived at. `Arrival evidence` supports photo
+  AND video beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters
+  Inventory or the pending arithmetic.
 - Quantity words stay `Order Qty` · `Received Qty` · `Damaged Qty` · `Wrong Item Qty` ·
   `Pending Delivery Qty`; damaged/wrong/extra never reduce Pending Delivery Qty and never create
-  available stock. `Goods Received At` is the physical receipt date only.
+  available stock. `Goods received on` is the physical arrival date only.
 - **A posted GRN has no ordinary Edit.** `Amend Receiving` (`receiving_amend`) requires a reason,
   records before/after in an append-only `amended` event, recalculates the PO counters and stock
   safely, and refuses by name when goods moved on (`threads_block_amend` · `units_block_amend`).
@@ -1408,7 +1454,12 @@ Operation enters/checks goods in the Receiving Session
   never offers a control the server would refuse. **`Reports → Receiving & Inbound`** is the
   central report: every non-draft session with its GRN, source, site facts, totals from the
   shared arithmetics, submitter/poster, and the `Still owed by suppliers` pending section.
-- The GRN Duty reviewer may verify/correct `Actual Site` on a submitted Warehouse count at
+- **The Warehouse boundary (owner correction §7).** The 50/50 GRN screen belongs to
+  Operation / GRN Duty. Warehouse may only scan Units, record count/outcomes, upload arrival
+  photo/video, and return the count to Carres. Warehouse cannot create, amend or void the GRN,
+  and cannot directly update Inventory — enforced at web, API (`requireOperation`) and SQL
+  (`receiving_require_post_authority`).
+- The GRN Duty reviewer may verify/correct `Goods arrived at` on a submitted Warehouse count at
   check-in; `Deliver To` is never overwritten. No Manual receipt lane exists; no approved
   Receiving scope is deferred to a later card.
 
@@ -1563,7 +1614,7 @@ proof, linked object and read-only foreign-module state. It never edits another 
 Calendar displays only governed work dates with actual weekday + calendar date. Purchasing /
 Operation uses the Office calendar (Mon–Fri); Receiving / GRN / Warehouse uses the Warehouse
 calendar (Mon–Sat). Sunday and Selangor public holidays are excluded. Recorded business dates are
-never silently moved: PO Delivery Date, Supplier Delivery Date and Goods Received At remain the
+never silently moved: PO Delivery Date, Supplier Delivery Date and Goods received on remain the
 dates actually stated/observed. A computed work due date may use its governed calendar only when
 the rule and resulting date are visible.
 
