@@ -5,10 +5,13 @@ import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register
 import InvoiceAskToPay from "./InvoiceAskToPay";
 
 const state = vi.hoisted(() => ({
-  fetch: vi.fn(async () => ({})),
+  fetch: vi.fn(async (url: string) =>
+    url.includes("templates") ? { templates: [] } : {}),
   upload: vi.fn(async () => ({ error: null })),
   open: vi.fn(),
 }));
+const recordCalls = () =>
+  state.fetch.mock.calls.filter(([u]: [string]) => String(u).includes("record-message"));
 vi.mock("@/lib/api", () => ({ apiFetch: state.fetch }));
 vi.mock("@/lib/queries", () => ({
   qk: { finance: { invoiceRegister: () => ["finance", "invoice-register"] } },
@@ -43,6 +46,8 @@ function show(tone: "reminder" | "chase" = "reminder") {
 
 beforeEach(() => {
   state.fetch.mockClear();
+  state.fetch.mockImplementation(async (url: string) =>
+    url.includes("templates") ? { templates: [] } : {});
   state.upload.mockClear();
   window.open = state.open as never;
   Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
@@ -60,7 +65,7 @@ describe("Ask the customer to pay (§16)", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: "Open WhatsApp" }));
     expect(state.open).toHaveBeenCalled();
-    expect(state.fetch).not.toHaveBeenCalled();
+    expect(recordCalls()).toHaveLength(0);
     expect(screen.getByRole("button", { name: "Record message sent" })).toBeDisabled();
   });
   it("record uploads the proof first, then posts the exact sent text", async () => {
@@ -68,9 +73,9 @@ describe("Ask the customer to pay (§16)", () => {
     const file = new File(["shot"], "sent.png", { type: "image/png" });
     fireEvent.change(screen.getByLabelText("Sent screenshot"), { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "Record message sent" }));
-    await waitFor(() => expect(state.fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(recordCalls()).toHaveLength(1));
     expect(state.upload).toHaveBeenCalled();
-    const [url, init] = state.fetch.mock.calls[0] as unknown as [string, { body: string }];
+    const [url, init] = recordCalls()[0] as unknown as [string, { body: string }];
     expect(url).toBe("/api/finance/invoices/i1/record-message");
     const body = JSON.parse(init.body);
     expect(body.kind).toBe("payment_request");
@@ -84,8 +89,8 @@ describe("Ask the customer to pay (§16)", () => {
     const file = new File(["shot"], "sent.png", { type: "image/png" });
     fireEvent.change(screen.getByLabelText("Sent screenshot"), { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "Record message sent" }));
-    await waitFor(() => expect(state.fetch).toHaveBeenCalled());
-    const body = JSON.parse((state.fetch.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    await waitFor(() => expect(recordCalls()).toHaveLength(1));
+    const body = JSON.parse((recordCalls()[0] as unknown as [string, { body: string }])[1].body);
     expect(body.messageText).toBe("Hi, custom words. REF: CR12345");
     expect(body.kind).toBe("reminder");
   });

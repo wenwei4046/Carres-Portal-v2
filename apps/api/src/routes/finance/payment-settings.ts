@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
+import {
+  paymentTemplateActiveInput,
+  paymentTemplateKeyInput,
+  paymentTemplateSaveInput,
+} from "@carres/shared/payment-templates";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -123,6 +128,88 @@ paymentSettingsRouter.post("/storage-rule", async (c) => {
     p_extra_free_allowed: body.data.extraFreeAllowed,
     p_inspection_days: body.data.inspectionDays,
     p_effective_from: body.data.effectiveFrom,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// ---------------------------------------------------------------------------
+// 0435 — the WhatsApp template library. Reads return every version (the
+// heads are the current library; older versions are the immutable history);
+// every write goes through the manager-gated SQL doors.
+// ---------------------------------------------------------------------------
+
+paymentSettingsRouter.get("/templates", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot view templates." });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("payment_message_templates")
+    .select("*")
+    .order("purpose")
+    .order("template_key")
+    .order("version", { ascending: false });
+  if (error || data == null) {
+    throw new HTTPException(500, { message: "Templates could not be loaded. Try again." });
+  }
+  return c.json({ templates: data });
+});
+
+paymentSettingsRouter.post("/templates/save", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot change templates." });
+  }
+  const body = await parseJsonBody(c, paymentTemplateSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_template_save", {
+    p_template_key: body.data.templateKey ?? null,
+    p_purpose: body.data.purpose,
+    p_name: body.data.name,
+    p_body: body.data.body,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+paymentSettingsRouter.post("/templates/set-default", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot change templates." });
+  }
+  const body = await parseJsonBody(c, paymentTemplateKeyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_template_set_default", {
+    p_template_key: body.data.templateKey,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+paymentSettingsRouter.post("/templates/set-active", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot change templates." });
+  }
+  const body = await parseJsonBody(c, paymentTemplateActiveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_template_set_active", {
+    p_template_key: body.data.templateKey,
+    p_active: body.data.active,
   });
   if (error) {
     const m = mapPgError(error);
