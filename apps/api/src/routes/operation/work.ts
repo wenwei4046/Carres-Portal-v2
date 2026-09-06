@@ -9,7 +9,10 @@ import {
   manualPurchaseSupplierSummary,
   manualPurchaseWorkContext,
   manualPurchaseWorkItems,
+  orderActionsInDisplayOrder,
   receivingWorkItems,
+  salesOrderActionSignalsFromFacts,
+  storageHold,
   workItemsForOrder,
   type DeliveryQueueLeads,
   type ManualPurchaseWorkInput,
@@ -19,6 +22,7 @@ import {
   type OperationWorkItem,
   type OperationWorkResponse,
   type WorkItem,
+  type WorkOwnerRule,
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
 } from "@carres/shared";
@@ -27,6 +31,154 @@ export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+interface SalesOrderModuleRow {
+  id: string;
+  so: number;
+  status: string;
+  operation_stage: string | null;
+  customer_name: string;
+  delivery_date: string | null;
+  delivery_date_tbd?: boolean | null;
+  placed_at: string;
+  do_number?: string | null;
+  paid?: number | string | null;
+  ops_assigned_logistic?: string | null;
+  delivery_partner_id?: string | null;
+  salesperson_id?: string | null;
+  salespersons?: { name: string | null } | null;
+  po_skus?: string[] | null;
+  order_lines?: Array<{ sku: string; qty: number; unit_price?: number | string | null }>;
+  order_addons?: Array<{ qty: number; unit_price?: number | string | null }>;
+  order_supplier_threads?: Array<{ purchase_orders?: { placed_at?: string | null } | null }>;
+  order_finance_exceptions?: Array<{ status: string }>;
+  ops_sofa_loans?: Array<{ status: string }>;
+  ops_order_control?: SalesOrderControlFacts | SalesOrderControlFacts[] | null;
+}
+
+interface SalesOrderControlFacts {
+  assigned_staff?: string | null;
+  booking_stage?: string | null;
+  confirmed_date?: string | null;
+  delivery_photos?: unknown[] | null;
+  line_etas?: Record<string, string> | null;
+  line_stock_status?: Record<string, string> | null;
+  delay_decision?: "keep" | "new_date" | null;
+  delay_decision_eta?: string | null;
+  delay_decision_at?: string | null;
+  delay_detected_at?: string | null;
+  storage_from?: string | null;
+  storage_fee_override?: number | string | null;
+  storage_fee_msbf?: number | string | null;
+  storage_fee_sof?: number | string | null;
+  storage_collected_at?: string | null;
+  storage_waiver_status?: string | null;
+}
+
+function orderControl(row: SalesOrderModuleRow): SalesOrderControlFacts | null {
+  const raw = row.ops_order_control;
+  return (Array.isArray(raw) ? raw[0] : raw) ?? null;
+}
+
+export function projectSalesOrdersFromModuleFacts(input: {
+  orders: SalesOrderModuleRow[];
+  stock: Array<{ sku: string; available: number }>;
+  staff: Array<{ user_id: string; name: string | null; email: string }>;
+  dutyResolutions: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
+  today: string;
+  safetyDays: number | null;
+}): OperationWorkItem[] {
+  const availableBySku = Object.fromEntries(
+    input.stock.map((row) => [row.sku, row.available]),
+  );
+  const staff = new Map(input.staff.map((row) => [row.user_id, row]));
+  return input.orders.flatMap((row) => {
+    const control = orderControl(row);
+    const lineTotal = row.order_lines
+      ? row.order_lines.reduce(
+          (total, line) => total + Number(line.unit_price ?? 0) * Number(line.qty),
+          0,
+        )
+      : null;
+    const addonTotal = row.order_addons
+      ? row.order_addons.reduce(
+          (total, line) => total + Number(line.unit_price ?? 0) * Number(line.qty),
+          0,
+        )
+      : null;
+    const storage = storageHold({
+      storageFrom: control?.storage_from ?? null,
+      override: control?.storage_fee_override ?? null,
+      importedMsbf: control?.storage_fee_msbf ?? null,
+      importedSof: control?.storage_fee_sof ?? null,
+      skus: (row.order_lines ?? []).map((line) => line.sku),
+      asOf: input.today,
+      collectedAt: control?.storage_collected_at ?? null,
+      waiverStatus: control?.storage_waiver_status ?? null,
+    });
+    const signals = salesOrderActionSignalsFromFacts({
+      status: row.status,
+      operationStage: row.operation_stage,
+      lines: row.order_lines ?? [],
+      availableBySku,
+      purchaseOrderSkus: row.po_skus ?? null,
+      stockEtaByLine: control?.line_etas ?? null,
+      stockStatusByLine: control?.line_stock_status ?? null,
+      deliveryDate: row.delivery_date,
+      deliveryDateTbd: row.delivery_date_tbd === true,
+      logisticsAssigned: Boolean(row.delivery_partner_id || row.ops_assigned_logistic),
+      bookingStage: control?.booking_stage ?? null,
+      confirmedDate: control?.confirmed_date ?? null,
+      deliveryOrderNumber: row.do_number,
+      deliveryPhotos: control?.delivery_photos,
+      lineTotal,
+      addonTotal,
+      paid: row.paid == null ? null : Number(row.paid),
+      storageOwing: storage.owing,
+      delayDecision: control?.delay_decision ?? null,
+      delayDecisionEta: control?.delay_decision_eta ?? null,
+      today: input.today,
+      safetyDays: input.safetyDays,
+      financeExceptionHolds: (row.order_finance_exceptions ?? []).some(
+        (exception) => exception.status === "open",
+      ),
+    });
+    const picId = control?.assigned_staff ?? null;
+    const pic = picId ? staff.get(picId) : null;
+    const poDates = (row.order_supplier_threads ?? [])
+      .map((thread) => thread.purchase_orders?.placed_at ?? null)
+      .filter((date): date is string => Boolean(date))
+      .sort();
+    return projectSalesOrderWork({
+      open: orderActionsInDisplayOrder(signals),
+      context: {
+        orderId: row.id,
+        so: row.so,
+        picName: pic?.name ?? pic?.email ?? null,
+        picUserId: picId,
+        dutyResolutions: input.dutyResolutions,
+        salespersonName: row.salespersons?.name ?? null,
+        askDeliveryDate:
+          !row.delivery_date &&
+          row.delivery_date_tbd !== true &&
+          row.status !== "delivered",
+        promisedDateIso: row.delivery_date_tbd ? null : row.delivery_date,
+        confirmedDateIso: control?.confirmed_date ?? null,
+        deliveredAtIso: row.status === "delivered" ? row.placed_at : null,
+        delayDetectedAtIso: control?.delay_detected_at ?? null,
+        delayDecisionAtIso: control?.delay_decision_at ?? null,
+        poIssuedAtIso: poDates[0] ?? null,
+        placedAtIso: row.placed_at,
+        financeExceptionHolds: signals.financeExceptionHolds,
+        loanOutstanding: (row.ops_sofa_loans ?? []).some(
+          (loan) => loan.status === "on_loan",
+        ),
+      },
+      customer: row.customer_name,
+      today: input.today,
+    });
+  });
 }
 
 interface ManualPurchaseRegisterSource {

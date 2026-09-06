@@ -7,6 +7,7 @@ import {
   projectManualPurchaseWork,
   projectReceivingWork,
   projectSalesOrderWork,
+  projectSalesOrdersFromModuleFacts,
 } from "./work";
 
 const base: OperationWorkItem = {
@@ -272,5 +273,61 @@ describe("operation Work response composition", () => {
       eta_date: "2026-09-06",
       pending_qty: 3,
     }]);
+  });
+
+  it("projects an Orders route row through shared signals and per-action owners", () => {
+    const items = projectSalesOrdersFromModuleFacts({
+      orders: [{
+        id: "order-9",
+        so: 1309,
+        status: "proceed_order",
+        operation_stage: "in_production",
+        customer_name: "Tan Qu Qu",
+        delivery_date: null,
+        delivery_date_tbd: false,
+        placed_at: "2026-09-01",
+        do_number: null,
+        paid: 0,
+        ops_assigned_logistic: null,
+        delivery_partner_id: null,
+        salesperson_id: "sales-1",
+        salespersons: { name: "Shasha" },
+        po_skus: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+        order_addons: [],
+        order_supplier_threads: [],
+        order_finance_exceptions: [],
+        ops_sofa_loans: [],
+        ops_order_control: {
+          assigned_staff: "pic-1",
+          booking_stage: null,
+          confirmed_date: null,
+          delivery_photos: [],
+          line_etas: null,
+          line_stock_status: null,
+        },
+      }],
+      stock: [{ sku: "SOFA-1", available: 0 }],
+      staff: [{ user_id: "pic-1", name: "Order PIC", email: "pic@carres.test" }],
+      dutyResolutions: {
+        po_duty: {
+          dutyKey: "po_duty",
+          onDate: "2026-09-06",
+          normalOwner: { userId: "po-1", name: "PO Person" },
+          buddy: null,
+          activeCover: null,
+          actingPerson: { userId: "po-1", name: "PO Person" },
+          state: "primary",
+          assignmentId: "assignment-3",
+        },
+      },
+      today: "2026-09-06",
+      safetyDays: 3,
+    });
+
+    expect(items.find((item) => item.ruleKey === "issue_po")?.owner.acting?.userId)
+      .toBe("po-1");
+    expect(items.find((item) => item.ruleKey === "ask_delivery_date")?.owner.acting?.name)
+      .toBe("Shasha");
   });
 });
