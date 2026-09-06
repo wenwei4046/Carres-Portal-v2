@@ -220,6 +220,14 @@ export function purchasingRefusal(
         wrong: "The same buying line is on two purchase orders.",
         todo: "Go back to buying and tick the line once.",
       };
+    /* 0430 — a fully covered line stays VISIBLE as a receipt (T6), but it may
+       never be issued again: production minted six purchase orders for one
+       1-unit demand because nothing downstream of the receipt refused it. */
+    case "already_on_po":
+      return {
+        wrong: `An open purchase order${facts.po ? ` (${facts.po})` : ""} already covers this line.`,
+        todo: "Nothing to buy here. Check the covering purchase order instead.",
+      };
     case "sofa_merge":
       return {
         wrong: "One sofa purchase order carries one customer order.",
@@ -456,6 +464,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "unknown_build",
   "duplicate_demand",
   "duplicate_build",
+  "already_on_po",
   "sofa_merge",
   "unknown_request",
   "not_ready_to_order",

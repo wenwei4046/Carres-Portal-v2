@@ -406,7 +406,47 @@ does not decide it.
   communication history and completes nothing; a `confirmed_sent` for an EARLIER version stays
   history and never completes the current one.
 
-### 5.7 PO states and balances
+### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
+
+**HOW IT IS ENFORCED — BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
+
+- **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**
+  `purchase_orders.official_delivery_date` is stamped from the birth `eta_date` by trigger at
+  INSERT; once it holds a value no UPDATE may change it. `eta_date` stays the LIVE planning
+  arrival (the ready-date door may recompute it); the register's `PO Delivery Date`, the PDF's
+  `Deliver by` and every reply comparison read the immutable original. Pre-0428 records were
+  recovered from evidence, not invented: a PO whose eta no door ever moved kept it as the
+  original; a PO the legacy delayed door rewrote took the date the earliest delayed reply moved
+  FROM; a PO the ready-date door recomputed stays NULL — **an unknown original is recorded as
+  unknown, never replaced by today's planning date.**
+- **THE SERVER CLASSIFIES THE SUPPLIER ANSWER.** The reply wire carries ONE date. Compared with
+  the recorded original it is written as `confirmed`, `earlier`, `delayed` (later — and only then
+  is a governed reason required; none is ever pre-selected) or `reported` (original unknown). A
+  browser's own classification is ignored. An earlier date is not a delay. Every reply still
+  carries channel, recipient, supplier reporter, actual recorder, evidence file, reported time,
+  the exact PO version and duty/cover, enforced by trigger on the table itself.
+- **REPLIES STAY READABLE BY VERSION, AND ONLY EVIDENCE QUALIFIES.** A previous-version reply
+  never confirms the current version. A pre-evidence reply on a never-revised PO is linked to
+  version 1 (the only link its evidence supports) and is shown as *recorded without evidence* —
+  a recorded answer is not a proven absence, and an unevidenced answer is not the governed
+  Supplier Delivery Date.
+- **ONE ARRIVAL-PLANNING ARITHMETIC (Architecture Law D).** `purchasing_project_line_etas`
+  recomputes each affected customer (order, SKU) arrival as the LATEST effective supplier date
+  across ALL open POs still owing units for that order line, from the exact `po_line_sources`
+  lineage — never from SO numbers or SKU similarity, and never from whichever reply was recorded
+  last. The reply door and the balance-date door both call it; the SO-ref-inferring
+  `purchasing_push_supplier_date` projection is retired. It writes goods-arrival planning only;
+  the customer promise is a separate Sales fact it never touches.
+- **THE SENT DOCUMENT IS KEPT, PER VERSION.** The first confirmed send of a version freezes the
+  full `purchasing_po_document` payload in `po_version_documents`; a resend of the same version
+  reuses the same recorded facts, and Revisions can reprint exactly what the supplier received
+  (`print-data?version=N`). A version sent before keeping began answers with a named absence —
+  history is never reconstructed or back-invented.
+- **A RECEIPT IS NOT A BUY.** A demand an open PO already fully covers stays visible as a
+  receipt but is refused at the issue door BY NAME (`already_on_po`). Production carried the
+  proof this rule was missing: six open POs each sourcing the same 1-unit line of SO-1340.
+
+### 5.8 PO states and balances
 
 **APPROVED / LOCKED — owner correction 2026-09-04.**
 

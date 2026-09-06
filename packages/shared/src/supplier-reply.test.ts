@@ -24,10 +24,14 @@ describe("evidenced current-version supplier reply", () => {
     const changed = { ...reply, answer: "delayed" as const, new_date: "2026-09-15", recorded_at: "2026-09-02T02:00:00Z" };
     expect(poSupplierDeliveryDateOf([changed, reply], 1)).toBe("2026-09-15");
   });
-  it("rejects conflicting dates and an ungoverned delay category", () => {
-    const input = { poVersion: 1, answer: "shipping", firstDate: "2026-09-10", channel: "whatsapp", recipient: "Factory", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T00:00:00Z" };
+  it("takes ONE date, no browser classification, and only a governed reason", () => {
+    /* 0430 — `answer`/`firstDate`/`newDate` left the wire: the server compares
+       `supplierDate` with the recorded original and classifies it itself. */
+    const input = { poVersion: 1, supplierDate: "2026-09-10", channel: "whatsapp", recipient: "Factory", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T00:00:00Z" };
     expect(recordSupplierReplyInput.safeParse(input).success).toBe(true);
+    expect(recordSupplierReplyInput.safeParse({ ...input, answer: "shipping" }).success).toBe(false);
     expect(recordSupplierReplyInput.safeParse({ ...input, newDate: "2026-09-15" }).success).toBe(false);
-    expect(recordSupplierReplyInput.safeParse({ ...input, answer: "delayed", newDate: "2026-09-15", reason: "Anything" }).success).toBe(false);
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Anything" }).success).toBe(false);
+    expect(recordSupplierReplyInput.safeParse({ ...input, reason: "Material Shortage" }).success).toBe(true);
   });
 });

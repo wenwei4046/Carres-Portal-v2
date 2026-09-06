@@ -130,6 +130,38 @@ describe("Purchase Order Register authority", () => {
     expect(cancelled.operationStatus).toBe("Cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
   });
+
+  it("a completed PO without sending evidence leaves work but never fabricates a send", () => {
+    /* Correction card §5 — receiving completion and sending evidence are two
+       facts. Completed goods close the send WORK (no PDF is owed), while the
+       Sent to Supplier fact stays an honest `Not sent`. */
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      status: "received",
+      lines: [{ qty: 3, receivedQty: 3 }],
+      sends: [],
+    }, "2026-08-28");
+    expect(facts.filters).toEqual(["completed"]);
+    expect(facts.filters).not.toContain("pdf_not_sent");
+    expect(facts.sentToSupplier).toBe("Not sent");
+  });
+
+  it("a revised PO whose latest version is unsent is BOTH not-sent and update-required — overlap, not exclusivity", () => {
+    /* Correction card §5 — the rail's facets overlap by design; their counts
+       describe rows matching each facet, never a partition of the register. */
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      version: 2,
+      sends: [{ kind: "confirmed_sent", channel: "whatsapp", poVersion: 1, sentAt: "2026-08-27T09:00:00Z" }],
+    }, "2026-08-28");
+    expect(facts.filters).toContain("pdf_not_sent");
+    expect(facts.filters).toContain("supplier_update_required");
+    /* And it left the chase facets: nothing asks a supplier about a version
+       Carres has not sent. */
+    expect(facts.filters).not.toContain("supplier_date_missing");
+    expect(facts.filters).not.toContain("supplier_date_passed");
+    expect(facts.sentToSupplier).toBe("PO V1");
+  });
 });
 
 

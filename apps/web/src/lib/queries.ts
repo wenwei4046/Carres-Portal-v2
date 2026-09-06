@@ -5189,9 +5189,9 @@ export function useRecordSupplierDate(poId: string | null) {
       evidence?: string;
       reportedBy?: string;
       reportedAt?: string;
-      answer: "shipping" | "delayed";
-      firstDate?: string;
-      newDate?: string;
+      /* 0430 — ONE date; the server classifies the answer against the PO's
+         recorded original date. The browser never writes "delayed". */
+      supplierDate: string;
       reason?: string;
       remarks?: string;
     }) =>

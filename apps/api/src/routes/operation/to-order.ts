@@ -1216,6 +1216,17 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     /* Absent from the recomputation means CHANGED, CANCELLED, COVERED or
        never real. All four read the same from here, and all four must fail. */
     if (!hit) return refuse(c, 409, "unknown_demand");
+    /* ⭐ 0430 — A RECEIPT IS NOT A BUY. T6 keeps a fully covered build VISIBLE
+       (its qty states what the covering purchase order bought), and nothing
+       here refused it — so re-issuing the same covered demand minted a fresh
+       purchase order every time. Production carries the proof: six open POs,
+       each sourcing the SAME 1-unit order line of SO-1340 (2026-09-04/05).
+       The door now refuses the receipt BY NAME, whatever the screen showed. */
+    if (hit.build.fullyOnPo) {
+      return refuse(c, 422, "already_on_po", {
+        po: hit.build.coveredByOpenPoPos?.[0] ?? null,
+      });
+    }
     if (hit.proposal.blocked === "production_days") {
       return refuse(c, 422, "production_days_required", {
         supplier: hit.proposal.supplierName ?? null,
