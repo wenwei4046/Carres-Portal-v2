@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   receivingDisplayNo,
   receivingExtraQty,
+  RECEIVING_CATEGORY_ROWS,
   warehouseReceiptStatusLabel,
   warehouseReceiptTotals,
   type WarehouseReceiptLine,
@@ -29,23 +30,35 @@ import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
 
 /**
- * OperationReceiving — the Receiving Register and its object surfaces
- * (owner instruction 2026-09-04; purchasing/MASTER.md §9.4; UI MASTER §6.7).
+ * OperationReceiving — the formal GRN Register and its object surfaces
+ * (owner correction 2026-09-06; purchasing/MASTER.md §9.4; UI MASTER §6.7).
  *
  * ```
- * Receiving
- * ├─ 240px Filter Rail        concrete record facets, never Today/Tomorrow
- * └─ Full-width register      36/38/32 register DataGrid · status footer
+ * My Work / Team Work   =  what staff must receive or review
+ * Receiving             =  formal GRN records
  * ```
  *
- * The Register lists RECEIVING SESSIONS — every count the warehouse filed and
- * every posted, numbered GRN. Opening a row shows the Receiving object or the
- * formal GRN, depending on its state. Work (what to receive today) lives in
- * `My Work` / `Team Work`; this page is the record and the doors:
+ * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
+ * GRN — the Register lists `Valid` and `Cancelled` GRNs, nothing else. A
+ * Warehouse count awaiting Carres action lives in My Work / Team Work and
+ * deep-links (`?session=`) to its Receiving review; it never becomes a
+ * Register row. There is no state rail: the old
+ * `All receiving / Count waiting for check / Sent back to recount / Posted /
+ * Voided` rows are retired.
+ *
+ * The rail holds exactly three record facets plus `Clear filters`:
+ *
+ *   CATEGORY          the five governed rows, shared ladder order
+ *   SUPPLIER          the suppliers present in Receiving records
+ *   GOODS ARRIVED AT  the receiving locations present in the records
+ *
+ * No `Any`, no `All …` rows; re-clicking the active row clears its section.
+ * Dates are the TABLE's job — the `Goods received on` column owns date
+ * filtering; the rail carries no date filter.
  *
  *   [Start Receiving]  →  Find PO or CO  →  pre-start object  →  Session
- *   a submitted row    →  the count review (Save Receiving / Return count)
- *   a posted row       →  the read-only GRN record (Amend / Void doors)
+ *   `?session=` (Work) →  the count review (Save Receiving / Return count)
+ *   a Register row     →  the formal GRN object (50/50, Amend / More ▾)
  *
  * THE REGISTER STAYS MOUNTED under an open object (`invisible`, never
  * display:none) so Back restores rail filters, search, sort and scroll — the
@@ -59,15 +72,6 @@ import PurchasingTabs from "./PurchasingTabs";
 
 // design-standard: not-a-list-page — the Receiving Register renders through
 // the shared register DataGrid engine (UI MASTER §6.7), not ListPageShell.
-
-type StateFacet = "submitted" | "returned" | "posted" | "voided";
-
-const STATE_ROWS: Array<{ key: StateFacet; label: string }> = [
-  { key: "submitted", label: "Count waiting for check" },
-  { key: "returned", label: "Sent back to recount" },
-  { key: "posted", label: "Posted" },
-  { key: "voided", label: "Voided" },
-];
 
 /** Rows still owing goods — the Find PO or CO population. The search is
  *  CONTROLLED: the user must select an existing PO before starting Receiving
@@ -90,7 +94,7 @@ export default function OperationReceiving() {
   const warehouseQ = useOperationWarehouse();
   const dutyQ = useReceivingDuty();
 
-  const stateSel = (params.get("state") as StateFacet | null) ?? null;
+  const categorySel = params.get("category");
   const supplierSel = params.get("supplier");
   const siteSel = params.get("site");
   const [search, setSearch] = useState("");
@@ -98,6 +102,12 @@ export default function OperationReceiving() {
   const receipts = useMemo(
     () => receiptsQ.data?.receipts ?? [],
     [receiptsQ.data],
+  );
+  /** THE REGISTER BOUNDARY — a row exists only once Save Receiving created
+   *  the GRN. Counts awaiting review live in My Work / Team Work. */
+  const grnRecords = useMemo(
+    () => receipts.filter((r) => r.status === "posted" || r.status === "voided"),
+    [receipts],
   );
   const suppliers = useMemo(
     () => suppliersQ.data?.suppliers ?? [],
@@ -120,53 +130,53 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
+  /** Where the goods PHYSICALLY arrived — the record's own location fact. */
+  const arrivedAtOf = (r: WarehouseReceiptQueueRow) =>
+    r.actual_site_name ?? r.warehouse_name ?? "";
+
   /** One filter per section; sections combine with AND; counts are computed
    *  against the OTHER selected sections so a number never lies about what
    *  clicking it would show. */
   const matchesExcept = (r: WarehouseReceiptQueueRow, except: string) => {
-    if (except !== "state" && stateSel && r.status !== stateSel) return false;
+    if (
+      except !== "category" &&
+      categorySel &&
+      !(r.categories ?? []).includes(categorySel)
+    )
+      return false;
     if (
       except !== "supplier" &&
       supplierSel &&
       (r.supplier_name ?? "") !== supplierSel
     )
       return false;
-    if (
-      except !== "site" &&
-      siteSel &&
-      (r.actual_site_name ?? r.warehouse_name ?? "") !== siteSel
-    )
+    if (except !== "site" && siteSel && arrivedAtOf(r) !== siteSel)
       return false;
     return true;
   };
 
   const counts = useMemo(() => {
-    const state = new Map<string, number>();
+    const category = new Map<string, number>();
     const supplier = new Map<string, number>();
     const site = new Map<string, number>();
-    for (const r of receipts) {
-      if (matchesExcept(r, "state"))
-        state.set(r.status, (state.get(r.status) ?? 0) + 1);
+    for (const r of grnRecords) {
+      if (matchesExcept(r, "category"))
+        for (const w of r.categories ?? [])
+          category.set(w, (category.get(w) ?? 0) + 1);
       if (matchesExcept(r, "supplier") && r.supplier_name)
         supplier.set(r.supplier_name, (supplier.get(r.supplier_name) ?? 0) + 1);
-      const siteName = r.actual_site_name ?? r.warehouse_name;
+      const siteName = arrivedAtOf(r);
       if (matchesExcept(r, "site") && siteName)
         site.set(siteName, (site.get(siteName) ?? 0) + 1);
     }
-    return { state, supplier, site };
+    return { category, supplier, site };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receipts, stateSel, supplierSel, siteSel]);
+  }, [grnRecords, categorySel, supplierSel, siteSel]);
 
   const rows = useMemo(
-    () =>
-      receipts.filter(
-        (r) =>
-          matchesExcept(r, "") &&
-          // draft sessions have no business existence on the register
-          r.status !== "draft",
-      ),
+    () => grnRecords.filter((r) => matchesExcept(r, "")),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [receipts, stateSel, supplierSel, siteSel],
+    [grnRecords, categorySel, supplierSel, siteSel],
   );
 
   const supplierNames = useMemo(
@@ -185,40 +195,31 @@ export default function OperationReceiving() {
         label: "GRN No",
         width: 168,
         sortable: true,
-        searchValue: (r) =>
-          r.status === "posted" || r.status === "voided"
-            ? receivingDisplayNo(r)
-            : "",
-        exportValue: (r) =>
-          r.status === "posted" || r.status === "voided"
-            ? receivingDisplayNo(r)
-            : "No GRN yet",
-        accessor: (r) =>
-          r.status === "posted" || r.status === "voided" ? (
-            <span className="font-mono text-meta text-base-900">
-              {receivingDisplayNo(r)}
-            </span>
-          ) : (
-            /* The formal GRN exists only from the posted session
-               (purchasing/MASTER.md §7.3) — an honest absence, never `—`. */
-            <span className="text-meta text-base-500">No GRN yet</span>
-          ),
+        /* Every Register row IS a GRN (the boundary above) — the formal
+           number exists by construction (purchasing/MASTER.md §7.3). */
+        searchValue: (r) => receivingDisplayNo(r),
+        exportValue: (r) => receivingDisplayNo(r),
+        accessor: (r) => (
+          <span className="font-mono text-meta text-base-900">
+            {receivingDisplayNo(r)}
+          </span>
+        ),
       },
       {
         key: "status",
         label: "Status",
-        width: 170,
+        width: 110,
         sortable: true,
+        /* Document status words — `Valid` / `Cancelled` (owner correction
+           2026-09-06). `Posted`/`Voided` stay internal database statuses. */
         searchValue: (r) => warehouseReceiptStatusLabel(r.status),
         exportValue: (r) => warehouseReceiptStatusLabel(r.status),
         accessor: (r) => (
           <span
             className={
-              r.status === "submitted"
-                ? "text-body text-kit-amber-11"
-                : r.status === "voided"
-                  ? "text-body text-base-500 line-through"
-                  : "text-body text-base-900"
+              r.status === "voided"
+                ? "text-body text-base-500 line-through"
+                : "text-body text-base-900"
             }
           >
             {warehouseReceiptStatusLabel(r.status)}
@@ -227,7 +228,7 @@ export default function OperationReceiving() {
       },
       {
         key: "receivedAt",
-        label: "Goods Received At",
+        label: "Goods received on",
         width: 150,
         sortable: true,
         searchValue: (r) => r.goods_received_at ?? "",
@@ -278,20 +279,23 @@ export default function OperationReceiving() {
       },
       {
         key: "actualSite",
-        label: "Actual Site",
+        label: "Goods arrived at",
         width: 150,
         sortable: true,
-        searchValue: (r) => r.actual_site_name ?? "",
-        exportValue: (r) => r.actual_site_name ?? "Same as Deliver To",
+        searchValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
+        exportValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
         accessor: (r) =>
-          r.actual_site_name ? (
+          r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
             /* The physical truth, preserved BESIDE the instruction — never
-               overwriting it (owner instruction §6). */
+               overwriting `Deliver To` (owner correction 2026-09-06). Amber
+               only when the goods landed somewhere other than instructed. */
             <span className="truncate text-body text-kit-amber-11">
               {r.actual_site_name}
             </span>
           ) : (
-            <span className="text-meta text-base-500">Same as Deliver To</span>
+            <span className="truncate text-body text-base-900">
+              {r.actual_site_name ?? r.warehouse_name ?? ""}
+            </span>
           ),
       },
       {
@@ -407,8 +411,8 @@ export default function OperationReceiving() {
     [],
   );
 
-  const waiting = receiptsQ.data?.counts.waiting ?? 0;
-  const narrowed = stateSel !== null || supplierSel !== null || siteSel !== null;
+  const narrowed =
+    categorySel !== null || supplierSel !== null || siteSel !== null;
 
   const openObject = sessionId ?? poId ?? (finding ? "find" : null);
 
@@ -470,38 +474,25 @@ export default function OperationReceiving() {
         data-testid="receiving-register"
       >
         <FilterRail testId="receiving-rail">
-          <FilterRailGroup title="RECEIVING">
-            <FilterRailRow
-              label="All receiving"
-              active={!narrowed}
-              onClick={() => {
-                const next = new URLSearchParams(params);
-                next.delete("state");
-                next.delete("supplier");
-                next.delete("site");
-                setParams(next, { replace: true });
-              }}
-              testId="rail-all-receiving"
-            />
-            {STATE_ROWS.map((s) => (
+          {/* The five governed category rows, in the shared ladder's order —
+              no `Any`, no `All …`, no invented category. Real counts from the
+              current GRN result set; re-clicking the active row clears the
+              section (owner correction 2026-09-06). */}
+          <FilterRailGroup title="CATEGORY">
+            {RECEIVING_CATEGORY_ROWS.map((word) => (
               <FilterRailRow
-                key={s.key}
-                label={s.label}
-                count={counts.state.get(s.key) ?? 0}
-                active={stateSel === s.key}
-                onClick={() => setFacet("state", s.key)}
-                testId={`rail-state-${s.key}`}
+                key={word}
+                label={word}
+                count={counts.category.get(word) ?? 0}
+                active={categorySel === word}
+                onClick={() => setFacet("category", word)}
+                testId={`rail-category-${word}`}
               />
             ))}
           </FilterRailGroup>
 
+          {/* The suppliers actually present in Receiving records. */}
           <FilterRailGroup title="SUPPLIER">
-            <FilterRailRow
-              label="All suppliers"
-              active={supplierSel === null}
-              onClick={() => setFacet("supplier", null)}
-              testId="rail-all-suppliers"
-            />
             {supplierNames.map((name) => (
               <FilterRailRow
                 key={name}
@@ -514,22 +505,36 @@ export default function OperationReceiving() {
             ))}
           </FilterRailGroup>
 
-          {/* A filter offering one choice is not a filter — SITE appears the
-              moment a second site holds a receiving. */}
-          {siteNames.length > 1 ? (
-            <FilterRailGroup title="SITE">
-              {siteNames.map((name) => (
-                <FilterRailRow
-                  key={name}
-                  label={name}
-                  count={counts.site.get(name) ?? 0}
-                  active={siteSel === name}
-                  onClick={() => setFacet("site", name)}
-                  testId={`rail-site-${name}`}
-                />
-              ))}
-            </FilterRailGroup>
-          ) : null}
+          {/* The receiving locations actually present in the records —
+              where the goods PHYSICALLY arrived. */}
+          <FilterRailGroup title="GOODS ARRIVED AT">
+            {siteNames.map((name) => (
+              <FilterRailRow
+                key={name}
+                label={name}
+                count={counts.site.get(name) ?? 0}
+                active={siteSel === name}
+                onClick={() => setFacet("site", name)}
+                testId={`rail-site-${name}`}
+              />
+            ))}
+          </FilterRailGroup>
+
+          <button
+            type="button"
+            disabled={!narrowed}
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.delete("category");
+              next.delete("supplier");
+              next.delete("site");
+              setParams(next, { replace: true });
+            }}
+            data-testid="rail-clear-filters"
+            className="self-start rounded-control px-2 py-1.5 text-left text-body text-kit-blue-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9"
+          >
+            Clear filters
+          </button>
         </FilterRail>
 
         <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="receiving-register-column">
@@ -579,7 +584,7 @@ export default function OperationReceiving() {
                 </button>
               }
               emptyMessage={
-                receipts.length === 0
+                grnRecords.length === 0
                   ? // The record is what is empty — never "the goods have not
                     // come" (Jess, 2026-08-03).
                     "No receiving activity yet."
@@ -590,9 +595,7 @@ export default function OperationReceiving() {
                   `${filteredRows.length} receiving record${filteredRows.length === 1 ? "" : "s"}`,
                 ];
                 if (narrowed || search.trim() !== "")
-                  bits.push(`of ${receipts.length}`);
-                if (waiting > 0)
-                  bits.push(`${waiting} count${waiting === 1 ? "" : "s"} waiting for check`);
+                  bits.push(`of ${grnRecords.length}`);
                 const line = bits.join(" · ");
                 return (
                   <span className="block truncate" title={line}>

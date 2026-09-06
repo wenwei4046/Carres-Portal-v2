@@ -657,13 +657,13 @@ function ReceivingMode({
       <Section title="Receiving Details">
         <div className="flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Goods Received At
+            Goods received on
           </span>
           <input
             type="date"
             value={goodsReceivedAt}
             onChange={(e) => setGoodsReceivedAt(e.target.value)}
-            aria-label="Goods Received At"
+            aria-label="Goods received on"
             data-testid="goods-received-at"
             className={FIELD}
           />
@@ -676,14 +676,15 @@ function ReceivingMode({
         </div>
         <div className="mt-1 flex items-center gap-2 text-body leading-6">
           <span className="w-32 shrink-0 text-label text-kit-slate-9">
-            Actual Site
+            Goods arrived at
           </span>
           {/* Where the goods PHYSICALLY arrived. It never overwrites
-              `Deliver To` — both facts are preserved (owner instruction §6). */}
+              `Deliver To` — both facts are preserved (owner correction
+              2026-09-06 §3; the retired label was `Actual Site`). */}
           <select
             value={actualSiteId || po.warehouse_id}
             onChange={(e) => setActualSiteId(e.target.value)}
-            aria-label="Actual Site"
+            aria-label="Goods arrived at"
             data-testid="actual-site"
             className={FIELD}
           >

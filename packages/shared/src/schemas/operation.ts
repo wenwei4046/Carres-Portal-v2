@@ -387,6 +387,20 @@ export const receivingAmendInput = z
     goodsReceivedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     doNumber: z.string().min(3).max(60).optional(),
     actualSiteId: z.string().uuid().nullable().optional(),
+    /** A corrected signed-DO file (0427) — the old path is preserved in the
+     *  amendment's before/after, never deleted. */
+    doFilePath: z.string().min(3).max(300).optional(),
+    /** Additional arrival evidence (0427) — APPEND-ONLY; an amendment never
+     *  removes recorded evidence. */
+    arrivalEvidenceAdd: z
+      .array(
+        z.object({
+          path: z.string().min(3).max(300),
+          kind: z.enum(["photo", "video"]),
+        }),
+      )
+      .max(20)
+      .optional(),
     lines: z
       .array(
         z.object({
