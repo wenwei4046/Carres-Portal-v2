@@ -1,55 +1,56 @@
-// design-standard: not-a-list-page — dated Warehouse workspace (Dashboard
-// Calendar + Outbound exact-Unit work), Stock MASTER §7, not a Register list.
+// design-standard: not-a-list-page — dated Warehouse Monitor Calendar
+// (read-only projection of arrivals and pickups), not a Register list.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import {
-  ChevronLeft,
-  ChevronRight,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addWorkingDays,
   myHolidaySet,
   subtractWorkingDays,
   WAREHOUSE_OFF_DAYS,
-  warehouseEmptyDaySentence,
+  warehouseMonitorArrivalEvents,
+  warehouseMonitorDayEvents,
+  warehouseMonitorEmptyDaySentence,
+  warehouseMonitorPickupEvents,
   warehouseOperatingDates,
   warehouseOutboundCards,
   warehouseRangeShift,
   type DeliveryWarehouseScheduleEvent,
-  type WarehouseOutboundCard,
+  type WarehouseExpectedArrival,
+  type WarehouseMonitorEvent,
 } from "@carres/shared";
-import { useDeliveryWarehouseSchedule } from "@/lib/queries";
+import {
+  useDeliveryWarehouseSchedule,
+  useOperationPos,
+  useOperationSuppliers,
+  useOperationWarehouse,
+} from "@/lib/queries";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import ModuleHeader from "./components/ModuleHeader";
-import {
-  FilterRail,
-  FilterRailGroup,
-  FilterRailRow,
-} from "./components/workspace-rail";
-import WarehouseOutboundWork from "./WarehouseOutboundWork";
 
 /**
- * WAREHOUSE — Dashboard Calendar → Outbound exact-Unit work
- * (CARD-2026-09-04-warehouse-03; Stock MASTER §2 「WAREHOUSE DASHBOARD
- *  CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04」 and §12.6).
+ * WAREHOUSE — MONITOR: the module's ONLY Calendar-summary page
+ * (owner replacement Card 2026-09-06; Stock MASTER §2).
  *
- * ONE component owns both `?tab=` addresses so the Dashboard stays mounted
- * (visibility only) while Outbound is open — browser Back restores the
- * Calendar range, filters and scroll position instead of a fresh board.
+ * Six governed working dates, full width — deliberately NO 240px filter
+ * rail: Monitor summarises the whole site's day; filtering belongs to the
+ * destination pages (Inbound · Outbound) each card opens.
  *
- * The Dashboard is a READ-ONLY projection of Delivery's schedule feed: no
- * KPI wall, no primary action, no Refresh button, no Warehouse write control.
- * Clicking a card opens Outbound scoped to that date and DO; `DO No` is a
- * separate door to the formal read-only Delivery Order. Never Edit Delivery.
+ * BOTH directions render on one board, arranged by actual time inside each
+ * date: ARRIVAL work projected from Purchasing's expected arrivals, PICKUP
+ * work projected from Delivery's schedule feed. Every card says what its
+ * time MEANS (`Driver pickup 14:30`) or says exactly `Time not provided` —
+ * never a bare clock.
+ *
+ * Monitor is read-only. It completes nothing: an ARRIVAL card opens Inbound
+ * already filtered to the date, Site and source record; a PICKUP card opens
+ * Outbound the same way; `DO No` opens the formal read-only Delivery Order.
+ * Warehouse never reaches Edit Delivery from here.
  */
 
-/** Below this width six readable date columns cannot fit beside the rail —
- *  the same projection becomes a one-day agenda (Stock MASTER §7). */
+/** Below this width six readable date columns cannot fit — the same
+ *  projection becomes a one-day agenda list (card §3, mobile). */
 const AGENDA_BREAKPOINT = 1280;
-
-export type WarehouseScheduleView = "calendar" | "not-done" | "no-evidence";
 
 export function useIsAgendaWidth(): boolean {
   const query = `(max-width: ${AGENDA_BREAKPOINT - 1}px)`;
@@ -67,8 +68,6 @@ export function useIsAgendaWidth(): boolean {
 
 export default function WarehouseWorkspace() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") ?? "warehouse-dashboard";
-  const isOutbound = tab === "warehouse-outbound";
 
   const holidays = useMemo(() => myHolidaySet(), []);
   const today = appTodayIso();
@@ -78,54 +77,56 @@ export default function WarehouseWorkspace() {
     [from, holidays],
   );
   const selectedDate = params.get("date") ?? dates[0] ?? today;
-  const site = params.get("site");
-  const sched = (params.get("sched") ?? "calendar") as WarehouseScheduleView;
-  const search = params.get("q") ?? "";
-  const selectedDo = params.get("do");
   const isAgenda = useIsAgendaWidth();
-  const [railHidden, setRailHidden] = useState(isAgenda);
-  /* At agenda width the 240px rail would crush the one-day list, so it opens
-     on demand from the [Filters] control and closes after a pick (card §5
-     narrow composition). */
-  useEffect(() => {
-    if (isAgenda) setRailHidden(true);
-  }, [isAgenda]);
-  function pickRail(key: string, value: string | null) {
-    setParam(key, value);
-    if (isAgenda) setRailHidden(true);
-  }
 
-  const { data, isLoading, error } = useDeliveryWarehouseSchedule();
+  const sched = useDeliveryWarehouseSchedule();
+  const posQ = useOperationPos();
+  const suppliersQ = useOperationSuppliers();
+  const warehouseQ = useOperationWarehouse();
+
+  const pickupEvents = useMemo(() => {
+    const events = (sched.data?.events ?? []) as DeliveryWarehouseScheduleEvent[];
+    return warehouseMonitorPickupEvents(warehouseOutboundCards(events));
+  }, [sched.data]);
+
+  const arrivalEvents = useMemo(() => {
+    const supplierName = new Map(
+      (suppliersQ.data?.suppliers ?? []).map((s: { id: string; name: string }) => [
+        s.id,
+        s.name,
+      ]),
+    );
+    const siteName = new Map(
+      (warehouseQ.data?.warehouses ?? []).map((w: { id: string; name: string }) => [
+        w.id,
+        w.name,
+      ]),
+    );
+    const arrivals: WarehouseExpectedArrival[] = (posQ.data?.pos ?? [])
+      .filter((po) => po.status === "open")
+      .map((po) => ({
+        poId: po.id,
+        supplierName: supplierName.get(po.supplier_id) ?? null,
+        siteName:
+          siteName.get(po.destination_id ?? po.warehouse_id) ??
+          siteName.get(po.warehouse_id) ??
+          null,
+        etaDate: po.eta_date,
+        pendingQty: (po.purchase_order_lines ?? []).reduce(
+          (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),
+          0,
+        ),
+      }));
+    return warehouseMonitorArrivalEvents(arrivals);
+  }, [posQ.data, suppliersQ.data, warehouseQ.data]);
+
   const events = useMemo(
-    () => (data?.events ?? []) as DeliveryWarehouseScheduleEvent[],
-    [data],
-  );
-  const allCards = useMemo(() => warehouseOutboundCards(events), [events]);
-
-  const siteNames = useMemo(
-    () =>
-      [...new Set(allCards.map((c) => c.fromLocation))]
-        .filter((s) => s && s !== "Not recorded")
-        .sort(),
-    [allCards],
+    () => [...arrivalEvents, ...pickupEvents],
+    [arrivalEvents, pickupEvents],
   );
 
-  const cards = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allCards.filter((c) => {
-      if (site && c.fromLocation !== site) return false;
-      if (sched === "not-done" && c.notHandedOver === 0) return false;
-      if (sched === "no-evidence" && !c.evidenceNotSubmitted) return false;
-      if (!q) return true;
-      return (
-        c.doNumber.toLowerCase().includes(q) ||
-        c.source.toLowerCase().includes(q) ||
-        c.toCustomer.toLowerCase().includes(q) ||
-        c.logisticsPartner.toLowerCase().includes(q) ||
-        c.units.some((u) => u.unitId.toLowerCase().includes(q))
-      );
-    });
-  }, [allCards, site, sched, search]);
+  const isLoading = sched.isLoading || posQ.isLoading;
+  const error = sched.error;
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -134,11 +135,21 @@ export default function WarehouseWorkspace() {
     setParams(next, { replace: false });
   }
 
-  function openOutbound(card: WarehouseOutboundCard) {
+  /** Card §4 — a card opens its work page ALREADY filtered: date, Site,
+   *  source document, exact record. Same `/operation?tab=` address space. */
+  function openEvent(e: WarehouseMonitorEvent) {
     const next = new URLSearchParams(params);
-    next.set("tab", "warehouse-outbound");
-    next.set("date", card.eventDate);
-    next.set("do", card.doNumber);
+    next.set("tab", e.open.tab);
+    next.set("date", e.open.date);
+    if (e.open.site) next.set("site", e.open.site);
+    else next.delete("site");
+    if (e.open.tab === "warehouse-inbound") {
+      next.set("po", e.open.po);
+      next.delete("do");
+    } else {
+      next.set("do", e.open.do);
+      next.delete("po");
+    }
     setParams(next);
   }
 
@@ -148,200 +159,101 @@ export default function WarehouseWorkspace() {
       : "—";
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-workspace">
-      {/* Dashboard stays mounted underneath Outbound — visibility only, so
-          Back restores filters and scroll (the Manual Purchase pattern). */}
-      <div
-        className={`flex min-h-0 flex-1 flex-col${isOutbound ? " hidden" : ""}`}
-        aria-hidden={isOutbound || undefined}
-        data-testid="warehouse-dashboard"
-      >
-        <ModuleHeader
-          testId="warehouse-dashboard-header"
-          word="Dashboard"
-          docTitle="Dashboard · Warehouse — Carres"
-          destinationHeader
-        />
-        <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
+    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-monitor">
+      <ModuleHeader
+        testId="warehouse-monitor-header"
+        word="Monitor"
+        docTitle="Monitor · Warehouse — Carres"
+        destinationHeader
+      />
+      <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
+        <div className="flex items-center gap-1" data-testid="wm-range">
           <button
             type="button"
-            className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint"
-            onClick={() => setRailHidden((h) => !h)}
-            data-testid="wd-toggle-filters"
+            aria-label="Previous dates"
+            className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
+            onClick={() =>
+              isAgenda
+                ? setParam(
+                    "date",
+                    subtractWorkingDays(selectedDate, 1, {
+                      offDays: WAREHOUSE_OFF_DAYS,
+                      holidays,
+                    }),
+                  )
+                : setParam("from", warehouseRangeShift(dates, -1, holidays))
+            }
+            data-testid="wm-prev"
           >
-            {railHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-            {railHidden ? "Filters" : "Hide filters"}
+            <ChevronLeft size={16} />
           </button>
-          <div className="flex items-center gap-1" data-testid="wd-range">
-            <button
-              type="button"
-              aria-label="Previous dates"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-              onClick={() =>
-                isAgenda
-                  ? setParam(
-                      "date",
-                      subtractWorkingDays(selectedDate, 1, {
-                        offDays: WAREHOUSE_OFF_DAYS,
-                        holidays,
-                      }),
-                    )
-                  : setParam("from", warehouseRangeShift(dates, -1, holidays))
-              }
-              data-testid="wd-prev"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="min-w-0 px-1 text-[13px] font-medium text-base-800">
-              {isAgenda ? fmtDate(selectedDate) : rangeLabel}
-            </span>
-            <button
-              type="button"
-              aria-label="Next dates"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-              onClick={() =>
-                isAgenda
-                  ? setParam(
-                      "date",
-                      addWorkingDays(selectedDate, 1, {
-                        offDays: WAREHOUSE_OFF_DAYS,
-                        holidays,
-                      }),
-                    )
-                  : setParam("from", warehouseRangeShift(dates, 1, holidays))
-              }
-              data-testid="wd-next"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-          <div className="ml-auto">
-            <input
-              type="search"
-              value={search}
-              placeholder="Search"
-              aria-label="Search outbound handovers"
-              className="h-7 w-52 rounded border border-kit-slate-5 px-2 text-[13px]"
-              onChange={(e) => setParam("q", e.target.value)}
-              data-testid="wd-search"
-            />
-          </div>
-        </div>
-        <div className="flex min-h-0 flex-1">
-          {!railHidden && (
-            <FilterRail testId="wd-rail">
-              <FilterRailGroup title="OUTBOUND SCHEDULE">
-                <FilterRailRow
-                  label="Calendar"
-                  active={sched === "calendar"}
-                  onClick={() => pickRail("sched", null)}
-                  testId="wd-sched-calendar"
-                />
-                <FilterRailRow
-                  label="Not done"
-                  count={allCards.filter((c) => c.notHandedOver > 0).length}
-                  active={sched === "not-done"}
-                  onClick={() => pickRail("sched", sched === "not-done" ? null : "not-done")}
-                  testId="wd-sched-not-done"
-                />
-                <FilterRailRow
-                  label="Evidence not submitted"
-                  count={allCards.filter((c) => c.evidenceNotSubmitted).length}
-                  active={sched === "no-evidence"}
-                  onClick={() => pickRail("sched", sched === "no-evidence" ? null : "no-evidence")}
-                  testId="wd-sched-no-evidence"
-                />
-              </FilterRailGroup>
-              {siteNames.length > 1 && (
-                <FilterRailGroup title="SITE">
-                  {siteNames.map((name) => (
-                    <FilterRailRow
-                      key={name}
-                      label={name}
-                      count={allCards.filter((c) => c.fromLocation === name).length}
-                      active={site === name}
-                      onClick={() => pickRail("site", site === name ? null : name)}
-                      testId={`wd-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                    />
-                  ))}
-                </FilterRailGroup>
-              )}
-              {/* SOURCE is not rendered while `Delivery Order` is the only live
-                  source: a one-option group is a dead control (card §4.2).
-                  The source stays explicit on every card. */}
-            </FilterRail>
-          )}
-          <div className={`min-h-0 min-w-0 flex-1 flex-col${!railHidden && isAgenda ? " hidden" : " flex"}`}>
-            {isLoading ? (
-              <p className="p-4 text-[13px] text-base-500">Loading…</p>
-            ) : error ? (
-              <p className="p-4 text-[13px] text-base-600" data-testid="wd-error">
-                The schedule could not be loaded. {error.message}
-              </p>
-            ) : sched !== "calendar" ? (
-              <GroupedCardList
-                cards={cards}
-                onOpen={openOutbound}
-                testId={`wd-list-${sched}`}
-              />
-            ) : isAgenda ? (
-              <AgendaDay
-                date={selectedDate}
-                cards={cards.filter((c) => c.eventDate === selectedDate)}
-                onOpen={openOutbound}
-              />
-            ) : (
-              <CalendarBoard
-                dates={dates}
-                cards={cards}
-                onOpen={openOutbound}
-              />
-            )}
-          </div>
+          <span className="min-w-0 px-1 text-[13px] font-medium text-base-800">
+            {isAgenda ? fmtDate(selectedDate) : rangeLabel}
+          </span>
+          <button
+            type="button"
+            aria-label="Next dates"
+            className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
+            onClick={() =>
+              isAgenda
+                ? setParam(
+                    "date",
+                    addWorkingDays(selectedDate, 1, {
+                      offDays: WAREHOUSE_OFF_DAYS,
+                      holidays,
+                    }),
+                  )
+                : setParam("from", warehouseRangeShift(dates, 1, holidays))
+            }
+            data-testid="wm-next"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
       </div>
-
-      {isOutbound && (
-        <WarehouseOutboundWork
-          cards={allCards}
-          date={selectedDate}
-          selectedDo={selectedDo}
-          isLoading={isLoading}
-          onSelectDo={(doNumber) => setParam("do", doNumber)}
-        />
-      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {isLoading ? (
+          <p className="p-4 text-[13px] text-base-500">Loading…</p>
+        ) : error ? (
+          <p className="p-4 text-[13px] text-base-600" data-testid="wm-error">
+            The schedule could not be loaded. {error.message}
+          </p>
+        ) : isAgenda ? (
+          <AgendaDay date={selectedDate} events={events} onOpen={openEvent} />
+        ) : (
+          <CalendarBoard dates={dates} events={events} onOpen={openEvent} />
+        )}
+      </div>
     </div>
   );
 }
 
 /** Desktop board — six operating dates in ONE chronological horizontal
- *  sequence (never 3 × 2), one shared vertical scroll, the work area owning
- *  horizontal overflow. */
+ *  sequence (never 3 × 2), one shared vertical scroll, full width (no rail). */
 function CalendarBoard({
   dates,
-  cards,
+  events,
   onOpen,
 }: {
   dates: string[];
-  cards: WarehouseOutboundCard[];
-  onOpen: (card: WarehouseOutboundCard) => void;
+  events: WarehouseMonitorEvent[];
+  onOpen: (e: WarehouseMonitorEvent) => void;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-auto" data-testid="wd-board">
+    <div className="min-h-0 flex-1 overflow-auto" data-testid="wm-board">
+      {/* min-w-full, not min-w-max: a long empty-day sentence must WRAP inside
+          its 232px-floor column, not widen every column until six days cannot
+          fit even at full page width. Below the floor the container scrolls. */}
       <div
-        className="grid min-w-max gap-px bg-kit-slate-5"
+        className="grid min-w-full gap-px bg-kit-slate-5"
         style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(232px, 1fr))` }}
       >
         {dates.map((date) => (
-          <div key={date} className="bg-base-50" data-testid={`wd-col-${date}`}>
+          <div key={date} className="bg-base-50" data-testid={`wm-col-${date}`}>
             <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-2 py-1.5 text-label font-semibold uppercase tracking-wide text-base-600">
               {fmtDate(date)}
             </div>
-            <DayColumn
-              date={date}
-              cards={cards.filter((c) => c.eventDate === date)}
-              onOpen={onOpen}
-            />
+            <DayEvents date={date} events={events} onOpen={onOpen} />
           </div>
         ))}
       </div>
@@ -349,154 +261,109 @@ function CalendarBoard({
   );
 }
 
-function DayColumn({
+/** Narrow width — one selected day as a vertical time-ordered list;
+ *  previous/next moves one operating date (card §3, mobile). */
+function AgendaDay({
   date,
-  cards,
+  events,
   onOpen,
 }: {
   date: string;
-  cards: WarehouseOutboundCard[];
-  onOpen: (card: WarehouseOutboundCard) => void;
+  events: WarehouseMonitorEvent[];
+  onOpen: (e: WarehouseMonitorEvent) => void;
 }) {
-  if (cards.length === 0) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="wm-agenda">
+      <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
+        {fmtDate(date)}
+      </h2>
+      <div className="max-w-xl">
+        <DayEvents date={date} events={events} onOpen={onOpen} />
+      </div>
+    </div>
+  );
+}
+
+function DayEvents({
+  date,
+  events,
+  onOpen,
+}: {
+  date: string;
+  events: WarehouseMonitorEvent[];
+  onOpen: (e: WarehouseMonitorEvent) => void;
+}) {
+  const day = warehouseMonitorDayEvents(events, date);
+  if (day.length === 0) {
     return (
-      <p className="px-3 py-4 text-[13px] leading-5 text-base-500" data-testid={`wd-empty-${date}`}>
-        {warehouseEmptyDaySentence(fmtDate(date))}
+      <p className="px-3 py-4 text-[13px] leading-5 text-base-500" data-testid={`wm-empty-${date}`}>
+        {warehouseMonitorEmptyDaySentence(fmtDate(date))}
       </p>
     );
   }
   return (
     <div className="space-y-2 p-2">
-      {cards.map((card) => (
-        <OutboundCard key={card.doNumber} card={card} onOpen={onOpen} />
+      {day.map((e) => (
+        <MonitorCard key={`${e.kind}-${e.sourceLabel}`} event={e} onOpen={onOpen} />
       ))}
     </div>
   );
 }
 
-/** Narrow width — one selected day as an agenda list; previous/next moves one
- *  operating date. Same data, permissions and destinations as the board. */
-function AgendaDay({
-  date,
-  cards,
+/** ONE card = one dated piece of physical work. Field order is fixed:
+ *  the time sentence · the event name with its direction · the source
+ *  document · the party and what moves · the Site. The card body opens the
+ *  filtered work page; `DO No` is a separate read-only document door. */
+function MonitorCard({
+  event,
   onOpen,
 }: {
-  date: string;
-  cards: WarehouseOutboundCard[];
-  onOpen: (card: WarehouseOutboundCard) => void;
+  event: WarehouseMonitorEvent;
+  onOpen: (e: WarehouseMonitorEvent) => void;
 }) {
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid="wd-agenda">
-      <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
-        {fmtDate(date)}
-      </h2>
-      {cards.length === 0 ? (
-        <p className="text-[13px] leading-5 text-base-500" data-testid={`wd-empty-${date}`}>
-          {warehouseEmptyDaySentence(fmtDate(date))}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {cards.map((card) => (
-            <OutboundCard key={card.doNumber} card={card} onOpen={onOpen} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Not done / Evidence not submitted — the same cards, grouped under their
- *  ORIGINAL dates (unfinished work is never re-dated or hidden). */
-function GroupedCardList({
-  cards,
-  onOpen,
-  testId,
-}: {
-  cards: WarehouseOutboundCard[];
-  onOpen: (card: WarehouseOutboundCard) => void;
-  testId: string;
-}) {
-  const dates = [...new Set(cards.map((c) => c.eventDate))].sort();
-  return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid={testId}>
-      {dates.length === 0 ? (
-        <p className="text-[13px] text-base-500">Nothing here. Every handover on this view is done.</p>
-      ) : (
-        dates.map((date) => (
-          <section key={date} className="mb-4">
-            <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
-              {fmtDate(date)}
-            </h2>
-            <div className="grid max-w-4xl gap-2">
-              {cards
-                .filter((c) => c.eventDate === date)
-                .map((card) => (
-                  <OutboundCard key={card.doNumber} card={card} onOpen={onOpen} />
-                ))}
-            </div>
-          </section>
-        ))
-      )}
-    </div>
-  );
-}
-
-/** ONE card = ONE active customer-DO scope. Field order is locked (card §6):
- *  actual handover time (only when it exists) · DO No · From → To · Partner ·
- *  Units required · Handed over · Not handed over · the current fact.
- *  The card body opens Outbound; `DO No` opens the formal read-only DO. */
-export function OutboundCard({
-  card,
-  onOpen,
-}: {
-  card: WarehouseOutboundCard;
-  onOpen: (card: WarehouseOutboundCard) => void;
-}) {
-  const remaining = card.units.filter((u) => !u.unitHandedOverAt);
   return (
     <div
       role="button"
       tabIndex={0}
       className="cursor-pointer rounded border border-kit-slate-5 bg-white p-2.5 text-left shadow-sm outline-offset-2 hover:border-base-300 focus-visible:outline focus-visible:outline-2"
-      onClick={() => onOpen(card)}
+      onClick={() => onOpen(event)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onOpen(card);
+          onOpen(event);
         }
       }}
-      data-testid={`wd-card-${card.doNumber}`}
-      aria-label={`Open Outbound for ${card.doNumber}`}
+      data-testid={`wm-card-${event.sourceLabel.split(" ")[0]}`}
+      aria-label={`Open ${event.group === "arrival" ? "Inbound" : "Outbound"} for ${event.sourceLabel}`}
     >
-      {card.actualHandoverAt && (
-        <div className="text-label text-base-500" data-testid="wd-card-time">
-          {fmtDate(card.actualHandoverAt, { timeOnly: true })}
-        </div>
-      )}
-      <div className="flex items-baseline gap-2">
-        <Link
-          to={card.deliveryOrderHref}
-          className="font-mono text-[13px] font-semibold text-base-800 underline-offset-2 hover:underline"
-          onClick={(e) => e.stopPropagation()}
-          data-testid="wd-card-do"
-        >
-          {card.doNumber}
-        </Link>
-        <span className="text-label text-base-500">{card.source}</span>
+      <div className="text-[13px] font-medium text-base-800" data-testid="wm-card-time">
+        {event.timeSentence}
       </div>
-      <div className="mt-0.5 truncate text-[13px] text-base-700" title={`${card.fromLocation} → ${card.toCustomer}`}>
-        {card.fromLocation} → {card.toCustomer}
+      <div className="mt-0.5 text-label uppercase tracking-wide text-base-500" data-testid="wm-card-kind">
+        {event.group === "arrival" ? "Arrival" : "Pickup"} · {event.label}
       </div>
-      <div className="text-[13px] text-base-600">{card.logisticsPartner}</div>
-      <div className="mt-1 text-[13px] text-base-700" data-testid="wd-card-tally">
-        Required {card.unitsRequired} · Handed over {card.handedOver} · Not handed over{" "}
-        {card.notHandedOver}
+      <div className="mt-0.5 flex items-baseline gap-2">
+        {event.sourceHref ? (
+          <Link
+            to={event.sourceHref}
+            className="font-mono text-[13px] font-semibold text-base-800 underline-offset-2 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="wm-card-source-link"
+          >
+            {event.sourceLabel}
+          </Link>
+        ) : (
+          <span className="font-mono text-[13px] font-semibold text-base-800">
+            {event.sourceLabel}
+          </span>
+        )}
       </div>
-      {remaining.length > 0 && (
-        <div className="mt-0.5 text-label text-base-500" data-testid="wd-card-fact">
-          {remaining.length === 1
-            ? `${remaining[0].unitId} still needs handover`
-            : `${remaining.length} Units still need handover`}
+      <div className="mt-0.5 truncate text-[13px] text-base-700" title={`${event.party} · ${event.detail}`}>
+        {event.party} · {event.detail}
+      </div>
+      {event.site && (
+        <div className="text-label text-base-500" data-testid="wm-card-site">
+          {event.site}
         </div>
       )}
     </div>

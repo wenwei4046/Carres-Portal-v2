@@ -1,12 +1,29 @@
 // design-standard: not-a-list-page — dated Warehouse work surface (Outbound
-// exact-Unit check/pack/handover, Stock MASTER §12.6), not a Register list.
-import { useMemo, useState } from "react";
+// exact-Unit scan/check/pack/load, Stock MASTER §12.6), not a Register list.
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronRight as ChevronRightSmall } from "lucide-react";
 import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronRight as ChevronRightSmall,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
+import {
+  addWorkingDays,
   DELIVERY_PHOTO_MAX_BYTES,
   DELIVERY_PHOTO_MIMES,
+  driverCollectedLine,
+  myHolidaySet,
+  subtractWorkingDays,
+  WAREHOUSE_OFF_DAYS,
+  warehouseAssignedDriverLine,
   warehouseEmptyDaySentence,
+  warehouseLoadedLine,
+  warehouseOutboundCards,
+  warehouseRecordLoadedSentence,
+  warehouseUnitNotCollectedSentence,
   warehouseUnitPendingReason,
   type DeliveryWarehouseScheduleEvent,
   type WarehouseOutboundCard,
@@ -16,53 +33,146 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { apiFetch, ApiError } from "@/lib/api";
 import {
+  useDeliveryWarehouseSchedule,
   useRecordHandoverEvent,
   useRecordOutboundPrep,
 } from "@/lib/queries";
-import { fmtDate } from "@/lib/fmt-date";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import ModuleHeader from "./components/ModuleHeader";
 import { Modal, ModalActions } from "./components/Modal";
+import {
+  FilterRail,
+  FilterRailGroup,
+  FilterRailRow,
+} from "./components/workspace-rail";
 
 /**
- * WAREHOUSE — Outbound: the dated exact-Unit work page (card §7).
+ * WAREHOUSE — OUTBOUND: the dated physical work the Warehouse owns
+ * (owner replacement Card 2026-09-06 §7–§8; Stock MASTER §2).
  *
- * Not a document, not a second DO, not an inventory-event register. The
- * source DO owns why the movement exists; this page tells the operator what
- * must physically be scanned, checked, packed and handed over today.
+ * `240px page-specific filter rail + Outbound Register`. The rail filters
+ * the same outgoing work by pickup status and Site; the toolbar's compact
+ * selected-date control is only a filter — never another Calendar summary
+ * (Monitor alone owns the Calendar).
  *
- * The visible action order is governed: ① scan every required Unit ② record
- * check and pack for the scanned IDs ③ read the exact receiving Partner and
- * the consequence ④ record the physical handover with the actual receiver
- * and required evidence ⑤ every omitted/refused Unit stays under its
- * original date with its existing holder. No generic `Mark done` exists —
- * the accepted physical fact completes the work.
+ * The work itself is governed and exact: scan exact Unit IDs, record check
+ * and pack, then record which exact Units were LOADED to the individually
+ * named receiver, with proof. Partial results persist under their original
+ * date. The two evidence records stay separate forever:
+ *
+ *   Warehouse loaded    what the identified operator scanned and submitted
+ *   Driver collected    what the driver independently confirms
+ *
+ * Only matching exact-Unit evidence changes `Who has it` (the server's
+ * rule). The transport company and the individual driver are separate
+ * stored facts and render separately; no value here is ever invented.
  */
-export default function WarehouseOutboundWork({
-  cards,
-  date,
-  selectedDo,
-  isLoading,
-  onSelectDo,
-}: {
-  cards: WarehouseOutboundCard[];
-  date: string;
-  selectedDo: string | null;
-  isLoading: boolean;
-  onSelectDo: (doNumber: string | null) => void;
-}) {
-  const [params] = useSearchParams();
-  const selectedCard = cards.find((c) => c.doNumber === selectedDo) ?? null;
-  /* A deep link may carry `do` without `date` — the work date is the card's
-     own date, never a guess. */
-  const workDate = selectedCard?.eventDate ?? date;
-  const dayCards = useMemo(
-    () => cards.filter((c) => c.eventDate === workDate),
-    [cards, workDate],
+
+type OutboundView = "all" | "not-loaded" | "loaded" | "no-evidence";
+
+/** At agenda width the 240px rail would crush the list — it opens on demand
+ *  from [Filters] and closes after a pick (the Monitor's own narrow rule). */
+const NARROW_BREAKPOINT = 1280;
+
+function useIsNarrow(): boolean {
+  const query = `(max-width: ${NARROW_BREAKPOINT - 1}px)`;
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+  return narrow;
+}
+
+export default function WarehouseOutboundWork() {
+  const [params, setParams] = useSearchParams();
+  const holidays = useMemo(() => myHolidaySet(), []);
+  const today = appTodayIso();
+  const view = (params.get("view") ?? "all") as OutboundView;
+  const site = params.get("site");
+  const search = params.get("q") ?? "";
+  const selectedDo = params.get("do");
+
+  const { data, isLoading } = useDeliveryWarehouseSchedule();
+  const allCards = useMemo(
+    () =>
+      warehouseOutboundCards(
+        (data?.events ?? []) as DeliveryWarehouseScheduleEvent[],
+      ),
+    [data],
   );
 
+  const selectedCard = allCards.find((c) => c.doNumber === selectedDo) ?? null;
+  /* A deep link may carry `do` without `date` — the work date is the card's
+     own date, never a guess. */
+  const date = selectedCard?.eventDate ?? params.get("date") ?? today;
+
+  const isNarrow = useIsNarrow();
+  const [railHidden, setRailHidden] = useState(isNarrow);
+  useEffect(() => {
+    if (isNarrow) setRailHidden(true);
+  }, [isNarrow]);
+
+  function setParam(key: string, value: string | null) {
+    const next = new URLSearchParams(params);
+    if (value === null || value === "") next.delete(key);
+    else next.set(key, value);
+    setParams(next, { replace: false });
+  }
+  function pickRail(key: string, value: string | null) {
+    setParam(key, value);
+    if (isNarrow) setRailHidden(true);
+  }
+
+  const siteNames = useMemo(
+    () =>
+      [...new Set(allCards.map((c) => c.fromLocation))]
+        .filter((s) => s && s !== "Not recorded")
+        .sort(),
+    [allCards],
+  );
+
+  /** Rail + search narrow the SAME records (card §7). */
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allCards.filter((c) => {
+      if (site && c.fromLocation !== site) return false;
+      if (view === "not-loaded" && c.notHandedOver === 0) return false;
+      if (view === "loaded" && c.notHandedOver !== 0) return false;
+      if (view === "no-evidence" && !c.evidenceNotSubmitted) return false;
+      if (!q) return true;
+      return (
+        c.doNumber.toLowerCase().includes(q) ||
+        c.source.toLowerCase().includes(q) ||
+        c.toCustomer.toLowerCase().includes(q) ||
+        c.logisticsPartner.toLowerCase().includes(q) ||
+        (c.driverName ?? "").toLowerCase().includes(q) ||
+        c.units.some((u) => u.unitId.toLowerCase().includes(q))
+      );
+    });
+  }, [allCards, site, view, search]);
+
+  /* A status view shows its work under the ORIGINAL dates (unfinished work
+     is never re-dated); the default view shows the selected date. */
+  const dayRows = useMemo(
+    () => filtered.filter((c) => c.eventDate === date),
+    [filtered, date],
+  );
+  const groupedDates = useMemo(
+    () => [...new Set(filtered.map((c) => c.eventDate))].sort(),
+    [filtered],
+  );
+  const grouped = view !== "all";
+
   const backParams = new URLSearchParams(params);
-  backParams.set("tab", "warehouse-dashboard");
+  backParams.set("tab", "warehouse-monitor");
   backParams.delete("do");
+  backParams.delete("view");
+  backParams.delete("q");
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-outbound">
@@ -73,48 +183,183 @@ export default function WarehouseOutboundWork({
         destinationHeader
       />
       <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
+        <button
+          type="button"
+          className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint"
+          onClick={() => setRailHidden((h) => !h)}
+          data-testid="wo-toggle-filters"
+        >
+          {railHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+          {railHidden ? "Filters" : "Hide filters"}
+        </button>
         <Link
           to={`/operation?${backParams.toString()}`}
           className="text-meta text-base-600 underline-offset-2 hover:underline"
-          data-testid="wo-back-dashboard"
+          data-testid="wo-back-monitor"
         >
-          ← Dashboard
+          ← Monitor
         </Link>
-        <span className="text-[13px] font-medium text-base-800" data-testid="wo-date">
-          {fmtDate(workDate)}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {isLoading ? (
-          <p className="text-[13px] text-base-500">Loading…</p>
-        ) : dayCards.length === 0 ? (
-          <p className="text-[13px] text-base-500" data-testid={`wo-empty-${workDate}`}>
-            {warehouseEmptyDaySentence(fmtDate(workDate))}
-          </p>
-        ) : (
-          <div className="max-w-6xl space-y-2">
-            {dayCards.map((card) => (
-              <OutboundSourceRow
-                key={card.doNumber}
-                card={card}
-                expanded={card.doNumber === (selectedCard?.doNumber ?? dayCards[0]?.doNumber)}
-                onToggle={() =>
-                  onSelectDo(card.doNumber === selectedCard?.doNumber ? null : card.doNumber)
-                }
-              />
-            ))}
+        {!grouped && (
+          <div className="flex items-center gap-1" data-testid="wo-date-control">
+            <button
+              type="button"
+              aria-label="Previous date"
+              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
+              onClick={() =>
+                setParam(
+                  "date",
+                  subtractWorkingDays(date, 1, {
+                    offDays: WAREHOUSE_OFF_DAYS,
+                    holidays,
+                  }),
+                )
+              }
+              data-testid="wo-prev"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="min-w-0 px-1 text-[13px] font-medium text-base-800" data-testid="wo-date">
+              {fmtDate(date)}
+            </span>
+            <button
+              type="button"
+              aria-label="Next date"
+              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
+              onClick={() =>
+                setParam(
+                  "date",
+                  addWorkingDays(date, 1, {
+                    offDays: WAREHOUSE_OFF_DAYS,
+                    holidays,
+                  }),
+                )
+              }
+              data-testid="wo-next"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
         )}
+        <div className="ml-auto">
+          <input
+            type="search"
+            value={search}
+            placeholder="Search"
+            aria-label="Search outbound work"
+            className="h-7 w-52 rounded border border-kit-slate-5 px-2 text-[13px]"
+            onChange={(e) => setParam("q", e.target.value)}
+            data-testid="wo-search"
+          />
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1">
+        {!railHidden && (
+          <FilterRail testId="wo-rail">
+            <FilterRailGroup title="PICKUP STATUS">
+              <FilterRailRow
+                label="Not loaded yet"
+                count={allCards.filter((c) => c.notHandedOver > 0).length}
+                active={view === "not-loaded"}
+                onClick={() => pickRail("view", view === "not-loaded" ? null : "not-loaded")}
+                testId="wo-view-not-loaded"
+              />
+              <FilterRailRow
+                label="Loaded"
+                count={allCards.filter((c) => c.notHandedOver === 0).length}
+                active={view === "loaded"}
+                onClick={() => pickRail("view", view === "loaded" ? null : "loaded")}
+                testId="wo-view-loaded"
+              />
+              <FilterRailRow
+                label="Evidence not submitted"
+                count={allCards.filter((c) => c.evidenceNotSubmitted).length}
+                active={view === "no-evidence"}
+                onClick={() => pickRail("view", view === "no-evidence" ? null : "no-evidence")}
+                testId="wo-view-no-evidence"
+              />
+            </FilterRailGroup>
+            {siteNames.length > 1 && (
+              <FilterRailGroup title="SITE">
+                {siteNames.map((name) => (
+                  <FilterRailRow
+                    key={name}
+                    label={name}
+                    count={allCards.filter((c) => c.fromLocation === name).length}
+                    active={site === name}
+                    onClick={() => pickRail("site", site === name ? null : name)}
+                    testId={`wo-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                  />
+                ))}
+              </FilterRailGroup>
+            )}
+            {/* SOURCE is not rendered while `Delivery Order` is the only live
+                source: a one-option group is a dead control. The source stays
+                explicit on every row. */}
+          </FilterRail>
+        )}
+        <div className={`min-h-0 min-w-0 flex-1 overflow-y-auto p-3${!railHidden && isNarrow ? " hidden" : ""}`}>
+          {isLoading ? (
+            <p className="text-[13px] text-base-500">Loading…</p>
+          ) : grouped ? (
+            groupedDates.length === 0 ? (
+              <p className="text-[13px] text-base-500">Nothing here. Every pickup on this view is done.</p>
+            ) : (
+              groupedDates.map((d) => (
+                <section key={d} className="mb-4" data-testid={`wo-group-${d}`}>
+                  <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
+                    {fmtDate(d)}
+                  </h2>
+                  <RowList
+                    cards={filtered.filter((c) => c.eventDate === d)}
+                    selectedDo={selectedCard?.doNumber ?? null}
+                    onSelectDo={(doNumber) => setParam("do", doNumber)}
+                  />
+                </section>
+              ))
+            )
+          ) : dayRows.length === 0 ? (
+            <p className="text-[13px] text-base-500" data-testid={`wo-empty-${date}`}>
+              {warehouseEmptyDaySentence(fmtDate(date))}
+            </p>
+          ) : (
+            <RowList
+              cards={dayRows}
+              selectedDo={selectedCard?.doNumber ?? dayRows[0]?.doNumber ?? null}
+              onSelectDo={(doNumber) => setParam("do", doNumber)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/** One work row = one source document scope, with the approved fields:
- *  Required handover · DO No · SO No · SO date · Journey/leg · From · To ·
- *  Logistics partner · Units required · Handed over · Not handed over ·
- *  Warehouse operator · Delivery person · Evidence · Work. Expanding shows
- *  the exact Units. The formal DO is LINKED, never copied into this page. */
+function RowList({
+  cards,
+  selectedDo,
+  onSelectDo,
+}: {
+  cards: WarehouseOutboundCard[];
+  selectedDo: string | null;
+  onSelectDo: (doNumber: string | null) => void;
+}) {
+  return (
+    <div className="max-w-6xl space-y-2">
+      {cards.map((card) => (
+        <OutboundSourceRow
+          key={card.doNumber}
+          card={card}
+          expanded={card.doNumber === selectedDo}
+          onToggle={() => onSelectDo(card.doNumber === selectedDo ? null : card.doNumber)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** One work row = one source document scope. The transport company and the
+ *  individual driver are SEPARATE fields (card §8); the two evidence records
+ *  are separate lines. The formal DO is LINKED, never copied into this page. */
 function OutboundSourceRow({
   card,
   expanded,
@@ -126,11 +371,10 @@ function OutboundSourceRow({
 }) {
   const handed = card.units.filter((u) => u.unitHandedOverAt);
   const operator = handed.map((u) => u.unitWarehouseOperator).find(Boolean) ?? null;
-  const receiver = handed.map((u) => u.unitDeliveryPerson).find(Boolean) ?? null;
   const work =
     card.notHandedOver === 0
-      ? `Handed over ${card.handedOver} of ${card.unitsRequired} Units`
-      : `Check, pack and hand over ${card.notHandedOver} Unit${card.notHandedOver === 1 ? "" : "s"}`;
+      ? `Loaded ${card.handedOver} of ${card.unitsRequired} Units`
+      : `Scan, check, pack and load ${card.notHandedOver} Unit${card.notHandedOver === 1 ? "" : "s"}`;
 
   return (
     <div className="rounded border border-kit-slate-5 bg-white" data-testid={`wo-row-${card.doNumber}`}>
@@ -147,7 +391,7 @@ function OutboundSourceRow({
           <ChevronRightSmall size={16} className="mt-0.5 shrink-0 text-base-500" />
         )}
         <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-0.5 text-[13px] md:grid-cols-4">
-          <Field label="Required handover" value={fmtDate(card.eventDate)} />
+          <Field label="Pickup date" value={fmtDate(card.eventDate)} />
           <Field
             label="DO No"
             value={
@@ -174,20 +418,33 @@ function OutboundSourceRow({
             }
           />
           <Field label="SO date" value={card.soDate ? fmtDate(card.soDate) : "—"} />
-          <Field label="Journey/leg" value={card.leg === 0 ? "Whole order" : `Leg ${card.leg}`} />
           <Field label="From" value={card.fromLocation} />
           <Field label="To" value={card.toCustomer} />
-          <Field label="Logistics partner" value={card.logisticsPartner} />
+          <Field label="Logistics Partner" value={card.logisticsPartner} />
+          <Field
+            label="Assigned Driver"
+            value={
+              <span data-testid={`wo-driver-${card.doNumber}`}>
+                {warehouseAssignedDriverLine(card.logisticsPartner, card.driverName)}
+              </span>
+            }
+          />
+          <Field label="Vehicle" value={card.vehicle ?? "—"} />
           <Field label="Units required" value={String(card.unitsRequired)} />
-          <Field label="Handed over" value={String(card.handedOver)} />
-          <Field label="Not handed over" value={String(card.notHandedOver)} />
           <Field label="Warehouse operator" value={operator ?? "—"} />
-          <Field label="Delivery person" value={receiver ?? "—"} />
           <Field
             label="Evidence"
             value={
               handed.length === 0 ? "—" : card.evidenceNotSubmitted ? "Not submitted" : "Submitted"
             }
+          />
+          <Field
+            label="Warehouse loaded"
+            value={<span data-testid={`wo-loaded-${card.doNumber}`}>{warehouseLoadedLine(card)}</span>}
+          />
+          <Field
+            label="Driver collected"
+            value={<span data-testid={`wo-collected-${card.doNumber}`}>{driverCollectedLine(card)}</span>}
           />
           <Field label="Work" value={work} />
         </div>
@@ -214,7 +471,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
   const doId = card.deliveryOrderId ?? "";
   const prep = useRecordOutboundPrep(doId);
   const [scanValue, setScanValue] = useState("");
-  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [loadOpen, setLoadOpen] = useState(false);
 
   const remaining = card.units.filter((u) => !u.unitHandedOverAt);
   const scannedNotChecked = remaining.filter((u) => u.unitScannedAt && !u.unitCheckedAt);
@@ -222,6 +479,16 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
   const readyUnits = remaining.filter(
     (u) => u.unitScannedAt && u.unitCheckedAt && u.unitPackedAt,
   );
+  const receiverWord =
+    (card.driverName ?? "").trim() || card.logisticsPartner;
+  /* The DO-level collection is confirmed while an exact Unit was never
+     loaded: that Unit did NOT travel — say so per Unit, never generically. */
+  const notCollected =
+    card.actualCollectionAt !== null
+      ? remaining.map((u) =>
+          warehouseUnitNotCollectedSentence(u.unitId, receiverWord, card.fromLocation),
+        )
+      : [];
 
   function recordPrep(fact: WarehousePrepFact, unitCodes: string[], done: string) {
     if (!doId) {
@@ -248,7 +515,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
       return;
     }
     if (match.unitHandedOverAt) {
-      toast.error(`${match.unitId} was already handed over.`);
+      toast.error(`${match.unitId} was already loaded.`);
       return;
     }
     recordPrep("scanned", [match.unitId], `${match.unitId} scanned`);
@@ -257,6 +524,9 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
 
   return (
     <div className="border-t border-kit-slate-5 px-3 py-2" data-testid={`wo-units-${card.doNumber}`}>
+      <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+        Goods scheduled for pickup
+      </div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-meta text-base-600">
           Scan Unit ID
@@ -321,18 +591,27 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           <button
             type="button"
             className="btn-hero h-7 px-3 text-meta"
-            onClick={() => setHandoverOpen(true)}
-            data-testid="wo-record-handover"
+            onClick={() => setLoadOpen(true)}
+            data-testid="wo-record-loaded"
           >
-            Record handover
+            {warehouseRecordLoadedSentence(readyUnits.length, receiverWord)}
           </button>
         )}
       </div>
       {readyUnits.length > 0 && (
         <p className="mb-2 text-label text-base-500" data-testid="wo-receiver-consequence">
-          Handing over moves the accepted Units to {card.logisticsPartner}. Name the person who
-          actually receives them and attach proof.
+          Recording the load moves the accepted Units to {card.logisticsPartner}. Name the person
+          who actually receives them and attach proof.
         </p>
+      )}
+      {notCollected.length > 0 && (
+        <div className="mb-2 space-y-0.5" data-testid="wo-not-collected">
+          {notCollected.map((line) => (
+            <p key={line} className="text-label text-base-600">
+              {line}
+            </p>
+          ))}
+        </div>
       )}
       <table className="w-full border-collapse text-[13px]">
         <thead>
@@ -343,7 +622,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             <th className="py-1 pr-3 font-medium">Scanned</th>
             <th className="py-1 pr-3 font-medium">Checked</th>
             <th className="py-1 pr-3 font-medium">Packed</th>
-            <th className="py-1 pr-3 font-medium">Handed over</th>
+            <th className="py-1 pr-3 font-medium">Loaded</th>
             <th className="py-1 font-medium">Still to do</th>
           </tr>
         </thead>
@@ -353,11 +632,11 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
           ))}
         </tbody>
       </table>
-      {handoverOpen && card.deliveryOrderId && (
-        <RecordHandoverModal
+      {loadOpen && card.deliveryOrderId && (
+        <RecordLoadedModal
           card={card}
           readyUnits={readyUnits}
-          onClose={() => setHandoverOpen(false)}
+          onClose={() => setLoadOpen(false)}
         />
       )}
     </div>
@@ -389,10 +668,10 @@ function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
   );
 }
 
-/** The evidence-backed handover: pick the packed Units this batch physically
- *  moves, name the ACTUAL receiver, attach proof. A partial batch changes
- *  only the accepted Units — the server enforces every rule again. */
-function RecordHandoverModal({
+/** The evidence-backed loading record: pick the packed Units this batch
+ *  physically moves, name the ACTUAL receiver, attach proof. A partial batch
+ *  changes only the accepted Units — the server enforces every rule again. */
+function RecordLoadedModal({
   card,
   readyUnits,
   onClose,
@@ -447,13 +726,24 @@ function RecordHandoverModal({
 
   const canSubmit =
     picked.size > 0 && receiver.trim().length > 0 && Boolean(proofPath) && !record.isPending;
+  const primaryLabel = warehouseRecordLoadedSentence(
+    picked.size,
+    receiver.trim() || (card.driverName ?? "").trim() || card.logisticsPartner,
+  );
 
   return (
-    <Modal title={`Record handover — ${card.doNumber}`} onClose={onClose}>
+    <Modal title={`Record Units loaded — ${card.doNumber}`} onClose={onClose}>
       <div className="space-y-3 text-[13px]">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-0.5">
+          <Field label="Logistics Partner" value={card.logisticsPartner} />
+          <Field
+            label="Assigned Driver"
+            value={warehouseAssignedDriverLine(card.logisticsPartner, card.driverName)}
+          />
+        </div>
         <div>
           <div className="mb-1 text-label uppercase tracking-wide text-base-500">
-            Units in this handover
+            Units in this load
           </div>
           {readyUnits.map((u) => (
             <label key={u.unitId} className="flex items-center gap-2 py-0.5">
@@ -478,7 +768,7 @@ function RecordHandoverModal({
         </div>
         <label className="block">
           <span className="text-label uppercase tracking-wide text-base-500">
-            Received by ({card.logisticsPartner})
+            Loaded to ({card.logisticsPartner})
           </span>
           <input
             value={receiver}
@@ -517,7 +807,7 @@ function RecordHandoverModal({
       </div>
       <ModalActions
         onCancel={onClose}
-        primary="Record handover"
+        primary={primaryLabel}
         primaryDisabled={!canSubmit}
         primaryPending={record.isPending}
         onPrimary={() =>
@@ -532,7 +822,7 @@ function RecordHandoverModal({
             {
               onSuccess: () => {
                 toast.success(
-                  `Handed over ${picked.size} of ${card.unitsRequired} Units to ${card.logisticsPartner}`,
+                  `Loaded ${picked.size} of ${card.unitsRequired} Units to ${receiver.trim()}`,
                 );
                 onClose();
               },

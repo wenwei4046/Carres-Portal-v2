@@ -2,7 +2,7 @@
  * PURCHASE ORDERS REGISTER PREVIEW — DEV ONLY (walk aid for the 2026-09-04
  * register-facts correction).
  *
- * Same contract as `warehouse-dashboard-preview.tsx`: the REAL
+ * Same contract as `warehouse-monitor-preview.tsx`: the REAL
  * PurchaseOrdersPage, the REAL stylesheet, only the session seeded and the
  * API reads stubbed with fixtures. A separate vite entry — cannot reach
  * production. The fixtures exercise the four `Sent to Supplier` readings:

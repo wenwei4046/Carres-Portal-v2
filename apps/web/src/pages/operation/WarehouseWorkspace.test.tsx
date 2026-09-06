@@ -7,13 +7,15 @@ import {
   type DeliveryWarehouseScheduleInput,
 } from "@carres/shared";
 import WarehouseWorkspace from "./WarehouseWorkspace";
+import WarehouseOutboundWork from "./WarehouseOutboundWork";
 
 /**
- * WAREHOUSE CARD 03 — the §12 UI verification list over the §10 acceptance
- * story: six desktop columns in one horizontal sequence, the exact empty
- * sentence, card → scoped Outbound, `DO No` → the formal DO, exact counts
- * after a partial batch, the approved rail headings, and no forbidden
- * control (ETA · generic Failed Delivery · Edit Delivery · Mark done).
+ * WAREHOUSE — the 2026-09-06 replacement Card's completion standard:
+ * Monitor alone renders the six-working-day Calendar, full width with NO
+ * 240px rail; both directions show with governed time sentences; an
+ * ARRIVAL card opens filtered Inbound, a PICKUP card filtered Outbound;
+ * Outbound is rail + work rows with the carrier and the driver as separate
+ * fields and the loading act named exactly.
  */
 
 const apiFetchMock = vi.fn();
@@ -22,8 +24,8 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, apiFetch: (...args: unknown[]) => apiFetchMock(...args) };
 });
 
-/* The workspace derives "today" from the app clock — pin it to the card's
-   fixture week (Thu, 3 Sep 2026). */
+/* The pages derive "today" from the app clock — pin it to the fixture week
+   (Thu, 3 Sep 2026). */
 vi.mock("@/lib/fmt-date", async () => {
   const actual = await vi.importActual<typeof import("@/lib/fmt-date")>("@/lib/fmt-date");
   return { ...actual, appTodayIso: () => "2026-09-03" };
@@ -45,7 +47,7 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia;
 });
 
-/** The §10 fixture: DO-2609-019, Tan Wei Ming, Klang → PJ, NETS, two Units. */
+/** DO-2609-019, Klang → PJ, NETS Delivery, two Units, pickup Fri 4 Sep. */
 function unitInput(
   overrides: Partial<DeliveryWarehouseScheduleInput> & { unitId: string },
 ): DeliveryWarehouseScheduleInput {
@@ -56,7 +58,7 @@ function unitInput(
     so: 260919,
     fromLocation: "Carres Klang Warehouse",
     toCustomer: "Petaling Jaya",
-    logisticsPartner: "NETS",
+    logisticsPartner: "NETS Delivery",
     driverName: null,
     vehicle: null,
     doNumber: "DO-2609-019",
@@ -79,16 +81,48 @@ const TWO_UNIT_EVENTS = [
   ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
 ];
 
+/** One open PO owing 3 units, expected Fri 4 Sep at the Klang warehouse. */
+const OPEN_PO = {
+  id: "PO-2646-0107",
+  supplier_id: "sup-1",
+  warehouse_id: "wh-1",
+  status: "open",
+  sup_status: "confirmed",
+  so: null,
+  so_refs: null,
+  eta_date: "2026-09-04",
+  placed_at: "2026-08-20",
+  purchase_order_lines: [
+    { id: "l1", sku: "MAT-1", qty: 3, received_qty: 0 },
+  ],
+};
+
+function stubApi({
+  events = TWO_UNIT_EVENTS,
+  pos = [OPEN_PO],
+  receipts = [] as unknown[],
+} = {}) {
+  apiFetchMock.mockImplementation((url: string) => {
+    if (String(url).includes("warehouse-schedule"))
+      return Promise.resolve({ events });
+    if (String(url).includes("/api/operation/pos"))
+      return Promise.resolve({ pos });
+    if (String(url).includes("/api/operation/suppliers"))
+      return Promise.resolve({ suppliers: [{ id: "sup-1", name: "Nice Future" }] });
+    if (String(url).includes("/api/operation/warehouse-receipts"))
+      return Promise.resolve({ receipts });
+    if (String(url).includes("/api/operation/warehouse"))
+      return Promise.resolve({ warehouses: [{ id: "wh-1", name: "Carres Klang Warehouse" }] });
+    return Promise.resolve({});
+  });
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function mount(
-  events = TWO_UNIT_EVENTS,
-  initialUrl = "/operation?tab=warehouse-dashboard",
-) {
-  apiFetchMock.mockResolvedValue({ events });
+function mountMonitor(initialUrl = "/operation?tab=warehouse-monitor") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -110,168 +144,209 @@ function mount(
   );
 }
 
-describe("Warehouse Dashboard — the Calendar board", () => {
-  it("shows six operating dates in one horizontal sequence with Sunday absent", async () => {
-    mount();
-    await waitFor(() => expect(screen.getByTestId("wd-board")).toBeInTheDocument());
-    // Thu 3 → Wed 9 Sep, Sunday 6 Sep omitted.
+function mountOutbound(initialUrl = "/operation?tab=warehouse-outbound") {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[initialUrl]}>
+        <Routes>
+          <Route
+            path="/operation"
+            element={
+              <>
+                <WarehouseOutboundWork />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="/operation/delivery-orders/:doId" element={<div data-testid="do-object" />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("Warehouse Monitor — the only Calendar", () => {
+  it("shows six operating dates full-width, with NO 240px filter rail", async () => {
+    stubApi();
+    mountMonitor();
+    await waitFor(() => expect(screen.getByTestId("wm-board")).toBeInTheDocument());
     for (const d of ["2026-09-03", "2026-09-04", "2026-09-05", "2026-09-07", "2026-09-08", "2026-09-09"]) {
-      expect(screen.getByTestId(`wd-col-${d}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`wm-col-${d}`)).toBeInTheDocument();
     }
-    expect(screen.queryByTestId("wd-col-2026-09-06")).toBeNull();
-    // ONE sequence: the six columns share one grid row, not a 3 × 2 wrap.
-    const board = screen.getByTestId("wd-board");
-    const grid = board.firstElementChild as HTMLElement;
-    expect(grid.style.gridTemplateColumns).toContain("repeat(6");
-    // One shared vertical scroll: the columns themselves are not scroll containers.
-    expect(screen.getByTestId("wd-col-2026-09-03").className).not.toContain("overflow");
+    expect(screen.queryByTestId("wm-col-2026-09-06")).toBeNull();
+    // The replacement Card: Monitor renders no page filter rail and no
+    // Filters toggle — filtering lives on Inbound/Outbound.
+    expect(screen.queryByTestId("wd-rail")).toBeNull();
+    expect(screen.queryByTestId("wm-rail")).toBeNull();
+    expect(screen.queryByText("Filters")).toBeNull();
+    // The page title is Monitor, not Dashboard.
+    expect(screen.getByTestId("warehouse-monitor-header")).toHaveTextContent("Monitor");
   });
 
-  it("an empty date says the exact governed sentence", async () => {
-    mount();
-    const empty = await screen.findByTestId("wd-empty-2026-09-05");
-    expect(empty).toHaveTextContent("No outbound handovers on Sat, 5 Sep. Choose another date.");
-  });
-
-  it("the card prints the exact tally and no forbidden word", async () => {
-    mount();
-    const card = await screen.findByTestId("wd-card-DO-2609-019");
-    expect(within(card).getByTestId("wd-card-tally")).toHaveTextContent(
-      "Required 2 · Handed over 0 · Not handed over 2",
+  it("shows BOTH directions with governed time sentences — never a bare clock", async () => {
+    stubApi();
+    mountMonitor();
+    const pickup = await screen.findByTestId("wm-card-DO-2609-019");
+    expect(within(pickup).getByTestId("wm-card-time")).toHaveTextContent("Time not provided");
+    expect(within(pickup).getByTestId("wm-card-kind")).toHaveTextContent(
+      "Pickup · Customer-delivery pickup",
     );
-    expect(within(card).getByText("NETS")).toBeInTheDocument();
-    expect(card.textContent).not.toContain("ETA");
-    expect(card.textContent).not.toContain("Failed Delivery");
-    expect(card.textContent).not.toContain("Edit Delivery");
-    // No actual handover exists yet, so no time is invented.
-    expect(within(card).queryByTestId("wd-card-time")).toBeNull();
+    expect(within(pickup).getByText(/2 Units to Petaling Jaya/)).toBeInTheDocument();
+
+    const arrival = screen.getByTestId("wm-card-PO-2646-0107");
+    expect(within(arrival).getByTestId("wm-card-time")).toHaveTextContent("Time not provided");
+    expect(within(arrival).getByTestId("wm-card-kind")).toHaveTextContent(
+      "Arrival · Supplier arrival",
+    );
+    expect(within(arrival).getByText(/Nice Future · Pending Delivery Qty 3/)).toBeInTheDocument();
   });
 
-  it("after a partial batch the card reads the recorded time and 1/1, and Outbound names the remaining Unit", async () => {
-    const events = [
-      ...deliveryWarehouseScheduleEvents(
-        unitInput({
-          unitId: "U1-260-019",
-          unitScannedAt: "t",
-          unitCheckedAt: "t",
-          unitPackedAt: "t",
-          unitHandedOverAt: "2026-09-04T11:18:00+08:00",
-          unitHasEvidence: true,
-          unitDeliveryPerson: "Ahmad",
-        }),
-      ),
-      ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
-    ];
-    mount(events);
-    const card = await screen.findByTestId("wd-card-DO-2609-019");
-    expect(within(card).getByTestId("wd-card-tally")).toHaveTextContent(
-      "Required 2 · Handed over 1 · Not handed over 1",
-    );
-    expect(within(card).getByTestId("wd-card-time")).toHaveTextContent("11:18");
-    expect(within(card).getByTestId("wd-card-fact")).toHaveTextContent(
-      "U1-260-020 still needs handover",
-    );
+  it("a recorded pickup window reads `Driver pickup {time}`", async () => {
+    stubApi({
+      events: [
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({ unitId: "U1-260-019", collectionWindow: "14:30" }),
+        ),
+      ],
+      pos: [],
+    });
+    mountMonitor();
+    const pickup = await screen.findByTestId("wm-card-DO-2609-019");
+    expect(within(pickup).getByTestId("wm-card-time")).toHaveTextContent("Driver pickup 14:30");
   });
 
-  it("clicking the card opens Outbound scoped to the card's date and DO", async () => {
-    mount();
-    const card = await screen.findByTestId("wd-card-DO-2609-019");
+  it("an empty date says the governed both-directions sentence", async () => {
+    stubApi();
+    mountMonitor();
+    const empty = await screen.findByTestId("wm-empty-2026-09-05");
+    expect(empty).toHaveTextContent("No arrivals or pickups on Sat, 5 Sep. Choose another date.");
+  });
+
+  it("a PICKUP card opens Outbound filtered to date, Site and DO", async () => {
+    stubApi();
+    mountMonitor();
+    const card = await screen.findByTestId("wm-card-DO-2609-019");
     fireEvent.click(card);
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "tab=warehouse-outbound",
-    );
-    expect(screen.getByTestId("location")).toHaveTextContent("date=2026-09-04");
-    expect(screen.getByTestId("location")).toHaveTextContent("do=DO-2609-019");
-    expect(screen.getByTestId("warehouse-outbound")).toBeInTheDocument();
-    // The Dashboard stays mounted underneath — Back restores it as it stood.
-    expect(screen.getByTestId("warehouse-dashboard")).toBeInTheDocument();
+    const loc = screen.getByTestId("location");
+    expect(loc).toHaveTextContent("tab=warehouse-outbound");
+    expect(loc).toHaveTextContent("date=2026-09-04");
+    expect(loc).toHaveTextContent("do=DO-2609-019");
   });
 
-  it("the card activates from the keyboard", async () => {
-    mount();
-    const card = await screen.findByTestId("wd-card-DO-2609-019");
-    fireEvent.keyDown(card, { key: "Enter" });
-    expect(screen.getByTestId("location")).toHaveTextContent("tab=warehouse-outbound");
+  it("an ARRIVAL card opens Inbound filtered to date, Site and PO", async () => {
+    stubApi();
+    mountMonitor();
+    const card = await screen.findByTestId("wm-card-PO-2646-0107");
+    fireEvent.click(card);
+    const loc = screen.getByTestId("location");
+    expect(loc).toHaveTextContent("tab=warehouse-inbound");
+    expect(loc).toHaveTextContent("date=2026-09-04");
+    expect(loc).toHaveTextContent("po=PO-2646-0107");
   });
 
-  it("`DO No` is a separate door to the formal Delivery Order — it does not open Outbound", async () => {
-    mount();
-    const card = await screen.findByTestId("wd-card-DO-2609-019");
-    fireEvent.click(within(card).getByTestId("wd-card-do"));
+  it("`DO No` is a separate read-only document door — never Edit Delivery", async () => {
+    stubApi();
+    mountMonitor();
+    const card = await screen.findByTestId("wm-card-DO-2609-019");
+    fireEvent.click(within(card).getByTestId("wm-card-source-link"));
     expect(screen.getByTestId("do-object")).toBeInTheDocument();
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
   });
 
-  it("the rail uses the approved headings and never draws a dead one-option group", async () => {
-    mount();
-    await screen.findByTestId("wd-card-DO-2609-019");
-    const rail = screen.getByTestId("wd-rail");
-    expect(within(rail).getByText("OUTBOUND SCHEDULE")).toBeInTheDocument();
-    // One Site and one live source today: neither group renders as a dead
-    // one-option control (card §4.2).
-    expect(within(rail).queryByText("SITE")).toBeNull();
-    expect(within(rail).queryByText("SOURCE")).toBeNull();
-    // No Refresh and no write control in the toolbar; no Mark done anywhere.
-    expect(screen.queryByText("Refresh")).toBeNull();
-    expect(screen.queryByText("Mark done")).toBeNull();
-  });
-
-  it("Not done groups unfinished work under its ORIGINAL date", async () => {
-    mount();
-    await screen.findByTestId("wd-card-DO-2609-019");
-    fireEvent.click(screen.getByTestId("wd-sched-not-done"));
-    const list = await screen.findByTestId("wd-list-not-done");
-    expect(within(list).getByText("Fri, 4 Sep")).toBeInTheDocument();
-    expect(within(list).getByTestId("wd-card-DO-2609-019")).toBeInTheDocument();
-  });
-});
-
-describe("Warehouse Dashboard — narrow width", () => {
-  it("renders one selected day as an agenda, never six shrunken columns", async () => {
+  it("narrow width renders one selected day; previous/next move one operating date", async () => {
     mediaMatches = true;
-    mount();
-    await waitFor(() => expect(screen.getByTestId("wd-agenda")).toBeInTheDocument());
-    expect(screen.queryByTestId("wd-board")).toBeNull();
-    // Prev/next move ONE operating date: from Thu 4 Sep back over no Sunday.
-    fireEvent.click(screen.getByTestId("wd-next"));
+    stubApi();
+    mountMonitor();
+    await waitFor(() => expect(screen.getByTestId("wm-agenda")).toBeInTheDocument());
+    expect(screen.queryByTestId("wm-board")).toBeNull();
+    fireEvent.click(screen.getByTestId("wm-next"));
     expect(screen.getByTestId("location")).toHaveTextContent("date=2026-09-04");
   });
 });
 
-describe("Warehouse Outbound — the dated work listing", () => {
-  it("opens scoped to the deep-linked DO and shows the exact Units with their derived reasons", async () => {
-    mount(TWO_UNIT_EVENTS, "/operation?tab=warehouse-outbound&do=DO-2609-019");
+describe("Warehouse Outbound — rail + dated work rows", () => {
+  it("has the pickup-status rail, and the carrier and driver as separate fields", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
     await waitFor(() =>
       expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
+    );
+    const rail = screen.getByTestId("wo-rail");
+    expect(within(rail).getByText("PICKUP STATUS")).toBeInTheDocument();
+    expect(within(rail).getByTestId("wo-view-not-loaded")).toBeInTheDocument();
+    expect(within(rail).getByTestId("wo-view-loaded")).toBeInTheDocument();
+    // One Site today — the group never renders as a dead one-option control.
+    expect(within(rail).queryByText("SITE")).toBeNull();
+    // The identities are separate, and no driver is invented.
+    const row = screen.getByTestId("wo-row-DO-2609-019");
+    expect(within(row).getByText("Logistics Partner")).toBeInTheDocument();
+    expect(within(row).getByText("Assigned Driver")).toBeInTheDocument();
+    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
+      "Waiting for NETS Delivery to assign a driver",
+    );
+    // The two evidence records stay separate lines.
+    expect(within(row).getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
+      "Warehouse loaded — nothing yet",
+    );
+    expect(within(row).getByTestId("wo-collected-DO-2609-019")).toHaveTextContent(
+      "NETS Delivery has not confirmed collection yet",
+    );
+  });
+
+  it("an assigned driver renders by name, and the vehicle is its own field", async () => {
+    stubApi({
+      events: [
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({
+            unitId: "U1-260-019",
+            driverName: "Ahmad Rahman",
+            vehicle: "VBM 1234",
+          }),
+        ),
+      ],
+    });
+    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
+    const row = await screen.findByTestId("wo-row-DO-2609-019");
+    expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
+    expect(within(row).getByText("VBM 1234")).toBeInTheDocument();
+  });
+
+  it("opens scoped to the deep-linked DO with `Goods scheduled for pickup` and derived reasons", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    await waitFor(() =>
+      expect(screen.getByTestId("wo-units-DO-2609-019")).toBeInTheDocument(),
     );
     // The work date is the card's own date even without a date param.
     expect(screen.getByTestId("wo-date")).toHaveTextContent("Fri, 4 Sep");
     const units = screen.getByTestId("wo-units-DO-2609-019");
-    expect(within(units).getByTestId("wo-unit-U1-260-019")).toBeInTheDocument();
+    expect(within(units).getByText("Goods scheduled for pickup")).toBeInTheDocument();
     expect(within(units).getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent(
       "Not scanned yet",
     );
-    // No handover control before scan/check/pack; no generic Mark done ever.
-    expect(screen.queryByTestId("wo-record-handover")).toBeNull();
+    // No loading act before scan/check/pack; no generic Mark done ever.
+    expect(screen.queryByTestId("wo-record-loaded")).toBeNull();
     expect(screen.queryByText("Mark done")).toBeNull();
   });
 
-  it("an empty Outbound date says the exact governed sentence", async () => {
-    mount(TWO_UNIT_EVENTS, "/operation?tab=warehouse-outbound&date=2026-09-05");
+  it("an empty Outbound date says the governed pickup sentence", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-05");
     const empty = await screen.findByTestId("wo-empty-2026-09-05");
-    expect(empty).toHaveTextContent("No outbound handovers on Sat, 5 Sep. Choose another date.");
+    expect(empty).toHaveTextContent("No pickups on Sat, 5 Sep. Choose another date.");
   });
 
-  it("scanning a Unit outside this DO's scope is refused in words, and a valid scan calls the governed door", async () => {
-    mount(TWO_UNIT_EVENTS, "/operation?tab=warehouse-outbound&do=DO-2609-019");
-    await screen.findByTestId("wo-row-DO-2609-019");
+  it("scanning a Unit outside this DO's scope is refused in words; a valid scan calls the governed door", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    await screen.findByTestId("wo-units-DO-2609-019");
     const input = screen.getByTestId("wo-scan-input");
     const prepCalls = () =>
-      apiFetchMock.mock.calls.filter(([url]) =>
-        String(url).includes("outbound-prep"),
-      );
+      apiFetchMock.mock.calls.filter(([url]) => String(url).includes("outbound-prep"));
     fireEvent.change(input, { target: { value: "U9-999-999" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(prepCalls()).toHaveLength(0); // refused in words, no call made
+    expect(prepCalls()).toHaveLength(0);
     fireEvent.change(input, { target: { value: "U1-260-019" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() =>
@@ -284,40 +359,78 @@ describe("Warehouse Outbound — the dated work listing", () => {
     );
   });
 
-  it("Record handover appears only for fully prepared Units and requires receiver + proof", async () => {
-    const events = [
-      ...deliveryWarehouseScheduleEvents(
-        unitInput({
-          unitId: "U1-260-019",
-          unitScannedAt: "t",
-          unitCheckedAt: "t",
-          unitPackedAt: "t",
-        }),
-      ),
-      ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
-    ];
-    mount(events, "/operation?tab=warehouse-outbound&do=DO-2609-019");
-    const open = await screen.findByTestId("wo-record-handover");
-    // The consequence is readable before the act (card §7 step 3).
-    expect(screen.getByTestId("wo-receiver-consequence")).toHaveTextContent("NETS");
+  it("the loading act names the exact count and receiver, and requires receiver + proof", async () => {
+    stubApi({
+      events: [
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({
+            unitId: "U1-260-019",
+            driverName: "Ahmad Rahman",
+            unitScannedAt: "t",
+            unitCheckedAt: "t",
+            unitPackedAt: "t",
+          }),
+        ),
+        ...deliveryWarehouseScheduleEvents(unitInput({ unitId: "U1-260-020" })),
+      ],
+    });
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    const open = await screen.findByTestId("wo-record-loaded");
+    expect(open).toHaveTextContent("Record 1 Unit loaded to Ahmad Rahman");
+    expect(screen.getByTestId("wo-receiver-consequence")).toHaveTextContent("NETS Delivery");
     fireEvent.click(open);
     // Only the prepared Unit is offered; the un-prepared one cannot ride.
     expect(screen.getByTestId("wo-pick-U1-260-019")).toBeInTheDocument();
     expect(screen.queryByTestId("wo-pick-U1-260-020")).toBeNull();
     const submit = screen
-      .getAllByRole("button", { name: "Record handover" })
+      .getAllByRole("button", { name: /loaded to/ })
       .at(-1) as HTMLButtonElement;
     expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByTestId("wo-receiver"), { target: { value: "Ahmad" } });
+    fireEvent.change(screen.getByTestId("wo-receiver"), { target: { value: "Ahmad Rahman" } });
     // Still disabled — proof is required, not optional.
     expect(submit).toBeDisabled();
   });
 
-  it("Back to Dashboard keeps the URL context", async () => {
-    mount(TWO_UNIT_EVENTS, "/operation?tab=warehouse-outbound&date=2026-09-04&do=DO-2609-019&site=X");
+  it("a confirmed collection with an unloaded Unit names that exact Unit — never `Needs checking`", async () => {
+    stubApi({
+      events: [
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({
+            unitId: "U1-260-019",
+            driverName: "Ahmad Rahman",
+            unitScannedAt: "t",
+            unitCheckedAt: "t",
+            unitPackedAt: "t",
+            unitHandedOverAt: "2026-09-04T11:18:00+08:00",
+            unitHasEvidence: true,
+            actualCollectionAt: "2026-09-04T15:02:00+08:00",
+            hasCollectionEvidence: true,
+          }),
+        ),
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({
+            unitId: "U1-260-020",
+            driverName: "Ahmad Rahman",
+            actualCollectionAt: "2026-09-04T15:02:00+08:00",
+            hasCollectionEvidence: true,
+          }),
+        ),
+      ],
+    });
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
+    const block = await screen.findByTestId("wo-not-collected");
+    expect(block).toHaveTextContent(
+      "U1-260-020 was not confirmed by Ahmad Rahman. It remains with Carres Klang Warehouse.",
+    );
+    expect(screen.queryByText("Needs checking")).toBeNull();
+  });
+
+  it("Back goes to Monitor and keeps the URL context", async () => {
+    stubApi();
+    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04&do=DO-2609-019&site=X");
     await screen.findByTestId("warehouse-outbound");
-    const back = screen.getByTestId("wo-back-dashboard");
-    expect(back).toHaveAttribute("href", expect.stringContaining("tab=warehouse-dashboard"));
+    const back = screen.getByTestId("wo-back-monitor");
+    expect(back).toHaveAttribute("href", expect.stringContaining("tab=warehouse-monitor"));
     expect(back).toHaveAttribute("href", expect.stringContaining("site=X"));
   });
 });

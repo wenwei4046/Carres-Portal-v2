@@ -20,9 +20,9 @@ import { Modal } from "./Modal";
  *
  *   Ready for Handover → Handed Over → Received by Logistics
  *
- * WAREHOUSE CARD 03 superseded the Warehouse acts here: scan / check / pack /
- * `Record handover` live on the approved Outbound work page, and this block is
- * their DOOR. The one act that stays is the counterparty's own:
+ * The Warehouse acts live elsewhere: scan / check / pack / `Record {n} Units
+ * loaded to {person}` (the 2026-09-06 replacement Card's act name) belong to
+ * the approved Outbound work page, and this block is their DOOR. The one act that stays is the counterparty's own:
  *
  *   · `Confirm logistics receipt` — logistics' own count, editable: a receipt
  *     with a different quantity is a DISCREPANCY — both facts stay visible and
