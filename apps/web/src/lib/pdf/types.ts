@@ -205,7 +205,7 @@ export type PoTemplateData = {
  * GOODS RECEIVED NOTE — the formal receiving document (owner correction
  * 2026-09-06). Money-free like the PO and the DO: a receiving document talks
  * quantity and identity, never price. The five quantity words are the
- * governed set (`purchasing/MASTER.md` §5.7); `Deliver To` is where the PO
+ * governed set (`purchasing/MASTER.md` §5.8); `Deliver To` is where the PO
  * instructed the supplier to deliver, `Goods arrived at` is where the goods
  * physically arrived, `Goods received on` is the physical arrival date —
  * three different facts, all printed.

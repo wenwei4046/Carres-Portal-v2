@@ -11,6 +11,10 @@ import {
   poArrivalGapOf,
   poCurrentActionOf,
   poOverdueDays,
+  poRecordedReplyOf,
+  poReplyDateOf,
+  poSupplierDeliveryDateOf,
+  poSupplierReplyOf,
   poWorkStateOf,
   type PoWorkspacePo,
 } from "./po-workspace";
@@ -625,5 +629,55 @@ describe("the unshared-version sentence — derived, never stored", () => {
         "Ohana",
       ),
     ).toBeNull();
+  });
+});
+
+describe("the reply readers after 0430 — one date rule, two truth levels", () => {
+  const base = {
+    kind: "tomorrow_delivery",
+    about_date: "2026-09-10",
+    previous_date: null,
+    reason: null,
+    po_version: 2,
+    channel: "whatsapp",
+    recipient: "Factory group",
+    evidence: "PO-1/reply.png",
+    reported_by: "Factory staff",
+    reported_at: "2026-09-01T08:00:00Z",
+    recorded_by: "u1",
+    recorded_at: "2026-09-01T08:05:00Z",
+  };
+
+  it("poReplyDateOf reads the legacy vocabulary AND 0430's", () => {
+    expect(poReplyDateOf({ ...base, answer: "shipping", new_date: null } as never)).toBe("2026-09-10");
+    expect(poReplyDateOf({ ...base, answer: "confirmed", new_date: "2026-09-10" } as never)).toBe("2026-09-10");
+    expect(poReplyDateOf({ ...base, answer: "earlier", new_date: "2026-09-05" } as never)).toBe("2026-09-05");
+    expect(poReplyDateOf({ ...base, answer: "delayed", new_date: "2026-09-15" } as never)).toBe("2026-09-15");
+    expect(poReplyDateOf({ ...base, answer: "reported", new_date: "2026-09-12" } as never)).toBe("2026-09-12");
+  });
+
+  it("an EARLIER answer is an evidenced reply — it is not a delay and not an absence", () => {
+    const rows = [{ ...base, answer: "earlier", new_date: "2026-09-05" }] as never[];
+    expect(poSupplierDeliveryDateOf(rows as never, 2)).toBe("2026-09-05");
+  });
+
+  it("a previous-version reply never confirms the current version", () => {
+    const rows = [{ ...base, answer: "confirmed", new_date: "2026-09-10", po_version: 1 }] as never[];
+    expect(poSupplierReplyOf(rows as never, 2)).toBeNull();
+    expect(poRecordedReplyOf(rows as never, 2)).toBeNull();
+  });
+
+  it("a version-linked reply WITHOUT evidence is recorded, not qualifying", () => {
+    /* 0430 backfilled po_version=1 onto pre-evidence replies of never-revised
+       POs. They must surface as "recorded without evidence" — never as the
+       governed supplier date, and never as a proven absence. */
+    const rows = [{
+      ...base, answer: "shipping", new_date: null,
+      channel: null, recipient: null, evidence: null, reported_by: null,
+      reported_at: null, recorded_by: null, po_version: 1,
+    }] as never[];
+    expect(poSupplierReplyOf(rows as never, 1)).toBeNull();
+    expect(poRecordedReplyOf(rows as never, 1)).not.toBeNull();
+    expect(poReplyDateOf(poRecordedReplyOf(rows as never, 1)!)).toBe("2026-09-10");
   });
 });

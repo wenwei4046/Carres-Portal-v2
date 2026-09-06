@@ -169,6 +169,63 @@ describe("GET /api/operation/pos/:id/print-data", () => {
     expect(body.lines[0].unit_codes).toEqual(["U1-000-001"]);
   });
 
+  it("?version=N answers with the KEPT document of that version, through its own authority", async () => {
+    /* 0430 — a confirmed send freezes the document per version; reprinting an
+       already-sent version reads THAT record, never a live reconstruction. */
+    const { rpc } = mockRpcAndRefs({ document: makeDocument({ version: 2 }) });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data?version=2`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_po_version_document", { p_po_id: PO_ID, p_version: 2 });
+    expect(rpc).not.toHaveBeenCalledWith("purchasing_po_document", expect.anything());
+  });
+
+  it("?version=N on a version nobody kept is a NAMED absence, never a reconstruction", async () => {
+    mockRpcAndRefs({
+      rpcError: { code: "P0001", message: "No kept document", details: "version_document_missing" },
+    });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data?version=1`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code: string }).code).toBe("version_document_missing");
+  });
+
+  it("?version rejects a non-integer before touching the database", async () => {
+    const { rpc } = mockRpcAndRefs({});
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/pos/${PO_ID}/print-data?version=abc`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("the confirm-sent authority keeps the document at first send and reuses it on a resend (0430)", () => {
+    const sql = readFileSync(
+      new URL("../../../../../supabase/migrations/0430_the_po_keeps_its_original_date_and_replies_tell_the_truth.sql", import.meta.url),
+      "utf8",
+    );
+    expect(sql).toContain("insert into public.po_version_documents");
+    expect(sql).toContain("on conflict (po_id, po_version) do nothing");
+    /* Recovery never invents: an eta the ready-date door may have recomputed
+       stays NULL, and reconciliation only fills a NULL — never overwrites. */
+    expect(sql).toMatch(/official_delivery_date is null[\s\S]{0,200}eta_date is not null/);
+    expect(sql).toContain("p.kind = 'ready_date'");
+  });
+
   it("reads the purchase order table for nothing — the RPC is the authority", async () => {
     const { fromImpl } = mockRpcAndRefs({});
     const jwt = await makeJwt("operation");

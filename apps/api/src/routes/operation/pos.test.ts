@@ -2745,7 +2745,9 @@ describe("opening an app records an OPEN, and completes nothing", () => {
 
 
 describe("POST evidenced supplier reply", () => {
-  const input = { poVersion: 2, answer: "shipping", firstDate: "2026-09-10", channel: "whatsapp", recipient: "Factory group", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T01:00:00Z" };
+  /* 0430 — ONE date on the wire; the server classifies it. `answer` and the
+     firstDate/newDate pair are gone from the schema. */
+  const input = { poVersion: 2, supplierDate: "2026-09-10", channel: "whatsapp", recipient: "Factory group", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T01:00:00Z" };
   async function post(body: unknown, role = "operation") {
     return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/tomorrow-delivery", {
       method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -2758,7 +2760,7 @@ describe("POST evidenced supplier reply", () => {
     expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_reply", { p_po_id: "PO-TEST", p_reply: input });
   });
   it("rejects incomplete evidence before any database call", async () => {
-    for (const key of ["poVersion", "channel", "recipient", "evidence", "reportedBy", "reportedAt"]) {
+    for (const key of ["poVersion", "supplierDate", "channel", "recipient", "evidence", "reportedBy", "reportedAt"]) {
       const body = { ...input } as Record<string, unknown>; delete body[key];
       expect((await post(body)).status).toBe(422);
     }

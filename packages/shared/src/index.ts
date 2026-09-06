@@ -988,6 +988,8 @@ export {
   poDateHistoryOf,
   poSupplierReplyOf,
   poSupplierDeliveryDateOf,
+  poReplyDateOf,
+  poRecordedReplyOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,

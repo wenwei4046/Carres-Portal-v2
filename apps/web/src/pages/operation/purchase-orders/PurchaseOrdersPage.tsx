@@ -8,6 +8,8 @@ import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
   manualPurchaseSourceSummary,
+  poRecordedReplyOf,
+  poReplyDateOf,
   poSupplierDeliveryDateOf,
   poSupplierReplyOf,
   recordSupplierReplyInput,
@@ -664,7 +666,11 @@ export default function PurchaseOrdersPage() {
               searchPlaceholder="Search purchase orders…"
               isLoading={posQ.isLoading}
               emptyMessage={filter ? "No purchase orders match this filter." : "No purchase orders yet."}
-              stickyIdentity
+              /* 0430 — the pinned identity is PO NO BY NAME, not "whatever
+                 column the saved layout happens to put first": a reordered
+                 chooser layout must never unpin the number the operator
+                 navigates by while scrolling the wide register. */
+              stickyIdentity={{ columnKey: "po" }}
               groupBanner={false}
               chooserGroupOrder={["Document", "Supplier", "Goods", "Receiving"]}
               onRowDoubleClick={openObject}
@@ -689,6 +695,23 @@ export default function PurchaseOrdersPage() {
       </div>
     </div>
   );
+}
+
+/** 0430 — reprint the KEPT document of an already-sent version, exactly as it
+ *  was recorded at that version's first confirmed send. */
+async function downloadKeptPdf(poId: string, version: number): Promise<void> {
+  const data = await apiFetch<PoTemplateData>(
+    `/api/operation/pos/${encodeURIComponent(poId)}/print-data?version=${version}`,
+  );
+  const blob = await renderPoPdf(data);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${poId}-V${version}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function downloadOfficialPdf(poId: string): Promise<void> {
@@ -939,6 +962,32 @@ function PurchaseOrderObject({
                 meta: "Live purchase order",
                 detail: "This is the version used by the official PDF.",
               },
+              /* 0430 — every version the supplier actually received, with its
+                 KEPT document where one was recorded at confirm-sent. A send
+                 before document keeping began answers with a named absence,
+                 never a reconstruction. */
+              ...[...new Set(
+                (po.sends ?? [])
+                  .filter((send) => send.kind === "confirmed_sent" && send.po_version != null)
+                  .map((send) => send.po_version as number),
+              )].sort((a, b) => b - a).map((sentVersion) => ({
+                id: `sent-v${sentVersion}`,
+                title: `Sent document · PO V${sentVersion}`,
+                meta: "Recorded at the confirmed send",
+                action: (
+                  <button
+                    type="button"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-meta"
+                    data-testid={`po-sent-version-pdf-${sentVersion}`}
+                    onClick={() => void downloadKeptPdf(po.id, sentVersion).catch((e: unknown) => {
+                      const body = (e as { body?: { message?: string } }).body;
+                      window.alert(body?.message ?? "The kept document could not be downloaded");
+                    })}
+                  >
+                    <Download size={14} /> Download PDF
+                  </button>
+                ),
+              })),
               ...(auditQ.data?.revisions ?? []).map((revision) => ({
                 id: revision.id,
                 title: `Snapshot ${revision.rev_no}`,
@@ -1165,7 +1214,9 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
  */
 function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => void }) {
   const [date, setDate] = useState("");
-  const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
+  /* 0430 — NO pre-selected delay reason. "Production Delay" used to ship on
+     every distracted save; a delay now requires the operator to choose. */
+  const [reason, setReason] = useState<string>("");
   const [remarks, setRemarks] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [channel, setChannel] = useState<"whatsapp" | "email" | "phone" | "in_person">("whatsapp");
@@ -1178,17 +1229,30 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
   const canRecord = !!row.facts.currentSend && row.facts.quantities.open > 0 && row.facts.operationStatus !== "Cancelled";
   const known = row.supplierDate;
   const savedReply = poSupplierReplyOf(row.po.promises, row.facts.version);
-  if (!row.facts.currentSend || (!canRecord && !savedReply)) return null;
-  const changing = date !== "" && row.po.official_delivery_date != null && date !== row.po.official_delivery_date;
+  /* A reply recorded before the evidence law is a fact, not an absence. */
+  const recordedReply = poRecordedReplyOf(row.po.promises, row.facts.version);
+  const allReplies = [...(row.po.promises ?? [])]
+    .filter((p) => p.kind === "tomorrow_delivery" && poReplyDateOf(p))
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+  /* The block appears whenever there is anything to RECORD or anything to
+     READ. A revision must never hide the previous versions' replies: an
+     unsent V2 still shows V1's answers and evidence as history (item 3 —
+     replies stay readable by version). */
+  if (!row.facts.currentSend && allReplies.length === 0) return null;
+  /* The server owns the classification. These mirrors only decide which
+     fields the form shows: a LATER date asks why, nothing else does. */
+  const official = row.po.official_delivery_date;
+  const later = date !== "" && official != null && date > official;
+  const earlier = date !== "" && official != null && date < official;
   const replyInput = recordSupplierReplyInput.safeParse({
     poVersion: row.facts.version,
-    answer: changing ? "delayed" : "shipping",
-    ...(changing ? { newDate: date, reason } : { firstDate: date }),
+    supplierDate: date,
+    ...(later && reason ? { reason } : {}),
     remarks: remarks.trim() || undefined,
     channel, recipient, evidence, reportedBy,
     reportedAt: reportedAt && Number.isFinite(Date.parse(reportedAt)) ? new Date(reportedAt).toISOString() : "",
   });
-  const ready = date !== "" && replyInput.success && !record.isPending;
+  const ready = date !== "" && (!later || reason !== "") && replyInput.success && !record.isPending;
 
   function save() {
     if (!ready) return;
@@ -1218,7 +1282,9 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
       <p className="mt-1 text-meta text-kit-slate-11">
         {known
           ? `Supplier Delivery Date · ${fmtDate(known)}`
-          : "Supplier has not confirmed the PO date"}
+          : recordedReply
+            ? `Supplier reply recorded without evidence · ${fmtDate(poReplyDateOf(recordedReply)!)}`
+            : "Supplier has not confirmed the PO date"}
       </p>
       {savedReply ? (
         <div className="mt-2 text-meta text-kit-slate-11">
@@ -1231,9 +1297,36 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
           }}>Reply evidence</button>
         </div>
       ) : null}
+      {/* 0430 — every reply stays readable, BY VERSION. A previous version's
+          answer never confirms the current one (`poSupplierReplyOf` gates
+          that); here it is history the operator can still open and check. */}
+      {allReplies.length > 0 ? (
+        <div className="mt-2" data-testid="po-supplier-reply-history">
+          <div className="text-label text-kit-slate-9">Reply history</div>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {allReplies.map((p) => (
+              <li key={`${p.recorded_at}:${p.new_date ?? p.about_date}`} className="text-meta text-kit-slate-11">
+                {p.po_version != null ? `PO V${p.po_version}` : "PO version not recorded"}
+                {" · "}{fmtDate(poReplyDateOf(p)!)}
+                {" · "}{replyAnswerWord(p.answer, p.reason)}
+                {p.evidence?.trim() ? (
+                  <>
+                    {" · "}
+                    <button type="button" className="text-kit-blue-11 underline" onClick={async () => {
+                      const { data, error } = await supabase.storage.from("delivery-orders").createSignedUrl(p.evidence!, 3600);
+                      if (error || !data?.signedUrl) { setProblem("The reply evidence could not be opened"); return; }
+                      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                    }}>Reply evidence</button>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {canRecord ? <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-label text-kit-slate-9">Date</span>
+          <span className="text-label text-kit-slate-9">Supplier Delivery Date</span>
           <input
             type="date"
             value={date}
@@ -1242,10 +1335,18 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
             className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
           />
         </label>
-        {changing ? (
+        {date !== "" && official != null ? (
+          <span className="pb-2 text-meta text-kit-slate-11" data-testid="po-supplier-date-compare">
+            {later ? "Later than the PO date" : earlier ? "Earlier than the PO date" : "Same as PO"}
+          </span>
+        ) : null}
+        {later ? (
           <label className="flex flex-col gap-1">
             {/* A LOCKED CATEGORY, never free text (Jess, 2026-08-02) - the
-                ledger has to be countable. The story goes in Remarks. */}
+                ledger has to be countable. The story goes in Remarks.
+                0430 — only a LATER date asks why, and nothing is pre-chosen:
+                an earlier or matching date is not a delay and gets no delay
+                reason, silently or otherwise. */}
             <span className="text-label text-kit-slate-9">Why has it moved?</span>
             <select
               value={reason}
@@ -1253,6 +1354,7 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
               data-testid="po-supplier-date-reason"
               className="h-8 rounded-control border border-kit-slate-5 px-2 text-meta"
             >
+              <option value="">Choose a reason</option>
               {PO_DELAY_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </label>
@@ -1308,6 +1410,22 @@ function SupplierDateBlock({ row, onSaved }: { row: RegisterRow; onSaved: () => 
   );
 }
 
+/** The reply vocabulary, one place: legacy `shipping` reads as a confirmation,
+ *  0430's answers read as themselves, and a delay names its recorded reason. */
+function replyAnswerWord(answer: string, reason: string | null | undefined): string {
+  switch (answer) {
+    case "confirmed":
+    case "shipping":
+      return "Confirms the PO date";
+    case "earlier":
+      return "Earlier than the PO date";
+    case "delayed":
+      return `Delayed — ${reason ?? "Not recorded"}`;
+    default:
+      return "Date reported";
+  }
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-label text-kit-slate-9">{label}</dt><dd className="mt-0.5 text-body font-medium text-kit-slate-12">{value === "Not recorded" ? <Absence /> : value}</dd></div>;
 }
@@ -1320,8 +1438,8 @@ function ConnectionRow({ primary, secondary }: { primary: string; secondary: str
   return <div><div className="text-body font-medium text-kit-slate-12">{primary}</div><div className="text-meta text-kit-slate-9">{secondary}</div></div>;
 }
 
-function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string }>; problem?: string | null; action?: string; onRetry?: () => void }) {
-  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-9">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
+function RecordList({ title, empty, rows, problem, action, onRetry }: { title: string; empty: string; rows: Array<{ id: string; title: string; meta: string; detail?: string; action?: React.ReactNode }>; problem?: string | null; action?: string; onRetry?: () => void }) {
+  return <section className="mx-auto max-w-[980px] border border-kit-slate-5 bg-white p-4"><h2 className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">{title}</h2><div className="mt-3 divide-y divide-kit-slate-4">{problem ? <ReadProblem problem={problem} action={action ?? "Try again."} onRetry={onRetry} /> : rows.length ? rows.map((row) => <article key={row.id} className="py-3"><div className="text-body font-semibold text-kit-slate-12">{row.title}</div><div className="mt-0.5 text-meta text-kit-slate-9">{row.meta}</div>{row.detail ? <div className="mt-1 text-body text-kit-slate-11">{row.detail}</div> : null}{row.action ? <div className="mt-1">{row.action}</div> : null}</article>) : <Absence>{empty}</Absence>}</div></section>;
 }
 
 function ReadProblem({ problem, action, onRetry }: { problem: string; action: string; onRetry?: () => void }) {

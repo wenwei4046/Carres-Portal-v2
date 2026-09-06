@@ -710,6 +710,30 @@ interchangeable:
 | `Supplier Delivery Date` | the supplier's answer to the PO date: `Not confirmed` before evidenced supplier reply; `Same as PO` after the supplier confirms the PO date; otherwise the different date supplied by the supplier |
 | `Goods received on` | the physical arrival date and time; never keyed/submitted/posted time. Owner correction 2026-09-06 — the retired spelling `Goods Received At` may not appear. |
 
+**Supplier reply truth — correction card 2026-09-06.** The reply form's date field is labelled
+`Supplier Delivery Date` (never a bare `Date`), and the form states the comparison beside it:
+`Same as PO` · `Earlier than the PO date` · `Later than the PO date`. Only a LATER date asks
+`Why has it moved?`, and nothing is pre-chosen — the select opens on `Choose a reason`. A reply
+recorded before the evidence law reads `Supplier reply recorded without evidence · {date}`; it never
+claims the governed `Supplier Delivery Date` and never reads as `Not confirmed`, because a recorded
+answer is not a proven absence. The object's `Reply history` lists every reply by version —
+`PO V{n} · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
+`Delayed — {reason}` · `Date reported` — with its `Reply evidence` link where evidence exists.
+A demand an open purchase order already fully covers refuses issue with
+`An open purchase order ({PO No}) already covers this line.` /
+`Nothing to buy here. Check the covering purchase order instead.`
+
+**Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
+actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
+`Download PDF`. A version sent before document keeping began answers
+`No kept document for this PO version` — a named absence, never a reconstruction.
+
+**Help version words — correction card 2026-09-06.** The Help menu shows `Version {code}` and
+`Built {time}`, with `Check for update` answering one of `You are on the latest version` ·
+`A newer version is ready` (with the `Reload to update` button — the reload is always the
+operator's own click, so unfinished input is never thrown away) ·
+`The version check did not reach the server`.
+
 No recorded business date is silently moved to fit a calendar. Purchasing/Operation work uses the
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
