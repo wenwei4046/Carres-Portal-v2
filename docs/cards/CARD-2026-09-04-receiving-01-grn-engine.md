@@ -165,5 +165,19 @@ continues under it (no new Card). Scope and rulings:
    cap/evidence-amend mapping · shared ladder + status words. Register fetch limit raised
    (`?limit`, hard cap 1000) with virtualised rows for large record counts.
 
-Delivery evidence (merge SHA, deploy SHA, 0427 apply, production walk) is recorded at the
-foot of this section on closure.
+**Delivery evidence — CLOSED 2026-09-06.** PR #1106 merged
+`f755dea80fb7a60c0b0dc481841bfcf7757f5cc1`; deploy automatic on merge, both canonical surfaces
+(`erp.carresofficial.com` and the Pages origin) reporting `__carres_deploy.json` commit
+`f755dea8…` — the exact merge SHA. Migration 0427 applied through the governed path (tracker
+`0427_an_amendment_may_correct_the_papers_evidence`) after a rolled-back functional probe
+against production (evidence replace + append, named refusal `evidence_invalid`, legacy date
+amend unchanged; rollback verified). Served-bundle proof: `Goods arrived at` ·
+`Goods received on` · `GOODS RECEIVED NOTE` · `GOODS ARRIVED AT` · `Clear filters` present;
+`Actual Site` and `Goods Received At` absent. Committed production smoke on the designated
+smoke record GRN-20260904-1064: 0427 evidence amend recorded (before `smoke/do-b.jpg` →
+after `smoke/do-b-corrected.jpg`, evidence 0 → 1, reason on the append-only event), idempotent
+retry answered `already_saved`, and a caller outside GRN Duty/cover/superuser was refused
+`no_grn_duty_holder`. Local gates at merge: web 3864 · api 2712 · shared 2880 tests green,
+typechecks clean, migration gate green, design lint stage-1 with zero findings in the changed
+files. Desktop and mobile walks of the Register, the 50/50 GRN object, the live Amend preview
+and the More ▾ Void door performed on the dev preview entry against the real pages.
