@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import {
   composeOperationWorkResponse,
+  createOperationWorkRouter,
   manualPurchaseWorkInputsFromRegister,
   receivingWorkSourceFromModuleFacts,
   projectManualPurchaseWork,
@@ -9,6 +11,7 @@ import {
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
 } from "./work";
+import type { AppEnv } from "../../types";
 
 const base: OperationWorkItem = {
   id: "orders:SO-1318:missing_delivery_date",
@@ -36,6 +39,35 @@ const base: OperationWorkItem = {
 };
 
 describe("operation Work response composition", () => {
+  it("serves the one composed response from GET /api/operation/work", async () => {
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("auth", {
+        id: "user-1",
+        email: "ops@carres.test",
+        role: "operation",
+        dealerId: null,
+        supplierId: null,
+        partnerId: null,
+        outletId: null,
+        warehouseId: null,
+        jwt: "jwt",
+      });
+      await next();
+    });
+    app.route(
+      "/api/operation/work",
+      createOperationWorkRouter(async () =>
+        composeOperationWorkResponse([[base]], [], "2026-09-06"),
+      ),
+    );
+
+    const response = await app.request("/api/operation/work");
+    expect(response.status).toBe(200);
+    const body = await response.json() as { items: OperationWorkItem[] };
+    expect(body.items).toHaveLength(1);
+  });
+
   it("returns one validated set and removes only duplicate stable identities", () => {
     const receiving: OperationWorkItem = {
       ...base,

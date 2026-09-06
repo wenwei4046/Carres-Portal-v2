@@ -1,4 +1,7 @@
+import { Hono, type Context } from "hono";
 import {
+  countWorkingDays,
+  myHolidaySet,
   operationWorkItemFromProjection,
   operationWorkResponseSchema,
   demandPurposeLabelOf,
@@ -25,7 +28,18 @@ import {
   type WorkOwnerRule,
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
+  WAREHOUSE_OFF_DAYS,
 } from "@carres/shared";
+import { requireOperation } from "../../lib/auth-guards";
+import type { AppEnv } from "../../types";
+import operationOrdersRouter from "./orders";
+import operationStockRouter from "./stock";
+import manualPurchaseRouter from "./manual-purchase";
+import warehouseReceiptsRouter from "./warehouse-receipts";
+import operationPosRouter from "./pos";
+import operationSuppliersRouter from "./suppliers";
+import workspaceDutiesRouter from "./workspace-duties";
+import opsStaffRouter from "./staff";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -504,3 +518,163 @@ export function composeOperationWorkResponse(
     generatedOn,
   });
 }
+
+function malaysiaToday(): string {
+  return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+function dutyResolution(
+  payload: Record<string, unknown>,
+  key: string,
+  today: string,
+): WorkspaceDutyResolution | null {
+  const duties = payload.duties as Array<Record<string, unknown>> | undefined;
+  const duty = duties?.find((row) => row.key === key);
+  const raw = duty?.resolution as Record<string, unknown> | undefined;
+  if (!raw) return null;
+  const person = (idKey: string, nameKey: string) => {
+    const userId = raw[idKey];
+    if (typeof userId !== "string" || userId.length === 0) return null;
+    return {
+      userId,
+      name: typeof raw[nameKey] === "string" ? raw[nameKey] as string : null,
+    };
+  };
+  const normalOwner = person("normal_user_id", "normal_user_name");
+  const acting = person("actor_user_id", "acting_user_name") ??
+    person("acting_user_id", "acting_user_name") ??
+    normalOwner;
+  const activeCover = raw.is_cover === true
+    ? person("acting_user_id", "acting_user_name")
+    : null;
+  return {
+    dutyKey: key,
+    onDate: today,
+    normalOwner,
+    buddy: activeCover,
+    activeCover,
+    actingPerson: acting,
+    state: normalOwner ? (activeCover ? "covered" : "primary") : "not_assigned",
+    assignmentId: null,
+  };
+}
+
+async function readInternal<T>(
+  app: Hono<AppEnv>,
+  path: string,
+  c: Context<AppEnv>,
+): Promise<T> {
+  const response = await app.request(`http://workspace.internal${path}`, {}, c.env);
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Workspace source ${path} failed (${response.status}): ${body}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+/** Reuse the existing module read routes inside the Worker. This avoids a
+ * second set of table queries while keeping Work a single browser request. */
+export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWorkResponse> {
+  const internal = new Hono<AppEnv>();
+  internal.use("*", async (child, next) => {
+    child.set("auth", c.var.auth);
+    await next();
+  });
+  internal.route("/orders", operationOrdersRouter);
+  internal.route("/stock", operationStockRouter);
+  internal.route("/manual-purchase", manualPurchaseRouter);
+  internal.route("/warehouse-receipts", warehouseReceiptsRouter);
+  internal.route("/pos", operationPosRouter);
+  internal.route("/suppliers", operationSuppliersRouter);
+  internal.route("/workspace-duties", workspaceDutiesRouter);
+  internal.route("/staff", opsStaffRouter);
+
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff] =
+    await Promise.all([
+      readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
+      readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
+      readInternal<ManualPurchaseRegisterSource & {
+        approvers?: Array<{ id: string; name: string | null }>;
+        todayIso?: string;
+      }>(internal, "/manual-purchase", c),
+      readInternal<{ receipts: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["receipts"] }>(
+        internal,
+        "/warehouse-receipts?status=submitted",
+        c,
+      ),
+      readInternal<{ pos: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["pos"] }>(
+        internal,
+        "/pos?status=all",
+        c,
+      ),
+      readInternal<{ suppliers: Parameters<typeof receivingWorkSourceFromModuleFacts>[0]["suppliers"] }>(
+        internal,
+        "/suppliers",
+        c,
+      ),
+      readInternal<Record<string, unknown>>(internal, "/workspace-duties", c),
+      readInternal<{ staff: Array<{ user_id: string; name: string | null; email: string }> }>(
+        internal,
+        "/staff",
+        c,
+      ),
+    ]);
+  const today = manual.todayIso ?? malaysiaToday();
+  const poDuty = dutyResolution(duties, "po_duty", today);
+  const grnDuty = dutyResolution(duties, "grn_duty", today);
+  const paymentDuty = dutyResolution(duties, "payment_duty", today);
+  const dutyResolutions = {
+    ...(poDuty ? { po_duty: poDuty } : {}),
+    ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
+  };
+  const orderItems = projectSalesOrdersFromModuleFacts({
+    orders: orders.orders,
+    stock: stock.skus,
+    staff: staff.staff,
+    dutyResolutions,
+    today,
+    safetyDays: null,
+  });
+  const manualItems = projectManualPurchaseWork({
+    requests: manualPurchaseWorkInputsFromRegister(manual),
+    approver: manual.approvers?.[0]
+      ? { userId: manual.approvers[0].id, name: manual.approvers[0].name }
+      : null,
+    poDuty,
+    today,
+  });
+  const receivingSource = receivingWorkSourceFromModuleFacts({
+    receipts: receipts.receipts,
+    pos: pos.pos,
+    suppliers: suppliers.suppliers,
+  });
+  const holidays = myHolidaySet();
+  const receivingItems = projectReceivingWork({
+    source: receivingSource,
+    duty: grnDuty,
+    today,
+    workingDaysLate: (dueIso) =>
+      countWorkingDays(dueIso, today, { holidays, offDays: WAREHOUSE_OFF_DAYS }),
+  });
+  return composeOperationWorkResponse(
+    [orderItems, manualItems, receivingItems],
+    staff.staff.map((row) => ({
+      userId: row.user_id,
+      name: row.name,
+      email: row.email,
+    })),
+    today,
+  );
+}
+
+export function createOperationWorkRouter(
+  loader: (c: Context<AppEnv>) => Promise<OperationWorkResponse> = loadOperationWork,
+): Hono<AppEnv> {
+  const router = new Hono<AppEnv>();
+  router.get("/", requireOperation, async (c) => c.json(await loader(c)));
+  return router;
+}
+
+const operationWorkRouter = createOperationWorkRouter();
+
+export default operationWorkRouter;
