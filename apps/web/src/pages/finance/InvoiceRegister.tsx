@@ -9,6 +9,8 @@ import {
   invoicePaymentTiming,
 } from "@carres/shared/payment-invoice-register";
 import { myHolidaySet } from "@carres/shared/my-holidays";
+import InvoiceRecordPayment from "./InvoiceRecordPayment";
+import { useAuth } from "@/lib/auth";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -105,17 +107,29 @@ export default function InvoiceRegister() {
   ], [today, opts]);
   const selected = params.get("invoice");
   const invoice = query.data?.find((r) => r.id === selected);
+  // §16 — 50/50 exists only while recording Payment; ordinary View stays one
+  // full-width scroll. The door shows only for staff the posting door admits.
+  const role = useAuth((s) => s.role);
+  const [recording, setRecording] = useState(false);
+  const canRecord = (role === "operation" || role === "principal")
+    && !!invoice && invoice.status !== "voided"
+    && invoiceNeeded(invoice).known && invoiceNeeded(invoice).outstanding > 0;
   return <div className="flex h-full min-h-0 flex-col">
     {invoice ? <SalesOrderTabs identity={identityOf(invoice)}
       customer={invoice.orders?.customer_name} backLabel="Invoices" backTo="?"
-      onBack={(event) => { event.preventDefault(); close(); }}
+      onBack={(event) => { event.preventDefault(); setRecording(false); close(); }}
       status={STATUS_MARK[invoice.status] ? <span>{STATUS_MARK[invoice.status]}</span> : undefined}
       navigation={<span className="text-body">{invoice.orders ? `SO-${invoice.orders.so}` : "SO not available"}</span>}
+      right={canRecord && !recording
+        ? <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>
+        : undefined}
     /> : <ModuleHeader destinationHeader testId="invoices-destination-header" word="Invoices" docTitle="Invoices — Carres" />}
     {query.isError ? <div role="alert" className="p-6 text-body">
       <p>Invoices could not be loaded. Try again.</p>
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
-    </div> : selected ? invoice ? <InvoiceObject invoice={invoice} today={today} opts={opts} />
+    </div> : selected ? invoice ? recording && canRecord
+      ? <InvoiceRecordPayment invoice={invoice} onClose={() => setRecording(false)} />
+      : <InvoiceObject invoice={invoice} today={today} opts={opts} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
     : <ListPageShell register>

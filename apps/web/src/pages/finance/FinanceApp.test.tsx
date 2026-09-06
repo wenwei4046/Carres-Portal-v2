@@ -9,6 +9,10 @@ vi.mock("@/lib/queries", () => ({
   usePaymentRegister: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn(), error: null }),
   useInvoiceRegister: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn(), error: null }),
 }));
+const auth = vi.hoisted(() => ({ role: "finance" as string }));
+vi.mock("@/lib/auth", () => ({
+  useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
+}));
 
 function show(path: string) {
   return render(
@@ -30,5 +34,17 @@ describe("Finance routing", () => {
   it("opens the canonical Invoices Register at /finance/invoices", () => {
     show("/finance/invoices");
     expect(screen.getByTestId("invoices-destination-header")).toBeInTheDocument();
+  });
+  it("operation staff reach Payments — collection is their daily work (§12)", () => {
+    auth.role = "operation";
+    show("/finance/payments");
+    expect(screen.getByTestId("payments-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("operation staff bounce off the finance-only pages to Payments", () => {
+    auth.role = "operation";
+    show("/finance/recon");
+    expect(screen.getByTestId("payments-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
   });
 });

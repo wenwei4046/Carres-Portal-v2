@@ -7424,17 +7424,18 @@ export function useRecordPayment(
   });
 }
 
-/** Void a mis-keyed ledger entry (principal only — server-enforced). */
+/** Void a mis-keyed ledger entry. The reason is REQUIRED (0430) and the
+ *  server gate is the Payment Approver duty or principal — SQL-enforced. */
 export function useVoidPayment(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, string>>,
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, { paymentId: string; reason: string }>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ ok: true }, ApiError, string>({
-    mutationFn: (paymentId) =>
+  return useMutation<{ ok: true }, ApiError, { paymentId: string; reason: string }>({
+    mutationFn: ({ paymentId, reason }) =>
       apiFetch<{ ok: true }>(
         `/api/operation/orders/${orderId}/payments/${paymentId}`,
-        { method: "DELETE" },
+        { method: "DELETE", body: JSON.stringify({ reason }) },
       ),
     ...opts,
     onSuccess: async (...args) => {
