@@ -33,6 +33,17 @@ import type { AppEnv } from "../../types";
 const dosRouter = new Hono<AppEnv>();
 
 const ALLOWED_MIMES = ["application/pdf", "image/jpeg", "image/png"] as const;
+// 0426 — arrival evidence supports both photo and VIDEO (owner instruction
+// 2026-09-04 §5C). Video joins for the `arrival` kind only; the signed DO and
+// claim photos stay documents/images. The bucket's own 10 MiB file_size_limit
+// still governs, so an arrival video is a short clip, not a film.
+const ARRIVAL_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+] as const;
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MiB
 
 // R2 (0288) — `kind: "claim"` names the file `<po_id>/<uuid>-claim-<do>.<ext>`
@@ -40,13 +51,24 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10 MiB
 // a supplier-claim photo IS a document about that PO, so giving it its own
 // bucket would have meant a second storage policy for no gain. The default is
 // "do", so every existing caller is byte-for-byte unchanged.
-const signUploadSchema = z.object({
-  po_id: z.string().min(1).max(100),
-  do_number: z.string().min(3).max(50),
-  mime_type: z.enum(ALLOWED_MIMES),
-  size_bytes: z.number().int().positive().max(MAX_SIZE),
-  kind: z.enum(["do", "claim"]).default("do"),
-});
+const signUploadSchema = z
+  .object({
+    po_id: z.string().min(1).max(100),
+    do_number: z.string().min(3).max(50),
+    mime_type: z.enum([...ALLOWED_MIMES, ...ARRIVAL_MIMES] as [string, ...string[]]),
+    size_bytes: z.number().int().positive().max(MAX_SIZE),
+    kind: z.enum(["do", "claim", "arrival"]).default("do"),
+  })
+  .superRefine((v, ctx) => {
+    const pool: readonly string[] = v.kind === "arrival" ? ARRIVAL_MIMES : ALLOWED_MIMES;
+    if (!pool.includes(v.mime_type)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mime_type"],
+        message: `mime ${v.mime_type} is not allowed for kind ${v.kind}`,
+      });
+    }
+  });
 
 // Order-level DO uploads (operation → customer final delivery). Path prefix
 // `order-<order_uuid>/...` keeps these distinct from PO-level files at
@@ -64,9 +86,12 @@ const signOrderUploadSchema = z.object({
   kind:       z.enum(["do", "signature"]).default("do"),
 });
 
-function extForMime(mime: (typeof ALLOWED_MIMES)[number]): string {
+function extForMime(mime: string): string {
   if (mime === "application/pdf") return "pdf";
   if (mime === "image/jpeg") return "jpg";
+  if (mime === "video/mp4") return "mp4";
+  if (mime === "video/quicktime") return "mov";
+  if (mime === "video/webm") return "webm";
   return "png";
 }
 
@@ -132,7 +157,12 @@ dosRouter.post("/sign-upload", async (c) => {
   const { po_id, do_number, mime_type, kind } = parsed.data;
   const safeDo = do_number.replace(/[^a-zA-Z0-9._-]/g, "_");
   const ext = extForMime(mime_type);
-  const slug = kind === "claim" ? `claim-${safeDo}` : safeDo;
+  const slug =
+    kind === "claim"
+      ? `claim-${safeDo}`
+      : kind === "arrival"
+        ? `arrival-${safeDo}`
+        : safeDo;
   const path = `${po_id}/${crypto.randomUUID()}-${slug}.${ext}`;
 
   // F11 — USER JWT, never service_role. Storage RLS (migration 0042) gates

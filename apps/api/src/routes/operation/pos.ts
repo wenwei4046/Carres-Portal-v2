@@ -1526,6 +1526,12 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
     // Omitted → the RPC stamps today in MYT. The browser's clock never
     // decides a business date.
     p_goods_received_at: parsed.data.goodsReceivedAt ?? null,
+    // 0426 — Actual Site, arrival photo/video evidence, extra goods and the
+    // idempotency key. All optional; the RPC owns every rule.
+    p_actual_site_id: parsed.data.actualSiteId ?? null,
+    p_arrival_evidence: parsed.data.arrivalEvidence ?? [],
+    p_extra_lines: parsed.data.extraLines ?? [],
+    p_save_key: parsed.data.saveKey ?? null,
     p_lines: parsed.data.lines.map((l) => ({
       id: l.id,
       received_now: l.receivedNow,
@@ -1534,6 +1540,14 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
       damaged_photos: l.damagedPhotos ?? [],
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
       wrong_item_photos: l.wrongItemPhotos ?? [],
+      // 0426 — per-Unit outcomes (ERP-ARCHITECTURE §3.4); absent = the
+      // quantity line the validator already governs.
+      units: (l.units ?? []).map((u) => ({
+        unit_code: u.unitCode,
+        outcome: u.outcome,
+        issue_kind: u.issueKind ?? null,
+        note: u.note ?? null,
+      })),
     })),
   });
   if (error) {
@@ -1577,6 +1591,16 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   }
   const sessions = (rows ?? []) as Array<Record<string, unknown>>;
   const ids = sessions.map((s) => s.id as string);
+
+  // 0426 — the EXPECTED Units for this PO (minted `incoming` at issue), so the
+  // session can record one physical result per governed Unit
+  // (ERP-ARCHITECTURE §3.4). A PO whose units predate the mint simply returns
+  // none and the quantity line stays the lawful path.
+  const { data: unitRows } = await sb
+    .from("ops_stock_items")
+    .select("id, unit_code, sku, status")
+    .eq("po_no", poId)
+    .order("unit_code");
 
   const { data: evs } = ids.length
     ? await sb
@@ -1624,6 +1648,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
         ? (userNames.get(e.actor_id as string) ?? null)
         : null,
     })),
+    expected_units: unitRows ?? [],
   });
 });
 

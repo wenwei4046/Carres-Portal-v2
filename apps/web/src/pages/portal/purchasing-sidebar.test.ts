@@ -78,7 +78,7 @@ describe("the approved hierarchy", () => {
       "Manual Purchase",
       "Purchase Orders",
     ]);
-    expect(group("purchasing-receive")).toEqual(["Goods Receipts"]);
+    expect(group("purchasing-receive")).toEqual(["Receiving"]);
     expect(group("purchasing-problems")).toEqual([
       "Supplier Claims",
       "Purchase Returns",
@@ -145,7 +145,7 @@ describe("the live destinations keep their exact current addresses", () => {
       ["SO Batch Purchase", "/operation?tab=purchase"],
       ["Manual Purchase", "/operation?tab=manual-purchase"],
       ["Purchase Orders", "/operation/procurement"],
-      ["Goods Receipts", "/operation?tab=receiving"],
+      ["Receiving", "/operation?tab=receiving"],
       ["Supplier Claims", "/operation?tab=claims"],
     ]);
   });
@@ -159,8 +159,8 @@ describe("the live destinations keep their exact current addresses", () => {
     );
   });
 
-  it("`Goods Receipts` is unchanged", () => {
-    expect(purchasing.find((i) => i.key === "receiving")?.label).toBe("Goods Receipts");
+  it("`Receiving` is unchanged", () => {
+    expect(purchasing.find((i) => i.key === "receiving")?.label).toBe("Receiving");
   });
 
   it("SO Batch Purchase answers to BOTH its entrances, and links to one", () => {

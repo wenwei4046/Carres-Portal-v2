@@ -498,6 +498,12 @@ export {
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
+  // 0426 — Amend / Void doors for a posted GRN.
+  receivingAmendInput,
+  receivingVoidInput,
+  // 0425 — Workspace → Staff & Duties.
+  workspaceAssignDutyInput,
+  workspaceCoverDutyInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -1142,6 +1148,23 @@ export {
   type WarehouseIncomingLine,
   type WarehouseIncomingPo,
   type WarehouseIncomingResponse,
+  // 0426 · the 2026-09-04 owner instruction — stored GRN, Actual Site, unit
+  // outcomes, extra goods, the save-blocker law and the Work feed.
+  receivingDisplayNo,
+  receivingSummaryOf,
+  receivingExtraQty,
+  pendingDeliveryAfterSave,
+  receivingSaveBlocker,
+  receivingWorkItems,
+  RECEIVING_UNIT_OUTCOME_LABEL,
+  RECEIVING_AUTHORITY_LABEL,
+  RECEIVING_WORK_WORDS,
+  type ReceivingUnitOutcome,
+  type ReceivingUnitResult,
+  type ReceivingArrivalEvidence,
+  type ReceivingExtraLine,
+  type ReceivingSummary,
+  type ReceivingWorkSource,
 } from "./warehouse-receipt";
 export {
   warehouseSubmitReceiptInput,

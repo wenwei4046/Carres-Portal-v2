@@ -377,15 +377,21 @@ append Root Cause later without rewriting the observation.
 
 ## 8 · Information architecture and templates
 
-**SIDEBAR — owner ruling 2026-08-24.** Delivery is one direct sidebar destination, not an
-expandable parent. It has no separate Delivery Work or Delivery Orders child. Delivery Orders
-remain Delivery-owned formal objects, but operators find them in the one Delivery listing.
-Delivery applies the governed Shell, Register and Object Detail Templates and does not invent
-another UI system.
+**THE FOUR-PAGE MAP — CARD-2026-09-04-delivery-01, overwriting the 2026-08-24 one-destination
+ruling.** Delivery is four pages with four distinct jobs:
 
-**DELIVERY NAVIGATION — owner ruling 2026-08-24.** The sidebar carries exactly one Delivery door:
-**Delivery** · `/operation?tab=delivery`. There is no Delivery parent chevron, child elbow,
-separate Delivery Orders list, hairline or `Coming soon` label.
+```
+Monitor           plan/read delivery days and open the right record      ?tab=delivery
+Delivery Orders   find and finish formal DO records                      /operation/delivery-orders
+Delivery Order    read one formal DO and its evidence/history            /operation/delivery-orders/:doId
+Edit Delivery     write arrangement/result/evidence                      /operation/delivery/edit/:orderId
+```
+
+**DELIVERY NAVIGATION.** The sidebar carries the Delivery module with exactly two children, in
+this order: **Monitor** and **Delivery Orders**. Monitor leads and is the collapsed icon's
+landing. The DO object page and Edit Delivery are never navigation — they are doors on cards and
+rows. Delivery applies the governed Shell, Register and Object Detail Templates and does not
+invent another UI system.
 
 `Schedule`, `Delivery History`, `Exceptions`, `Partners` and `Report` were rows an operator could
 read, count and want, and every one of them refused the click. Five dead controls in a module with
@@ -401,88 +407,90 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**The unified Delivery listing — owner ruling 2026-08-24:**
+**MONITOR — the internal Operations calendar (CARD-2026-09-04-delivery-01, BUILT).** Monitor
+replaces the unified planning listing of 2026-08-24 and answers the operator's morning question:
+*what customer deliveries are planned across the next operating days, and which existing record do
+I open to continue the work?*
 
 ```
-SO / Ref · Customer · Requested Delivery Date · Delivery Location · Building · Logistics Partner ·
-Confirmed Delivery · Confirmed Time · Goods · DO No · Delivery Status
+one 50px Destination Header  ·  Monitor
+page-owned 240px rail        ·  DELIVERY SCHEDULE + NEEDS CHECKING + REGION + LOGISTICS
+one toolbar                  ·  ‹ six-day range › + Search
+six operating-day columns    ·  Sunday omitted; cards stack inside each day
 ```
 
-`Requested Delivery Date` is the date the customer asked for, owned by Sales Orders. `Confirmed Delivery` and `Confirmed Time` are
-Delivery's operational arrangement. `DO No` appears in that same row only after system issue;
-before issue it says `No delivery order yet`. DO No opens the formal document and SO / Ref opens
-the source Sales Order. One row = one Delivery scope/Journey leg; a split or multi-leg journey
-shows one row per scope.
+**Monitor writes NOTHING.** No inline edit, assignment, upload, result, proof review, selection,
+bulk action or drag/drop reschedule. Every card is ONE accessible link: an issued DO opens the
+formal Delivery Order object; a scope without one says `No delivery order yet` and opens Edit
+Delivery. There is no `New DO`, `Issue`, `Release` or `Approve` — §3's ruling stands: **the
+SYSTEM issues the Delivery Order** when the governed gate becomes true.
 
-Statuses are the document's own: `Created → Out for delivery → Delivered`, plus
-`Delivery exception` carrying its ONE reason, and `Cancelled` for a voided document. There is NO
-`Waiting for goods` status — a DO cannot exist before goods are ready; waiting lives on the Order
-Route. **The register shows NO owner, NO avatar and NO action sentence** — a register finds
-documents; work lives in My Work / Team Work. Rows open the DO object page; document numbers are
-doors (`DO → DO`, `SO → SO`).
+- **Six consecutive OPERATING days, Sunday omitted.** The default window opens one operating day
+  before business today (yesterday's deliveries are still being closed out); previous/next moves
+  exactly six operating days. On Friday 4 Sep 2026 the range is Thu 3 – Wed 9, omitting Sun 6.
+- **No hour-by-hour vertical timeline.** The planned window is text; card height never implies
+  duration. Cards order by window start, then customer (locale-aware), then stable scope id. An
+  empty day says `No deliveries`.
+- **One card shows only:** planned window · DO No (or `No delivery order yet`) · Customer ·
+  City/locality · Goods summary · Logistics Partner · Expected arrival when recorded · ONE
+  derived delivery status. **Never** a customer or partner phone, money, internal owner, driver,
+  vehicle, upload timestamp or actual delivery time.
+- **The status is the shared seven-word operational ladder** (`deliveryWorkStatusOf`) — one
+  arithmetic with the old workspace, never a second copy. **A planned time window ending proves
+  nothing**: no failure, no "result needed", no invented status reads the clock.
+  `Delivered — Proof Required` is derived only from a RECORDED delivery result whose photo
+  ledger is known and empty — never from time.
+- **The URL is the state** (`?start=` · `?schedule=` · `?checking=` · `?region=` ·
+  `?logistics=` · `?q=`), so refresh, share and Back all restore the same calendar.
+- **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
+  the rail becomes the filter drawer, the visible range becomes one selected operating day with a
+  sticky date heading and 44px rows, previous/next skips Sunday, and the cards and href
+  arithmetic are identical to desktop.
 
-**Delivery — the one planning and document workspace. TWO OWNER RULINGS OF 2026-08-24, merged
-here as one truth:** the UNITING ruling (it replaces the separate Delivery Work and Delivery Orders
-lists while preserving the formal DO object) and the BEHAVIOUR CORRECTION
-(`CARD-2026-08-21-delivery-02-work-layout` §0), which overwrites the 2026-08-21 ruling wherever
-the two disagree. The
-three-pane action-card screen is deleted, not deprecated beside this: the `Work list / Calendar`
-switch, the KPI/count preamble, the Refresh control, the action-card wall, the permanent detail
-pane and the third working column are gone, and no Delivery surface carries the generic employee
-labels `Due`, `Next Action` or `Priority`. That page answered *who should be nagged today*, which
-is My Work / Team Work's question; this one answers the logistics question — **everything going out
-on a given day, who is carrying it, and what is still missing.**
+**The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
+`RailGroup`/`RailItem` recipe every Register page uses (the FilterRail law). Four single-pick
+groups that COMBINE; each group's counts are computed over the cards the other groups already
+narrowed (Architecture Law D). `DELIVERY SCHEDULE` holds `Calendar` (cards inside the visible
+window), `No confirmed date` and **`Overdue`** — never `Today`, never `Tomorrow`. `NEEDS
+CHECKING` holds `Failed Delivery`, `Delivered — Proof Required` and `Waiting for warehouse` —
+each a recorded fact, never a clock inference. `REGION` and `LOGISTICS` keep their ruled
+grammars below.
 
-⛔ **SUPERSEDED — *"it writes nothing"*.** The 2026-08-21 text said the workspace is read-only. The
-owner overturned that on 2026-08-24 and the sentence is deleted rather than kept beside its
-replacement:
+**DELIVERY ORDERS — the restored register.** `/operation/delivery-orders` reaches the existing
+formal-document register again (the 2026-08-24 redirect into the unified page is retired with
+that page). This Card restored the route only; the register's fields, rail, layout and actions
+are unchanged, and its redesign is its own later Card. The document-status vocabulary stays the
+register's own (`Created → Out for delivery → Delivered`, `Delivery exception` with its ONE
+reason, `Cancelled`), and **`Created` may not appear on Monitor** — the operational and document
+vocabularies never borrow each other's words.
 
-> **THE DELIVERY WORKSPACE OWNS THE DELIVERY ARRANGEMENT.** Who carries a scope, the confirmed operational
+**THE ARRANGEMENT OWNERSHIP RULING (owner, 2026-08-24) STANDS UNCHANGED:**
+
+> **DELIVERY OWNS THE DELIVERY ARRANGEMENT.** Who carries a scope, the confirmed operational
 > date and time, the expected arrival, the logistics note, the partner's actual reply proof and the
-> Condo driver/vehicle are **Delivery's writes**, made from this workspace. **Sales Orders remains
+> Condo driver/vehicle are **Delivery's writes**. **Sales Orders remains
 > the owner of the commercial customer promise** — the customer, the address, the building facts and
 > the customer-requested `Requested Delivery Date` — and Delivery may never write one of them.
 
-It is an operational workspace with formal DO doors in the same listing; arrangement facts and the
-issued DO remain different objects. What is unchanged is §3's ruling: **the SYSTEM issues the
-Delivery Order** when the governed gate becomes true. There is no `New DO`, no `Issue`, no `Release` and no `Approve` on this page or in any
-dialog it opens. `Save Delivery` records an arrangement; issuance reads it.
+What changed is WHERE the writes are made: they live on **Edit Delivery** (and the governed
+partner door), never on Monitor. The retired listing's multi-scope `Assign logistics` selection
+door left with that listing — **a bulk assignment surface is an open gap named for a later
+Delivery Card**, and the governed `Change logistics` rules below still bind every partner write
+wherever it is made.
 
 The arrangement is its OWN record (`ops_delivery_arrangements`, migration 0386) keyed by the scope
 `(order_id, leg)` — never `orders.delivery_partner_id`, which is a Sales Order column and could
 hold only one carrier for a two-leg Journey, kept no history, and had two writers.
 
-```
-one 50px Destination Header  ·  Delivery
-local rail (the shared governed rail recipe, 240px) ·
-                                DELIVERY SCHEDULE + REGION + LOGISTICS, page-owned FILTERING
-one expandable DataGrid      ·  the Sales Orders engine, density and toolbar
-```
-
-The rail uses the ONE shared `RailGroup`/`RailItem` recipe every Register page uses (240px —
-the FilterRail law). The earlier page-local 200px predates that shared recipe; a page-private
-rail width would be a second rail kit, which the UI system forbids.
-
 **THE ENTRY RULE (owner ruling 2026-08-24).** A Sales Order does not become delivery work merely by
-existing. A scope enters this workspace only when it has **a delivery location/address · building
+existing. A scope reaches Monitor only when it has **a delivery location/address · building
 and access facts · goods that require delivering · a valid scope or Journey leg**. An order missing
-its address stays **Sales-owned Work** and must not appear here as a row of `Not given` — measured
+its address stays **Sales-owned Work** and must not appear here as a card of `Not given` — measured
 before the correction, 59 of 90 rows carried no location at all, which is two thirds of a logistics
 screen that no logistics operator could act on.
 
-**The rail.** `DELIVERY SCHEDULE` lists `No confirmed date`, then **`Overdue`** (renamed from
-`Date passed`), then the actual weekday + calendar dates ascending — **never Today, never
-Tomorrow** — and it shows the **near-term operating dates even when their count is zero**, because
-a planner has to be able to see that a day is free. **The generated window is the next seven
-OPERATING days (owner ruling 2026-09-01): logistics runs six days, so a Sunday or a Malaysian
-public holiday is never offered as a plannable choice** — the same calendar
-`ACTION-FLOW-STANDARD.md` Law 2A already states. A scope genuinely recorded on a Sunday or
-holiday still reaches the rail through its own count: evidence is never hidden, only the empty
-generated choice is. The schedule reads **`Confirmed Delivery`**,
-never the customer's promised date.
-
-**`REGION` (owner ruling 2026-09-01)** sits between the schedule and the partners and answers
-*where is each scope going?* in the words the address actually carries:
+**`REGION` (owner ruling 2026-09-01)** answers *where is each delivery going?* in the words the
+address actually carries, wherever the Delivery rail draws it:
 
 - **Peninsular states are listed by their own names, never merged and never bucketed under an
   `Other`** — a state appears while it genuinely holds a scope (the same admission rule the
@@ -492,74 +500,42 @@ never the customer's promised date.
 - **`SINGAPORE` is a fixed sub-heading with Singapore beneath it, always visible** — the two-leg
   journey's home. **Leg 1 (KL → JB) counts under Johor** — the truck the planner sees on the JB
   run — **and leg 2 under Singapore.**
-- State detection reuses the ONE address classifier; a row whose address resolves to no state
-  joins no region row and stays reachable through `All` — fixing its address is Sales work
-  through `Open Sales Order to change`.
+- State detection reuses the ONE address classifier; a delivery whose address resolves to no
+  state joins no region row and shows while no region is picked — fixing its address is Sales
+  work through `Open Sales Order to change`.
 
-`LOGISTICS` lists `All`, then the governed partners
+`LOGISTICS` lists the governed partners
 **NETS · AL · TEOW · TT · EU · SSY · HOUZS in that order and visible at zero**, then any other
-partner while it is genuinely carrying a scope, then `No logistics picked` when scopes have none.
-The three groups COMBINE, each group's counts are computed over the rows the others have already
-narrowed, and counts are **delivery scopes or Journey legs, never whole Sales Orders.** Choices ride
-the URL (`?date=` · `?region=` · `?logistics=`).
+partner while it is genuinely carrying a scope, then `No logistics picked`. Picking an active row
+again unpicks it — there is no separate `All` row on a single-pick rail. Counts are **delivery
+scopes or Journey legs, never whole Sales Orders.**
 
-**One parent row = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
-rows, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the
+**One card = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
+cards, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the
 goods reached the named JB warehouse, which is not the event the Singapore customer is waiting for.
-Singapore Journey legs are **separate assignments**. A delivered order leaves the workspace — that
+Singapore Journey legs are **separate assignments**. A delivered order leaves Monitor — that
 is Delivery Orders and Delivery History.
 
-**Default columns, in this order (owner ruling 2026-08-24, OVERWRITING the 2026-08-21 order):**
-
-```
-☐ · ▸ · SO / Ref · Customer · Delivery Location · Building · Requested Delivery Date ·
-Confirmed Delivery · Confirmed Time · Logistics Partner · Goods · DO No · Delivery Status
-```
-
-Date and time stay **separate columns**. `SO / Ref` is the sticky identity column and stays visible
-through horizontal scroll. **No Owner column, no avatar, no action sentence.** Dates print the
-actual weekday + date. `Confirmed Delivery` is Delivery's own operational date — the document's when
-one exists, else the arrangement, else the confirmed booking; a carrier's provisional date is never
-printed as confirmed. `Phone` and `Delivery address` ship in the chooser, off by default.
-
-**THE INTERACTION CONTRACT (owner ruling 2026-08-24).**
-
-```
-Click SO No          →  open the Sales Order
-Click DO No          →  open the Delivery Order
-Click ▸              →  expand and inspect this scope's goods — READ-ONLY
-Double-click a row   →  open Edit Delivery          (never the Sales Order)
-Select one row       →  Assign logistics + Edit Delivery
-Select many rows     →  Assign logistics only
-```
-
-The 45px toolbar is **replaced in place** when rows are selected — never a second toolbar row — and
-reads `1 delivery scope selected` / `3 delivery scopes selected`, `Clear`, then the actions.
-`Edit Delivery` may never redirect to the Sales Order.
-
-**THE DISCLOSURE.** The governed chevron: `▸` collapsed, rotated when expanded, **neutral grey and
-never the danger ink**, in the 32px control gutter, titled `Show delivery items`, carrying a correct
-`aria-expanded`. It is an ENGINE property, so every register wears it.
-
-**`Delivery Status` is the OPERATION's progress, not the document's** (owner ruling 2026-08-24):
+**`Delivery Status` on Monitor is the OPERATION's progress, not the document's** (owner ruling
+2026-08-24):
 
 ```
 Waiting for customer date · Delivery confirmed · Waiting for warehouse ·
 Ready for handover · Out for delivery · Delivered · Failed Delivery
 ```
 
-**`Created` may not appear on the Delivery workspace.** It is a true fact about a piece of paper and a
+**`Created` may not appear on Monitor.** It is a true fact about a piece of paper and a
 useless one on a planning screen — two scopes reading `Created` can be a week of real work apart. It
-stays in the Delivery Orders Register, which is where the document's own life is described. The two
+stays in the Delivery Orders register, which is where the document's own life is described. The two
 vocabularies are separate and neither may borrow the other's words.
 
-**ASSIGN LOGISTICS — Delivery's own write.** One or many selected scopes at once. Only partners
-valid for the selected routes/coverage are offered; **Klang Valley defaults to NETS** per §2, as a
-pre-selection and never a lock. **An existing Logistics Partner is never silently replaced:**
-changing one is the governed **`Change logistics`** act and requires a reason from the governed list
-plus an append-only history line, enforced by a database check constraint rather than only by a
-dialog. Singapore Journey legs are assigned separately. The write lands on the arrangement, never on
-the Sales Order.
+**PARTNER WRITES stay governed wherever they are made.** Only partners valid for the route/
+coverage are offered; **Klang Valley defaults to NETS** per §2, as a pre-selection and never a
+lock. **An existing Logistics Partner is never silently replaced:** changing one is the governed
+**`Change logistics`** act and requires a reason from the governed list plus an append-only
+history line, enforced by a database check constraint rather than only by a dialog. Singapore
+Journey legs are assigned separately. The write lands on the arrangement, never on the Sales
+Order.
 
 **EDIT DELIVERY — the Delivery-owned full-screen 50/50 surface.** Left, the form; right, a **live
 preview rendered by the actual governed Delivery Order renderer**, which reads
@@ -585,13 +561,12 @@ A wrong Sales fact is corrected through the door **`Open Sales Order to change`*
 from Delivery: the save payload has no field for one, so it cannot be written from here even by a
 hand-made request. **`Save Delivery` records the arrangement and does not issue the document.**
 
-**▸ has exactly one job:** that scope's goods and physical facts, read-only. The shared Goods
-mini-table (`Category · Unit ID · Deliver To · SKU · Qty · Item`), then `Where` · `Who has it` ·
-`Stock ETA`, then **`Items to collect`** and only when a Loan exists. **No editable field, no
-Partner selector, no Save, no second Delivery form inside the expansion.** Stock owns Where/Who has
-it/Stock ETA, Sales Orders owns the customer, address, promise and ordered goods, Warehouse owns
-readiness and handover, Payment owns the release gate; the Delivery workspace creates no duplicate Sales,
-Stock, Warehouse, Purchasing or Payment truth.
+**Goods inspection lives on the formal pages, not on Monitor.** A Monitor card carries only the
+goods SUMMARY; the exact Units, `Where` · `Who has it` · `Stock ETA` and any `Items to collect`
+Loan facts are read on the record the card opens. Stock owns Where/Who has it/Stock ETA, Sales
+Orders owns the customer, address, promise and ordered goods, Warehouse owns readiness and
+handover, Payment owns the release gate; no Delivery surface creates duplicate Sales, Stock,
+Warehouse, Purchasing or Payment truth.
 
 **Delivery History defaults:** `Delivery Date · DO No · Customer · Logistics Partner · Result ·
 Failed Delivery Reason · Goods · Proof Status · Recorded By`.
@@ -684,7 +659,10 @@ owns audited/versioned:
   Tesco and Sedenak. §5.1's backward calculation reads these calendars; assigning such a
   partner raises the dated Warehouse/Purchasing Work computed from them;
 - customer-contact responsibility and record-on-behalf policy;
-- per-Partner Portal/WhatsApp/email/API confirmation method, deadline, proof and rejection reasons;
+- per-Partner Portal/WhatsApp/email/API confirmation method, deadline, proof and rejection reasons.
+  **Partner contact is company MASTER DATA, stored and read through
+  `delivery_partners.contact` — HOUZS's confirmed company contact is `011-11108855`.** It is
+  read wherever partner contact is needed and never printed on a Monitor calendar card;
 - Warehouse preparation, checking, handover and return requirements;
 - minimum proof by result, Partner and goods type;
 - Failed Delivery reason, required proof, suggested next action and default owner;
@@ -854,7 +832,7 @@ No unresolved Owner Decision remains.
 This MASTER persists the approved operating model only. It does not authorise Cards,
 implementation sequencing, migration or build work.
 
-## 16 · Production closure — unified Delivery page
+## 16 · Production closure
 
 **DEPLOYED 2026-08-24 — PR #896, main SHA
 `52804c005d7bf53bcbe9e1b1dcdd2b47cd684656`.** The first approved Delivery UI correction is live
@@ -932,528 +910,16 @@ Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy 
 `Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
 an activity fact that confirms nothing and moves no arrangement field.
 
----
-
-## 17 · Monitor — complete surface proposal for owner review, 2026-09-03
-
-**PROPOSAL — OWNER APPROVAL REQUIRED. NOT LAW. NOT BUILT.**
-
-This section is a review proposal in an isolated, documentation-only checkout. It does not
-overrule §§1–16 or claim approval, implementation, visual testing or production deployment.
-The earlier chat sketches of a second full register and a wall of date cards are withdrawn,
-not accumulated as alternative designs. No Monitor proposal has been approved in this chat.
-After owner approval, replace conflicting current-law paragraphs and the affected dictionary
-entries; do not leave this proposal beside a competing approved rule.
-
-本节只完整设计 **Monitor 这一主要 surface**，包括它的日期概览、某日明细、筛选结果、
-货品展开和窄屏状态。Edit Delivery 与 DO object 在这里定义准确入口和返回行为；它们自己的
-完整页面 Blueprint 仍需分别展示。本节不是整个 Delivery UI Blueprint 的完成声明。
-
-### 17.1 · Decision, scope and evidence
-
-**RECOMMENDATION — Monitor 是日期概览加按需打开的交付明细；Delivery Orders 是永久正式文件 register。**
-Monitor 不是另一张永久 DO register，也不是员工任务卡墙。默认主体显示交付安排与实际结果的日期分布。
-需要比较详细字段、查看 Units 或批量安排时，在同一个 Monitor 内打开某日／某个筛选范围的明细。
-没有 Calendar/List 两个顶层 Tab，没有新增第三个 Delivery 页面，没有常驻右侧详情或第二个表单。
-
-这个组合保留现有表格在精确比较、展开和批量操作上的能力，但不再让它充当 Monitor 的全部入口。
-不能只为两页外观不同而换布局：日期概览必须帮助员工少查日期、少漏交付；明细必须保留完成工作的能力。
-
-**FACT — baseline read at `origin/main` = `0649b7c32efe68b2aa2ce995ac95175eac93253e`.**
-ERP public deployment marker returned that same SHA; this is not a fresh authenticated production walk.
-The user-specified new DO register was found in local code snapshot
-`700504ea1f9c9adea658baa5d1e46b31bfdf91ca`, not in that main revision. A separate read/test checkout
-passed 158 related web tests and 13 API tests, web/API type checks and the design-standard check.
-No build ran. Those checks do not prove the new Monitor or complete arbitrary split-Unit handling.
-
-| Classification | Relevant finding and exact evidence |
-|---|---|
-| RESOLVED FROM AUTHORITY | This chat's starter locks `Delivery > Monitor`, `Delivery > Delivery Orders`, the DO register's ten-column order, sticky DO No, 240px rail, below-1280 overlay and automatic DO issue. Delivery MASTER §§2–7, 11–15 and Architecture §§3.5.1/3.6 own the business boundaries. |
-| BUILT / VERIFIED | Existing Monitor predecessor: `OperationDelivery.tsx:170–294` goods inspection, `:387–425` combined filtering, `:885–940` DataGrid/selection; `delivery-work.ts` scope/date/region projections; `delivery-arrangements.ts` arrangement and reply doors. These are code findings, not a new visual acceptance claim. |
-| APPROVED TARGET / NOT BUILT | Exact Unit reconciliation and partial handover, complete proof/exception follow-through, shared Staff & Duties resolution, calendar Settings editor. Business approval is not UI or production completion. |
-| REAL GAP / CONTRADICTION | MASTER §8 and COPY-STANDARD's 2026-08-24 module wording still demand one direct Delivery destination. Current scope projection excludes delivered orders wholesale, copies whole-SO goods into leg rows, and does not provide complete split-to-Unit lineage. A calendar cannot repair these facts by changing appearance. |
-| REAL GAP / CONTRADICTION | The requested `docs/UI-KIT.md` is absent from main. Current Constitution names 01/02/03 and UI MASTER. No alternative token system is adopted here; resolve the obsolete reference before build handoff. |
-
-**Primary reference lessons, not imported business law:**
-
-| CURRENT CARRES → reference lesson | KEEP / ADAPT / IMPROVE / REJECT | Recommended flow → operator journey → placement → cross-module connection |
-|---|---|---|
-| Existing day/region/partner filters → Microsoft schedule board separates dated bookings and unscheduled requirements | ADAPT | Confirmed delivery dates form the overview; undated scopes retain an explicit entry. Employee sees dates, then opens a scope. Monitor reads Delivery arrangements; it does not schedule staff shifts. |
-| Existing expandable list → 2990 `DeliveryPlanning.tsx`, `MfgDeliveryOrdersList.tsx` separate operational planning and formal records | KEEP + RELOCATE | Keep scoped selection, goods inspection and document links in focused Monitor detail; keep the permanent DO register separate. Sales and Stock remain source owners. |
-| Current date and document projections can diverge → SAP Monitor Outbound Deliveries tracks fulfillment, events and item/shipment relationships | IMPROVE | Each visible entry identifies a real scope/leg/visit and links to its own evidence; inspection follows the same Units. Actual handover/result drives progress, not the calendar. |
-| Reply upload exists → reference systems distinguish demand, booking and execution | KEEP | Prepare request → receive real reply → Save Delivery → arrangement changes. Copy/open/send alone changes no confirmation. NETS portal and Operations proxy use the same fact. |
-| Current readiness is partly order-scoped → mature warehouse execution distinguishes preparation, handover and receipt | IMPROVE | Monitor shows readiness and discrepancies; Warehouse and Logistics record their separate exact-Unit facts. Delivery does not manufacture a stock count. |
-| Existing Work deep-links → mature exception drill-down | ADAPT | An unresolved reason/proof/loan remains reachable across dates, with the shared Work action leading to its owning page. No local assignment list or manual completion checkbox. |
-| International boards also offer staff resources, GPS, drag/drop and optimization | REJECT in this scope | Carres buys partner services and records agreed dates. No invented live location, driver availability, route optimizer, manual DO creation, or drag-to-confirm. |
-
-References inspected: [Microsoft schedule board](https://learn.microsoft.com/en-us/dynamics365/field-service/work-with-schedule-board),
-[SAP Monitor Outbound Deliveries](https://help.sap.com/docs/business-network-global-track-and-trace/shipping-specialist-test-tenants/about-monitor-outbound-deliveries-app),
-[SAP filter documentation](https://help.sap.com/docs/SAP_LOGISTICS_BUSINESS_NETWORK_GLOBAL_TRACK_AND_TRACE_OPTION_V2/c020ec3d720342e59c76abe196fefa55/f875a59a70091014902e5e61bf035c23.html?locale=en-US&state=PRODUCTION&version=Cloud),
-and actual source under `/Users/chaichiewlim/Desktop/2990s/apps/backend/src/pages/`.
-Microsoft supplies the overview/unscheduled principle, not a literal Carres screen. SAP supplies
-the evidence/relationship principle, not authority for a Carres calendar layout.
-
-**INFERENCE / trade-off:** overview plus focused detail uses one additional navigation step for
-dense comparison, but direct `Edit Delivery` and `Show delivery items` shortcuts avoid a forced
-detour for one scope. A dates-only board would lose the current batch/Unit tools; a register-only
-Monitor would not add a useful overview beside the permanent DO register.
-
-**Falsifier:** reject or simplify the calendar composition if a representative operator walk cannot
-find an undated scope, an overdue delivery, an unresolved result and a named date's partner/goods
-without hunting; if the same work consistently takes longer than the current filtered list; or if
-scope/date/Unit identity cannot be reconciled between overview, detail and owning records.
-Synthetic sketches and imported test-data volume are not evidence of real operator speed.
-
-### 17.2 · One page, explicit internal states
-
-```text
-Portal sidebar                       Monitor (one destination)
-Delivery                             ├─ date overview (default)
-├─ Monitor                           ├─ a named day's detail
-└─ Delivery Orders                   ├─ No confirmed date / Overdue results
-                                     └─ specific unfinished-work results
-
-Monitor scope ── Edit Delivery ── Save / return ── same Monitor context
-             ├─ SO number / Order Route ── owning Sales Order
-             └─ DO number ── exact formal Delivery Order object
-```
-
-这些不是 Tab。日期标题、筛选项和记录上的明确按钮改变当前 Monitor 内容；浏览器 Back 恢复
-前一个范围、滚动位置、展开项和焦点。没有双重 breadcrumb、没有点击父菜单打开的第三个页面。
-进入 Edit 或对象页后，返回保持原来日期、地区、物流和搜索；已经不符合筛选的记录正常离开结果，
-页面告知保存成功，不把它偷偷塞回列表。
-
-### 17.3 · Desktop date overview — exact anatomy
-
-```text
- Portal sidebar 232       Page header, 50
-┌───────────────────┬────────────────────────────────────────────────────────────┐
-│ ▾ Delivery        │ Monitor                          Jump to…       [bell ? gear]│
-│   ▌ Monitor       ├────────────────────────────────────────────────────────────┤
-│   Delivery Orders │ [Search delivery scopes…]  [‹] [Fri, 4 Sep — Fri, 11 Sep] [›] │ 45
-│                   ├───────────────────┬────────────────────────────────────────┤
-│                   │ Local rail 240    │ Fri, 4 Sep · 3       Sat, 5 Sep · 1     │
-│                   │                   │ ┌─────────────────┐ ┌─────────────────┐│
-│                   │ DELIVERY SCHEDULE │ │ SO-1321          │ │ SO-1323         ││
-│                   │ Calendar          │ │ TAN MEI          │ │ LEE WEN         ││
-│                   │ No confirmed date │ │ Ampang · Condo   │ │ JB → Singapore  ││
-│                   │ Overdue           │ │ NETS             │ │ EU              ││
-│                   │ Fri, 4 Sep        │ │ 09:00–12:00      │ │ 14:00–17:00     ││
-│                   │ Sat, 5 Sep        │ │ ETA 10:30        │ │ No ETA          ││
-│                   │ Mon, 7 Sep        │ │ 3 items          │ │ 2 items         ││
-│                   │ …                 │ │ Ready for        │ │ Delivery        ││
-│                   │                   │ │ handover         │ │ confirmed       ││
-│                   │ DELIVERY WORK *   │ │ DO-040926-0001   │ │ No delivery     ││
-│                   │ Cannot Deliver    │ │ Edit Delivery    │ │ order yet       ││
-│                   │ Failed Delivery   │ │ Show delivery    │ │ Edit Delivery   ││
-│                   │ Delivery Proof    │ │ items            │ │ Show delivery   ││
-│                   │ Items to collect  │ └─────────────────┘ │ items           ││
-│                   │ Needs checking    │ ┌─────────────────┐ └─────────────────┘│
-│                   │                   │ │ SO-1322 …       │                      │
-│                   │ REGION            │ └─────────────────┘                      │
-│                   │ …                 │ ┌─────────────────┐                      │
-│                   │ LOGISTICS         │ │ SO-1323 · Leg 1 │                      │
-│                   │ …                 │ └─────────────────┘                      │
-│                   │                   │        grid-owned horizontal scroll →   │
-│                   ├───────────────────┴────────────────────────────────────────┤
-│                   │ 4 deliveries · Fri, 4 Sep — Fri, 11 Sep                    │ 32
-└───────────────────┴────────────────────────────────────────────────────────────┘
-```
-
-Illustrative records/counts only, not production data. Columns after Saturday are omitted from the
-drawing, not from navigation. `*` marks proposed placement/copy, detailed in §17.11.
-The calendar composition is new and needs shared-kit composition approval as part of this proposal;
-there is no claim that a proven Calendar component already exists. Reuse shared shell, controls,
-cards, status, date formatting and inspection components; do not create a parallel token kit.
-
-- **Default range:** the next seven Delivery operating dates, starting at the current business
-  date if it is open. Date range navigation moves the window, not a booking. A date picker reaches
-  any required date. Sunday/public-holiday exclusions come from the shared calendar, not browser
-  weekday guesses; a real event on a closed day remains accessible on its actual date.
-- **Date placement, not date rewriting:** a not-yet-resulted delivery sits on Confirmed Delivery.
-  Once an actual visit is recorded with its business occurrence date, that same delivery entry
-  sits on the actual date. If different, its card also prints the original Confirmed Delivery.
-  The two facts remain intact; neither upload time nor record-entry time is the occurrence date.
-  A failed visit stays on its actual date; a rebooked delivery is a different entry. Closed dates
-  with real visits are included as evidence columns inside a viewed range, never offered as new
-  allowed booking days. If an actual date has not been recorded, keep the known confirmed date
-  and disclose the missing fact; do not infer it from a timestamp with a different meaning.
-- **Not an hourly Gantt:** Confirmed Time may be a named/free-text agreed window. Cards sort by a
-  trustworthy normalized start only when available; otherwise retain a stable order. Do not draw
-  fake start/duration blocks from a phrase or turn an ETA into booked time.
-- **Density:** date columns have a proposed minimum width of 300px; they do not shrink seven
-  detailed cards into unreadable strips. The work area owns horizontal scrolling, sticky date
-  headers and a single vertical scroll. No independently scrolling card columns. At small content
-  width the view becomes the focused daily layout in §17.9, not a miniature seven-column board.
-- **Card content, in order:** source SO/ref; customer; this scope's destination/building or leg
-  route; actual Logistics Partner; Confirmed Time; ETA; scoped goods summary; operational status;
-  actual DO link/absence; `Show delivery items`, plus `Edit Delivery` only for an authorized,
-  currently editable arrangement. Historical/resulted entries never inherit an Edit control
-  that would modify a replacement arrangement.
-  The date is already in the column heading. Requested Delivery Date appears on undated entries
-  and when different from the operational date; full facts remain in focused detail/Edit.
-- **ETA scope:** read only the logistics estimate belonging to this exact arrangement/leg and
-  agreed date. A current whole-order estimate is not an old DO's estimate; an uncertain split
-  estimate is No ETA. A later ETA never rewrites the confirmed date/window. Historical result
-  entries do not borrow an estimate from a replacement arrangement.
-- **No false summaries:** goods summary counts this scope, excludes money/service-only lines and
-  does not label an entire SO as one trip. A missing scope mapping produces a named unavailable
-  fact, never a guessed quantity. A grouped count is not a vehicle-capacity estimate.
-- **Status is text plus the governed tone:** no partner rainbow, status-by-color-only, KPI cards,
-  manual status dropdown, owner/avatar column or generic next-action sentence.
-- **Shortcuts:** date heading opens that day's detail; `Show delivery items` opens that scope's
-  exact detail context with the goods row expanded and focused. `Edit Delivery` opens the exact
-  arrangement directly. A DO/SO link never behaves like a card-selection click.
-
-### 17.4 · Focused day / filter detail, selection and goods inspection
-
-This is the same Monitor, with the calendar work area replaced by the relevant detail list.
-The Portal sidebar, page header and local rail remain. `Calendar` returns to the overview and
-restores its date position; it is a return control, not a competing top-level Tab.
-
-```text
-Monitor
-────────────────────────────────────────────────────────────────────────────────
-[Calendar]  Fri, 4 Sep       [Search delivery scopes…]        [Export] [Columns]
-────────────────────────────────────────────────────────────────────────────────
-☐ ▸ SO / Ref │ Customer │ Delivery Location │ Building │ Requested Delivery Date
-             │ Confirmed Delivery │ Confirmed Time │ Logistics Partner │ Goods
-             │ ETA │ DO No │ Delivery Status                    (horizontal →)
-────────────────────────────────────────────────────────────────────────────────
-☐ ▾ SO-1321  │ TAN MEI …                                      Ready for handover
-     Category │ Unit ID   │ Deliver To    │ SKU       │ Qty │ Item
-     Mattress │ U1-000-001│ Carres Klang  │ H1401F-K  │ 1   │ King mattress
-     Bedframe │ U1-000-002│ Carres Klang  │ BF-EXAMPLE│ 1   │ King bedframe
-     Sofa     │ U1-000-003│ Carres Klang  │ SF-EXAMPLE│ 1   │ Three-seat sofa
-
-     Unit ID   │ Source Document │ Where        │ Who has it
-     U1-000-001│ PO-EXAMPLE      │ Carres Klang │ Carres Warehouse
-     U1-000-002│ PO-EXAMPLE      │ Carres Klang │ Carres Warehouse
-     U1-000-003│ PO-EXAMPLE      │ Carres Klang │ Carres Warehouse
-
-     Required 3 · Handed over 0 · Not handed over 3
-     Expected arrival: [supplier fact only when goods remain short]
-     Items to collect: [appears only for this scope's linked collection]
-────────────────────────────────────────────────────────────────────────────────
-3 deliveries
-```
-
-示例 Unit/PO/SKU 用于说明关联，不是实际记录或新的编号规则。最终格式继续使用已有 formatter。
-
-- **Default field order:** control gutter → SO / Ref → Customer → Delivery Location → Building →
-  Requested Delivery Date → Confirmed Delivery → Confirmed Time → Logistics Partner → Goods →
-  ETA → DO No → Delivery Status. Existing optional Phone/Delivery address remain chooser-only.
-  ETA placement on Monitor is a proposal; this never modifies the locked DO register columns.
-- **Identity and powers:** sticky control gutter + SO / Ref; current shared DataGrid density,
-  resize, permitted column arrangement, horizontal scrolling and browser layout preferences.
-  Defaults must be readable without manual repair. Return controls cannot obscure the identity.
-- **Inspect has one job:** the six-column Goods mini-table, physical facts tied to the exact Unit
-  and Source Document, then conditional collection facts. No partner picker, Save or editable
-  stock fields. Different holders must remain associated with their own Unit IDs; two unrelated
-  lists of holder names and locations are not an acceptable substitute.
-- **Keyboard:** Enter/Space on the disclosure opens it; up/down moves through inspectable rows;
-  Escape closes the inspection and returns focus. Double-click Edit may remain a shortcut but
-  is never the only editing route. SO number and Order Route go to the owning SO.
-- **No selection:** normal toolbar. **One selection:** `Clear`, the scoped count,
-  `Assign logistics`, `Edit Delivery`, shared selection export. **Many:** `Assign logistics`
-  and read-only selection export only. Replace the 45px toolbar in place, not a second band.
-  Historical/resulted/cancelled entries may be included in read-only export selection, but must
-  never become eligible for Assign/Edit merely because they are selected. Mixed eligibility
-  suppresses the write action and explains the exact ineligible records. A failed old delivery
-  does not edit the replacement arrangement under the old identity.
-- **Bulk limits:** selected scopes only; no mass date/ETA/result/proof/status update. Partner
-  choices must cover the intersection of selected destinations. A replacement requires the
-  governed reason and history. The existing all-or-nothing business contract remains: a refused
-  batch must not leave some scopes reassigned. After an uncertain response, reconcile the actual
-  outcome rather than retrying blindly or claiming success. A filter/range
-  change clears selection and makes the reset visible; hidden selections are never acted upon.
-- **External communication is not a bulk side effect:** assigning a carrier neither sends a
-  message nor proves agreement. Save/assignment refresh the same projections and preserve context.
-
-**Work-filter detail is not another assignment register.** After choosing Delivery Proof, Items
-to collect, Needs checking, Cannot Deliver or Failed Delivery, the main area uses the shared
-compact Work-row presentation for that particular obligation. Identity/fact is first; the
-resolved owner is structured metadata; the exact shared action is the single direct control.
-This is a filtered projection of Work, not locally stored work. It is the intentional exception
-to the fact-only overview/day-list display: those ordinary calendar/register entries have no
-owner/action column. Multiple obligations on one delivery do not acquire multiple fake deliveries.
-
-```text
-Monitor
-[Calendar]  Delivery Proof · All dates            [Search delivery scopes…]
-────────────────────────────────────────────────────────────────────────────
-DO-010926-0007 · WONG MEI · Tue, 1 Sep
-Delivered · No delivery photo yet
-[resolved staff avatar]                 [Upload delivery photo]
-────────────────────────────────────────────────────────────────────────────
-```
-
-The button opens the same exact DO/photo action as My Work, with no intermediate search and no
-second upload form on Monitor. Partner refusal opens the exact arrangement's governed response;
-failure opens its remaining Delivery act; collection opens its linked collection act; discrepancy
-opens the exact reconciliation work. If no duty is configured, show the shared resolver's missing-
-duty state and its authorized Staff & Duties route, not a guessed salesperson or page-local picker.
-
-### 17.5 · Rail, count meaning, search and zero states
-
-The rail is exactly 240px, including padding; it is not the 232px Portal sidebar. Group order is
-`DELIVERY SCHEDULE → DELIVERY WORK → REGION → LOGISTICS`. The new work-filter group and its
-placement are a proposal; the relative Date/Region/Logistics order is retained.
-
-| Group | Entries / scope |
-|---|---|
-| DELIVERY SCHEDULE | `Calendar` returns to the current overview range; `No confirmed date`; `Overdue`; next seven operating dates including zero; selected/outside-window dates remain reachable through the date picker. |
-| DELIVERY WORK | `Cannot Deliver` means an unresolved partner refusal before a run; `Failed Delivery` means an actual failed result with remaining Delivery work; `Delivery Proof` means a due/open proof obligation, not every future DO without a photo; `Items to collect` means an open linked Loan collection; `Needs checking` means unresolved exact-Unit handover/receipt discrepancy. |
-| REGION | Actual Peninsular states; Sabah/Sarawak always under EAST MALAYSIA, Singapore under SINGAPORE; Labuan when applicable. Unknown classification remains reachable without inventing an Other region. Leg 1 KL→JB is Johor, leg 2 is Singapore. |
-| LOGISTICS | All; NETS, AL, TEOW, TT, EU, SSY, HOUZS fixed and visible at zero; other actual partners; No logistics picked when applicable or selected. |
-
-**Selection model:** one schedule/work mode at a time, not five contradictory simultaneous date
-filters. Region and Logistics selections combine with it and with search; alternatives within
-one of those groups are OR, groups combine with AND. Mode and date range are explicit in the
-work-area heading. Picking a work filter changes to its all-date detail results, retaining region,
-partner and search; it does not silently retain last week's date window. Picking a day returns
-to that day's mode. This is one content navigation model, not hidden Tabs.
-
-**Entry identity:** an entry is one planned or actually performed delivery within its exact scope
-and leg, linked to its source arrangement/DO/visit. Issuing a DO does not create a second calendar
-entry for the same delivery. Rebooking after failure creates a new delivery entry; the previous
-visit is history. The view must not use SO number alone as identity or create its own trip store.
-Calendar/day result totals therefore use proposed `{n} deliveries`; active arrangement selection
-retains the governed `{n} delivery scopes selected`. Counts are not customer-order or Unit totals.
-
-**Counts:** date/work entry counts are distinct matching delivery identities after search,
-region and partner, independent of the currently selected date/work entry so other outstanding
-work remains visible. Region counts honor active mode/search/partner; Logistics counts honor
-active mode/search/region. No group sums overlapping work categories into a fabricated total.
-A scope may need both proof and collection; it counts once in each relevant filter and once in
-the resulting union if an aggregate is ever shown. A two-leg journey counts two leg entries,
-not two customer orders and not twice the physical stock.
-
-The rail work counts cover unresolved work across dates; the calendar footer covers only entries
-in its displayed range. Both name their scope. Do not display a grand total above the calendar
-that mixes undated, historical, active and completed documents.
-
-Search covers the current mode's SO/ref, customer, actual DO, locality, partner and scoped goods.
-It does not cross authorization or silently discard the selected range. A no-match state exposes
-the active range/filters, clear controls and the separate Delivery Orders destination for a
-historical formal-document search. Filter choices and selected-zero entries remain available.
-
-**Zero is not availability:** an empty date says no matching deliveries; it does not promise the
-partner has capacity. A zero partner row remains selectable. A zero work filter means no such
-matching open obligations, never missing data or a reason to remove the entry.
-
-### 17.6 · Which facts appear where — including after delivery
-
-| Case | Monitor placement and behavior | Fact/owner boundary |
-|---|---|---|
-| Complete Sales delivery facts but no DO/date/money clearance | No confirmed date, or the confirmed day if one exists; arranging logistics proceeds independently of the issue gate | Sales owns customer/address/access/goods/requested date; money remains Payment; no DO button |
-| Missing Sales address/access or invalid goods scope | Does not enter an actionable Delivery scope; correction stays on Sales Work | Do not pad Monitor with guessed destinations; a formerly valid scope that becomes invalid must not vanish silently from its linked exception/history |
-| Confirmed day in current range | One entry for the current arrangement/leg; show accurate readiness even before a DO exists | Document issue remains the shared automatic gate |
-| Actual handover/receipt | Same entry's progress updates; only exact moved Units change holder | Warehouse outbound and Logistics receipt remain separate records |
-| Date passed, no physical result | Overdue across all dates, retain the missed date | Do not redate automatically or treat a passed date as an actual visit |
-| Delivered within viewed date range | Retain the factual Delivered entry for that day's review; it leaves the rolling default range as dates move | This proposal deliberately avoids making the day's successful deliveries disappear immediately; it is not a permanent document register |
-| Delivered but proof still owed | Delivered remains true; Delivery Proof filter stays populated across dates | Do not rename it Failed Delivery or close Work merely because goods arrived |
-| Loan still with customer | Items to collect remains visible independent of the sale's completion | Collection has its own obligation; Warehouse inspection gates future availability |
-| Failed actual run, not rebooked | Failed Delivery filter; result/reason stay on the failed visit/DO | A partner refusal before a run is not this case |
-| Rebooked after failure | New arrangement/new DO when gates permit; old visit remains on its real date and in formal history | Never repurpose the failed DO number or count old and new plans as two physical Units |
-| Order cancelled / system-rescheduled document | Remove the cancelled plan from active calendar execution; exact old document/reason remains reachable through SO lineage and Delivery Orders | Cancellation is not an actual failed run or an invented eighth operational status; staff cannot manually void a DO |
-| Partially handed over/delivered | Show scoped progress plus exact unmatched Units; outstanding part stays open | No whole-order successful label, no count-only forced reconciliation |
-| Unit scope or source fact cannot load | Named data error on that part, inspection/result unavailable until reliable | Never substitute the whole SO or turn a load failure into Qty 0 |
-
-**Important implementation gap:** the current `isOpenDeliveryScope` excludes every delivered
-order, and the current expansion starts from all `row.o.order_lines`. Those reads cannot be
-treated as ready for the above lifecycle merely because the existing tests pass. Correct source
-projection is a dependency of the target, not a new operating question for the owner.
-
-### 17.7 · A new employee's complete daily journey
-
-1. **Open Monitor.** The actual date range and global filter choices are visible. Cross-date
-   failure/proof/collection/refusal/discrepancy counts remain accessible in the rail.
-2. **Arrange an undated NETS delivery.** No confirmed date → relevant scope → Edit Delivery.
-   The NETS default follows configured coverage. NETS records the actual customer agreement, or
-   Operations records it on behalf of NETS with actor/source/evidence. Save returns to Monitor;
-   the entry moves to its agreed day and the rail recounts. There is no Accept gate.
-3. **Arrange non-portal logistics.** Edit Delivery shows the source facts and prepared request.
-   Copy/open WhatsApp/email records preparation only. A real reply/evidence is recorded before
-   confirmation; rejection leads to governed Change logistics/replanning, not a failed visit.
-   Monitor itself does not add another composer or send without an explicit operator act.
-4. **Check a confirmed date.** Open the day → compare destination/time/logistics → expand goods.
-   The same Unit IDs, source documents, holders and shared readiness tally explain what is
-   missing. Warehouse/Purchasing Work opens at its owner; Delivery does not edit their facts.
-5. **Record execution.** Exact DO opens the owning object and authorized result/handover doors.
-   Work deep-links land on that same governed act. Delivered/partial/failed records update the
-   Monitor projection. No activity copy, date passage or uploaded unrelated photo marks success.
-6. **Close the operational day.** Review that date including actual successes, then the cross-date
-   unfinished filters. Every remaining item has its source, concrete shared Work action and
-   resolved duty owner. There is no Mark done and no locally assigned staff list.
-
-### 17.8 · Partner, journey and module seams
-
-| Capability | What Monitor exposes; exact next destination | What it never owns |
-|---|---|---|
-| NETS / proxy | Assignment, agreed date/window, ETA, actual reply; Edit Delivery for proxy record; distinct recorder and reporting partner | No Accept gate, no owner inferred from the proxy recorder |
-| TEOW / TT calendars | Read-only calculated pickup/arrival/Warehouse-ready chain in focused scope facts; Edit Delivery uses central rules | No guessed weekdays, stock-ready-before-planning rule, or separate backward calculation |
-| KL→JB→Singapore | Separate leg entries, each destination, partner, date/time and result; own source/Unit mapping; related leg link via SO Order Route | Leg 1 arrival never claims customer receipt; no reuse of a whole-order DO on both legs without a real link |
-| HOUZS East Malaysia | Carres-to-HOUZS handover and returned onward-arrival evidence, linked to the same scope | No fabricated last-mile ETA, GPS, route or HOUZS fleet; no external cutover |
-| Condo | Building/access read-only from Sales; driver/IC/phone/vehicle and registration facts in Delivery's governed Edit context | Monitor does not invent driver data or let a logistics actor alter the Sales address |
-| Outbound / partial / discrepancy | Required, Handed over, Not handed over; actual Logistics receipt; unmatched Unit links; Needs checking filter | No copying aggregate numbers into another record or editing one party's count to agree |
-| Failure / proof | Actual reason, original date and specific remaining obligation; exact result/evidence object and shared Work action | No overwrite of failed history; no claim that preparing a message supplies proof |
-| Loan | Open collection source, item/Unit and return destination; collection result remains separate from goods delivery | No free-to-sell return before Warehouse inspection; no automatic loan closure |
-| Settings / Reports | Global gear reaches central Delivery settings; reports read the same date/result/scope facts | No extra sidebar pages, local partner calendar editor, or KPI dashboard on Monitor |
-| Work / duty / Quick Rail | People → Staff & Duties → shared resolver → Work action/deep-link; Quick Rail previews those same dates/actions | No local roster, `assigned_to`, page-specific owner arithmetic, or duplicate booking calendar store |
-
-### 17.9 · Responsive behavior, keyboard and accessibility
-
-**Desktop:** Portal sidebar follows its shared 232/60px behavior. Local filter rail is in-flow
-240px at viewport ≥1280px. The calendar owns overflow and the focused list owns its grid
-overflow; document body must not grow sideways. Date columns remain at least 300px. Depending
-on available content width, users see as many full columns as fit and can reach the rest by
-horizontal scrolling or direct date choice. These are layout budgets, not measured browser proof.
-
-**Below 1280px:** local rail starts closed regardless of a wider-screen open preference; Show
-filters opens the same 240px rail as an overlay, with backdrop, Escape, focus containment and
-focus return. Active filters remain applied and visibly indicated. Resizing must never leave a
-hidden interactive panel focused or accidentally erase the filter choices.
-
-**Content width below 640px:** the calendar becomes a single-date agenda, not a squeezed week.
-Actual date picker/previous/next remain; undated and unfinished modes use the same stacked scope
-layout. The data, source links and permitted actions are unchanged. The focused list's dense
-columns become a readable identity/facts summary; no required information is discarded because
-an optional column could not fit. Unit inspection may scroll horizontally inside its own area.
-
-```text
-Monitor                       [global controls]
-[Show filters]    [Search]
-[‹]              Fri, 4 Sep             [›]
-────────────────────────────────────────────
-SO-1321 · TAN MEI
-Ampang · Condo · NETS
-Confirmed Time 09:00–12:00
-ETA 10:30 · 3 items
-Ready for handover
-DO-040926-0001
-[Edit Delivery]  [Show delivery items]
-────────────────────────────────────────────
-SO-1322 · LIM …
-```
-
-Compact toolbar controls remain governed; no clipped 45px row. In a narrow selection toolbar,
-the one-scope Edit action remains direct and secondary assignment/export use the shared action
-overflow; with multiple scopes Assign logistics remains direct. Every icon-only control has a
-governed accessible name. Do not add a permanent second toolbar or make horizontal scrolling the
-only way to discover the primary action.
-
-Keyboard order: toolbar → local filter choices → date heading → each scope's source links and
-actions → next date. No nested clickable card with conflicting links. Controls work without
-double-click, hover, drag or color recognition. Date headings announce full actual dates; scope
-controls announce source identity/leg; selected/expanded/loading states are conveyed explicitly.
-200% zoom and a 390px-wide viewport preserve the same source/action paths. Destructive or changing
-actions are never triggered by moving keyboard focus or changing a filter.
-
-### 17.10 · Loading, empty, stale, failure and permission states
-
-| State | Visible behavior | Safe next step |
-|---|---|---|
-| Initial load | Stable header/rail shell; loading placeholders, no zero counts presented as fact | Wait for the authorized scope projection |
-| Entire read fails | Named page error; preserve filter controls; no empty-success wording | Try again; keep query/context |
-| One scope's Units fail | Scope remains visible, goods area states failure; no guessed SO fallback | Retry that inspection; no partial/result submission on unreliable scope |
-| Valid empty date | Date heading remains; no matching-delivery message | Choose another date/filter; no New DO |
-| Valid empty work filter | State the exact missing obligation count is zero | Change filters or return to Calendar |
-| Search excludes everything | Show current filter/range context and clear controls | Clear the narrowed scope; formal historical lookup stays Delivery Orders |
-| New facts arrive | Refresh the source projection; do not reorder the record being edited or discard entered changes | On return/save, reconcile against latest facts and explain any conflict |
-| Save conflicts with another actor | Preserve entered values; explain which source fact changed; no blind last-writer win | Reload/review the governed arrangement |
-| Cancelled/historical object | View permitted facts with history; no current execution controls | Open exact related/current record where one exists |
-| Unauthorized scope | No customer/address/proof leakage through cards, counts, search, exports or links | Authenticated permission refusal / non-disclosing not-found as appropriate |
-
-Internal Operations may inspect and arrange authorized scopes. Warehouse/Logistics duties execute
-only their own doors. NETS and other partner identities stay in the limited Partner Portal/API,
-not an unrestricted internal Monitor. Manager capability is not a second duty assignment system.
-Prepared external content must contain only that partner's relevant scope; full IC/phone data
-belongs only in the authorized registration context, not a calendar card or general export.
-
-### 17.11 · Wording ledger — no invented word treated as approved
-
-**Already-authorized words reused:** `Monitor` / `Delivery Orders` (current user starter);
-`DELIVERY SCHEDULE`, `No confirmed date`, `Overdue`, `Assign logistics`, `Change logistics`,
-`Edit Delivery`, `Save Delivery`, `Show delivery items`, `Items to collect`, scoped selection
-counts and the operational status set (COPY-STANDARD delivery sections); `Show filters` /
-`Hide filters` (COPY-STANDARD shared controls); `Expected arrival` (booking-call dictionary);
-`Required · Handed over · Not handed over` and `Needs checking` (Delivery §4 / Architecture
-§3.5.1); `Cannot Deliver` (partner screen authority). `Calendar` is an existing shared word,
-but its use as this Monitor mode/return control is proposed, not prior placement approval.
-
-**PROPOSAL — OWNER APPROVAL REQUIRED:** all phrases and new contexts below are part of this
-surface proposal, not strings silently added to the dictionary. Approval is reviewed with the
-complete surface, not as a sequence of wording questions.
-
-| Exact proposed text / context | Intended meaning |
-|---|---|
-| `DELIVERY WORK` as a local filter-group heading, never a sidebar destination | Specific unresolved Delivery obligations |
-| `All dates` in a work-filter result heading | This result ignores the previously displayed calendar range |
-| `No deliveries match these filters.` | Valid empty calendar/date results |
-| `Clear filters` | Clear narrowing controls without creating or changing a record |
-| `No deliveries without a confirmed date match these filters.` | Valid empty No confirmed date results |
-| `No overdue deliveries match these filters.` | Valid empty Overdue results |
-| `No delivery proof is missing for these filters.` | Valid empty proof-obligation results; never claims every partner/date is clear |
-| `No items need collecting for these filters.` | Valid empty linked Loan-collection results |
-| `No deliveries need checking for these filters.` | Valid empty discrepancy results |
-| `No partner reports need a reply for these filters.` | Valid empty Cannot Deliver results |
-| `No failed deliveries need work for these filters.` | Valid empty unresolved failure results |
-| `Delivery details could not be loaded. Try again.` | Full Monitor read failure |
-| `Goods for this delivery could not be loaded.` | Scope inspection failure; not zero goods |
-| `Goods for this delivery are not linked yet.` | Missing exact scope-to-line/Unit mapping |
-| `These delivery details changed. Check them before saving.` | Concurrent arrangement change |
-| `Selection cleared because the filters changed.` | Prevent hidden bulk mutation |
-| `Previous dates` / `Next dates` / `Choose delivery date` | Accessible names for range navigation and date picker |
-| `Show deliveries on {date}` | Accessible name for date-heading drill-down |
-| `More actions` | Narrow-toolbar secondary-action overflow |
-| `{n} deliveries` | Distinct planned/performed delivery entries; not SO, physical Unit or Work-row totals |
-| `Leg {n}` | Scope identity alongside its actual origin/destination on a journey card |
-| `Actual delivery date not recorded` | Missing visit occurrence date; never filled from upload/entry time |
-| `No time agreed`, `No ETA`, `Search delivery scopes…`, `Calendar` on this new composition | Existing code/current starter/shared wording reused in a new Monitor context; ratify context and dictionary gaps explicitly |
-
-Example people, partners, dates, SO/DO/Unit values are data, not newly coined labels. Actual cards
-must use the current registered partner display name rather than normalize a name from a sketch.
-Do not borrow stale banned `Stock ETA`, generic Due/Next Action/Priority/Follow Up, or Today/Tomorrow.
-
-### 17.12 · Acceptance boundary, unresolved dependencies and review status
-
-The following are product acceptance scenarios, not implementation tasks or a build Card:
-
-1. A new employee can find one undated scope, open its correct arrangement and return after Save
-   without losing region/partner context; copying a message alone leaves it unconfirmed.
-2. A selected date shows its relevant arrangements and actual results. Completed visits remain
-   available for that date; date passage does not invent a result or move an ETA into a booking.
-3. An old failed visit, outstanding photo, open Loan and unmatched Unit remain findable across
-   dates; each action has an owning source and shared duty resolution, with no Mark done.
-4. Two legs of one Singapore journey show their own dates/partners/Units/results. Completing
-   Johor never completes the Singapore customer leg. No whole-order DO link is fabricated.
-5. Partial handover changes only named Units. Both counterparty counts and the discrepancy remain
-   visible. Original work and original evidence survive. A split scope never falls back to SO totals.
-6. One/many selection exposes only the permitted acts; changed partner requires reason/history;
-   no hidden selection or half-success message can mislead the operator.
-7. Show delivery items is read-only and exact; wrong Sales facts leave through Sales, Warehouse
-   facts through Outbound, missing supplier facts through Purchasing, and money through Payment.
-8. At 1920, 1440, 1280, 1130, 920 and 390px, plus 200% zoom and keyboard-only use, dates, source
-   identity, filters, inspection and the permitted action remain reachable without body overflow.
-   These widths are required future checks, not checks claimed to have run on this proposal.
-9. Partner or unauthorized users cannot recover other scopes through counts, deep-links, search,
-   proof URLs, exports or registration data. No external message/account/channel is changed here.
-10. The new Monitor does not change the locked DO register sequence, fixed identity, rail width,
-    automatic issuance, formal history or DO/SO link semantics. The existing 500-row/scope/ETA/
-    narrow-preference defects remain explicit convergence requirements, not accepted behavior.
-
-**Dependency conclusions — no business re-interview needed:** exact scope/Unit/visit identities,
-evidence-linked date/partner reads, a complete rather than capped result set, open-work projection
-after delivery, shared duty resolution, governed bulk failure behavior, and source-backed proof
-enforcement are required to support this design. Current code gaps do not authorize guessed UI.
-
-**Still awaiting review, not silently decided:** the Monitor composition and its focus navigation;
-retaining completed entries within the inspected date; the new all-date work-filter placement;
-and the explicitly proposed copy. The owner has not approved them. No runtime implementation,
-Card, migration, build, PR, external contact or deploy is authorized by this section.
-
-**Whole Blueprint remains open:** this section connects all requested Delivery lifecycle seams,
-but the DO register, full Edit/preview, DO object, dedicated partner experience, central Settings
-and Reports still require their own complete surface presentations and owner review. Do not
-declare `DELIVERY UI BLUEPRINT COMPLETE` or prepare a build handoff from this section alone.
+**DEPLOYED 2026-09-04 — Delivery CARD 01 · Monitor Calendar, PR #1101, main SHA
+`e04dc00708eb2f40f001b8dedd8a4721a24c3875`, production converged (deploy probe).** The four-page
+map's first page is live: Monitor is the read-only six-operating-day calendar at
+`?tab=delivery` (mobile: one-day list), the Portal sidebar carries the Delivery module with
+Monitor and Delivery Orders, and `/operation/delivery-orders` reaches the existing register
+again instead of redirecting. Every card is one link — an issued DO opens the Delivery Order
+object, a scope without one opens Edit Delivery — and no Delivery writer, evidence change,
+partner file or migration is in the diff. Walked on the seeded dev preview at 1920/1440/1130/
+375px; the walk's own findings (raw partner id on the rail · NEEDS CHECKING hidden behind the
+window · plain REGION rows) were fixed before merge. Named follow-ups, not accidents: a bulk
+`Assign logistics` surface (the retired listing's door), the Delivery Orders register's own
+redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar` ·
+`NEEDS CHECKING` · `Search deliveries…`).

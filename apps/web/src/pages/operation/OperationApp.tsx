@@ -32,6 +32,7 @@ import OperationDashboard from "./OperationDashboard";
 import OperationOrdersControl from "./OperationOrdersControl";
 import SalesOrdersRegister from "./SalesOrdersRegister";
 import DeliveryOrderPage from "./DeliveryOrderPage";
+import DeliveryOrdersRegister from "./DeliveryOrdersRegister";
 import SalesOrderWorkspace from "./SalesOrderWorkspace";
 import SettingsWorkspace from "./SettingsWorkspace";
 // T11 (2026-07-27) — the Delivery module: the ONE new sidebar item in the
@@ -52,6 +53,8 @@ import OperationPurchaseOrders from "./OperationPurchaseOrders";
 // P3 (Jess redesign Q3a=B) — GRN receiving station, split out from the
 // Purchase Order (procurement) menu.
 import OperationReceiving from "./OperationReceiving";
+import OperationReceivingReport from "./OperationReceivingReport";
+import StaffDuties from "./StaffDuties";
 // R2 (0288) — the supplier-claim queue, fourth tab of the Purchasing module.
 import OperationSupplierClaims from "./OperationSupplierClaims";
 import OperationPurchasingSettings from "./OperationPurchasingSettings";
@@ -351,6 +354,12 @@ export default function OperationApp() {
           tab !== "claims" &&
           tab !== "purchasing-report" &&
           tab !== "purchasing-settings" &&
+          /* 【RECEIVING】 CARD 01 — Receiving & Inbound and Staff & Duties draw
+             their own Destination Header; the slim bar would be a second top
+             row (the same defect the Warehouse walks caught, found live on
+             this card's production walk). */
+          tab !== "receiving-report" &&
+          tab !== "staff-duties" &&
           /* 【WAREHOUSE】 CARD 02 — the Inventory Register, the two
              de-navigated legacy Stock pages and Unit Detail all draw their own
              50px Destination Header (ModuleHeader embeds TopBarIcons), so the
@@ -410,12 +419,12 @@ export default function OperationApp() {
             />
             <Route path="orders" element={<SalesOrdersRegister />} />
             {/* The Delivery Orders register + the DO object page (blueprint
-                card 2026-08-16). `:doId` accepts the row id or the document
-                number itself, so `DO-…` anywhere in the portal is a door. */}
-            <Route
-              path="delivery-orders"
-              element={<Navigate to="/operation?tab=delivery" replace />}
-            />
+                card 2026-08-16). The register address is a real destination
+                again (CARD-2026-09-04-delivery-01 four-page map) — the
+                2026-08-24 redirect into the unified page is retired with that
+                page. `:doId` accepts the row id or the document number
+                itself, so `DO-…` anywhere in the portal is a door. */}
+            <Route path="delivery-orders" element={<DeliveryOrdersRegister />} />
             <Route path="delivery-orders/:doId" element={<DeliveryOrderPage />} />
             {/* One exact Unit, addressed by its PERMANENT Carres Unit ID —
                 the thing printed on the supplier label and the thing 0366
@@ -482,6 +491,12 @@ export default function OperationApp() {
                 Purchase Order menu (TabbedProcurementShell at
                 /operation/procurement); this is tab-state driven. */}
             {tab === "receiving" && <OperationReceiving />}
+            {/* Central Reports → Receiving & Inbound (2026-09-04 card) —
+                reachable by direct URL, like the Purchasing Report. */}
+            {tab === "receiving-report" && <OperationReceivingReport />}
+            {/* Workspace → Staff & Duties — the ONE duty assignment door
+                (workspace/MASTER.md, LOCKED 2026-09-03). */}
+            {tab === "staff-duties" && <StaffDuties />}
             {/* R2 — the supplier-claim queue: what receiving found wrong, and
                 what an unkept ETA turned into. Fourth Purchasing tab, no new
                 sidebar entry. */}

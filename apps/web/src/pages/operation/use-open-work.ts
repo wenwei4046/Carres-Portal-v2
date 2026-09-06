@@ -33,8 +33,11 @@ import {
   manualPurchaseSupplierSummary,
   manualPurchaseWorkContext,
   manualPurchaseWorkItems,
+  countWorkingDays,
   myHolidaySet,
   orderActionLine,
+  receivingWorkItems,
+  WAREHOUSE_OFF_DAYS,
   workItemsForOrder,
   type OpsStaffMember,
   type WorkItem,
@@ -46,9 +49,13 @@ import {
   useManualPurchaseRegister,
   useOperationOrders,
   useOperationPoDuty,
+  useOperationPos,
   useOperationStaff,
   useOperationStock,
+  useOperationSuppliers,
+  useOperationWarehouseReceipts,
   usePurchasingSettings,
+  useReceivingDuty,
 } from "@/lib/queries";
 import {
   logisticStateOf,
@@ -103,6 +110,19 @@ export function useOpenWorkSet(): OpenWorkSet {
   // resolves to the month's PO-duty holder. Fails soft exactly as the duty
   // hook always has: dormant layer → no holder → the duty word stands.
   const poDutyQ = useOperationPoDuty();
+  // Receiving's feed (2026-09-04 card): submitted counts + arrival-day POs,
+  // owner from the ONE shared resolver — never a rota read (Law F.1).
+  const receiptsQ = useOperationWarehouseReceipts("submitted");
+  const posQ = useOperationPos();
+  const suppliersQ = useOperationSuppliers();
+  const receivingDutyQ = useReceivingDuty();
+  const supplierNameById = useMemo(
+    () =>
+      new Map(
+        (suppliersQ.data?.suppliers ?? []).map((s) => [s.id, s.name ?? null]),
+      ),
+    [suppliersQ.data],
+  );
 
   const orders = useMemo(() => ordersQ.data?.orders ?? [], [ordersQ.data]);
   const staff = useMemo(() => staffQ.data?.staff ?? [], [staffQ.data]);
@@ -348,9 +368,86 @@ export function useOpenWorkSet(): OpenWorkSet {
     return out;
   }, [manualQ.data, poDuty, holidayOpts, today]);
 
+  /* Receiving's projection (owner-approved 2026-08-29 slice; wired by the
+     2026-09-04 card). Two triggers only — a submitted Warehouse count, and a
+     supplier date that has arrived with goods still owed. Outstanding
+     quantity alone never makes a row (the anti-spam rule), and lateness
+     counts on the WAREHOUSE calendar (Mon–Sat). The owner is the ONE shared
+     resolver's answer (`useReceivingDuty` → 0425); this hook never reads a
+     rota or computes an offset (Law F.1). */
+  const receivingItems = useMemo(() => {
+    const receipts = receiptsQ.data?.receipts ?? [];
+    const pos = posQ.data?.pos ?? [];
+    const duty = receivingDutyQ.data;
+    const grnDuty =
+      duty?.normal_user_id != null
+        ? {
+            userId: duty.acting_user_id ?? duty.normal_user_id,
+            name: duty.acting_user_name ?? duty.normal_user_name,
+          }
+        : null;
+    const src = {
+      submitted: receipts
+        .filter((r) => r.status === "submitted")
+        .map((r) => ({
+          id: r.id,
+          po_id: r.po_id,
+          supplier_name: r.supplier_name,
+          goods_received_at: r.goods_received_at,
+          submitted_at: r.submitted_at,
+        })),
+      arrivalsDue: pos
+        .filter((p) => p.status === "open")
+        .map((p) => ({
+          po_id: p.id,
+          supplier_name: p.supplier_id
+            ? (supplierNameById.get(p.supplier_id) ?? null)
+            : null,
+          eta_date: p.eta_date ?? null,
+          pending_qty: (p.purchase_order_lines ?? []).reduce(
+            (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),
+            0,
+          ),
+        })),
+    };
+    const late = (dueIso: string) =>
+      countWorkingDays(dueIso, today, {
+        ...holidayOpts,
+        offDays: WAREHOUSE_OFF_DAYS,
+      });
+    return receivingWorkItems(src, { grnDuty }, today, late).map(
+      (it): WorkRow => ({
+        ruleKey: it.ruleKey,
+        module: "receiving" as WorkItem["module"],
+        soRef: it.soRef,
+        orderId: it.orderId,
+        action: it.action,
+        ownerName: it.ownerName,
+        ownerUserId: it.ownerUserId,
+        ...(it.ownerDuty ? { ownerDuty: it.ownerDuty } : {}),
+        tone: it.tone,
+        locked: false,
+        broken: false,
+        dueIso: it.dueIso,
+        workingDaysLate: it.workingDaysLate,
+        line: it.action,
+        customer: null,
+        ownerId: it.ownerUserId,
+        deliveryDoNumber: null,
+      }),
+    );
+  }, [
+    receiptsQ.data,
+    posQ.data,
+    receivingDutyQ.data,
+    supplierNameById,
+    holidayOpts,
+    today,
+  ]);
+
   const allItems = useMemo(
-    () => [...items, ...manualItems],
-    [items, manualItems],
+    () => [...items, ...manualItems, ...receivingItems],
+    [items, manualItems, receivingItems],
   );
 
   return {

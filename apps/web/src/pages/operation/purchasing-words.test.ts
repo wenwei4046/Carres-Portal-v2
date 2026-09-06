@@ -214,13 +214,14 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
     ).toMatch(/Supplier: /);
-    // Receiving names it as the RAIL GROUP's title instead — the Workspace
-    // template has a navigation rail, not filter chips, so the word moved but
-    // the law did not: it is `Supplier`, never `Factory`.
+    // Receiving names it as the FILTER RAIL group's title — the governed
+    // 240px FilterRail prints group headings uppercase (Card 02-C grammar),
+    // so the word moved to `SUPPLIER` but the law did not: it is `Supplier`,
+    // never `Factory`.
     expect(
       visibleSource("pages/operation/OperationReceiving.tsx"),
       "Receiving must still call the facet Supplier",
-    ).toMatch(/RailGroup title="Supplier"/);
+    ).toMatch(/FilterRailGroup title="SUPPLIER"/);
   });
 });
 
