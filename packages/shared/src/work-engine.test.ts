@@ -40,6 +40,41 @@ const ctx = {
   delayDecisionAtIso: null,
 };
 
+describe("Payment MASTER — no blind collection Work", () => {
+  const waiting = { ...baseSignals, goodsReady: false, moneyOwing: true };
+
+  it("keeps goods work but creates no collection even with a customer delivery date", () => {
+    const items = workItemsForOrder(openOrderActions(waiting), ctx, "2026-08-18", HOLS);
+    expect(items.some((item) => item.ruleKey === "confirm_ready_date")).toBe(true);
+    expect(items.some((item) => item.ruleKey === "collect")).toBe(false);
+  });
+
+  it("still raises the independent Finance Exception while collection waits", () => {
+    const items = workItemsForOrder(
+      openOrderActions({ ...waiting, financeExceptionHolds: true }),
+      { ...ctx, financeExceptionHolds: true },
+      "2026-08-18",
+      HOLS,
+    );
+    expect(items.filter((item) => item.ruleKey === "collect")).toHaveLength(0);
+    expect(items.find((item) => item.ruleKey === "resolve_payment_exception")).toMatchObject({
+      ownerDuty: "Finance",
+      dueIso: "2026-08-18",
+    });
+  });
+
+  it("creates collection when arrival becomes known and removes it when that fact is withdrawn", () => {
+    const itemsFor = (stockEtaIso: string | null) => workItemsForOrder(
+      openOrderActions({ ...waiting, stockEtaIso }), ctx, "2026-08-18", HOLS,
+    );
+    expect(itemsFor("2026-08-19").find((item) => item.ruleKey === "collect")).toMatchObject({
+      ownerName: "Shasha",
+      dueIso: "2026-08-18",
+    });
+    expect(itemsFor(null).some((item) => item.ruleKey === "collect")).toBe(false);
+  });
+});
+
 describe("the blueprint card's two composed Work items (owner-approved 2026-08-16)", () => {
   it("an OPEN Finance exception composes `Resolve the payment exception` — Finance's duty, due today", () => {
     const items = workItemsForOrder(

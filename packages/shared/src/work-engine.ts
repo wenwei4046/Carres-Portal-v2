@@ -206,7 +206,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "collect",
     module: "orders",
-    trigger: "outstanding > RM 0 — and it survives delivery",
+    trigger: "outstanding > RM 0 with goods ready or arrival confirmed; collection survives delivery",
     owner:
       "Payment duty (payment/MASTER §5) — no payment-duty roster exists yet, so the order's PIC stands as governed cover: money may never sit unowned (the 2026-08-19 incident is why the gate reversed)",
     ownerRule: "payment_duty",

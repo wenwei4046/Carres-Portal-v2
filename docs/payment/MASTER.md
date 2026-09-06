@@ -284,6 +284,14 @@ refuses failed or incomplete source reads instead of reporting a false zero. The
 uses the shared grid, sticky Receipt No, six approved columns, view-scoped selection/export and
 void-aware footer total. Its Inspect is read-only; the draft object uses one continuous scroll.
 
+The delivery branch also makes the existing shared Order/Work action engine check collection
+readiness. A live order with goods not ready and no usable arrival date creates no collection
+action, even when a customer delivery date exists. Arrival confirmation creates the action;
+withdrawing it restores waiting. Already-delivered balances stay collectible. This changes no
+money arithmetic or Delivery gate; an actual Finance Exception remains independent Work.
+Focused shared and source-mapping tests cover the rule, and removing the guard fails the three
+Work integration cases. This remains branch evidence, not a production verification claim.
+
 This UI is not connected to production navigation. Existing payment writers and entrances remain
 unchanged. Invoice objects, immutable documents/Print, evidence opening, authorised corrections,
 message/template persistence, Settings, Reports and full business workflows remain unfinished.
