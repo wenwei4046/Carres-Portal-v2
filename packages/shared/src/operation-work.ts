@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { WORK_RULES, type WorkItem } from "./work-engine";
 
 export const operationWorkModuleSchema = z.enum([
   "orders",
   "purchasing",
   "receiving",
+  "claims",
   "stock",
   "delivery",
   "payment",
@@ -82,3 +84,55 @@ export function operationWorkStableId(
   return [module, objectLabel, ruleKey].map(identityPart).join(":");
 }
 
+export interface OperationWorkPresentation {
+  object: OperationWorkItem["object"];
+  problem: string;
+  recipient: string | null;
+  requiredResult: string;
+  destination: string;
+  today: string;
+}
+
+/** Translate a module engine's open projection into the transport contract.
+ * The module supplies presentation facts and the registry supplies closure;
+ * neither the API nor Workspace invents either one. */
+export function operationWorkItemFromProjection(
+  item: WorkItem,
+  presentation: OperationWorkPresentation,
+): OperationWorkItem {
+  const rule = WORK_RULES.find((candidate) => candidate.key === item.ruleKey);
+  if (!rule) throw new Error(`Work rule is not registered: ${item.ruleKey}`);
+  const dueOn = item.dueIso;
+  const bucket =
+    item.workingDaysLate > 0
+      ? "overdue"
+      : dueOn === null
+        ? "no_date"
+        : dueOn === presentation.today
+          ? "today"
+          : "later";
+  return operationWorkItemSchema.parse({
+    id: operationWorkStableId(item.module, presentation.object.label, item.ruleKey),
+    module: item.module,
+    ruleKey: item.ruleKey,
+    object: presentation.object,
+    problem: presentation.problem,
+    action: item.action,
+    recipient: presentation.recipient,
+    requiredResult: presentation.requiredResult,
+    completionFact: rule.completionFact,
+    owner: {
+      rule: item.ownerRule,
+      dutyKey: item.ownerDutyKey,
+      normal: item.normalOwner,
+      activeCover: item.activeCover,
+      acting: item.actingPerson,
+      state: item.ownerState,
+    },
+    timing: { dueOn, workingDaysLate: item.workingDaysLate, bucket },
+    destination: presentation.destination,
+    tone: item.tone,
+    locked: item.locked,
+    broken: item.broken,
+  });
+}
