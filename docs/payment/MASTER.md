@@ -372,11 +372,12 @@ muted as `not a working day` (Malaysian holidays too), the selected date on the 
 every indicator carrying words. Entries are read-only facts from their authoritative owners;
 an Expected arrival entry creates no deadline and no chase, and voided invoices place nothing.
 
-### BUILD in progress — the template library keeps every version, 2026-09-06
+### Deployed — the template library keeps every version, 2026-09-06
 
-Migration `0435` (branch evidence; verified on production in a rolled-back transaction — a
-non-manager is refused, an edit appends version 2 while version 1 stays history, one Default
-per purpose holds, and an inactive template cannot be the Default; not yet applied) creates
+Migration `0435` is APPLIED and PR #1116 merged as `012887af`; production converged that exact
+SHA. The rolled-back production probe proved: a non-manager is refused, an edit appends
+version 2 while version 1 stays history, one Default per purpose holds, and an inactive
+template cannot be the Default. The migration creates
 `payment_message_templates`, the append-only version store, and its three manager doors
 (save · set default · set active) through the same settings gate and change log. Seeds carry
 ONLY the two already-locked customer wordings (Jess 2026-07-13) as the `Gentle reminder` and
@@ -391,12 +392,25 @@ pay` now recommends the Default template from the shared clock's answer, offers
 `Change template` across Active templates, renders protected fields from structured facts,
 and falls back to the built-in locked wording when the library is unreachable.
 
+### BUILD in progress — Send receipt, 2026-09-06
+
+Branch evidence, no migration: after a successful posting, the done panel says Payment
+recorded · Receipt number · Amount still needed and offers **Send receipt** — template-driven
+ONLY. A full payment recommends the `Payment received` template, a partial one
+`Partial payment received`; the composition renders the manager's wording with the receipt
+facts (`{receipt_no}` `{amount}` `{still_needed}` join the protected fields) and records into
+the immutable ledger as kind `receipt` with the sent-screenshot proof. With no Active receipt
+template the panel says `No receipt template yet. Ask a manager to add the approved wording
+in Settings.` — nothing invents customer copy.
+
 Message assembly with bank routing and Partner contact, Reports, Stripe convergence, storage
 journeys, full responsive 390px/200% verification and the retirement of the rejected
 Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
-it into a `Standard bank transfer` template once approved.
+it into a `Standard bank transfer` template once approved. The production Calendar walk is
+still owed (the walk aborted on a frozen browser extension; the shipped path is covered by
+the local walk and its tests).
 
 ### Approved target / not claimed built by this scope
 
