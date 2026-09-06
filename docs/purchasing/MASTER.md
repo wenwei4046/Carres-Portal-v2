@@ -362,9 +362,11 @@ this door, while SKU relationships remain the authority for which specific goods
 supply. The form never asks for a PO Delivery Date: that date belongs to each Purchase Order, not
 Supplier Master.
 
-**BUILD prepared 2026-09-06 / NOT DEPLOYED:** the form and API now submit one complete setup to
-`catalog_create_supplier_setup`. The SQL remains a review draft outside the migrations directory
-until owner approval under `docs/ENGINEERING.md` §5; this is not production completion.
+**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** the form and API submit
+one complete setup to `catalog_create_supplier_setup`. Owner-approved migration `0428` was applied
+at 07:35:20 UTC after production rollback assertions and a negative control passed. All six
+function hashes and the tracker SQL SHA-256 match the committed approved file; no fixture rows
+remain. PR #1105 carries the dependent application and deployment proof.
 
 ### 5.6 Issue means the PDF was actually sent
 
@@ -1317,15 +1319,16 @@ evidence stays visibly missing. Opening, downloading or previewing the PDF prove
 system never claims the supplier read or accepted the PO — only which version Carres sent, through
 which channel, to which recipient, when and by whom. `PO Version` beside `Sent to Supplier` makes
 a version mismatch (`PO V2` vs `PO V1`) immediately visible.
-**APPROVED TARGET / NOT BUILT — measured gap 2026-09-04:** current storage mutates the same PO date
-when a supplier changes it, so it cannot yet truthfully display the original `PO Delivery Date`
-beside the current `Supplier Delivery Date`. BUILD must preserve the issued PO date separately from
-the evidenced supplier answer and must store the reply channel/evidence before this wording ships.
-**BUILD prepared 2026-09-06 / NOT DEPLOYED:** the correction uses an immutable original PO date,
-an append-only current-version reply with channel/evidence/reporter/recorder/time and duty/cover,
-and one shared supplier-reply Work projection. The reviewed SQL must be approved, verified and
-applied before this dependent application code deploys. Earlier records receive no invented dates
-or reply evidence. Production verification remains outstanding.
+**BUILD 2026-09-06 / DATABASE APPLIED, APPLICATION DEPLOYMENT PENDING:** migration `0428`
+preserves an immutable original PO date and requires an append-only current-version reply with
+channel/evidence/reporter/recorder/time and shared duty/cover. Production rollback verification
+proved atomic supplier setup, role/send/version/evidence guards, preserved known and unknown
+original dates, exact persisted source planning without changing an unrelated order, and a
+negative control that fails when the send guard is removed. All six committed function bodies
+were reconciled before and after apply; tracker version `20260906073520` stores the exact approved
+SQL SHA-256 `c4fe5a29f4d4672cf13535577c28f60d8222b37d6399d657245150d385c7cb85`.
+Earlier records receive no invented dates or reply evidence. PR #1105 carries the Register,
+reply form and shared Work projection; application deployment proof remains pending.
 **Journey:** open prepared issue → validate authority/price/Units/destination → send PDF → record
 outbound fact → record the supplier's confirmation or changed date → monitor receipt balance.
 **Object/placement:** full-width view; 50/50 check/preview for issue/change; Document, Revisions,
