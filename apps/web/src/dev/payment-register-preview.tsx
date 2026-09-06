@@ -75,6 +75,49 @@ const VOIDED = {
   ],
 };
 
+function soon(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
+}
+
+const INVOICE_BASE = {
+  kind: "sales", tax_amount: 0, void_reason: null, replaces_invoice_id: null,
+  created_at: "2026-09-06T00:00:00Z",
+};
+const INVOICE_ORDER = {
+  id: ORDER.id, so: ORDER.so, customer_name: ORDER.customer_name,
+  status: "proceed_order", paid: 3200,
+  delivery_date: soon(12), delivery_date_tbd: false, delivered_at: null,
+  ops_assigned_logistic: null,
+  delivery_partners: { name: "NETS", contact: null },
+  order_payments: [{ id: "p-1", receipt_no: "RC-040926-1207", amount: 3200,
+    paid_on: "2026-09-04", voided_at: null }],
+  order_lines: [{ qty: 1, unit_price: 5400 }],
+  order_addons: [],
+  ops_order_control: [{ balance: null, confirmed_date: null,
+    line_etas: { "MS01-K": soon(3) }, line_stock_status: { "MS01-K": "awaiting" } }],
+};
+const INVOICES = [
+  { ...INVOICE_BASE, id: "i-1", invoice_no: "INV-060926-4101", status: "issued",
+    issued_at: "2026-09-06", voided_at: null, order_id: ORDER.id,
+    orders: { ...INVOICE_ORDER,
+      ops_order_control: [{ balance: null, confirmed_date: soon(10),
+        line_etas: null, line_stock_status: { "MS01-K": "ready" } }] } },
+  { ...INVOICE_BASE, id: "i-2", invoice_no: null, status: "draft",
+    issued_at: null, voided_at: null, order_id: ORDER_2.id,
+    orders: { ...INVOICE_ORDER, id: ORDER_2.id, so: ORDER_2.so,
+      customer_name: ORDER_2.customer_name, paid: 500,
+      order_lines: [{ qty: 1, unit_price: 2100 }],
+      delivery_partners: null,
+      order_payments: [{ id: "p-2", receipt_no: "RC-050926-0031", amount: 500,
+        paid_on: "2026-09-05", voided_at: null }] } },
+  { ...INVOICE_BASE, id: "i-3", invoice_no: "INV-030926-2208", status: "voided",
+    issued_at: "2026-09-03", voided_at: "2026-09-04",
+    void_reason: "Wrong amount on the paper", order_id: ORDER.id,
+    orders: INVOICE_ORDER },
+];
+
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
@@ -86,6 +129,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     });
   if (url.includes("/api/finance/payments/register"))
     return json({ rows: [PARTIAL, LIVE, VOIDED], total: 3 });
+  if (url.includes("/api/finance/invoices/register"))
+    return json({ rows: INVOICES, total: 3 });
   if (url.startsWith("/api/")) {
     return new Response(JSON.stringify({}), { status: 404 });
   }

@@ -276,30 +276,41 @@ entrance, idempotency mapping, role gate and void contract; focused web tests pr
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
 
-### BUILD in progress — Payment Register foundation, 2026-09-06
+### Deployed — the Payments Register answers the Finance door, 2026-09-06
 
-The delivery branch adds a read-only canonical receipt Register endpoint and reader. It preserves
-voids and allocation history, resolves recorded actors from shared staff, pages explicitly, and
-refuses failed or incomplete source reads instead of reporting a false zero. The draft Register
-uses the shared grid, sticky Receipt No, six approved columns, view-scoped selection/export and
-void-aware footer total. Exports retain the VOIDED mark beside the original receipt number and
-amount. Its Inspect is read-only; the draft object uses one continuous scroll.
+PR #1104 merged as `caebd3e3` and the production deploy converged that exact SHA on the ERP
+page, the POS page and the API Worker; the served bundle carries the Register's own strings.
+`Finance → Payments` opens the canonical receipt Register: fail-closed paginated
+`GET /finance/payments/register`, six approved columns with sticky Receipt No, view-scoped
+selection/export retaining the VOIDED mark, void-aware footer total, read-only Inspect and the
+one-scroll payment object. The sidebar row says the governed word `Payments`; the Phase-5
+bucket page left the route. The shared Order/Work action engine now checks collection
+readiness: goods not ready with no usable arrival date creates no collection action; arrival
+confirmation creates it; delivered balances stay collectible. No money arithmetic or Delivery
+gate changed. An authenticated owner walk of the live page is still owed; exact-SHA and bundle
+evidence are the current production proof.
 
-The delivery branch also makes the existing shared Order/Work action engine check collection
-readiness. A live order with goods not ready and no usable arrival date creates no collection
-action, even when a customer delivery date exists. Arrival confirmation creates the action;
-withdrawing it restores waiting. Already-delivered balances stay collectible. This changes no
-money arithmetic or Delivery gate; an actual Finance Exception remains independent Work.
-Focused shared and source-mapping tests cover the rule, and removing the guard fails the three
-Work integration cases. This remains branch evidence, not a production verification claim.
+### BUILD in progress — invoice lifecycle and the Invoices Register, 2026-09-06
 
-This UI is not connected to production navigation. Existing payment writers and entrances remain
-unchanged. Invoice objects, immutable documents/Print, evidence opening, authorised corrections,
-message/template persistence, Settings, Reports and full business workflows remain unfinished.
-Local preview checks are fixture evidence only; they are not authenticated production proof.
-No Payment UI completion or exact-SHA deployment is claimed. The complete approved customer
-Important Notes wording has not yet been located in the repository and has been requested from
-its owner; it must not be invented or shortened during implementation.
+Migration `0429` (branch evidence; verified on production in a rolled-back transaction with
+negative controls, not yet applied) gives `invoices` its governed lifecycle: kind
+(Sales/Storage/Additional Storage), draft → issued → voided status, immutable issue snapshot,
+void reason/actors and the replacement lineage; one live Sales Invoice per order; allocations
+may name an invoice. `payment_invoice_prepare` drafts idempotently, `payment_invoice_issue`
+mints the governed `INV-DDMMYY-NNNN` number and freezes the snapshot, and
+`payment_invoice_void_replace` — Payment Approver duty via the Shared Duty Resolver, or
+principal — voids with a required reason and drafts the linked replacement. The dispatch
+trigger now adopts a prepared live invoice instead of minting a twin, and mints on the
+governed scheme when none exists. The branch also builds the §16 Invoices Register (eight
+approved columns; Goods/arrival/timing derived through the one shared
+`orderMoney`/`collectionClock` arithmetic), read-only Inspect, and the one-scroll invoice
+object with honest empty states for the document and Communication History.
+
+Record-payment flow, WhatsApp messages/templates, bank routing, Settings, Reports, Stripe
+convergence, storage journeys, responsive 390px/200% verification and the retirement of the
+rejected Refund/Bank Matching surfaces remain unfinished target work. The complete approved
+customer Important Notes wording has not been located in the repository and has been requested
+from its owner; it must not be invented or shortened during implementation.
 
 ### Approved target / not claimed built by this scope
 
