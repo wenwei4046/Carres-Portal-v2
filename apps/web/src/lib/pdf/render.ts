@@ -16,6 +16,7 @@ import { Document, pdf } from "@react-pdf/renderer";
 import { SalesOrderTemplate } from "./sales-order-template";
 import { InvoiceTemplate } from "./invoice-template";
 import { DoTemplate } from "./do-template";
+import { GrnTemplate } from "./grn-template";
 import { PoTemplate } from "./po-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
@@ -26,6 +27,7 @@ import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
   ExtensionAgreementTemplateData,
+  GrnTemplateData,
   InvoiceTemplateData,
   LoanNoteTemplateData,
   PoTemplateData,
@@ -87,6 +89,12 @@ export function renderExtensionAgreementPdf(
 
 export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
   return toBlob(DoTemplate(data));
+}
+
+/** The formal Goods Received Note (owner correction 2026-09-06) — the GRN
+ *  object's preview, its Print and its Download PDF share this one call. */
+export function renderGrnPdf(data: GrnTemplateData): Promise<Blob> {
+  return toBlob(GrnTemplate(data));
 }
 
 /** Migration 0242 — ON LOAN delivery-note (the customer signs on hand-over of a

@@ -9,6 +9,8 @@ import {
   warehouseReceiptTotals,
   warehouseReceiptOpensClaims,
   WAREHOUSE_RECEIPT_STATUS_LABEL,
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
   type WarehouseReceiptDraft,
   type WarehouseReceiptLineDraft,
 } from "./warehouse-receipt";
@@ -268,14 +270,13 @@ describe("warehouseReceiptTotals / summary", () => {
 describe("status words", () => {
   it("names WHO a submitted receipt is waiting for", () => {
     expect(WAREHOUSE_RECEIPT_STATUS_LABEL.submitted).toBe("Waiting Carres check");
-    // C2 (2026-08-03): the status word is `posted`. `checked_in` was renamed by
-    // 0314 — it named the ACT (`Check in`) while a status has to name the
-    // STATE — and this file was the last place still asserting the old word.
-    expect(warehouseReceiptStatusLabel("posted")).toBe("Checked in by Carres");
+    // Owner correction 2026-09-06: a GRN's DOCUMENT status words are
+    // `Valid` / `Cancelled` — `Posted` / `Voided` stay internal database
+    // statuses and never reach a normal user's screen. `Void Receiving`
+    // remains the ACT's name (a door, not a status).
+    expect(warehouseReceiptStatusLabel("posted")).toBe("Valid");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
-    // `Voided` joined the dictionary with the 2026-09-04 owner instruction
-    // (`Void Receiving` is the GRN's own act, distinct from Cancel).
-    expect(warehouseReceiptStatusLabel("voided")).toBe("Voided");
+    expect(warehouseReceiptStatusLabel("voided")).toBe("Cancelled");
     // An unknown key echoes rather than inventing a word.
     expect(warehouseReceiptStatusLabel("checked_in")).toBe("checked_in");
     expect(warehouseReceiptStatusLabel("returned")).toBe("Sent back to recount");
@@ -319,5 +320,85 @@ describe("receivingRecordNo — the Receiving Record's document number", () => {
       /^GRN-310726-\d{4}$/,
     );
     expect(receivingRecordNo({ id: R.id })).toBe("—");
+  });
+});
+
+/* ── The Receiving rail's category vocabulary (owner correction 2026-09-06) ── */
+
+describe("receiptCategoryWords — the rail's five governed rows", () => {
+  const rl = (over: Partial<{
+    id: string; sku: string; received_now: number; damaged_qty: number;
+    wrong_item_qty: number;
+  }> = {}) => ({
+    id: "l1",
+    sku: "sku-x",
+    received_now: 1,
+    damaged_qty: 0,
+    wrong_item_qty: 0,
+    wrong_item_claim_type: null,
+    ...over,
+  });
+
+  it("is exactly the five labels, in the shared display order", () => {
+    expect(RECEIVING_CATEGORY_ROWS).toEqual([
+      "Mattress",
+      "Bedframe",
+      "Sofa",
+      "Pillow",
+      "Mattress protector",
+    ]);
+  });
+
+  it("answers from the CATALOG's category through the one shared ladder", () => {
+    const cats = new Map([
+      ["sku-a", "mattress"],
+      ["sku-b", "sofa"],
+    ]);
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a" }), rl({ id: "b", sku: "sku-b" })],
+        cats,
+      ),
+    ).toEqual(["Mattress", "Sofa"]);
+  });
+
+  it("a catalog `accessory` resolves to its governed TYPE — MP prints as Mattress protector, never the abbreviation", () => {
+    const cats = new Map([
+      ["Memory Pillow", "accessory"],
+      ["M.P Queen", "accessory"],
+    ]);
+    const words = receiptCategoryWords(
+      [
+        rl({ id: "p", sku: "Memory Pillow" }),
+        rl({ id: "m", sku: "M.P Queen" }),
+      ],
+      cats,
+    );
+    expect(words).toEqual(["Pillow", "Mattress protector"]);
+    expect(words.join(" ")).not.toContain("MP");
+  });
+
+  it("never invents a row — goods outside the five light nothing", () => {
+    const cats = new Map([["Topper Deluxe", "accessory"]]);
+    expect(
+      receiptCategoryWords([rl({ id: "t", sku: "Topper Deluxe" })], cats),
+    ).toEqual([]);
+  });
+
+  it("only lines this delivery actually counted speak", () => {
+    const cats = new Map([["sku-a", "mattress"]]);
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a", received_now: 0 })],
+        cats,
+      ),
+    ).toEqual([]);
+    // A damaged-only line still arrived physically.
+    expect(
+      receiptCategoryWords(
+        [rl({ id: "a", sku: "sku-a", received_now: 0, damaged_qty: 1 })],
+        cats,
+      ),
+    ).toEqual(["Mattress"]);
   });
 });
