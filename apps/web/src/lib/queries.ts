@@ -587,6 +587,7 @@ export const qk = {
       ["finance", "recon-suggest", bankStmtId] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
+    paymentRegister: () => ["finance", "payment-register"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -7364,6 +7365,7 @@ function invalidateOrderMoney(
 ) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.operation.orderPayments(orderId), exact: true }),
+    qc.invalidateQueries({ queryKey: qk.finance.paymentRegister(), exact: true }),
     qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true }),
     qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
     qc.invalidateQueries({ queryKey: ["operation", "payments"] }),
@@ -8465,6 +8467,29 @@ export function useFinanceReconSuggest(
     enabled: !!bankStmtId,
     staleTime: 30_000,
     ...opts,
+  });
+}
+
+export function usePaymentRegister() {
+  return useQuery({
+    queryKey: qk.finance.paymentRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-register").PaymentRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-register").PaymentRegisterPage>(
+          `/api/finance/payments/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Payments could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Payments changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Payments could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Payments changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
   });
 }
 

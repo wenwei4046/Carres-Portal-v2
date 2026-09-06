@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { paymentRegisterQuery } from "@carres/shared/payment-register";
+import { APP_USERS, ORDER_PAYMENTS } from "@carres/shared/tables";
 import {
   financePoPayInput,
   financePoScheduleInput,
@@ -46,6 +48,38 @@ import type { AppEnv } from "../../types";
  *                           0063.
  */
 const financePaymentsRouter = new Hono<AppEnv>();
+
+// A Payment Register reads the canonical ledger, never order progress or AP.
+// Keep voids and allocation evidence; an absent source is not a zero balance.
+financePaymentsRouter.get("/register", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view payments." });
+  }
+  const parsed = paymentRegisterQuery.safeParse(c.req.query());
+  if (!parsed.success) return c.json({ message: "Choose a valid payment range." }, 422);
+  const { offset, limit } = parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error, count } = await sb
+    .from(ORDER_PAYMENTS)
+    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,orders(id,so,customer_name),payment_allocations(id,order_id,amount,allocated_at,voided_at)", { count: "exact" })
+    .order("paid_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error || count == null || data == null) {
+    throw new HTTPException(500, { message: "Payments could not be loaded. Try again." });
+  }
+  const actorIds = [...new Set(data.map((r) => r.recorded_by).filter((id): id is string => !!id))];
+  const names = new Map<string, string>();
+  if (actorIds.length) {
+    const actors = await sb.from(APP_USERS).select("id,name").in("id", actorIds);
+    if (actors.error) throw new HTTPException(500, { message: "Payment history could not be loaded. Try again." });
+    for (const actor of actors.data ?? []) names.set(actor.id, actor.name);
+  }
+  return c.json({ rows: data.map((row) => row.recorded_by
+    ? { ...row, recorded_by_name: names.get(row.recorded_by) ?? null } : row), total: count });
+});
 
 financePaymentsRouter.get("/", requireFinance, async (c) => {
   const auth = c.var.auth;

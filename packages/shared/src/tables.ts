@@ -9,6 +9,7 @@
 // Core order / dealer tables
 // ---------------------------------------------------------------------------
 export const ORDERS           = "orders" as const;
+export const ORDER_PAYMENTS   = "order_payments" as const;
 export const ORDER_LINES      = "order_lines" as const;
 export const ORDER_ADDONS     = "order_addons" as const;
 export const ORDER_HISTORY    = "order_history" as const;
