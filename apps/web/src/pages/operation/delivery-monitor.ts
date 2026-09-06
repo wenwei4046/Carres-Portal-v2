@@ -55,6 +55,7 @@ export const MONITOR_COPY = {
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
   railWork: "WORK TO DO",
+  allDeliveryWork: "All delivery work",
   railRegion: "REGION",
   railLogistics: "LOGISTICS",
   calendar: "Calendar",
@@ -108,12 +109,36 @@ function previousOperatingDay(dateIso: string): string {
 }
 
 /**
- * The default window opens ONE operating day before today: yesterday's
- * deliveries are still being closed out (results, proof), and hiding them
- * would push the operator to the Overdue queue for ordinary morning work.
+ * THE FIXED OPERATING WEEK (owner correction 2026-09-06) — Monday to Saturday,
+ * the six operating days containing `dateIso`. A Sunday input belongs to no
+ * operating week and snaps FORWARD to Monday first, the same rule the phone's
+ * one-day view has always applied. Windows are week-aligned: the arrows
+ * replace the whole displayed work week, never scroll it.
  */
-export function defaultMonitorWindowStart(todayIso: string): string {
-  return previousOperatingDay(todayIso);
+export function operatingWeekOf(dateIso: string): string[] {
+  const snapped = operatingDaysFrom(dateIso, 1)[0]!;
+  const [y, m, d] = snapped.slice(0, 10).split("-").map(Number);
+  const t = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  const monday = new Date(t);
+  monday.setUTCDate(t.getUTCDate() - (t.getUTCDay() - 1));
+  const out: string[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const day = new Date(monday);
+    day.setUTCDate(monday.getUTCDate() + i);
+    out.push(day.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/**
+ * THE TABLET WINDOW — a fixed three-day half of the operating week (Mon–Wed
+ * or Thu–Sat), so the window is aligned and finite rather than a horizontal
+ * scroll. Previous/next moves three operating days, landing on the other half.
+ */
+export function tabletWindowOf(dateIso: string): string[] {
+  const week = operatingWeekOf(dateIso);
+  const snapped = operatingDaysFrom(dateIso, 1)[0]!;
+  return week.indexOf(snapped) < 3 ? week.slice(0, 3) : week.slice(3, 6);
 }
 
 /** Next moves exactly `count` operating days forward. */
@@ -171,6 +196,7 @@ export type DeliveryMonitorSource = ScopeInputs;
  */
 export type MonitorWorkView =
   | "calendar"
+  | "all"
   | "no_confirmed_date"
   | "overdue"
   | "failed"
@@ -179,6 +205,7 @@ export type MonitorWorkView =
 
 export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "calendar",
+  "all",
   "no_confirmed_date",
   "overdue",
   "failed",
@@ -188,6 +215,7 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
 
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   calendar: MONITOR_COPY.calendar,
+  all: MONITOR_COPY.allDeliveryWork,
   no_confirmed_date: MONITOR_COPY.noConfirmedDate,
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
@@ -290,6 +318,9 @@ function matchesView(
   visibleDaySet: ReadonlySet<string>,
 ): boolean {
   switch (view) {
+    case "all":
+      /* Every open delivery scope — the unfiltered selectable listing. */
+      return true;
     case "no_confirmed_date":
       return card.confirmedDate === null;
     case "overdue":
@@ -502,6 +533,7 @@ export function buildMonitorRails(
 
   const work: Record<MonitorWorkView, number> = {
     calendar: calendarCount,
+    all: forWork.length,
     no_confirmed_date: forWork.filter((c) => c.confirmedDate === null).length,
     overdue: forWork.filter(
       (c) => c.confirmedDate !== null && c.confirmedDate < filters.todayIso,

@@ -45,8 +45,11 @@ function toIso(date: Date): string {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
-/** The calendar's own skin. Every value is a §2–§4 token; nothing is invented. */
-const CALENDAR_CLASSNAMES = {
+/** The calendar's own skin. Every value is a §2–§4 token; nothing is invented.
+ *  EXPORTED (2026-09-06, Delivery Monitor month-calendar correction): the rail's
+ *  inline month calendar renders the SAME `react-day-picker` primitive and must
+ *  wear the same skin — a second spelling of these classes is the §6.1 defect. */
+export const CALENDAR_CLASSNAMES = {
   root: "text-body text-kit-slate-12",
   months: "flex flex-col gap-4",
   month: "flex flex-col gap-2",

@@ -24,7 +24,8 @@ import type { DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
   operatingDaysFrom,
-  defaultMonitorWindowStart,
+  operatingWeekOf,
+  tabletWindowOf,
   nextOperatingWindowStart,
   previousOperatingWindowStart,
   buildDeliveryMonitorCards,
@@ -182,21 +183,39 @@ describe("operatingDaysFrom", () => {
   });
 });
 
-describe("the selected window", () => {
-  it("on Friday 4 Sep the default range begins Thursday 3 Sep", () => {
-    expect(defaultMonitorWindowStart(TODAY)).toBe("2026-09-03");
+describe("the fixed operating week (owner correction 2026-09-06)", () => {
+  it("is the Mon–Sat week containing the date — Friday 4 Sep sits in Mon 31 Aug – Sat 5 Sep", () => {
+    expect(operatingWeekOf("2026-09-04")).toEqual([
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+      "2026-09-05",
+    ]);
+    // Monday and Saturday land in their OWN week — the window is aligned.
+    expect(operatingWeekOf("2026-08-31")[0]).toBe("2026-08-31");
+    expect(operatingWeekOf("2026-09-05")[0]).toBe("2026-08-31");
   });
 
-  it("on Monday the previous operating day is Saturday, never Sunday", () => {
-    expect(defaultMonitorWindowStart("2026-09-07")).toBe("2026-09-05");
+  it("a Sunday snaps FORWARD to Monday's week — no operating week holds a Sunday", () => {
+    expect(operatingWeekOf("2026-09-06")[0]).toBe("2026-09-07");
+    for (const week of [operatingWeekOf("2026-09-04"), operatingWeekOf("2026-09-06")]) {
+      expect(week).toHaveLength(6);
+      expect(week).not.toContain("2026-09-06");
+    }
   });
 
-  it("next moves exactly six operating days forward", () => {
-    expect(nextOperatingWindowStart("2026-09-03")).toBe("2026-09-10");
+  it("the tablet window is the aligned three-day half-week containing the date", () => {
+    expect(tabletWindowOf("2026-09-01")).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
+    expect(tabletWindowOf("2026-09-04")).toEqual(["2026-09-03", "2026-09-04", "2026-09-05"]);
   });
 
-  it("previous moves exactly six operating days back", () => {
-    expect(previousOperatingWindowStart("2026-09-03")).toBe("2026-08-27");
+  it("the arrows replace the whole window: ±6 operating days is exactly one week, ±3 the other half", () => {
+    expect(nextOperatingWindowStart("2026-09-04", 6)).toBe("2026-09-11");
+    expect(previousOperatingWindowStart("2026-09-04", 6)).toBe("2026-08-28");
+    // Thu + 3 operating days crosses the weekend into Monday's half.
+    expect(nextOperatingWindowStart("2026-09-03", 3)).toBe("2026-09-07");
     // The two directions are inverses.
     expect(nextOperatingWindowStart(previousOperatingWindowStart("2026-09-03"))).toBe(
       "2026-09-03",
@@ -461,6 +480,11 @@ describe("filterMonitorListRows", () => {
     ).toEqual(["failed", "old-failed"]);
   });
 
+  it("`All delivery work` lists every open scope — the unfiltered selectable listing", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "all" }, WINDOW);
+    expect(out).toHaveLength(SET.length);
+  });
+
   it("a region or logistics pick alone lists EVERY matching open scope", () => {
     expect(
       filterMonitorListRows(SET, { ...noFilters, region: "Selangor" }, WINDOW)
@@ -564,6 +588,7 @@ describe("buildMonitorRails", () => {
     const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
     // Five of the seven cards sit inside the window (dateless + overdue don't).
     expect(rails.work.calendar).toBe(5);
+    expect(rails.work.all).toBe(7);
     expect(rails.work.no_confirmed_date).toBe(1);
     expect(rails.work.overdue).toBe(1);
     expect(rails.work.failed).toBe(1);

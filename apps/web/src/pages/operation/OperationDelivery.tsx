@@ -23,14 +23,20 @@
  * existing partner is the governed `Change logistics` act (reason + history)
  * and is offered for ONE row at a time — never as an uncontrolled batch.
  *
- * ⭐ THE RAIL IS THE SHARED FilterRail GRAMMAR (240px, page-owned): one
- * WORK TO DO group, REGION as direct state names from the real records (no
- * EAST/WEST MALAYSIA sub-headings), LOGISTICS as the partners genuinely
- * carrying matching scopes plus `No logistics picked`.
+ * ⭐ THE RAIL IS THE SHARED FilterRail GRAMMAR (240px, page-owned), with the
+ * COMPLETE MONTH CALENDAR fixed at its top (owner correction 2026-09-06):
+ * month arrows move one month, the selected date wears the governed blue,
+ * today stays distinguishable, Sundays are muted, work days carry a dot, and
+ * the filter groups (one WORK TO DO group with `All delivery work` · flat
+ * REGION state names · LOGISTICS carrying partners + `No logistics picked`)
+ * scroll independently BELOW it. Clicking a date opens the FIXED operating
+ * week containing it in the right workspace.
  *
- * ── MOBILE ──────────────────────────────────────────────────────────────────
- * The calendar becomes a one-day list; a work list stays the selectable grid
- * (sticky identity + horizontal scroll); the rail becomes the filter drawer.
+ * ── THE WINDOWS ─────────────────────────────────────────────────────────────
+ * One `?date=` drives every viewport's finite window — the desktop's Mon–Sat
+ * operating week, the tablet's three-day half-week, the phone's one-day list
+ * (its full month opens through the kit's standard date control). Arrows
+ * replace the whole displayed window; the calendar never scrolls sideways.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -65,10 +71,10 @@ import {
   MONITOR_COPY,
   MONITOR_DAYS,
   MONITOR_VIEW_LABEL,
+  MONITOR_WORK_VIEWS,
   activeFilterLabels,
   buildDeliveryMonitorCards,
   buildMonitorRails,
-  defaultMonitorWindowStart,
   emptyRangeSentence,
   filterMonitorCalendarCards,
   filterMonitorListRows,
@@ -78,11 +84,15 @@ import {
   needConfirmedDateSentence,
   nextOperatingWindowStart,
   operatingDaysFrom,
+  operatingWeekOf,
   previousOperatingWindowStart,
+  tabletWindowOf,
   type DeliveryMonitorCard,
   type DeliveryMonitorFilters,
   type MonitorWorkView,
 } from "./delivery-monitor";
+import MonitorMonthCalendar from "./components/MonitorMonthCalendar";
+import DatePicker from "@/components/kit/DatePicker";
 
 /** The two governed action words on this workspace (COPY-STANDARD). */
 const ASSIGN_LOGISTICS = "Assign logistics";
@@ -91,7 +101,7 @@ const EDIT_DELIVERY = "Edit Delivery";
 
 /** The rail-collapse memory (LOCAL FILTER RAIL COLLAPSE law). */
 const FILTER_RAIL_STORAGE_KEY = "carres.deliveryMonitor.filterRail";
-const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v1";
+const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v2";
 
 /**
  * The OPERATIONAL ladder's tones (owner ruling 2026-08-24): waiting is the
@@ -111,22 +121,43 @@ const STATUS_TONE: Record<DeliveryWorkStatusKind, OrderActionTone> = {
 /** Edit Delivery's own governed words for the arrangement's narrower arrival. */
 const EXPECTED_ARRIVAL = "Expected arrival";
 
-/** Below this width six readable date columns cannot exist — the same
- *  projection becomes the one-day list (the Warehouse agenda's own law). */
+/**
+ * THE THREE FIXED WINDOWS (owner correction 2026-09-06). The calendar never
+ * scrolls horizontally; the viewport picks a FINITE window instead:
+ *
+ *   phone   < 768px   one operating day (list), full month via the kit's
+ *                     standard date control
+ *   tablet  < 1280px  a fixed three-day half of the operating week
+ *   desktop ≥ 1280px  the fixed six-day operating week, fitting its width
+ */
 const PHONE_BREAKPOINT = 768;
+const TABLET_BREAKPOINT = 1280;
 
-function useIsPhoneWidth(): boolean {
-  const query = `(max-width: ${PHONE_BREAKPOINT - 1}px)`;
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
+type ViewportMode = "phone" | "tablet" | "desktop";
+
+function useViewportMode(): ViewportMode {
+  const phoneQuery = `(max-width: ${PHONE_BREAKPOINT - 1}px)`;
+  const tabletQuery = `(max-width: ${TABLET_BREAKPOINT - 1}px)`;
+  const read = (): ViewportMode => {
+    if (typeof window === "undefined") return "desktop";
+    if (window.matchMedia(phoneQuery).matches) return "phone";
+    if (window.matchMedia(tabletQuery).matches) return "tablet";
+    return "desktop";
+  };
+  const [mode, setMode] = useState<ViewportMode>(read);
   useEffect(() => {
-    const mq = window.matchMedia(query);
-    const onChange = () => setNarrow(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [query]);
-  return narrow;
+    const phone = window.matchMedia(phoneQuery);
+    const tablet = window.matchMedia(tabletQuery);
+    const onChange = () => setMode(read());
+    phone.addEventListener("change", onChange);
+    tablet.addEventListener("change", onChange);
+    return () => {
+      phone.removeEventListener("change", onChange);
+      tablet.removeEventListener("change", onChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneQuery, tabletQuery]);
+  return mode;
 }
 
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
@@ -256,7 +287,8 @@ export default function OperationDelivery() {
   const docsQ = useDeliveryOrdersRegister();
   const arrangementsQ = useDeliveryArrangements();
   const today = appTodayIso();
-  const isPhone = useIsPhoneWidth();
+  const viewport = useViewportMode();
+  const isPhone = viewport === "phone";
 
   /* The rail-collapse memory — the browser remembers open/closed (ui MASTER,
      LOCAL FILTER RAIL COLLAPSE). On a phone the rail starts closed: the
@@ -282,10 +314,15 @@ export default function OperationDelivery() {
   const railVisible = isPhone ? phoneRailOverride : filterRailOpen;
 
   /* ── THE URL IS THE STATE ──────────────────────────────────────────────── */
-  const start = searchParams.get("start") ?? defaultMonitorWindowStart(today);
-  /* The phone's one selected day. A Sunday in the URL lands on the next
-     operating day rather than an empty page nobody planned. */
-  const day = operatingDaysFrom(searchParams.get("day") ?? today, 1)[0]!;
+  /* ONE selected date (`?date=`) drives every window: the phone's day, the
+     tablet's three-day half-week, the desktop's fixed operating week — and
+     the rail calendar's blue selection. The retired `?start=`/`?day=`
+     spellings still resolve so an old shared URL keeps answering. A Sunday
+     lands on the next operating day rather than an empty page nobody planned. */
+  const selectedDate = operatingDaysFrom(
+    searchParams.get("date") ?? searchParams.get("day") ?? searchParams.get("start") ?? today,
+    1,
+  )[0]!;
 
   /* `?view=` is the one WORK TO DO pick. The retired `?schedule=`/`?checking=`
      spellings still resolve so a shared or bookmarked URL keeps answering. */
@@ -300,6 +337,7 @@ export default function OperationDelivery() {
           ? "waiting_warehouse"
           : null);
   const view: MonitorWorkView =
+    viewParam === "all" ||
     viewParam === "no_confirmed_date" ||
     viewParam === "overdue" ||
     viewParam === "failed" ||
@@ -341,6 +379,25 @@ export default function OperationDelivery() {
     });
   const clearFilters = () =>
     setParams((next) => {
+      next.delete("view");
+      next.delete("region");
+      next.delete("logistics");
+    });
+  /* The one date write — the retired spellings never survive it. */
+  const setDate = (iso: string) =>
+    setParams((next) => {
+      next.set("date", iso);
+      next.delete("day");
+      next.delete("start");
+    });
+  /* A rail-calendar click OPENS that date's operating week in the right
+     workspace (owner correction 2026-09-06): the operational picks clear so
+     the week is actually what appears. */
+  const pickCalendarDate = (iso: string) =>
+    setParams((next) => {
+      next.set("date", iso);
+      next.delete("day");
+      next.delete("start");
       next.delete("view");
       next.delete("region");
       next.delete("logistics");
@@ -387,9 +444,21 @@ export default function OperationDelivery() {
     [ordersQ.data, docsQ.data, partnerNameById, arrangementsByScope],
   );
 
+  /* The FIXED window for this viewport — never a horizontal date scroll. */
   const visibleDays = useMemo(
-    () => (isPhone ? [day] : operatingDaysFrom(start, MONITOR_DAYS)),
-    [isPhone, day, start],
+    () =>
+      viewport === "phone"
+        ? [selectedDate]
+        : viewport === "tablet"
+          ? tabletWindowOf(selectedDate)
+          : operatingWeekOf(selectedDate),
+    [viewport, selectedDate],
+  );
+  /* The dot days for the rail's month calendar — every date genuinely
+     holding a confirmed delivery, whatever month it sits in. */
+  const workDayIsos = useMemo(
+    () => [...new Set(cards.map((c) => c.confirmedDate).filter((d): d is string => d !== null))],
+    [cards],
   );
   const rails = useMemo(
     () => buildMonitorRails(cards, filters, visibleDays, partners),
@@ -528,6 +597,33 @@ export default function OperationDelivery() {
         filterValue: (r) => r.customerName,
       },
       {
+        /* The rail's REGION answer, on the row — the ONE address classifier
+           (`regionBucketOf`), never a second derivation. */
+        key: "state",
+        label: "State",
+        width: 110,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Customer",
+        accessor: (r) => r.region ?? <Absent>{DW.notRecorded}</Absent>,
+        searchValue: (r) => r.region ?? "",
+        filterValue: (r) => r.region ?? DW.notRecorded,
+      },
+      {
+        key: "location",
+        label: "Delivery Location",
+        width: 170,
+        sortable: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.scope.location}>
+            {r.scope.location}
+          </span>
+        ),
+        searchValue: (r) => r.scope.location,
+        filterValue: (r) => r.scope.location,
+      },
+      {
         /* Sales Orders' promise, in the governed word (`Requested Delivery
            Date`, owner ruling 2026-08-27). Delivery reads it, never writes it. */
         key: "customer_delivery",
@@ -557,45 +653,6 @@ export default function OperationDelivery() {
               : DW.noCustomerDate,
         sortFn: (a, b) =>
           (a.scope.customerDeliveryIso ?? "").localeCompare(b.scope.customerDeliveryIso ?? ""),
-      },
-      {
-        key: "location",
-        label: "Delivery Location",
-        width: 170,
-        sortable: true,
-        chooserGroup: "Customer",
-        accessor: (r) => (
-          <span className="block truncate" title={r.scope.location}>
-            {r.scope.location}
-          </span>
-        ),
-        searchValue: (r) => r.scope.location,
-        filterValue: (r) => r.scope.location,
-      },
-      {
-        /* The rail's REGION answer, on the row — the ONE address classifier
-           (`regionBucketOf`), never a second derivation. */
-        key: "state",
-        label: "State",
-        width: 110,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Customer",
-        accessor: (r) => r.region ?? <Absent>{DW.notRecorded}</Absent>,
-        searchValue: (r) => r.region ?? "",
-        filterValue: (r) => r.region ?? DW.notRecorded,
-      },
-      {
-        key: "logistics",
-        label: "Logistics Partner",
-        width: 140,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
-        accessor: (r) =>
-          r.logisticsPartnerName ?? <Absent>{MONITOR_COPY.noLogistics}</Absent>,
-        searchValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
-        filterValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
       },
       {
         /* Delivery's OWN confirmed operational date — the document's when one
@@ -665,6 +722,18 @@ export default function OperationDelivery() {
           ),
         searchValue: (r) => r.doNumber ?? MONITOR_COPY.noDeliveryOrder,
         filterValue: (r) => r.doNumber ?? MONITOR_COPY.noDeliveryOrder,
+      },
+      {
+        key: "logistics",
+        label: "Logistics Partner",
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) =>
+          r.logisticsPartnerName ?? <Absent>{MONITOR_COPY.noLogistics}</Absent>,
+        searchValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
+        filterValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
       },
       {
         key: "delivery_status",
@@ -741,17 +810,15 @@ export default function OperationDelivery() {
   );
 
   const rangeLabel = isPhone
-    ? fmtDate(day)
+    ? fmtDate(selectedDate)
     : `${fmtDate(visibleDays[0]!)} – ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
 
-  const goPrevious = () =>
-    isPhone
-      ? setParam("day", previousOperatingWindowStart(day, 1))
-      : setParam("start", previousOperatingWindowStart(start, MONITOR_DAYS));
-  const goNext = () =>
-    isPhone
-      ? setParam("day", nextOperatingWindowStart(day, 1))
-      : setParam("start", nextOperatingWindowStart(start, MONITOR_DAYS));
+  /* Previous/next REPLACES the whole displayed window: one operating day on
+     the phone, the three-day half-week on a tablet, the whole operating week
+     on the desktop (six operating days = exactly one week, Sundays skipped). */
+  const windowStep = viewport === "phone" ? 1 : viewport === "tablet" ? 3 : MONITOR_DAYS;
+  const goPrevious = () => setDate(previousOperatingWindowStart(selectedDate, windowStep));
+  const goNext = () => setDate(nextOperatingWindowStart(selectedDate, windowStep));
 
   const showFiltersButton = (
     <button
@@ -769,7 +836,7 @@ export default function OperationDelivery() {
     </button>
   );
 
-  /* ── THE RAIL — the shared FilterRail grammar (240px, page-owned) ──────── */
+  /* ── THE RAIL — month calendar FIXED on top, filters scrolling below ───── */
   const rail = (
     <FilterRail
       testId="delivery-monitor-rail"
@@ -777,18 +844,20 @@ export default function OperationDelivery() {
         setFilterRailVisible(false);
         setPhoneRailOverride(false);
       }}
+      /* The complete month, always in view (owner correction 2026-09-06):
+         scrolling the filter groups never removes it. Clicking a date opens
+         its fixed operating week in the right workspace. */
+      header={
+        <MonitorMonthCalendar
+          selectedIso={selectedDate}
+          onSelect={pickCalendarDate}
+          workDayIsos={workDayIsos}
+          testId="delivery-monitor-month-calendar"
+        />
+      }
     >
       <FilterRailGroup title={MONITOR_COPY.railWork}>
-        {(
-          [
-            "calendar",
-            "no_confirmed_date",
-            "overdue",
-            "failed",
-            "delivered_proof_required",
-            "waiting_warehouse",
-          ] as const
-        ).map((key) => (
+        {MONITOR_WORK_VIEWS.map((key) => (
           <FilterRailRow
             key={key}
             label={MONITOR_VIEW_LABEL[key]}
@@ -951,25 +1020,40 @@ export default function OperationDelivery() {
               {/* The calendar toolbar: where the window stands, and the one search. */}
               <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
                 {!railVisible ? showFiltersButton : null}
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     aria-label={MONITOR_COPY.previousDays}
-                    className="flex h-8 w-8 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
                     onClick={goPrevious}
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span
-                    className="min-w-0 truncate px-1 text-body font-medium text-kit-slate-12"
-                    data-testid="delivery-monitor-range"
-                  >
-                    {rangeLabel}
-                  </span>
+                  {isPhone ? (
+                    /* The phone's full month opens through the kit's one
+                       STANDARD date control (UI-KIT §11) — never a squeezed
+                       desktop calendar. */
+                    <div className="w-36 shrink-0" data-testid="delivery-monitor-date-control">
+                      <DatePicker
+                        id="delivery-monitor-date"
+                        value={selectedDate}
+                        onChange={(iso) => {
+                          if (iso) pickCalendarDate(iso);
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <span
+                      className="min-w-0 truncate px-1 text-body font-medium text-kit-slate-12"
+                      data-testid="delivery-monitor-range"
+                    >
+                      {rangeLabel}
+                    </span>
+                  )}
                   <button
                     type="button"
                     aria-label={MONITOR_COPY.nextDays}
-                    className="flex h-8 w-8 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
                     onClick={goNext}
                   >
                     <ChevronRight size={16} />
@@ -979,7 +1063,9 @@ export default function OperationDelivery() {
                   type="search"
                   value={q}
                   placeholder={MONITOR_COPY.search}
-                  className="ml-auto h-8 w-full max-w-60 rounded-control border border-kit-slate-6 bg-white px-2.5 text-body text-kit-slate-12 placeholder:text-kit-slate-9"
+                  /* min-w-0 lets the box yield on a phone so the window
+                     arrows and the date control always stay reachable. */
+                  className="ml-auto h-8 w-full min-w-0 max-w-60 rounded-control border border-kit-slate-6 bg-white px-2.5 text-body text-kit-slate-12 placeholder:text-kit-slate-9"
                   onChange={(e) => setParam("q", e.target.value, true)}
                 />
               </div>
@@ -988,9 +1074,9 @@ export default function OperationDelivery() {
                 /* ── THE ONE-DAY LIST — never the grid squeezed into a phone. ── */
                 <div className="min-h-0 flex-1 overflow-y-auto" data-testid="delivery-monitor-daily">
                   <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-3 py-2 text-body font-semibold text-kit-slate-12">
-                    {fmtDate(day)}
+                    {fmtDate(selectedDate)}
                   </div>
-                  {dayCards(day)}
+                  {dayCards(selectedDate)}
                 </div>
               ) : !isLoading && calendarCards.length === 0 ? (
                 q.trim() ? (
@@ -1006,9 +1092,15 @@ export default function OperationDelivery() {
                   emptyRange
                 )
               ) : (
-                /* ── SIX OPERATING-DAY COLUMNS ─────────────────────────────── */
-                <div className="min-h-0 flex-1 overflow-auto" aria-busy={isLoading}>
-                  <div className="grid h-full min-w-[860px] grid-cols-6 divide-x divide-kit-slate-4">
+                /* ── THE FIXED WINDOW'S COLUMNS — six on desktop, three on a
+                   tablet, always fitting the available width (no horizontal
+                   date scrolling; vertical scrolling inside the days). ───── */
+                <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={isLoading}>
+                  <div
+                    className={`grid h-full divide-x divide-kit-slate-4 ${
+                      viewport === "tablet" ? "grid-cols-3" : "grid-cols-6"
+                    }`}
+                  >
                     {visibleDays.map((iso) => (
                       <div
                         key={iso}
