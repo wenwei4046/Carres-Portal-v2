@@ -4,6 +4,7 @@ import {
   composeOperationWorkResponse,
   projectManualPurchaseWork,
   projectReceivingWork,
+  projectSalesOrderWork,
 } from "./work";
 
 const base: OperationWorkItem = {
@@ -142,5 +143,47 @@ describe("operation Work response composition", () => {
     expect(issuance[0]?.destination).toBe(
       "/operation?tab=manual-purchase&mp=request-1",
     );
+  });
+
+  it("projects separate Sales Order actions with their own owner rules", () => {
+    const poDuty = {
+      dutyKey: "po_duty",
+      onDate: "2026-09-06",
+      normalOwner: { userId: "po-normal", name: "Po Normal" },
+      buddy: null,
+      activeCover: null,
+      actingPerson: { userId: "po-normal", name: "Po Normal" },
+      state: "primary" as const,
+      assignmentId: "assignment-2",
+    };
+    const items = projectSalesOrderWork({
+      open: [{ key: "issue_po", track: "goods", tone: "warning" }],
+      context: {
+        orderId: "order-1318",
+        so: 1318,
+        picName: "Order PIC",
+        picUserId: "pic-1",
+        dutyResolutions: { po_duty: poDuty },
+        salespersonName: "Shasha",
+        askDeliveryDate: true,
+        promisedDateIso: null,
+        confirmedDateIso: null,
+        deliveredAtIso: null,
+        delayDetectedAtIso: null,
+        delayDecisionAtIso: null,
+      },
+      customer: "Tan Qu Qu",
+      today: "2026-09-06",
+    });
+
+    const issuePo = items.find((item) => item.ruleKey === "issue_po");
+    const askDate = items.find((item) => item.ruleKey === "ask_delivery_date");
+    expect(issuePo?.owner.rule).toBe("po_duty");
+    expect(issuePo?.owner.acting?.userId).toBe("po-normal");
+    expect(askDate?.owner.rule).toBe("salesperson");
+    expect(askDate?.owner.acting?.name).toBe("Shasha");
+    expect(askDate?.object.label).toBe("SO-1318");
+    expect(askDate?.problem).toBe("No delivery date");
+    expect(askDate?.destination).toBe("/operation/orders/so/order-1318");
   });
 });

@@ -3,18 +3,88 @@ import {
   operationWorkResponseSchema,
   manualPurchaseWorkItems,
   receivingWorkItems,
+  workItemsForOrder,
+  type DeliveryQueueLeads,
   type ManualPurchaseWorkInput,
+  type OrderOpenAction,
+  type OrderWorkContext,
   type ReceivingWorkSource,
   type OperationWorkItem,
   type OperationWorkResponse,
   type WorkItem,
   type WorkspaceDutyResolution,
+  type WorkingDayOptions,
 } from "@carres/shared";
 
 export interface OperationWorkStaff {
   userId: string;
   name: string | null;
   email: string;
+}
+
+const ORDER_PROBLEM: Record<string, string> = {
+  issue_po: "Goods not covered by a purchase order",
+  confirm_ready_date: "Supplier date missing",
+  delay_planning: "Supplier date misses the customer commitment",
+  arrange_new_delivery_date: "New delivery date required",
+  assign_logistics: "Delivery company not assigned",
+  confirm_delivery_date: "Customer delivery booking not confirmed",
+  deliver_today: "Delivery due today",
+  upload_delivery_photo: "Delivery proof missing",
+  collect: "Customer balance due",
+  collect_loan_item: "Loan item still out",
+  resolve_payment_exception: "Finance exception holding delivery",
+  ask_delivery_date: "No delivery date",
+};
+
+const ORDER_RESULT: Record<string, string> = {
+  issue_po: "Purchase order covers the demand",
+  confirm_ready_date: "Supplier promise recorded",
+  delay_planning: "Delivery decision recorded",
+  arrange_new_delivery_date: "Customer-confirmed delivery booking recorded",
+  assign_logistics: "Delivery company recorded",
+  confirm_delivery_date: "Customer-confirmed date and slot recorded",
+  deliver_today: "Delivery result recorded",
+  upload_delivery_photo: "Delivery photo recorded",
+  collect: "Outstanding balance is RM 0",
+  collect_loan_item: "Loan item recorded as returned",
+  resolve_payment_exception: "Finance exception cleared with evidence",
+  ask_delivery_date: "Customer Delivery exists or Not yet is recorded",
+};
+
+export function projectSalesOrderWork(input: {
+  open: readonly OrderOpenAction[];
+  context: OrderWorkContext;
+  customer: string | null;
+  today: string;
+  workingDays?: WorkingDayOptions;
+  queueLeads?: DeliveryQueueLeads;
+}): OperationWorkItem[] {
+  return workItemsForOrder(
+    input.open,
+    input.context,
+    input.today,
+    input.workingDays,
+    input.queueLeads,
+  ).map((item) =>
+    operationWorkItemFromProjection(item, {
+      object: {
+        kind: "sales_order",
+        id: input.context.orderId,
+        label: `SO-${input.context.so}`,
+      },
+      problem: ORDER_PROBLEM[item.ruleKey] ?? "Action required",
+      recipient:
+        item.ruleKey === "ask_delivery_date" ||
+        item.ruleKey === "confirm_delivery_date" ||
+        item.ruleKey === "collect"
+          ? input.customer
+          : null,
+      requiredResult: ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
+      destination: `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
+      today: input.today,
+    }),
+  );
 }
 
 export function projectManualPurchaseWork(input: {
