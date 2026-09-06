@@ -1325,14 +1325,18 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06
+### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
-**State: migrations 0425/0426 APPLIED (tracker 20260904125205 / 20260904125800), PR #1099 merged
-`7a897494`, production-smoked 2026-09-04; the 2026-09-06 correction (register boundary · rail ·
-corrected words · formal GRN document · 50/50 object · evidence-amend 0427) ships in the same
-Card's correction PR. GRN Duty is honestly unassigned until the manager assigns it in
+**State: PRODUCTION-VERIFIED 2026-09-06 — migrations 0425/0426/0427 APPLIED (tracker
+20260904125205 / 20260904125800 / 0427_an_amendment_may_correct_the_papers_evidence; 0427 was
+functionally proven in a rolled-back production transaction before apply). Correction PR #1106
+merged `f755dea8`, deployed, both canonical surfaces reporting that exact SHA; the served bundle
+carries every corrected word and zero retired words; committed production smoke on
+GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
+evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
+refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
 `Workspace → Staff & Duties`.** The operating rule is:
 
 ```text
