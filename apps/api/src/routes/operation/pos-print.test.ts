@@ -215,7 +215,7 @@ describe("GET /api/operation/pos/:id/print-data", () => {
 
   it("the confirm-sent authority keeps the document at first send and reuses it on a resend (0430)", () => {
     const sql = readFileSync(
-      new URL("../../../../../supabase/migrations/0430_the_po_keeps_its_original_date_and_replies_tell_the_truth.sql", import.meta.url),
+      new URL("../../../../../supabase/migrations/0432_the_po_keeps_its_original_date_and_replies_tell_the_truth.sql", import.meta.url),
       "utf8",
     );
     expect(sql).toContain("insert into public.po_version_documents");

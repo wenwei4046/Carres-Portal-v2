@@ -1,4 +1,4 @@
--- 0430 · Purchase Orders correction card (Jess, approved 2026-09-06).
+-- 0432 · Purchase Orders correction card (Jess, approved 2026-09-06).
 --
 -- Four defects, one migration:
 --   §1  Every pre-0428 PO lost its displayed date: the register and PDF read
@@ -359,7 +359,7 @@ create table public.po_version_documents (
   primary key (po_id, po_version)
 );
 comment on table public.po_version_documents is
-  '0430: the exact document payload of each PO version at its first confirmed send. Immutable; readable only through purchasing_po_version_document().';
+  '0432: the exact document payload of each PO version at its first confirmed send. Immutable; readable only through purchasing_po_version_document().';
 alter table public.po_version_documents enable row level security;
 revoke all on table public.po_version_documents from public, anon, authenticated;
 
