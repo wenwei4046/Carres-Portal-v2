@@ -78,10 +78,10 @@ function identityPart(value: string): string {
 
 export function operationWorkStableId(
   module: OperationWorkModule,
-  objectLabel: string,
+  objectId: string,
   ruleKey: string,
 ): string {
-  return [module, objectLabel, ruleKey].map(identityPart).join(":");
+  return [module, objectId, ruleKey].map(identityPart).join(":");
 }
 
 export interface OperationWorkPresentation {
@@ -112,7 +112,7 @@ export function operationWorkItemFromProjection(
           ? "today"
           : "later";
   return operationWorkItemSchema.parse({
-    id: operationWorkStableId(item.module, presentation.object.label, item.ruleKey),
+    id: operationWorkStableId(item.module, presentation.object.id, item.ruleKey),
     module: item.module,
     ruleKey: item.ruleKey,
     object: presentation.object,

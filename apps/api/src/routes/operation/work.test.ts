@@ -1,0 +1,99 @@
+import { describe, expect, it } from "vitest";
+import type { OperationWorkItem } from "@carres/shared";
+import { composeOperationWorkResponse, projectReceivingWork } from "./work";
+
+const base: OperationWorkItem = {
+  id: "orders:SO-1318:missing_delivery_date",
+  module: "orders",
+  ruleKey: "missing_delivery_date",
+  object: { kind: "sales_order", id: "order-1", label: "SO-1318" },
+  problem: "No delivery date",
+  action: "Ask customer for a delivery date",
+  recipient: "Customer",
+  requiredResult: "Customer Delivery exists",
+  completionFact: "orders.delivery_date exists",
+  owner: {
+    rule: "salesperson",
+    dutyKey: null,
+    normal: { userId: "shasha", name: "Shasha" },
+    activeCover: null,
+    acting: { userId: "shasha", name: "Shasha" },
+    state: "primary",
+  },
+  timing: { dueOn: "2026-09-06", workingDaysLate: 0, bucket: "today" },
+  destination: "/operation/orders/so/order-1",
+  tone: "warning",
+  locked: false,
+  broken: false,
+};
+
+describe("operation Work response composition", () => {
+  it("returns one validated set and removes only duplicate stable identities", () => {
+    const receiving: OperationWorkItem = {
+      ...base,
+      id: "receiving:PO-2041:receiving.check_in",
+      module: "receiving",
+      ruleKey: "receiving.check_in",
+      object: { kind: "receiving", id: "receipt-1", label: "PO-2041" },
+      problem: "Goods arrived · GRN not posted",
+      action: "Check in PO-2041 from Nice Future",
+      requiredResult: "GRN posted",
+      completionFact: "a posted Receiving Session",
+      destination: "/operation?tab=receiving&session=receipt-1",
+    };
+    const response = composeOperationWorkResponse(
+      [[base, base], [receiving]],
+      [{ userId: "shasha", name: "Shasha", email: "shasha@carres.test" }],
+      "2026-09-06",
+    );
+
+    expect(response.items.map((item) => item.id)).toEqual([base.id, receiving.id]);
+    expect(response.staff).toHaveLength(1);
+    expect(response.generatedOn).toBe("2026-09-06");
+  });
+
+  it("rejects an invalid module projection instead of returning a false empty desk", () => {
+    expect(() =>
+      composeOperationWorkResponse(
+        [[{ ...base, completionFact: "" } as OperationWorkItem]],
+        [],
+        "2026-09-06",
+      ),
+    ).toThrow();
+  });
+
+  it("projects submitted Receiving facts with GRN Duty cover and an exact session door", () => {
+    const items = projectReceivingWork({
+      source: {
+        submitted: [{
+          id: "receipt-1",
+          po_id: "PO-2041",
+          supplier_name: "Nice Future",
+          goods_received_at: "2026-09-05",
+          submitted_at: "2026-09-05T09:00:00Z",
+        }],
+        arrivalsDue: [],
+      },
+      duty: {
+        dutyKey: "grn_duty",
+        onDate: "2026-09-06",
+        normalOwner: { userId: "shasha", name: "Shasha" },
+        buddy: { userId: "yujun", name: "Yu Jun" },
+        activeCover: { userId: "yujun", name: "Yu Jun" },
+        actingPerson: { userId: "yujun", name: "Yu Jun" },
+        state: "covered",
+        assignmentId: "assignment-1",
+      },
+      today: "2026-09-06",
+      workingDaysLate: () => 1,
+    });
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.owner.normal?.userId).toBe("shasha");
+    expect(items[0]?.owner.acting?.userId).toBe("yujun");
+    expect(items[0]?.destination).toBe(
+      "/operation?tab=receiving&session=receipt-1",
+    );
+    expect(items[0]?.problem).toBe("Goods arrived · GRN not posted");
+  });
+});

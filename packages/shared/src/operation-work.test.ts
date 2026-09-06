@@ -42,8 +42,8 @@ describe("Operation Work wire contract", () => {
   });
 
   it("mints one deterministic identity from module, object, and rule", () => {
-    expect(operationWorkStableId("orders", "SO-1318", "missing_delivery_date")).toBe(
-      "orders:SO-1318:missing_delivery_date",
+    expect(operationWorkStableId("orders", "order-1318", "missing_delivery_date")).toBe(
+      "orders:order-1318:missing_delivery_date",
     );
   });
 
