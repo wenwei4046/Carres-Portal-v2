@@ -354,12 +354,27 @@ complete §16 payment message swaps in when its owner-approved Important Notes w
 arrives — the bottom rules are never invented or shortened. `waLink` converged from two
 page-local copies into the one shared implementation.
 
-WhatsApp template library, message assembly with bank routing and Partner contact, invoice
-document/Print from the snapshot, Reports, Stripe convergence, storage journeys, full
-responsive 390px/200% verification and the retirement of the rejected Refund/Bank Matching
-surfaces remain unfinished target work. The complete approved customer Important Notes wording
-has not been located in the repository and has been requested from its owner; it must not be
-invented or shortened during implementation.
+### BUILD in progress — the invoice document prints from its snapshot, and the §17 Calendar, 2026-09-06
+
+Branch evidence, no migration: `GET /finance/invoices/:id/document` serves the issued
+invoice's IMMUTABLE snapshot as the governed InvoiceTemplate data (a voided invoice keeps its
+paper and says VOIDED in the title; a pre-0429 invoice has no snapshot, falls back to a live
+read and says so); the Invoice object header gains the direct `Print` output. The §17 Calendar
+navigation is built as ruled: Customer/SO/Invoice cells open the collection details (never an
+automatic Calendar switch); a Customer Delivery or Expected arrival date cell opens the
+Calendar at that date's fixed workweek with the exact SO highlighted and the Expected arrival
+label explicit; a record without a usable date keeps its honest words and no door. The
+Calendar view: 240px rail with the complete month fixed on top (arrows one month at a time),
+business date filters scrolling below, one fixed Mon–Sun workweek with Sunday visible and
+muted as `not a working day` (Malaysian holidays too), the selected date on the blue token,
+every indicator carrying words. Entries are read-only facts from their authoritative owners;
+an Expected arrival entry creates no deadline and no chase, and voided invoices place nothing.
+
+WhatsApp template library, message assembly with bank routing and Partner contact, Reports,
+Stripe convergence, storage journeys, full responsive 390px/200% verification and the
+retirement of the rejected Refund/Bank Matching surfaces remain unfinished target work. The
+complete approved customer Important Notes wording has not been located in the repository and
+has been requested from its owner; it must not be invented or shortened during implementation.
 
 ### Approved target / not claimed built by this scope
 

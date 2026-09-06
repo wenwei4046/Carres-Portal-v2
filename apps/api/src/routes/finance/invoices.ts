@@ -211,6 +211,126 @@ financeInvoicesRouter.post("/:id/issue", async (c) => {
   return c.json(data);
 });
 
+/** The document read (payment/MASTER.md §4): an issued invoice prints from
+ *  its immutable SNAPSHOT — reprint is the same number and the same content,
+ *  whatever the order looks like today. A voided invoice keeps its paper and
+ *  says VOIDED. Pre-0429 invoices carry no snapshot; they fall back to a live
+ *  read and say so. */
+financeInvoicesRouter.get("/:id/document", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view invoice documents." });
+  }
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data: invoice, error: invErr } = await sb
+    .from("invoices")
+    .select("id,invoice_no,order_id,amount,tax_amount,issued_at,voided_at,void_reason,status,kind,snapshot")
+    .eq("id", id)
+    .maybeSingle();
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  if (!invoice) {
+    return c.json({ error: "not_found", code: "not_found", message: "Invoice not found." }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inv: any = invoice;
+  if (inv.status === "draft" || !inv.invoice_no) {
+    return c.json({
+      error: "rule_violation", code: "not_issued",
+      message: "A draft has no document yet. Issue the invoice first.",
+    }, 422);
+  }
+  const kindTitle = inv.kind === "storage" ? "STORAGE INVOICE"
+    : inv.kind === "additional_storage" ? "ADDITIONAL STORAGE INVOICE" : "INVOICE";
+  const voided = inv.status === "voided";
+
+  if (inv.snapshot && typeof inv.snapshot === "object" && Array.isArray(inv.snapshot.lines)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const snap: any = inv.snapshot;
+    const taxAmount = Number(snap.tax_amount ?? 0);
+    const total = Number(snap.amount ?? inv.amount);
+    return c.json({
+      voided,
+      void_reason: inv.void_reason ?? null,
+      from_snapshot: true,
+      document: {
+        doc_title: voided ? `${kindTitle} · VOIDED` : kindTitle,
+        invoice_no: String(inv.invoice_no),
+        issue_date: String(snap.issued_at ?? inv.issued_at).slice(0, 10),
+        order_id: String(snap.order_id ?? inv.order_id),
+        order_code: String(snap.so ?? ""),
+        customer: {
+          name: String(snap.customer?.name ?? ""),
+          address: String(snap.customer?.address ?? "Not recorded"),
+          phone: snap.customer?.phone ?? null,
+        },
+        dealer: { name: "Carres", contact: null },
+        lines: (snap.lines as Array<{ sku: string; qty: number; unit_price: number }>).map((l) => ({
+          sku: String(l.sku), description: String(l.sku), qty: Number(l.qty),
+          unit: "pc", unit_price: Number(l.unit_price),
+          line_total: +(Number(l.qty) * Number(l.unit_price)).toFixed(2),
+        })),
+        subtotal: +(total - taxAmount).toFixed(2),
+        tax_amount: taxAmount,
+        total,
+        currency: "MYR",
+      },
+    });
+  }
+
+  // Legacy invoice (pre-0429): no snapshot exists, so the document reads the
+  // live order and says so — it must never pretend to be an immutable reprint.
+  const { data: order, error: ordErr } = await sb
+    .from("orders")
+    .select("id,so,customer_name,customer_phone,customer_address,order_lines(sku,qty,unit_price)")
+    .eq("id", inv.order_id)
+    .maybeSingle();
+  if (ordErr) {
+    const m = mapPgError(ordErr);
+    return c.json(m.body, m.status);
+  }
+  if (!order) {
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found." }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ord: any = order;
+  const taxAmount = Number(inv.tax_amount ?? 0);
+  const total = Number(inv.amount);
+  return c.json({
+    voided,
+    void_reason: inv.void_reason ?? null,
+    from_snapshot: false,
+    document: {
+      doc_title: voided ? `${kindTitle} · VOIDED` : kindTitle,
+      invoice_no: String(inv.invoice_no),
+      issue_date: String(inv.issued_at).slice(0, 10),
+      order_id: String(ord.id),
+      order_code: `SO-${ord.so}`,
+      customer: {
+        name: String(ord.customer_name ?? ""),
+        address: String(ord.customer_address ?? "Not recorded"),
+        phone: ord.customer_phone ?? null,
+      },
+      dealer: { name: "Carres", contact: null },
+      lines: (ord.order_lines ?? []).map((l: { sku: string; qty: number; unit_price: number | null }) => ({
+        sku: String(l.sku), description: String(l.sku), qty: Number(l.qty),
+        unit: "pc", unit_price: Number(l.unit_price ?? 0),
+        line_total: +(Number(l.qty) * Number(l.unit_price ?? 0)).toFixed(2),
+      })),
+      subtotal: +(total - taxAmount).toFixed(2),
+      tax_amount: taxAmount,
+      total,
+      currency: "MYR",
+    },
+  });
+});
+
 /** The message-sent door (0434): opening WhatsApp is neither sent nor read —
  *  the record requires the sent screenshot; SQL keeps the immutable ledger. */
 financeInvoicesRouter.post("/:id/record-message", async (c) => {
