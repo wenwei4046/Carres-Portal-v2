@@ -57,7 +57,7 @@ const W = {
   pendingLabel: "Still owed by suppliers",
   noGrnYet: "No GRN yet",
   sameAsDeliverTo: "Same as Deliver To",
-  voided: "Voided",
+  voided: "Cancelled",
   draftNote: "Draft sessions are not receiving records and are excluded.",
   emptyRegister: "No receiving activity yet.",
   emptyPending: "No supplier delivery is owed.",
@@ -200,7 +200,7 @@ export default function OperationReceivingReport() {
     },
     {
       key: "receivedAt",
-      label: "Goods Received At",
+      label: "Goods received on",
       width: "126px",
       // Never a bare ISO date — the portal's one date spelling.
       cell: (r) => fmtDate(r.goods_received_at),
@@ -236,7 +236,7 @@ export default function OperationReceivingReport() {
     },
     {
       key: "actualSite",
-      label: "Actual Site",
+      label: "Goods arrived at",
       width: "140px",
       // NULL means the goods arrived where the PO said they would — said in
       // words, never left as a blank the reader must interpret.

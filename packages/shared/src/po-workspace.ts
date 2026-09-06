@@ -376,6 +376,16 @@ export function poCurrentActionOf(
  * is our guess, not their promise).
  */
 export interface PoDatePromise {
+  po_version?: number | null;
+  channel?: string | null;
+  recipient?: string | null;
+  evidence?: string | null;
+  reported_by?: string | null;
+  reported_at?: string | null;
+  recorded_by?: string | null;
+  recorded_by_name?: string | null;
+  duty_name?: string | null;
+  acting_name?: string | null;
   kind: string;
   answer: string;
   about_date: string | null;
@@ -384,6 +394,21 @@ export interface PoDatePromise {
   reason: string | null;
   remarks?: string | null;
   recorded_at: string;
+}
+
+/** Only an evidenced answer about this exact document version is a reply. */
+export function poSupplierReplyOf(promises: readonly PoDatePromise[] | null | undefined, version: number) {
+  return [...(promises ?? [])].filter(row =>
+    row.kind === "tomorrow_delivery" && row.po_version === version &&
+    row.channel?.trim() && row.recipient?.trim() && row.evidence?.trim() &&
+    row.reported_by?.trim() && row.reported_at && row.recorded_by && row.recorded_at &&
+    (row.answer === "shipping" ? row.about_date : row.answer === "delayed" ? row.new_date : null)
+  ).sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0] ?? null;
+}
+
+export function poSupplierDeliveryDateOf(promises: readonly PoDatePromise[] | null | undefined, version: number): string | null {
+  const reply = poSupplierReplyOf(promises, version);
+  return reply ? (reply.answer === "shipping" ? reply.about_date : reply.new_date) : null;
 }
 
 export interface PoDateHistoryEntry {

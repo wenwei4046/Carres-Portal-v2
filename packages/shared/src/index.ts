@@ -986,6 +986,8 @@ export {
   poArrivalGapOf,
   poCurrentActionOf,
   poDateHistoryOf,
+  poSupplierReplyOf,
+  poSupplierDeliveryDateOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,
@@ -1159,6 +1161,11 @@ export {
   RECEIVING_UNIT_OUTCOME_LABEL,
   RECEIVING_AUTHORITY_LABEL,
   RECEIVING_WORK_WORDS,
+  // 2026-09-06 owner correction — the Register is the GRN record; the rail
+  // speaks exactly five governed category rows through the shared ladder.
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
+  type ReceivingCategoryRow,
   type ReceivingUnitOutcome,
   type ReceivingUnitResult,
   type ReceivingArrivalEvidence,
@@ -1829,6 +1836,11 @@ export {
   lineKind,
   lineSortRank,
   defaultLineLocation,
+  // The governed category-word ladder (2026-09-06) — extracted from the SO
+  // register footer so Receiving and Sales Orders speak one rule.
+  GOODS_CATEGORY_WORDS,
+  goodsCategoryWordOf,
+  type GoodsCategoryWord,
   type CoreCat,
   type LineClass,
   type ItemKind,
@@ -2967,3 +2979,7 @@ export * from "./operation-work";
 export * from "./sales-order-work-source";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
+
+export { recordSupplierReplyInput } from "./schemas/operation";
+
+export { purchaseOrderReplyWorkItems } from "./purchase-order-register";

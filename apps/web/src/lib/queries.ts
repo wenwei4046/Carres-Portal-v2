@@ -589,6 +589,7 @@ export const qk = {
       ["finance", "recon-suggest", bankStmtId] as const,
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
+    paymentRegister: () => ["finance", "payment-register"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -3391,6 +3392,7 @@ export interface operationPoListRow {
   so: number | null;
   so_refs: number[] | null;
   eta_date: string | null;
+  official_delivery_date?: string | null;
   /** `Supplier Ready Date` (§12.2 ①) — the day the FACTORY says it has finished
    *  making the goods, written only by `purchasing_record_ready_date` (0318)
    *  after a supplier answered. It is NOT `eta_date`, which is our own
@@ -3520,6 +3522,16 @@ export interface operationPoListRow {
   /** The supplier-date field's own history (0306 ledger, newest first) —
    *  it renders BESIDE the field, never in the Activity timeline. */
   promises?: {
+    po_version?: number | null;
+    channel?: string | null;
+    recipient?: string | null;
+    evidence?: string | null;
+    reported_by?: string | null;
+    reported_at?: string | null;
+    recorded_by?: string | null;
+    recorded_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
     kind: string;
     answer: string;
     about_date: string | null;
@@ -4228,6 +4240,10 @@ export interface WarehouseReceiptQueueRow {
   void_by_name?: string | null;
   void_reason?: string | null;
   do_file_url?: string | null;
+  /** The governed category words this receiving answers to (owner correction
+   *  2026-09-06) — computed server-side through the ONE shared ladder from
+   *  the catalog's answer; the rail only counts them. */
+  categories?: string[];
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4411,6 +4427,9 @@ export interface ReceivingSessionDetail {
       wrong_item_qty: number;
     }>;
   } | null;
+  /** The formal GRN document's product facts — catalog description + the
+   *  governed category word, resolved server-side (2026-09-06). */
+  line_info?: Record<string, { description: string | null; category: string }>;
   events: ReceivingEvent[];
 }
 
@@ -4432,6 +4451,11 @@ export interface ReceivingAmendBody {
   goodsReceivedAt?: string;
   doNumber?: string;
   actualSiteId?: string | null;
+  /** 0427 — a corrected signed-DO file; the old path is preserved in the
+   *  amendment's before/after. */
+  doFilePath?: string;
+  /** 0427 — additional arrival evidence; append-only. */
+  arrivalEvidenceAdd?: Array<{ path: string; kind: "photo" | "video" }>;
   lines?: Array<{ id: string; receivedNow: number }>;
 }
 
@@ -4496,7 +4520,9 @@ export function useOperationWarehouseReceipts(
     queryKey: qk.operation.warehouseReceipts(status),
     queryFn: () =>
       apiFetch<WarehouseReceiptsQueueResponse>(
-        `/api/operation/warehouse-receipts?status=${status}`,
+        // The Register virtualises its rows, so it may list a large GRN
+        // history in one fetch (the server hard-caps the limit).
+        `/api/operation/warehouse-receipts?status=${status}&limit=1000`,
       ),
     staleTime: 30_000,
     ...opts,
@@ -5163,14 +5189,20 @@ export function usePurchasingSettings(
  * situations: the supplier tells us early, or nobody told us and we phoned.
  * The operator keys a DATE; the answer word is derived — the same date the
  * PO already holds is `shipping` (the promise stands), a different one is
- * `delayed` and must carry a reason. 0306/0310's RPC does the rest in one
- * transaction: ledger row · the PO's date · the push into Delay planning ·
- * the history sentence.
+ * `delayed` and must carry a reason. The current RPC requires version and
+ * reply evidence, preserves the original PO date, and updates the exact
+ * linked Sales lines' arrival planning in the same transaction.
  */
 export function useRecordSupplierDate(poId: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: {
+      poVersion?: number;
+      channel?: "whatsapp" | "email" | "phone" | "in_person";
+      recipient?: string;
+      evidence?: string;
+      reportedBy?: string;
+      reportedAt?: string;
       answer: "shipping" | "delayed";
       firstDate?: string;
       newDate?: string;
@@ -7379,6 +7411,7 @@ function invalidateOrderMoney(
 ) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.operation.orderPayments(orderId), exact: true }),
+    qc.invalidateQueries({ queryKey: qk.finance.paymentRegister(), exact: true }),
     qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true }),
     qc.invalidateQueries({ queryKey: ["operation", "orders"] }),
     qc.invalidateQueries({ queryKey: ["operation", "payments"] }),
@@ -8480,6 +8513,29 @@ export function useFinanceReconSuggest(
     enabled: !!bankStmtId,
     staleTime: 30_000,
     ...opts,
+  });
+}
+
+export function usePaymentRegister() {
+  return useQuery({
+    queryKey: qk.finance.paymentRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-register").PaymentRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-register").PaymentRegisterPage>(
+          `/api/finance/payments/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Payments could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Payments changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Payments could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Payments changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
   });
 }
 

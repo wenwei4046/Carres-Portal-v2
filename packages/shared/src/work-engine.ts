@@ -206,7 +206,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "collect",
     module: "orders",
-    trigger: "outstanding > RM 0 — and it survives delivery",
+    trigger: "outstanding > RM 0 with goods ready or arrival confirmed; collection survives delivery",
     owner:
       "the effective Payment Duty holder from Workspace; unresolved fails closed and never borrows the order PIC",
     ownerRule: "payment_duty",

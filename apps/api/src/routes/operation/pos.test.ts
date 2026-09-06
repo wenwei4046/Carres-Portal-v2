@@ -2742,3 +2742,36 @@ describe("opening an app records an OPEN, and completes nothing", () => {
     expect(openBlock).not.toContain("purchasing_confirm_po_sent");
   });
 });
+
+
+describe("POST evidenced supplier reply", () => {
+  const input = { poVersion: 2, answer: "shipping", firstDate: "2026-09-10", channel: "whatsapp", recipient: "Factory group", evidence: "PO-TEST/reply.png", reportedBy: "Factory staff", reportedAt: "2026-09-01T01:00:00Z" };
+  async function post(body: unknown, role = "operation") {
+    return app.fetch(new Request("https://api.test/api/operation/pos/PO-TEST/tomorrow-delivery", {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }), env as never, { waitUntil() {}, passThroughException() {} } as never);
+  }
+  it("submits the exact version and evidence through one caller-authenticated RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { reply_id: "reply" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    expect((await post(input)).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_record_supplier_reply", { p_po_id: "PO-TEST", p_reply: input });
+  });
+  it("rejects incomplete evidence before any database call", async () => {
+    for (const key of ["poVersion", "channel", "recipient", "evidence", "reportedBy", "reportedAt"]) {
+      const body = { ...input } as Record<string, unknown>; delete body[key];
+      expect((await post(body)).status).toBe(422);
+    }
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("surfaces a concurrent revision as a named refusal", async () => {
+    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "22023", details: "stale_po_version", message: "Open the current PO and record the supplier answer." } }) } as any);
+    const response = await post(input);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ code: "stale_po_version" });
+  });
+  it("rejects a dealer", async () => {
+    expect((await post(input, "dealer")).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+});

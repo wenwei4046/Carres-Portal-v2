@@ -29,6 +29,7 @@
  * PURE — no I/O, no clock.
  */
 import { docNumber } from "./doc-number";
+import { goodsCategoryWordOf } from "./line-category";
 import {
   receiveLineClaimProblems,
   RECEIVE_LINE_CLAIM_PROBLEM_TEXT,
@@ -69,7 +70,13 @@ export type WarehouseReceiptStatus =
 
 /** The words on screen. `Waiting Carres check` names WHO the receipt is waiting
  *  for — "Pending" would leave a warehouse clerk wondering whether they still
- *  have something to do (they do not). */
+ *  have something to do (they do not).
+ *
+ *  DOCUMENT STATUS WORDS (owner correction 2026-09-06): a GRN on the Register
+ *  is `Valid` or `Cancelled` — clear document words, the same pair every
+ *  formal document speaks. `Posted` / `Voided` remain internal database
+ *  statuses and never reach a normal user's screen; `Void Receiving` stays
+ *  the ACT's name (a door, not a status). */
 export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   WarehouseReceiptStatus,
   string
@@ -77,11 +84,8 @@ export const WAREHOUSE_RECEIPT_STATUS_LABEL: Record<
   draft: "Not sent yet",
   submitted: "Waiting Carres check",
   returned: "Sent back to recount",
-  posted: "Checked in by Carres",
-  /** `Voided` joined the dictionary with the 2026-09-04 owner instruction:
-   *  `Void Receiving` is the GRN's own act, distinct from an order's
-   *  `Cancel`. The record survives; only its consequences are reversed. */
-  voided: "Voided",
+  posted: "Valid",
+  voided: "Cancelled",
 };
 
 export function warehouseReceiptStatusLabel(
@@ -553,6 +557,60 @@ export function receivingSaveBlocker(d: {
   if (d.claimProblems.length > 0)
     return `Save — ${RECEIVE_LINE_CLAIM_PROBLEM_TEXT[d.claimProblems[0]].toLowerCase()}`;
   return null;
+}
+
+/**
+ * THE RECEIVING RAIL'S CATEGORY VOCABULARY (owner correction 2026-09-06).
+ *
+ * Exactly these five rows, in exactly this order — the shared display order
+ * every Operation page speaks (mattress → bedframe → sofa → pillow →
+ * protector; `lineSortRank`'s own sequence). No `Any`, no `All …`, no
+ * `Accessory`, no `Topper`/`Footrest`/`Service`, no invented category. A
+ * receiving whose goods answer none of these five simply lights no row.
+ */
+export const RECEIVING_CATEGORY_ROWS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+] as const;
+
+export type ReceivingCategoryRow = (typeof RECEIVING_CATEGORY_ROWS)[number];
+
+/**
+ * The category words ONE receiving record answers to — derived through the
+ * governed shared ladder (`goodsCategoryWordOf`: recorded → catalog →
+ * classifier), never a receiving-local SKU rule. Only lines the delivery
+ * actually counted (good, damaged or wrong) speak; a zero line is the PO's
+ * fact, not this arrival's. Returned in the rail's own order, unique.
+ *
+ * `categoryBySku` is the catalog's answer (`product_models.category` via the
+ * one shared reader); an absent SKU falls to the ladder's measured-gap branch
+ * exactly as the Sales Orders register does.
+ */
+export function receiptCategoryWords(
+  lines: readonly WarehouseReceiptLine[] | null | undefined,
+  categoryBySku: ReadonlyMap<string, string>,
+): ReceivingCategoryRow[] {
+  const seen = new Set<string>();
+  for (const l of lines ?? []) {
+    if (
+      countedOnLine({
+        receivedNow: num(l.received_now),
+        damagedQty: num(l.damaged_qty),
+        wrongItemQty: num(l.wrong_item_qty),
+      }) <= 0
+    )
+      continue;
+    seen.add(
+      goodsCategoryWordOf({
+        sku: l.sku,
+        category: categoryBySku.get(l.sku) ?? null,
+      }),
+    );
+  }
+  return RECEIVING_CATEGORY_ROWS.filter((w) => seen.has(w));
 }
 
 /** The governed labels for who saved a posting (never a rewritten owner). */
