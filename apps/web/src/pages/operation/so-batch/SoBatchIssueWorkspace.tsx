@@ -105,6 +105,47 @@ export default function SoBatchIssueWorkspace({
   );
 
   const current = documents[Math.min(at, Math.max(documents.length - 1, 0))];
+  const draftData = useMemo<PoTemplateData | null>(() => {
+    if (!current) return null;
+    const destination = destinations.find((d) => d.id === current.destinationId);
+    return {
+      draft: true,
+      po_number: "DRAFT",
+      po_id: "",
+      version: 0,
+      issue_date: "",
+      supplier: { name: current.supplierName ?? "", address: null, contact: null },
+      destination: { name: destination?.name ?? "", address: "" },
+      delivery_instructions: null,
+      // The selected goods deadline is not the issued PO's delivery promise.
+      eta_date: null,
+      terms: null,
+      so_refs: [...new Set(current.lines.flatMap((line) => line.so == null ? [] : [line.so]))],
+      lines: current.lines.flatMap((line) => line.parts.map((part) => ({
+        sku: part.sku,
+        description: [line.item, line.variant].filter(Boolean).join(" · "),
+        qty: part.qty,
+        unit: "unit",
+        sources: [{ so: line.so, qty: part.qty }],
+      }))),
+    };
+  }, [current, destinations]);
+  const [draftPdf, setDraftPdf] = useState<{ data: PoTemplateData; url?: string; error?: string } | null>(null);
+  const [draftAttempt, setDraftAttempt] = useState(0);
+  useEffect(() => {
+    if (mode !== "review" || !draftData) return;
+    let dead = false;
+    let url: string | undefined;
+    setDraftPdf(null);
+    void renderPoPdf(draftData).then((blob) => {
+      if (dead) return;
+      url = URL.createObjectURL(blob);
+      setDraftPdf({ data: draftData, url });
+    }).catch(() => {
+      if (!dead) setDraftPdf({ data: draftData, error: "Could not load the preview." });
+    });
+    return () => { dead = true; if (url) URL.revokeObjectURL(url); };
+  }, [draftData, mode, draftAttempt]);
 
   /**
    * WHAT IS STOPPING THE WHOLE BATCH, named.
@@ -443,31 +484,48 @@ export default function SoBatchIssueWorkspace({
               </div>
             </>
           ) : currentPo ? (
-            /* The form appears only once the official document has rendered:
-               until then there is no version to declare, and a confirmation
-               without one is the defect 0378 closes. */
-            pdfVersion != null ? (
-              <PoIssueEvidence
-                po={currentPo}
-                version={pdfVersion}
-                /* PERSISTED rows, never this tab's memory (closure §8). */
-                evidence={evidence[currentPo.id] ?? []}
-                /* The supplier's real group and address, from the issue
-                   response — the ONE communication area asks for them. */
-                doors={doorsForIssuedPo(currentPo)}
-                onOpened={() => {
-                  /* An OPEN is history. SO Batch Purchase does not write it:
-                     `purchasing_record_send` belongs to the Purchase Order
-                     object, and a second writer of the same row is a second
-                     truth about the same document. */
-                }}
-                onConfirmed={() => onConfirmed(currentPo.id)}
-              />
-            ) : (
-              <p className="text-meta text-kit-slate-11" data-testid="so-batch-evidence-waiting">
-                {pdfError ?? `Opening ${currentPo.id}…`}
-              </p>
-            )
+            <>
+              {/* The form appears only once the official document has rendered:
+                 until then there is no version to declare, and a confirmation
+                 without one is the defect 0378 closes. */}
+              {pdfVersion != null ? (
+                <PoIssueEvidence
+                  po={currentPo}
+                  version={pdfVersion}
+                  /* PERSISTED rows, never this tab's memory (closure §8). */
+                  evidence={evidence[currentPo.id] ?? []}
+                  /* The supplier's real group and address, from the issue
+                     response — the ONE communication area asks for them. */
+                  doors={doorsForIssuedPo(currentPo)}
+                  onOpened={() => {
+                    /* An OPEN is history. SO Batch Purchase does not write it:
+                       `purchasing_record_send` belongs to the Purchase Order
+                       object, and a second writer of the same row is a second
+                       truth about the same document. */
+                  }}
+                  onConfirmed={() => onConfirmed(currentPo.id)}
+                />
+              ) : (
+                <p className="text-meta text-kit-slate-11" data-testid="so-batch-evidence-waiting">
+                  {pdfError ?? `Opening ${currentPo.id}…`}
+                </p>
+              )}
+              {/* LEAVING IS SAFE (file header): a numbered PO is never deleted
+                  by walking away, so the same door out of THIS journey stays
+                  open after Issue PO — same label, same destination
+                  (`SO Batch Purchase`'s own buying list), never `Purchase
+                  Orders`, which is a different module's register. */}
+              <div className="mt-4 flex items-center border-t border-kit-slate-5 pt-3">
+                <button
+                  type="button"
+                  data-testid="so-batch-issue-back"
+                  className="h-8 rounded-control border border-kit-slate-6 px-3 text-meta font-medium"
+                  onClick={onBack}
+                >
+                  {W.backToBuying}
+                </button>
+              </div>
+            </>
           ) : null}
         </div>
 
@@ -482,13 +540,20 @@ export default function SoBatchIssueWorkspace({
             /* NOT SENDABLE, AND IT SAYS SO. A preview that looked official
                would be a purchase order with no number — the one thing a
                supplier cannot act on. */
-            <div className="flex h-full flex-col items-center justify-center gap-2 rounded-control border border-dashed border-kit-slate-6 bg-white p-6 text-center">
-              <p className="text-body font-medium">{W.previewNotSendable}</p>
-              <p className="text-meta text-kit-slate-11">
-                {current?.supplierName ?? ""} · {destinationName(current?.destinationId ?? "")} ·{" "}
-                {current?.qty ?? 0} {current?.qty === 1 ? "unit" : "units"}
-              </p>
-            </div>
+            <>
+              <p className="mb-2 shrink-0 text-meta text-kit-slate-11">{W.previewNotSendable}</p>
+              {draftPdf?.data === draftData && draftPdf?.url ? (
+                <iframe title="Draft purchase order preview" data-testid="so-batch-draft-pdf"
+                  className="min-h-0 w-full flex-1 rounded-control border border-kit-slate-6 bg-white"
+                  src={draftPdf.url} />
+              ) : (
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-white text-meta text-kit-slate-11" role="status">
+                  {draftPdf?.data === draftData && draftPdf?.error ? (
+                    <><p>{draftPdf.error}</p><button type="button" className="h-7 rounded-control border border-kit-slate-6 px-2 text-meta" onClick={() => setDraftAttempt((n) => n + 1)}>Try again</button></>
+                  ) : "Rendering preview…"}
+                </div>
+              )}
+            </>
           ) : currentPo ? (
             pdfUrl ? (
               <iframe

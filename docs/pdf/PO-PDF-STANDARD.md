@@ -30,6 +30,13 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
 
 ## 2 · The PO's own rules
 
+- **Pre-issue review (owner request, 2026-09-07):** Review Purchase Orders opens
+  a draft using this same template immediately. It prints DRAFT / Not issued
+  and a do-not-send footer on every page. Only selected SKU quantities, source
+  SOs and known supplier/destination facts are previewed; no PO number, issued
+  version, issue date, Unit IDs or delivery promise is invented. Issue PO still
+  creates the official document; the preview then switches to its print data.
+
 - **Money is ABSENT, structurally.** The payload (0307) carries no RM figure;
   the template cannot print one. The source-scan test enforces it.
 - **THE DOCUMENT PRINTS ITS VERSION, INCLUDING VERSION 1** (0378, 2026-08-24).

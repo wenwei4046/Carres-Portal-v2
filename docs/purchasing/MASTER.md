@@ -614,6 +614,10 @@ summary. Action ownership uses structured avatar metadata.
 - Use `Order Route`, never `RelationMap`, `RelationshipMap` or `Relation Map`.
 - A formal outside-readable document uses 50% edit/check + 50% live PDF preview only during
   issue/edit/revision. It returns to full-width view after completion.
+- **Review Purchase Orders opens with a rendered draft (owner request, 2026-09-07).**
+  The selected document is visible before Issue PO, using the PO template and its
+  explicit draft treatment in `docs/pdf/PO-PDF-STANDARD.md`. Navigating documents
+  changes the draft. Previewing creates nothing; Issue PO remains the creation action.
 - **THE 50/50 BINDS FROM 1130px** (measured: two 565px halves is the narrowest a readable A4 preview
   and a full decision column both fit). Narrower, the surface STACKS — decision work first, the
   document below it keeping a readable height — and the surface scrolls. Nothing is compressed:
