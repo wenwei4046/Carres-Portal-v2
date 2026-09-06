@@ -354,9 +354,11 @@ complete §16 payment message swaps in when its owner-approved Important Notes w
 arrives — the bottom rules are never invented or shortened. `waLink` converged from two
 page-local copies into the one shared implementation.
 
-### BUILD in progress — the invoice document prints from its snapshot, and the §17 Calendar, 2026-09-06
+### Deployed — the invoice document prints from its snapshot, and the §17 Calendar, 2026-09-06
 
-Branch evidence, no migration: `GET /finance/invoices/:id/document` serves the issued
+PR #1115 merged as `53853a12` and production converged that exact SHA (ERP page + Worker); PR
+#1114 (`52659282` — the sent-message ledger and Ask the customer to pay, migration 0434
+applied) converged before it. `GET /finance/invoices/:id/document` serves the issued
 invoice's IMMUTABLE snapshot as the governed InvoiceTemplate data (a voided invoice keeps its
 paper and says VOIDED in the title; a pre-0429 invoice has no snapshot, falls back to a live
 read and says so); the Invoice object header gains the direct `Print` output. The §17 Calendar
@@ -370,11 +372,31 @@ muted as `not a working day` (Malaysian holidays too), the selected date on the 
 every indicator carrying words. Entries are read-only facts from their authoritative owners;
 an Expected arrival entry creates no deadline and no chase, and voided invoices place nothing.
 
-WhatsApp template library, message assembly with bank routing and Partner contact, Reports,
-Stripe convergence, storage journeys, full responsive 390px/200% verification and the
-retirement of the rejected Refund/Bank Matching surfaces remain unfinished target work. The
-complete approved customer Important Notes wording has not been located in the repository and
-has been requested from its owner; it must not be invented or shortened during implementation.
+### BUILD in progress — the template library keeps every version, 2026-09-06
+
+Migration `0435` (branch evidence; verified on production in a rolled-back transaction — a
+non-manager is refused, an edit appends version 2 while version 1 stays history, one Default
+per purpose holds, and an inactive template cannot be the Default; not yet applied) creates
+`payment_message_templates`, the append-only version store, and its three manager doors
+(save · set default · set active) through the same settings gate and change log. Seeds carry
+ONLY the two already-locked customer wordings (Jess 2026-07-13) as the `Gentle reminder` and
+`Payment should have been received` Defaults, with protected merge fields
+`{customer} {ref} {outstanding} {items}`; every other governed purpose says
+`No template yet. The approved wording must come from its owner.` — nothing invents customer
+copy. `Settings → Payment → WhatsApp templates` gains the library: heads under the governed
+§16 purpose words, New template · Duplicate · Edit · Set as default · Make inactive · View
+history, and the governed 50/50 editor (ordinary wording left, real preview right, protected
+fields, a lost amount field blocks Review, Review changes before Save). `Ask the customer to
+pay` now recommends the Default template from the shared clock's answer, offers
+`Change template` across Active templates, renders protected fields from structured facts,
+and falls back to the built-in locked wording when the library is unreachable.
+
+Message assembly with bank routing and Partner contact, Reports, Stripe convergence, storage
+journeys, full responsive 390px/200% verification and the retirement of the rejected
+Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
+Important Notes wording has not been located in the repository and has been requested from its
+owner; it must not be invented or shortened during implementation — the manager can also paste
+it into a `Standard bank transfer` template once approved.
 
 ### Approved target / not claimed built by this scope
 

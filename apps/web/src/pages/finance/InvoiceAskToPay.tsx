@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { invoiceNeeded } from "@carres/shared/payment-invoice-register";
 import { SectionCard } from "@/components/SectionPanel";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { qk } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,12 @@ import {
   rmAmount,
   salutationOf,
 } from "@/lib/wa-templates";
+import {
+  PAYMENT_TEMPLATE_PURPOSE_WORD,
+  recommendedTemplatePurpose,
+  renderPaymentTemplate,
+  type PaymentTemplateRow,
+} from "@carres/shared/payment-templates";
 import { waLink } from "@/lib/wa-link";
 import { toast } from "sonner";
 
@@ -37,19 +43,50 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
 }) {
   const money = invoiceNeeded(invoice);
   const order = invoice.orders;
-  const prepared = useMemo(() => {
+  // The structured facts every template's protected fields fill from.
+  const facts = useMemo(() => {
     const refs = order?.source_ref;
-    const input = {
-      salutation: salutationOf(null, order?.customer_name),
+    return {
+      customer: salutationOf(null, order?.customer_name),
       ref: (Array.isArray(refs) ? refs[0] : refs) ?? null,
       outstanding: rmAmount(money.known ? money.outstanding : 0),
+      items: (order?.order_lines ?? [])
+        .filter((l): l is { sku: string; qty: number; unit_price: number | string | null } => !!l.sku)
+        .map((l) => `${Number(l.qty)}× ${l.sku}`).join("\n") || null,
+    };
+  }, [order, money]);
+  // §16 — the system recommends a template from the structured facts (the
+  // shared clock's answer); `Change template` may choose any Active template.
+  // With the library unavailable, the LOCKED built-in wording stands in.
+  const templates = useQuery<{ templates: PaymentTemplateRow[] }>({
+    queryKey: ["finance", "payment-templates"],
+    queryFn: () => apiFetch("/api/finance/payment-settings/templates"),
+    staleTime: 60_000,
+  });
+  const activeHeads = useMemo(() =>
+    (templates.data?.templates ?? []).filter((t) => t.is_head && t.active),
+  [templates.data]);
+  const recommendedPurpose = recommendedTemplatePurpose(tone === "chase" ? "late" : "due");
+  const recommended = activeHeads.find((t) => t.purpose === recommendedPurpose && t.is_default)
+    ?? activeHeads.find((t) => t.purpose === recommendedPurpose) ?? null;
+  const [chosenKey, setChosenKey] = useState<string | null>(null);
+  const chosen = (chosenKey && activeHeads.find((t) => t.template_key === chosenKey)) || recommended;
+  const prepared = useMemo(() => {
+    if (chosen) return renderPaymentTemplate(chosen.body, facts);
+    const input = {
+      salutation: facts.customer,
+      ref: facts.ref,
+      outstanding: facts.outstanding,
       lines: (order?.order_lines ?? [])
         .filter((l): l is { sku: string; qty: number; unit_price: number | string | null } => !!l.sku)
         .map((l) => ({ sku: l.sku, qty: Number(l.qty) })),
     };
     return tone === "chase" ? buildCustomerChase(input) : buildCustomerReminder(input);
-  }, [order, money, tone]);
+  }, [chosen, facts, order, tone]);
   const [text, setText] = useState(prepared);
+  const [editedByHand, setEditedByHand] = useState(false);
+  // A template switch replaces unedited wording; hand-edited words survive.
+  const shown = editedByHand ? text : prepared;
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const qc = useQueryClient();
@@ -67,14 +104,14 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
   });
 
   const copy = () => {
-    void navigator.clipboard?.writeText(text);
+    void navigator.clipboard?.writeText(shown);
     toast.success("Message copied");
   };
   const openWa = () => {
-    void navigator.clipboard?.writeText(text);
+    void navigator.clipboard?.writeText(shown);
     const wa = waLink(order?.customer_phone ?? null);
     if (wa) {
-      window.open(`${wa}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      window.open(`${wa}?text=${encodeURIComponent(shown)}`, "_blank", "noopener");
       toast.success("WhatsApp opened — sending is not recorded yet");
     } else {
       toast.success("No phone on file — message copied, paste it into WhatsApp");
@@ -93,7 +130,7 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
     setFile(f);
   };
   async function recordSent() {
-    if (!file || saving || record.isPending || !text.trim()) return;
+    if (!file || saving || record.isPending || !shown.trim()) return;
     setSaving(true);
     const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60);
     const path = `orders/${invoice.order_id}/communications/${Date.now()}-${safeName}`;
@@ -107,8 +144,10 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
     }
     record.mutate({
       kind: tone === "chase" ? "payment_request" : "reminder",
-      messageText: text.trim(),
-      templateKey: tone === "chase" ? "customer_chase" : "customer_reminder",
+      messageText: shown.trim(),
+      templateKey: chosen
+        ? `${chosen.purpose}:${chosen.template_key}:v${chosen.version}`
+        : tone === "chase" ? "customer_chase" : "customer_reminder",
       screenshotUrl: `${ATTACHMENTS_BUCKET}/${path}`,
     });
   }
@@ -118,9 +157,21 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
       <SectionCard><div className="p-4">
         <h2 className="text-strong mb-2">Ask the customer to pay</h2>
         <div className="space-y-2 text-body">
+          {activeHeads.length > 0 && <label className="block">
+            <span className="text-label">Template</span>
+            <select value={chosen?.template_key ?? ""} aria-label="Change template"
+              onChange={(e) => { setChosenKey(e.target.value || null); setEditedByHand(false); }}
+              className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
+              {activeHeads.map((t) => <option key={t.template_key} value={t.template_key}>
+                {PAYMENT_TEMPLATE_PURPOSE_WORD[t.purpose]} · {t.name}
+                {recommended?.template_key === t.template_key ? " (recommended)" : ""}
+              </option>)}
+            </select>
+          </label>}
           <label className="block">
             <span className="text-label">Message</span>
-            <textarea value={text} onChange={(e) => setText(e.target.value)}
+            <textarea value={shown}
+              onChange={(e) => { setText(e.target.value); setEditedByHand(true); }}
               rows={9} aria-label="Message"
               className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" />
           </label>
@@ -138,7 +189,7 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
             </span>
           </label>
           <div className="flex gap-2 pt-1">
-            <button className="btn-primary" disabled={!file || !text.trim() || saving || record.isPending}
+            <button className="btn-primary" disabled={!file || !shown.trim() || saving || record.isPending}
               onClick={() => void recordSent()}>Record message sent</button>
             <button className="btn-secondary" onClick={onClose}>Back</button>
           </div>
@@ -146,7 +197,7 @@ export default function InvoiceAskToPay({ invoice, tone, onClose }: {
       </div></SectionCard>
       <SectionCard><div className="p-4" data-testid="ask-message-preview">
         <h2 className="text-strong mb-2">What the customer receives</h2>
-        <pre className="whitespace-pre-wrap font-sans text-body">{text}</pre>
+        <pre className="whitespace-pre-wrap font-sans text-body">{shown}</pre>
       </div></SectionCard>
     </div>
   </div>;
