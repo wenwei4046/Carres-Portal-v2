@@ -68,7 +68,7 @@ describe("Payment MASTER — no blind collection Work", () => {
       openOrderActions({ ...waiting, stockEtaIso }), ctx, "2026-08-18", HOLS,
     );
     expect(itemsFor("2026-08-19").find((item) => item.ruleKey === "collect")).toMatchObject({
-      ownerName: "Shasha",
+      ownerRule: "payment_duty",
       dueIso: "2026-08-18",
     });
     expect(itemsFor(null).some((item) => item.ruleKey === "collect")).toBe(false);
