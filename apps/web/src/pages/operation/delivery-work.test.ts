@@ -26,10 +26,7 @@ import {
   SINGAPORE_KEY,
   scopeFooter,
   DW,
-  GOVERNED_LOGISTICS,
   } from "./delivery-work";
-
-const TODAY = "2026-08-21";
 
 function order(
   over: Partial<operationOrderListRow> & { id: string; so: number },
