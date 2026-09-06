@@ -206,8 +206,27 @@ View` proposal. Scope and rulings (this Card, no new Card, no new navigation des
    words retained · new columns · the shared view/marker arithmetic unit-tested in
    `@carres/shared` (`receiving-register.test.ts`).
 
-**Delivery evidence — second correction:** recorded on merge below the first correction's
-evidence.
+**Delivery evidence — second correction, CLOSED 2026-09-07.** PR #1117 squash-merged
+`00bf3cedfe5544bf71a12ad0cfd33af400026bee`; deploy automatic on merge, both canonical surfaces
+(`erp.carresofficial.com` and `carres-portal.pages.dev`) reporting `__carres_deploy.json`
+commit `00bf3ced…` — the exact merge SHA. Served-bundle proof: `expected supplier arrival` ·
+`PO/CO No` · `Supplier Delivery Date` · the pager template and the `grn` scope present; zero
+occurrences of `Actual Site` · `Goods Received At` · `Calendar View` · `GRN Register View` ·
+`Receiving Monitor`. Authenticated production walk as operation@ (read-only, no records
+created): the fixed SEPTEMBER 2026 calendar with today highlighted and Sundays muted; only
+present governed categories (Bedframe 3 on the trial data — the ladder's honest answer);
+seven real GRNs under the new columns with `Not confirmed` supplier dates (truthful: no live
+PO carries an evidenced reply, so no day is marked); `Showing 1–7 of 7`; picking 4 Sep
+narrowed to `Showing 0–0 of 0` with the governed no-match sentence and picking it again
+restored the complete listing; a row still opens the 50/50 GRN object with the A4 preview.
+Local gates at merge: shared receiving-register 8 · page 49 · API 33 targeted tests green,
+web+API typecheck clean, design-standard green; full matrix by CI (`verify` pass). Two CI
+catches folded in: `disabled:text-kit-slate-8` was an unpublished palette step (→ slate-9),
+and the kit one-calendar source law now names `MonthCalendar` as the second governed
+react-day-picker skin. Delivery's same-day #1119 collided on the FilterRail header slot; the
+merge keeps the sibling's shipped structure plus the `{testId}-fixed/-scroll` regions, and
+Delivery's page-level `MonitorMonthCalendar` migrates onto kit `MonthCalendar` in its own
+card (ui/MASTER §6.1 second-occurrence rule).
 
 **Delivery evidence — CLOSED 2026-09-06.** PR #1106 merged
 `f755dea80fb7a60c0b0dc481841bfcf7757f5cc1`; deploy automatic on merge, both canonical surfaces
