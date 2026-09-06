@@ -29,7 +29,17 @@ const workspaceDutiesRouter = new Hono<AppEnv>();
 
 /** The duties this surface manages today. A new duty joins by adding a row
  *  here AND its consumer module — never by a module keeping its own list. */
-const DUTIES = [{ key: "grn_duty", label: "GRN Duty" }] as const;
+const DUTIES = [
+  { key: "po_duty", label: "PO Duty" },
+  { key: "grn_duty", label: "GRN Duty" },
+  { key: "payment_duty", label: "Payment Duty" },
+  { key: "storage_waiver_approver", label: "Storage Waiver Approver" },
+  { key: "purchasing_approver", label: "Purchasing Approver" },
+  { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
+  { key: "payment_approver", label: "Payment Approver" },
+  { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
+  { key: "service_case_approver", label: "Service Case Approver" },
+] as const;
 
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
