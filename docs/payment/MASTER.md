@@ -740,13 +740,27 @@ business verification exists for every migration (probes) and the §7 arithmetic
 inspection and native-200%-zoom acceptance exist for NO slice** — they need a visible
 signed-in browser window, and automation cannot drive the browser-chrome zoom control; the
 Storage journey's authenticated interaction walk is also still owed. The observed tool
-failures, precisely: screenshot capture returned `Cannot take screenshot with 0 width`,
-and JavaScript evaluation timed out after 45s (`Runtime.evaluate` — "renderer may be
-frozen or unresponsive") on the existing tab AND on a freshly created tab, while the
-window was minimised. The likely cause is the minimised window's renderers being
-suspended, but that is inference, not measurement. ONE owner action should clear it:
-bring the signed-in Chrome window to a normal visible size and leave it open; the visual
-pass, the native-zoom pass and the Storage walk run from there.
+failures, precisely and in the order they happened — two DIFFERENT modes, not one:
+
+1. **Renderer unresponsive (while the signed-in window was minimised).** Screenshot
+   capture returned `Cannot take screenshot with 0 width`; JavaScript evaluation timed out
+   after 45s (`Runtime.evaluate` — "renderer may be frozen or unresponsive") on the
+   existing tab AND on a freshly created tab. The minimised window is the correlated
+   condition; renderer suspension is a plausible cause and was NOT measured.
+2. **Extension not connected (later, 2026-09-07).** The browser tool returned
+   `Claude in Chrome is not connected` — the extension is unreachable, a different failure
+   from (1) and not a page-state problem at all.
+
+Neither mode is a product defect and neither is evidence about the pages. ONE owner action
+should clear both: with the Claude in Chrome extension connected and signed in, bring the
+signed-in `erp.carresofficial.com` window to a normal visible size and leave it open; the
+visual pass, the native-zoom pass, the Storage interaction walk and the production check of
+the converged Work/gate readers all run from there. **Deployment evidence measured
+meanwhile (2026-09-07), which is NOT visual or interaction acceptance:** the served ERP
+bundle carries `A Storage Invoice correction is in progress`, `Create Storage Invoice`, the
+Reports→Payment door card and the §13 no-refund wording, and carries NO `Reconciliation`
+string; the live `ops_delivery_orders_money_gate` function body contains the 0441 storage
+block, reads the storage kinds and performs the subtract-once arithmetic.
 
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
