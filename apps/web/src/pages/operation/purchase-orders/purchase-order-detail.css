@@ -1,0 +1,48 @@
+/* Local PO/SO detail styling trial. Explicit object scopes keep other shared
+   blocks, alert banners, action controls and PDF templates intact. */
+:is(.po-detail-style, .so-detail-style) {
+  font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
+}
+
+:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child {
+  margin: -0.75rem -1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 0;
+  border-radius: inherit;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+:is(.po-detail-style, .so-detail-style) [data-block] > div:first-child > h2 {
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+}
+
+.po-detail-style h1 > .font-mono,
+.po-detail-style [data-block] .font-mono {
+  font-family: inherit;
+}
+
+.so-detail-style [data-block] > div:first-child > h2 {
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.so-detail-style [data-block] > div:first-child :is(span, p) {
+  color: #94a3b8;
+}
+
+.so-detail-style .so-customer-status,
+.so-detail-style [data-testid="subhead-delivery-address"],
+.so-detail-style [data-testid="subhead-emergency-contact"] {
+  color: #334155;
+}
+
+.so-detail-style [data-block] > div:first-child :is(a, button),
+.so-detail-style [data-block] > div:first-child :is(a, button) * {
+  color: #38bdf8;
+}

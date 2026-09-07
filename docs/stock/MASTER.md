@@ -29,12 +29,19 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**.
+Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**
+(owner replacement Card, 2026-09-06). The ERP keeps ONE global Dashboard; no Warehouse-local
+`Dashboard` label exists, and Calendar, Transfer, Ready Stock and Dashboard are not
+additional Warehouse destinations. The navigation rail contains page names only.
 
-- Monitor: dated read-only projection of Warehouse work and exceptions; never a second truth.
-- Inbound: physical goods expected at and received into a governed Site.
-- Inventory: the one current Unit authority, including Ready Stock and Counts & Adjustments views.
-- Outbound: dated physical work for Units that must leave a governed Site.
+- Monitor: the module's ONLY Calendar-summary page — a dated read-only projection of both
+  incoming and outgoing Warehouse work; never a second truth.
+- Inbound: physical goods expected at a governed Site — a 240px filter rail + Inbound
+  Register that routes actual receipt work to the governed Receiving Session.
+- Inventory: the one current Unit authority (240px rail + Register), including Ready Stock
+  and Counts & Adjustments views. No Calendar summary and no six-day date strip.
+- Outbound: dated physical work for Units that must leave a governed Site — a 240px filter
+  rail + Outbound Register over the same work.
 
 Ready Stock is one shared eligible-Unit view of Inventory. Operations reaches it through Warehouse
 Inventory; Sales reaches the same authority through `Sales → Ready Stock`. It is not another stock
@@ -47,11 +54,19 @@ Purchasing, Delivery, Payments and Service Cases keep their own doors.
 Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
 
-**WAREHOUSE MONITOR CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Monitor's
-page-owned filter groups are `OUTBOUND SCHEDULE · SITE · SOURCE`. These are read-only filters over
-the dated Warehouse projection, never new records or destinations. A valid empty day says
-`No outbound handovers on {date}. Choose another date.` The Calendar card uses the owning source's
-actual words and never invents a shorter Warehouse status vocabulary.
+**WAREHOUSE MONITOR CALENDAR — OWNER RULING 2026-09-06 (replaces the 2026-09-04 Dashboard
+Calendar law).** Monitor renders the full-width six-working-day Calendar and carries NO 240px
+page filter rail — filtering belongs to the destination pages its cards open. Each date shows
+the actual weekday and date; inside a date, work is arranged by actual time. Both directions
+render: ARRIVAL (`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` ·
+`Return from repair`) and PICKUP (`Customer-delivery pickup` · `Transfer pickup` ·
+`Supplier-return pickup` · `Repair pickup`). Every event says what its time means —
+`Supplier arrival 09:00–10:00` · `Driver pickup 14:30` — or exactly `Time not provided`;
+an unexplained bare time may not render. A valid empty day says
+`No arrivals or pickups on {date}. Choose another date.` The Calendar card uses the owning
+source's actual words and never invents a shorter Warehouse status vocabulary. On mobile the
+same projection is one selected day as a vertical time-ordered list with previous/next
+working-date controls.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
 Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
@@ -318,41 +333,42 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Monitor is the only Warehouse Calendar-summary page. Its six-working-day Calendar prints
-actual weekday and date, omits governed closures and keeps unfinished work on its original date.
-Inbound uses exactly **240px page-specific filter rail + Inbound Register**, with the Register
-occupying the remaining width. Inbound never renders a Calendar, calendar cards or six-day strip.
-Its compact date/date-range control filters the Register only. This owner-approved implementation
-card supersedes the earlier all-destinations date strip and 35%/65% Inbound composition.
-Monitor arrival cards deep-link with the exact date, governed Site ID, source type and source record.
+Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
+actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
+`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
+Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
+it into a misleading current-day bucket.
 
-**MONITOR CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Monitor is the
-read-only date overview; it does not replace Outbound's exact-Unit work listing. On desktop the six
-operating dates remain one chronological horizontal sequence. Date columns have a readable minimum
-width and the Monitor work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
-grid whose tall first row pushes later days below the fold. There is one shared vertical scroll,
-not an independent scroll inside every day column. At narrow width the same projection becomes a
-single-day agenda with previous/next date controls; data, permissions and destinations do not
-change.
+The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
+For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
+5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
+later working date come from the Warehouse calendar rather than staff memory.
 
-This card Calendar is the Monitor's selected `OUTBOUND SCHEDULE` projection. It does not remove
-the same Monitor's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
-one of those opens that owner's dated rows rather than repainting them as outbound cards.
+**MONITOR CALENDAR COMPOSITION — OWNER RULING 2026-09-06 (replaces the 2026-09-04
+composition law).** Monitor is the read-only date overview; it does not replace Outbound's
+exact-Unit work listing. On desktop the six operating dates remain one chronological
+horizontal sequence at full page width — no page filter rail beside them. Date columns have a
+readable minimum width and the Monitor work area owns horizontal overflow; the dates may not
+wrap into a `3 × 2` grid whose tall first row pushes later days below the fold. There is one
+shared vertical scroll, not an independent scroll inside every day column. At narrow width the
+same projection becomes a single-day agenda with previous/next date controls; data,
+permissions and destinations do not change.
 
-One Calendar card is one governed outbound source scope, never one whole customer order and never a
-second DO. It shows, in this order: actual handover time when one exists · clickable source document
-(`DO No` for customer delivery) · `From → To` · named Logistics Partner/receiving party · `Units
-required` · `Handed over` · `Not handed over` · the current Warehouse fact or shared Work action.
-The card may aggregate for scanning only when every count drills to the exact Unit IDs. It never
-shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem, or an
-`Edit Delivery` control. A Failed Delivery appears only through the exact governed return/collection
-work that now requires a Warehouse physical act.
+One Calendar card is one dated piece of physical work from its owning module — a PICKUP card
+is one governed outbound source scope (never one whole customer order, never a second DO); an
+ARRIVAL card is one expected-arrival source scope. It shows, in this order: the governed time
+sentence · the event name with its direction · the source document identity · the party and
+what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
+shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
+or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
+return/collection work that requires a Warehouse physical act.
 
-Clicking the card opens **Outbound** already scoped to that date and source. It does not make the
-formal DO the Warehouse work surface. The `DO No` inside Outbound remains a door to the read-only
-source document. The signed-in Warehouse operator checks, packs, scans and confirms the handover in
-Outbound; Delivery remains the only owner of its partner/date/time/route editor. Return restores the
-Monitor date, Site, Source filter and scroll position.
+Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
+document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
+nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
+may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
+never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
+editor.
 
 For any selected date, the operator journey is always:
 
@@ -1733,11 +1749,12 @@ buttons on screen whose refusals nobody had designed. They are the scope after t
 
 ### 13.5 · BUILT — the four destinations in the rail (CARD 01, PR #1045)
 
-The current Warehouse module rows are **Monitor · Inbound · Inventory · Outbound**.
-Inventory retains `?tab=stock-onhand`; Monitor retains the compatible `?tab=warehouse-dashboard`
-address, and Outbound uses `?tab=warehouse-outbound`. The local Inbound implementation now links
-`?tab=warehouse-inbound` instead of printing `Coming soon`; its acceptance limits are recorded in
-“Inbound local implementation” below. The collapsed icon opens the named Monitor landing.
+`CARD-2026-09-01-warehouse-01-sidebar` shipped the §2 map: the Warehouse module rows are
+**Dashboard · Inbound · Inventory · Outbound**, complete from day one. `Inventory` is the one
+live door — the same Unit Register page, key and `?tab=stock-onhand` address unchanged, its
+destination header/docTitle/export renamed to the rail's word. Dashboard, Inbound and Outbound
+print `Coming soon` as non-controls and go live in their own pages' PRs. The collapsed 60px
+icon opens the NAMED landing (`WAREHOUSE_LANDING_KEY` = Inventory) until Dashboard exists.
 
 The superseded `Stock · Ready stock · In & out · Transfers · Counts` rows left the rail.
 **De-navigated, not deleted:** `?tab=stock-plan` (reorder points K1 · urgent restock K3 · pool
@@ -1753,7 +1770,7 @@ answered 500 since birth**: the route selected `site_name`/`holder_name` from
 `stock_unit_register_v` and no migration ever gave the view either column — the route merged
 2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
 governed-name joins on 0373's exact shape. **A Unit's permanent address rendered the
-Monitor**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
+Dashboard**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
 route-gate test that only mounting the app can provide. **Every Warehouse surface drew two top
 rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
 Header and none suppressed the slim global bar; all four do now, with a dashboard control test.
@@ -1819,6 +1836,42 @@ Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every
 and the partial-batch holder transition were proven on production in rolled-back probes before
 merge (`PROBE_COMPLETE_ALL_PASS`).
 
+### 13.8 · BUILT / PRODUCTION-VERIFIED — the replacement Card: Monitor, Inbound, and the rail + Register pages
+
+The 2026-09-06 owner replacement Card cancelled the Warehouse `Dashboard` name, the
+Calendar-on-every-page pattern, the `35% / 65%` Inbound/Outbound layouts and the generic
+`Handover / Receiver / Ready / Needs checking` outbound wording, and this build applied it:
+
+- The rail reads **Monitor · Inbound · Inventory · Outbound**; `?tab=warehouse-dashboard`
+  still lands on Monitor (address alias, the `stock-onhand` precedent), and the collapsed icon's
+  named landing is Monitor.
+- **Monitor** renders the full-width six-working-day Calendar with NO 240px rail, both ARRIVAL
+  and PICKUP events time-ordered per governed §2 law, and routes each card to filtered
+  Inbound/Outbound. Supplier arrivals project from Purchasing's open POs (`eta_date`, Pending
+  Delivery Qty); pickups from Delivery's schedule feed. Event kinds with no live source yet
+  (transfers, returns, repair) exist in the shared taxonomy and project nothing — no invented
+  rows.
+- **Inbound** is a 240px rail + Inbound Register over expected arrivals (`Waiting goods
+  arrival · Overdue goods arrival · Waiting Carres check`, Site) that ROUTES to the governed
+  Receiving Session (`?tab=receiving&po=` / `&session=`) and posts nothing itself.
+- **Outbound** is a 240px rail (`PICKUP STATUS`, Site) + the dated work rows; `Logistics
+  Partner`, `Assigned Driver` and `Vehicle` are separate fields (`Waiting for {partner} to
+  assign a driver` when unassigned); the loading act is `Record {n} Units loaded to {person}`;
+  `Warehouse loaded` and `Driver collected` stay two evidence lines, and a confirmed collection
+  with an unloaded Unit names that exact Unit (`{unit} was not confirmed by {person}. It
+  remains with {site}.`).
+- The shared projector lives in `packages/shared/src/warehouse-monitor.ts` (one arithmetic;
+  Law D); the outbound empty day says `No pickups on {date}. Choose another date.`
+
+**Production proof (2026-09-07):** PR #1123 merged as `d45e9047`; the production deploy proof
+(`__carres_deploy.json`) reports build `4d717422`, whose ancestry contains that merge, and the
+served bundle carries the shipped surface verbatim — `warehouse-monitor` / `warehouse-inbound`
+addresses, `Goods scheduled for pickup`, `No arrivals or pickups on`, `Driver pickup`,
+`Time not provided`, `to assign a driver`, ` loaded to ` and `was not confirmed by` all grep
+positive in `/assets/index-BZQ9N_Ss.js`. Desktop (1512px, six days full-width) and mobile
+(375px one-day agenda; Outbound Filters drawer) were walked on the identical code via the
+dev preview entry before merge. CI `verify` passed on the PR head.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
@@ -1864,7 +1917,7 @@ one movement status to collection, transit and arrival; bulk reservation to Sale
 binding; missing month-end to Stock date, window, reconciliation and version; generic task to the
 shared Action contract; and hard-coded NETS to role-based partner/future-self-operation.
 
-Intentional rejects now: Dashboard as a second truth/KPI wall, second exception register, manual totals,
+Intentional rejects now: Monitor as a second truth/KPI wall, second exception register, manual totals,
 negative stock, generic status editing, Position or slot at current scale, heavy WMS without
 measured need, and assumed external cutover.
 
@@ -1891,86 +1944,3 @@ scope, without exact-Unit binding.
 
 **PLAN MISSION COMPLETE.** The complete Warehouse operating model is approved and persisted. PLAN
 does not author Cards or choose implementation mechanics.
-
-### Inbound local implementation — 2026-09-07, not deployed
-
-**Approved scope — owner confirmation 2026-09-07:** implement Transfer, Customer/failed-delivery
-Return, Repair and Replacement source and Receiving chains with Inbound. Receiving remains the
-sole receipt writer. This authorisation does not permit push, merge, deployment or production
-migration. No additional scope approval is required for these chains.
-
-The operation route `?tab=warehouse-inbound` uses the shared 240px FilterRail and DataGrid without
-Calendar. Supplier delivery and the five additional source types project exact expected, received,
-not-yet-received and issue Unit tallies. Source opens its owning object; Work opens Receiving.
-URL filters and Register scroll restore on browser Back. Dates retain their recorded authority;
-`poSupplierDeliveryDateOf` resolves supplier replies. Paginated user-token reads report failures.
-There is no fabricated empty-data fallback or commercial quantity inference. A later Not received
-entry cannot erase an earlier valid receipt; voiding that receipt removes its physical evidence.
-Missing identities/results remain explicit unknowns. Split PO destinations without exact Unit
-lineage remain investigation work rather than guessed arrival allocations.
-
-The local source object records exact Units, dates, reasons, Claim/Case lineage and append-only
-handover evidence. Transfer collection, carrier receipt and destination Receiving are separate
-per-Unit facts; a missing confirmation is visible without moving an untouched Unit. Handover
-rechecks current eligibility and custody. Dates/cancellation retain reasons and history;
-cancellation is blocked after movement. Repair retains Unit identity; replacement allocates a new
-identity linked to the old Unit without consuming the original PO receipt scope. Existing formal
-TR/RO and Unit allocators are reused. Claim outcome and execution layers remain independent.
-
-Case-backed work requires an explicit recorded physical-work approval and linked dated evidence.
-Condition-dependent collection additionally requires passed pre-collection checks and doorstep
-photo/check evidence. A refused collection records the refusal without changing custody. This is
-the local physical chain, not the entire policy/playbook engine or urgent shared-Work integration.
-
-Receiving uses the existing GRN header, exact Unit-result ledger and GRN Duty resolver. Each actual
-arrival records date, Site, holder, handover person, document and private proof. Partial and issue
-outcomes leave other Units untouched. Returns/repair require inspection; reserved Units keep their
-pledge and receive a repair flag. Safe cancellation retains receipt history and restores prior
-Unit state only when no later Unit change exists. There is no second Warehouse receipt ledger.
-
-**Database readiness:** `supabase/drafts/arrival_sources_and_receiving.sql` is an unnumbered,
-unapplied local draft. It adds source facts, private proofs and a nullable PO/arrival-source XOR
-on existing GRNs, plus narrowly evidenced hold-transition exceptions. Measured 2026-09-07: the
-production migration tracker was read; its tail is `0436` → `0438` **applied** (the earlier
-0435 reading is stale), and `0437_offboard_khor_yee_and_keep_two_person_duty` sits on
-`origin/main` but is **not yet in the tracker** — the governed apply is still owed by its own
-lane. The next free number today is `0439`; take the MAX across tracker and every ref again at
-promotion, because sibling lanes race for it. Then verify the complete migration chain, real
-Supabase RLS/storage and signed-in workflows. The new API requires these tables; do not deploy
-it before that database work. No production change, push, merge or deployment has occurred.
-
-**Remaining broader acceptance gaps:** Monitor arrival-card integration, exact split-PO Unit/Site
-lineage, complete legacy receipt results, formal Repair/Purchase Return document workflows,
-automated Case policy/photo completeness and urgent refusal Work remain outside this local
-physical-chain implementation. Their approved module targets remain open.
-
-**Convergence gap — measured 2026-09-07:** this branch's base (`a3813e5e`) is ~89 commits behind
-`origin/main` (`90a8f3ef`). `main` already ships its own supplier-only Inbound page and the
-Monitor rename (PR #1123), the server-paged GRN Register (PR #1117) and later Payment/Claims
-work (`0436`–`0438`, PR #1138); this branch touches the same files (`WarehouseInbound.tsx` ·
-`warehouse-receipts.ts` · `WarehouseWorkspace.tsx` · `portal-nav.ts` · `OperationApp.tsx`).
-Before any PR, merge `origin/main` and converge the two Inbound implementations into ONE page —
-this branch's six-source Register should absorb `main`'s PO projection, never sit beside it.
-During that convergence the full-table `GET /operation/warehouse/inbound` read must be re-cut
-onto `main`'s scoped, server-paged read pattern; a whole-table scan of `ops_stock_items`,
-`warehouse_receipts` and `receiving_unit_results` per page open does not survive real volume.
-
-Local verification preview: `/warehouse-inbound-preview.html` on this worktree's Vite dev server
-(launch entry `warehouse-inbound-preview`, port 5212; requires a local-machine `.env.local`),
-explicitly labelled sample data, with six source types and read-only source/Receiving/Outbound
-navigation.
-Sample writes are rejected. Earlier Inbound browser checks covered 1440px desktop and 390px phone,
-240px rail, no page overflow, filters, loading and retry. Expanded source navigation and partial
-Receiving were subsequently checked in the browser; actual date/person remain blank and only the
-outstanding Unit is offered for receipt. The expanded Receiving form was also checked at 390px:
-page scroll width equalled viewport width, with no horizontal overflow.
-
-Latest focused verification (review pass, 2026-09-07): 176 targeted tests passed (25 shared
-source/projection, 41 API and 110 page/sidebar/workspace). Web, API and shared TypeScript checks
-passed — the API check had been failing on a stale receipts-test fixture and was repaired in this
-pass. The register empty state, source detail, partial Receiving form and void door were
-re-walked in the browser on the labelled sample preview. The isolated PostgreSQL contract script
-checks the draft against fixture tables and the existing receipt-result function/hold trigger:
-partial/issue receipt, retained custody, duplicate prevention, duty denial, exact repair/replacement
-identity, Case approval, doorstep refusal, preserved reservations and safe void refusal after later
-changes, post-plan eligibility, direct-write denial and dealer read/RPC denial. It is not proof of the complete production migration chain or production permissions.

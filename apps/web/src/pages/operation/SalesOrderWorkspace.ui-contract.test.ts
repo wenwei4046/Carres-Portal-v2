@@ -289,9 +289,14 @@ describe("Sales Order object template contract", () => {
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038
      rules it read-only on both surfaces. */
-  it("answers new-or-existing in the Customer heading, and still never lets it be typed", () => {
+  it("answers new-or-existing inside the Customer card, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
-    expect(workspace).toContain("headerSlot=");
+    const start = workspace.indexOf('<Block title="Customer">');
+    const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
+    expect(start).toBeGreaterThan(-1);
+    expect(customer).not.toContain("headerSlot=");
+    expect(customer).toContain('mb-2 flex justify-start');
+    expect(customer).toContain('data-testid="customer-type-chip"');
     expect(workspace).not.toContain('label="Customer type (auto)"');
     expect(workspace).toContain("customerTypeWord");
     /* The accent is spent once, on the tab underline — a chip may not take it. */
@@ -650,24 +655,17 @@ describe("Sales Order object template contract", () => {
   });
 
   it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
-    expect(workspace).toContain("Open this order in Payments");
+    expect(workspace).toContain("Open this order in Payment");
     expect(workspace).toContain("tab=payments&so=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    /* ⭐ AND IT RIDES THE TITLE (YH, 2026-09-01) — a hairline and a whole row
-       at the foot of a card holding three numbers, to carry one link. The word
-       is locked (COPY-STANDARD:1595) and unchanged; the row is gone. Still a
-       navigator, never a writer: `headerSlot` admits a read-only door and
-       nothing that submits. */
-    expect(workspace).toContain('data-testid="workspace-open-payments"');
-    /* It rides the Money card's own heading now: the slot appears inside the
-       Money Block's props, not in a bordered strip at the foot of the card. */
-    const money = workspace.indexOf('title="Money"');
-    expect(money, "the Money block exists").toBeGreaterThan(-1);
-    expect(
-      workspace.slice(money, money + 900),
-      "the payments door rides the Money title",
-    ).toContain("headerSlot");
+    const start = workspace.indexOf('<Block title="Money">');
+    const money = workspace.slice(start, workspace.indexOf('</Block>', start));
+    expect(money).not.toContain("headerSlot");
+    expect(money).toContain('mt-3 flex justify-end');
+    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeGreaterThan(
+      money.indexOf('data-testid="money-outstanding"'),
+    );
   });
 
   /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the

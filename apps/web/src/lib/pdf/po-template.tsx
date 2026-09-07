@@ -169,7 +169,7 @@ export function PoTemplate(data: PoTemplateData) {
      number and no version cannot tell which to build from, so Version 1 prints
      too. (`Version 1 prints nothing` is the internal REVISIONS PANEL's rule —
      `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */
-  const versionLabel = `Version ${version ?? 1}`;
+  const versionLabel = data.draft ? "Not issued" : `Version ${version ?? 1}`;
 
   /**
    * ⭐ PER-LINE SO ATTRIBUTION, FROM THE LINE'S OWN LINEAGE (0382).
@@ -205,9 +205,10 @@ export function PoTemplate(data: PoTemplateData) {
   // column is the one home (owner round, 2026-08-09). `Deliver by` is the
   // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
-    ["PO No", po_number],
-    ["Version", versionLabel.replace("Version ", "")],
-    ["Issued", niceDate(issue_date)],
+    ["PO No", data.draft ? "Assigned when issued" : po_number],
+    ["Version", data.draft ? null : versionLabel.replace("Version ", "")],
+    ["Status", data.draft ? "Not issued" : null],
+    ["Issued", data.draft ? null : niceDate(issue_date)],
     ["Deliver by", niceDate(eta_date), true],
   ];
 
@@ -415,7 +416,7 @@ export function PoTemplate(data: PoTemplateData) {
               {po_number}
               {issued_by ? ` · Issued by ${issued_by}` : ""}
             </Text>
-            <Text style={styles.footerCenter}>Computer-generated document · No signature required.</Text>
+            <Text style={styles.footerCenter}>{data.draft ? "DRAFT · Not issued · Do not send to supplier." : "Computer-generated document · No signature required."}</Text>
             <Text
               style={styles.footerPage}
               render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}

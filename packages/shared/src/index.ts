@@ -1175,6 +1175,16 @@ export {
   type ReceivingSummary,
   type ReceivingWorkSource,
 } from "./warehouse-receipt";
+// 2026-09-06 owner correction (Receiving page) — server-side GRN Register
+// pagination/facets and the rail Calendar's expected-arrival markers, one
+// arithmetic for the Worker and the page's tests alike.
+export {
+  buildGrnRegisterView,
+  expectedArrivalCounts,
+  type GrnRegisterFactRow,
+  type GrnRegisterSelection,
+  type GrnRegisterView,
+} from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
@@ -2108,6 +2118,25 @@ export {
   type WarehouseOutboundCard,
 } from "./warehouse-outbound";
 export {
+  driverCollectedLine,
+  WAREHOUSE_MONITOR_EVENT_LABEL,
+  WAREHOUSE_MONITOR_GROUP_LABEL,
+  warehouseAssignedDriverLine,
+  warehouseLoadedLine,
+  warehouseMonitorArrivalEvents,
+  warehouseMonitorDayEvents,
+  warehouseMonitorEmptyDaySentence,
+  warehouseMonitorGroupOf,
+  warehouseMonitorPickupEvents,
+  warehouseMonitorTimeSentence,
+  warehouseRecordLoadedSentence,
+  warehouseUnitNotCollectedSentence,
+  type WarehouseExpectedArrival,
+  type WarehouseMonitorEvent,
+  type WarehouseMonitorEventKind,
+  type WarehouseMonitorGroup,
+} from "./warehouse-monitor";
+export {
   MY_HOLIDAYS_2026,
   MY_HOLIDAYS_2027_EARLY,
   myHolidaySet,
@@ -2975,6 +3004,10 @@ export * from "./work-engine";
 // Workspace foundation — company-wide owner-Duty assignments, cover resolution,
 // and immutable actor evidence. Capability/permission duties remain separate.
 export * from "./workspace-duty";
+// Workspace Work — the one server/client wire contract. Owning modules keep
+// trigger and completion truth; this only carries their open-action projection.
+export * from "./operation-work";
+export * from "./sales-order-work-source";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 

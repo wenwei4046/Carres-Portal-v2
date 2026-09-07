@@ -119,6 +119,14 @@ const INVOICES = [
     issued_at: "2026-09-03", voided_at: "2026-09-04",
     void_reason: "Wrong amount on the paper", order_id: ORDER.id,
     orders: INVOICE_ORDER },
+  // The dedupe walk: a Storage invoice on the SAME order as i-1 — the
+  // calendar must still show ONE delivery and ONE arrival for that SO.
+  { ...INVOICE_BASE, id: "i-4", invoice_no: "INV-060926-7710", status: "issued",
+    kind: "storage", amount: 150, issued_at: "2026-09-06", voided_at: null,
+    order_id: ORDER.id,
+    orders: { ...INVOICE_ORDER,
+      ops_order_control: [{ balance: null, confirmed_date: soon(10),
+        line_etas: null, line_stock_status: { "MS01-K": "ready" } }] } },
 ];
 
 const realFetch = window.fetch.bind(window);
@@ -133,7 +141,31 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payments/register"))
     return json({ rows: [PARTIAL, LIVE, VOIDED], total: 3 });
   if (url.includes("/api/finance/invoices/register"))
-    return json({ rows: INVOICES, total: 3 });
+    return json({ rows: INVOICES, total: INVOICES.length });
+  // The §16 Online link walk: one standing open link on the walk order.
+  if (/\/stripe\/checkout$/.test(url) && (!init || init.method !== "POST"))
+    return json({ sessions: [{
+      sessionId: "cs_test_walk", url: "https://checkout.stripe.com/pay/cs_test_walk",
+      amount: 2200, status: "open", paidAt: null,
+      expiresAt: new Date(Date.now() + 86_000_000).toISOString(),
+      paymentMethodDetail: null, receiptUrl: null,
+    }] });
+  if (url.includes("/stripe/checkout/"))
+    return json({ session: { sessionId: "cs_test_walk", status: "open" } });
+  if (url.includes("/api/finance/payment-settings/templates"))
+    return json({ templates: [] });
+  // The §6 storage walk: one mattress case on day 21 (one period commenced).
+  if (url.includes("/api/finance/payment-storage") && (!init || init.method !== "POST"))
+    return json({ cases: [{
+      id: "sc-1", order_id: ORDER.id, product_group: "mattress_bedframe",
+      readiness_witnessed_on: soon(-20), customer_delay_witnessed_on: soon(-20),
+      delay_witness_note: "Customer asked to hold the delivery",
+      storage_start: soon(-20), rule_free_days: 14, rule_charge_amount: 150,
+      rule_cycle_days: 30, rule_extra_free_allowed: true,
+      approved_free_until: null, approval_reason: null, status: "open",
+    }] });
+  if (url.includes("/api/finance/payment-storage") )
+    return json({ case: {} });
   if (url.startsWith("/api/")) {
     return new Response(JSON.stringify({}), { status: 404 });
   }

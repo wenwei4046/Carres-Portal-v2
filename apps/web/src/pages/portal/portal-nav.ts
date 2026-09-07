@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  CalendarDays,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -122,10 +123,9 @@ export interface PortalModule {
 
 /** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
  *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
- *  `Dashboard` is live (Warehouse Card 03) and the daily journey OPENS on it
- *  (Stock MASTER §7), so the named landing moved from Inventory to Dashboard
- *  — by name, never derived from row order. */
-export const WAREHOUSE_LANDING_KEY = "wh-dashboard";
+ *  `Monitor` is the module's Calendar-summary page and the daily journey
+ *  OPENS on it (Stock MASTER §7) — by name, never derived from row order. */
+export const WAREHOUSE_LANDING_KEY = "wh-monitor";
 
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
@@ -393,16 +393,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         activeFor: ["path:/operation/delivery-orders"],
         section: "Delivery",
       },
-      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner-approved Blueprint,
-       * 2026-09-01 — Stock MASTER §2, ERP-ARCHITECTURE §2.1;
-       * CARD-2026-09-01-warehouse-01-sidebar): `Dashboard · Inbound ·
-       * Inventory · Outbound`. The former `Stock · Ready stock · In & out ·
-       * Transfers · Counts` subtree is superseded by that ruling. `Inventory`
-       * is the one current Unit Register — the SAME page the `Stock` row
-       * opened; the `?tab=stock-onhand` address is unchanged, so no bookmark
-       * moves. COPY-STANDARD unbanned `Inventory` for exactly this destination
-       * on 2026-09-01. The unbuilt three print `Coming soon` and go live in
-       * their own pages' PRs; the rail never reshuffles after that.
+      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner replacement Card,
+       * 2026-09-06 — Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor ·
+       * Inbound · Inventory · Outbound`. The ERP keeps ONE global Dashboard;
+       * the Warehouse Calendar-summary page is `Monitor` (the same word
+       * Delivery's calendar page already speaks). `Inventory` is the one
+       * current Unit Register — the `?tab=stock-onhand` address is unchanged,
+       * so no bookmark moves, and `?tab=warehouse-dashboard` still lands on
+       * Monitor for the same reason.
        * Reports and Settings stay central: NO Report row, NO Settings row.
        *
        * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
@@ -410,13 +408,19 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * points/urgent restock and the event history are named next scopes in
        * Stock MASTER §13; a direct URL still lands. */
       {
-        key: "wh-dashboard",
+        key: "wh-monitor",
         label: "Monitor",
-        icon: LayoutDashboard,
-        tab: "warehouse-dashboard",
+        icon: CalendarDays,
+        tab: "warehouse-monitor",
         section: "Warehouse",
       },
-      { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, tab: "warehouse-inbound", section: "Warehouse" },
+      {
+        key: "wh-inbound",
+        label: "Inbound",
+        icon: ArrowDownLeft,
+        tab: "warehouse-inbound",
+        section: "Warehouse",
+      },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       {
         key: "wh-outbound",

@@ -186,6 +186,53 @@ describe("POST /api/finance/invoices/:id/issue", () => {
   });
 });
 
+describe("POST /api/finance/invoices/:id/record-message", () => {
+  function withInvoice() {
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: INVOICE_ID, order_id: ORDER_ID }, error: null }),
+          }),
+        }),
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: { id: "c1" }, error: null }),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function request(role: string, body: unknown) {
+    return app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/record-message`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("records the sent message with its proof through the one door", async () => {
+    const sb = withInvoice();
+    const res = await request("operation", {
+      kind: "reminder", messageText: "Hi…", templateKey: "customer_reminder",
+      screenshotUrl: "orders-attachments/orders/o/comm/1.png",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_record_message_sent", {
+      p_order_id: ORDER_ID, p_invoice_id: INVOICE_ID, p_kind: "reminder",
+      p_message_text: "Hi…", p_template_key: "customer_reminder",
+      p_screenshot_url: "orders-attachments/orders/o/comm/1.png",
+    });
+  });
+  it("refuses a record without the sent screenshot before SQL", async () => {
+    const sb = withInvoice();
+    const res = await request("operation", { kind: "reminder", messageText: "Hi…", screenshotUrl: "" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("refuses a dealer", async () => {
+    expect((await request("dealer", { kind: "reminder", messageText: "Hi…", screenshotUrl: "x" })).status).toBe(403);
+  });
+});
+
 describe("POST /api/finance/invoices/:id/void-replace", () => {
   async function request(role: string, body: unknown) {
     return app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void-replace`, {

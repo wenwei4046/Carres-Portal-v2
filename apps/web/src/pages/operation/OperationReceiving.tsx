@@ -1,7 +1,7 @@
-import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  expectedArrivalCounts,
   receivingDisplayNo,
   receivingExtraQty,
   RECEIVING_CATEGORY_ROWS,
@@ -10,10 +10,10 @@ import {
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import {
+  useOperationGrnRegister,
   useOperationPos,
   useOperationSuppliers,
   useOperationWarehouse,
-  useOperationWarehouseReceipts,
   useReceivingDuty,
   type operationPoListRow,
   type SupplierRow,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/queries";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import MonthCalendar from "@/components/kit/MonthCalendar";
 import {
   FilterRail,
   FilterRailGroup,
@@ -29,33 +30,51 @@ import {
 import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 
 /**
- * OperationReceiving — the formal GRN Register and its object surfaces
- * (owner correction 2026-09-06; purchasing/MASTER.md §9.4; UI MASTER §6.7).
+ * OperationReceiving — the ONE Receiving destination
+ * (owner corrections 2026-09-06; purchasing/MASTER.md §9.4; UI MASTER §6.7).
  *
  * ```
  * My Work / Team Work   =  what staff must receive or review
- * Receiving             =  formal GRN records
+ * Receiving             =  the complete GRN Register, beside its rail
  * ```
+ *
+ * ONE PAGE. No Receiving Monitor, no `Calendar View / GRN Register View`
+ * switch, no permanent tabs, no second Receiving destination — the earlier
+ * two-view proposal is superseded. The left 240px rail holds the full month
+ * Calendar FIXED on top and the business filters scrolling beneath it; the
+ * right side is always the complete GRN Register.
  *
  * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
  * GRN — the Register lists `Valid` and `Cancelled` GRNs, nothing else. A
  * Warehouse count awaiting Carres action lives in My Work / Team Work and
  * deep-links (`?session=`) to its Receiving review; it never becomes a
- * Register row. There is no state rail: the old
- * `All receiving / Count waiting for check / Sent back to recount / Posted /
- * Voided` rows are retired.
+ * Register row.
  *
- * The rail holds exactly three record facets plus `Clear filters`:
+ * THE RAIL CALENDAR (owner correction 2026-09-06):
+ *   · one month at a time, ‹ › exactly one month; Sunday visible but muted —
+ *     Receiving follows the Warehouse working calendar, Monday–Saturday,
+ *   · a date with expected supplier arrivals prints a COUNT (never colour
+ *     alone), from the linked POs' governed `Supplier Delivery Date`
+ *     (`expectedArrivalCounts` — the ONE reply arithmetic; our own estimate
+ *     never marks a day),
+ *   · picking a date filters the SAME register by that Supplier Delivery
+ *     Date; picking it again — or `Clear filters` — restores the whole list,
+ *   · the right side never becomes a weekly calendar and never shows work
+ *     cards — daily Receiving actions stay in My Work / Team Work.
  *
- *   CATEGORY          the five governed rows, shared ladder order
- *   SUPPLIER          the suppliers present in Receiving records
- *   GOODS ARRIVED AT  the receiving locations present in the records
+ * The filters below it: CATEGORY (only governed rows present in the result
+ * set) · SUPPLIER · GOODS ARRIVED AT · Clear filters. No `Any`, no `All …`;
+ * re-clicking the active row clears its section. Detailed received-date
+ * filtering is the TABLE's `Goods received on` column — the rail carries no
+ * second received-date filter.
  *
- * No `Any`, no `All …` rows; re-clicking the active row clears its section.
- * Dates are the TABLE's job — the `Goods received on` column owns date
- * filtering; the rail carries no date filter.
+ * THE REGISTER PAGINATES ON THE SERVER: `Showing 1–50 of {total}` with
+ * Previous/Next — the browser never renders the whole history, and every
+ * rail count is computed over the COMPLETE filtered result set by the one
+ * shared arithmetic (`buildGrnRegisterView`, behind `?scope=grn`).
  *
  *   [Start Receiving]  →  Find PO or CO  →  pre-start object  →  Session
  *   `?session=` (Work) →  the count review (Save Receiving / Return count)
@@ -83,13 +102,21 @@ function poStillOwes(po: operationPoListRow): boolean {
   return lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
 }
 
+/** Today in the business timezone — the Calendar opens on the month the
+ *  operator is standing in, wherever the machine thinks it is. */
+function todayMYT(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+  }).format(new Date());
+}
+
 export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
   const poId = params.get("po");
+  const arrivalId = params.get("arrival");
   const finding = params.get("find") === "1";
 
-  const receiptsQ = useOperationWarehouseReceipts("all");
   const posQ = useOperationPos();
   const suppliersQ = useOperationSuppliers();
   const warehouseQ = useOperationWarehouse();
@@ -98,18 +125,42 @@ export default function OperationReceiving() {
   const categorySel = params.get("category");
   const supplierSel = params.get("supplier");
   const siteSel = params.get("site");
+  /** The rail Calendar's picked `Supplier Delivery Date`. */
+  const expectedSel = params.get("expected");
   const [search, setSearch] = useState("");
+  const [offset, setOffset] = useState(0);
+  /** The visible Calendar month — opens on the picked date's month, else
+   *  today's (MYT). The ‹ › arrows move exactly one month. */
+  const [month, setMonth] = useState(() =>
+    (expectedSel ?? todayMYT()).slice(0, 7),
+  );
 
-  const receipts = useMemo(
-    () => receiptsQ.data?.receipts ?? [],
-    [receiptsQ.data],
+  // A changed filter or search term starts the result set over — page 1.
+  const filterKey = [categorySel, supplierSel, siteSel, expectedSel, search].join("|");
+  useEffect(() => {
+    setOffset(0);
+  }, [filterKey]);
+
+  const registerQ = useOperationGrnRegister({
+    offset,
+    category: categorySel,
+    supplier: supplierSel,
+    site: siteSel,
+    expected: expectedSel,
+    q: search,
+  });
+
+  const rows = useMemo(
+    () => registerQ.data?.receipts ?? [],
+    [registerQ.data],
   );
-  /** THE REGISTER BOUNDARY — a row exists only once Save Receiving created
-   *  the GRN. Counts awaiting review live in My Work / Team Work. */
-  const grnRecords = useMemo(
-    () => receipts.filter((r) => r.status === "posted" || r.status === "voided"),
-    [receipts],
-  );
+  const page = registerQ.data?.page ?? { offset: 0, limit: 50, total: 0 };
+  const facets = registerQ.data?.facets ?? {
+    category: {},
+    supplier: {},
+    site: {},
+  };
+
   const suppliers = useMemo(
     () => suppliersQ.data?.suppliers ?? [],
     [suppliersQ.data],
@@ -124,6 +175,11 @@ export default function OperationReceiving() {
     [suppliers],
   );
 
+  /** The Calendar's markers — expected supplier arrivals per governed
+   *  `Supplier Delivery Date`, the ONE shared arithmetic over the same PO
+   *  list Find PO already reads. */
+  const markers = useMemo(() => expectedArrivalCounts(pos), [pos]);
+
   function setFacet(key: string, value: string | null) {
     const next = new URLSearchParams(params);
     if (value === null || next.get(key) === value) next.delete(key);
@@ -131,63 +187,26 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  /** Where the goods PHYSICALLY arrived — the record's own location fact. */
-  const arrivedAtOf = (r: WarehouseReceiptQueueRow) =>
-    r.actual_site_name ?? r.warehouse_name ?? "";
-
-  /** One filter per section; sections combine with AND; counts are computed
-   *  against the OTHER selected sections so a number never lies about what
-   *  clicking it would show. */
-  const matchesExcept = (r: WarehouseReceiptQueueRow, except: string) => {
-    if (
-      except !== "category" &&
-      categorySel &&
-      !(r.categories ?? []).includes(categorySel)
-    )
-      return false;
-    if (
-      except !== "supplier" &&
-      supplierSel &&
-      (r.source_party_name ?? r.supplier_name ?? "") !== supplierSel
-    )
-      return false;
-    if (except !== "site" && siteSel && arrivedAtOf(r) !== siteSel)
-      return false;
-    return true;
-  };
-
-  const counts = useMemo(() => {
-    const category = new Map<string, number>();
-    const supplier = new Map<string, number>();
-    const site = new Map<string, number>();
-    for (const r of grnRecords) {
-      if (matchesExcept(r, "category"))
-        for (const w of r.categories ?? [])
-          category.set(w, (category.get(w) ?? 0) + 1);
-      if (matchesExcept(r, "supplier") && r.supplier_name)
-        supplier.set(r.supplier_name, (supplier.get(r.supplier_name) ?? 0) + 1);
-      const siteName = arrivedAtOf(r);
-      if (matchesExcept(r, "site") && siteName)
-        site.set(siteName, (site.get(siteName) ?? 0) + 1);
-    }
-    return { category, supplier, site };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grnRecords, categorySel, supplierSel, siteSel]);
-
-  const rows = useMemo(
-    () => grnRecords.filter((r) => matchesExcept(r, "")),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [grnRecords, categorySel, supplierSel, siteSel],
+  /** Only the governed rows PRESENT in the result set appear (owner
+   *  correction 2026-09-06) — plus the active pick, so a row narrowed to
+   *  zero elsewhere can still be cleared. Ladder order always. */
+  const categoryRows = useMemo(
+    () =>
+      RECEIVING_CATEGORY_ROWS.filter(
+        (w) => (facets.category[w] ?? 0) > 0 || categorySel === w,
+      ),
+    [facets.category, categorySel],
   );
-
-  const supplierNames = useMemo(
-    () => [...counts.supplier.keys()].sort((a, b) => a.localeCompare(b)),
-    [counts.supplier],
-  );
-  const siteNames = useMemo(
-    () => [...counts.site.keys()].sort((a, b) => a.localeCompare(b)),
-    [counts.site],
-  );
+  const supplierNames = useMemo(() => {
+    const names = new Set(Object.keys(facets.supplier));
+    if (supplierSel) names.add(supplierSel);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [facets.supplier, supplierSel]);
+  const siteNames = useMemo(() => {
+    const names = new Set(Object.keys(facets.site));
+    if (siteSel) names.add(siteSel);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [facets.site, siteSel]);
 
   const columns: DataGridColumn<WarehouseReceiptQueueRow>[] = useMemo(
     () => [
@@ -207,25 +226,33 @@ export default function OperationReceiving() {
         ),
       },
       {
-        key: "status",
-        label: "Status",
-        width: 110,
+        key: "supplierDeliveryDate",
+        label: "Supplier Delivery Date",
+        width: 166,
         sortable: true,
-        /* Document status words — `Valid` / `Cancelled` (owner correction
-           2026-09-06). `Posted`/`Voided` stay internal database statuses. */
-        searchValue: (r) => warehouseReceiptStatusLabel(r.status),
-        exportValue: (r) => warehouseReceiptStatusLabel(r.status),
-        accessor: (r) => (
-          <span
-            className={
-              r.status === "voided"
-                ? "text-body text-base-500 line-through"
-                : "text-body text-base-900"
-            }
-          >
-            {warehouseReceiptStatusLabel(r.status)}
-          </span>
-        ),
+        /* The linked PO's governed supplier answer (`poSupplierDeliveryDateOf`,
+           server-resolved) — the SAME date the rail Calendar filters by, so
+           the picked day and this cell can never disagree. `Not confirmed`
+           while the supplier has not evidenced one. */
+        searchValue: (r) => r.supplier_delivery_date ?? "Not confirmed",
+        exportValue: (r) =>
+          r.supplier_delivery_date
+            ? fmtDate(r.supplier_delivery_date)
+            : "Not confirmed",
+        filterType: "date",
+        dateValue: (r) => r.supplier_delivery_date,
+        sortFn: (a, b) =>
+          (a.supplier_delivery_date ?? "").localeCompare(
+            b.supplier_delivery_date ?? "",
+          ),
+        accessor: (r) =>
+          r.supplier_delivery_date ? (
+            <span className="tabular-nums text-body text-base-900">
+              {fmtDate(r.supplier_delivery_date)}
+            </span>
+          ) : (
+            <span className="text-body text-kit-slate-9">Not confirmed</span>
+          ),
       },
       {
         key: "receivedAt",
@@ -235,6 +262,12 @@ export default function OperationReceiving() {
         searchValue: (r) => r.goods_received_at ?? "",
         exportValue: (r) =>
           r.goods_received_at ? fmtDate(r.goods_received_at) : "",
+        /* The table's date column OWNS detailed date filtering (owner
+           correction 2026-09-06) — the rail carries no second one. */
+        filterType: "date",
+        dateValue: (r) => r.goods_received_at,
+        sortFn: (a, b) =>
+          (a.goods_received_at ?? "").localeCompare(b.goods_received_at ?? ""),
         accessor: (r) => (
           <span className="tabular-nums text-body text-base-900">
             {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
@@ -243,27 +276,54 @@ export default function OperationReceiving() {
       },
       {
         key: "po",
-        label: "Source",
+        label: "PO/CO No",
         width: 150,
         sortable: true,
-        searchValue: (r) => r.source_no ?? r.po_id ?? "",
-        exportValue: (r) => r.source_no ?? r.po_id ?? "",
+        searchValue: (r) => r.po_id,
+        exportValue: (r) => r.po_id,
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.source_no ?? r.po_id ?? "Source needs checking"}</span>
+          <span className="font-mono text-meta text-base-900">{r.po_id}</span>
         ),
       },
       {
         key: "supplier",
-        label: "Source party",
+        label: "Supplier",
         minWidth: 140,
         sortable: true,
-        searchValue: (r) => r.source_party_name ?? r.supplier_name ?? "",
-        exportValue: (r) => r.source_party_name ?? r.supplier_name ?? "",
+        searchValue: (r) => r.supplier_name ?? "",
+        exportValue: (r) => r.supplier_name ?? "",
         accessor: (r) => (
           <span className="truncate text-body text-base-900">
-            {r.source_party_name ?? r.supplier_name ?? ""}
+            {r.supplier_name ?? ""}
           </span>
         ),
+      },
+      {
+        key: "product",
+        label: "Product",
+        minWidth: 160,
+        sortable: true,
+        /* The GRN PAPER's own line words (`product_skus.variant`, else the
+           SKU — server-resolved), first label plus a truthful `+n`. */
+        searchValue: (r) => (r.product_labels ?? []).join(" "),
+        exportValue: (r) => (r.product_labels ?? []).join(" · "),
+        accessor: (r) => {
+          const labels = r.product_labels ?? [];
+          const text =
+            labels.length === 0
+              ? ""
+              : labels.length === 1
+                ? labels[0]!
+                : `${labels[0]} +${labels.length - 1}`;
+          return (
+            <span
+              className="truncate text-body text-base-900"
+              title={labels.join(" · ")}
+            >
+              {text}
+            </span>
+          );
+        },
       },
       {
         key: "deliverTo",
@@ -300,19 +360,6 @@ export default function OperationReceiving() {
           ),
       },
       {
-        key: "doNo",
-        label: "Supplier DO No.",
-        width: 140,
-        sortable: true,
-        searchValue: (r) => r.do_number ?? "",
-        exportValue: (r) => r.do_number ?? "",
-        accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
-            {r.do_number}
-          </span>
-        ),
-      },
-      {
         key: "receivedQty",
         label: "Received Qty",
         width: 110,
@@ -326,6 +373,40 @@ export default function OperationReceiving() {
         accessor: (r) => (
           <span className="tabular-nums text-body text-base-900">
             {warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).received}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        width: 110,
+        sortable: true,
+        /* Document status words — `Valid` / `Cancelled` (owner correction
+           2026-09-06). `Posted`/`Voided` stay internal database statuses. */
+        searchValue: (r) => warehouseReceiptStatusLabel(r.status),
+        exportValue: (r) => warehouseReceiptStatusLabel(r.status),
+        accessor: (r) => (
+          <span
+            className={
+              r.status === "voided"
+                ? "text-body text-base-500 line-through"
+                : "text-body text-base-900"
+            }
+          >
+            {warehouseReceiptStatusLabel(r.status)}
+          </span>
+        ),
+      },
+      {
+        key: "doNo",
+        label: "Supplier DO No.",
+        width: 140,
+        sortable: true,
+        searchValue: (r) => r.do_number ?? "",
+        exportValue: (r) => r.do_number ?? "",
+        accessor: (r) => (
+          <span className="font-mono text-meta text-base-900">
+            {r.do_number}
           </span>
         ),
       },
@@ -413,18 +494,19 @@ export default function OperationReceiving() {
   );
 
   const narrowed =
-    categorySel !== null || supplierSel !== null || siteSel !== null;
+    categorySel !== null ||
+    supplierSel !== null ||
+    siteSel !== null ||
+    expectedSel !== null;
 
-  const arrivalId = params.get("arrival") ?? receipts.find(r=>r.id===sessionId)?.arrival_source_id;
   const openObject = arrivalId ?? sessionId ?? poId ?? (finding ? "find" : null);
 
   function openSession(id: string) {
     const next = new URLSearchParams(params);
+    next.delete("arrival");
     next.delete("po");
     next.delete("find");
     next.set("session", id);
-    const source=receipts.find(r=>r.id===id)?.arrival_source_id;
-    if(source)next.set("arrival",source);else next.delete("arrival");
     setParams(next);
   }
   function closeObject() {
@@ -480,17 +562,34 @@ export default function OperationReceiving() {
         ].join(" ")}
         data-testid="receiving-register"
       >
-        <FilterRail testId="receiving-rail">
-          {/* The five governed category rows, in the shared ladder's order —
-              no `Any`, no `All …`, no invented category. Real counts from the
-              current GRN result set; re-clicking the active row clears the
-              section (owner correction 2026-09-06). */}
+        <FilterRail
+          testId="receiving-rail"
+          header={
+            /* The full month Calendar, FIXED at the top of the rail while the
+               business filters scroll beneath it (owner correction
+               2026-09-06). Picking a date filters the SAME register by that
+               Supplier Delivery Date; picking it again clears. */
+            <MonthCalendar
+              testId="receiving-calendar"
+              month={month}
+              onMonthChange={setMonth}
+              selected={expectedSel}
+              onSelect={(iso) => setFacet("expected", iso)}
+              markers={markers}
+              markerWord="expected supplier arrival"
+            />
+          }
+        >
+          {/* Only the governed category rows PRESENT in the result set, in
+              the shared ladder's order — no `Any`, no `All …`, no invented
+              category. Counts speak for the COMPLETE filtered result set;
+              re-clicking the active row clears the section. */}
           <FilterRailGroup title="CATEGORY">
-            {RECEIVING_CATEGORY_ROWS.map((word) => (
+            {categoryRows.map((word) => (
               <FilterRailRow
                 key={word}
                 label={word}
-                count={counts.category.get(word) ?? 0}
+                count={facets.category[word] ?? 0}
                 active={categorySel === word}
                 onClick={() => setFacet("category", word)}
                 testId={`rail-category-${word}`}
@@ -504,7 +603,7 @@ export default function OperationReceiving() {
               <FilterRailRow
                 key={name}
                 label={name}
-                count={counts.supplier.get(name) ?? 0}
+                count={facets.supplier[name] ?? 0}
                 active={supplierSel === name}
                 onClick={() => setFacet("supplier", name)}
                 testId={`rail-supplier-${name}`}
@@ -519,7 +618,7 @@ export default function OperationReceiving() {
               <FilterRailRow
                 key={name}
                 label={name}
-                count={counts.site.get(name) ?? 0}
+                count={facets.site[name] ?? 0}
                 active={siteSel === name}
                 onClick={() => setFacet("site", name)}
                 testId={`rail-site-${name}`}
@@ -535,6 +634,7 @@ export default function OperationReceiving() {
               next.delete("category");
               next.delete("supplier");
               next.delete("site");
+              next.delete("expected");
               setParams(next, { replace: true });
             }}
             data-testid="rail-clear-filters"
@@ -545,7 +645,7 @@ export default function OperationReceiving() {
         </FilterRail>
 
         <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="receiving-register-column">
-          {receiptsQ.isError ? (
+          {registerQ.isError ? (
             /* A failure sentence is never the empty sentence (COPY-STANDARD
                2026-08-28): what broke, then the act that fixes it. */
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
@@ -555,7 +655,7 @@ export default function OperationReceiving() {
               <button
                 type="button"
                 className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-hovertint"
-                onClick={() => void receiptsQ.refetch()}
+                onClick={() => void registerQ.refetch()}
               >
                 Try again
               </button>
@@ -569,7 +669,7 @@ export default function OperationReceiving() {
               rowKey={(r) => r.id}
               exportName="Receiving"
               searchPlaceholder="GRN, PO, supplier or DO number…"
-              isLoading={receiptsQ.isLoading}
+              isLoading={registerQ.isLoading}
               onSearchChange={setSearch}
               stickyIdentity
               groupBanner={false}
@@ -591,22 +691,43 @@ export default function OperationReceiving() {
                 </button>
               }
               emptyMessage={
-                grnRecords.length === 0
+                !narrowed && search.trim() === ""
                   ? // The record is what is empty — never "the goods have not
                     // come" (Jess, 2026-08-03).
                     "No receiving activity yet."
                   : "No receiving matches these filters."
               }
-              statusSummary={(filteredRows) => {
-                const bits = [
-                  `${filteredRows.length} receiving record${filteredRows.length === 1 ? "" : "s"}`,
-                ];
-                if (narrowed || search.trim() !== "")
-                  bits.push(`of ${grnRecords.length}`);
-                const line = bits.join(" · ");
+              statusSummary={() => {
+                /* SERVER-SIDE PAGINATION (owner correction 2026-09-06):
+                   `Showing 1–50 of 10,000` speaks for the WHOLE filtered
+                   result set; Previous/Next move one server page. */
+                const from = page.total === 0 ? 0 : page.offset + 1;
+                const to = Math.min(page.offset + page.limit, page.total);
                 return (
-                  <span className="block truncate" title={line}>
-                    {line}
+                  <span className="flex items-center gap-3">
+                    <span data-testid="grn-page-range" className="truncate">
+                      Showing {from}–{to} of {page.total}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="grn-page-previous"
+                      disabled={page.offset === 0}
+                      onClick={() =>
+                        setOffset(Math.max(0, offset - page.limit))
+                      }
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="grn-page-next"
+                      disabled={to >= page.total}
+                      onClick={() => setOffset(offset + page.limit)}
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
+                    >
+                      Next
+                    </button>
                   </span>
                 );
               }}

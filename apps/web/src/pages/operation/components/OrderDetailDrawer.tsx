@@ -143,6 +143,7 @@ import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
+import { waLink } from "@/lib/wa-link";
 import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
@@ -4893,20 +4894,8 @@ function CustomerIdentityCard({
  * message the customer). Takes the FIRST number if the field lists several
  * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
  */
-export function waLink(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const first = phone.split(/[|,/]/)[0] ?? "";
-  let d = first.replace(/\D/g, "");
-  if (!d) return null;
-  if (d.startsWith("60")) {
-    /* already international */
-  } else if (d.startsWith("0")) {
-    d = `60${d.slice(1)}`;
-  } else {
-    d = `60${d}`;
-  }
-  return `https://wa.me/${d}`;
-}
+// waLink lives in @/lib/wa-link; re-exported for existing importers.
+export { waLink };
 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;

@@ -4159,8 +4159,8 @@ columns. **Cancelled orders are excluded server-side**, so `All` means every LIV
   **A facet may never print a number its own click cannot produce.**
 - **Nothing on the list says the same thing twice.** The `Delivery` cell never repeats the
   sentence `Actions` already carries; `Overdue` has exactly ONE home (the QUEUES rail);
-  a LOGISTICS row counting zero is not rendered — **but `Khor Yee · pending 0` stays, because a
-  person on the roster is not a filter statistic.**
+  a LOGISTICS row counting zero is not rendered. A current staff member with zero work remains
+  visible because a person on the roster is not a filter statistic; a departed staff member does not.
 - **Every money figure is `fmtMoney` from `packages/shared/src/money-format.ts`.** One spelling,
   asserted by identity, never by two implementations agreeing.
 - **The stage pill and the dots sit side by side.** The pill says WHERE the order is; the dots

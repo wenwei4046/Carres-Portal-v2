@@ -407,35 +407,64 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**MONITOR — calendar planning + selectable operational work lists (owner UI correction
-2026-09-06, overwriting the 2026-09-04 calendar-only composition).** Monitor answers the
-operator's morning question — *what customer deliveries are planned, and which record do I open
-or act on?* — through **two projections of the SAME canonical scope rows**:
+**MONITOR — the complete work list first, calendar planning behind an explicit pick (owner UI
+correction 2026-09-07, overwriting the 2026-09-06 calendar-default landing).** Monitor answers
+the operator's morning question — *what customer deliveries are planned, and which record do I
+open or act on?* — through **two projections of the SAME canonical scope rows**:
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-page-owned 240px FilterRail  ·  WORK TO DO + REGION + LOGISTICS (shared FilterRail grammar)
-Calendar (untouched)         ·  ‹ six-day range › + Search · six operating-day columns,
-                                delivery cards, NO checkboxes, no batch selection
-every operational pick       ·  the standard selectable Register work list (shared DataGrid):
-                                selection ☐ · ▸ expansion · SO No · Customer · Requested
-                                Delivery Date · Delivery Location · State · Logistics Partner ·
+page-owned 240px FilterRail  ·  the COMPLETE MONTH CALENDAR fixed on top, then
+                                WORK TO DO + REGION + LOGISTICS scrolling below it
+All delivery work (DEFAULT)  ·  the standard selectable Register work list (shared DataGrid):
+                                selection ☐ · ▸ expansion · SO No · Customer · State ·
+                                Delivery Location · Requested Delivery Date ·
                                 Confirmed Delivery · Confirmed Time · Goods · DO No ·
-                                Delivery Status — sticky identity, real horizontal scrolling
+                                Logistics Partner · Delivery Status — sticky identity,
+                                real horizontal scrolling
+Calendar (explicit pick)     ·  ‹ fixed operating week › + Search · week-aligned day
+                                columns, delivery cards, NO checkboxes, no batch selection
 ```
 
-A work queue (`No confirmed date` · `Overdue` · `Failed Delivery` · `Delivered — Proof
-Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an operational
-question, and its answer is the Register grammar every other module answers with — **never a
-full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
+**`All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07).** Measured before
+the correction, 86 of 87 delivery scopes carried no confirmed date, so the Calendar landing
+opened empty and the workspace appeared to contain no orders. Opening Monitor now shows the
+complete selectable DataGrid of every delivery-eligible Sales Order scope immediately —
+including scopes with **no formal DO yet, no confirmed delivery date, and no logistics partner
+yet**. The governed entry rule below still gates the population (no cancelled orders, no orders
+that need no delivery, no scope missing its minimum facts), and one row remains ONE delivery
+scope / Journey leg, never necessarily one Sales Order. Calendar is not removed: its rail row,
+or a date click on the rail's month calendar, opens the fixed operating-week Calendar, which
+continues to show only scopes with a confirmed date and never places undated scopes into date
+columns.
+
+**THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
+region is the complete current month — never a one-week strip, never the Portal sidebar:
+month arrows move exactly one month; the selected date wears the governed blue selected
+state; today stays distinguishable from the selection; Sundays — the non-operating day —
+stay visible in the governed muted treatment and take no click; a date holding confirmed
+deliveries carries a dot mark (shape, never colour alone); the arithmetic is real and
+locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
+pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
+independently BELOW it; scrolling them never removes the month from view. **Clicking a date
+opens the fixed operating week containing it in the right workspace** — Calendar becomes the
+explicit pick and the other operational picks clear so the week actually appears.
+
+A work queue (`No logistics picked` · `No confirmed date` · `Overdue` · `Failed Delivery` ·
+`Delivered — Proof Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an
+operational question, and its answer is the Register grammar every other module answers with —
+**never a full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
 read-only. `SO No` opens the Sales Order, `DO No` opens the Delivery Order, double-click opens
 Edit Delivery.
 
 **BULK INITIAL LOGISTICS ASSIGNMENT LIVES ON MONITOR (owner correction 2026-09-06)** — the
 planning population includes delivery scopes that have no formal DO yet, so the journey is
-`Monitor → No logistics picked → select visible rows → Assign logistics`. Selection follows the
-shared engine: every row has a checkbox; the header checkbox selects only the visible filtered
-rows; changing a filter clears the selection; the selection toolbar replaces the normal toolbar
+`Monitor → No logistics picked → header select-all → Assign logistics`, and the queue answers
+across ALL dates — rows without a DO and rows without a confirmed date included. Selection
+follows the shared engine: every row has a checkbox; the header checkbox selects only the
+visible filtered rows (a combined `Selangor · No logistics picked` narrowing selects only those
+Selangor rows); changing a filter clears the selection; a completed assignment clears the
+selection and refreshes the rail counts; the selection toolbar replaces the normal toolbar
 at the same height and reads `{N} delivery scopes selected · Clear · Assign logistics`. The
 write goes through the ONE governed assignment door (coverage-checked partners, Klang Valley
 pre-selects NETS, history preserved). **Bulk assignment is offered only while every selected
@@ -455,9 +484,12 @@ REAL `{n} deliveries need a confirmed date.` count when true, and the `Open No c
 door — never the same absence repeated in every column; an individually empty day says
 `No deliveries`.
 
-- **Six consecutive OPERATING days, Sunday omitted.** The default window opens one operating day
-  before business today (yesterday's deliveries are still being closed out); previous/next moves
-  exactly six operating days. On Sunday 6 Sep 2026 the range is Sat 5 – Fri 11, omitting Sun 6.
+- **THE FIXED OPERATING WEEK (owner correction 2026-09-06, superseding the rolling six-day
+  window).** Desktop shows the week-aligned Mon–Sat containing the selected date, fitting its
+  available width — no unlimited horizontal date scrolling; previous/next REPLACES the whole
+  displayed work week (six operating days). A tablet shows the fixed three-day half-week
+  (Mon–Wed / Thu–Sat), previous/next replacing the visible window. The default selected date
+  is business today, a Sunday snapping forward to Monday.
 - **No hour-by-hour vertical timeline.** The planned window is text; card height never implies
   duration. Cards order by window start, then customer (locale-aware), then stable scope id. An
   empty day says `No deliveries` (owner correction 2026-09-06).
@@ -470,13 +502,17 @@ door — never the same absence repeated in every column; an individually empty 
   nothing**: no failure, no "result needed", no invented status reads the clock.
   `Delivered — Proof Required` is derived only from a RECORDED delivery result whose photo
   ledger is known and empty — never from time.
-- **The URL is the state** (`?start=` · `?view=` · `?region=` · `?logistics=` · `?q=`), so
-  refresh, share and Back all restore the same view; the retired `?schedule=`/`?checking=`
-  spellings still resolve so an old shared link keeps answering.
+- **The URL is the state** — ONE selected date (`?date=`) drives every viewport's window,
+  plus `?view=` · `?region=` · `?logistics=` · `?q=`, so refresh, share and Back all restore
+  the same view. An absent `?view=` is the default `All delivery work`; the retired
+  `?schedule=`/`?checking=`/`?start=`/`?day=` spellings still resolve so an old shared link
+  keeps answering — `?start=`/`?day=` only ever named the calendar, so they still open its
+  week.
 - **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
   the rail becomes the filter drawer, the visible range becomes one selected operating day with a
-  sticky date heading and 44px rows, previous/next skips Sunday, and the cards and href
-  arithmetic are identical to desktop.
+  sticky date heading and 44px rows, previous/next skips Sunday, **the full month opens through
+  the kit's one standard date control (UI-KIT §11)**, and the cards and href arithmetic are
+  identical to desktop.
 
 **The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
 `FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px
@@ -486,11 +522,18 @@ drawer). **Three single-pick groups that COMBINE**; each group's counts are comp
 cards the other groups already narrowed (Architecture Law D):
 
 - **`WORK TO DO` is ONE group (owner correction 2026-09-06 — never split into "Delivery
-  Schedule" and "Needs Checking"):** `Calendar` · `No confirmed date` · **`Overdue`** ·
-  `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`,
-  never `Tomorrow`; every queue a recorded fact, never a clock inference.
-- **`REGION`** — `All regions`, then the direct rows ruled below.
-- **`LOGISTICS`** — `All logistics`, then the partner rows ruled below.
+  Schedule" and "Needs Checking"), in the ruled order (owner correction 2026-09-07):**
+  **`All delivery work`** (the default landing — every open scope, the unfiltered selectable
+  listing) · **`No logistics picked`** (a PRIMARY work queue, visible without scrolling past
+  REGION and the partner rows — never buried in, or duplicated under, LOGISTICS) ·
+  `No confirmed date` · `Calendar` · **`Overdue`** · `Failed Delivery` ·
+  `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`, never `Tomorrow`;
+  every queue a recorded fact, never a clock inference.
+- **`REGION`** — `All regions`, then the direct rows ruled below. A REGION pick combines with
+  a work queue (`Selangor · No logistics picked`), and header select-all then takes only those
+  visible filtered rows.
+- **`LOGISTICS`** — `All logistics`, then only the governed partners genuinely carrying a
+  matching scope, per the rows ruled below.
 
 **DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
 correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**
@@ -570,11 +613,12 @@ Putrajaya, Sabah, Sarawak, Selangor, Singapore and the rest as the data genuinel
   state joins no region row and shows while no region is picked — fixing its address is Sales
   work through `Open Sales Order to change`.
 
-**`LOGISTICS` (same correction)** lists `All logistics`, then only the partners **genuinely
-carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT · EU · SSY ·
-HOUZS) among those present, then others by name, a picked partner staying visible at 0 — then
-**`No logistics picked`** always, because it is the bulk-assignment journey's entry. A long
-list of irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
+**`LOGISTICS` (owner correction 2026-09-07)** lists `All logistics`, then only the partners
+**genuinely carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT ·
+EU · SSY · HOUZS) among those present, then others by name, a picked partner staying visible
+at 0. **`No logistics picked` does NOT appear here**: it is a primary WORK TO DO queue (the
+bulk-assignment journey's entry) and is never duplicated in two groups. A long list of
+irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
 Journey legs, never whole Sales Orders.**
 
 **One card = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
@@ -954,6 +998,22 @@ on-screen law *sending is not confirmation*) and the reply proof as a REAL uploa
 `POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
 bucket under `arrangement/{order}/{leg}/…`.
 
+**DEPLOYED 2026-09-07 — Monitor default landing correction, PR #1125, main SHA
+`ccc4c63b4aa8294fe91103dda0b36395606514a5`, production converged (deploy probe reports that
+exact SHA and the served bundle carries the ruled view order).** The §8 owner correction is
+live and was verified through an authenticated Operations session on production:
+`/operation?tab=delivery` lands on **`All delivery work`** — the selectable DataGrid listing
+all 87 real delivery scopes, DO-less/dateless/partnerless rows included, footer `87 delivery
+scopes`; the rail reads the ruled order with the real counts (All delivery work 87 ·
+No logistics picked 35 · No confirmed date 86 · Calendar 0 · Overdue 1 · Failed Delivery 0 ·
+Delivered — Proof Required 0 · Waiting for warehouse 0) and LOGISTICS carries no duplicated
+unassigned row; `No logistics picked` → header select-all read `35 delivery scopes selected ·
+Clear · Assign logistics` (the governed dialog opened on the seeded preview; no production
+assignment was submitted); the explicit `Calendar` pick opened the fixed week Mon 7 – Sat 12
+Sep with the honest spanning state and the REAL `86 deliveries need a confirmed date.` door.
+Typecheck clean, 3,979 web tests green (91 in the two Monitor suites, including the default
+landing, the ruled order, the all-dates unassigned queue and the Selangor combination).
+
 **DEPLOYED 2026-09-03 — Delivery Card 07, PRs #1065 + #1068, production converged at
 `1ffb21e8882ebd7e46b2851ce090f24f17d1570a`.** The ruled partner screen (§5/§13) is live:
 `Delivery dates` at `/delivery-partner/arrange` — one phone-first column, the ruled minimum
@@ -976,6 +1036,21 @@ tail reads `0412` and the column + door were measured live. Condominium registra
 Delivery-owned arrangement field in Edit Delivery's Condo-only block, and `Copy message` /
 `Open WhatsApp group` quietly record the `message_prepared` activity through the one SQL door —
 an activity fact that confirms nothing and moves no arrangement field.
+
+**DEPLOYED 2026-09-06 — Monitor month calendar + fixed windows, PR #1119, main SHA
+`88c76100fd7a40623c1904030869c36031303de8`, all three canonical surfaces converged (deploy
+probes).** The §8 month-calendar correction is live and was verified through an authenticated
+Operations session on production: the complete SEPTEMBER 2026 month fixed at the rail's top
+(Sunday-first per the owner's sketch, selected date blue, today distinguishable, Sundays
+muted and unclickable, the work-day DOT visible on the real Thu 27 Aug confirmed delivery);
+month arrows browsing to AUGUST 2026 and back; clicking 27 opening the fixed operating week
+Mon 24 – Sat 29 Aug with its real card and partner, the picks cleared and `?date=2026-08-27`
+on the URL; `All delivery work` listing all 87 real scopes in the corrected column order with
+the month still in view. Windows verified at all three breakpoints on the seeded preview
+(desktop week · tablet Thu–Sat half-week · phone one-day list with the kit date control).
+Local full-suite runs that night were polluted by overlapping sibling vitest processes (the
+rotating purchasing failures never reproduced twice and passed 126/126 solo and 235/235 on
+clean main); CI's clean runner passed the full suite before merge.
 
 **DEPLOYED 2026-09-06 — Monitor work lists + Delivery Orders Register correction, PR #1109,
 main SHA `22bf71493b5c6f12c946c3898a2cf13477ca33eb`, all three canonical surfaces converged on

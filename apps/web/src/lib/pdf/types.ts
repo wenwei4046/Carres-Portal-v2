@@ -149,6 +149,8 @@ export type InvoiceTemplateData = {
 };
 
 export type PoTemplateData = {
+  /** Local review only; no PO number, version or unit identities exist yet. */
+  draft?: boolean;
   // Money-free payload of `purchasing_po_document` (migration 0307) — the
   // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;

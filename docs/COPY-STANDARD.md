@@ -246,7 +246,7 @@ required result. Shape:
 Examples (all pass):
 
     ✔ Yu Jun · Send PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
-    ✔ Khor Yee · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
+    ✔ Shasha · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
     ✔ Shasha · Call AL about SO-1318 · Record the delivery date · Fri 14 Aug.
 
 Anti-patterns (all fail):
@@ -1324,6 +1324,12 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
 | `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
 | `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
+| `PO/CO No` | GRN Register column | The receiving's exact source — a Purchase Order or a consignment CO — through one column; the one Receiving engine serves both (owner correction 2026-09-06, second ruling). |
+| `Supplier Delivery Date` | GRN Register column · the rail Calendar's filter fact | The SAME governed word as the Purchase Orders register (the evidenced supplier answer — see the Purchasing date dictionary): the Calendar's expected-arrival markers and this column read one arithmetic, so the picked day and the cell can never disagree. `Not confirmed` while no evidenced reply exists. |
+| `Product` | GRN Register column | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
+| `Showing {from}–{to} of {total}` | GRN Register footer | Server-side pagination speaks for the WHOLE filtered result set (owner correction 2026-09-06, second ruling) — never `{n} loaded` over an unknown remainder. |
+| `Previous` · `Next` | GRN Register footer page moves | One server page back / forward; disabled at the ends rather than hidden. |
+| `{date} — {n} expected supplier arrival(s)` | the rail Calendar day's aria sentence | The marker COUNT said in words — colour is never the only signal (owner correction 2026-09-06, second ruling). |
 
 ### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
 
@@ -1529,7 +1535,8 @@ it is in the wrong element.
 delay" — the word on screen is `Delay planning`)
 
 **`Inventory` is no longer banned globally — owner ruling 2026-09-01.** It is the approved
-Warehouse master Register destination under `Monitor · Inbound · Inventory · Outbound`. It does
+Warehouse master Register destination under `Monitor · Inbound · Inventory · Outbound`
+(the Warehouse map's words since the 2026-09-06 owner replacement Card). It does
 not become a synonym for Finance valuation, Purchasing planning or another module's goods pool.
 
 **`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
@@ -1592,14 +1599,24 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
-| Warehouse Monitor's outbound-date filter group | **`OUTBOUND SCHEDULE`** | Delivery Schedule · Dispatch · Shipments |
-| Warehouse Monitor's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
-| Warehouse Monitor's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
-| Warehouse Monitor valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
-| The Outbound §3.5.1 tally (Warehouse Card 03) | **`Required {n} · Handed over {n} · Not handed over {n}`** | Progress · Completed · Pending · Done |
-| The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status) |
-| A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting for handover`** | Pending · In progress · Blocked |
-| The evidence-backed handover act (Warehouse Card 03) | **Record handover** | Mark done · Complete · Ship · Dispatch |
+| The Warehouse Calendar-summary page (2026-09-06 replacement Card) | **Monitor** — the same word Delivery's calendar page speaks; the ERP keeps ONE global `Dashboard` | Dashboard (as a Warehouse page) · Schedule · Board · Overview |
+| Monitor's two event directions, as group words | **`ARRIVAL` · `PICKUP`** | Incoming/Outgoing (as group headers) · In/Out |
+| Monitor ARRIVAL event names | **`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` · `Return from repair`** | Inbound delivery · Receipt · GRN (as an event name) |
+| Monitor PICKUP event names | **`Customer-delivery pickup` · `Transfer pickup` · `Supplier-return pickup` · `Repair pickup`** | Dispatch · Shipment · Collection (bare) |
+| A Monitor event's time — every time says what it means | **`Supplier arrival 09:00–10:00` · `Driver pickup 14:30`**, or exactly **`Time not provided`** | a bare `09:00` · TBD · Unknown |
+| Monitor valid empty date | **`No arrivals or pickups on {date}. Choose another date.`** | No handovers · Empty · Nothing |
+| Outbound's pickup-status filter group | **`PICKUP STATUS`** | OUTBOUND SCHEDULE (retired with the Monitor split) · Status |
+| Warehouse rails' governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
+| Warehouse rails' source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
+| Outbound valid empty date | **`No pickups on {date}. Choose another date.`** | No outbound handovers (retired 2026-09-06) · Empty · Nothing |
+| The exact goods a pickup takes, as the work heading | **`Goods scheduled for pickup`** — listing exact Unit IDs and products | Units to give · Items · Load list |
+| The transport company and the person, ALWAYS separate fields | **`Logistics Partner` · `Assigned Driver` · `Vehicle`**; unassigned reads **`Waiting for {partner} to assign a driver`** | NETS driver (merged identity) · Driver (as the company) · an invented driver name |
+| The Outbound §3.5.1 tally | **`Required {n} · Loaded {n} · Not loaded {n}`** | Handed over (retired 2026-09-06) · Progress · Completed · Pending · Done |
+| The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status — `loaded` is the ACT sentence and evidence line below, never a stored status word) |
+| A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting to be loaded`** | Pending · In progress · Blocked · Waiting for handover (retired 2026-09-06) |
+| The evidence-backed loading act (2026-09-06 replacement Card) | **`Record {n} Units loaded to {person}`** | Record handover (retired) · Mark done · Complete · Ship · Dispatch |
+| The two evidence records, never merged | **`Warehouse loaded`** (the identified operator's exact-Unit submission) · **`Driver collected`** (the driver's own confirmation) | Handover · Receiver · a single combined confirmation |
+| A load/collection mismatch — per exact Unit, never generic | **`{unit} was not confirmed by {person}. It remains with {site}.`** | Needs checking · Mismatch · Discrepancy |
 | The DO-object door to the Warehouse work page | **Open Outbound** | Go to warehouse · Handover here |
 | Unit and Stock event history | **History** | In & out · Movements · Movement log · Ledger |
 | Cross-Site movement object | **Transfer** | Movement · Relocation; it appears in Inbound/Outbound/Inventory rather than a fifth top page |
@@ -2336,7 +2353,9 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
 | `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
 | `Calendar` | the WORK TO DO default row (cards inside the visible window) | **RULED 2026-09-06** |
+| `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
 | `All regions` · `All logistics` | the two group-clearing rows | **RULED 2026-09-06** |
+| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
 | `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
 | `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
@@ -2404,7 +2423,7 @@ the screen already has one word for it — the booking, spelt **`{logistics} · 
 the ruling's phrase stays in the documents and the screen keeps the word it has.
 
 **SUPERSEDED Stock word law — owner ruling 2026-09-01.** The former `On hand · Ready stock · In &
-out` top-page model is historical evidence only. Warehouse now has exactly `Monitor · Inbound ·
+out` top-page model is historical evidence only. Warehouse now has exactly `Dashboard · Inbound ·
 Inventory · Outbound`. Inventory is the one current Unit Register; Ready Stock is a saved eligible-
 Unit view shared with Sales; History is a rail/detail/report view; Transfer projects into Inbound,
 Outbound and Inventory; `Counts & Adjustments` is one Inventory control view. `Movements`, `Stock
@@ -2550,18 +2569,6 @@ it has actually been broken so a chat can grep for them:
 reason both failures exist, so a caller that formats first is the thing to look for.
 
 ---
-
-## Arrival source work (owner-approved scope, 2026-09-07)
-
-Use the source words Transfer, Customer Return, Failed Delivery return, Return from repair and
-Supplier replacement. Actions are Request Transfer, Plan Customer Return, Plan Repair,
-Plan Supplier replacement, Open Outbound, Open Receiving, Save Receiving and Cancel Receiving.
-Physical evidence fields use Actual Site, Receiving party, Handover person, Handover document
-number and Handover proof. Case approval uses Approve physical work and dated Case evidence.
-The condition gate uses Doorstep check before loading, Doorstep photos and the existing service
-wording Do not collect — condition failed. Checks name stain, liquid/odour, pests, unsanitary
-condition, tear/burn/cut, customer damage, correct item and safe wrapped transport directly.
-These words describe the approved physical chain; they do not announce a commercial remedy.
 
 ## Header rules (see UI-KIT for the shell)
 

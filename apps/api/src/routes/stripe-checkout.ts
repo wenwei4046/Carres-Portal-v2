@@ -241,6 +241,33 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   return c.json({ session: shape(row as SessionRow) }, 201);
 });
 
+// GET /:id/stripe/checkout — the order's recent links, newest first (payment
+// MASTER §16 Online link: the Invoice object shows the standing link instead
+// of blindly minting a twin). Read-only; status changes belong to the
+// per-session poll and the webhook.
+stripeCheckoutRouter.get("/:id/stripe/checkout", async (c) => {
+  requireConfigured(c);
+  requireOrderRole(c.var.auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  // Visibility gate first — RLS decides whether the caller may see the order.
+  await fetchOrderScoped(c, idCheck.data);
+
+  const admin = adminClient(c.env);
+  const { data, error } = await admin
+    .from("stripe_checkout_sessions")
+    .select(SESSION_COLS)
+    .eq("order_id", idCheck.data)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ sessions: ((data ?? []) as SessionRow[]).map(shape) });
+});
+
 // GET /:id/stripe/checkout/:sid — status poll + live reconcile while open.
 // The reconcile makes the counter QR flow self-sufficient: even with the
 // webhook down (or not yet configured) the payment records within one poll.

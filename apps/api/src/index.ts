@@ -35,6 +35,7 @@ import supplierClaimsRouter from "./routes/operation/supplier-claims";
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
 import workspaceDutiesRouter from "./routes/operation/workspace-duties";
+import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
@@ -78,6 +79,7 @@ import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
+import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
@@ -122,7 +124,6 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
-import { runPoDutyCron } from "./cron/po-duty";
 import { runSupplierClaimSweepCron } from "./cron/supplier-claim-sweep";
 import type { AppEnv, Bindings } from "./types";
 
@@ -257,6 +258,7 @@ api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
+api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
@@ -285,6 +287,7 @@ api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
 api.route("/operation/workspace-duties", workspaceDutiesRouter);
+api.route("/operation/work", operationWorkRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);
@@ -302,11 +305,6 @@ export default {
       (async () => {
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
-        // 0236 — Mon/Thu (MYT) PO-day reminder for the duty holder; no-ops on
-        // other days and on a pre-0236 DB.
-        await runPoDutyCron(env).catch((e) =>
-          console.error("po-duty cron failed:", (e as Error).message),
-        );
         // R2 (0288) — an ETA that has passed with units still owed becomes a
         // late-delivery claim. Idempotent, so a retry costs nothing.
         await runSupplierClaimSweepCron(env).catch((e) =>

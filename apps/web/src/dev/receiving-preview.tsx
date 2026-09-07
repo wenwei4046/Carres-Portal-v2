@@ -10,6 +10,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { buildGrnRegisterView } from "@carres/shared";
 import { useAuth } from "@/lib/auth";
 import OperationReceiving from "@/pages/operation/OperationReceiving";
 import OperationReceivingReport from "@/pages/operation/OperationReceivingReport";
@@ -54,7 +55,7 @@ const POSTED_ROW = {
   grn_no: "GRN-20260903-1184",
   actual_site_id: null,
   actual_site_name: null,
-  posted_duty_holder_name: "Khor Yee",
+  posted_duty_holder_name: "Shasha",
   posted_duty_cover_name: null,
   posted_authority: "grn_duty",
   arrival_evidence: [
@@ -78,6 +79,8 @@ const POSTED_ROW = {
   summary: "3 good · 1 damaged",
   opens_claims: true,
   categories: ["Mattress"],
+  supplier_delivery_date: "2026-09-08",
+  product_labels: ["Mattress Forte King"],
 };
 
 const SUBMITTED_ROW = {
@@ -110,6 +113,8 @@ const SUBMITTED_ROW = {
   summary: "2 good",
   opens_claims: false,
   categories: ["Bedframe"],
+  supplier_delivery_date: "2026-09-04",
+  product_labels: ["Bedframe Quinn Queen"],
 };
 
 const VOIDED_ROW = {
@@ -137,13 +142,35 @@ const VOIDED_ROW = {
   summary: "1 good",
   opens_claims: false,
   categories: ["Sofa"],
+  supplier_delivery_date: null,
+  product_labels: ["Jager Sofa 3-seater"],
 };
+
+/** An EVIDENCED supplier reply — what the rail Calendar's markers read. */
+const reply = (date: string) => ({
+  kind: "tomorrow_delivery",
+  answer: "confirmed",
+  about_date: null,
+  new_date: date,
+  po_version: 1,
+  channel: "whatsapp",
+  recipient: "Supplier group",
+  evidence: "evidence/reply.jpg",
+  reported_by: "Factory PIC",
+  reported_at: "2026-09-01T02:00:00Z",
+  recorded_by: "u-ky",
+  recorded_at: "2026-09-01T03:00:00Z",
+  reason: null,
+  remarks: null,
+});
 
 const PO_OPEN = {
   id: "PO-20260902-0761",
   supplier_id: "sup-ohana",
   warehouse_id: WH2,
   status: "open",
+  version: 1,
+  promises: [reply("2026-09-08")],
   placed_at: "2026-09-02T03:00:00Z",
   eta_date: "2026-09-04",
   purchase_order_lines: [
@@ -162,6 +189,8 @@ const PO_OPEN_2 = {
   supplier_id: "sup-hooka",
   warehouse_id: WH,
   status: "open",
+  version: 1,
+  promises: [reply("2026-09-08")],
   placed_at: "2026-09-04T01:00:00Z",
   eta_date: "2026-09-06",
   purchase_order_lines: [
@@ -266,11 +295,11 @@ const DETAIL = {
 
 const DUTY = {
   duty_key: "grn_duty",
-  normal_user_id: "u-ky",
-  normal_user_name: "Khor Yee",
+  normal_user_id: "u-yj",
+  normal_user_name: "Yu Jun",
   acting_user_id: null,
   acting_user_name: null,
-  actor_user_id: "u-ky",
+  actor_user_id: "u-yj",
   is_cover: false,
   is_superuser: true,
   allowed: true,
@@ -286,8 +315,8 @@ const WORKSPACE_DUTIES = {
       resolution: {
         duty_key: "grn_duty",
         on_date: "2026-09-04",
-        normal_user_id: "u-ky",
-        normal_user_name: "Khor Yee",
+        normal_user_id: "u-yj",
+        normal_user_name: "Yu Jun",
         acting_user_id: "u-sha",
         acting_user_name: "Shasha",
         actor_user_id: "u-sha",
@@ -299,8 +328,8 @@ const WORKSPACE_DUTIES = {
         {
           id: "a1",
           duty_key: "grn_duty",
-          holder_id: "u-ky",
-          holder_name: "Khor Yee",
+          holder_id: "u-yj",
+          holder_name: "Yu Jun",
           effective_from: "2026-09-01",
           effective_until: null,
           assigned_by: "u-jess",
@@ -313,8 +342,8 @@ const WORKSPACE_DUTIES = {
         {
           id: "c1",
           duty_key: "grn_duty",
-          normal_user_id: "u-ky",
-          normal_user_name: "Khor Yee",
+          normal_user_id: "u-yj",
+          normal_user_name: "Yu Jun",
           acting_user_id: "u-sha",
           acting_user_name: "Shasha",
           starts_on: "2026-09-04",
@@ -399,6 +428,39 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         },
       ],
     });
+  if (url.includes("/api/operation/warehouse-receipts") && url.includes("scope=grn")) {
+    // The paged GRN Register — the SAME shared arithmetic the Worker runs.
+    const params = new URLSearchParams(url.split("?")[1] ?? "");
+    const grn = [POSTED_ROW, VOIDED_ROW];
+    const view = buildGrnRegisterView(
+      grn.map((r) => ({
+        id: r.id,
+        categories: r.categories,
+        supplierName: r.supplier_name,
+        siteName: r.actual_site_name ?? r.warehouse_name,
+        supplierDeliveryDateIso: r.supplier_delivery_date,
+        searchText: [r.grn_no, r.po_id, r.do_number, r.supplier_name]
+          .filter(Boolean)
+          .join(" "),
+      })),
+      {
+        category: params.get("category"),
+        supplier: params.get("supplier"),
+        site: params.get("site"),
+        expected: params.get("expected"),
+        q: params.get("q"),
+      },
+      Number(params.get("offset") ?? 0),
+      50,
+    );
+    const byId = new Map(grn.map((r) => [r.id, r]));
+    return json({
+      receipts: view.pageIds.map((id) => byId.get(id)),
+      page: { offset: Number(params.get("offset") ?? 0), limit: 50, total: view.total },
+      facets: view.facets,
+      counts: { waiting: 1 },
+    });
+  }
   if (url.includes("/api/operation/warehouse-receipts"))
     return json({
       receipts: [SUBMITTED_ROW, POSTED_ROW, VOIDED_ROW],

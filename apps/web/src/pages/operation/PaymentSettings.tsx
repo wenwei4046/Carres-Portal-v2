@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
 import PageShell from "@/components/kit/PageShell";
+import PaymentTemplateLibrary from "./PaymentTemplateLibrary";
 import { rm } from "@/lib/format-currency";
 import { toast } from "sonner";
 
@@ -212,8 +213,12 @@ export default function PaymentSettings() {
       <section className="rounded-card border border-kit-slate-5 bg-white p-5">
         <h2 className="text-section">WhatsApp templates</h2>
         <p className="mt-1 text-body text-kit-slate-11">
-          The template library is not built yet. Messages keep their current one prepared wording.
+          Each situation keeps one Default. Only Active templates can be chosen when sending.
+          Saved versions and actual sent messages stay history forever.
         </p>
+        <div className="mt-3">
+          <PaymentTemplateLibrary />
+        </div>
       </section>
     </div>
   </PageShell>;

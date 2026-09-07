@@ -3,6 +3,7 @@
 // filters, columns, export and footer. ListPageShell would add a second set of
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useState } from "react";
+import "./purchase-order-detail.css";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
@@ -784,7 +785,7 @@ function PurchaseOrderObject({
   const issueNeeded = row.facts.currentSend == null && po.status === "open";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-order-object">
+    <div className="po-detail-style flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-order-object">
       <PurchasingTabs />
       <header className="shrink-0 border-b border-kit-slate-5 bg-white px-4 pt-3">
         <div className="flex flex-wrap items-start gap-3">

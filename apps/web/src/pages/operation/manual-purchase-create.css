@@ -1,0 +1,48 @@
+.mp-create-page {
+  background: #f8fafc;
+  font-family: Inter, "SF Pro Text", Roboto, system-ui, sans-serif;
+}
+.mp-create-card {
+  min-width: 0;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+.mp-create-header {
+  padding: 16px 24px;
+  background: #1e293b;
+  color: #fff;
+  border-radius: 7px 7px 0 0;
+}
+.mp-create-title { font-size: 16px; font-weight: 600; text-transform: capitalize; }
+.mp-create-body { padding: 24px; }
+.mp-create-general {
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.mp-create-general label,
+.mp-create-general > div > span:first-child {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mp-create-body :is(input, textarea, button[role="combobox"]) {
+  background-color: #fff;
+  border-color: #cbd5e1;
+}
+.mp-create-page .mp-create-picker { border: 1px solid #e2e8f0; }
+.mp-create-page .mp-create-picker th {
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.mp-create-page .mp-create-picker td { border-bottom: 1px solid #f1f5f9; }
+@media (max-width: 640px) {
+  .mp-create-body, .mp-create-header, .mp-create-general { padding: 16px; }
+  .mp-create-items { overflow-x: auto; }
+}

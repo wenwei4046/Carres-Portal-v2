@@ -10,6 +10,7 @@ import InvoiceRegister from "./InvoiceRegister";
 import FinanceRefunds from "./FinanceRefunds";
 import FinanceRecon from "./FinanceRecon";
 import FinanceReports from "./FinanceReports";
+import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
 
 /**
@@ -50,6 +51,9 @@ export default function FinanceApp() {
           <Route path="refunds"   element={financeOnly(<FinanceRefunds />)} />
           <Route path="recon"     element={financeOnly(<FinanceRecon />)} />
           <Route path="reports"   element={financeOnly(<FinanceReports />)} />
+          {/* Payment MASTER §16 — Reports → Payment: the six approved
+              read-only listings over the same register wires. */}
+          <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
           <Route path="*"         element={<Navigate to="." replace />} />

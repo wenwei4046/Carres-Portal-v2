@@ -32,8 +32,8 @@ export default function WarehouseOutboundDoor() {
     <div className="px-4 py-6 sm:px-9 sm:py-8 pb-14" data-testid="warehouse-outbound-door">
       <PageHeader kicker="Warehouse" title="Outbound" className="mb-3" />
       <div className="text-body text-base-600 mb-[18px]">
-        Goods leaving this warehouse. Scan, check and pack each Unit, then hand
-        it to the named delivery person and attach proof.
+        Goods scheduled for pickup from this warehouse. Scan, check and pack
+        each Unit, then record which exact Units were loaded and attach proof.
       </div>
       {isLoading ? (
         <p className="text-body text-base-500">Loading…</p>
@@ -43,7 +43,7 @@ export default function WarehouseOutboundDoor() {
         </p>
       ) : dates.length === 0 ? (
         <p className="text-body text-base-500" data-testid="wod-empty">
-          No outbound handovers are assigned to this warehouse.
+          No pickups are assigned to this warehouse.
         </p>
       ) : (
         dates.map((date) => (
@@ -70,8 +70,8 @@ export default function WarehouseOutboundDoor() {
                       </span>
                     </div>
                     <div className="mt-0.5 text-base-700" data-testid="wod-tally">
-                      Required {card.unitsRequired} · Handed over {card.handedOver} · Not
-                      handed over {card.notHandedOver}
+                      Required {card.unitsRequired} · Loaded {card.handedOver} · Not
+                      loaded {card.notHandedOver}
                     </div>
                   </div>
                   <OutboundUnitWork card={card} />

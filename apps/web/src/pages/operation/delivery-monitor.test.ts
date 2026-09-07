@@ -12,11 +12,13 @@
  *     opens Edit Delivery. There is no third door.
  *  4. An expired planned window alone changes NOTHING — no failure, no
  *     "result needed", no invented status.
- *  5. THE PROJECTION RULE — the calendar renders only for the untouched
- *     Calendar view; any operational pick answers with the work list.
+ *  5. THE PROJECTION RULE — the calendar renders only for the explicit
+ *     Calendar pick with no other filter; any operational pick answers with
+ *     the work list.
  *  6. The rail filters combine, every count is what clicking it produces,
- *     REGION is flat direct names, and LOGISTICS lists only partners
- *     genuinely carrying matching scopes plus `No logistics picked`.
+ *     REGION is flat direct names, LOGISTICS lists only partners genuinely
+ *     carrying matching scopes, and `No logistics picked` is a WORK TO DO
+ *     queue — never duplicated under LOGISTICS (owner correction 2026-09-07).
  */
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -24,7 +26,8 @@ import type { DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
   operatingDaysFrom,
-  defaultMonitorWindowStart,
+  operatingWeekOf,
+  tabletWindowOf,
   nextOperatingWindowStart,
   previousOperatingWindowStart,
   buildDeliveryMonitorCards,
@@ -39,6 +42,8 @@ import {
   activeFilterLabels,
   MONITOR_DAYS,
   MONITOR_COPY,
+  MONITOR_WORK_VIEWS,
+  MONITOR_VIEW_LABEL,
   type DeliveryMonitorCard,
   type DeliveryMonitorFilters,
 } from "./delivery-monitor";
@@ -182,21 +187,39 @@ describe("operatingDaysFrom", () => {
   });
 });
 
-describe("the selected window", () => {
-  it("on Friday 4 Sep the default range begins Thursday 3 Sep", () => {
-    expect(defaultMonitorWindowStart(TODAY)).toBe("2026-09-03");
+describe("the fixed operating week (owner correction 2026-09-06)", () => {
+  it("is the Mon–Sat week containing the date — Friday 4 Sep sits in Mon 31 Aug – Sat 5 Sep", () => {
+    expect(operatingWeekOf("2026-09-04")).toEqual([
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+      "2026-09-05",
+    ]);
+    // Monday and Saturday land in their OWN week — the window is aligned.
+    expect(operatingWeekOf("2026-08-31")[0]).toBe("2026-08-31");
+    expect(operatingWeekOf("2026-09-05")[0]).toBe("2026-08-31");
   });
 
-  it("on Monday the previous operating day is Saturday, never Sunday", () => {
-    expect(defaultMonitorWindowStart("2026-09-07")).toBe("2026-09-05");
+  it("a Sunday snaps FORWARD to Monday's week — no operating week holds a Sunday", () => {
+    expect(operatingWeekOf("2026-09-06")[0]).toBe("2026-09-07");
+    for (const week of [operatingWeekOf("2026-09-04"), operatingWeekOf("2026-09-06")]) {
+      expect(week).toHaveLength(6);
+      expect(week).not.toContain("2026-09-06");
+    }
   });
 
-  it("next moves exactly six operating days forward", () => {
-    expect(nextOperatingWindowStart("2026-09-03")).toBe("2026-09-10");
+  it("the tablet window is the aligned three-day half-week containing the date", () => {
+    expect(tabletWindowOf("2026-09-01")).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
+    expect(tabletWindowOf("2026-09-04")).toEqual(["2026-09-03", "2026-09-04", "2026-09-05"]);
   });
 
-  it("previous moves exactly six operating days back", () => {
-    expect(previousOperatingWindowStart("2026-09-03")).toBe("2026-08-27");
+  it("the arrows replace the whole window: ±6 operating days is exactly one week, ±3 the other half", () => {
+    expect(nextOperatingWindowStart("2026-09-04", 6)).toBe("2026-09-11");
+    expect(previousOperatingWindowStart("2026-09-04", 6)).toBe("2026-08-28");
+    // Thu + 3 operating days crosses the weekend into Monday's half.
+    expect(nextOperatingWindowStart("2026-09-03", 3)).toBe("2026-09-07");
     // The two directions are inverses.
     expect(nextOperatingWindowStart(previousOperatingWindowStart("2026-09-03"))).toBe(
       "2026-09-03",
@@ -461,6 +484,39 @@ describe("filterMonitorListRows", () => {
     ).toEqual(["failed", "old-failed"]);
   });
 
+  it("`All delivery work` lists every open scope — the unfiltered selectable listing", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "all" }, WINDOW);
+    expect(out).toHaveLength(SET.length);
+  });
+
+  it("`No logistics picked` keeps every unassigned scope across ALL dates — DO-less and dateless included", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics" }, WINDOW);
+    expect(out.map((c) => c.scopeId).sort()).toEqual([
+      "dateless",
+      "failed",
+      "in-window",
+      "overdue",
+      "sunday",
+    ]);
+    // The one assigned card is the only one excluded.
+    expect(out.some((c) => c.scopeId === "nets")).toBe(false);
+  });
+
+  it("a REGION pick combines with `No logistics picked` — Selangor · No logistics picked", () => {
+    const out = filterMonitorListRows(
+      SET,
+      { ...noFilters, view: "no_logistics", region: "Selangor" },
+      WINDOW,
+    );
+    expect(out.map((c) => c.scopeId).sort()).toEqual([
+      "dateless",
+      "failed",
+      "in-window",
+      "overdue",
+      "sunday",
+    ]);
+  });
+
   it("a region or logistics pick alone lists EVERY matching open scope", () => {
     expect(
       filterMonitorListRows(SET, { ...noFilters, region: "Selangor" }, WINDOW)
@@ -542,6 +598,10 @@ describe("activeFilterLabels", () => {
   it("the untouched calendar has no active filters", () => {
     expect(activeFilterLabels(noFilters, () => null)).toEqual([]);
   });
+
+  it("the default `All delivery work` landing is not a pick and prints no summary", () => {
+    expect(activeFilterLabels({ ...noFilters, view: "all" }, () => null)).toEqual([]);
+  });
 });
 
 describe("buildMonitorRails", () => {
@@ -564,6 +624,9 @@ describe("buildMonitorRails", () => {
     const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
     // Five of the seven cards sit inside the window (dateless + overdue don't).
     expect(rails.work.calendar).toBe(5);
+    expect(rails.work.all).toBe(7);
+    // Every card but the NETS one is unassigned — the primary queue's count.
+    expect(rails.work.no_logistics).toBe(6);
     expect(rails.work.no_confirmed_date).toBe(1);
     expect(rails.work.overdue).toBe(1);
     expect(rails.work.failed).toBe(1);
@@ -583,8 +646,10 @@ describe("buildMonitorRails", () => {
     expect(rails.regions.find((r) => r.key === "Selangor")).toBeUndefined();
     // …but the logistics group still shows what each partner WOULD give.
     expect(rails.logistics.find((r) => r.key === "p-nets")!.count).toBe(1);
-    // Cards nobody carries: in-window, dateless, overdue, failed, proof, wh.
-    expect(rails.logistics.find((r) => r.key === "none")!.count).toBe(6);
+    // The unassigned queue lives in WORK TO DO, never as a logistics row —
+    // and under the NETS pick its count is honestly what clicking gives: 0.
+    expect(rails.logistics.some((r) => r.key === "none")).toBe(false);
+    expect(rails.work.no_logistics).toBe(0);
   });
 
   it("REGION is FLAT direct names — no sub-headings, no fixed zero rows (owner correction 2026-09-06)", () => {
@@ -600,12 +665,12 @@ describe("buildMonitorRails", () => {
     expect(rails.regions.find((r) => r.key === "Sabah")!.count).toBe(0);
   });
 
-  it("LOGISTICS lists only partners genuinely carrying a matching scope, then No logistics picked", () => {
+  it("LOGISTICS lists only partners genuinely carrying a matching scope — never a duplicated No logistics picked row", () => {
     const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
     const labels = rails.logistics.map((r) => r.label);
     // NETS carries one; AL and HOUZS carry nothing and are not listed.
-    expect(labels).toEqual(["NETS", MONITOR_COPY.noLogistics]);
-    expect(rails.logistics[rails.logistics.length - 1]!.key).toBe("none");
+    expect(labels).toEqual(["NETS"]);
+    expect(labels).not.toContain(MONITOR_COPY.noLogistics);
   });
 
   it("a partner the table read missed still lands on its NAME, never a raw id", () => {
@@ -628,11 +693,23 @@ describe("buildMonitorRails", () => {
     ];
     const rails = buildMonitorRails(withMore, noFilters, WINDOW, partners);
     // NETS · AL · HOUZS is the governed order — never alphabetical.
-    expect(rails.logistics.map((r) => r.label)).toEqual([
-      "NETS",
-      "AL",
-      "HOUZS",
-      MONITOR_COPY.noLogistics,
+    expect(rails.logistics.map((r) => r.label)).toEqual(["NETS", "AL", "HOUZS"]);
+  });
+});
+
+describe("the ruled WORK TO DO order (owner correction 2026-09-07)", () => {
+  it("lists the primary queues before Calendar, No logistics picked second", () => {
+    expect(MONITOR_WORK_VIEWS).toEqual([
+      "all",
+      "no_logistics",
+      "no_confirmed_date",
+      "calendar",
+      "overdue",
+      "failed",
+      "delivered_proof_required",
+      "waiting_warehouse",
     ]);
+    expect(MONITOR_VIEW_LABEL.all).toBe(MONITOR_COPY.allDeliveryWork);
+    expect(MONITOR_VIEW_LABEL.no_logistics).toBe(MONITOR_COPY.noLogistics);
   });
 });

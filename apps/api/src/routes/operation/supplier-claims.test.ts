@@ -111,6 +111,11 @@ describe("GET /api/operation/supplier-claims", () => {
     const eqCalls: Array<[string, unknown]> = [];
     const sb = {
       from: vi.fn((t: string) => {
+        if (t === "product_skus") {
+          const builder = listBuilder([{ sku: "MS01-K", variant: "Mattress Classic King" }], eqCalls);
+          builder.select = vi.fn((columns: string) => { expect(columns).toBe("sku, variant"); return builder; });
+          return builder;
+        }
         if (t === "supplier_claims") return listBuilder([CLAIM], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
@@ -120,7 +125,7 @@ describe("GET /api/operation/supplier-claims", () => {
         if (t === "ops_stock_items")
           return listBuilder(
             [
-              { hold_claim_id: "c1", hold_reason: "damaged" },
+              { hold_claim_id: "c1", hold_reason: "damaged", unit_code: "U-1001" },
               { hold_claim_id: "c1", hold_reason: "damaged" },
             ],
             eqCalls,
@@ -147,6 +152,8 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(body.claims[0].supplier_name).toBe("Ohana");
     expect(body.claims[0].reported_by_name).toBe("Shasha");
     expect(body.claims[0].photo_count).toBe(1);
+    expect(body.claims[0].product_description).toBe("Mattress Classic King");
+    expect(body.claims[0].held_unit_codes).toEqual(["U-1001"]);
     // R4 — the goods, read from the register rather than copied from qty.
     expect(body.claims[0].held_units).toBe(2);
     expect(body.claims[0].hold_reason).toBe("damaged");
@@ -221,7 +228,7 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(body.counts.closed).not.toBe(0);
   });
 
-  it("returns every claim connected to one PO beyond the worklist window", async () => {
+  it.each(["&poId=PO-2030", ""])("returns all claims beyond 200 for scope %s", async (scope) => {
     const eqCalls: Array<[string, unknown]> = [];
     const claims = Array.from({ length: 205 }, (_, index) => ({
       ...CLAIM,
@@ -241,7 +248,7 @@ describe("GET /api/operation/supplier-claims", () => {
     vi.mocked(userClient).mockReturnValue(sb as any);
     const jwt = await makeJwt("operation");
     const res = await app.fetch(
-      new Request("http://t/api/operation/supplier-claims?status=all&poId=PO-2030", {
+      new Request(`http://t/api/operation/supplier-claims?status=all${scope}`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
@@ -325,6 +332,7 @@ describe("GET /api/operation/supplier-claims", () => {
     const sb = {
       from: vi.fn((t: string) => {
         tables.push(t);
+        if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([CLAIM, LATE], eqCalls);
         if (t === "suppliers")
           return listBuilder([{ id: "s1", name: "Ohana" }], eqCalls);
@@ -376,6 +384,7 @@ describe("GET /api/operation/supplier-claims", () => {
     };
     const sb = {
       from: vi.fn((t: string) => {
+        if (t === "product_skus") return listBuilder([], eqCalls);
         if (t === "supplier_claims") return listBuilder([LATE], eqCalls);
         // po_line_id is ON DELETE SET NULL — the line can simply not be there.
         if (t === "purchase_order_lines") return listBuilder([], eqCalls);

@@ -85,6 +85,45 @@ describe("GET /api/finance/payment-settings", () => {
   });
 });
 
+describe("payment templates (0435)", () => {
+  it("save maps to the manager-gated versioning door", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { version: 2 }, error: null }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/templates/save", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ templateKey: null, purpose: "gentle_reminder",
+        name: "Standard reminder", body: "Hi {customer}, RM {outstanding}" }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_template_save", {
+      p_template_key: null, p_purpose: "gentle_reminder",
+      p_name: "Standard reminder", p_body: "Hi {customer}, RM {outstanding}",
+    });
+  });
+  it("an unknown purpose is refused before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/templates/save", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ purpose: "birthday_wish", name: "X", body: "Hi" }),
+    }), env);
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("the SQL manager refusal maps to 403 for set-default", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "42501", message: "forbidden" } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/templates/set-default", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ templateKey: "00000000-0000-4000-8000-000000000001" }),
+    }), env);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("POST /api/finance/payment-settings/*", () => {
   async function post(path: string, role: string, body: unknown) {
     return app.fetch(new Request(`http://t/api/finance/payment-settings/${path}`, {

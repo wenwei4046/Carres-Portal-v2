@@ -16,6 +16,14 @@ vi.mock("@/lib/queries", () => ({
   } },
 }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+// The object scroll now carries the §6 Storage section, which reads its own
+// wire — answered empty here so the register tests stay about the register.
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(async (url: string) => {
+    if (url.includes("/payment-storage")) return { cases: [] };
+    return {};
+  }),
+}));
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
@@ -150,6 +158,61 @@ describe("Invoices Register", () => {
     fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
     fireEvent.click(screen.getByText("Open invoice"));
     expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
+  });
+  it("the chase door never opens on a waiting invoice (催钱前先看货)", () => {
+    auth.role = "operation";
+    show();
+    // Row i1 waits: goods not ready, no arrival.
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[0]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.getByText("Do not ask the customer to pay yet.", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ask the customer to pay" })).not.toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("a due invoice offers the chase door and renders the sent-message history", () => {
+    auth.role = "operation";
+    state.data = [row({ id: "i2", invoice_no: "INV-060926-0001", status: "issued",
+      issued_at: "2026-09-06", delivery_date: iso(14),
+      control: { line_stock_status: { A: "ready" } } })];
+    const orders = (state.data[0] as InvoiceRegisterRow).orders!;
+    orders.payment_communications = [{
+      id: "c1", kind: "reminder", message_text: "Hi, just a friendly reminder…",
+      template_key: "customer_reminder", sent_screenshot_url: "orders-attachments/x.png",
+      recorded_at: "2026-09-06T03:00:00Z",
+    }];
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[0]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.getByRole("button", { name: "Ask the customer to pay" })).toBeInTheDocument();
+    expect(screen.getByText("Reminder sent")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ask the customer to pay" }));
+    expect(screen.getByTestId("invoice-ask-to-pay")).toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("a date cell opens the Calendar at that week with the exact SO highlighted (§17)", () => {
+    show();
+    // Row 2 (issued) carries a customer delivery date button.
+    const dateButtons = screen.getAllByRole("button", { name: /Open Calendar · Customer Delivery/ });
+    fireEvent.click(dateButtons[0]);
+    expect(screen.getByTestId("invoice-calendar")).toBeInTheDocument();
+    expect(screen.getAllByTestId("calendar-highlight")[0]).toHaveTextContent("SO-1300");
+    // The month stays a complete month, and the register is one click back.
+    expect(screen.getByTestId("calendar-month")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back to Invoices" }));
+    expect(screen.queryByTestId("invoice-calendar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("invoice-register-summary")).toBeInTheDocument();
+  });
+  it("a record without a date keeps its honest words and no calendar door (§17)", () => {
+    state.data = [row({ id: "i1" })]; // no delivery date, no ETA
+    show();
+    expect(screen.getByText("No delivery date")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open Calendar/ })).not.toBeInTheDocument();
+  });
+  it("Customer, SO and Invoice No open the collection details, never the Calendar (§17)", () => {
+    show();
+    fireEvent.click(screen.getAllByRole("button", { name: /LIM KUAN YANG/ })[0]);
+    expect(screen.getByTestId("invoice-object-scroll")).toBeInTheDocument();
+    expect(screen.queryByTestId("invoice-calendar")).not.toBeInTheDocument();
   });
   it("shows a failed source with recovery rather than a zero total", () => {
     state.isError = true;

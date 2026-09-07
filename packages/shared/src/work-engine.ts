@@ -74,7 +74,7 @@ export type WorkOwnerRule =
 
 export interface WorkRule {
   key: string;
-  module: "orders" | "purchasing" | "receiving" | "claims";
+  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery" | "payment";
   /** ① when the item exists — the owning engine's trigger, in words. */
   trigger: string;
   /** ② who — the rule in words, never a stored owner field (§2.2). */
@@ -128,7 +128,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "arrange_new_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "the decision is 'new_date' and no reachable booking exists",
     owner:
       "the order's PIC as governed proxy (§0.1: customer date/time confirmation → assigned Partner or governed proxy owner; ACTION-FLOW Law 4 rung 2 — the conversation is logistics', the ACTION in this portal is ours, and a partner has no login to close it)",
@@ -139,7 +139,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "assign_logistics",
-    module: "orders",
+    module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
     owner:
       "the order's PIC as governed proxy — no delivery-staff roster fact exists (0363 records none), and choosing the company is an operations act on the order",
@@ -150,7 +150,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "confirm_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
     owner:
       "the order's PIC as governed proxy (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line already names the partner)",
@@ -182,7 +182,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "deliver_today",
-    module: "orders",
+    module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
     owner:
       "the order's PIC as governed proxy — Delivery ownership has no staff roster fact yet; the PIC watches today's run reach its result",
@@ -194,7 +194,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "upload_delivery_photo",
-    module: "orders",
+    module: "delivery",
     trigger: "delivered with no photo on file",
     owner:
       "the order's PIC — the proof arrives on the order's own WhatsApp thread; filing it is the relationship owner's act",
@@ -218,7 +218,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
   {
     key: "collect_loan_item",
-    module: "orders",
+    module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
     owner:
       "Delivery staff (blueprint card owner rule) — no delivery-staff roster fact exists yet, so no person resolves and the duty word stands (the canvas's measured-boundary rule)",
@@ -262,6 +262,26 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRule[] = [
   {
+    key: "manual_purchase.approve",
+    module: "purchasing",
+    trigger: "a Manual Purchase request requires a decision and has none",
+    owner: "the configured Purchasing approver duty holder",
+    ownerRule: "purchasing_approver",
+    action: "Approve purchase",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "a stored approval or refusal decision on the purchase request",
+  },
+  {
+    key: "manual_purchase.issue_po",
+    module: "purchasing",
+    trigger: "approved Manual Purchase demand remains uncovered or its current PO version has not reached the supplier",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Issue PO",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "confirmed-sent evidence for every linked current PO version (po_sends)",
+  },
+  {
     key: "purchasing.confirm_ready_date",
     module: "purchasing",
     trigger: "an open PO owing goods with no standing ready/arrival promise",
@@ -270,6 +290,36 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     action: "Confirm ready date",
     dueRule: "customer date − buffer (OFFICE week) − production (FACTORY week)",
     completionFact: "a standing promise row (po_supplier_promises)",
+  },
+  {
+    key: "payment.collect_customer_balance",
+    module: "payment",
+    trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
+    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "payment_duty",
+    action: "Ask the customer to pay",
+    dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
+    completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
+    key: "purchasing.supplier_reply",
+    module: "purchasing",
+    trigger: "the current PO version was sent and the supplier has not confirmed its delivery date",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask the supplier to confirm the PO delivery date",
+    dueRule: "the Malaysia calendar day the current PO version was first confirmed sent, moved only to the next OFFICE working day",
+    completionFact: "an evidenced supplier answer for the exact current PO version, including channel, recipient, reporter, recorder and times",
+  },
+  {
+    key: "purchasing.supplier_date_passed",
+    module: "purchasing",
+    trigger: "the evidenced supplier delivery date passed while the PO still has goods owing",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask the supplier when the goods will arrive",
+    dueRule: "the supplier delivery date, moved only to the next OFFICE working day when it falls on an office closure",
+    completionFact: "a new evidenced supplier answer and governed delivery date for the exact current PO version",
   },
   {
     key: "purchasing.confirm_tomorrows_delivery",
@@ -691,9 +741,10 @@ export function workItemsForOrder(
           )
         : 0;
     const owner = resolveOwner(a.key);
+    const module = ORDER_RULE_BY_KEY.get(a.key)?.module ?? "orders";
     return {
       ruleKey: a.key,
-      module: "orders" as const,
+      module,
       soRef: `SO-${ctx.so}`,
       orderId: ctx.orderId,
       action: orderActionQueue(a.key),

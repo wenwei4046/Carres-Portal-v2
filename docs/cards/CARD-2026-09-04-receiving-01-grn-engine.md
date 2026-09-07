@@ -165,6 +165,69 @@ continues under it (no new Card). Scope and rulings:
    cap/evidence-amend mapping · shared ladder + status words. Register fetch limit raised
    (`?limit`, hard cap 1000) with virtualised rows for large record counts.
 
+## Second owner correction — 2026-09-06 (same Card, continued): one page, rail Calendar, server pagination
+
+The owner issued a further correction superseding the earlier `Calendar View / GRN Register
+View` proposal. Scope and rulings (this Card, no new Card, no new navigation destination):
+
+1. **One Receiving page only** — `Purchasing → Receiving`. No Receiving Monitor, no
+   Calendar/Register view switch, no permanent tabs, no second Receiving page. Left: the
+   240px rail with the full month Calendar and the filters; right: the complete GRN Register,
+   always.
+2. **Rail month Calendar** — fixed at the top of the rail (`FilterRail` gained a fixed
+   `header` slot; the filters scroll independently beneath). The kit gained `MonthCalendar`
+   (same `react-day-picker` engine and token skin as `DatePicker`). ‹ › move exactly one
+   month; Sunday visible and muted (Warehouse working calendar Mon–Sat); expected-arrival
+   days print an accessible COUNT from the linked POs' governed `Supplier Delivery Date`
+   (`expectedArrivalCounts` over `poSupplierDeliveryDateOf` — one arithmetic; a Carres-only
+   estimate never marks a day, a fully received PO stops being expected). Picking a date
+   filters the SAME register by that Supplier Delivery Date; picking again or
+   `Clear filters` restores; the right side never becomes a weekly calendar and never shows
+   work cards.
+3. **Server-side pagination** — `GET /api/operation/warehouse-receipts?scope=grn` scans light
+   rows, resolves the shared facts, and answers page + facets + total through the ONE pure
+   arithmetic `@carres/shared buildGrnRegisterView` (also what the page tests run). Footer:
+   `Showing {from}–{to} of {total}` + `Previous`/`Next` (default 50/page); rail counts speak
+   for the COMPLETE filtered result set; a changed filter or search returns to page 1;
+   search runs server-side over GRN/PO/DO/supplier.
+4. **CATEGORY shows only governed rows present** in the result set (ladder order; the active
+   pick stays visible so it can be cleared) — no `Any`, no invented category, unchanged
+   shared ladder.
+5. **Register columns** — `GRN No` · `Supplier Delivery Date` (governed supplier answer;
+   `Not confirmed` absence; date-filterable) · `Goods received on` (owns detailed date
+   filtering) · `PO/CO No` · `Supplier` · `Product` (the GRN paper's words —
+   `product_skus.variant`, else SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` ·
+   `Status`, then `Supplier DO No.` and damaged/wrong/extra.
+6. **Verification** — new/updated regression: one destination + no view switch (portal nav
+   holds exactly one `Receiving` row) · Calendar fixed / filters scroll independently ·
+   month navigation · Sunday muted · accessible markers and counts · date-pick filtering and
+   restore · Clear filters clears the pick · only present governed categories · server
+   pagination (range sentence, Next/Previous offsets, filter reset to page 1) · corrected
+   words retained · new columns · the shared view/marker arithmetic unit-tested in
+   `@carres/shared` (`receiving-register.test.ts`).
+
+**Delivery evidence — second correction, CLOSED 2026-09-07.** PR #1117 squash-merged
+`00bf3cedfe5544bf71a12ad0cfd33af400026bee`; deploy automatic on merge, both canonical surfaces
+(`erp.carresofficial.com` and `carres-portal.pages.dev`) reporting `__carres_deploy.json`
+commit `00bf3ced…` — the exact merge SHA. Served-bundle proof: `expected supplier arrival` ·
+`PO/CO No` · `Supplier Delivery Date` · the pager template and the `grn` scope present; zero
+occurrences of `Actual Site` · `Goods Received At` · `Calendar View` · `GRN Register View` ·
+`Receiving Monitor`. Authenticated production walk as operation@ (read-only, no records
+created): the fixed SEPTEMBER 2026 calendar with today highlighted and Sundays muted; only
+present governed categories (Bedframe 3 on the trial data — the ladder's honest answer);
+seven real GRNs under the new columns with `Not confirmed` supplier dates (truthful: no live
+PO carries an evidenced reply, so no day is marked); `Showing 1–7 of 7`; picking 4 Sep
+narrowed to `Showing 0–0 of 0` with the governed no-match sentence and picking it again
+restored the complete listing; a row still opens the 50/50 GRN object with the A4 preview.
+Local gates at merge: shared receiving-register 8 · page 49 · API 33 targeted tests green,
+web+API typecheck clean, design-standard green; full matrix by CI (`verify` pass). Two CI
+catches folded in: `disabled:text-kit-slate-8` was an unpublished palette step (→ slate-9),
+and the kit one-calendar source law now names `MonthCalendar` as the second governed
+react-day-picker skin. Delivery's same-day #1119 collided on the FilterRail header slot; the
+merge keeps the sibling's shipped structure plus the `{testId}-fixed/-scroll` regions, and
+Delivery's page-level `MonitorMonthCalendar` migrates onto kit `MonthCalendar` in its own
+card (ui/MASTER §6.1 second-occurrence rule).
+
 **Delivery evidence — CLOSED 2026-09-06.** PR #1106 merged
 `f755dea80fb7a60c0b0dc481841bfcf7757f5cc1`; deploy automatic on merge, both canonical surfaces
 (`erp.carresofficial.com` and the Pages origin) reporting `__carres_deploy.json` commit

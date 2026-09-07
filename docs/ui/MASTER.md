@@ -1019,6 +1019,20 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
+Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
+block: the header stays put while the filter groups scroll independently beneath it, separated
+by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
+month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
+it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
+instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
+it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
+keeps Sunday visible in the muted non-working state, and marks a day by printing a COUNT under
+the date with the same fact in the day's aria sentence — colour is never the only signal.
+Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the kit's exported
+DatePicker skin, dot markers, opens the week) predates the kit component by hours and migrates
+onto it in its own card — §6.1's second-occurrence rule; nobody draws a third month grid.
+
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
 to the Register; it never leaves a duplicate 60px icon strip beside the Portal navigation. The

@@ -5,6 +5,7 @@ import {
   invoiceGoodsWord,
   invoiceNeeded,
   invoicePaymentTiming,
+  soRemaining,
   type InvoiceRegisterRow,
 } from "./payment-invoice-register";
 
@@ -90,6 +91,69 @@ describe("invoiceNeeded", () => {
     const m = invoiceNeeded(row({ lines: [], control: { balance: 250 } }));
     expect(m.outstanding).toBe(250);
     expect(m.source).toBe("keyed");
+  });
+});
+
+describe("soRemaining — the SO across every live invoice kind", () => {
+  /** The meaningful fixture: one SO carrying all three kinds, a partial
+   *  payment and a voided obligation. Goods RM 1,000; live issued Storage
+   *  RM 150 + RM 8 tax; a VOIDED Additional Storage RM 100 (dead); a DRAFT
+   *  additional storage RM 60 (asks nothing yet); paid RM 400. */
+  const so = (): InvoiceRegisterRow[] => [
+    { ...row({ paid: 400 }), id: "i-sales", kind: "sales", status: "issued",
+      issued_at: "2026-09-01" },
+    { ...row({ paid: 400 }), id: "i-storage", kind: "storage", status: "issued",
+      issued_at: "2026-09-02", amount: 150, tax_amount: 8 },
+    { ...row({ paid: 400 }), id: "i-extra-void", kind: "additional_storage",
+      status: "voided", issued_at: "2026-09-02", voided_at: "2026-09-03",
+      amount: 100 },
+    { ...row({ paid: 400 }), id: "i-extra-draft", kind: "additional_storage",
+      status: "draft", amount: 60 },
+  ];
+  it("the Sales door does not hide the storage obligation, paid subtracts ONCE", () => {
+    // 1000 goods + 158 live storage − 400 paid = 758. Never 600 (storage
+    // omitted), never 858 (the voided obligation revived), never 918 (the
+    // draft charged), never 508 (paid subtracted from goods AND storage).
+    expect(soRemaining(so(), "o1")).toEqual({
+      known: true, outstanding: 758, storageOwing: 158, overpaid: 0,
+    });
+  });
+  it("a payment larger than goods spills into storage instead of inflating it", () => {
+    const rows = so().map((r) => ({
+      ...r, orders: r.orders ? { ...r.orders, paid: 1100 } : r.orders,
+    }));
+    // 1000 + 158 − 1100 = 58: the customer who paid past the goods value has
+    // that excess honoured against storage — the clamp-goods-first shape
+    // would have said 158.
+    expect(soRemaining(rows, "o1")).toMatchObject({ outstanding: 58, overpaid: 0 });
+    // Past EVERY obligation the excess is the §5 review money, said as such.
+    const over = so().map((r) => ({
+      ...r, orders: r.orders ? { ...r.orders, paid: 1300 } : r.orders,
+    }));
+    expect(soRemaining(over, "o1")).toMatchObject({ outstanding: 0, overpaid: 142 });
+  });
+  it("a keyed (imported) order adds storage to the keyed outstanding", () => {
+    const keyed = so().map((r) => ({
+      ...r,
+      orders: r.orders ? { ...r.orders, paid: 0, order_lines: [] } : r.orders,
+      ...(r.id === "i-sales" ? {} : {}),
+    })).map((r) => ({
+      ...r,
+      orders: r.orders ? {
+        ...r.orders,
+        ops_order_control: [{ ...r.orders.ops_order_control[0], balance: 500 }],
+      } : r.orders,
+    }));
+    expect(soRemaining(keyed, "o1").outstanding).toBe(658);
+  });
+  it("an unpriced SO stays honestly unknown, and an absent SO answers nothing", () => {
+    const unknown = so().map((r) => ({
+      ...r, orders: r.orders ? { ...r.orders, order_lines: [] } : r.orders,
+    }));
+    expect(soRemaining(unknown, "o1").known).toBe(false);
+    expect(soRemaining(so(), "o-else")).toEqual({
+      known: false, outstanding: 0, storageOwing: 0, overpaid: 0,
+    });
   });
 });
 

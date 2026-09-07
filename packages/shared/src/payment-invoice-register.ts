@@ -29,6 +29,13 @@ export const invoiceVoidReplaceInput = z.object({
   reason: z.string().trim().min(1, "A reason is required to void an invoice.").max(500),
 });
 
+export const recordMessageInput = z.object({
+  kind: z.enum(["payment_request", "reminder", "receipt", "storage", "other"]),
+  messageText: z.string().trim().min(1, "The sent message text is required.").max(4000),
+  templateKey: z.string().trim().max(80).nullish(),
+  screenshotUrl: z.string().trim().min(1, "The sent screenshot is required.").max(300),
+});
+
 export type InvoiceStatus = "draft" | "issued" | "voided";
 export type InvoiceKind = "sales" | "storage" | "additional_storage";
 
@@ -50,6 +57,8 @@ export interface InvoiceRegisterRow {
     id: string;
     so: number;
     customer_name: string;
+    customer_phone?: string | null;
+    source_ref?: string[] | string | null;
     status: string;
     paid: number | string | null;
     delivery_date: string | null;
@@ -61,7 +70,11 @@ export interface InvoiceRegisterRow {
       id: string; receipt_no: string | null; amount: number;
       paid_on: string; voided_at: string | null;
     }>;
-    order_lines: Array<{ qty: number; unit_price: number | string | null }>;
+    payment_communications?: Array<{
+      id: string; kind: string; message_text: string; template_key: string | null;
+      sent_screenshot_url: string; recorded_at: string;
+    }>;
+    order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
     order_addons: Array<{ qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
       balance: number | string | null;
@@ -154,6 +167,46 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
     paid: order?.paid ?? null,
     controlBalance: ctrlOf(row)?.balance ?? null,
   });
+}
+
+/** The SO's remaining money across EVERY live invoice kind — what a deduped
+ *  Calendar entry (or any SO-level "still needed") says, so choosing the
+ *  Sales Invoice as the door never hides an unpaid Storage or Additional
+ *  Storage obligation.
+ *
+ *  Storage obligations are the SO's live ISSUED storage-kind invoices with
+ *  their tax — a draft asks for nothing yet, a voided one is dead. Goods
+ *  value comes from the same `orderMoney` stores as `invoiceNeeded`.
+ *  `orders.paid` is subtracted ONCE from the combined obligation — the Work
+ *  engine's law (`sales-order-work-source`) — so a payment posted against a
+ *  storage invoice is neither counted twice nor left inflating goods owing.
+ *  (`orderMoney`'s keyed source is already an outstanding, so the combined
+ *  subtraction reduces to `keyed + storage` there — no second subtraction.) */
+export function soRemaining(
+  rows: InvoiceRegisterRow[],
+  orderId: string,
+): {
+  known: boolean;
+  outstanding: number;
+  storageOwing: number;
+  /** Money past every obligation — `RM {amount} needs review` (§5). */
+  overpaid: number;
+} {
+  const mine = rows.filter((r) => r.order_id === orderId);
+  const door = mine.find((r) => r.kind === "sales") ?? mine[0];
+  if (!door) return { known: false, outstanding: 0, storageOwing: 0, overpaid: 0 };
+  const storageOwing = mine
+    .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
+    .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
+  const goods = invoiceNeeded(door);
+  if (!goods.known) return { known: false, outstanding: 0, storageOwing, overpaid: 0 };
+  const total = goods.total ?? 0;
+  return {
+    known: true,
+    outstanding: Math.max(0, total + storageOwing - goods.paid),
+    storageOwing,
+    overpaid: Math.max(0, goods.paid - (total + storageOwing)),
+  };
 }
 
 /** The Customer Delivery cell fact: the customer-confirmed day, else the

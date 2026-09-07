@@ -179,9 +179,9 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
     dutyKey: "po_duty",
     onDate: "2026-08-11",
     normalOwner: { userId: "u-duty", name: "Yu Jun" },
-    buddy: { userId: "u-cover", name: "Khor Yee" },
-    activeCover: { userId: "u-cover", name: "Khor Yee" },
-    actingPerson: { userId: "u-cover", name: "Khor Yee" },
+    buddy: { userId: "u-cover", name: "Shasha" },
+    activeCover: { userId: "u-cover", name: "Shasha" },
+    actingPerson: { userId: "u-cover", name: "Shasha" },
     state: "covered" as const,
     assignmentId: "a-po",
   };
@@ -198,8 +198,8 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
     expect(po.ownerRule).toBe("po_duty");
     expect(po.ownerDutyKey).toBe("po_duty");
     expect(po.normalOwner).toEqual({ userId: "u-duty", name: "Yu Jun" });
-    expect(po.activeCover).toEqual({ userId: "u-cover", name: "Khor Yee" });
-    expect(po.actingPerson).toEqual({ userId: "u-cover", name: "Khor Yee" });
+    expect(po.activeCover).toEqual({ userId: "u-cover", name: "Shasha" });
+    expect(po.actingPerson).toEqual({ userId: "u-cover", name: "Shasha" });
   });
 
   it("Purchasing's order-track work lands on the PO-duty holder, never the PIC", () => {
@@ -388,7 +388,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
   it("groups by actual working day — days ascend, broken first, No date last", () => {
     const mk = (over: Partial<WorkItem>): WorkItem => ({
       ruleKey: "assign_logistics",
-      module: "orders",
+      module: "delivery",
       soRef: "SO-1",
       orderId: "o",
       action: "Assign logistics",
