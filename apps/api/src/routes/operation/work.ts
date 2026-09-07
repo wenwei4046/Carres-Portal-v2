@@ -44,6 +44,13 @@ import operationPosRouter from "./pos";
 import operationSuppliersRouter from "./suppliers";
 import workspaceDutiesRouter from "./workspace-duties";
 import opsStaffRouter from "./staff";
+import financeInvoicesRouter from "../finance/invoices";
+import {
+  invoiceNeeded,
+  invoicePaymentTiming,
+  type InvoiceRegisterPage,
+  type InvoiceRegisterRow,
+} from "@carres/shared/payment-invoice-register";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -299,6 +306,57 @@ export function projectPurchaseOrderReplyWork(input: {
       destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
       today: input.today,
     }));
+  });
+}
+
+export function projectPaymentCollectionWork(input: {
+  invoices: readonly InvoiceRegisterRow[];
+  paymentDuty: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  const holidays = myHolidaySet();
+  return input.invoices.flatMap((invoice) => {
+    if (invoice.status !== "issued" || !invoice.orders) return [];
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays });
+    if (timing.kind !== "due" && timing.kind !== "late") return [];
+    const money = invoiceNeeded(invoice);
+    if (!money.known || money.outstanding <= 0) return [];
+    const owner = input.paymentDuty;
+    const workItem: WorkItem = {
+      ruleKey: "payment.collect_customer_balance",
+      module: "payment",
+      soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
+      orderId: invoice.id,
+      action: "Ask the customer to pay",
+      ownerRule: "payment_duty",
+      ownerDutyKey: "payment_duty",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Duty" }),
+      tone: timing.kind === "late" ? "danger" : "warning",
+      locked: false,
+      broken: false,
+      dueIso: clock.dueIso,
+      workingDaysLate: timing.kind === "late" && clock.dueIso
+        ? countWorkingDays(clock.dueIso, input.today, { holidays })
+        : 0,
+    };
+    return [operationWorkItemFromProjection(workItem, {
+      object: {
+        kind: "invoice",
+        id: invoice.id,
+        label: invoice.invoice_no ?? `SO-${invoice.orders.so} invoice`,
+      },
+      problem: timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
+      recipient: invoice.orders.customer_name,
+      requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
+      destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
+      today: input.today,
+    })];
   });
 }
 
@@ -659,6 +717,30 @@ async function readInternal<T>(
   return response.json() as Promise<T>;
 }
 
+async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<InvoiceRegisterRow[]> {
+  const rows: InvoiceRegisterRow[] = [];
+  let total: number | null = null;
+  do {
+    const page = await readInternal<InvoiceRegisterPage>(
+      app,
+      `/finance-invoices/register?offset=${rows.length}&limit=1000`,
+      c,
+    );
+    if (!Number.isInteger(page.total) || page.total < 0 || (total !== null && total !== page.total)) {
+      throw new Error("Workspace invoice source changed while loading");
+    }
+    total = page.total;
+    if (page.rows.length === 0 && rows.length < total) {
+      throw new Error("Workspace invoice source ended before its reported total");
+    }
+    rows.push(...page.rows);
+  } while (rows.length < total);
+  if (rows.length !== total || new Set(rows.map((row) => row.id)).size !== rows.length) {
+    throw new Error("Workspace invoice source is inconsistent");
+  }
+  return rows;
+}
+
 /** Reuse the existing module read routes inside the Worker. This avoids a
  * second set of table queries while keeping Work a single browser request. */
 export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWorkResponse> {
@@ -675,8 +757,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/suppliers", operationSuppliersRouter);
   internal.route("/workspace-duties", workspaceDutiesRouter);
   internal.route("/staff", opsStaffRouter);
+  internal.route("/finance-invoices", financeInvoicesRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -706,6 +789,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
         c,
       ),
       loadPurchasingSettings(userClient(c.env, c.var.auth.jwt)),
+      readAllInvoices(internal, c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -750,8 +834,9 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
+  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today });
   return composeOperationWorkResponse(
-    [orderItems, manualItems, purchaseOrderItems, receivingItems],
+    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,
