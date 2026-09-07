@@ -2197,6 +2197,10 @@ replacement offered.
 **Purpose / source:** showroom staff request a new model, replacement, removal, display change,
 or movement and installation of an existing display Unit;
 Purchasing chooses the commercial path.
+**Optional remarks — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The Display Request form
+includes an optional Remarks field for additional explanation when needed. It supplements the
+request's structured facts and is not required for submission. This approves the optional field,
+not the remaining proposed question flow or request-link capability.
 **Existing display movement and installation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
 Show the requested result first, including collection place, destination and installation floor
 when relevant. PO Duty checks the exact Unit/model and existing source, verifies collection and
