@@ -2332,6 +2332,17 @@ recorded results; arrival alone cannot complete a request requiring installation
 the request-page layout/completion boundary, not the entire Showroom Blueprint.
 **Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
 duplicate request.
+**Showroom exceptions and failed actions — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Unknown item/Unit does not discard the request; Operations checks photos/video and identifies the
+Unit before movement. An unconfirmed appointment reads Not confirmed separately from Needed Date.
+Upload failure retains entered details, names the failed file and permits retry. Failed save or
+submission preserves the form; retry must not create a duplicate request. No eligible Duty holder
+appears as Not assigned to supervision with a Staff & Duties link. Damaged arrival or failed
+installation records the actual result/evidence and leaves the remaining work open under the
+owning problem/physical authorities. Failed loading shows the failure and retry, never zero goods
+or Completed. The requester sees specific missing information and permission-scoped progress
+through the same request link. This approves these behaviours; whole-Blueprint closure still
+requires the owner's consolidated review.
 **Connections:** Showroom, Catalog, Manual Purchase, CO/CRTN, Stock transfer/Unit.
 
 ### 9.9 Consignment Orders
