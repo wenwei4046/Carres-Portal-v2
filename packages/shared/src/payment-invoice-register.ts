@@ -185,20 +185,27 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
 export function soRemaining(
   rows: InvoiceRegisterRow[],
   orderId: string,
-): { known: boolean; outstanding: number; storageOwing: number } {
+): {
+  known: boolean;
+  outstanding: number;
+  storageOwing: number;
+  /** Money past every obligation — `RM {amount} needs review` (§5). */
+  overpaid: number;
+} {
   const mine = rows.filter((r) => r.order_id === orderId);
   const door = mine.find((r) => r.kind === "sales") ?? mine[0];
-  if (!door) return { known: false, outstanding: 0, storageOwing: 0 };
+  if (!door) return { known: false, outstanding: 0, storageOwing: 0, overpaid: 0 };
   const storageOwing = mine
     .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
     .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
   const goods = invoiceNeeded(door);
-  if (!goods.known) return { known: false, outstanding: 0, storageOwing };
+  if (!goods.known) return { known: false, outstanding: 0, storageOwing, overpaid: 0 };
   const total = goods.total ?? 0;
   return {
     known: true,
     outstanding: Math.max(0, total + storageOwing - goods.paid),
     storageOwing,
+    overpaid: Math.max(0, goods.paid - (total + storageOwing)),
   };
 }
 

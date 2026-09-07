@@ -474,11 +474,33 @@ exact SHA. The verification evidence, each result stated for exactly what it pro
   local multi-invoice fixture walk, where the deduped SO card said RM 2,350 = goods 5,400 +
   storage 150 − paid 3,200.
 
+### BUILD — Reports → Payment, 2026-09-07
+
+`Finance → Reports` gains the Payment door and `/finance/reports/payment` renders the six
+approved §16 listings — Money received · Customer balances · Storage charged and collected ·
+Storage waived · Payment corrections · Money needing review — and never a Refund, Bank
+Matching or Negative Payment report. The governed report laws hold: the page STORES NOTHING
+(one read of the same payments wire the Payments Register reads, one read of the same
+invoices wire the Invoices Register reads, every figure computed at render time by the
+shared `soRemaining`/`isLivePayment` arithmetic); EVERY ROW IS A DOOR (a payment opens its
+record at `?payment=`, an SO opens its collection object at `?invoice=`); EVERY EXCLUSION IS
+SAID ON SCREEN (voided payments out of Money received, settled and unpriced orders out of
+Customer balances with the unpriced count, drafts out of Storage). The month filter governs
+the dated sections; balances, storage and review money are today's facts and say so.
+`soRemaining` gains the `overpaid` field — money past every recorded obligation — which
+feeds `RM {amount} needs review` (§5) without a second arithmetic. Storage waived states
+honestly that the waiver journey is not built. The page stays finance-only under the §12
+door (operation staff reach Payments and Invoices only). Verified by 9 focused report tests
+(102 finance page tests green), a preview walk of all six sections with fixture data, and
+390px/640px checks with zero clipped elements; production convergence and the walk of this
+slice are recorded when they exist.
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
-Message assembly with bank routing and Partner contact, Reports, Stripe convergence, storage
-journeys and the retirement of the rejected Refund/Bank Matching surfaces remain unfinished
-target work. The complete approved customer
+Message assembly with bank routing and Partner contact, Stripe convergence, storage
+journeys, report export, and the retirement of the rejected Refund/Bank Matching surfaces
+remain unfinished target work (Reports → Payment itself is built above; its export and the
+storage-waiver rows await their journeys). The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
 it into a `Standard bank transfer` template once approved. The Calendar correction's
