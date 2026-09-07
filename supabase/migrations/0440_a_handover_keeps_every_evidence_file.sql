@@ -35,7 +35,10 @@ create policy delivery_handover_evidence_read
   on delivery_handover_evidence for select to authenticated
   using ((select public.is_internal()));
 grant select on delivery_handover_evidence to authenticated;
-revoke insert, update, delete on delivery_handover_evidence from authenticated, anon;
+-- 0367's lesson by name: a new table inherits TRUNCATE/REFERENCES/TRIGGER
+-- write grants nobody asked for — revoke the full set, not three of them.
+revoke insert, update, delete, truncate, references, trigger
+  on delivery_handover_evidence from authenticated, anon;
 
 -- Append-only: the ledger can only grow, exactly like its parent events.
 create or replace function public.delivery_handover_evidence_no_rewrite()
