@@ -2194,8 +2194,24 @@ replacement offered.
 
 ### 9.8 Display Requests
 
-**Purpose / source:** showroom staff request a new model, replacement, removal or display change;
+**Purpose / source:** showroom staff request a new model, replacement, removal, display change,
+or movement and installation of an existing display Unit;
 Purchasing chooses the commercial path.
+**Existing display movement and installation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Show the requested result first, including collection place, destination and installation floor
+when relevant. PO Duty checks the exact Unit/model and existing source, verifies collection and
+destination Sites, confirms installation requirements from the available photos/videos, records
+who will transport and install, and records agreed charges and the required approval. These checks
+lead to the linked existing-goods movement/installation continuation, not a new purchase merely
+to arrange transport. Stock retains non-customer Transfer and physical custody authority; the
+Display Request reads and links those facts rather than becoming another movement writer.
+
+Supplier responsibility may remain under investigation while an authorised movement proceeds.
+Authority to arrange the movement/cost and the party ultimately bearing the cost are separate
+facts; Carres paying transport does not establish supplier liability or waive recovery. Purchasing
+and Finance retain their governed supplier/cost-recovery responsibilities. Show arrival and
+installation separately: arrival cannot complete a requested installation. This approves this
+request/check/result boundary, not the remaining Showroom Blueprint or application implementation.
 **Photo and video evidence — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Display Requests
 must support uploading photos and videos when needed to explain the request. Both media types
 are optional supporting evidence; a video is not mandatory for every request. This approves the
