@@ -1,41 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-fix/zul-dev-branch
-import { loadPurchasingSettings, loadPurchasingNumbers } from "./purchasing-settings";
-
-describe("purchasing numbers schema compatibility", () => {
-  const row = { order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] };
-  function client(...responses: Array<{ data: unknown; error: unknown }>) {
-    const maybeSingle = vi.fn();
-    responses.forEach((response) => maybeSingle.mockResolvedValueOnce(response));
-    const select = vi.fn().mockReturnValue({ eq: () => ({ maybeSingle }) });
-    return { sb: { from: () => ({ select }) } as unknown as SupabaseClient, select };
-  }
-  const missing = { code: "42703", message: "column purchasing_settings.manual_purchase_enforce_earliest_date does not exist" };
-
-  it("reads the stored numbers before 0422 with the new switch off", async () => {
-    const { sb, select } = client({ data: null, error: missing }, { data: row, error: null });
-    expect(await loadPurchasingNumbers(sb)).toEqual({ orderByBufferDays: 7, earliestSellDays: 21, logisticsCallWorkingDays: 1, poDays: [1, 3, 5], manualPurchaseEnforceEarliestDate: false });
-    expect(select.mock.calls[1][0]).not.toContain("manual_purchase_enforce_earliest_date");
-  });
-  it("preserves an enabled switch on migrated schemas", async () => {
-    const { sb, select } = client({ data: { ...row, manual_purchase_enforce_earliest_date: true }, error: null });
-    expect((await loadPurchasingNumbers(sb)).manualPurchaseEnforceEarliestDate).toBe(true);
-    expect(select).toHaveBeenCalledTimes(1);
-  });
-  it("does not hide other missing columns", async () => {
-    const { sb, select } = client({ data: null, error: { code: "42703", message: "column purchasing_settings.po_days does not exist" } });
-    await expect(loadPurchasingNumbers(sb)).rejects.toThrow("po_days does not exist");
-    expect(select).toHaveBeenCalledTimes(1);
-  });
-  it("propagates errors from the legacy read", async () => {
-    const { sb } = client({ data: null, error: missing }, { data: null, error: { message: "permission denied" } });
-    await expect(loadPurchasingNumbers(sb)).rejects.toThrow("permission denied");
-  });
-});
-
 import { loadPurchasingNumbers, loadPurchasingSettings } from "./purchasing-settings";
- main
 
 function fakeClient(rows: Record<string, unknown[]>): SupabaseClient {
   return {

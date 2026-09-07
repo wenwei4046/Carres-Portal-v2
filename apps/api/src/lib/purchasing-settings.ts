@@ -44,25 +44,11 @@ export async function loadPurchasingNumbers(sb: SupabaseClient): Promise<{
   poDays: number[];
   manualPurchaseMinDeliveryDays: number;
 }> {
-  let { data, error } = await sb
+  const { data, error } = await sb
     .from("purchasing_settings")
     .select("order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days")
     .eq("id", 1)
     .maybeSingle();
-  // Pre-0422 schemas reject the select before the optional-field default
-  // below can run. Retry only for this specific missing column.
-  if (
-    error?.code === "42703" &&
-    error.message.includes("purchasing_settings.manual_purchase_enforce_earliest_date")
-  ) {
-    const legacy = await sb
-      .from("purchasing_settings")
-      .select("order_by_buffer_days, earliest_sell_days, logistics_call_working_days, po_days")
-      .eq("id", 1)
-      .maybeSingle();
-    data = legacy.data ? { ...legacy.data, manual_purchase_enforce_earliest_date: false } : null;
-    error = legacy.error;
-  }
   if (error) throw new Error(`purchasing_settings: ${error.message}`);
   if (!data) throw new Error("purchasing_settings row 1 missing");
   const row = data as SettingsRow;
