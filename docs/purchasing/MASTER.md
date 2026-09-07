@@ -2225,6 +2225,16 @@ without repeated entry. These are operational contact facts, not the Work action
 approval assignment. The intended receiver is not proof of receipt: actual receiving records
 retain who physically received the goods. Supplier decisions and approvals stay in Purchasing.
 This approves this form/link/contact scope only; the complete Showroom Blueprint remains under review.
+
+**Review before submission — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Show a short
+Check your request review before Submit request. It summarises the requested work/item/quantity,
+collection and destination/floor where relevant, contact and receiver names/phone numbers,
+Needed Date, access, installer arrangement, photos/video previews and Remarks when entered.
+Provide Edit and Submit request. Missing required contact or receiver details block submission;
+permitted Not sure / Not decided answers stay explicit for Operations to check, not false No
+values. After successful submission show the request number and progress; PO Duty receives the
+decision work under the existing §9.8 deadline. This approves this review/validation boundary;
+the complete Showroom Blueprint remains under review.
 **Existing display movement and installation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
 Show the requested result first, including collection place, destination and installation floor
 when relevant. PO Duty checks the exact Unit/model and existing source, verifies collection and
