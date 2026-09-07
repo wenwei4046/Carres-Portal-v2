@@ -4,6 +4,8 @@ import {
   myHolidaySet,
   operationWorkItemFromProjection,
   operationWorkResponseSchema,
+  poSupplierDeliveryDateOf,
+  purchaseOrderReplyWorkItems,
   demandPurposeLabelOf,
   manualPurchaseForOf,
   manualPurchaseLineRemainingOf,
@@ -229,6 +231,74 @@ interface ManualPurchaseRegisterSource {
   users: Array<{ id: string; name: string | null }>;
   serviceCases: Array<{ id: string; case_no: string }>;
   pos: Array<{ id: string; sent: boolean }>;
+}
+
+interface PurchaseOrderWorkSource {
+  id: string;
+  supplier_id: string;
+  status: "open" | "received" | "cancelled";
+  version?: number | null;
+  expected_ready_date?: string | null;
+  promises?: Parameters<typeof poSupplierDeliveryDateOf>[0];
+  sends?: Array<{
+    kind?: "external_open" | "confirmed_sent" | null;
+    channel: string;
+    recipient?: string | null;
+    sent_at: string;
+    po_version?: number | null;
+    sent_by_name?: string | null;
+    duty_name?: string | null;
+    acting_name?: string | null;
+  }>;
+  purchase_order_lines: Array<{ qty: number; received_qty: number }>;
+}
+
+export function projectPurchaseOrderReplyWork(input: {
+  pos: readonly PurchaseOrderWorkSource[];
+  suppliers: readonly { id: string; name: string | null }[];
+  poDuty: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
+  const holidays = myHolidaySet();
+  return input.pos.flatMap((po) => {
+    const version = po.version ?? 1;
+    const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    const items = purchaseOrderReplyWorkItems({
+      id: po.id,
+      supplierName,
+      status: po.status,
+      version,
+      supplierDate: poSupplierDeliveryDateOf(po.promises, version),
+      expectedReadyDate: po.expected_ready_date ?? null,
+      lines: po.purchase_order_lines.map((line) => ({
+        qty: line.qty,
+        receivedQty: line.received_qty,
+      })),
+      sends: (po.sends ?? []).map((send) => ({
+        kind: send.kind,
+        channel: send.channel,
+        recipient: send.recipient,
+        sentAt: send.sent_at,
+        poVersion: send.po_version,
+        sentByName: send.sent_by_name,
+        dutyName: send.duty_name,
+        actingName: send.acting_name,
+      })),
+    }, input.poDuty, input.today, holidays);
+    return items.map((item) => operationWorkItemFromProjection(item, {
+      object: { kind: "purchase_order", id: po.id, label: po.id },
+      problem: item.ruleKey === "purchasing.supplier_date_passed"
+        ? "Supplier delivery date passed"
+        : "Supplier has not confirmed the PO date",
+      recipient: supplierName,
+      requiredResult: item.ruleKey === "purchasing.supplier_date_passed"
+        ? "New evidenced supplier delivery date recorded"
+        : "Evidenced supplier delivery date recorded",
+      destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
+      today: input.today,
+    }));
+  });
 }
 
 export function receivingWorkSourceFromModuleFacts(data: {
@@ -660,8 +730,14 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     workingDaysLate: (dueIso) =>
       countWorkingDays(dueIso, today, { holidays, offDays: WAREHOUSE_OFF_DAYS }),
   });
+  const purchaseOrderItems = projectPurchaseOrderReplyWork({
+    pos: pos.pos as PurchaseOrderWorkSource[],
+    suppliers: suppliers.suppliers,
+    poDuty,
+    today,
+  });
   return composeOperationWorkResponse(
-    [orderItems, manualItems, receivingItems],
+    [orderItems, manualItems, purchaseOrderItems, receivingItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

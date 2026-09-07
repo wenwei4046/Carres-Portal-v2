@@ -7,6 +7,7 @@ import {
   manualPurchaseWorkInputsFromRegister,
   receivingWorkSourceFromModuleFacts,
   projectManualPurchaseWork,
+  projectPurchaseOrderReplyWork,
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
@@ -361,5 +362,51 @@ describe("operation Work response composition", () => {
       .toBe("po-1");
     expect(items.find((item) => item.ruleKey === "ask_delivery_date")?.owner.acting?.name)
       .toBe("Shasha");
+  });
+
+  it("admits supplier reply work from the owning PO facts with PO Duty and the exact PO door", () => {
+    const person = { userId: "po-duty", name: "Yu Jun" };
+    const [item] = projectPurchaseOrderReplyWork({
+      pos: [{
+        id: "PO-2041",
+        supplier_id: "supplier-1",
+        status: "open",
+        version: 2,
+        promises: [],
+        sends: [{
+          kind: "confirmed_sent",
+          channel: "whatsapp",
+          sent_at: "2026-09-03T17:00:00Z",
+          po_version: 2,
+        }],
+        purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+      }],
+      suppliers: [{ id: "supplier-1", name: "Nice Future" }],
+      poDuty: {
+        dutyKey: "po_duty",
+        onDate: "2026-09-08",
+        normalOwner: person,
+        buddy: null,
+        activeCover: null,
+        actingPerson: person,
+        state: "primary",
+        assignmentId: "assignment-1",
+      },
+      today: "2026-09-08",
+    });
+
+    expect(item).toMatchObject({
+      id: "purchasing:PO-2041:purchasing.supplier_reply",
+      module: "purchasing",
+      object: { kind: "purchase_order", id: "PO-2041", label: "PO-2041" },
+      problem: "Supplier has not confirmed the PO date",
+      action: "Ask Nice Future to confirm the PO delivery date",
+      recipient: "Nice Future",
+      owner: { dutyKey: "po_duty", normal: person, acting: person },
+      timing: { dueOn: "2026-09-04", workingDaysLate: 2, bucket: "overdue" },
+      destination: "/operation?tab=purchase-orders&po=PO-2041",
+    });
+    expect(item?.action).not.toContain("Yu Jun");
+    expect(item?.completionFact).toContain("exact current PO version");
   });
 });
