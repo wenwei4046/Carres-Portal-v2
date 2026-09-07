@@ -961,7 +961,9 @@ scrolls horizontally. Normal state spends the left side on the current View cont
 Register Search, and the right side on page-owned Export/display controls, frequent actions, one
 primary create action and a low-frequency overflow when needed. `View: {current view}` is explicit;
 scope capabilities such as All orders / Not delivered are saved/reusable Views, never a permanent
-row of pills. Header-column filters remain the direct per-column filter door; the Toolbar does not
+row of pills. A View control is conditional on a useful, distinct view capability; do not render
+one merely to repeat status filters. Supplier Claims defaults to all permitted new and historical
+records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third

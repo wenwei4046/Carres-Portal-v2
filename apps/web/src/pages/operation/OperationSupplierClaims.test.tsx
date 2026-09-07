@@ -79,6 +79,8 @@ describe("Supplier Claims factual Register and owning object", () => {
     expect(screen.queryByText("Queues")).not.toBeInTheDocument();
     expect(screen.queryByText("New Claim")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "SC-1001" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SC-1002" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^View/ })).not.toBeInTheDocument();
   });
   it("separates PO, GRN, product name and size into their own cells", () => {
     claimsQuery.mockReturnValue({ data: { claims: [row({
@@ -94,10 +96,26 @@ describe("Supplier Claims factual Register and owning object", () => {
     expect(screen.getByRole("columnheader", { name: /Supplier Claim No/ })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: /^Source/ })).not.toBeInTheDocument();
   });
+  it("shows the source SKU by default when Catalog cannot name a product", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({ sku: "SMOKE King Mattress", product_description: null, product_variant: null })] }, isLoading: false });
+    show();
+    expect(screen.getByRole("columnheader", { name: /^SKU/ })).toBeInTheDocument();
+    expect(screen.getByText("SMOKE King Mattress").closest("td")).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "Super Single" })).not.toBeInTheDocument();
+  });
+  it("uses selection for a concrete export action", () => {
+    show();
+    fireEvent.click(screen.getAllByRole("checkbox", { name: "Select row" })[0]);
+    expect(screen.getByRole("button", { name: /Export Excel.*1/ })).toBeInTheDocument();
+  });
   it("keeps the inspector read-only and opens the full Claim", () => {
     show(); fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
     const inspector = screen.getByTestId("claim-inspector");
     expect(within(inspector).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(inspector).toHaveTextContent("Problem: Damaged");
+    expect(inspector).toHaveTextContent("Evidence: 2 photos");
+    expect(inspector).not.toHaveTextContent("Variant:");
+    expect(inspector).not.toHaveTextContent("Supplier Response:");
     fireEvent.click(within(inspector).getByRole("button", { name: "Open Claim" }));
     expect(screen.getByTestId("claim-object")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Link Case" })).not.toBeInTheDocument();
