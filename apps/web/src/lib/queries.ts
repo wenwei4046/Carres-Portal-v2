@@ -3859,7 +3859,13 @@ export function useDeliveryPartners(
  * already exists; none of them can create one.
  */
 export interface SupplierClaimListRow {
+  case_id?: string | null;
   id: string;
+  /** Actual receipt and currently controlled Unit references, never inferred. */
+  warehouse_receipt_id?: string | null;
+  grn_no?: string | null;
+  held_unit_codes?: string[];
+  product_description?: string | null;
   claim_no: string;
   po_id: string;
   po_line_id: string | null;

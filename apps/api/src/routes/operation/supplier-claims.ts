@@ -18,57 +18,16 @@ import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 /**
- * /api/operation/supplier-claims — R2 + R3 of the receiving & claim queue
- * (docs/receiving-claim-execution-queue.md, Jess 2026-07-27).
+ * Supplier Claim reads and legacy mutation routes.
+ * Purchasing MASTER §9.5 (2026-09-06) governs the approved Case-linked target.
+ * The register reads every permitted row, actual Catalog descriptions and held
+ * Stock Unit codes. Photos are signed only after an authorised Claim read.
  *
- * A claim is never FILED here: claims are minted inside
- * `operation_receive_po_with_do` (a damaged / wrong-item report) and
- * `supplier_claim_sweep_overdue` (a promise the supplier did not keep), both in
- * migration 0288, and a guard trigger refuses any PO-line issue that has no
- * covering claim. A hand-filed claim would be a receiving problem with no
- * receiving behind it — the exact hole the queue exists to close.
- *
- * What R3 adds is the claim's LIFE: what we asked, what they answered, and the
- * close. Each is its own RPC in 0291 — `supplier_claims` has no write policy at
- * all, so there is no PostgREST door that can edit a claim by hand.
- *
- * R4 adds the GOODS. A damaged or wrong unit is quarantined by the same receive
- * that raised the claim (`on_hold`, migration 0299) and can never be sold,
- * reserved or delivered until somebody says what happened to it. The claim is
- * where that is said, because the claim is the thing that knows the answer.
- *
- * Layer ③ adds the CUSTOMER (0324). `Customer Resolution` answers "what are we
- * doing for the customer?" and is a SECOND decision beside the item's outcome,
- * never a replacement for it — the customer can cancel AND the mattress be
- * destroyed, and a single list would force the operator to record only one of
- * the two.
- *
- * Layer ④ adds the ORDER OF EVENTS (0409) and completes Loo's model. `Carres
- * Execution` answers "in what order do the goods actually move?" — a third
- * independent axis, because `replace` is a promise and `Replace First` /
- * `Collect First` are two ways of keeping it that leave Carres holding a
- * different number of units. Both arguments of f(Resolution, Execution) now
- * exist, so the consequence is computable for the first time; WHICH stock,
- * finance and demand moves each pair produces is still unruled and is not
- * guessed here. Purchase Returns (§9.6) and Repair Orders (§9.7) were frozen on
- * exactly this missing argument.
- *
- *   GET  /                — the queue (status filter, names, who owes next)
- *   GET  /:id/photos      — signed URLs for that claim's evidence
- *   POST /:id/request     — what WE ask the supplier to do
- *   POST /:id/response    — what the SUPPLIER answered
- *   POST /:id/close       — settle it (refuses unless both sides are on file)
- *   POST /:id/hold-resolve — R4: what happened to the quarantined units
- *   POST /:id/customer-resolution — layer ③: what we are doing for the customer
- *   POST /:id/carres-execution    — layer ④: in what order the goods move
- *
- * Role: operation + principal, on every route. `supplier_claims` RLS admits
- * every internal role (principal/operation/finance/bd) for SELECT; this
- * endpoint is narrower on purpose — the claim desk is an operations surface,
- * and finance has no move to make on a claim (a claim NEVER produces a credit
- * note; resolutions are goods actions). Widen it when a card asks for it, not
- * before. The RPCs gate independently, so this is defence in depth rather than
- * the only lock.
+ * Legacy request/answer/customer/execution/stock/close RPCs remain here for
+ * compatibility; they are not the approved scoped instruction or completion
+ * contract. The new read-only UI does not expose them as replacement authorities.
+ * Case intake/linking, versioned conversation, shared Work, scoped execution and
+ * Finance-backed closure remain explicit dependencies before operational release.
  */
 const supplierClaimsRouter = new Hono<AppEnv>();
 
@@ -145,25 +104,22 @@ supplierClaimsRouter.get("/", async (c) => {
     let q = sb
       .from("supplier_claims")
       .select(
-        "id, claim_no, po_id, po_line_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
+        "id, claim_no, po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
       )
       .order("reported_at", { ascending: false })
       .order("id", { ascending: false });
     if (status !== "all") q = q.eq("status", status);
     if (poId) q = q.eq("po_id", poId);
 
-    const { data, error } = poId
-      ? await q.range(from, from + DEFAULT_LIMIT - 1)
-      : await q.limit(DEFAULT_LIMIT);
+    const { data, error } = await q.range(from, from + DEFAULT_LIMIT - 1);
     if (error) {
       const m = mapPgError(error);
       return c.json(m.body, m.status);
     }
     const page = (data ?? []) as Array<Record<string, unknown>>;
     claims.push(...page);
-    // A PO object is a complete connection. The general Claims worklist keeps
-    // its existing 200-row window and reports its counts separately below.
-    if (!poId || page.length < DEFAULT_LIMIT) break;
+    // Search, factual rail counts and export must cover the full permitted set.
+    if (page.length < DEFAULT_LIMIT) break;
   }
 
   // Counts for the tab chips come from a separate, unfiltered head-count so the
@@ -208,6 +164,32 @@ supplierClaimsRouter.get("/", async (c) => {
   const reporterIds = [
     ...new Set(claims.map((r) => r.reported_by as string).filter(Boolean)),
   ];
+
+  const grnNumbers = new Map<string, string>();
+  const receiptIds = [...new Set(claims.map((row) => row.warehouse_receipt_id as string).filter(Boolean))];
+  if (receiptIds.length) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      receiptIds, (ids) => sb.from("warehouse_receipts").select("id, grn_no").in("id", ids),
+    );
+    if (result.error) {
+      const mapped = mapPgError(result.error);
+      return c.json(mapped.body, mapped.status);
+    }
+    for (const row of result.data) if (row.grn_no) grnNumbers.set(String(row.id), String(row.grn_no));
+  }
+
+  const descriptions = new Map<string, string>();
+  const skuKeys = [...new Set(claims.map((row) => String(row.sku)).filter(Boolean))];
+  if (skuKeys.length) {
+    const result = await readEveryClaimRelation<Record<string, unknown>>(
+      skuKeys, (keys) => sb.from("product_skus").select("sku, variant").in("sku", keys),
+    );
+    if (result.error) {
+      const mapped = mapPgError(result.error);
+      return c.json(mapped.body, mapped.status);
+    }
+    for (const row of result.data) if (row.variant) descriptions.set(String(row.sku), String(row.variant));
+  }
 
   const supplierNames = new Map<string, string>();
   if (supplierIds.length > 0) {
@@ -281,13 +263,13 @@ supplierClaimsRouter.get("/", async (c) => {
   // already been resolved). The panel must say what is true of the goods, not
   // what was true of the paperwork.
   const claimIds = claims.map((r) => r.id as string);
-  const heldByClaim = new Map<string, { units: number; reason: string | null }>();
+  const heldByClaim = new Map<string, { units: number; reason: string | null; codes: string[] }>();
   if (claimIds.length > 0) {
     const result = await readEveryClaimRelation<Record<string, unknown>>(
       claimIds,
       (ids) => sb
         .from("ops_stock_items")
-        .select("hold_claim_id, hold_reason")
+        .select("hold_claim_id, hold_reason, id, unit_code")
         .in("hold_claim_id", ids)
         .eq("status", HELD_STOCK_STATUS),
     );
@@ -301,6 +283,7 @@ supplierClaimsRouter.get("/", async (c) => {
       heldByClaim.set(key, {
         units: (prev?.units ?? 0) + 1,
         reason: prev?.reason ?? ((u.hold_reason as string | null) ?? null),
+        codes: [...(prev?.codes ?? []), ...(u.unit_code ? [String(u.unit_code)] : [])],
       });
     }
   }
@@ -315,6 +298,8 @@ supplierClaimsRouter.get("/", async (c) => {
       return {
         ...r,
         supplier_name,
+        product_description: descriptions.get(String(r.sku)) ?? null,
+        grn_no: grnNumbers.get(String(r.warehouse_receipt_id)) ?? null,
         reported_by_name: r.reported_by
           ? (reporterNames.get(r.reported_by as string) ?? null)
           : null,
@@ -323,6 +308,7 @@ supplierClaimsRouter.get("/", async (c) => {
         // R4 — the goods, as they stand right now.
         held_units: held?.units ?? 0,
         hold_reason: held?.reason ?? null,
+        held_unit_codes: held?.codes ?? [],
         // Computed here so the row, the button and any future digest all read
         // the same sentence — one rule, in the shared module.
         next_move: claimNextMove({
