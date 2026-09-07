@@ -2343,6 +2343,17 @@ send one PDF → record promise → receive through Receiving → prove outgoing
 screens. Name the actual originating document, such as Display Request or Supplier Claim, with
 its linked number. Physical locations use Collect from and Send to; a document reference must
 not stand in for the location where goods will be collected or sent.
+**Consignment Order presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header shows
+Consignment Order and its number, Supplier, linked Display Request (or actual Supplier Claim),
+and Requested by when applicable. COMING IN shows Collect from, Send to, Expected arrival
+(actual date or Not confirmed), Unit ID, Model and Quantity. GOING BACK appears only for a swap
+and shows Collect from, Send to, Expected collection (actual date or Not confirmed), Unit ID,
+Model and Quantity. Contact person and phone appear with each location. Document and reply shows
+PDF version, Sent to, Sent date and Supplier reply. Results separates coming-in Received / Still
+waiting from going-back Collected / Still waiting, retaining exact outstanding Units and partial
+results. History follows. Purchasing sends one combined swap document; Receiving and Stock supply
+the authoritative arrival and departure results through their existing doors. This approves this
+page presentation, not the entire Showroom Blueprint or any application implementation.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
 **Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
 swap, supplier changes model/date.
