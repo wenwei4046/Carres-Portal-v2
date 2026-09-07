@@ -800,6 +800,23 @@ Every export prints generation time/person, applied filters, Stock/report date, 
 rows and source document numbers. It is a fixed snapshot, cannot be uploaded to overwrite Portal
 truth and never becomes a second authority.
 
+**Showroom report views — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Place the Showroom
+report in central Reports, reading the existing Stock, Sales Order and Purchasing records:
+
+| View | Required facts |
+|---|---|
+| At showroom | Exact Units by current physical Site, ownership and condition |
+| Sold, waiting for collection | Reserved Units still physically at the showroom |
+| On loan | Customer order, exact Unit, current holder and governed return date |
+| Waiting for supplier | Exact Units awaiting supplier collection, repair or replacement |
+| Requests not finished | Display Requests and remaining decision, arrival, installation or other required result |
+
+Each count opens its exact Units or requests; a customer-held loan Unit never counts as physically
+at the showroom. These are overlapping purpose-specific views, not quantities to add into one
+stock total. Supplier cost and settlement visibility follows Finance permissions. The report has
+no separate stock/status editor, and its request/loan/financial facts remain read-only projections
+of their owning modules. This approves the report presentation, not the entire Showroom Blueprint.
+
 Report visibility follows need: Sales receives Ready Stock and permitted showroom availability;
 NETS receives its authorised organisation/Site work/evidence; Purchasing receives Receiving,
 ownership, Consignment and supplier consequences; Finance receives Month-end/ownership/valuation
