@@ -223,6 +223,46 @@ describe("operation Work response composition", () => {
     expect(askDate?.destination).toBe("/operation/orders/so/order-1318");
   });
 
+  it("presents Delivery-owned actions as Delivery objects with Delivery doors", () => {
+    const context = {
+      orderId: "order-2041",
+      so: 2041,
+      picName: "Operation PIC",
+      picUserId: "pic-1",
+      promisedDateIso: "2026-09-08",
+      confirmedDateIso: "2026-09-08",
+      deliveredAtIso: null,
+      delayDetectedAtIso: null,
+      delayDecisionAtIso: null,
+    };
+    const [arrangement] = projectSalesOrderWork({
+      open: [{ key: "confirm_delivery_date", track: "delivery", tone: "warning" }],
+      context: { ...context, confirmedDateIso: null },
+      customer: "Tan Qu Qu",
+      today: "2026-09-07",
+    });
+    expect(arrangement).toMatchObject({
+      module: "delivery",
+      object: { kind: "delivery_scope", id: "order-2041", label: "SO-2041" },
+      destination: "/operation/delivery/edit/order-2041",
+    });
+
+    const [run] = projectSalesOrderWork({
+      open: [{ key: "deliver_today", track: "delivery", tone: "danger" }],
+      context,
+      customer: "Tan Qu Qu",
+      deliveryOrderNumber: "DO-2041",
+      today: "2026-09-08",
+    });
+    expect(run).toMatchObject({
+      id: "delivery:DO-2041:deliver_today",
+      module: "delivery",
+      object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" },
+      destination: "/operation/delivery-orders/DO-2041",
+    });
+    expect(run?.action).not.toContain("Operation PIC");
+  });
+
   it("derives Manual Purchase projector input from the module register facts", () => {
     const inputs = manualPurchaseWorkInputsFromRegister({
       requests: [{

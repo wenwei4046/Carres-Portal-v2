@@ -74,7 +74,7 @@ export type WorkOwnerRule =
 
 export interface WorkRule {
   key: string;
-  module: "orders" | "purchasing" | "receiving" | "claims";
+  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery";
   /** ① when the item exists — the owning engine's trigger, in words. */
   trigger: string;
   /** ② who — the rule in words, never a stored owner field (§2.2). */
@@ -128,7 +128,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "arrange_new_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "the decision is 'new_date' and no reachable booking exists",
     owner:
       "the order's PIC as governed proxy (§0.1: customer date/time confirmation → assigned Partner or governed proxy owner; ACTION-FLOW Law 4 rung 2 — the conversation is logistics', the ACTION in this portal is ours, and a partner has no login to close it)",
@@ -139,7 +139,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "assign_logistics",
-    module: "orders",
+    module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
     owner:
       "the order's PIC as governed proxy — no delivery-staff roster fact exists (0363 records none), and choosing the company is an operations act on the order",
@@ -150,7 +150,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "confirm_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
     owner:
       "the order's PIC as governed proxy (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line already names the partner)",
@@ -182,7 +182,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "deliver_today",
-    module: "orders",
+    module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
     owner:
       "the order's PIC as governed proxy — Delivery ownership has no staff roster fact yet; the PIC watches today's run reach its result",
@@ -194,7 +194,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "upload_delivery_photo",
-    module: "orders",
+    module: "delivery",
     trigger: "delivered with no photo on file",
     owner:
       "the order's PIC — the proof arrives on the order's own WhatsApp thread; filing it is the relationship owner's act",
@@ -218,7 +218,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
   {
     key: "collect_loan_item",
-    module: "orders",
+    module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
     owner:
       "Delivery staff (blueprint card owner rule) — no delivery-staff roster fact exists yet, so no person resolves and the duty word stands (the canvas's measured-boundary rule)",
@@ -731,9 +731,10 @@ export function workItemsForOrder(
           )
         : 0;
     const owner = resolveOwner(a.key);
+    const module = ORDER_RULE_BY_KEY.get(a.key)?.module ?? "orders";
     return {
       ruleKey: a.key,
-      module: "orders" as const,
+      module,
       soRef: `SO-${ctx.so}`,
       orderId: ctx.orderId,
       action: orderActionQueue(a.key),

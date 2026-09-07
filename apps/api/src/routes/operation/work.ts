@@ -195,6 +195,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
         ),
       },
       customer: row.customer_name,
+      deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
     });
   });
@@ -448,6 +449,7 @@ export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
   customer: string | null;
+  deliveryOrderNumber?: string | null;
   today: string;
   workingDays?: WorkingDayOptions;
   queueLeads?: DeliveryQueueLeads;
@@ -458,13 +460,21 @@ export function projectSalesOrderWork(input: {
     input.today,
     input.workingDays,
     input.queueLeads,
-  ).map((item) =>
-    operationWorkItemFromProjection(item, {
-      object: {
-        kind: "sales_order",
-        id: input.context.orderId,
-        label: `SO-${input.context.so}`,
-      },
+  ).map((item) => {
+    const deliveryOwned = item.module === "delivery";
+    const deliveryOrder = input.deliveryOrderNumber ?? null;
+    return operationWorkItemFromProjection(item, {
+      object: deliveryOwned
+        ? {
+            kind: deliveryOrder ? "delivery_order" : "delivery_scope",
+            id: deliveryOrder ?? input.context.orderId,
+            label: deliveryOrder ?? `SO-${input.context.so}`,
+          }
+        : {
+            kind: "sales_order",
+            id: input.context.orderId,
+            label: `SO-${input.context.so}`,
+          },
       problem: ORDER_PROBLEM[item.ruleKey] ?? "Action required",
       recipient:
         item.ruleKey === "ask_delivery_date" ||
@@ -473,10 +483,14 @@ export function projectSalesOrderWork(input: {
           ? input.customer
           : null,
       requiredResult: ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
-      destination: `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
+      destination: deliveryOwned
+        ? deliveryOrder && (item.ruleKey === "deliver_today" || item.ruleKey === "upload_delivery_photo")
+          ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
+          : `/operation/delivery/edit/${encodeURIComponent(input.context.orderId)}`
+        : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
       today: input.today,
-    }),
-  );
+    });
+  });
 }
 
 export function projectManualPurchaseWork(input: {

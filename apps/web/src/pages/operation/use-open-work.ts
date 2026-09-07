@@ -51,7 +51,8 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
         ? "claims"
         : item.module === "orders" ||
             item.module === "purchasing" ||
-            item.module === "receiving"
+            item.module === "receiving" ||
+            item.module === "delivery"
           ? item.module
           : "orders",
     soRef: item.object.label,
@@ -147,4 +148,3 @@ export function ownerWorkloads(
       ),
     );
 }
-
