@@ -218,6 +218,16 @@ honest Work for admitted modules.
   the Issue's structured current-action transition the single truth, resolve its owner rule through
   Workspace, preserve actual-actor history, expose exact Issue routing and retire the duplicate
   generated task only after source-by-source migration proof.
+- Notifications were re-audited against the shipped global Bell on 2026-09-07. The current Bell is
+  not a notification system: it independently recomputes overdue/near-delivery Orders, reads legacy
+  `ops_tasks`, labels the result `to action` and opens Orders. That is a second action queue and can
+  disagree with My Work, so it is not accepted as Workspace truth. No durable Work-transition receipt,
+  recipient, unread/dismiss evidence or source-failure event store exists yet. Browser polling or
+  local storage must not fabricate that history. The replacement must persist idempotent receipts
+  from admitted Work identity transitions (`assigned`, `cover activated`, `became late`, `unblocked`,
+  `source failed`, `completed`), scope them to the affected person/supervision, and keep read/dismiss
+  independent from Work. Until that source exists, the legacy Bell remains measured debt, not a
+  completed Workspace feature.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
@@ -235,7 +245,8 @@ honest Work for admitted modules.
    owner rule, versioned current-action result transition and exact Issue deep link; migrate existing
    truth before admitting it to Work.
 7. Retire remaining duplicate generated-task paths after source-by-source proof.
-8. Emit Notifications from Work transitions.
+8. Replace the legacy Bell queue with durable, idempotent Work-transition receipts and migrate the
+   header to those receipts; read/dismiss must never alter Work.
 9. Last, complete and owner-review Dashboard against production data.
 
 Cards follow dependency slices; this MASTER is not an implementation queue.
