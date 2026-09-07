@@ -260,6 +260,13 @@ Operation informed customer. Payment may show linked read-only history; it does 
 
 ## 14 · Current build truth
 
+**OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is
+production-verified and the §16/§17 registers, objects, actions, Settings and Calendar are
+deployed with exact-SHA proof and local walks, but the governed acceptance is not complete:
+the authenticated production walk, the complete §16 message assembly (blocked on the
+owner-approved Important Notes wording), Reports, Stripe convergence, the storage journeys and
+the Refund/Recon retirement remain open below.
+
 ### Production-verified — Customer payment posting convergence
 
 Every current customer-order money entrance delegates to the canonical `_customer_payment_post`
@@ -338,11 +345,12 @@ method toggles, the two storage cards, and the numbering summary that says only 
 example and `Numbers are created automatically.` Record payment's method list now reads the
 Active set. No approver name, Payment Duty or roster appears in Payment Settings.
 
-### BUILD in progress — a sent message is recorded with its proof, 2026-09-06
+### Deployed — a sent message is recorded with its proof, 2026-09-06
 
-Migration `0434` (branch evidence; verified on production in a rolled-back transaction — a
-screenshotless record is refused, a cross-order invoice is refused, and a real record lands
-with its proof, the order-history fact and the shared chase stamp; not yet applied) creates
+Migration `0434` is APPLIED and PR #1114 merged as `52659282`; production converged that
+exact SHA. The rolled-back production probe proved a screenshotless record is refused, a
+cross-order invoice is refused, and a real record lands
+with its proof, the order-history fact and the shared chase stamp. The migration creates
 `payment_communications`, the append-only sent-message ledger, and
 `payment_record_message_sent`, its one recording door. The Invoice object gains
 `Ask the customer to pay` — the door exists only when the shared clock says due or late, never
@@ -392,9 +400,9 @@ pay` now recommends the Default template from the shared clock's answer, offers
 `Change template` across Active templates, renders protected fields from structured facts,
 and falls back to the built-in locked wording when the library is unreachable.
 
-### BUILD in progress — Send receipt, 2026-09-06
+### Deployed — Send receipt, 2026-09-06
 
-Branch evidence, no migration: after a successful posting, the done panel says Payment
+PR #1118 merged as `314b3d87` (no migration): after a successful posting, the done panel says Payment
 recorded · Receipt number · Amount still needed and offers **Send receipt** — template-driven
 ONLY. A full payment recommends the `Payment received` template, a partial one
 `Partial payment received`; the composition renders the manager's wording with the receipt
@@ -403,14 +411,46 @@ the immutable ledger as kind `receipt` with the sent-screenshot proof. With no A
 template the panel says `No receipt template yet. Ask a manager to add the approved wording
 in Settings.` — nothing invents customer copy.
 
+### BUILD — the Calendar review corrections, 2026-09-07
+
+The #1115 review found five gaps; the correction rebuilds the Calendar view on the kit's ONE
+pinned `MonthCalendar` primitive (shared with Receiving and Delivery) instead of the
+hand-rolled month grid. Built and locally verified (13 focused Calendar tests, 364 web tests
+across every MonthCalendar consumer, design guard clean, walked at desktop, 390px and a
+640px ≈200%-zoom viewport with no horizontal scroll):
+
+- **Sunday-first month** with `SUN MON TUE WED THU FRI SAT` three-letter headings — the kit
+  formatter now says the short weekday name, never a single ambiguous letter.
+- **`‹ Previous week` / `Next week ›`** stand beside the week range and move exactly one
+  fixed Mon–Sun workweek.
+- **Filter → listing → Calendar**: a business date filter (Customer Delivery · Expected
+  arrival — Payment-owned words only, no Delivery logistics-assignment copied) opens its
+  dated LISTING while the complete month stays visible and its markers follow the filter;
+  choosing any month date returns to Calendar at that week. `All dates` is the Calendar.
+- **One SO, once**: entries dedupe on SO · date · type, so an SO carrying Sales, Storage and
+  Additional Storage invoices is ONE Customer Delivery and ONE Expected arrival, its balance
+  said once through the canonical `orderMoney` arithmetic; the Sales invoice is the door and
+  the other obligations stay reachable through the Register and the opened details.
+- **The kit fix the correction surfaced**: `MonthCalendar` passed no `onSelect` to
+  `react-day-picker` v10, so selection was internal-state only and a day set from OUTSIDE
+  (a register date door, a week arrow) never repainted; it now uses DayPicker's own
+  controlled `onSelect`, keeping the pick-again-clears contract for every consumer.
+
+Merge, exact-SHA convergence and the production walk of this correction are recorded in the
+closure below when they exist — this paragraph does not claim them early.
+
+### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
+
 Message assembly with bank routing and Partner contact, Reports, Stripe convergence, storage
-journeys, full responsive 390px/200% verification and the retirement of the rejected
-Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
+journeys and the retirement of the rejected Refund/Bank Matching surfaces remain unfinished
+target work. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
-it into a `Standard bank transfer` template once approved. The production Calendar walk is
-still owed (the walk aborted on a frozen browser extension; the shipped path is covered by
-the local walk and its tests).
+it into a `Standard bank transfer` template once approved. The authenticated production walk
+is still owed: the in-app browser walk covers the local build, but the live-site walk aborted
+because the Claude Chrome extension reports site access for `erp.carresofficial.com` turned
+off in `chrome://extensions` — recorded as the precise verification blocker, not as
+acceptance.
 
 ### Approved target / not claimed built by this scope
 
