@@ -15,6 +15,12 @@
  *     Calendar          day columns and cards — planning by day
  *     every other view  the standard selectable work list (DataGrid rows)
  *
+ * ⭐ `All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07):
+ * 86 of 87 scopes carried no confirmed date, so a Calendar landing opened an
+ * empty page and the workspace looked like it held no orders. The default view
+ * is the complete selectable listing; Calendar is an explicit pick — the rail
+ * row, or a date on the rail's month calendar.
+ *
  * The six-day window, the card mapping, the filters, the rail counts and the
  * one href arithmetic all live here, so the rail count and the listing it
  * filters cannot be two different numbers (Architecture Law D).
@@ -192,21 +198,28 @@ export type DeliveryMonitorSource = ScopeInputs;
 
 /**
  * ONE single-pick WORK TO DO group (owner correction 2026-09-06 — never split
- * into "Delivery Schedule" and "Needs Checking"). `calendar` is the default.
+ * into "Delivery Schedule" and "Needs Checking"). `all` is the default landing
+ * (owner correction 2026-09-07), and `no_logistics` sits here as a PRIMARY
+ * work queue — the bulk-assignment journey's entry, visible without scrolling
+ * past REGION and the partner rows. It never appears a second time under
+ * LOGISTICS.
  */
 export type MonitorWorkView =
-  | "calendar"
   | "all"
+  | "no_logistics"
   | "no_confirmed_date"
+  | "calendar"
   | "overdue"
   | "failed"
   | "delivered_proof_required"
   | "waiting_warehouse";
 
+/** The ruled rail order (owner correction 2026-09-07). */
 export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
-  "calendar",
   "all",
+  "no_logistics",
   "no_confirmed_date",
+  "calendar",
   "overdue",
   "failed",
   "delivered_proof_required",
@@ -214,9 +227,10 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
 ];
 
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
-  calendar: MONITOR_COPY.calendar,
   all: MONITOR_COPY.allDeliveryWork,
+  no_logistics: MONITOR_COPY.noLogistics,
   no_confirmed_date: MONITOR_COPY.noConfirmedDate,
+  calendar: MONITOR_COPY.calendar,
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
   delivered_proof_required: MONITOR_COPY.deliveredProofRequired,
@@ -226,7 +240,8 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
 export interface DeliveryMonitorFilters {
   view: MonitorWorkView;
   region: string | null;
-  /** A partner id, `"none"` for scopes nobody carries, or null for all. */
+  /** A partner id, or null for all. `"none"` survives only for a retired
+   *  shared URL — the UI's own unassigned queue is the `no_logistics` view. */
   logisticsPartnerId: string | "none" | null;
   search: string;
   /** Business today — `Overdue` is a question about it, answered here once. */
@@ -321,6 +336,10 @@ function matchesView(
     case "all":
       /* Every open delivery scope — the unfiltered selectable listing. */
       return true;
+    case "no_logistics":
+      /* The bulk-assignment queue: nobody carries this scope yet — across ALL
+         dates, with or without a DO or a confirmed date. */
+      return card.logisticsPartnerId === null;
     case "no_confirmed_date":
       return card.confirmedDate === null;
     case "overdue":
@@ -460,14 +479,17 @@ export function needConfirmedDateSentence(n: number): string {
 /**
  * Every active pick, in rail order, so a combined narrowing (86 → 35) is
  * visible above the rows it produced rather than only in a rail row the
- * operator may have scrolled past. Empty = the unfiltered work view.
+ * operator may have scrolled past. Empty = the unfiltered default —
+ * `All delivery work` is the landing, not a pick, and prints no summary.
  */
 export function activeFilterLabels(
   filters: DeliveryMonitorFilters,
   partnerNameOf: (id: string) => string | null,
 ): string[] {
   const out: string[] = [];
-  if (filters.view !== "calendar") out.push(MONITOR_VIEW_LABEL[filters.view]);
+  if (filters.view !== "calendar" && filters.view !== "all") {
+    out.push(MONITOR_VIEW_LABEL[filters.view]);
+  }
   if (filters.region !== null) out.push(filters.region);
   if (filters.logisticsPartnerId === "none") out.push(MONITOR_COPY.noLogistics);
   else if (filters.logisticsPartnerId !== null) {
@@ -500,10 +522,10 @@ export interface MonitorRails {
  * sub-headings, no `Other` bucket, no fixed zero rows. A picked region stays
  * listed at 0 until it is unpicked.
  *
- * LOGISTICS (same correction): only partners genuinely carrying a matching
- * scope (governed roster order first, then others by name), the operator's own
- * pick even at 0, and `No logistics picked` always — it is the bulk-assignment
- * journey's entry.
+ * LOGISTICS (owner correction 2026-09-07): `All logistics`, then only partners
+ * genuinely carrying a matching scope (governed roster order first, then
+ * others by name), and the operator's own pick even at 0. `No logistics
+ * picked` lives in WORK TO DO as a primary queue and is never duplicated here.
  */
 export function buildMonitorRails(
   cards: readonly DeliveryMonitorCard[],
@@ -534,6 +556,7 @@ export function buildMonitorRails(
   const work: Record<MonitorWorkView, number> = {
     calendar: calendarCount,
     all: forWork.length,
+    no_logistics: forWork.filter((c) => c.logisticsPartnerId === null).length,
     no_confirmed_date: forWork.filter((c) => c.confirmedDate === null).length,
     overdue: forWork.filter(
       (c) => c.confirmedDate !== null && c.confirmedDate < filters.todayIso,
@@ -559,17 +582,14 @@ export function buildMonitorRails(
      id must never become a rail label. */
   const countByPartnerId = new Map<string, number>();
   const partnerNameById = new Map(partners.map((p) => [p.id, p.name] as const));
-  let none = 0;
   for (const c of forLogistics) {
-    if (c.logisticsPartnerId === null) none += 1;
-    else {
-      countByPartnerId.set(
-        c.logisticsPartnerId,
-        (countByPartnerId.get(c.logisticsPartnerId) ?? 0) + 1,
-      );
-      if (!partnerNameById.has(c.logisticsPartnerId) && c.logisticsPartnerName) {
-        partnerNameById.set(c.logisticsPartnerId, c.logisticsPartnerName);
-      }
+    if (c.logisticsPartnerId === null) continue;
+    countByPartnerId.set(
+      c.logisticsPartnerId,
+      (countByPartnerId.get(c.logisticsPartnerId) ?? 0) + 1,
+    );
+    if (!partnerNameById.has(c.logisticsPartnerId) && c.logisticsPartnerName) {
+      partnerNameById.set(c.logisticsPartnerId, c.logisticsPartnerName);
     }
   }
   const ids = new Set<string>([
@@ -592,7 +612,6 @@ export function buildMonitorRails(
     const rb = rank.get(b.label as (typeof GOVERNED_LOGISTICS)[number]) ?? 99;
     return ra - rb || a.label.localeCompare(b.label);
   });
-  logistics.push({ key: "none", label: MONITOR_COPY.noLogistics, count: none });
 
   return { work, regions, logistics };
 }

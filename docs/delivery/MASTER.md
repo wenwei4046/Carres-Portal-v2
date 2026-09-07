@@ -407,24 +407,36 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**MONITOR — calendar planning + selectable operational work lists (owner UI correction
-2026-09-06, overwriting the 2026-09-04 calendar-only composition).** Monitor answers the
-operator's morning question — *what customer deliveries are planned, and which record do I open
-or act on?* — through **two projections of the SAME canonical scope rows**:
+**MONITOR — the complete work list first, calendar planning behind an explicit pick (owner UI
+correction 2026-09-07, overwriting the 2026-09-06 calendar-default landing).** Monitor answers
+the operator's morning question — *what customer deliveries are planned, and which record do I
+open or act on?* — through **two projections of the SAME canonical scope rows**:
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
 page-owned 240px FilterRail  ·  the COMPLETE MONTH CALENDAR fixed on top, then
                                 WORK TO DO + REGION + LOGISTICS scrolling below it
-Calendar (untouched)         ·  ‹ fixed operating week › + Search · week-aligned day
-                                columns, delivery cards, NO checkboxes, no batch selection
-every operational pick       ·  the standard selectable Register work list (shared DataGrid):
+All delivery work (DEFAULT)  ·  the standard selectable Register work list (shared DataGrid):
                                 selection ☐ · ▸ expansion · SO No · Customer · State ·
                                 Delivery Location · Requested Delivery Date ·
                                 Confirmed Delivery · Confirmed Time · Goods · DO No ·
                                 Logistics Partner · Delivery Status — sticky identity,
                                 real horizontal scrolling
+Calendar (explicit pick)     ·  ‹ fixed operating week › + Search · week-aligned day
+                                columns, delivery cards, NO checkboxes, no batch selection
 ```
+
+**`All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07).** Measured before
+the correction, 86 of 87 delivery scopes carried no confirmed date, so the Calendar landing
+opened empty and the workspace appeared to contain no orders. Opening Monitor now shows the
+complete selectable DataGrid of every delivery-eligible Sales Order scope immediately —
+including scopes with **no formal DO yet, no confirmed delivery date, and no logistics partner
+yet**. The governed entry rule below still gates the population (no cancelled orders, no orders
+that need no delivery, no scope missing its minimum facts), and one row remains ONE delivery
+scope / Journey leg, never necessarily one Sales Order. Calendar is not removed: its rail row,
+or a date click on the rail's month calendar, opens the fixed operating-week Calendar, which
+continues to show only scopes with a confirmed date and never places undated scopes into date
+columns.
 
 **THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
 region is the complete current month — never a one-week strip, never the Portal sidebar:
@@ -435,21 +447,24 @@ deliveries carries a dot mark (shape, never colour alone); the arithmetic is rea
 locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
 pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
 independently BELOW it; scrolling them never removes the month from view. **Clicking a date
-opens the fixed operating week containing it in the right workspace** — the operational
-picks clear so the week actually appears.
+opens the fixed operating week containing it in the right workspace** — Calendar becomes the
+explicit pick and the other operational picks clear so the week actually appears.
 
-A work queue (`No confirmed date` · `Overdue` · `Failed Delivery` · `Delivered — Proof
-Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an operational
-question, and its answer is the Register grammar every other module answers with — **never a
-full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
+A work queue (`No logistics picked` · `No confirmed date` · `Overdue` · `Failed Delivery` ·
+`Delivered — Proof Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an
+operational question, and its answer is the Register grammar every other module answers with —
+**never a full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
 read-only. `SO No` opens the Sales Order, `DO No` opens the Delivery Order, double-click opens
 Edit Delivery.
 
 **BULK INITIAL LOGISTICS ASSIGNMENT LIVES ON MONITOR (owner correction 2026-09-06)** — the
 planning population includes delivery scopes that have no formal DO yet, so the journey is
-`Monitor → No logistics picked → select visible rows → Assign logistics`. Selection follows the
-shared engine: every row has a checkbox; the header checkbox selects only the visible filtered
-rows; changing a filter clears the selection; the selection toolbar replaces the normal toolbar
+`Monitor → No logistics picked → header select-all → Assign logistics`, and the queue answers
+across ALL dates — rows without a DO and rows without a confirmed date included. Selection
+follows the shared engine: every row has a checkbox; the header checkbox selects only the
+visible filtered rows (a combined `Selangor · No logistics picked` narrowing selects only those
+Selangor rows); changing a filter clears the selection; a completed assignment clears the
+selection and refreshes the rail counts; the selection toolbar replaces the normal toolbar
 at the same height and reads `{N} delivery scopes selected · Clear · Assign logistics`. The
 write goes through the ONE governed assignment door (coverage-checked partners, Klang Valley
 pre-selects NETS, history preserved). **Bulk assignment is offered only while every selected
@@ -489,8 +504,10 @@ door — never the same absence repeated in every column; an individually empty 
   ledger is known and empty — never from time.
 - **The URL is the state** — ONE selected date (`?date=`) drives every viewport's window,
   plus `?view=` · `?region=` · `?logistics=` · `?q=`, so refresh, share and Back all restore
-  the same view; the retired `?schedule=`/`?checking=`/`?start=`/`?day=` spellings still
-  resolve so an old shared link keeps answering.
+  the same view. An absent `?view=` is the default `All delivery work`; the retired
+  `?schedule=`/`?checking=`/`?start=`/`?day=` spellings still resolve so an old shared link
+  keeps answering — `?start=`/`?day=` only ever named the calendar, so they still open its
+  week.
 - **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
   the rail becomes the filter drawer, the visible range becomes one selected operating day with a
   sticky date heading and 44px rows, previous/next skips Sunday, **the full month opens through
@@ -505,12 +522,18 @@ drawer). **Three single-pick groups that COMBINE**; each group's counts are comp
 cards the other groups already narrowed (Architecture Law D):
 
 - **`WORK TO DO` is ONE group (owner correction 2026-09-06 — never split into "Delivery
-  Schedule" and "Needs Checking"):** `Calendar` · **`All delivery work`** (every open scope,
-  the unfiltered selectable listing) · `No confirmed date` · **`Overdue`** · `Failed Delivery`
-  · `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`, never `Tomorrow`;
+  Schedule" and "Needs Checking"), in the ruled order (owner correction 2026-09-07):**
+  **`All delivery work`** (the default landing — every open scope, the unfiltered selectable
+  listing) · **`No logistics picked`** (a PRIMARY work queue, visible without scrolling past
+  REGION and the partner rows — never buried in, or duplicated under, LOGISTICS) ·
+  `No confirmed date` · `Calendar` · **`Overdue`** · `Failed Delivery` ·
+  `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`, never `Tomorrow`;
   every queue a recorded fact, never a clock inference.
-- **`REGION`** — `All regions`, then the direct rows ruled below.
-- **`LOGISTICS`** — `All logistics`, then the partner rows ruled below.
+- **`REGION`** — `All regions`, then the direct rows ruled below. A REGION pick combines with
+  a work queue (`Selangor · No logistics picked`), and header select-all then takes only those
+  visible filtered rows.
+- **`LOGISTICS`** — `All logistics`, then only the governed partners genuinely carrying a
+  matching scope, per the rows ruled below.
 
 **DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
 correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**
@@ -590,11 +613,12 @@ Putrajaya, Sabah, Sarawak, Selangor, Singapore and the rest as the data genuinel
   state joins no region row and shows while no region is picked — fixing its address is Sales
   work through `Open Sales Order to change`.
 
-**`LOGISTICS` (same correction)** lists `All logistics`, then only the partners **genuinely
-carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT · EU · SSY ·
-HOUZS) among those present, then others by name, a picked partner staying visible at 0 — then
-**`No logistics picked`** always, because it is the bulk-assignment journey's entry. A long
-list of irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
+**`LOGISTICS` (owner correction 2026-09-07)** lists `All logistics`, then only the partners
+**genuinely carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT ·
+EU · SSY · HOUZS) among those present, then others by name, a picked partner staying visible
+at 0. **`No logistics picked` does NOT appear here**: it is a primary WORK TO DO queue (the
+bulk-assignment journey's entry) and is never duplicated in two groups. A long list of
+irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
 Journey legs, never whole Sales Orders.**
 
 **One card = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
