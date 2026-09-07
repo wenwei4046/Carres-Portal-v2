@@ -6,14 +6,22 @@
  * ⭐ TWO PROJECTIONS OF ONE CANONICAL READ
  *
  * ```
- * Calendar (untouched)   six operating-day columns, delivery cards, NO checkboxes
- * every operational pick the standard selectable DataGrid work list
+ * Calendar (explicit pick) six operating-day columns, delivery cards, NO checkboxes
+ * every other view         the standard selectable DataGrid work list
  * ```
  *
- * A work queue (`No confirmed date` · `Overdue` · `Failed Delivery` ·
- * `Delivered — Proof Required` · `Waiting for warehouse`), a REGION row or a
- * LOGISTICS row is an operational question, and its answer is the same
- * Register grammar every other module answers with — never a card wall.
+ * ⭐ `All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07):
+ * the workspace opens on the complete selectable listing of every open
+ * delivery scope — scopes without a DO, without a confirmed date, without a
+ * partner included — never on a Calendar that is empty because the dates are
+ * not confirmed yet. Calendar opens through its rail row or a month-calendar
+ * date click.
+ *
+ * A work queue (`No logistics picked` · `No confirmed date` · `Overdue` ·
+ * `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse`),
+ * a REGION row or a LOGISTICS row is an operational question, and its answer
+ * is the same Register grammar every other module answers with — never a card
+ * wall.
  *
  * ⭐ BULK LOGISTICS ASSIGNMENT LIVES HERE (owner correction 2026-09-06).
  * The planning population includes delivery scopes that have no formal DO yet,
@@ -27,10 +35,11 @@
  * COMPLETE MONTH CALENDAR fixed at its top (owner correction 2026-09-06):
  * month arrows move one month, the selected date wears the governed blue,
  * today stays distinguishable, Sundays are muted, work days carry a dot, and
- * the filter groups (one WORK TO DO group with `All delivery work` · flat
- * REGION state names · LOGISTICS carrying partners + `No logistics picked`)
- * scroll independently BELOW it. Clicking a date opens the FIXED operating
- * week containing it in the right workspace.
+ * the filter groups (one WORK TO DO group in the ruled order, `No logistics
+ * picked` among the primary queues · flat REGION state names · LOGISTICS
+ * carrying `All logistics` + the partners genuinely present) scroll
+ * independently BELOW it. Clicking a date opens the FIXED operating week
+ * containing it in the right workspace.
  *
  * ── THE WINDOWS ─────────────────────────────────────────────────────────────
  * One `?date=` drives every viewport's finite window — the desktop's Mon–Sat
@@ -324,8 +333,11 @@ export default function OperationDelivery() {
     1,
   )[0]!;
 
-  /* `?view=` is the one WORK TO DO pick. The retired `?schedule=`/`?checking=`
-     spellings still resolve so a shared or bookmarked URL keeps answering. */
+  /* `?view=` is the one WORK TO DO pick. `All delivery work` is the DEFAULT
+     landing (owner correction 2026-09-07): an empty Calendar must never be the
+     first thing an operator sees, so Calendar is an explicit pick. The retired
+     `?schedule=`/`?checking=` spellings still resolve so a shared or
+     bookmarked URL keeps answering. */
   const viewParam =
     searchParams.get("view") ??
     searchParams.get("schedule") ??
@@ -338,13 +350,19 @@ export default function OperationDelivery() {
           : null);
   const view: MonitorWorkView =
     viewParam === "all" ||
+    viewParam === "calendar" ||
+    viewParam === "no_logistics" ||
     viewParam === "no_confirmed_date" ||
     viewParam === "overdue" ||
     viewParam === "failed" ||
     viewParam === "delivered_proof_required" ||
     viewParam === "waiting_warehouse"
       ? viewParam
-      : "calendar";
+      : /* The retired `?start=`/`?day=` spellings only ever named the calendar
+           landing — an old shared week link still opens its week. */
+        searchParams.has("start") || searchParams.has("day")
+        ? "calendar"
+        : "all";
 
   const q = searchParams.get("q") ?? "";
   const region = searchParams.get("region");
@@ -366,10 +384,12 @@ export default function OperationDelivery() {
       if (value === null || value === "") next.delete(key);
       else next.set(key, value);
     }, replace);
-  /* Picking again unpicks — the rail's own toggle grammar. */
+  /* Picking again unpicks — the rail's own toggle grammar. The default the
+     URL falls back to is `All delivery work` (owner correction 2026-09-07),
+     so `all` never needs to be spelled and unpicking any view lands there. */
   const pickView = (value: MonitorWorkView) =>
     setParams((next) => {
-      if (value === "calendar" || view === value) next.delete("view");
+      if (value === "all" || view === value) next.delete("view");
       else next.set("view", value);
     });
   const toggleParam = (key: "region" | "logistics", value: string) =>
@@ -383,22 +403,26 @@ export default function OperationDelivery() {
       next.delete("region");
       next.delete("logistics");
     });
-  /* The one date write — the retired spellings never survive it. */
+  /* The one date write — the window arrows exist only on the Calendar
+     projection, so the pick is spelled out and the retired spellings (which
+     implied it) never survive. */
   const setDate = (iso: string) =>
     setParams((next) => {
       next.set("date", iso);
+      next.set("view", "calendar");
       next.delete("day");
       next.delete("start");
     });
   /* A rail-calendar click OPENS that date's operating week in the right
-     workspace (owner correction 2026-09-06): the operational picks clear so
-     the week is actually what appears. */
+     workspace (owner correction 2026-09-06): Calendar becomes the explicit
+     pick and the other operational picks clear so the week is actually what
+     appears. */
   const pickCalendarDate = (iso: string) =>
     setParams((next) => {
       next.set("date", iso);
       next.delete("day");
       next.delete("start");
-      next.delete("view");
+      next.set("view", "calendar");
       next.delete("region");
       next.delete("logistics");
     });
