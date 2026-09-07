@@ -48,7 +48,7 @@ async function resolveLegacyDuty(
   }
 }
 
-/** Used by the existing PO-day reminder until that reminder is retired. */
+/** Temporary compatibility shape for remaining Purchasing consumers. */
 export async function resolveCurrentPoDuty(
   sb: ReturnType<typeof userClient>,
 ): Promise<DutyRow | null> {

@@ -22,7 +22,7 @@ import type { Bindings } from "../types";
  *
  * FAILS SOFT: on a DB that predates 0288 the RPC is missing and the sweep
  * logs and returns 0 — a dormant feature must never take the other crons down
- * with it (the po-duty cron's contract, kept).
+ * with it.
  */
 export async function runSupplierClaimSweepCron(env: Bindings): Promise<number> {
   const sb = adminClient(env);

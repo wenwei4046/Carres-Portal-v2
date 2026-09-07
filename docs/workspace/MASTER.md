@@ -285,8 +285,10 @@ honest Work for admitted modules.
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
 - `/api/operation/po-duty` remains only as the response-shape adapter listed in the Purchasing
-  MASTER. Remaining Purchasing screens and the PO-day reminder must move to the Workspace contract
-  before that adapter is deleted.
+  MASTER. Remaining Purchasing screens must move to the Workspace contract before that adapter is
+  deleted. The legacy PO-day `ops_tasks` reminder is retired: each Sales Order that needs a PO is
+  already an authoritative `issue_po` Work projection owned by current PO Duty. PO Days remain
+  Purchasing scheduling facts and never create a second free-text task.
 - `GET /api/operation/work` is now the one server-composed feed for admitted Sales Orders,
   Manual Purchase, Purchase Order supplier-reply and Receiving actions. Purchase Order reply work
   reads the exact current-version send and evidenced supplier-answer facts, resolves PO Duty and
@@ -367,7 +369,8 @@ honest Work for admitted modules.
 6. Replace Issue Tracker's stored owner prose and duplicate `ops_tasks` creation with a governed
    owner rule, versioned current-action result transition and exact Issue deep link; migrate existing
    truth before admitting it to Work.
-7. Retire remaining duplicate generated-task paths after source-by-source proof.
+7. Retire remaining duplicate generated-task paths after source-by-source proof; the PO-day task is
+   complete, while Issue Tracker and the legacy Bell remain governed gaps above.
 8. Replace the legacy Bell queue with durable, idempotent Work-transition receipts and migrate the
    header to those receipts; read/dismiss must never alter Work.
 9. Last, complete and owner-review Dashboard against production data.
