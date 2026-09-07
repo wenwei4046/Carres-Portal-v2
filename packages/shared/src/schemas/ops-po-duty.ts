@@ -6,7 +6,7 @@ import { z } from "zod";
  * Procurement policy: 人分单,货合买 — every PIC owns their customers, but
  * purchase orders are consolidated COMPANY-WIDE and controlled by ONE person
  * per calendar month, auto-rotating through the assignment pool
- * (Jul Shasha → Aug Yu Jun → Sep Khor Yee → …). Management (isOpsManager)
+ * (from 2026-09-07: Yu Jun ↔ Shasha). Management (isOpsManager)
  * can always raise POs and can override the month's holder.
  *
  * Cadence: the PO days and the urgent-bypass window are both SETTINGS since
@@ -30,16 +30,16 @@ export function monthKeyMYT(now: Date = new Date()): string {
  *
  * **THE DUTY MODEL** (`purchasing/MASTER.md` §2.2, Jess 2026-07-24, LOCKED):
  * two rotating duties offset by ONE month over one rota, so the person who
- * ORDERS never RECEIVES — segregation of duties in a three-person office.
+ * ORDERS never RECEIVES — segregation of duties in the current two-person office.
  *
  * ```
  *         PO duty (issue + call)    GRN duty (receive)
- * Jul     Shasha                    Yu Jun
- * Aug     Yu Jun                    Khor Yee
- * Sep     Khor Yee                  Shasha
+ * Sep     Yu Jun                    Shasha
+ * Oct     Shasha                    Yu Jun
+ * Nov     Yu Jun                    Shasha
  * ```
  *
- * Read the table down a column: July's GRN holder is Yu Jun, who is August's
+ * Read the table down a column: September's GRN holder is Shasha, who is October's
  * PO holder. **GRN duty for month M is the rota row of month M+1** — the NEXT
  * month, not the previous one. `work-engine.ts` and the Team panel both said
  * "offset−1" and reached BACKWARDS, which is why the panel printed

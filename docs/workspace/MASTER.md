@@ -76,6 +76,10 @@ no fake `ERP Owner`.
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
 
+Current Operation roster effective 2026-09-07: Yu Jun and Shasha. Khor Yee is departed and may
+appear only in immutable historical actor, employment, assignment or cover evidence; she is never a
+current/future Duty holder, cover, acting person, My Work recipient or Team Work group.
+
 ## 5 · My Work and Team Work
 
 ```text

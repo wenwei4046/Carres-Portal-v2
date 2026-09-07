@@ -159,15 +159,15 @@ describe("grnDutyMonth — the receiver is the NEXT month's PO holder", () => {
     expect(grnDutyMonth("2027-01")).toBe("2027-02");
   });
 
-  it("matches the locked rota table: Jul PO Shasha → Jul GRN = Aug PO Yu Jun", () => {
+  it("matches the current two-person rota: Sep PO Yu Jun → Sep GRN = Oct PO Shasha", () => {
     const rota: Record<string, string> = {
-      "2026-07": "Shasha",
-      "2026-08": "Yu Jun",
-      "2026-09": "Khor Yee",
+      "2026-09": "Yu Jun",
+      "2026-10": "Shasha",
+      "2026-11": "Yu Jun",
     };
-    expect(rota[grnDutyMonth("2026-07")]).toBe("Yu Jun");
-    expect(rota[grnDutyMonth("2026-08")]).toBe("Khor Yee");
+    expect(rota[grnDutyMonth("2026-09")]).toBe("Shasha");
+    expect(rota[grnDutyMonth("2026-10")]).toBe("Yu Jun");
     // And the receiver is never the month's own PO holder.
-    expect(rota[grnDutyMonth("2026-07")]).not.toBe(rota["2026-07"]);
+    expect(rota[grnDutyMonth("2026-09")]).not.toBe(rota["2026-09"]);
   });
 });
