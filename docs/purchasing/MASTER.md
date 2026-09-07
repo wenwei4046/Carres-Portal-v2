@@ -655,6 +655,13 @@ Purchase/PO. When the model changes, the Unit returns to Carres custody, may go 
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
+**Showroom loan practice — OWNER-CONFIRMED 2026-09-07:** Carres temporarily lends showroom
+display sofas to customers waiting for their purchased sofas. This uses the existing Sales Order
+loan journey; Sales Orders owns the loan obligation, Delivery owns its execution and Stock owns
+the exact Unit's custody and return inspection. This confirmation establishes the operating
+practice only; it does not authorise lending supplier-owned display Units. The supplier-consent
+boundary remains unresolved pending owner review.
+
 ### 7.6 Supplier-consignment showroom display
 
 Other sofa suppliers such as Dorsettloft may own display stock.
