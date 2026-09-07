@@ -2414,6 +2414,16 @@ invoice/settlement.
 
 ## 10 · Work, Quick Rail and Calendar
 
+**Showroom action ownership — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** PO Duty checks
+Display Requests, chooses the path, reviews changes/cancellation, sends supplier documents and
+obtains replies. Purchasing Approver retains spending and supplier-commercial-exception approval.
+GRN Duty posts formal Goods Receipts. Site-scoped Showroom Duty confirms showroom arrival,
+condition, handover and installation result under `workspace/MASTER.md` §4 and Stock §12.9.
+Finance/AP's governed rule owns supplier invoice matching and settlement. Each action opens the
+exact owning record in My Work and closes from its recorded result, preserving Primary holder,
+cover and actual actor. No business document gains a universal owner. This approves this ownership
+scope only; the complete Showroom Blueprint remains under review.
+
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
 | Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |

@@ -1243,6 +1243,15 @@ supplier settlement.
 
 ### 12.9 Showroom Stock and Supplier Consignment
 
+**Showroom result ownership — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Site-scoped
+Showroom Duty confirms showroom arrival, condition, handover and installation result. The one
+assignment/cover authority is `workspace/MASTER.md` §4. Confirmation records the observed result
+and actual actor; when an outside installer performs installation, retain that provider separately
+and never claim the confirming showroom person performed it. Arrival and installation remain
+separate results. Physical custody continues to use Stock's existing event authority; the Display
+Request reads those results and never records a duplicate arrival. My Work opens the exact owning
+record and completes from the stored result, with Primary holder/cover/actual actor preserved.
+
 **CURRENT CARRES →** display sofas can live in staff memory, a supplier list or separate showroom
 sheet; Carres-owned, Consignment, sold-awaiting-Delivery and repair/change/collection goods may be
 split; showroom can be treated as a sales address rather than a Stock Site; ownership, holder,
