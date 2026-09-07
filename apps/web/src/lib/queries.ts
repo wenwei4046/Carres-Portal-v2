@@ -3859,7 +3859,6 @@ export function useDeliveryPartners(
  * already exists; none of them can create one.
  */
 export interface SupplierClaimListRow {
-  case_id?: string | null;
   service_case_units?: { stock_item_id: string; unit_code: string; receiving_unit_result_id: string | null }[];
   case_id?: string | null;
   id: string;
