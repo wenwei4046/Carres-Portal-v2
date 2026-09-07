@@ -591,7 +591,7 @@ the storage-foundation blocker above (the signed-in browser's frozen renderer); 
 behaviour — including the real INV number minted inside the rolled-back probe — is
 production-proven.
 
-### BUILD — one money answer: the reader audit, 2026-09-07
+### Deployed — one money answer: the reader audit, 2026-09-07
 
 Every Payment reader of "what this SO still needs" was audited against the §2 model and
 converged on the ONE shared `soRemaining` arithmetic (SO across every live invoice kind;
@@ -631,7 +631,11 @@ in a reader audit. Work's inline combined formula
 (`sales-order-work-source`) and `soRemaining` are the same subtract-once law with the two
 different storage sources above; they unify when the gate does.
 
-### BUILD — the storage facts are immutable, and a case can close, 2026-09-07
+Closure: PR #1145 merged as `94acc54f` and the ERP page and Worker converged that exact
+SHA. The production DOM verification of the fixed readers is owed with the standing
+visual-pass blocker below.
+
+### Deployed — the storage facts are immutable, and a case can close, 2026-09-07
 
 Migration `0439` makes the §6 permanence STRUCTURAL instead of disciplinary: a BEFORE
 UPDATE trigger refuses any change to the witnessed facts, the derived start or the rule
@@ -647,9 +651,10 @@ charge and extra-free refused on the closed case · reopen refused · double clo
 unknown caller refused. Supplier/Carres delay staying unchargeable is structural (a charge
 derives only from a start that REQUIRES the readiness witness); mixed product groups run as
 separate cases per 0436; automatic close on delivery completion is Delivery-side wiring and
-stays a named next step.
+stays a named next step. Closure: migration `0439` is APPLIED (tracker tail confirmed) and
+PR #1147 merged as `7b47adbf`; production converged it.
 
-### BUILD — export, waivers on the report, the visible Reports door, and the §13 convergence, 2026-09-07
+### Deployed — export, waivers on the report, the visible Reports door, and the §13 convergence, 2026-09-07
 
 Reports → Payment gains: **Export Excel** (one sheet per section, computed at export time
 from the same reads — the report still stores nothing); the **Storage waived** section now
@@ -664,6 +669,8 @@ transfer, said on the page); the data, the list read and the API route remain un
 **Recon** keeps its function and gains the governed note (Finance checks the bank outside
 daily Payment; the workspace is scheduled to retire under §13). Destructive retirement of
 either surface still requires its own explicit authorization and has not been performed.
+Closure: PR #1148 merged as `72779db7`; the ERP page, POS page and Worker all reported that
+exact SHA.
 
 ### Stripe business verification — what is proven, and what live keys refuse
 
@@ -676,8 +683,11 @@ unchanged. Creation with the exact amount and expiry is covered by the route tes
 signed-in production walk of the composition. The one unexercised path is a FRESH live
 end-to-end payment: the production Stripe keys are LIVE mode (`cs_live_` sessions on
 record), so a real end-to-end verification would mint a genuinely payable link — refused
-deliberately; a Stripe TEST-mode key set would unlock it and is noted as an owner-side
-option, not requested.
+deliberately, and the rolled-back posting probes verify DATABASE behaviour, not the
+complete provider lifecycle. Provider end-to-end testing is PENDING authorised test-mode
+access (a Stripe test-mode key set); where the governed acceptance requires the full
+provider lifecycle, that access is a requirement, not an option. No live payable link is
+ever created for testing.
 
 ### Verification evidence — the four categories, stated separately
 
@@ -692,15 +702,25 @@ interaction walks exist for the Calendar, Reports and the payment-link door; DB-
 business verification exists for every migration (probes) and the §7 arithmetic; **visual
 inspection and native-200%-zoom acceptance exist for NO slice** — they need a visible
 signed-in browser window, and automation cannot drive the browser-chrome zoom control; the
-Storage journey's authenticated interaction walk is also still owed (frozen renderer).
+Storage journey's authenticated interaction walk is also still owed. The observed tool
+failures, precisely: screenshot capture returned `Cannot take screenshot with 0 width`,
+and JavaScript evaluation timed out after 45s (`Runtime.evaluate` — "renderer may be
+frozen or unresponsive") on the existing tab AND on a freshly created tab, while the
+window was minimised. The likely cause is the minimised window's renderers being
+suspended, but that is inference, not measurement. ONE owner action should clear it:
+bring the signed-in Chrome window to a normal visible size and leave it open; the visual
+pass, the native-zoom pass and the Storage walk run from there.
 
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
-Message assembly with bank routing and Partner contact, storage
-journeys, report export, and the retirement of the rejected Refund/Bank Matching surfaces
-remain unfinished target work (Reports → Payment, the Online link journey and the storage
-case-and-charge chain are built above; report export and the storage-waiver rows await
-their journeys, and the payment-link customer wording awaits its owner-approved template). The complete approved customer
+**The Work/Delivery money-gate convergence is the outstanding BUSINESS-CRITICAL
+integration** — the gate and shared Work still read the legacy C9 storage columns, not the
+canonical §2 obligations (the named gap above); until it ships, a Storage Invoice does not
+hold a DO and a legacy-keyed fee never reaches Payment's arithmetic. Beyond it: message
+assembly with bank routing and Partner contact stays blocked on its owner inputs; the
+payment-link customer wording awaits its owner-approved template; provider end-to-end
+Stripe testing awaits authorised test-mode access; and the destructive retirement of the
+rejected Refund/Bank Matching surfaces awaits its own authorization. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
 it into a `Standard bank transfer` template once approved. The Calendar correction's
