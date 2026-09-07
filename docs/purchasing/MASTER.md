@@ -2364,10 +2364,21 @@ swap, supplier changes model/date.
 **Purpose / source:** return an unsold supplier-owned Unit after approved removal, paired swap,
 supplier collection, overdelivery or claim outcome; no blank `+ New`.
 **Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
+**Columns:** Return No., Supplier, Display Request / Supplier Claim / Consignment Order, Exact Units, Collect From, Collection Date, Handover,
 Paired CO, Work.
 **Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
 combined CO PDF → scan exact Unit and prove collection.
+**Consignment Return presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header shows
+Consignment Return and number, Supplier, the actual linked Display Request / Supplier Claim /
+Consignment Order, and recorded return reason. Collect from shows location and contact name/phone;
+Send to shows supplier location and receiving person's name/phone. Goods going back lists exact
+Unit ID, Model and Condition. Collection shows Expected collection (actual date or Not confirmed),
+Collected Units, exact Units Still waiting, and actual collector/time/handover proof. Document shows
+the standalone Return PDF/version/recipient/sent date, or the linked combined Consignment Order
+PDF for a swap. History follows. Issue alone moves no goods; partial collection leaves the exact
+remainder open. Existing Stock handover authority supplies physical results. Unsold consignment
+return creates no automatic refund or supplier credit. This approves this page presentation,
+not the complete Showroom Blueprint or application implementation.
 **Object/placement:** full-width view; 50/50 only for standalone issue/revision.
 **Exceptions:** supplier collects wrong/partial Unit, Unit condition disputed, date changed,
 unidentified legacy Unit.
