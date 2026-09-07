@@ -262,6 +262,26 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRule[] = [
   {
+    key: "manual_purchase.approve",
+    module: "purchasing",
+    trigger: "a Manual Purchase request requires a decision and has none",
+    owner: "the configured Purchasing approver duty holder",
+    ownerRule: "purchasing_approver",
+    action: "Approve purchase",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "a stored approval or refusal decision on the purchase request",
+  },
+  {
+    key: "manual_purchase.issue_po",
+    module: "purchasing",
+    trigger: "approved Manual Purchase demand remains uncovered or its current PO version has not reached the supplier",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Issue PO",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "confirmed-sent evidence for every linked current PO version (po_sends)",
+  },
+  {
     key: "purchasing.confirm_ready_date",
     module: "purchasing",
     trigger: "an open PO owing goods with no standing ready/arrival promise",
