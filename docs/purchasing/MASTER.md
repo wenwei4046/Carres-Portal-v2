@@ -2199,8 +2199,32 @@ or movement and installation of an existing display Unit;
 Purchasing chooses the commercial path.
 **Optional remarks — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The Display Request form
 includes an optional Remarks field for additional explanation when needed. It supplements the
-request's structured facts and is not required for submission. This approves the optional field,
-not the remaining proposed question flow or request-link capability.
+request's structured facts and is not required for submission.
+
+**Question-led form and requester link — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+The requester chooses Showroom and New display / Move / Install / Swap / Remove, finds the Unit or
+model (or uses Not sure with photos/video), and supplies quantity. Movement reveals Collect from
+and Send to. Installation needed is Yes / No / Not sure; installation questions cover Floor,
+Access (Lift / Stairs / Not sure) and Installer arranged (Yes / No / Not sure). Install requests
+must expose their installation questions. Needed Date allows an actual date or Not decided.
+Known item/Site facts prefill; ask only missing questions. Photos/videos and optional Remarks sit
+below the questions, before Submit request. Uncertainty remains explicit and creates a specific
+check; it never silently becomes No or a confirmed arrangement.
+
+Operations may prepare a draft and use Request details to copy/send its link to the requester.
+The requester completes and submits that same record. Copy request link also opens an existing
+request for progress and missing information. Sign-in and record permissions apply; opening or
+sending the link neither submits nor approves the request. Preserve draft preparer, requester and
+actual actor separately. The initial door may be a simple page in the existing portal; future
+Sales Portal entry uses the same record and authority, not another form/store or status engine.
+
+**Contact and receiving person — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester
+must supply who the team should contact and who will receive the goods. Capture contact name and
+phone number and receiving person's name and phone number; allow the same person to serve both
+without repeated entry. These are operational contact facts, not the Work action owner or an
+approval assignment. The intended receiver is not proof of receipt: actual receiving records
+retain who physically received the goods. Supplier decisions and approvals stay in Purchasing.
+This approves this form/link/contact scope only; the complete Showroom Blueprint remains under review.
 **Existing display movement and installation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
 Show the requested result first, including collection place, destination and installation floor
 when relevant. PO Duty checks the exact Unit/model and existing source, verifies collection and
