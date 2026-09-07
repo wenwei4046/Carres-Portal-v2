@@ -3,12 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
   ATTENTION_REASONS,
-  ATTENTION_REASON_LABEL,
   availabilityLabel,
   categoryKeyOf,
   changedWithin,
   CHANGED_SCOPES,
-  CHANGED_SCOPE_LABEL,
   hasAttention,
   isCurrentUnit,
   isRailFiltered,
@@ -28,42 +26,29 @@ import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
+import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
+import Button from "@/components/kit/Button";
 
-/**
- * THE STOCK REGISTER — Warehouse's one current listing of controlled Units.
- * CARD-2026-08-20-stock-register · Stock MASTER §7 · UI MASTER §6.7.
- *
- * ── THE DESTINATION IS `Inventory` ──────────────────────────────────────────
- * The owner-approved 2026-09-01 Blueprint names the Warehouse master Register
- * `Inventory` (Stock MASTER §2; COPY-STANDARD unbanned the word for exactly
- * this destination). Not `On hand`, not `Stock Units` — `On hand` described a
- * QUANTITY on a shelf; this page lists exact Units and answers "which one,
- * where, who has it, can it be used". The `?tab=stock-onhand` address is
- * unchanged (CARD-2026-09-01-warehouse-01-sidebar renamed the door, not the
- * page).
- *
- * ── READ-ONLY, DELIBERATELY ─────────────────────────────────────────────────
- * There is no row editor, no status selector, no Add stock, no Delete and no
- * reservation control anywhere on this page. Choosing, binding, substituting and
- * releasing an exact Unit are the SALES ORDER's decisions (Stock MASTER §4), and
- * 0366 removed the write policy that used to let a page reach around them. A
- * Register finds things; the Unit page shows one; work lives in Work.
- *
- * ── WHAT THE FOOTER SAYS, AND WHY IT IS TWO NUMBERS ─────────────────────────
- * `85 you can promise · 893 pieces you cannot`. Both are true and they are
- * different facts: `ops_stock_items_bulk_never_reserved` (0366) forbids a
- * qty > 1 record from ever being reserved, so the 893 pillows on the floor can
- * be sold in principle but no Sales Order can name one of them. One number here
- * would either hide 893 real pillows or promise 893 that cannot be promised.
- *
- * ── THE RAIL IS DRAWN FROM FACTS THAT EXIST ─────────────────────────────────
- * Card §3 lists seven sections. Site and Ownership render only when the data
- * holds more than one value — a filter offering one choice is not a filter, and
- * today there is one Site and no consignment Unit. Five of the nine Attention
- * reasons have no column behind them at all and are recorded as a gap in
- * docs/stock/MASTER.md rather than drawn as chips that cannot answer anything.
- * `03-page-patterns.md:149` bans a control that does nothing.
- */
+/** Inventory is the current Unit Register. Its 240px rail narrows the same
+ * authority; source facts are read-only. Sales Order alone owns reservation. */
+const STOCK_VIEWS = [
+  ["all", "All stock"], ["reserved", "Reserved for Sales Orders"],
+  ["ready", "Ready Stock"], ["display", "Showroom Display"],
+  ["service", "Service Case"], ["checking", "Needs checking"],
+] as const;
+type InventoryView = typeof STOCK_VIEWS[number][0] | "history";
+function matchesView(u: StockRegisterUnit, view: InventoryView) {
+  if (view === "history") return !isCurrentUnit(u);
+  if (!isCurrentUnit(u)) return false;
+  switch (view) {
+    case "reserved": return u.availability === "reserved";
+    case "ready": return u.availability === "available" && u.qty === 1;
+    case "display": return u.condition === "exhibition" || u.purchasePurpose === "showroom_display";
+    case "service": return u.purchasePurpose === "service_case";
+    case "checking": return ATTENTION_REASONS.some((r) => hasAttention(u, r));
+    default: return true;
+  }
+}
 
 const CATEGORY_LABEL: Record<string, string> = {
   mattress: "Mattress",
@@ -98,6 +83,24 @@ export default function WarehouseStockRegister() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { data, isLoading, isError, error, refetch } = useStockRegister();
+  const [railOpen, setRailOpen] = useState(true);
+  const requestedView = params.get("view");
+  const view: InventoryView = params.get("history") === "1" || requestedView === "history" ? "history"
+    : STOCK_VIEWS.some(([key]) => key === requestedView) ? requestedView as InventoryView : "all";
+  const holder = params.get("holder");
+  const sourceReady = !!data && !isLoading && !isError;
+  function setView(next: InventoryView) {
+    const updated = new URLSearchParams(params);
+    updated.set("tab", "stock-onhand");
+    updated.delete("history");
+    if (next === "all") updated.delete("view"); else updated.set("view", next);
+    setParams(updated, { replace: true });
+  }
+  function setHolder(next: string) {
+    const updated = new URLSearchParams(params);
+    if (holder === next) updated.delete("holder"); else updated.set("holder", next);
+    setParams(updated, { replace: true });
+  }
 
   /** The rail lives in the URL so a narrowed view can be sent to a colleague
    *  and comes back the same (Card §6 — deep-link behaviour). */
@@ -110,12 +113,13 @@ export default function WarehouseStockRegister() {
       category: params.get("category"),
       changed: (params.get("changed") as ChangedScope | null) ?? null,
       query: "",
-      showEnded: params.get("history") === "1",
+      showEnded: view === "history",
     }),
-    [params],
+    [params, view],
   );
 
   const [search, setSearch] = useState("");
+  const [gridRevision, setGridRevision] = useState(0);
   const now = useMemo(() => new Date(), []);
   const allUnits = useMemo(() => data?.units ?? [], [data]);
 
@@ -129,12 +133,12 @@ export default function WarehouseStockRegister() {
   }
 
   function clearAll() {
-    setParams(new URLSearchParams(), { replace: true });
+    setParams(new URLSearchParams({ tab: "stock-onhand" }), { replace: true });
     setSearch("");
+    setGridRevision((revision) => revision + 1);
   }
 
-  /** Section counts are computed against everything the section does NOT filter,
-   *  so a count never lies about what clicking it would show. */
+  /** Facet counts describe the whole current Register before narrowing it. */
   const currentUnits = useMemo(
     () => allUnits.filter((u) => (sel.showEnded ? true : isCurrentUnit(u))),
     [allUnits, sel.showEnded],
@@ -167,10 +171,19 @@ export default function WarehouseStockRegister() {
     return { availability, attention, site, ownership, category, changed };
   }, [currentUnits, now]);
 
-  const rows = useMemo(
-    () => applyRailSelection(allUnits, { ...sel, query: search }, now),
-    [allUnits, sel, search, now],
-  );
+  const holderRows = useMemo(() => allUnits.filter((u) => !holder ||
+    (holder === "not-recorded" ? !u.holderPartyId : u.holderPartyId === holder)), [allUnits, holder]);
+  const rows = useMemo(() => applyRailSelection(
+    view === "all" ? holderRows : holderRows.filter((u) => matchesView(u, view)),
+    { ...sel, query: search }, now,
+  ), [holderRows, view, sel, search, now]);
+  const holders = useMemo(() => {
+    const result = new Map<string, string>();
+    for (const u of allUnits.filter(isCurrentUnit)) {
+      result.set(u.holderPartyId ?? "not-recorded", u.holderName ?? "Not recorded");
+    }
+    return [...result].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [allUnits]);
 
   const categoryKeys = useMemo(() => {
     const present = [...counts.category.keys()].filter((k) => k !== NO_CATALOG_KEY);
@@ -199,13 +212,13 @@ export default function WarehouseStockRegister() {
         label: "Product",
         minWidth: 220,
         sortable: true,
-        searchValue: (u) => u.sku,
-        exportValue: (u) => u.sku,
+        searchValue: (u) => `${u.productName ?? ""} ${u.sku}`,
+        exportValue: (u) => u.productName ?? u.sku,
         chooserGroup: "Unit",
         accessor: (u) => (
           <div className="min-w-0">
-            <div className="truncate text-body text-base-900" title={u.sku}>
-              {u.sku}
+            <div className="truncate text-body text-base-900" title={u.productName ?? u.sku}>
+              {u.productName ?? u.sku}
             </div>
             {/* An inline second line is the ONE exception to a single-line row
                 (Constitution §2) — and it earns it: a bulk record is not one
@@ -220,7 +233,7 @@ export default function WarehouseStockRegister() {
       },
       {
         key: "availability",
-        label: "Availability",
+        label: "Stock use",
         width: 150,
         sortable: true,
         filterType: "enum",
@@ -236,15 +249,15 @@ export default function WarehouseStockRegister() {
       },
       {
         key: "site",
-        label: "Where",
+        label: "Site",
         width: 180,
         sortable: true,
         filterType: "enum",
-        filterValue: (u) => u.siteName ?? "—",
+        filterValue: (u) => u.siteName ?? "Not recorded",
         exportValue: (u) => u.siteName ?? "",
         chooserGroup: "Place",
         accessor: (u) => (
-          <span className="truncate text-meta text-base-800">{u.siteName ?? "—"}</span>
+          <span className="truncate text-meta text-base-800">{u.siteName ?? "Not recorded"}</span>
         ),
       },
       {
@@ -297,6 +310,7 @@ export default function WarehouseStockRegister() {
       {
         key: "attention",
         label: "Needs checking",
+        defaultHidden: true,
         minWidth: 190,
         chooserGroup: "Unit",
         exportValue: (u) => attentionSentence(u) ?? "",
@@ -310,26 +324,37 @@ export default function WarehouseStockRegister() {
               {line}
             </span>
           ) : (
-            <span className="text-meta text-base-300">—</span>
+            <span className="text-meta text-base-300">Not recorded</span>
           );
         },
       },
       {
         key: "source",
-        label: "Source",
+        label: "PO No",
         width: 160,
         sortable: true,
-        defaultHidden: true,
         searchValue: (u) => u.poNo ?? "",
         exportValue: (u) => u.poNo ?? "",
         chooserGroup: "Source",
         accessor: (u) =>
           u.poNo ? (
-            <span className="truncate font-mono text-meta text-base-700">{u.poNo}</span>
+            <button className="truncate font-mono text-meta text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/procurement?po=${encodeURIComponent(u.poNo!)}`)}>{u.poNo}</button>
           ) : (
-            <span className="text-meta text-base-400">—</span>
+            <span className="text-meta text-base-400">Not recorded</span>
           ),
       },
+      {
+        key: "so", label: "SO No", width: 150, sortable: true, chooserGroup: "Source",
+        searchValue: (u) => u.reservedRef ?? "", exportValue: (u) => u.reservedRef ?? "",
+        accessor: (u) => u.soldOrderId && u.reservedRef
+          ? <button className="font-mono text-kit-blue-11 hover:underline" onClick={() => navigate(`/operation/orders/${encodeURIComponent(u.soldOrderId!)}`)}>{u.reservedRef}</button>
+          : <span>{u.reservedRef ?? "Not recorded"}</span>,
+      },
+      ...([ ["soDate", "SO date"], ["poDate", "PO date"], ["expectedArrival", "Expected arrival"], ["lastVerifiedAt", "Last verified"] ] as const).map(([key, label]): DataGridColumn<StockRegisterUnit> => ({
+        key, label, width: 150, sortable: true, filterType: "date", chooserGroup: "Dates",
+        dateValue: (u) => u[key] ?? null, exportValue: (u) => u[key] ?? "",
+        accessor: (u) => u[key] ? fmtDate(u[key]!) : "Not recorded",
+      })),
       {
         key: "supplier",
         label: "Supplier",
@@ -340,12 +365,13 @@ export default function WarehouseStockRegister() {
         exportValue: (u) => u.supplier ?? "",
         chooserGroup: "Source",
         accessor: (u) => (
-          <span className="truncate text-meta text-base-700">{u.supplier ?? "—"}</span>
+          <span className="truncate text-meta text-base-700">{u.supplier ?? "Not recorded"}</span>
         ),
       },
       {
         key: "dateIn",
-        label: "Came in",
+        label: "Received date",
+        defaultHidden: true,
         width: 130,
         sortable: true,
         filterType: "date",
@@ -353,7 +379,7 @@ export default function WarehouseStockRegister() {
         exportValue: (u) => u.dateIn ?? "",
         chooserGroup: "Dates",
         accessor: (u) => (
-          <span className="text-meta text-base-700">{u.dateIn ? fmtDate(u.dateIn) : "—"}</span>
+          <span className="text-meta text-base-700">{u.dateIn ? fmtDate(u.dateIn) : "Not recorded"}</span>
         ),
       },
       {
@@ -374,11 +400,11 @@ export default function WarehouseStockRegister() {
           ),
       },
     ],
-    [],
+    [navigate],
   );
 
   const totals = summariseRegister(rows);
-  const filtered = isRailFiltered({ ...sel, query: search });
+  const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -388,140 +414,40 @@ export default function WarehouseStockRegister() {
         docTitle="Inventory · Warehouse — Carres"
         destinationHeader
       />
-      <div className="flex min-h-0 flex-1 gap-4 p-2" data-testid="stock-register">
-        {/* ── LEFT FILTER RAIL (Card §3) ─────────────────────────────────── */}
-        <aside
-          className="w-[196px] shrink-0 space-y-3 overflow-y-auto"
-          data-testid="stock-rail"
-          aria-label="Filter stock"
-        >
-          {!isLoading && !isError && data ? <>
-          <RailButton
-            label="All stock"
-            n={allUnits.filter(isCurrentUnit).length}
-            active={!filtered}
-            onClick={clearAll}
-            testId="rail-all-stock"
-          />
-
-          <RailSection title="Needs checking">
-            {ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).length === 0 ? (
-              <p className="px-1 text-meta text-base-400">Nothing needs checking</p>
-            ) : (
-              ATTENTION_REASONS.filter((r) => (counts.attention.get(r) ?? 0) > 0).map((r) => (
-                <RailButton
-                  key={r}
-                  label={ATTENTION_REASON_LABEL[r]}
-                  n={counts.attention.get(r) ?? 0}
-                  active={sel.attention === r}
-                  tone="warning"
-                  onClick={() => setRail("attention", r)}
-                />
-              ))
-            )}
-          </RailSection>
-
-          <RailSection title="Availability">
-            {UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => (
-              <RailButton
-                key={a}
-                label={availabilityLabel(a)}
-                n={counts.availability.get(a) ?? 0}
-                active={sel.availability === a}
-                onClick={() => setRail("availability", a)}
-              />
-            ))}
-          </RailSection>
-
-          {/* A filter offering ONE choice is not a filter. Today there is one
-              Site and one ownership value, so neither section is drawn. Each
-              appears by itself the moment a second value exists. */}
-          {counts.site.size > 1 ? (
-            <RailSection title="Where">
-              {[...counts.site.entries()].map(([id, v]) => (
-                <RailButton
-                  key={id}
-                  label={v.name}
-                  n={v.n}
-                  active={sel.site === id}
-                  onClick={() => setRail("site", id)}
-                />
-              ))}
-            </RailSection>
-          ) : null}
-
-          {counts.ownership.size > 1 ? (
-            <RailSection title="Ownership">
-              {[...counts.ownership.entries()].map(([o, n]) => (
-                <RailButton
-                  key={o}
-                  label={UNIT_OWNERSHIP_LABEL[o as keyof typeof UNIT_OWNERSHIP_LABEL] ?? o}
-                  n={n}
-                  active={sel.ownership === o}
-                  onClick={() => setRail("ownership", o)}
-                />
-              ))}
-            </RailSection>
-          ) : null}
-
-          <RailSection title="Category">
-            {categoryKeys.map((c) => (
-              <RailButton
-                key={c}
-                label={CATEGORY_LABEL[c] ?? c}
-                n={counts.category.get(c) ?? 0}
-                active={sel.category === c}
-                onClick={() => setRail("category", c)}
-              />
-            ))}
-            {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? (
-              /* NOT a category, and it never folds into Accessory: "we do not
-                 know what this is" is a different fact from "this is an
-                 accessory" (Card §3 — an honest bucket, Catalog was asked). */
-              <RailButton
-                label={NO_CATALOG_LABEL}
-                n={counts.category.get(NO_CATALOG_KEY) ?? 0}
-                active={sel.category === NO_CATALOG_KEY}
-                onClick={() => setRail("category", NO_CATALOG_KEY)}
-              />
-            ) : null}
-          </RailSection>
-
-          <RailSection title="Changed">
-            {CHANGED_SCOPES.map((s) => (
-              <RailButton
-                key={s}
-                label={CHANGED_SCOPE_LABEL[s]}
-                n={counts.changed.get(s) ?? 0}
-                active={sel.changed === s}
-                onClick={() => setRail("changed", s)}
-              />
-            ))}
-            {[...counts.changed.values()].every((n) => n === 0) ? (
-              <p className="px-1 pt-1 text-meta text-base-400">
-                No Unit has moved yet — this fills in as goods are received,
-                counted and handed over.
-              </p>
-            ) : null}
-          </RailSection>
-
-          <RailSection title="History">
-            {/* Delivered and ended Units are a DESTINATION, not a filter mixed
-                into today's shelf (Card §1). Exact-ID search finds them either
-                way. */}
-            <RailButton
-              label="Delivered / history"
-              n={allUnits.filter((u) => !isCurrentUnit(u)).length}
-              active={sel.showEnded}
-              onClick={() => setRail("showEnded", sel.showEnded ? null : "1")}
-              testId="rail-history"
-            />
-          </RailSection>
+      <div className="flex min-h-0 flex-1" data-testid="stock-register">
+        {railOpen ? <FilterRail testId="stock-rail" onHide={() => setRailOpen(false)}>
+          <FilterRailGroup title="Stock">
+            {STOCK_VIEWS.map(([key, label]) => <FilterRailRow key={key} testId={key === "all" ? "rail-all-stock" : `rail-${key}`}
+              label={label} active={view === key} count={sourceReady ? allUnits.filter((u) => matchesView(u, key)).length : undefined}
+              onClick={() => key === "all" ? clearAll() : setView(key)} />)}
+          </FilterRailGroup>
+          {sourceReady ? <>
+            <FilterRailGroup title="Who has it">{holders.map(([id, label]) => <FilterRailRow key={id} testId={`rail-holder-${id}`}
+              label={label} active={holder === id} count={allUnits.filter((u) => isCurrentUnit(u) && (u.holderPartyId ?? "not-recorded") === id).length}
+              onClick={() => setHolder(id)} />)}</FilterRailGroup>
+            <FilterRailGroup title="Ownership">{[...counts.ownership].map(([id, count]) => <FilterRailRow key={id} testId={`rail-ownership-${id}`}
+              label={UNIT_OWNERSHIP_LABEL[id as keyof typeof UNIT_OWNERSHIP_LABEL] ?? id} count={count} active={sel.ownership === id}
+              onClick={() => setRail("ownership", id)} />)}</FilterRailGroup>
+            <FilterRailGroup title="Site">{[...counts.site].map(([id, item]) => <FilterRailRow key={id} testId={`rail-site-${id}`}
+              label={item.name} count={item.n} active={sel.site === id} onClick={() => setRail("site", id)} />)}</FilterRailGroup>
+            <FilterRailGroup title="Stock use">{UNIT_AVAILABILITY.filter((a) => a !== "ended").map((a) => <FilterRailRow key={a} testId={`rail-availability-${a}`}
+              label={availabilityLabel(a)} count={counts.availability.get(a) ?? 0} active={sel.availability === a} onClick={() => setRail("availability", a)} />)}</FilterRailGroup>
+            <FilterRailGroup title="Category">{categoryKeys.map((key) => <FilterRailRow key={key} testId={`rail-category-${key}`}
+              label={CATEGORY_LABEL[key] ?? key} count={counts.category.get(key) ?? 0} active={sel.category === key} onClick={() => setRail("category", key)} />)}
+              {(counts.category.get(NO_CATALOG_KEY) ?? 0) > 0 ? <FilterRailRow testId="rail-no-catalog" label={NO_CATALOG_LABEL}
+                count={counts.category.get(NO_CATALOG_KEY)} active={sel.category === NO_CATALOG_KEY} onClick={() => setRail("category", NO_CATALOG_KEY)} /> : null}
+            </FilterRailGroup>
           </> : null}
-        </aside>
+          <FilterRailGroup title="History"><FilterRailRow testId="rail-history" label="Delivered / history" active={view === "history"}
+            count={sourceReady ? allUnits.filter((u) => !isCurrentUnit(u)).length : undefined} onClick={() => setView("history")} /></FilterRailGroup>
+        </FilterRail> : null}
 
         {/* ── THE REGISTER ───────────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-1 flex-col" data-testid="register-column">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="register-column">
+          {!railOpen || filtered ? <div className="flex shrink-0 gap-2 pb-2">
+            {!railOpen ? <Button icon="filter" onClick={() => setRailOpen(true)}>Show filters</Button> : null}
+            {filtered ? <Button onClick={clearAll}>Clear filters</Button> : null}
+          </div> : null}
           {isError ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
               <p className="text-body text-base-700">Stock could not be loaded</p>
@@ -538,10 +464,11 @@ export default function WarehouseStockRegister() {
             </div>
           ) : (
             <DataGrid<StockRegisterUnit>
+              key={gridRevision}
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.warehouse.stockRegister.v1"
+              storageKey="carres.warehouse.inventory.v2"
               rowKey={(u) => u.id}
               exportName="Inventory"
               searchPlaceholder="Unit ID, product, PO, SO or supplier…"
@@ -588,49 +515,4 @@ function attentionSentence(u: StockRegisterUnit): string | null {
   if (u.condition === "damaged") return "Damaged";
   if (!u.poNo) return "No purchase order";
   return null;
-}
-
-function RailSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded border border-base-200 bg-white p-2">
-      <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-base-500">
-        {title}
-      </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
-    </div>
-  );
-}
-
-function RailButton({
-  label,
-  n,
-  active,
-  onClick,
-  tone,
-  testId,
-}: {
-  label: string;
-  n: number;
-  active: boolean;
-  onClick: () => void;
-  tone?: "warning";
-  testId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-testid={testId}
-      className={[
-        "flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-meta",
-        active ? "bg-primary/10 font-semibold text-primary" : "text-base-700 hover:bg-hovertint",
-      ].join(" ")}
-    >
-      <span className="truncate">{label}</span>
-      <span className={tone === "warning" && n > 0 && !active ? "text-kit-amber-11" : "text-base-500"}>
-        {n}
-      </span>
-    </button>
-  );
 }

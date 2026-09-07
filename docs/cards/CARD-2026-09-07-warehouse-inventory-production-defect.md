@@ -1,8 +1,8 @@
-# WAREHOUSE — INVENTORY: restore the production read contract
+# WAREHOUSE — INVENTORY: build the Register and restore its production source
 
-**Status:** production database apply awaits the explicit go recorded in Card 02.
-Code and regression coverage are in PR #1149; delivery requires its checks and the
-governed apply below. This card does not claim the production defect is closed.
+**Status:** owner confirmed BUILD and production repair. Existing migration applied
+and production Inventory loads real stock. The expanded page is in PR #1149;
+its final CI and deployment proof are still required.
 
 ## Scope and authority
 
@@ -19,10 +19,10 @@ Staff & Duties, departed staff history remains. No staff or NETS assignment is
 hard-coded by this change.
 
 Reviewed the uncommitted Inventory component and tests in worktree `76f2`.
-They introduce a date strip, new saved views, fixed holder buckets and Counts &
-Adjustments. Those are beyond this production-defect scope and some conflict
-with the current Register ruling. They remain untouched in their original
-worktree. Draft PR #1005 is a superseded broad candidate, not an apply source.
+They introduce a date strip, saved views, fixed holder buckets and Counts &
+Adjustments. This implementation follows the current 240px Register ruling and
+reads governed holder rows. It does not adopt the date strip, fixed partners or
+a fabricated empty Counts register. The original worktree remains untouched. Draft PR #1005 is a superseded broad candidate, not an apply source.
 
 ## Production evidence, 7 September 2026
 
@@ -72,9 +72,18 @@ owner-derived names, preserves the Unit authority and last physical event, and
 keeps the view caller-secured and SELECT-only. No new migration is required.
 Exact committed file SHA-256: `656fa52c9d0683471faa44062fdf8409a700e0d77a83b17503671a12cc268379`.
 
-UI: only render rail counts and empty assertions when the query has data and has
-not failed. The rail's footprint, destination header, navigation, table and retry
-remain in place. A refresh failure also withdraws cached success claims. A real
+UI: a shared 240px Filter Rail and Inventory Register, without a Calendar or date
+strip. Saved views cover all stock, Sales Order reservations, eligible exact-Unit
+Ready Stock, Showroom Display, Service Case, Needs checking and history. Holder,
+Site, ownership, stock use and Catalog category are independent facts. Filters
+combine and persist in the URL; hiding the rail preserves selection; clearing
+filters stays in Inventory. Product names, PO/SO dates and expected arrival read
+the existing Catalog/Purchasing/Sales authorities. PO and SO links open their
+owning records. Missing facts remain explicit, and metadata errors fail the read
+instead of becoming invented absence. No stock writer or allocation rule is added.
+
+Only render rail counts and empty assertions when the query has data and has
+not failed. A refresh failure also withdraws cached success claims. A real
 successful empty response still shows zero. An initial offline/paused request also
 remains loading until data exists; it cannot print the empty Register sentence.
 
@@ -87,16 +96,31 @@ event sequence and read-only grants. Mapping mocks no longer claim to describe
 the measured live schema. UI tests cover loading, failure, retry, refresh failure
 with cached data, and genuine zero stock.
 
-## Governed production step
+## Production apply, 2026-09-07 11:21 UTC
 
-After explicit approval, rehearse the exact committed migration inside a rolled-
-back transaction with `scripts/verify-inventory-read-surface.sql`, then apply the
-exact file transactionally and reconcile the tracker by its full name and exact
-source. Do not use a broad migration push because historical number collisions
-are known. Repeat the read-only assertion, deploy the reviewed code through the
-normal PR/CI path, and prove authenticated Inventory list, Unit detail, real counts
-and retry. Record the resulting database/deploy evidence before marking this card
-or stock/MASTER production-complete.
+The owner explicitly approved continuing the complete page and production fix.
+Rehearsed the exact committed file plus `scripts/verify-inventory-read-surface.sql`
+inside BEGIN/ROLLBACK; all assertions passed. The durable transaction first
+asserted the new column and tracker row were still absent, proving the rehearsal
+rolled back. It then applied the unchanged file, repeated the assertions and
+inserted the full-name tracker record with the exact file in `statements[1]`.
+
+Post-commit read-only assertions passed: 221 authority rows = 221 Register rows,
+221 Site names, 1 holder name, no identity/name/availability/quantity mismatches,
+negative control detects all rows, caller security and SELECT-only grants intact.
+Tracker version `20260907112136`, full name
+`0417_the_register_names_the_site_and_the_holder`; database SHA-256 of its stored
+source is `656fa52c9d0683471faa44062fdf8409a700e0d77a83b17503671a12cc268379`,
+matching the immutable repository file. No Unit row was changed.
+
+Authenticated production Inventory now loads: 181 current records and 40 history
+records, with real Site names. The expanded page still needs the normal final
+PR/CI merge, deployment, and authenticated UI verification.
+
+Counts/Differences/Adjustments remain the separately documented unbuilt business
+transaction in Stock MASTER §14.1 G6. This page does not claim that transaction
+exists by drawing a dummy empty table. Likewise no invented Work or staff owner
+is attached to a Unit.
 
 ## Verification log
 
@@ -112,4 +136,4 @@ or stock/MASTER production-complete.
   must pass the complete gate before merge.
 - Final web tests, full-suite, type checks, production build and bundle-secret
   verification are recorded on [PR #1149](https://github.com/wenwei4046/Carres-Portal-v2/pull/1149).
-  CI is required; production SQL and deployment proof remain separate gates.
+  The previous PR head passed all CI gates. Final page CI and deployment proof remain required.

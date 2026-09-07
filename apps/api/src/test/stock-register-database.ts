@@ -22,8 +22,10 @@ export async function stockRegisterDatabase() {
   const db = new PGlite();
   await db.exec(`
     create role authenticated; create role anon;
-    create table public.product_models (id text primary key, category text);
-    create table public.product_skus (sku text, model_id text);
+    create table public.product_models (id text primary key, category text, name text);
+    create table public.product_skus (sku text, model_id text, variant text);
+    create table public.purchase_orders (id text primary key, placed_at timestamptz, eta_date date, purpose text);
+    create table public.orders (id text primary key, placed_at timestamptz);
     create table public.warehouses (id text primary key, name text);
     create table public.stock_operating_parties (id text primary key, name text);
     create table public.ops_stock_items (
@@ -40,6 +42,11 @@ export async function stockRegisterDatabase() {
       values ('unit-1','id-contract1','fixture-sku','site-1','party-1','carres_owned','free','damaged',false,1),
              ('unit-2','id-contract2','fixture-sku',null,null,'carres_owned','sold','new',false,1);
     insert into stock_unit_events (unit_id,event,event_at,seq) values ('unit-1','older','2026-09-01',1), ('unit-1','latest','2026-09-01',2);
+    insert into product_models values ('model-1','sofa','Fixture sofa');
+    insert into product_skus values ('fixture-sku','model-1','Three seater');
+    insert into purchase_orders values ('PO-fixture','2026-08-01T00:00:00Z','2026-09-09','service_case');
+    insert into orders values ('order-1','2026-08-02T00:00:00Z');
+    update ops_stock_items set po_no='PO-fixture', sold_order_id='order-1' where id='unit-1';
   `);
   const authority = migration("0366_the_unit_register_is_the_one_inventory_authority");
   await db.exec(statement(authority, "create or replace function public.stock_sku_category", "$$;"));

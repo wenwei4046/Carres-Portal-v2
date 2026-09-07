@@ -49,6 +49,12 @@ export interface StockRegisterUnit {
    *  lineage ledger began — an honest fact, not a missing one. */
   lastEventAt: string | null;
   lastEvent: string | null;
+  /** Read-only facts joined from Catalog, Purchasing and Sales Order. */
+  productName?: string | null;
+  poDate?: string | null;
+  soDate?: string | null;
+  expectedArrival?: string | null;
+  purchasePurpose?: string | null;
 }
 
 /**
@@ -231,7 +237,7 @@ export function isRailFiltered(sel: StockRailSelection): boolean {
 export function matchesRegisterQuery(u: StockRegisterUnit, rawQuery: string): boolean {
   const q = rawQuery.trim().toLowerCase();
   if (q === "") return true;
-  return [u.unitCode, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName]
+  return [u.unitCode, u.productName, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName]
     .filter(Boolean)
     .some((v) => (v as string).toLowerCase().includes(q));
 }

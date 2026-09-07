@@ -42,6 +42,7 @@ import {
   unitLifecycleOutcome,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
+import { stockRegisterContext } from "../../lib/stock-register-context";
 import { attemptDeliveryOrderIssue } from "../../lib/delivery-order-issue";
 import { myDuties } from "../../lib/duties";
 import { skuCategories } from "../../lib/sku-categories";
@@ -233,7 +234,11 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
     } satisfies StockRegisterUnit;
   });
 
-  return c.json({ units, total: units.length });
+  try {
+    return c.json({ units: await stockRegisterContext(sb, units), total: units.length });
+  } catch (error) {
+    throw mapErr(error as { code?: string; message?: string });
+  }
 });
 
 /**
