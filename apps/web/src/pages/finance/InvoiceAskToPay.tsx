@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
-import { invoiceNeeded } from "@carres/shared/payment-invoice-register";
+import { soRemaining } from "@carres/shared/payment-invoice-register";
 import { SectionCard } from "@/components/SectionPanel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -35,13 +35,16 @@ import { toast } from "sonner";
  *  approved Important Notes — swaps in once its owner-approved wording
  *  arrives; the bottom rules are never invented or shortened here.
  */
-export default function InvoiceAskToPay({ invoice, tone, onClose }: {
+export default function InvoiceAskToPay({ invoice, rows, tone, onClose }: {
   invoice: InvoiceRegisterRow;
+  /** The SO's sibling register rows — the {outstanding} fact the customer
+   *  reads is the SO across every live invoice kind, storage included. */
+  rows: InvoiceRegisterRow[];
   /** reminder before the deadline · chase once late (the shared clock decides). */
   tone: "reminder" | "chase";
   onClose: () => void;
 }) {
-  const money = invoiceNeeded(invoice);
+  const money = soRemaining(rows, invoice.order_id);
   const order = invoice.orders;
   // The structured facts every template's protected fields fill from.
   const facts = useMemo(() => {
