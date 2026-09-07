@@ -2189,6 +2189,14 @@ replacement offered.
 
 **Purpose / source:** showroom staff request a new model, replacement, removal or display change;
 Purchasing chooses the commercial path.
+**Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
+Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
+next Office working day after submission, PO Duty records the first decision and its linked
+continuation, or requests the specific missing facts. Requesting missing facts completes that
+initial response only; the unresolved display decision remains open. This is an action owner,
+not a universal owner of the Display Request. History preserves the normal Primary holder,
+dated cover and actual actor. Paid-buy approval and governed commercial exceptions remain with
+Purchasing Approver; choosing Buy does not approve the Manual Purchase or issue a PO.
 **Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
 **Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
 Date, Purchasing Decision, Source Order, Work.
@@ -2258,7 +2266,8 @@ invoice/settlement.
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
 | Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
-| Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
+| Showroom display request facts missing | Requester under the shared owner rule | `Record the current Unit and requested model` | Required request facts exist |
+| Submitted Display Request needs a Purchasing decision | PO Duty / governed Buddy cover through the Shared Duty Resolver | Choose Buy, Consignment, Swap, Remove or No Action; initial response follows §9.8 | Recorded decision and linked continuation; a specific missing-facts request satisfies only the initial-response obligation |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
 | Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |
