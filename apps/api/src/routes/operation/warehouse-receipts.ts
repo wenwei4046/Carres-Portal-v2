@@ -1,13 +1,18 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  buildGrnRegisterView,
   goodsCategoryWordOf,
+  poSupplierDeliveryDateOf,
   receiptCategoryWords,
   receivingAmendInput,
+  receivingDisplayNo,
   receivingVoidInput,
   warehouseReceiptOpensClaims,
   warehouseReceiptSummary,
   warehouseReceiptReturnInput,
+  type GrnRegisterFactRow,
+  type PoDatePromise,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
@@ -66,8 +71,314 @@ type ReceiptRow = Record<string, unknown>;
  * its warehouse id so the record of who counted survives a PO being relocated,
  * but a human reading the queue needs the name as it stands today.
  */
+/** Chunked `.in(…)` read — bounded URLs, no PostgREST response ceiling. */
+async function readByIds<T>(
+  ids: readonly string[],
+  query: (batch: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 100) {
+    const { data, error } = await query(unique.slice(i, i + 100));
+    if (error) throw error;
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
+/** The full record select — one string, so the paged mode and the legacy
+ *  list cannot quietly read two different rows. */
+const RECEIPT_SELECT =
+  "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason";
+
+const GRN_PAGE_DEFAULT = 50;
+const GRN_PAGE_MAX = 200;
+/** The scan's own page size — a Worker-side read, never sent to the browser. */
+const GRN_SCAN_PAGE = 1000;
+
 warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  /* ── `?scope=grn` — THE PAGED GRN REGISTER (owner correction 2026-09-06:
+     server-side pagination; `Showing 1–50 of 10,000` and every rail count
+     speak for the WHOLE filtered result set, never a loaded sample). The
+     Worker scans light rows, resolves the shared facts (category ladder,
+     the governed `Supplier Delivery Date`), asks the ONE pure arithmetic
+     (`buildGrnRegisterView`) for facets and the slice, then reads the full
+     record for just that page. Everything else keeps the legacy shape. ── */
+  if (c.req.query("scope") === "grn") {
+    const limit = Math.min(
+      Math.max(1, Math.floor(Number(c.req.query("limit")) || GRN_PAGE_DEFAULT)),
+      GRN_PAGE_MAX,
+    );
+    const offset = Math.max(0, Math.floor(Number(c.req.query("offset")) || 0));
+    const sel = {
+      category: c.req.query("category") ?? null,
+      supplier: c.req.query("supplier") ?? null,
+      site: c.req.query("site") ?? null,
+      expected: c.req.query("expected") ?? null,
+      q: c.req.query("q") ?? null,
+    };
+
+    // The scan: every GRN record (the Register boundary — `posted`/`voided`
+    // only), light columns, in the register's own order (the BUSINESS date,
+    // submitted stamp breaking ties).
+    type ScanRow = {
+      id: string;
+      po_id: string;
+      warehouse_id: string | null;
+      actual_site_id: string | null;
+      goods_received_at: string | null;
+      submitted_at: string | null;
+      grn_no: string | null;
+      do_number: string | null;
+      lines: WarehouseReceiptLine[] | null;
+    };
+    const scan: ScanRow[] = [];
+    for (let from = 0; ; from += GRN_SCAN_PAGE) {
+      const { data, error } = await sb
+        .from("warehouse_receipts")
+        .select(
+          "id, po_id, warehouse_id, actual_site_id, goods_received_at, submitted_at, grn_no, do_number, lines",
+        )
+        .in("status", ["posted", "voided"])
+        .order("goods_received_at", { ascending: false })
+        .order("submitted_at", { ascending: false })
+        .range(from, from + GRN_SCAN_PAGE - 1);
+      if (error) {
+        const m = mapPgError(error);
+        return c.json(m.body, m.status);
+      }
+      scan.push(...((data ?? []) as ScanRow[]));
+      if ((data ?? []).length < GRN_SCAN_PAGE) break;
+    }
+
+    const scanPoIds = [...new Set(scan.map((r) => r.po_id).filter(Boolean))];
+    const scanWhIds = [
+      ...new Set(
+        scan
+          .flatMap((r) => [r.warehouse_id, r.actual_site_id])
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+
+    let poRows: Array<Record<string, unknown>> = [];
+    let promiseRows: Array<Record<string, unknown>> = [];
+    let whRows: Array<{ id: string; name: string }> = [];
+    try {
+      [poRows, promiseRows, whRows] = await Promise.all([
+        readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
+          sb
+            .from("purchase_orders")
+            .select("id, version, supplier_id, suppliers(name)")
+            .in("id", ids),
+        ),
+        // Only the fields the ONE reply arithmetic reads
+        // (`poSupplierDeliveryDateOf` — an evidenced answer about the exact
+        // PO version). Receiving re-derives nothing.
+        readByIds<Record<string, unknown>>(scanPoIds, (ids) =>
+          sb
+            .from("po_supplier_promises")
+            .select(
+              "po_id, kind, answer, about_date, new_date, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, recorded_at",
+            )
+            .in("po_id", ids)
+            .order("recorded_at", { ascending: false }),
+        ),
+        readByIds<{ id: string; name: string }>(scanWhIds, (ids) =>
+          sb.from("warehouses").select("id, name").in("id", ids),
+        ),
+      ]);
+    } catch (error) {
+      const m = mapPgError(error as never);
+      return c.json(m.body, m.status);
+    }
+
+    const supplierByPo = new Map<string, string | null>();
+    const versionByPo = new Map<string, number>();
+    for (const p of poRows) {
+      const sup = p.suppliers as { name?: string } | null;
+      supplierByPo.set(p.id as string, sup?.name ?? null);
+      versionByPo.set(p.id as string, (p.version as number | null) ?? 1);
+    }
+    const promisesByPo = new Map<string, PoDatePromise[]>();
+    for (const row of promiseRows) {
+      const pid = row.po_id as string;
+      const hist = promisesByPo.get(pid) ?? [];
+      hist.push(row as unknown as PoDatePromise);
+      promisesByPo.set(pid, hist);
+    }
+    const supplierDateByPo = new Map<string, string | null>();
+    for (const pid of scanPoIds) {
+      supplierDateByPo.set(
+        pid,
+        poSupplierDeliveryDateOf(promisesByPo.get(pid), versionByPo.get(pid) ?? 1),
+      );
+    }
+    const whNames = new Map(whRows.map((w) => [w.id, w.name]));
+
+    const scanCatalog = await skuCategories(
+      sb,
+      scan.flatMap((r) => (r.lines ?? []).map((l) => l.sku)),
+    );
+
+    const factRows: GrnRegisterFactRow[] = scan.map((r) => {
+      const supplierName = supplierByPo.get(r.po_id) ?? null;
+      return {
+        id: r.id,
+        categories: receiptCategoryWords(r.lines, scanCatalog),
+        supplierName,
+        siteName:
+          (r.actual_site_id ? whNames.get(r.actual_site_id) : null) ??
+          (r.warehouse_id ? whNames.get(r.warehouse_id) : null) ??
+          null,
+        supplierDeliveryDateIso: supplierDateByPo.get(r.po_id) ?? null,
+        // The Search box's own promise: GRN, PO, supplier or DO number.
+        searchText: [
+          receivingDisplayNo({
+            id: r.id,
+            grn_no: r.grn_no,
+            goods_received_at: r.goods_received_at ?? undefined,
+            submitted_at: r.submitted_at ?? undefined,
+          }),
+          r.po_id,
+          r.do_number ?? "",
+          supplierName ?? "",
+        ].join(" "),
+      };
+    });
+
+    const view = buildGrnRegisterView(factRows, sel, offset, limit);
+
+    // The page itself — full records for exactly these ids, in the scan's
+    // order (a `.in(…)` read has no order of its own).
+    let pageRows: ReceiptRow[] = [];
+    try {
+      pageRows = await readByIds<ReceiptRow>(view.pageIds, (ids) =>
+        sb.from("warehouse_receipts").select(RECEIPT_SELECT).in("id", ids),
+      );
+    } catch (error) {
+      const m = mapPgError(error as never);
+      return c.json(m.body, m.status);
+    }
+    const byId = new Map(pageRows.map((r) => [r.id as string, r]));
+    const ordered = view.pageIds
+      .map((id) => byId.get(id))
+      .filter((r): r is ReceiptRow => r != null);
+
+    const pageUserIds = [
+      ...new Set(
+        ordered
+          .flatMap((r) => [
+            r.submitted_by,
+            r.reviewed_by,
+            r.posted_by,
+            r.posted_duty_holder,
+            r.posted_duty_cover,
+            r.void_by,
+          ])
+          .filter((v): v is string => typeof v === "string" && v.length > 0),
+      ),
+    ];
+    const userNames = new Map<string, string>();
+    if (pageUserIds.length > 0) {
+      const { data: users } = await sb
+        .from("app_users")
+        .select("id, name")
+        .in("id", pageUserIds);
+      for (const u of users ?? [])
+        userNames.set(u.id as string, u.name as string);
+    }
+
+    // The Product cell speaks the GRN PAPER's word — `product_skus.variant`,
+    // else the SKU — resolved for the page only.
+    const pageSkus = [
+      ...new Set(
+        ordered.flatMap((r) =>
+          ((Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[]).map(
+            (l) => l.sku,
+          ),
+        ),
+      ),
+    ];
+    const productWordBySku = new Map<string, string>();
+    if (pageSkus.length > 0) {
+      const { data: skuRows } = await sb
+        .from("product_skus")
+        .select("sku, variant")
+        .in("sku", pageSkus);
+      for (const s of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>)
+        if (s.variant) productWordBySku.set(s.sku, s.variant);
+    }
+
+    // Signed DOs — page rows only, best-effort exactly as the legacy list.
+    const doPaths = ordered
+      .map((r) => r.do_file_path as string | null)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    const doUrls = new Map<string, string>();
+    if (doPaths.length > 0) {
+      try {
+        const admin = adminClient(c.env);
+        const { data: signed } = await admin.storage
+          .from("delivery-orders")
+          .createSignedUrls(doPaths, SIGNED_URL_TTL_SECONDS);
+        for (const s of signed ?? [])
+          if (s.path && s.signedUrl) doUrls.set(s.path, s.signedUrl);
+      } catch (e) {
+        console.error("signing receipt DO urls failed (non-fatal):", e);
+      }
+    }
+
+    const { count: waiting } = await sb
+      .from("warehouse_receipts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "submitted");
+
+    return c.json({
+      receipts: ordered.map((r) => {
+        const lines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
+        return {
+          ...r,
+          categories: receiptCategoryWords(lines, scanCatalog),
+          warehouse_name: whNames.get(r.warehouse_id as string) ?? null,
+          supplier_name: supplierByPo.get(r.po_id as string) ?? null,
+          supplier_delivery_date: supplierDateByPo.get(r.po_id as string) ?? null,
+          product_labels: [
+            ...new Set(lines.map((l) => productWordBySku.get(l.sku) ?? l.sku)),
+          ],
+          submitted_by_name: r.submitted_by
+            ? (userNames.get(r.submitted_by as string) ?? null)
+            : null,
+          reviewed_by_name: r.reviewed_by
+            ? (userNames.get(r.reviewed_by as string) ?? null)
+            : null,
+          posted_by_name: r.posted_by
+            ? (userNames.get(r.posted_by as string) ?? null)
+            : null,
+          actual_site_name: r.actual_site_id
+            ? (whNames.get(r.actual_site_id as string) ?? null)
+            : null,
+          posted_duty_holder_name: r.posted_duty_holder
+            ? (userNames.get(r.posted_duty_holder as string) ?? null)
+            : null,
+          posted_duty_cover_name: r.posted_duty_cover
+            ? (userNames.get(r.posted_duty_cover as string) ?? null)
+            : null,
+          void_by_name: r.void_by
+            ? (userNames.get(r.void_by as string) ?? null)
+            : null,
+          do_file_url: r.do_file_path
+            ? (doUrls.get(r.do_file_path as string) ?? null)
+            : null,
+          summary: warehouseReceiptSummary(lines),
+          opens_claims: warehouseReceiptOpensClaims(lines),
+        };
+      }),
+      page: { offset, limit, total: view.total },
+      facets: view.facets,
+      counts: { waiting: waiting ?? 0 },
+    });
+  }
 
   const raw = (c.req.query("status") ?? "submitted").toLowerCase();
   const status = (
@@ -86,7 +397,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // 0426 widened this: grn_no · actual_site_id · arrival_evidence ·
       // extra_lines · the posted duty-evidence trio · void_* are what the
       // Receiving Register and the GRN record read.
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
+      RECEIPT_SELECT,
     )
     // The register is a HISTORY, so it sorts by the BUSINESS date — when the
     // goods physically arrived — not by when somebody keyed them in. The
@@ -345,7 +656,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const { data: row, error } = await sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
+      RECEIPT_SELECT,
     )
     .eq("id", id)
     .maybeSingle();
