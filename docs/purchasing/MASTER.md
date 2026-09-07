@@ -2220,7 +2220,7 @@ managed in central Settings; the in-request door uses that same authority, not a
 Prefill contact/access for confirmation. A different contact for this request does not change
 the saved default. A collection address may be supplier premises or another showroom; creating
 it never automatically creates a Carres Stock Site or grants access. This approves collection
-location entry only; the remaining Showroom Blueprint and post-submission change flow stay under review.
+location entry only; the remaining Showroom Blueprint stays under review.
 
 **Destination selection — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Send to selects an
 existing Carres Site and fills its saved address automatically. Staff confirm floor, access and
@@ -2234,6 +2234,15 @@ request for progress and missing information. Sign-in and record permissions app
 sending the link neither submits nor approves the request. Preserve draft preparer, requester and
 actual actor separately. The initial door may be a simple page in the existing portal; future
 Sales Portal entry uses the same record and authority, not another form/store or status engine.
+
+**Changes after submission — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester may
+add missing information, photos/videos and Remarks directly to the same record, with History.
+Changes to item, quantity, collection/destination location or Needed Date use Request a change.
+Operations reviews the effect on existing commitments before applying the change; confirmed
+arrangements remain visible until replaced through their owning module. A proposed change is not
+an instruction to the supplier or transport team. Supporting-information entry must not bypass
+this boundary by overwriting an existing committed goods/location/date fact. The Display Request
+retains the request and review evidence; it never silently rewrites another module's instruction.
 
 **Contact and receiving person — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester
 must supply who the team should contact and who will receive the goods. Capture contact name and
