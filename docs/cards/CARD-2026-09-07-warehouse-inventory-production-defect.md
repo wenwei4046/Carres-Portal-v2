@@ -1,8 +1,8 @@
 # WAREHOUSE — INVENTORY: restore the production read contract
 
-**Status:** implementation and verification in progress; production database apply
-awaits the explicit go required by ENGINEERING §5 and Card 02. This card does not
-claim the production defect is closed.
+**Status:** production database apply awaits the explicit go recorded in Card 02.
+Code and regression coverage are in PR #1149; delivery requires its checks and the
+governed apply below. This card does not claim the production defect is closed.
 
 ## Scope and authority
 
@@ -43,7 +43,8 @@ Read-only SQL in project `kfprgpjpaffedghytstl` inspected `pg_get_viewdef` and
 ending with `last_event_at`, `last_event`. It has neither name column and joins
 only the availability view and the lateral physical-event lookup ordered by seq.
 This is actual schema drift, not a client spelling error or merely a stale schema
-cache.
+cache. The live view has `security_invoker=true`; authenticated has SELECT only
+and anon has no grant. The existing migration preserves that boundary.
 
 Migration tracker identity must use the complete name, not the numeric prefix:
 
@@ -74,7 +75,8 @@ Exact committed file SHA-256: `656fa52c9d0683471faa44062fdf8409a700e0d77a83b1750
 UI: only render rail counts and empty assertions when the query has data and has
 not failed. The rail's footprint, destination header, navigation, table and retry
 remain in place. A refresh failure also withdraws cached success claims. A real
-successful empty response still shows zero.
+successful empty response still shows zero. An initial offline/paused request also
+remains loading until data exists; it cannot print the empty Register sentence.
 
 Regression: execute the actual list and detail route projections in PostgreSQL
 (PGlite, test-only), using committed authority functions/views and the complete
@@ -98,9 +100,16 @@ or stock/MASTER production-complete.
 
 ## Verification log
 
-- Before UI fix: 3 new regressions failed; after fix: all 17 Inventory UI tests passed.
-- SQL-backed route test: all 9 route tests passed (including old-view negative control).
-- Added reusable production assertion script; final SQL-script run and full checks pending.
-- Migration gate passed: 451 filenames, zero migration changes. Design/governance lint passed.
-- Full suite and type checks are running. One additional SQL-script verification run
-  exceeded its 30-second timeout under concurrent local load; it is not counted as a pass.
+- Initial UI regressions: three failed before the fix. The initial-offline test
+  separately failed on the empty-Register sentence before its correction.
+- SQL-backed route regression: all 9 tests passed, including the reusable
+  production assertion script, in the full API run. A duplicate local run timed
+  out during concurrent load; the subsequent full run passed without a timeout change.
+- Full shared suite: 133 files / 2,960 tests passed. Full API suite: 139 files /
+  2,796 tests passed (local, two workers per package).
+- Migration gate passed: 451 filenames, zero migration changes. Design/governance
+  lint passed. CI completed type checks on the first revision; the final revision
+  must pass the complete gate before merge.
+- Final web tests, full-suite, type checks, production build and bundle-secret
+  verification are recorded on [PR #1149](https://github.com/wenwei4046/Carres-Portal-v2/pull/1149).
+  CI is required; production SQL and deployment proof remain separate gates.

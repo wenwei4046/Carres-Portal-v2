@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import type { StockRegisterUnit } from "@carres/shared";
@@ -100,6 +100,19 @@ describe("an unavailable source is never zero stock", () => {
     apiFetchMock.mockReturnValue(new Promise(() => {}));
     renderRegister();
     expectNoStockClaims();
+  });
+
+  it("does not call an initial offline request empty stock", () => {
+    onlineManager.setOnline(false);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderRegister(qc);
+    try {
+      expectNoStockClaims();
+    } finally {
+      view.unmount();
+      qc.clear();
+      onlineManager.setOnline(true);
+    }
   });
 
   it("shows the failure and retries into real Unit counts", async () => {

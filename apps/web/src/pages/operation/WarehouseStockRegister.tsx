@@ -545,7 +545,7 @@ export default function WarehouseStockRegister() {
               rowKey={(u) => u.id}
               exportName="Inventory"
               searchPlaceholder="Unit ID, product, PO, SO or supplier…"
-              isLoading={isLoading}
+              isLoading={isLoading || !data}
               onSearchChange={setSearch}
               stickyIdentity
               groupBanner={false}
