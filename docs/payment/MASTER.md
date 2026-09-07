@@ -495,12 +495,35 @@ door (operation staff reach Payments and Invoices only). Verified by 9 focused r
 390px/640px checks with zero clipped elements; production convergence and the walk of this
 slice are recorded when they exist.
 
+### BUILD — the Online link journey on the Invoice, 2026-09-07
+
+The §16 "Online link and Receipt" operator journey is built around the ALREADY-converged
+Stripe checkout (0223 → 0351 — only a successful provider callback/poll posts Payment and
+Receipt atomically; nothing here re-touches money). The Invoice object gains
+`Create payment link` for the posting door's staff: create shows the amount (prefilled from
+the shared goods outstanding the server cap enforces), then the standing link says
+`Waiting for payment` · the amount · the exact expiry, and the sending sequence is the
+governed Copy payment message → Open WhatsApp → Upload sent screenshot → Record link sent
+(into the immutable communications ledger; created, sent or opened is NOT Payment and the
+card says so). The customer message is TEMPLATE-DRIVEN ONLY — `Standard payment link`, with
+`New link after expiry` recommended after one died; with no Active template nothing invents
+customer wording: the page says the owner's words are owed and only the bare link URL (a
+fact, not wording) can be copied. An unpaid expiry says `Payment link expired` ·
+`Amount needed remains unchanged.` · `Create a new payment link`; a paid one says
+`Payment recorded` with the remainder. While a link stands open the composition polls the
+reconcile route, so a counter payment records within one poll even before the webhook. The
+API gains read-only `GET /orders/:id/stripe/checkout` (the order's recent links, RLS-gated
+on the order read) — no migration. Verified by 8 focused composition tests + 2 API route
+tests (31 stripe route tests green); production convergence and the walk of this slice are
+recorded when they exist.
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
-Message assembly with bank routing and Partner contact, Stripe convergence, storage
+Message assembly with bank routing and Partner contact, storage
 journeys, report export, and the retirement of the rejected Refund/Bank Matching surfaces
-remain unfinished target work (Reports → Payment itself is built above; its export and the
-storage-waiver rows await their journeys). The complete approved customer
+remain unfinished target work (Reports → Payment and the Online link journey are built
+above; report export and the storage-waiver rows await their journeys, and the payment-link
+customer wording awaits its owner-approved template). The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
 it into a `Standard bank transfer` template once approved. The Calendar correction's

@@ -11,6 +11,7 @@ import {
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
+import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
@@ -154,6 +155,8 @@ export default function InvoiceRegister() {
   const role = useAuth((s) => s.role);
   const [recording, setRecording] = useState(false);
   const [asking, setAsking] = useState(false);
+  // §16 Online link — the Stripe journey shares the posting door's staff.
+  const [linking, setLinking] = useState(false);
   // §17 — the Calendar view's business filter; the month always stays visible.
   const [calendarFilter, setCalendarFilter] = useState<"all" | CalendarEntryKind>("all");
   const canRecord = (role === "operation" || role === "principal")
@@ -184,14 +187,16 @@ export default function InvoiceRegister() {
   return <div className="flex h-full min-h-0 flex-col">
     {invoice ? <SalesOrderTabs identity={identityOf(invoice)}
       customer={invoice.orders?.customer_name} backLabel="Invoices" backTo="?"
-      onBack={(event) => { event.preventDefault(); setRecording(false); close(); }}
+      onBack={(event) => { event.preventDefault(); setRecording(false); setLinking(false); close(); }}
       status={STATUS_MARK[invoice.status] ? <span>{STATUS_MARK[invoice.status]}</span> : undefined}
       navigation={<span className="text-body">{invoice.orders ? `SO-${invoice.orders.so}` : "SO not available"}</span>}
       right={<span className="flex items-center gap-2">
-        {invoice.invoice_no && !recording && !asking &&
+        {invoice.invoice_no && !recording && !asking && !linking &&
           <button className="btn-secondary" disabled={printing}
             onClick={() => void printInvoice(invoice)}>Print</button>}
-        {canRecord && !recording && !asking &&
+        {canRecord && !recording && !asking && !linking &&
+          <button className="btn-secondary" onClick={() => setLinking(true)}>Create payment link</button>}
+        {canRecord && !recording && !asking && !linking &&
           <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
       </span>}
     /> : <ModuleHeader destinationHeader testId="invoices-destination-header" word="Invoices" docTitle="Invoices — Carres" />}
@@ -200,6 +205,8 @@ export default function InvoiceRegister() {
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
     </div> : selected ? invoice ? recording && canRecord
       ? <InvoiceRecordPayment invoice={invoice} onClose={() => setRecording(false)} />
+      : linking && canRecord
+        ? <InvoicePaymentLink invoice={invoice} onClose={() => setLinking(false)} />
       : asking && canAsk
         ? <InvoiceAskToPay invoice={invoice}
             tone={invoiceTiming?.kind === "late" ? "chase" : "reminder"}

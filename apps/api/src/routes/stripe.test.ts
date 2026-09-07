@@ -72,6 +72,8 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
         return builder;
       }),
       eq: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      limit: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
       maybeSingle: vi.fn(() => Promise.resolve(cfg.maybeSingle ?? { data: null, error: null })),
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
@@ -270,6 +272,34 @@ describe("POST /:id/stripe/checkout", () => {
 });
 
 // =====================================================================
+// GET /api/orders/:id/stripe/checkout — the order's recent links
+describe("GET /:id/stripe/checkout", () => {
+  it("lists the order's sessions newest first, RLS-gated on the order read", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(
+      makeSb({ stripe_checkout_sessions: { list: { data: [SESSION_ROW], error: null } } }) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { sessions: Array<{ sessionId: string; status: string }> };
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]).toMatchObject({ sessionId: "cs_test_abc", status: "open", amount: 1600 });
+  });
+  it("404 when RLS hides the order", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: null, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(makeSb({}) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(404);
+  });
+});
+
 // GET /api/orders/:id/stripe/checkout/:sid — poll + live reconcile
 // =====================================================================
 describe("GET /:id/stripe/checkout/:sid", () => {
