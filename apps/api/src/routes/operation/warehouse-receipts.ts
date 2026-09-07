@@ -873,6 +873,28 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       console.error("signing receipt DO url failed (non-fatal):", e);
     }
   }
+  /* Arrival evidence was stored (0426) but never viewable — sign every file
+     so the record can be RE-SEEN, not only counted (unified card §9). */
+  let arrivalEvidence: Array<{ path: string; kind: string; url: string | null }> =
+    [];
+  if (Array.isArray(r.arrival_evidence) && r.arrival_evidence.length > 0) {
+    const files = (r.arrival_evidence as Array<{ path?: string; kind?: string }>)
+      .filter((f) => typeof f?.path === "string" && f.path.length > 0)
+      .map((f) => ({ path: f.path as string, kind: f.kind === "video" ? "video" : "photo" }));
+    try {
+      const admin = adminClient(c.env);
+      const { data: signedFiles } = await admin.storage
+        .from(r.arrival_source_id ? "arrival-proofs" : "delivery-orders")
+        .createSignedUrls(files.map((f) => f.path), SIGNED_URL_TTL_SECONDS);
+      arrivalEvidence = files.map((f, i) => ({
+        ...f,
+        url: signedFiles?.[i]?.signedUrl ?? null,
+      }));
+    } catch (e) {
+      console.error("signing arrival evidence failed (non-fatal):", e);
+      arrivalEvidence = files.map((f) => ({ ...f, url: null }));
+    }
+  }
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (userNames.get(v) ?? null) : null;
   const sup = (po as Record<string, unknown> | null)?.suppliers as {
@@ -896,6 +918,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       posted_duty_cover_name: name(r.posted_duty_cover),
       void_by_name: name(r.void_by),
       do_file_url: doUrl,
+      arrival_evidence_files: arrivalEvidence,
       unit_results: units ?? [],
     },
     line_info: lineInfo,

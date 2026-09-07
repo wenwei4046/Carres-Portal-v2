@@ -111,6 +111,11 @@ export default function WarehouseWorkspace() {
           siteName.get(po.destination_id ?? po.warehouse_id) ??
           siteName.get(po.warehouse_id) ??
           null,
+        siteId: siteName.has(po.destination_id ?? po.warehouse_id)
+          ? po.destination_id ?? po.warehouse_id
+          : siteName.has(po.warehouse_id)
+            ? po.warehouse_id
+            : null,
         etaDate: po.eta_date,
         pendingQty: (po.purchase_order_lines ?? []).reduce(
           (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),

@@ -202,6 +202,7 @@ export interface ArrivalSource {
   reason: string;
   cancelled_at: string | null;
   created_at: string;
+  sales_order_ref?: string | null;
   case_approval?: { condition_required: boolean; note: string } | null;
 }
 export interface ArrivalSourceUnit {

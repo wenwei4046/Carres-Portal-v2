@@ -281,6 +281,21 @@ export default function ReceivingRecord({
                 <span className="text-body text-kit-slate-12">
                   {evidenceSentence(r.arrival_evidence ?? [])}
                 </span>
+                {/* Saved evidence can be RE-SEEN, not only counted (§9). */}
+                {(r.arrival_evidence_files ?? []).map((f, i) =>
+                  f.url ? (
+                    <a
+                      key={f.path}
+                      href={f.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-2 text-body text-kit-blue-11 hover:underline"
+                      data-testid="arrival-evidence-view"
+                    >
+                      {f.kind === "video" ? "Video" : "Photo"} {i + 1}
+                    </a>
+                  ) : null,
+                )}
               </Prop>
             )}
             {isGrn ? (

@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildInboundRegisterView,
   inboundArrivals,
+  inboundDocumentWordOf,
+  inboundExceptionLines,
+  inboundStatusWordOf,
   filterInbound,
   inboundHref,
 } from "./warehouse-inbound";
@@ -111,6 +115,26 @@ describe("Inbound physical projection", () => {
     expect(
       filterInbound(rows, new URLSearchParams("date=2026-09-02")),
     ).toHaveLength(0);
+  });
+  it("pages on the server while facet counts describe the complete result", () => {
+    const first = inboundArrivals(input)[0];
+    const second = {
+      ...first,
+      id: "PO-2",
+      sourceId: "PO-2",
+      siteId: "w2",
+      site: "JB",
+    };
+    const view = buildInboundRegisterView(
+      [first, second],
+      new URLSearchParams("status=part-received"),
+      0,
+      1,
+    );
+    expect(view.rows).toHaveLength(1);
+    expect(view.total).toBe(2);
+    expect(view.facets.status["part-received"]).toBe(2);
+    expect(view.facets.site).toEqual({ w: 1, w2: 1 });
   });
 });
 
@@ -278,6 +302,146 @@ it.each([
     [],
   );
 });
+describe("Document, products, status and exceptions", () => {
+  const named = {
+    ...input,
+    units: input.units.map((u) => ({
+      ...u,
+      sku: u.id === "3" ? "BED-K" : "MAT-Q",
+    })),
+    lines: [
+      { po_id: "PO-1", qty: 2, destination_id: null, sku: "MAT-Q" },
+      { po_id: "PO-1", qty: 1, destination_id: null, sku: "BED-K" },
+    ],
+    skuNames: [
+      { sku: "MAT-Q", name: "Cloud Mattress Queen" },
+      { sku: "BED-K", name: "Oak Bedframe King" },
+    ],
+  };
+  it("names every product with its own arranged and received counts", () => {
+    const [r] = inboundArrivals(named);
+    expect(r.documentWord).toBe("PO No");
+    expect(r.documentNo).toBe("PO-1");
+    expect(r.from).toBe("Factory");
+    expect(r.products).toEqual([
+      { sku: "MAT-Q", name: "Cloud Mattress Queen", qty: 2, received: 2 },
+      { sku: "BED-K", name: "Oak Bedframe King", qty: 1, received: 0 },
+    ]);
+    expect(r.units.find((u) => u.id === "1")?.product).toBe(
+      "Cloud Mattress Queen",
+    );
+  });
+  it("issue counts stay a subset of received — 4 received with 1 damaged never becomes 5", () => {
+    const [r] = inboundArrivals(named);
+    expect(r.received).toBe(2);
+    expect(r.issues).toBe(1);
+    expect(r.received + r.remaining).toBe(r.expected);
+  });
+  it("speaks one progress word and keeps exceptions beside it, not instead of it", () => {
+    const [r] = inboundArrivals(named);
+    expect(inboundStatusWordOf(r)).toBe("Part received");
+    const lines = inboundExceptionLines(r, "2026-09-07");
+    expect(lines).toContain("U1-000-002 · Damaged");
+    expect(
+      lines.some((l) => l.startsWith("Expected arrival was 2026-09-01")),
+    ).toBe(true);
+    expect(inboundStatusWordOf({ ...r, received: 0, remaining: 3 })).toBe(
+      "Not received yet",
+    );
+    expect(inboundStatusWordOf({ ...r, received: 3, remaining: 0 })).toBe(
+      "Received",
+    );
+  });
+  it("a Unit received at a different Site is a named location exception", () => {
+    const [r] = inboundArrivals({
+      ...named,
+      sites: [...named.sites, { id: "w2", name: "JB" }],
+      receipts: [{ ...named.receipts[0], actual_site_id: "w2" }],
+    });
+    expect(inboundExceptionLines(r, "2026-09-07")).toContain(
+      "U1-000-001 · Received at JB, not Klang",
+    );
+  });
+  it("`open` keeps unfinished arrangements and the facet counts agree", () => {
+    const rows = inboundArrivals(named);
+    expect(filterInbound(rows, new URLSearchParams("status=open"))).toHaveLength(
+      1,
+    );
+    const done = {
+      ...rows[0],
+      received: 3,
+      remaining: 0,
+      identitiesMissing: false,
+    };
+    expect(
+      filterInbound([done], new URLSearchParams("status=open")),
+    ).toHaveLength(0);
+    const view = buildInboundRegisterView(rows, new URLSearchParams(), 0, 50);
+    expect(view.facets.status.open).toBe(1);
+  });
+  it("keeps every posted session viewable with its GRN number", () => {
+    const [r] = inboundArrivals({
+      ...named,
+      receipts: [
+        {
+          ...named.receipts[0],
+          grn_no: "GRN-060926-1111",
+          goods_received_at: "2026-09-01",
+        },
+      ],
+    });
+    expect(r.sessions).toEqual([
+      {
+        id: "r",
+        grnNo: "GRN-060926-1111",
+        postedAt: "2026-09-01T10:00:00Z",
+        receivedAt: "2026-09-01",
+        actualSite: null,
+      },
+    ]);
+  });
+  it("gives each source kind the document its number belongs to", () => {
+    expect(inboundDocumentWordOf("transfer")).toBe("Transfer No");
+    expect(inboundDocumentWordOf("repair-return")).toBe("Repair Order No");
+    expect(inboundDocumentWordOf("supplier-replacement")).toBe("Claim No");
+    expect(inboundDocumentWordOf("customer-return")).toBe("Case No");
+    expect(inboundDocumentWordOf("failed-delivery-return")).toBe("Case No");
+  });
+  it("a return names the customer as origin, never the carrier", () => {
+    const [r] = inboundArrivals({
+      ...input,
+      pos: [],
+      arrivalSources: [
+        {
+          id: "source",
+          source_no: "CS-1",
+          kind: "customer-return" as const,
+          claim_id: null,
+          case_id: "case",
+          from_site_id: null,
+          to_site_id: "w",
+          party_id: "party",
+          expected_date: "2026-09-06",
+          collection_date: null,
+          reason: "Return",
+          cancelled_at: null,
+          created_at: "2026-09-01",
+          sales_order_ref: "CR12345",
+        },
+      ],
+      sourceUnits: input.units.map((u) => ({
+        source_id: "source",
+        stock_item_id: u.id,
+        replaces_item_id: null,
+      })),
+      parties: [{ id: "party", name: "NETS Logistics" }],
+      receipts: [],
+    });
+    expect(r.from).toBe("Customer · CR12345");
+    expect(r.from).not.toContain("NETS");
+  });
+});
+
 it("replacement identities are not counted twice as original PO Units", () => {
   const [r] = inboundArrivals({
     ...input,

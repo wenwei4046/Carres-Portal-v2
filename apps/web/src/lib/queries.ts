@@ -8204,6 +8204,12 @@ export interface ReceivingSession {
   grn_no?: string | null;
   actual_site_id?: string | null;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  /** 0440-era detail read: the same files, each with a signed VIEW url. */
+  arrival_evidence_files?: Array<{
+    path: string;
+    kind: "photo" | "video";
+    url: string | null;
+  }>;
   extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
   void_at?: string | null;
   void_reason?: string | null;

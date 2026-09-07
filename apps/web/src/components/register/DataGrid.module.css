@@ -592,6 +592,22 @@ div:first-child > .columnsMenuGroup {
 .td:last-child {
   border-right: 0;
 }
+/* WRAP COLUMN (Warehouse unified Inbound/Outbound card, 2026-09-07).
+   Information completeness outranks row height: a column that carries every
+   product of an arrangement declares `wrap: true` and its content wraps onto
+   further lines instead of being silently truncated. Opt-in per column -
+   every existing register cell keeps the single-line contract. */
+.tdWrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  height: auto;
+  min-height: 28px;
+  vertical-align: top;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
 /* Figures = one font system-wide. Carres sets numerals in Inter; the table
    already sets tabular-nums, so numeric columns line up regardless of which
    page renders them. */

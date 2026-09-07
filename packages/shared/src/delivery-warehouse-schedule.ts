@@ -36,6 +36,9 @@ export interface DeliveryWarehouseScheduleInput {
   unitPackedAt?: string | null;
   /** The append-only accepted handover time for THIS exact Unit, or null. */
   unitHandedOverAt?: string | null;
+  /** The Logistics side's own per-Unit receipt confirmation, or null. The
+   *  counterparty's statement — never derived from the Warehouse's loading. */
+  unitDriverConfirmedAt?: string | null;
   /** This Unit's own accepted-batch evidence (falls back to the DO's). */
   unitHasEvidence?: boolean;
   /** The signed-in person who recorded the accepted handover batch. */
@@ -76,6 +79,7 @@ export interface DeliveryWarehouseScheduleEvent {
   unitCheckedAt: string | null;
   unitPackedAt: string | null;
   unitHandedOverAt: string | null;
+  unitDriverConfirmedAt: string | null;
   unitWarehouseOperator: string | null;
   unitDeliveryPerson: string | null;
   deliveryHref: string;
@@ -129,6 +133,7 @@ export function deliveryWarehouseScheduleEvents(
     unitCheckedAt: input.unitCheckedAt ?? null,
     unitPackedAt: input.unitPackedAt ?? null,
     unitHandedOverAt: input.unitHandedOverAt ?? null,
+    unitDriverConfirmedAt: input.unitDriverConfirmedAt ?? null,
     unitWarehouseOperator: input.unitWarehouseOperator ?? null,
     unitDeliveryPerson: input.unitDeliveryPerson ?? null,
     unitId: input.unitId,

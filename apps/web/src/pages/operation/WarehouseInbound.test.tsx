@@ -3,7 +3,7 @@ import { MemoryRouter, useSearchParams, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi } from "vitest";
 import WarehouseInbound from "./WarehouseInbound";
-import { inboundArrivals } from "@carres/shared";
+import { buildInboundRegisterView, inboundArrivals } from "@carres/shared";
 const h = vi.hoisted(() => ({
   loading: false,
   error: null as Error | null,
@@ -13,12 +13,20 @@ vi.mock("./components/ModuleHeader", () => ({
   default: () => <h1>Inbound</h1>,
 }));
 vi.mock("./useWarehouseInbound", () => ({
-  useWarehouseInbound: () => ({
-    data: { arrivals: rows, sites: [{ id: "w", name: "Klang" }] },
-    isLoading: h.loading,
-    error: h.error,
-    refetch: h.refetch,
-  }),
+  useWarehouseInbound: (params: URLSearchParams, offset: number) => {
+    const view = buildInboundRegisterView(rows, params, offset, 50);
+    return {
+      data: {
+        arrivals: view.rows,
+        sites: [{ id: "w", name: "Klang" }],
+        page: { offset, limit: 50, total: view.total },
+        facets: view.facets,
+      },
+      isLoading: h.loading,
+      error: h.error,
+      refetch: h.refetch,
+    };
+  },
 }));
 const rows = inboundArrivals({
   pos: [
@@ -66,9 +74,31 @@ describe("Inbound Register", () => {
     mount();
     expect(screen.getByTestId("inbound-rail")).toHaveClass("w-[240px]");
     expect(screen.queryByText("Calendar")).toBeNull();
+    // The one action door lives inside the expansion, not on the row.
+    fireEvent.click(screen.getByTestId("inbound-expand-PO-1"));
     expect(
       screen.getByRole("link", { name: "Open Receiving Session" }),
     ).toHaveAttribute("href", "/operation?tab=receiving&po=PO-1");
+    expect(screen.getByTestId("inbound-page-range")).toHaveTextContent(
+      "Showing 1–1 of 1 arrangements",
+    );
+  });
+  it("the Document number opens the document, never the work surface", () => {
+    mount();
+    expect(screen.getByTestId("inbound-document-PO-1")).toHaveAttribute(
+      "href",
+      "/operation/procurement?po=PO-1",
+    );
+    expect(screen.getByText("PO No")).toBeInTheDocument();
+    expect(screen.getByText("DOCUMENT TYPE")).toBeInTheDocument();
+    expect(screen.queryByText("SOURCE TYPE")).toBeNull();
+  });
+  it("accepts Monitor's `po` deep link as the exact document scope", () => {
+    mount("&po=PO-1&date=2026-09-01");
+    expect(screen.getByTestId("inbound-document-PO-1")).toBeInTheDocument();
+    expect(screen.getByTestId("inbound-source-context")).toHaveTextContent(
+      "Document: PO-1",
+    );
   });
   it("honours exact Monitor selection and date context", () => {
     mount("&date=2026-09-02&site=w&sourceType=supplier-delivery&source=PO-1");
@@ -81,7 +111,7 @@ describe("Inbound Register", () => {
   });
   it("opens exact Unit outcomes and keeps the unreceived Unit unreceived", () => {
     mount();
-    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
+    fireEvent.click(screen.getByTestId("inbound-expand-PO-1"));
     expect(screen.getByRole("link", { name: "U1-000-001" })).toHaveAttribute(
       "href",
       "/operation/stock/unit/U1-000-001",
@@ -125,6 +155,7 @@ describe("Inbound Register", () => {
     Object.defineProperties(rail, {scrollHeight: {value: 900}, clientHeight: {value: 200}});
     rail.scrollTop = 80;
     fireEvent.scroll(rail);
+    fireEvent.click(screen.getByTestId("inbound-expand-PO-1"));
     fireEvent.click(
       screen.getByRole("link", { name: "Open Receiving Session" }),
     );

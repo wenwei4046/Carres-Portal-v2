@@ -127,6 +127,14 @@ export type DataGridColumn<T> = {
    * window, so virtualization cannot shrink a total.
    */
   footerTotal?: (rows: T[]) => ReactNode;
+  /**
+   * ⭐ ENGINE extension (Warehouse unified Inbound/Outbound card, 2026-09-07):
+   * this column's content WRAPS onto further lines and the row grows, instead
+   * of truncating. For columns whose whole job is completeness — every product
+   * of an arrangement, every exception — a silent ellipsis is information
+   * loss. Opt-in; omitted = the single-line contract every register has.
+   */
+  wrap?: boolean;
 };
 
 /** A single entry in a row's right-click context menu. `divider: true`
@@ -274,6 +282,21 @@ export type DataGridProps<T> = {
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
     testId?: (row: T) => string;
+    /**
+     * ⭐ ENGINE extension (Warehouse unified card, 2026-09-07): the named
+     * DATA column is the one expansion entry — its cell renders the chevron
+     * and the content inside ONE toggle button, and the synthetic 32px
+     * `__expand__` gutter column is not added. The arrow and the content
+     * share a single entry; a second expand button never appears. Omitted =
+     * the classic left chevron column, byte-identical for every caller.
+     */
+    trigger?: { columnKey: string };
+    /**
+     * Rows expanded on FIRST mount (a Monitor deep link opens its exact
+     * arrangement already unfolded). Seed only — later toggling is the
+     * operator's own; changing this after mount changes nothing.
+     */
+    defaultExpandedKeys?: readonly string[];
   };
   /**
    * First-class multi-select (Commander 2026-06-19). Prepends a synthetic
@@ -469,7 +492,9 @@ function DataGridInner<T>({
      expanded row ids; rendering inserts a colSpan sub-<tr> directly under
      each expanded parent. Stored as a Set so the chevron column accessor
      can read state in O(1). */
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(
+    () => new Set(expandable?.defaultExpandedKeys ?? []),
+  );
   const expansionId = expandable?.rowExpansionKey ?? rowKey;
   const toggleExpand = useCallback((id: string) => {
     setExpandedRows((prev) => {
@@ -819,8 +844,10 @@ function DataGridInner<T>({
     }
     /* Synthetic chevron column — accessor is a placeholder; the actual chevron
        is rendered in a dedicated <td> in the tbody so it can wire click handlers
-       without leaking `toggleExpand` into the column spec. */
-    if (expandable) {
+       without leaking `toggleExpand` into the column spec. With a `trigger`
+       column declared, that data column IS the one expansion entry and no
+       gutter chevron is added beside it. */
+    if (expandable && !expandable.trigger) {
       synthetic.push({
         key: "__expand__",
         label: "",
@@ -1555,10 +1582,71 @@ function DataGridInner<T>({
                (__expand__ / __select__) render nothing, not a dash. */
             const content = col.accessor(row);
             const isEmpty = content == null || content === "";
+            const wrapClass = col.wrap ? ` ${styles.tdWrap}` : "";
+            /* ⭐ TRIGGER COLUMN — the arrow and the content are ONE expansion
+               entry (Warehouse unified card §7): one button, chevron first,
+               content beside it, `aria-expanded` announced. No second expand
+               control exists anywhere on the row. */
+            if (
+              expandable?.trigger?.columnKey === col.key &&
+              expandKey != null
+            ) {
+              return (
+                <td
+                  key={col.key}
+                  className={`${styles.td}${wrapClass}${pinClass(col.key)}`}
+                  style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    title={expandTitle ?? "Show items"}
+                    data-testid={expandable.testId?.(row)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExpand(expandKey);
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: 0,
+                      padding: 0,
+                      cursor: "pointer",
+                      color: "inherit",
+                      font: "inherit",
+                      textAlign: "inherit",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 4,
+                      width: "100%",
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        color: "var(--fg-muted)",
+                        fontSize: 14,
+                        lineHeight: "18px",
+                        flexShrink: 0,
+                        display: "inline-block",
+                        transform: isExpanded
+                          ? "rotate(90deg)"
+                          : "rotate(0deg)",
+                        transition: "transform 120ms ease",
+                      }}
+                    >
+                      &#9656;
+                    </span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      {isEmpty ? "—" : content}
+                    </span>
+                  </button>
+                </td>
+              );
+            }
             return (
               <td
                 key={col.key}
-                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${pinClass(col.key)}`}
+                className={`${styles.td} ${col.align === "right" ? styles.tdAlignRight : ""}${wrapClass}${pinClass(col.key)}`}
                 style={{ width: w, maxWidth: w, ...pinStyle(col.key) }}
               >
                 {isEmpty ? (col.key.startsWith("__") ? null : "—") : content}

@@ -37,6 +37,19 @@ describe("GET warehouse/inbound", () => {
       arrivals: [],
       sites: [],
       unresolvedSources: [],
+      page: { offset: 0, limit: 50, total: 0 },
+      facets: {
+        status: {
+          all: 0,
+          open: 0,
+          expected: 0,
+          "part-received": 0,
+          received: 0,
+          "with-issue": 0,
+        },
+        sourceType: {},
+        site: {},
+      },
     });
   });
   it("reports a failed authority read instead of an empty success", async () => {

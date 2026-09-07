@@ -102,6 +102,7 @@ describe("ARRIVAL events from Purchasing's expected arrivals", () => {
         poId: "PO-2001",
         supplierName: "Nice Future",
         siteName: "Carres Klang Warehouse",
+        siteId: "wh-1",
         etaDate: "2026-09-04",
         pendingQty: 3,
       },
@@ -114,10 +115,12 @@ describe("ARRIVAL events from Purchasing's expected arrivals", () => {
     expect(e.label).toBe("Supplier arrival");
     expect(e.timeSentence).toBe("Time not provided");
     expect(e.detail).toBe("Pending Delivery Qty 3");
+    // The deep link carries the governed Site ID — the exact value the
+    // Inbound `site` filter takes — never the display name.
     expect(e.open).toEqual({
       tab: "warehouse-inbound",
       date: "2026-09-04",
-      site: "Carres Klang Warehouse",
+      site: "wh-1",
       po: "PO-2001",
     });
   });

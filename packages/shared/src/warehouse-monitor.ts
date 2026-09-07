@@ -163,6 +163,9 @@ export interface WarehouseExpectedArrival {
   supplierName: string | null;
   /** The governed Site the PO is bound for (null when not resolvable). */
   siteName: string | null;
+  /** The governed Site ID — the exact value Inbound's `site` filter takes.
+   *  Names collide and get renamed; the ID is the deep-link contract. */
+  siteId?: string | null;
   /** Purchasing's expected arrival date (date only — no time exists). */
   etaDate: IsoDate | null;
   /** Pending Delivery Qty — what the supplier still owes. */
@@ -191,7 +194,7 @@ export function warehouseMonitorArrivalEvents(
       open: {
         tab: "warehouse-inbound",
         date: a.etaDate,
-        site: a.siteName,
+        site: a.siteId ?? null,
         po: a.poId,
       },
       sourceHref: null,
