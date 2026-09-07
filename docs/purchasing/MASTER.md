@@ -655,12 +655,14 @@ Purchase/PO. When the model changes, the Unit returns to Carres custody, may go 
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
-**Showroom loan practice — OWNER-CONFIRMED 2026-09-07:** Carres temporarily lends showroom
-display sofas to customers waiting for their purchased sofas. This uses the existing Sales Order
-loan journey; Sales Orders owns the loan obligation, Delivery owns its execution and Stock owns
-the exact Unit's custody and return inspection. This confirmation establishes the operating
-practice only; it does not authorise lending supplier-owned display Units. The supplier-consent
-boundary remains unresolved pending owner review.
+**Showroom loan controls — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Carres temporarily
+lends showroom display sofas to customers waiting for purchased sofas through the existing Sales
+Order loan and exact Unit ID. Before lending a supplier-owned Unit, Purchasing records supplier
+permission covering the Unit and return terms. Sales Orders owns the loan obligation, Delivery
+owns handover/collection and Stock owns custody, availability and inspection. Customer recovery
+and required supplier return remain separate; the latter stays open until actually completed.
+Loan handover creates no Consignment Sale Notice. These controls do not approve implementation
+or the complete Showroom Blueprint.
 
 ### 7.6 Supplier-consignment showroom display
 
@@ -673,7 +675,7 @@ Display Request approved for consignment
 → Goods Receipt accepts without payable
 → Stock places supplier-owned Unit at selected showroom
 → display swap/removal creates Consignment Return path
-→ successful customer delivery of exact Unit creates CSN
+→ successful customer sale delivery of exact Unit creates CSN
 → Purchasing sends CSN to supplier
 → Finance matches supplier invoice and settles
 ```
@@ -683,8 +685,10 @@ record is auto-linked; no duplicate supplier message. Document issue alone does 
 
 ### 7.7 Consignment sale notice trigger
 
-Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
-notice. SO creation, deposit, reservation and delivery planning do not.
+Only a successful/partially successful customer sale delivery attempt for an exact supplier-owned
+Unit creates a notice. SO creation, deposit, reservation, delivery planning and temporary loan
+handover do not. Delivery success must distinguish sale from loan scope before this trigger
+consumes it (owner-approved 2026-09-07).
 
 One notice is created idempotently per supplier × delivery attempt and contains only successfully
 delivered Units. It excludes customer identity/contact/address, customer selling price, discount and

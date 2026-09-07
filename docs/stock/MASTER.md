@@ -121,10 +121,11 @@ page or integration maintains another available quantity.
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
 
-Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
+Successful customer sale delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
 event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
 consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
-refused delivery emits no sale event.
+refused delivery emits no sale event. Temporary loan handover emits no sale event under Purchasing
+§7.7; Delivery distinguishes sale from loan scope.
 
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
@@ -1242,6 +1243,13 @@ Outbound owns supplier/repair handover; Finance owns refund, Credit Note, write-
 supplier settlement.
 
 ### 12.9 Showroom Stock and Supplier Consignment
+
+**Display loan availability — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The existing Sales
+Order loan identifies the exact Unit. Stock keeps it unavailable for another sale or loan and
+records custody on outward handover and recovery. Inspect the returned sofa before availability;
+recovery alone never releases it. Purchasing §7.5 owns supplier permission/return terms; Sales
+Orders owns outstanding loan/supplier-return obligations. Loan handover does not change supplier
+ownership as if a sale occurred and never triggers a Consignment Sale Notice.
 
 **Showroom result ownership — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Site-scoped
 Showroom Duty confirms showroom arrival, condition, handover and installation result. The one

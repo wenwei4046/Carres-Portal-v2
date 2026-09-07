@@ -582,10 +582,11 @@ Related Documents and Order Route only link to the documents. For Singapore, eac
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 
-If a successful Delivery Visit contains an exact supplier-consignment Unit, the resulting
+If a successful customer-sale scope in a Delivery Visit contains an exact supplier-consignment Unit, the resulting
 Consignment Sale Notice is created under Purchasing and appears only as a linked Related Document /
 Order Route consequence. Sales Order creation, reservation, deposit and planning never create that
-notice, and Sales cannot issue or correct it.
+notice, and Sales cannot issue or correct it. Temporary loan handover creates no notice under
+Purchasing §7.7; Delivery must distinguish sale and loan scope.
 
 ## Completion, empty, loading and error truth
 
@@ -2756,6 +2757,14 @@ Issue Tracker may record the same incident for accountability and learning, but 
 the attempt, Unit movement or remaining customer obligation.
 
 ## Card 6 · Loan Mattress / Loan Sofa Obligations — approved and built
+
+**Display loan controls — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Use this loan record
+with the exact display Unit ID. Purchasing records supplier permission and return terms before
+a supplier-owned display Unit is lent (`purchasing/MASTER.md` §7.5). Stock keeps the Unit
+unavailable for another sale/loan and inspects it after recovery before availability. Customer
+handover, collection and any required supplier return are separate outcomes; required supplier
+return stays open until actually completed. Delivery distinguishes loan handover from sale success;
+loan handover creates no Consignment Sale Notice. This is not a production-verification claim.
 
 A temporary item is an independent obligation. The customer receiving real goods does not close
 the loan; the temporary item must be recovered. Distinguish:
