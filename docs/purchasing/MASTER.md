@@ -1945,14 +1945,14 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 50px destination header, governed toolbar, 240px factual rail, 36/38/32 table grammar and tokens.
 These values reuse the shared authority; this Blueprint reuses existing kit components.
 
-**APPROVED — register defaults:** Claim No. (or Not issued), Reported, Supplier, Source, Product,
-Affected Qty, Problem, Supplier Response and Claim status. Product uses human description with
-SKU as supporting evidence; source links Case/PO/GRN. One row is one supplier workstream, never one
-row per photo or Work action. Freeze identity/supplier when horizontal scroll is needed. Wider
-detail/reference fields are optional Columns: Units, Requested Result, Customer Resolution,
-Carres Execution, Item Outcome, Reply expected, Collection date, Expected back, Credit expected,
-Claim Version and Sent to Supplier. Only relevant date facts appear; no generic workflow field.
-Unknown optional facts are not promoted to permanent empty columns; measure before final layout.
+**APPROVED — register defaults (owner correction 2026-09-07):** Supplier Claim No.,
+Reported, Supplier, PO No, GRN No., Product, Variant, Qty, Problem, Supplier Response and Claim
+status. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
+reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
+product name. SKU is its own optional column. Preserve existing SC document numbers and explain
+them through the full Supplier Claim No. header; do not rename historical documents or invent
+another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
+identity column covering adjacent content. One row is one supplier workstream.
 
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
