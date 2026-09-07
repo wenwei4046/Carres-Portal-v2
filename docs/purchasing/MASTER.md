@@ -2200,6 +2200,15 @@ Purchasing chooses the commercial path.
 must support uploading photos and videos when needed to explain the request. Both media types
 are optional supporting evidence; a video is not mandatory for every request. This approves the
 upload capability only, not the remaining proposed Showroom Blueprint or application implementation.
+**Evidence viewing and future Sales Portal entry — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Staff preview photos and play videos within the request; permitted connected teams access the same
+evidence without requiring another upload. Attachments remain optional unless the particular work
+requires evidence to proceed. A future Sales Portal may create a Display Request through the same
+Purchasing-owned creation authority and link to that exact record. It is another entry point, not
+a second request store, status, attachment copy or approval workflow. Preserve the actual requester
+and Showroom context; access follows the governed permissions. Purchasing remains the record owner
+and its existing decision/approval boundaries apply. This reserves the future entry capability;
+it does not commission a Sales Portal build or approve the remaining Showroom Blueprint.
 **Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
 Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
 next Office working day after submission, PO Duty records the first decision and its linked
