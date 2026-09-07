@@ -24,7 +24,6 @@ import {
   deliveryEntryBlockers,
   regionBucketOf,
   SINGAPORE_KEY,
-  scopeFooter,
   DW,
   } from "./delivery-work";
 
@@ -372,13 +371,6 @@ describe("the arrangement is what Delivery wrote", () => {
   });
 });
 
-describe("the footer counts scopes, never orders", () => {
-  it("says so in the plural the number earns", () => {
-    expect(scopeFooter(1, 1)).toBe("1 delivery scope");
-    expect(scopeFooter(3, 3)).toBe("3 delivery scopes");
-    expect(scopeFooter(2, 9)).toBe("2 of 9 delivery scopes");
-  });
-});
 
 describe("REGION classification — direct state names (owner correction 2026-09-06)", () => {
   it("classifies a whole-order scope by its address state", () => {

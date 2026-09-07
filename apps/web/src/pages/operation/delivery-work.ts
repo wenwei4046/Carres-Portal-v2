@@ -583,12 +583,3 @@ export function regionBucketOf(row: DeliveryScopeRow): string | null {
   return customerRegionOf(row.o);
 }
 
-/**
- * The footer sentence. It counts SCOPES — legs included — because that is what
- * the rows and the rail counts are; calling them orders would be a third number
- * for the same list.
- */
-export function scopeFooter(shown: number, total: number): string {
-  const word = total === 1 ? "delivery scope" : "delivery scopes";
-  return shown === total ? `${shown} ${word}` : `${shown} of ${total} ${word}`;
-}

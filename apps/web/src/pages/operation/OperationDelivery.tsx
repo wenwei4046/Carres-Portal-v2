@@ -1,49 +1,47 @@
 /**
  * DELIVERY MONITOR — planning calendar + selectable operational work lists.
- * Owner UI correction 2026-09-06 · `docs/delivery/MASTER.md` §8.
+ * Owner UI corrections 2026-09-06 / 2026-09-07 · `docs/delivery/MASTER.md` §8.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ⭐ TWO PROJECTIONS OF ONE CANONICAL READ
  *
  * ```
- * Calendar (explicit pick) six operating-day columns, delivery cards, NO checkboxes
- * every other view         the standard selectable DataGrid work list
+ * Calendar (DEFAULT)   Day · Week · Month in the page toolbar — delivery cards
+ *                      by day, or the month's compact counts; NO checkboxes
+ * a work queue picked  the standard selectable DataGrid work list
  * ```
  *
- * ⭐ `All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07):
- * the workspace opens on the complete selectable listing of every open
- * delivery scope — scopes without a DO, without a confirmed date, without a
- * partner included — never on a Calendar that is empty because the dates are
- * not confirmed yet. Calendar opens through its rail row or a month-calendar
- * date click.
+ * ⭐ CALENDAR IS A VIEW, NEVER A `WORK TO DO` ROW (owner correction
+ * 2026-09-07). `Week` is the desktop default (six Mon–Sat columns fitting the
+ * width — no horizontal date scrolling), a tablet's Week is the fixed
+ * three-day half-week, a phone is only ever the `Day` list. A rail date or a
+ * Month-view date opens that date's `Day`. Choosing Day/Week/Month clears
+ * every operational pick so the Calendar actually appears.
  *
- * A work queue (`No logistics picked` · `No confirmed date` · `Overdue` ·
- * `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse`),
- * a REGION row or a LOGISTICS row is an operational question, and its answer
- * is the same Register grammar every other module answers with — never a card
- * wall.
+ * A work queue (`All delivery work` · `No logistics picked` · `No confirmed
+ * date` · `Overdue` · `Failed Delivery` · `Upload delivery proof`), a STATE
+ * row, a LOGISTICS PARTNER row or a DELIVERY STATUS row is an operational
+ * question, and its answer is the same Register grammar every other module
+ * answers with — never a card wall.
  *
  * ⭐ BULK LOGISTICS ASSIGNMENT LIVES HERE (owner correction 2026-09-06).
- * The planning population includes delivery scopes that have no formal DO yet,
+ * The planning population includes deliveries that have no formal DO yet,
  * so the journey `No logistics picked → select rows → Assign logistics` runs
  * on Monitor's work list, through the ONE governed door
  * (`AssignLogisticsDialog` → `/delivery-arrangements/assign`). Replacing an
  * existing partner is the governed `Change logistics` act (reason + history)
  * and is offered for ONE row at a time — never as an uncontrolled batch.
  *
- * ⭐ THE RAIL IS THE SHARED FilterRail GRAMMAR (240px, page-owned), with the
- * COMPLETE MONTH CALENDAR fixed at its top (owner correction 2026-09-06):
- * month arrows move one month, the selected date wears the governed blue,
- * today stays distinguishable, Sundays are muted, work days carry a dot, and
- * the filter groups (one WORK TO DO group in the ruled order, `No logistics
- * picked` among the primary queues · flat REGION state names · LOGISTICS
- * carrying `All logistics` + the partners genuinely present) scroll
- * independently BELOW it. Clicking a date opens the FIXED operating week
- * containing it in the right workspace.
+ * ⭐ THE RAIL IS THE SHARED FilterRail GRAMMAR (240px, page-owned, never the
+ * Portal sidebar), with the COMPLETE MONTH CALENDAR fixed at its top: month
+ * arrows move one month, the selected date wears the governed blue, today
+ * stays distinguishable, Sundays are muted, work days carry a dot, and the
+ * four filter groups (WORK TO DO · STATE · LOGISTICS PARTNER · DELIVERY
+ * STATUS) scroll independently BELOW it.
  *
  * ── THE WINDOWS ─────────────────────────────────────────────────────────────
- * One `?date=` drives every viewport's finite window — the desktop's Mon–Sat
- * operating week, the tablet's three-day half-week, the phone's one-day list
+ * One `?date=` drives every window — the Day, the desktop's Mon–Sat operating
+ * week, the tablet's three-day half-week, the Month, the phone's one-day list
  * (its full month opens through the kit's standard date control). Arrows
  * replace the whole displayed window; the calendar never scrolls sideways.
  */
@@ -51,7 +49,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
-import { fmtDate, appTodayIso } from "@/lib/fmt-date";
+import { fmtDate, fmtMonth, appTodayIso } from "@/lib/fmt-date";
 import StatusPill from "@/components/kit/StatusPill";
 import {
   useDeliveryOrdersRegister,
@@ -75,32 +73,47 @@ import {
   DATE_TO_BE_CONFIRMED_CELL,
   DATE_TO_BE_CONFIRMED_FULL,
 } from "./sales-order-guidance";
-import { DW, scopeFooter, type DeliveryScopeRow } from "./delivery-work";
+import { DW, type DeliveryScopeRow } from "./delivery-work";
+import Segmented from "@/components/Segmented";
 import {
+  DEFAULT_CALENDAR_VIEW,
+  MONITOR_CALENDAR_VIEWS,
+  MONITOR_CALENDAR_VIEW_LABEL,
   MONITOR_COPY,
   MONITOR_DAYS,
+  MONITOR_STATUS_FILTERS,
+  MONITOR_STATUS_LABEL,
   MONITOR_VIEW_LABEL,
   MONITOR_WORK_VIEWS,
   activeFilterLabels,
   buildDeliveryMonitorCards,
   buildMonitorRails,
+  deliveriesFooter,
   emptyRangeSentence,
   filterMonitorCalendarCards,
   filterMonitorListRows,
   groupCardsByDay,
   isCalendarProjection,
+  missingProofLabels,
   monitorCardHref,
+  monthDayCounts,
+  monthDaysOf,
+  monthStepStart,
   needConfirmedDateSentence,
   nextOperatingWindowStart,
   operatingDaysFrom,
   operatingWeekOf,
   previousOperatingWindowStart,
+  selectedSentence,
   tabletWindowOf,
   type DeliveryMonitorCard,
   type DeliveryMonitorFilters,
+  type MonitorCalendarView,
+  type MonitorDeliveryStatus,
   type MonitorWorkView,
 } from "./delivery-monitor";
 import MonitorMonthCalendar from "./components/MonitorMonthCalendar";
+import MonitorMonthView from "./components/MonitorMonthView";
 import DatePicker from "@/components/kit/DatePicker";
 
 /** The two governed action words on this workspace (COPY-STANDARD). */
@@ -126,9 +139,6 @@ const STATUS_TONE: Record<DeliveryWorkStatusKind, OrderActionTone> = {
   delivered: "success",
   failed: "warning",
 };
-
-/** Edit Delivery's own governed words for the arrangement's narrower arrival. */
-const EXPECTED_ARRIVAL = "Expected arrival";
 
 /**
  * THE THREE FIXED WINDOWS (owner correction 2026-09-06). The calendar never
@@ -181,7 +191,11 @@ function Absent({ children }: { children: string }) {
 /**
  * ONE CARD, ONE LINK. No nested button, no competing click target: the card
  * IS the door, and where it opens is the module's one href arithmetic.
- * Calendar cards carry NO checkbox and take no batch selection.
+ * Calendar cards carry NO checkbox and take no batch selection. A card shows
+ * ONLY (owner correction 2026-09-07): confirmed time · DO No or `No delivery
+ * order yet` · Customer · City and State · Goods summary · Logistics Partner ·
+ * Delivery Status. A recorded result stays `Delivered` — the missing evidence
+ * is the `Upload delivery proof` queue's job, never a second status word.
  */
 function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
   return (
@@ -215,16 +229,9 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
         {card.logisticsPartnerName ? (
           <div className="text-kit-slate-12">{card.logisticsPartnerName}</div>
         ) : null}
-        {card.expectedArrival ? (
-          <div className="text-label text-kit-slate-11">
-            {EXPECTED_ARRIVAL} {card.expectedArrival}
-          </div>
-        ) : null}
       </div>
       <div className="border-t border-kit-slate-4 px-2 py-1">
-        <StatusPill tone={card.proofRequired ? "warning" : STATUS_TONE[card.statusKey]}>
-          {card.proofRequired ? MONITOR_COPY.deliveredProofRequired : card.statusLabel}
-        </StatusPill>
+        <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>
       </div>
     </Link>
   );
@@ -333,40 +340,52 @@ export default function OperationDelivery() {
     1,
   )[0]!;
 
-  /* `?view=` is the one WORK TO DO pick. `All delivery work` is the DEFAULT
-     landing (owner correction 2026-09-07): an empty Calendar must never be the
-     first thing an operator sees, so Calendar is an explicit pick. The retired
-     `?schedule=`/`?checking=` spellings still resolve so a shared or
-     bookmarked URL keeps answering. */
+  /* `?view=` carries EITHER the calendar view (`day` · `week` · `month`) OR
+     the one WORK TO DO pick. Absent = the default `Week` Calendar (owner
+     correction 2026-09-07). The retired spellings still resolve so a shared
+     or bookmarked URL keeps answering: `calendar` → the week ·
+     `delivered_proof_required` → `upload_proof` · `waiting_warehouse` (once a
+     queue) → the DELIVERY STATUS filter · `?schedule=`/`?checking=` → their
+     queue · `?start=`/`?day=` only ever named the calendar → its week. */
   const viewParam =
     searchParams.get("view") ??
     searchParams.get("schedule") ??
     (searchParams.get("checking") === "failed"
       ? "failed"
       : searchParams.get("checking") === "delivered_proof_required"
-        ? "delivered_proof_required"
+        ? "upload_proof"
         : searchParams.get("checking") === "waiting_warehouse"
           ? "waiting_warehouse"
           : null);
-  const view: MonitorWorkView =
+  const view: MonitorWorkView | null =
     viewParam === "all" ||
-    viewParam === "calendar" ||
     viewParam === "no_logistics" ||
     viewParam === "no_confirmed_date" ||
     viewParam === "overdue" ||
     viewParam === "failed" ||
-    viewParam === "delivered_proof_required" ||
-    viewParam === "waiting_warehouse"
+    viewParam === "upload_proof"
       ? viewParam
-      : /* The retired `?start=`/`?day=` spellings only ever named the calendar
-           landing — an old shared week link still opens its week. */
-        searchParams.has("start") || searchParams.has("day")
-        ? "calendar"
-        : "all";
+      : viewParam === "delivered_proof_required"
+        ? "upload_proof"
+        : null;
+  const requestedCalendarView: MonitorCalendarView =
+    viewParam === "day" || viewParam === "week" || viewParam === "month"
+      ? viewParam
+      : DEFAULT_CALENDAR_VIEW;
+  /* A phone is ONLY ever the Day list — the Week and Month grids are never
+     squeezed into it, whatever the URL asks for. */
+  const calendarView: MonitorCalendarView = isPhone ? "day" : requestedCalendarView;
 
   const q = searchParams.get("q") ?? "";
   const region = searchParams.get("region");
   const logistics = searchParams.get("logistics");
+  const statusParam = searchParams.get("status") ?? (viewParam === "waiting_warehouse" ? "waiting_warehouse" : null);
+  const status: MonitorDeliveryStatus | null =
+    statusParam === "waiting_warehouse" ||
+    statusParam === "ready_for_handover" ||
+    statusParam === "out_for_delivery"
+      ? statusParam
+      : null;
 
   const setParams = useCallback(
     (mutate: (next: URLSearchParams) => void, replace = false) => {
@@ -384,47 +403,57 @@ export default function OperationDelivery() {
       if (value === null || value === "") next.delete(key);
       else next.set(key, value);
     }, replace);
-  /* Picking again unpicks — the rail's own toggle grammar. The default the
-     URL falls back to is `All delivery work` (owner correction 2026-09-07),
-     so `all` never needs to be spelled and unpicking any view lands there. */
+  /* Picking again unpicks — the rail's own toggle grammar. Unpicking any
+     queue lands on the default Calendar (`Week`). */
   const pickView = (value: MonitorWorkView) =>
     setParams((next) => {
-      if (value === "all" || view === value) next.delete("view");
+      if (view === value) next.delete("view");
       else next.set("view", value);
     });
-  const toggleParam = (key: "region" | "logistics", value: string) =>
+  const toggleParam = (key: "region" | "logistics" | "status", value: string) =>
     setParams((next) => {
       if (searchParams.get(key) === value) next.delete(key);
       else next.set(key, value);
+      /* A retired `?view=waiting_warehouse` was this filter — it may not
+         linger beside the real one. */
+      if (key === "status" && viewParam === "waiting_warehouse") next.delete("view");
     });
   const clearFilters = () =>
     setParams((next) => {
       next.delete("view");
       next.delete("region");
       next.delete("logistics");
+      next.delete("status");
     });
-  /* The one date write — the window arrows exist only on the Calendar
-     projection, so the pick is spelled out and the retired spellings (which
-     implied it) never survive. */
+  /* Choosing Day / Week / Month clears every operational pick and returns the
+     right workspace to the Calendar (owner correction 2026-09-07). `Week` is
+     the default and is spelled by its absence. */
+  const pickCalendarView = (value: MonitorCalendarView) =>
+    setParams((next) => {
+      if (value === DEFAULT_CALENDAR_VIEW) next.delete("view");
+      else next.set("view", value);
+      next.delete("region");
+      next.delete("logistics");
+      next.delete("status");
+    });
+  /* The one date write from the window arrows — the calendar view stays. */
   const setDate = (iso: string) =>
     setParams((next) => {
       next.set("date", iso);
-      next.set("view", "calendar");
       next.delete("day");
       next.delete("start");
     });
-  /* A rail-calendar click OPENS that date's operating week in the right
-     workspace (owner correction 2026-09-06): Calendar becomes the explicit
-     pick and the other operational picks clear so the week is actually what
-     appears. */
+  /* A rail-calendar or Month-view date click OPENS that date's Day view in
+     the right workspace and clears the selected work queue. */
   const pickCalendarDate = (iso: string) =>
     setParams((next) => {
       next.set("date", iso);
       next.delete("day");
       next.delete("start");
-      next.set("view", "calendar");
+      next.set("view", "day");
       next.delete("region");
       next.delete("logistics");
+      next.delete("status");
     });
 
   const filters: DeliveryMonitorFilters = useMemo(() => {
@@ -432,6 +461,7 @@ export default function OperationDelivery() {
       view,
       region,
       logisticsPartnerId: logistics,
+      status,
       search: "",
       todayIso: today,
     };
@@ -439,7 +469,7 @@ export default function OperationDelivery() {
        grid's own box — an invisible second narrowing from a carried-over URL
        would make the listing look complete while it is not. */
     return { ...base, search: isCalendarProjection(base) ? q : "" };
-  }, [view, region, logistics, q, today]);
+  }, [view, region, logistics, status, q, today]);
   const calendarMode = isCalendarProjection(filters);
 
   /* ── The cards — the workspace's own reads, mapped once ────────────────── */
@@ -468,15 +498,19 @@ export default function OperationDelivery() {
     [ordersQ.data, docsQ.data, partnerNameById, arrangementsByScope],
   );
 
-  /* The FIXED window for this viewport — never a horizontal date scroll. */
+  /* The FIXED window for this view and viewport — never a horizontal date
+     scroll: the Day, the tablet's three-day half-week, the desktop's Mon–Sat
+     operating week, or every day of the Month. */
   const visibleDays = useMemo(
     () =>
-      viewport === "phone"
+      calendarView === "day"
         ? [selectedDate]
-        : viewport === "tablet"
-          ? tabletWindowOf(selectedDate)
-          : operatingWeekOf(selectedDate),
-    [viewport, selectedDate],
+        : calendarView === "month"
+          ? monthDaysOf(selectedDate)
+          : viewport === "tablet"
+            ? tabletWindowOf(selectedDate)
+            : operatingWeekOf(selectedDate),
+    [calendarView, viewport, selectedDate],
   );
   /* The dot days for the rail's month calendar — every date genuinely
      holding a confirmed delivery, whatever month it sits in. */
@@ -485,21 +519,20 @@ export default function OperationDelivery() {
     [cards],
   );
   const rails = useMemo(
-    () => buildMonitorRails(cards, filters, visibleDays, partners),
-    [cards, filters, visibleDays, partners],
+    () => buildMonitorRails(cards, filters, partners),
+    [cards, filters, partners],
   );
   const calendarCards = useMemo(
     () => filterMonitorCalendarCards(cards, filters, visibleDays),
     [cards, filters, visibleDays],
   );
-  const listRows = useMemo(
-    () => filterMonitorListRows(cards, filters, visibleDays),
-    [cards, filters, visibleDays],
-  );
+  const listRows = useMemo(() => filterMonitorListRows(cards, filters), [cards, filters]);
   const byDay = useMemo(
     () => groupCardsByDay(calendarCards, visibleDays),
     [calendarCards, visibleDays],
   );
+  /* The Month's compact counts — over the SAME calendar cards. */
+  const countsByDay = useMemo(() => monthDayCounts(calendarCards, today), [calendarCards, today]);
 
   const isError = ordersQ.isError || docsQ.isError;
   const isLoading = ordersQ.isLoading || docsQ.isLoading;
@@ -510,7 +543,7 @@ export default function OperationDelivery() {
   const [assigning, setAssigning] = useState<DeliveryScopeRow[] | null>(null);
   useEffect(() => {
     setSelected(new Set());
-  }, [view, region, logistics]);
+  }, [view, region, logistics, status]);
 
   const toggleRow = useCallback(
     (key: string) =>
@@ -589,13 +622,15 @@ export default function OperationDelivery() {
             {r.scope.refs.length > 0 ? (
               <span className="ml-1.5 text-kit-slate-11">{r.scope.refs.join(" · ")}</span>
             ) : null}
-            {r.leg != null ? (
+            {r.scope.legRoute ? (
+              /* A Journey row names its own two places — the route IS the
+                 word; `leg` never reaches the screen (owner correction
+                 2026-09-07). */
               <span
                 className="block truncate text-label text-kit-slate-11"
-                title={r.scope.legRoute ?? undefined}
+                title={r.scope.legRoute}
               >
-                Leg {r.leg}
-                {r.scope.legRoute ? ` · ${r.scope.legRoute}` : ""}
+                {r.scope.legRoute}
               </span>
             ) : null}
           </span>
@@ -768,17 +803,28 @@ export default function OperationDelivery() {
         chooserGroup: "Delivery",
         /* ⭐ THE OPERATION'S progress, not the DOCUMENT's (owner ruling
            2026-08-24) — it always has an answer, and it is never `Created`. */
-        accessor: (r) => (
-          <span className="block min-w-0">
-            <StatusPill tone={STATUS_TONE[r.statusKey]}>{r.statusLabel}</StatusPill>
-            {r.scope.status.reasonLabel ? (
-              <span className="block truncate text-label font-normal text-base-600">
-                {r.scope.status.reasonLabel}
-              </span>
-            ) : null}
-          </span>
-        ),
-        searchValue: (r) => r.statusLabel,
+        accessor: (r) => {
+          /* The result stays `Delivered`; the row names the EXACT missing
+             evidence beneath it — `Upload delivery photo` and/or `Upload
+             signed Delivery Order` (owner correction 2026-09-07). */
+          const missing = missingProofLabels(r);
+          const second = r.scope.status.reasonLabel ?? (missing.length ? missing.join(" · ") : null);
+          return (
+            <span className="block min-w-0">
+              <StatusPill tone={STATUS_TONE[r.statusKey]}>{r.statusLabel}</StatusPill>
+              {second ? (
+                <span
+                  className="block truncate text-label font-normal text-base-600"
+                  title={second}
+                  data-testid={missing.length ? "delivery-monitor-missing-proof" : undefined}
+                >
+                  {second}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
+        searchValue: (r) => [r.statusLabel, ...missingProofLabels(r)].join(" "),
         filterValue: (r) => r.statusLabel,
       },
       {
@@ -833,16 +879,46 @@ export default function OperationDelivery() {
     [navigate, openOrder, openEditDelivery],
   );
 
-  const rangeLabel = isPhone
-    ? fmtDate(selectedDate)
-    : `${fmtDate(visibleDays[0]!)} – ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
+  const rangeLabel =
+    calendarView === "day"
+      ? fmtDate(selectedDate)
+      : calendarView === "month"
+        ? fmtMonth(selectedDate.slice(0, 7))
+        : `${fmtDate(visibleDays[0]!)} – ${fmtDate(visibleDays[visibleDays.length - 1]!)}`;
 
-  /* Previous/next REPLACES the whole displayed window: one operating day on
-     the phone, the three-day half-week on a tablet, the whole operating week
-     on the desktop (six operating days = exactly one week, Sundays skipped). */
-  const windowStep = viewport === "phone" ? 1 : viewport === "tablet" ? 3 : MONITOR_DAYS;
-  const goPrevious = () => setDate(previousOperatingWindowStart(selectedDate, windowStep));
-  const goNext = () => setDate(nextOperatingWindowStart(selectedDate, windowStep));
+  /* Previous/next REPLACES the whole displayed window: one operating day in
+     Day, the three-day half-week on a tablet, the whole operating week on the
+     desktop (six operating days = exactly one week, Sundays skipped), the
+     whole month in Month. */
+  const windowStep = calendarView === "day" ? 1 : viewport === "tablet" ? 3 : MONITOR_DAYS;
+  const goPrevious = () =>
+    setDate(
+      calendarView === "month"
+        ? monthStepStart(selectedDate, -1)
+        : previousOperatingWindowStart(selectedDate, windowStep),
+    );
+  const goNext = () =>
+    setDate(
+      calendarView === "month"
+        ? monthStepStart(selectedDate, 1)
+        : nextOperatingWindowStart(selectedDate, windowStep),
+    );
+  const previousLabel = calendarView === "month" ? MONITOR_COPY.previousMonth : MONITOR_COPY.previousDays;
+  const nextLabel = calendarView === "month" ? MONITOR_COPY.nextMonth : MONITOR_COPY.nextDays;
+
+  /* ── THE PAGE-TOOLBAR CALENDAR CONTROL — Day · Week · Month ──────────────
+     Present on both projections: on the work list nothing is lit, and one
+     click on any of the three returns to the Calendar. Never on a phone,
+     which is only ever the Day list. */
+  const calendarControl = isPhone ? null : (
+    <Segmented<MonitorCalendarView>
+      options={MONITOR_CALENDAR_VIEWS.map((v) => ({ value: v, label: MONITOR_CALENDAR_VIEW_LABEL[v] }))}
+      value={calendarMode ? calendarView : null}
+      onChange={pickCalendarView}
+      ariaLabel={MONITOR_COPY.calendarViews}
+      testId="delivery-monitor-calendar-view"
+    />
+  );
 
   const showFiltersButton = (
     <button
@@ -870,7 +946,7 @@ export default function OperationDelivery() {
       }}
       /* The complete month, always in view (owner correction 2026-09-06):
          scrolling the filter groups never removes it. Clicking a date opens
-         its fixed operating week in the right workspace. */
+         that date's Day view in the right workspace. */
       header={
         <MonitorMonthCalendar
           selectedIso={selectedDate}
@@ -892,13 +968,7 @@ export default function OperationDelivery() {
           />
         ))}
       </FilterRailGroup>
-      <FilterRailGroup title={MONITOR_COPY.railRegion}>
-        <FilterRailRow
-          label={MONITOR_COPY.allRegions}
-          active={region === null}
-          onClick={() => setParam("region", null)}
-          testId="delivery-monitor-region-all"
-        />
+      <FilterRailGroup title={MONITOR_COPY.railState}>
         {rails.regions.map((item) => (
           <FilterRailRow
             key={item.key}
@@ -911,12 +981,6 @@ export default function OperationDelivery() {
         ))}
       </FilterRailGroup>
       <FilterRailGroup title={MONITOR_COPY.railLogistics}>
-        <FilterRailRow
-          label={MONITOR_COPY.allLogistics}
-          active={logistics === null}
-          onClick={() => setParam("logistics", null)}
-          testId="delivery-monitor-logistics-all"
-        />
         {rails.logistics.map((item) => (
           <FilterRailRow
             key={item.key}
@@ -925,6 +989,18 @@ export default function OperationDelivery() {
             active={logistics === item.key}
             onClick={() => toggleParam("logistics", item.key)}
             testId={`delivery-monitor-logistics-${item.key}`}
+          />
+        ))}
+      </FilterRailGroup>
+      <FilterRailGroup title={MONITOR_COPY.railStatus}>
+        {MONITOR_STATUS_FILTERS.map((key) => (
+          <FilterRailRow
+            key={key}
+            label={MONITOR_STATUS_LABEL[key]}
+            count={rails.status[key]}
+            active={status === key}
+            onClick={() => toggleParam("status", key)}
+            testId={`delivery-monitor-status-${key}`}
           />
         ))}
       </FilterRailGroup>
@@ -1041,13 +1117,15 @@ export default function OperationDelivery() {
             </div>
           ) : calendarMode ? (
             <>
-              {/* The calendar toolbar: where the window stands, and the one search. */}
+              {/* The calendar toolbar: where the window stands, Day · Week ·
+                  Month, and the one search. */}
               <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
                 {!railVisible ? showFiltersButton : null}
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    aria-label={MONITOR_COPY.previousDays}
+                    aria-label={previousLabel}
+                    data-testid="delivery-monitor-previous"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
                     onClick={goPrevious}
                   >
@@ -1076,13 +1154,15 @@ export default function OperationDelivery() {
                   )}
                   <button
                     type="button"
-                    aria-label={MONITOR_COPY.nextDays}
+                    aria-label={nextLabel}
+                    data-testid="delivery-monitor-next"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-hovertint"
                     onClick={goNext}
                   >
                     <ChevronRight size={16} />
                   </button>
                 </div>
+                {calendarControl}
                 <input
                   type="search"
                   value={q}
@@ -1094,8 +1174,9 @@ export default function OperationDelivery() {
                 />
               </div>
 
-              {isPhone ? (
-                /* ── THE ONE-DAY LIST — never the grid squeezed into a phone. ── */
+              {calendarView === "day" ? (
+                /* ── THE DAY LIST — one operating day, the same cards and
+                   order on every viewport; on a phone the ONLY calendar. ── */
                 <div className="min-h-0 flex-1 overflow-y-auto" data-testid="delivery-monitor-daily">
                   <div className="sticky top-0 z-10 border-b border-kit-slate-5 bg-white px-3 py-2 text-body font-semibold text-kit-slate-12">
                     {fmtDate(selectedDate)}
@@ -1110,15 +1191,25 @@ export default function OperationDelivery() {
                     className="flex min-h-0 flex-1 items-center justify-center px-4 text-body text-kit-slate-11"
                     data-testid="delivery-monitor-empty-search"
                   >
-                    No matching delivery scopes.
+                    {MONITOR_COPY.emptySearch}
                   </div>
                 ) : (
                   emptyRange
                 )
+              ) : calendarView === "month" ? (
+                /* ── THE MONTH — compact counts per date, never cards; a
+                   date click opens its Day. ──────────────────────────────── */
+                <MonitorMonthView
+                  monthOfIso={selectedDate}
+                  selectedIso={selectedDate}
+                  countsByDay={countsByDay}
+                  onSelect={pickCalendarDate}
+                  testId="delivery-monitor-month-view"
+                />
               ) : (
-                /* ── THE FIXED WINDOW'S COLUMNS — six on desktop, three on a
-                   tablet, always fitting the available width (no horizontal
-                   date scrolling; vertical scrolling inside the days). ───── */
+                /* ── THE WEEK'S COLUMNS — six on desktop, three on a tablet,
+                   always fitting the available width (no horizontal date
+                   scrolling; vertical scrolling inside the days). ───────── */
                 <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={isLoading}>
                   <div
                     className={`grid h-full divide-x divide-kit-slate-4 ${
@@ -1159,14 +1250,12 @@ export default function OperationDelivery() {
                   searchPlaceholder={MONITOR_COPY.search}
                   isLoading={isLoading}
                   emptyMessage={
-                    cards.length === 0
-                      ? MONITOR_COPY.emptyList
-                      : "No matching delivery scopes."
+                    cards.length === 0 ? MONITOR_COPY.emptyList : MONITOR_COPY.emptySearch
                   }
                   groupBanner={false}
                   stickyIdentity
                   chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
-                  /* A row on this workspace IS a delivery scope, so opening it
+                  /* A row on this workspace IS a delivery, so opening it
                      opens the delivery (owner correction 2026-08-24). */
                   onRowDoubleClick={openEditDelivery}
                   contextMenu={contextMenu}
@@ -1179,9 +1268,11 @@ export default function OperationDelivery() {
                     onToggle: toggleRow,
                     onToggleAll: toggleAll,
                   }}
-                  selectionSummary={(n) =>
-                    n === 1 ? "1 delivery scope selected" : `${n} delivery scopes selected`
-                  }
+                  /* `{N} selected · Clear · Assign logistics` — no invented
+                     unit word and nothing between the three (owner correction
+                     2026-09-07); the sheet's Export stays on the normal toolbar. */
+                  selectionSummary={selectedSentence}
+                  hideSelectionExport
                   selectionActions={[
                     ...(allUnassigned
                       ? [
@@ -1212,7 +1303,7 @@ export default function OperationDelivery() {
                         ]
                       : []),
                     {
-                      /* ONE scope only — Edit Delivery opens a single
+                      /* ONE row only — Edit Delivery opens a single
                          arrangement. */
                       label: () => EDIT_DELIVERY,
                       kind: "write",
@@ -1223,9 +1314,14 @@ export default function OperationDelivery() {
                       },
                     },
                   ]}
-                  toolbarStart={!railVisible ? showFiltersButton : undefined}
+                  toolbarStart={
+                    <>
+                      {!railVisible ? showFiltersButton : null}
+                      {calendarControl}
+                    </>
+                  }
                   statusSummary={(filtered) => {
-                    const line = scopeFooter(filtered.length, listRows.length);
+                    const line = deliveriesFooter(filtered.length, listRows.length);
                     return (
                       <span className="block truncate" title={line}>
                         {line}
