@@ -1956,10 +1956,32 @@ Inbound endpoint answer 401 unauthenticated — alive behind their role gates. C
 passed on the PR head (shared 3004 · api 2806 · web 3951 tests; strict `tsconfig.app.json`
 typecheck; design-standard lint). Authenticated operator walks remain the owner's checklist.
 
+**CORRECTION — the first ship of this card broke two production surfaces (2026-09-07).** The
+merged branch carried an earlier session's arrival-source reads, which name
+`arrival_sources`, `arrival_source_units`, `arrival_source_events` and
+`warehouse_receipts.arrival_source_id` — objects that live only in an unnumbered draft and do
+not exist in production. Both registers therefore failed to open: Inbound (whose rows had been
+composed client-side from working endpoints before this card) and the Receiving Register, whose
+select list gained the absent column. **The 2026-09-07 verification did not catch it because it
+proved the deployed SHA, the bundle strings and the 401 gate — none of which exercises an
+authenticated read.** A green suite and a live route are not a working page.
+
+The rule this writes down: **a Register that reads an object the deployed schema may not carry
+must treat that absence as "this source kind has no records", never as a failed read** —
+`apps/api/src/lib/optional-relation.ts` degrades on an undefined table/column ONLY, so a
+permission or RLS failure still travels loudly, and both routes heal themselves the moment the
+draft lands. Both routes now carry a `PRODUCTION SHAPE` regression test that reproduces the
+deployed schema; the Inbound and Receiving suites fail if either read is made unconditional
+again.
+
 Still owed (not this card's build): land the arrival-sources draft
-(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered — the non-PO Inbound
-rows have no production tables), and migration 0437 (Khor Yee offboard / two-person duty) is
-on `main` but **NOT applied** in production while 0438–0440 are — flagged to its owning stream.
+(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered) — until it does, the
+Inbound rail's Transfer / Customer Return / Failed Delivery return / Return from repair /
+Supplier replacement rows honestly count zero. Migration **0437** (Khor Yee offboard /
+two-person duty) was found unapplied while 0438–0440 were — with nobody resolving `po_duty` or
+`grn_duty`, which blocked every GRN posting. It was applied on 2026-09-07 as
+`20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
+2026-10 → 2027-09 alternating rotation exists.
 
 ## 14 · Whole-domain completion gate
 

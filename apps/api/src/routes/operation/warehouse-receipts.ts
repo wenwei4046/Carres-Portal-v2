@@ -18,6 +18,7 @@ import {
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { isMissingRelationError } from "../../lib/optional-relation";
 import { skuCategories } from "../../lib/sku-categories";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -133,8 +134,26 @@ async function readByIds<T>(
 
 /** The full record select — one string, so the paged mode and the legacy
  *  list cannot quietly read two different rows. */
-const RECEIPT_SELECT =
-  "id, arrival_source_id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason";
+const RECEIPT_FIELDS =
+  "po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason";
+const RECEIPT_SELECT = `id, arrival_source_id, ${RECEIPT_FIELDS}`;
+/** `arrival_source_id` lands with the arrival-source tables, still an
+ *  unnumbered draft (docs/stock/MASTER.md §13.9). Until they exist every
+ *  receipt is PO-backed — which is what production holds — so the register
+ *  reads the same rows without that one column instead of refusing to open. */
+const RECEIPT_SELECT_WITHOUT_ARRIVAL = `id, ${RECEIPT_FIELDS}`;
+
+/** Run a receipts read with the full select; retry once without the optional
+ *  column when the deployed schema does not carry it. Any other error is the
+ *  caller's to handle unchanged. */
+async function readReceipts<T>(run: (select: string) => Promise<T>): Promise<T> {
+  try {
+    return await run(RECEIPT_SELECT);
+  } catch (error) {
+    if (!isMissingRelationError(error)) throw error;
+    return run(RECEIPT_SELECT_WITHOUT_ARRIVAL);
+  }
+}
 
 const GRN_PAGE_DEFAULT = 50;
 const GRN_PAGE_MAX = 200;
@@ -299,8 +318,11 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     // order (a `.in(…)` read has no order of its own).
     let pageRows: ReceiptRow[] = [];
     try {
-      pageRows = await readByIds<ReceiptRow>(view.pageIds, (ids) =>
-        sb.from("warehouse_receipts").select(RECEIPT_SELECT).in("id", ids),
+      pageRows = await readReceipts((select) =>
+        readByIds<ReceiptRow>(view.pageIds, (ids) =>
+          sb.from("warehouse_receipts").select(select).in("id", ids) as unknown as
+            PromiseLike<{ data: ReceiptRow[] | null; error: unknown }>,
+        ),
       );
     } catch (error) {
       const m = mapPgError(error as never);
@@ -432,34 +454,41 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     ? raw
     : "submitted";
 
-  let q = sb
-    .from("warehouse_receipts")
-    .select(
-      // C2 widened this: `submitted_from` · `goods_received_at` · `posted_*`
-      // are what the Goods Received register reads, and they are 0314/0315
-      // columns this select predates. `reviewed_*` stays until the
-      // reader-rename slice drops it (0314's own discipline).
-      // 0426 widened this: grn_no · actual_site_id · arrival_evidence ·
-      // extra_lines · the posted duty-evidence trio · void_* are what the
-      // Receiving Register and the GRN record read.
-      RECEIPT_SELECT,
-    )
-    // The register is a HISTORY, so it sorts by the BUSINESS date — when the
-    // goods physically arrived — not by when somebody keyed them in. The
-    // submitted stamp only breaks ties.
-    .order("goods_received_at", { ascending: false })
-    .order("submitted_at", { ascending: false })
-    .limit(
-      Math.min(
-        Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
-        MAX_LIMIT,
-      ),
-    );
-  if (status !== "all") q = q.eq("status", status);
+  // C2 widened this select: `submitted_from` · `goods_received_at` ·
+  // `posted_*` are what the Goods Received register reads, and they are
+  // 0314/0315 columns it predates. `reviewed_*` stays until the reader-rename
+  // slice drops it (0314's own discipline). 0426 widened it again: grn_no ·
+  // actual_site_id · arrival_evidence · extra_lines · the posted
+  // duty-evidence trio · void_* are what the Register and the GRN record read.
+  const listRead = async (select: string) => {
+    let q = sb
+      .from("warehouse_receipts")
+      .select(select)
+      // The register is a HISTORY, so it sorts by the BUSINESS date — when
+      // the goods physically arrived — not by when somebody keyed them in.
+      // The submitted stamp only breaks ties.
+      .order("goods_received_at", { ascending: false })
+      .order("submitted_at", { ascending: false })
+      .limit(
+        Math.min(
+          Math.max(1, Math.floor(Number(c.req.query("limit")) || DEFAULT_LIMIT)),
+          MAX_LIMIT,
+        ),
+      );
+    if (status !== "all") q = q.eq("status", status);
+    const res = (await q) as unknown as {
+      data: unknown[] | null;
+      error: unknown;
+    };
+    if (res.error) throw res.error;
+    return res.data;
+  };
 
-  const { data, error } = await q;
-  if (error) {
-    const m = mapPgError(error);
+  let data: unknown[] | null = null;
+  try {
+    data = await readReceipts(listRead);
+  } catch (err) {
+    const m = mapPgError(err as never);
     return c.json(m.body, m.status);
   }
   const rows = (data ?? []) as ReceiptRow[];
@@ -746,15 +775,26 @@ warehouseReceiptsRouter.get("/duty", requireOperation, async (c) => {
 warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
   const id = c.req.param("id");
-  const { data: row, error } = await sb
-    .from("warehouse_receipts")
-    .select(
-      RECEIPT_SELECT,
-    )
-    .eq("id", id)
-    .maybeSingle();
+  let row: Record<string, unknown> | null = null;
+  let error: unknown = null;
+  try {
+    row = await readReceipts(async (select) => {
+      const res = (await sb
+        .from("warehouse_receipts")
+        .select(select)
+        .eq("id", id)
+        .maybeSingle()) as unknown as {
+        data: Record<string, unknown> | null;
+        error: unknown;
+      };
+      if (res.error) throw res.error;
+      return res.data;
+    });
+  } catch (e) {
+    error = e;
+  }
   if (error) {
-    const m = mapPgError(error);
+    const m = mapPgError(error as never);
     return c.json(m.body, m.status);
   }
   if (!row) return c.json({ error: "receipt not found" }, 404);
