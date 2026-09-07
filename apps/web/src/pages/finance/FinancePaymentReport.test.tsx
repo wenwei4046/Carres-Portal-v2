@@ -1,5 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import FinancePaymentReport, {
@@ -10,6 +11,18 @@ import FinancePaymentReport, {
 const state = vi.hoisted(() => ({
   payments: { data: [] as unknown[], isLoading: false, isError: false },
   invoices: { data: [] as unknown[], isLoading: false, isError: false },
+  waiverCases: [] as unknown[],
+}));
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(async (url: string) => {
+    if (url.includes("/payment-storage")) return { cases: state.waiverCases };
+    throw new Error(`unexpected ${url}`);
+  }),
+}));
+vi.mock("xlsx", () => ({
+  utils: { book_new: () => ({}), json_to_sheet: (r: unknown) => r,
+    book_append_sheet: vi.fn() },
+  writeFile: vi.fn(),
 }));
 vi.mock("@/lib/queries", () => ({
   usePaymentRegister: () => state.payments,
@@ -50,6 +63,7 @@ function invoice(over: Partial<InvoiceRegisterRow> & { paid?: number; lines?: nu
 }
 
 beforeEach(() => {
+  state.waiverCases = [];
   state.payments = { data: [payment, voided], isLoading: false, isError: false };
   state.invoices = {
     data: [
@@ -63,7 +77,10 @@ beforeEach(() => {
 });
 
 function show() {
-  return render(<MemoryRouter><FinancePaymentReport /></MemoryRouter>);
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>
+    <MemoryRouter><FinancePaymentReport /></MemoryRouter>
+  </QueryClientProvider>);
 }
 
 describe("the report derivations", () => {
@@ -133,9 +150,33 @@ describe("Reports → Payment", () => {
     // 1300 − (1000 + 158) = 142 past every obligation.
     expect(card).toHaveTextContent("RM 142.00 needs review");
   });
-  it("the storage waiver section says honestly that the journey is not built", () => {
+  it("Storage waived lists each approved decision with its reason and approver", async () => {
+    state.waiverCases = [{
+      id: "c1", order_id: "o1", product_group: "mattress_bedframe",
+      approved_free_until: "2026-09-27", approved_at: "2026-09-07T01:00:00Z",
+      approval_reason: "Customer travelling",
+      approved_by_user: { name: "Shasha" },
+    }, {
+      id: "c2", order_id: "o1", product_group: "sofa",
+      approved_free_until: null, approved_at: null, approval_reason: null,
+    }];
     show();
-    expect(screen.getByTestId("report-storage-waived"))
-      .toHaveTextContent("No storage waiver is recorded yet.");
+    const card = await screen.findByTestId("report-storage-waived");
+    await waitFor(() => expect(card).toHaveTextContent("Customer travelling"));
+    expect(card).toHaveTextContent("SO-1319");
+    expect(card).toHaveTextContent("approved by Shasha");
+    expect(card).not.toHaveTextContent("Sofa");
+  });
+  it("with no approval the waiver section says so honestly", async () => {
+    show();
+    await waitFor(() => expect(screen.getByTestId("report-storage-waived"))
+      .toHaveTextContent("No free storage has been approved."));
+  });
+  it("Export Excel writes one sheet per section from the same reads", async () => {
+    show();
+    const { writeFile, utils } = await import("xlsx");
+    screen.getByTestId("report-export").click();
+    await waitFor(() => expect(vi.mocked(writeFile)).toHaveBeenCalled());
+    expect(vi.mocked(utils.book_append_sheet)).toHaveBeenCalledTimes(6);
   });
 });
