@@ -112,8 +112,8 @@ describe("GET /api/operation/supplier-claims", () => {
     const sb = {
       from: vi.fn((t: string) => {
         if (t === "product_skus") {
-          const builder = listBuilder([{ sku: "MS01-K", variant: "Mattress Classic King" }], eqCalls);
-          builder.select = vi.fn((columns: string) => { expect(columns).toBe("sku, variant"); return builder; });
+          const builder = listBuilder([{ sku: "MS01-K", variant: "King", product_models: { name: "Mattress Classic" } }], eqCalls);
+          builder.select = vi.fn((columns: string) => { expect(columns).toBe("sku, variant, product_models(name)"); return builder; });
           return builder;
         }
         if (t === "supplier_claims") return listBuilder([CLAIM], eqCalls);
@@ -152,7 +152,8 @@ describe("GET /api/operation/supplier-claims", () => {
     expect(body.claims[0].supplier_name).toBe("Ohana");
     expect(body.claims[0].reported_by_name).toBe("Shasha");
     expect(body.claims[0].photo_count).toBe(1);
-    expect(body.claims[0].product_description).toBe("Mattress Classic King");
+    expect(body.claims[0].product_description).toBe("Mattress Classic");
+    expect(body.claims[0].product_variant).toBe("King");
     expect(body.claims[0].held_unit_codes).toEqual(["U-1001"]);
     // R4 — the goods, read from the register rather than copied from qty.
     expect(body.claims[0].held_units).toBe(2);

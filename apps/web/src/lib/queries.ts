@@ -3866,6 +3866,7 @@ export interface SupplierClaimListRow {
   grn_no?: string | null;
   held_unit_codes?: string[];
   product_description?: string | null;
+  product_variant?: string | null;
   claim_no: string;
   po_id: string;
   po_line_id: string | null;
