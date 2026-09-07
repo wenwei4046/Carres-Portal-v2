@@ -568,13 +568,31 @@ a forged JWT role claim changes nothing). Charging (commenced cycles → Storage
 the operator journey UI (the delivery-window form, the case surfaces, §16 composition
 extension) are the named next slices — this one records the facts they derive from.
 
+### BUILD — a commenced period becomes a Storage Invoice, 2026-09-07
+
+Migration `0438` closes the charge side of the storage case: `payment_storage_invoice` turns
+commenced, UNBILLED §7 periods into a real invoice through the EXISTING 0429 lifecycle —
+the same `INV-` numbering authority, the same immutable snapshot (a server-composed
+document carrying the case, the period range and the per-period charge), the same
+void/replacement lineage; nothing invents a second document authority. The first paper for
+a case is kind `storage`, every later one `additional_storage`; `billed_through_period`
+advances atomically with the paper, a charge with nothing newly commenced is refused, a
+storage paper never stamps the order's Sales-Invoice number, and the door is Operation /
+principal (§12 — Finance reads and exports). The case card says
+`{n} charge periods started · RM {x} — {m} not on a Storage Invoice yet.` and offers
+`Create Storage Invoice` exactly while something is unbilled. The SQL arithmetic and the
+shared `storageChargeOf` are both pinned to the §7 worked examples (the rolled-back
+production probe asserted 1-period Aug-start RM150 · 7-period sofa RM1,400 ·
+additional-storage RM200 top-up · double-charge refused · unknown caller refused).
+Production convergence and this slice's walk are recorded when they exist.
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
 Message assembly with bank routing and Partner contact, storage
 journeys, report export, and the retirement of the rejected Refund/Bank Matching surfaces
-remain unfinished target work (Reports → Payment and the Online link journey are built
-above; report export and the storage-waiver rows await their journeys, and the payment-link
-customer wording awaits its owner-approved template). The complete approved customer
+remain unfinished target work (Reports → Payment, the Online link journey and the storage
+case-and-charge chain are built above; report export and the storage-waiver rows await
+their journeys, and the payment-link customer wording awaits its owner-approved template). The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
 it into a `Standard bank transfer` template once approved. The Calendar correction's

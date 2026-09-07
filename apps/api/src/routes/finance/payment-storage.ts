@@ -93,4 +93,24 @@ paymentStorageRouter.post("/extra-free", async (c) => {
   return c.json({ case: data });
 });
 
+const chargeInput = z.object({
+  caseId: z.string().uuid(),
+});
+
+// 0438 — commenced unbilled §7 periods become a Storage / Additional Storage
+// Invoice through the 0429 lifecycle. The SQL door owns every decision.
+paymentStorageRouter.post("/charge", async (c) => {
+  const parsed = await parseJsonBody(c, chargeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("payment_storage_invoice", {
+    p_case_id: parsed.data.caseId,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data as Record<string, unknown>, 201);
+});
+
 export default paymentStorageRouter;
