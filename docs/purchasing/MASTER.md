@@ -2315,7 +2315,17 @@ Purchasing Approver; choosing Buy does not approve the Manual Purchase or issue 
 Date, Purchasing Decision, Source Order, Work.
 **Journey:** showroom logs in → records simple request/current Unit and photos/videos when needed → Purchasing decides Buy,
 Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
-**Object/placement:** internal full-width object; no PDF preview.
+**Object/placement — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Internal full-width
+object; no PDF preview. Reading order is Request → Checks → Connected work → History. Request
+leads with the requested result, item/quantity, From/To and Needed Date where relevant, contact,
+receiver, photos/videos and Remarks. Checks cover exact Unit and ownership, collection/access,
+transport and installation arrangements, charges and required approval. PO Duty records the
+decision here. Connected work links Transfer/Purchase/Consignment/Return and shows actual arrival
+and installation results separately. Physical movement, supplier documents and money open their
+existing owning pages; this object never gains duplicate writers. History retains decisions,
+changes, messages and evidence. No generic Complete button: progress derives from required
+recorded results; arrival alone cannot complete a request requiring installation. This approves
+the request-page layout/completion boundary, not the entire Showroom Blueprint.
 **Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
 duplicate request.
 **Connections:** Showroom, Catalog, Manual Purchase, CO/CRTN, Stock transfer/Unit.
