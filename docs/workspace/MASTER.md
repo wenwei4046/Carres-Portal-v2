@@ -198,6 +198,16 @@ honest Work for admitted modules.
   is the object/door, and only an atomic allocated payment reducing outstanding to RM 0 completes it.
   A sent message remains evidence and bank matching remains later evidence; neither is a second
   settlement step nor closes Work.
+- Service Case admission was re-audited against the approved Service MASTER and shipped case plan,
+  deadline clock and case API on 2026-09-07. The one deadline action (`Call {customer} — say why it
+  is taking longer`) already has an authoritative trigger, 14-working-day deadline, exact case door
+  and completion event tied to the deadline in force. It is deliberately not admitted yet because
+  routine Service Case work has no governed person rule or Duty key: production describes the whole
+  module only as Operation-scoped. `Service Case Approver` governs case decisions, not routine
+  customer calls, and must not be reused as a convenient fallback. The other derived case follow-ups
+  also have no step owner or governed per-step due law. Workspace therefore reports this as an
+  admission gap and does not invent an `Operation team` owner, a global fallback or duplicate task
+  rows. Their outcome dates remain the authoritative completion facts in the Service Case.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
@@ -208,7 +218,9 @@ honest Work for admitted modules.
 3. Remove legacy PIC/duty fallbacks.
 4. Add permission-scoped Warehouse Site queues and personal operator acceptance/resolution, then
    admit physical Outbound actions; never turn Monitor events into actions.
-5. Admit the remaining qualified modules to the server feed.
+5. Define a routine Service Case owner rule/Duty (separate from approval) and decide whether its
+   derived follow-ups are governed `No date` actions or receive per-step clocks; then admit only the
+   qualified projections to the server feed.
 6. Retire remaining duplicate generated-task paths after source-by-source proof.
 7. Emit Notifications from Work transitions.
 8. Last, complete and owner-review Dashboard against production data.
