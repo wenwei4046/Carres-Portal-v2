@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import InvoiceStorage, { type StorageCaseRow } from "./InvoiceStorage";
@@ -111,6 +111,28 @@ describe("the Storage section", () => {
     await waitFor(() => expect(screen.getByTestId("storage-case-mattress_bedframe"))
       .toHaveTextContent("all on a Storage Invoice."));
     expect(screen.queryByRole("button", { name: "Create Storage Invoice" })).not.toBeInTheDocument();
+  });
+  it("End storage states its reason and posts to the closing door; a closed case offers no doors", async () => {
+    state.cases = [CASE];
+    show();
+    await waitFor(() => expect(screen.getByRole("button", { name: "End storage" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "End storage" }));
+    const form = screen.getByTestId("storage-end-form");
+    fireEvent.change(screen.getByLabelText("Why the storage ended"), { target: { value: "Goods delivered" } });
+    fireEvent.click(within(form).getByRole("button", { name: "End storage" }));
+    await waitFor(() => expect(state.posts).toHaveLength(1));
+    expect(state.posts[0]).toMatchObject({
+      url: "/api/finance/payment-storage/close",
+      body: { caseId: "c1", reason: "Goods delivered" } });
+  });
+  it("a closed case is history: no charge, no extra free, no end door", async () => {
+    state.cases = [{ ...CASE, status: "closed" }];
+    show();
+    await waitFor(() => expect(screen.getByTestId("storage-case-mattress_bedframe"))
+      .toHaveTextContent("· Closed"));
+    expect(screen.queryByRole("button", { name: "Create Storage Invoice" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request more free days" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "End storage" })).not.toBeInTheDocument();
   });
   it("a sofa case offers no extra-free door", async () => {
     state.cases = [{ ...CASE, id: "c2", product_group: "sofa", rule_extra_free_allowed: false,

@@ -631,6 +631,24 @@ in a reader audit. Work's inline combined formula
 (`sales-order-work-source`) and `soRemaining` are the same subtract-once law with the two
 different storage sources above; they unify when the gate does.
 
+### BUILD — the storage facts are immutable, and a case can close, 2026-09-07
+
+Migration `0439` makes the §6 permanence STRUCTURAL instead of disciplinary: a BEFORE
+UPDATE trigger refuses any change to the witnessed facts, the derived start or the rule
+snapshot (even a definer-function bug or a privileged hand cannot recalculate an old case),
+refuses rolling `billed_through_period` backwards (a paper, once minted, is corrected
+through the 0429 void lineage — never un-billed by an update), and refuses reopening a
+closed case. `payment_storage_close` is the one closing door — Operation/principal, a
+stated reason, the order history fact — and a closed case refuses charging, extra-free
+decisions and every other door. The case card gains `End storage` (reason first) and a
+closed case shows history with no doors. The rolled-back production probe passed with
+negative controls: start/snapshot edits refused · billed rollback refused · close stored ·
+charge and extra-free refused on the closed case · reopen refused · double close refused ·
+unknown caller refused. Supplier/Carres delay staying unchargeable is structural (a charge
+derives only from a start that REQUIRES the readiness witness); mixed product groups run as
+separate cases per 0436; automatic close on delivery completion is Delivery-side wiring and
+stays a named next step.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
