@@ -2424,6 +2424,16 @@ exact owning record in My Work and closes from its recorded result, preserving P
 cover and actual actor. No business document gains a universal owner. This approves this ownership
 scope only; the complete Showroom Blueprint remains under review.
 
+**Showroom work timing — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** First display decision
+or request for missing facts remains due by the next Office working day under §9.8. PO Duty reviews
+a requested change or cancellation by the next Office working day after submission. First send of
+an approved, ready Consignment Order, Consignment Return or Consignment Sale Notice is due by the
+next Office working day after it becomes ready; paired returns use the combined CO instruction,
+not duplicate sends. Requested dates and confirmed appointments remain separate; Not decided
+never becomes a fabricated booking. Stock §12.9 governs physical-result recording/check timing.
+Late work retains its original due date and any blocker in shared Team Work; no separate reminder
+list or manual completion is introduced. Existing PO timing is unchanged.
+
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
 | Manual Purchase awaits decision; due no later than its Order By | `Purchasing Approver` through the Shared Duty Resolver | `Approve purchase` (context: `Manual Purchase · Ready Stock · Carres Klang · Hooka`) | Stored approval or refusal with Primary, Cover and actual actor/time exists |

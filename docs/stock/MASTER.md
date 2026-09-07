@@ -1252,6 +1252,15 @@ separate results. Physical custody continues to use Stock's existing event autho
 Request reads those results and never records a duplicate arrival. My Work opens the exact owning
 record and completes from the stored result, with Primary holder/cover/actual actor preserved.
 
+**Showroom physical-result timing — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Showroom
+Duty confirms arrival, handover and installation result on the actual working date of the event.
+Preserve the actual event time/date separately from the recording time; late entry never backdates
+the actor evidence. When a confirmed event date passes without a result, the system asks that
+Site's Showroom Duty to check what happened. Missing evidence alone is not supplier failure.
+Requested dates remain separate from confirmed appointments. Late work keeps the original date
+and any blocker in shared Team Work, with no separate reminder list. A permitted unknown date
+never creates an invented appointment or late physical event.
+
 **CURRENT CARRES →** display sofas can live in staff memory, a supplier list or separate showroom
 sheet; Carres-owned, Consignment, sold-awaiting-Delivery and repair/change/collection goods may be
 split; showroom can be treated as a sales address rather than a Stock Site; ownership, holder,
