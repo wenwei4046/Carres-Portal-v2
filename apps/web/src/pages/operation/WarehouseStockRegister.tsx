@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyRailSelection,
   ATTENTION_REASONS,
@@ -386,6 +386,7 @@ export default function WarehouseStockRegister() {
         testId="stock-register-destination-header"
         word="Inventory"
         docTitle="Inventory · Warehouse — Carres"
+        right={<Link className="text-kit-blue-11 text-body" to="/operation?tab=arrival-source&kind=transfer">Request Transfer</Link>}
         destinationHeader
       />
       <div className="flex min-h-0 flex-1 gap-4 p-2" data-testid="stock-register">

@@ -42,7 +42,6 @@ import { Block } from "../SalesOrderWorkspace";
 import type { PoTemplateData } from "@/lib/pdf/types";
 import {
   useOperationPoAudit,
-  useOperationPoDuty,
   useOperationPos,
   useOperationPoUnits,
   useOperationSupplierClaims,
@@ -52,9 +51,11 @@ import {
   useRecordSend,
   useRecordSupplierDate,
   useRevisePo,
+  useWorkspaceDuties,
   type operationPoListRow,
   type SupplierRow,
 } from "@/lib/queries";
+import { workspaceDutyActor } from "../workspace-duty-owner";
 import PurchasingTabs from "../PurchasingTabs";
 import PoIssueEvidence, { CHANNEL_WORD, doorsForIssuedPo } from "../components/PoIssueEvidence";
 
@@ -207,7 +208,8 @@ export default function PurchaseOrdersPage() {
   const posQ = useOperationPos({ status: "all" });
   const suppliersQ = useOperationSuppliers();
   const warehouseQ = useOperationWarehouse();
-  const dutyQ = useOperationPoDuty();
+  const dutyQ = useWorkspaceDuties();
+  const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<PurchaseOrderRegisterFilter | null>(null);
   const [railOpen, setRailOpen] = useState(false);
@@ -335,7 +337,7 @@ export default function PurchaseOrdersPage() {
       <PurchaseOrderObject
         row={selected}
         messageTemplate={posQ.data?.messageTemplate ?? null}
-        owner={dutyQ.data?.holder ?? null}
+        owner={poDutyActor}
         destinations={destinations}
         activeDestinations={activeDestinations}
         onBack={() => {
@@ -744,7 +746,7 @@ function PurchaseOrderObject({
 }: {
   row: RegisterRow;
   messageTemplate: string | null;
-  owner: { userId: string; name: string | null; email: string } | null;
+  owner: { userId: string; name: string | null } | null;
   destinations: Array<{ id: string; name: string }>;
   activeDestinations: Array<{ id: string; name: string }>;
   onBack: () => void;

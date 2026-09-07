@@ -89,7 +89,9 @@ describe("PortalSidebar — role visibility", () => {
     mockRole = "finance";
     renderAt("/finance/dashboard");
     expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
-    expect(screen.getByText("Reconciliation")).toBeInTheDocument();
+    // §13 (payment/MASTER.md) — the Bank Matching workspace retired
+    // 2026-09-07: its row must NOT come back.
+    expect(screen.queryByText("Reconciliation")).not.toBeInTheDocument();
     expect(screen.queryByTestId("nav-module-purchasing")).not.toBeInTheDocument();
     expect(screen.queryByText("Accounts")).not.toBeInTheDocument();
   });

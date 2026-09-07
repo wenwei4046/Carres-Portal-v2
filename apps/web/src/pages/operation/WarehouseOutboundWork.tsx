@@ -1,25 +1,21 @@
-// design-standard: not-a-list-page — dated Warehouse work surface (Outbound
-// exact-Unit scan/check/pack/load, Stock MASTER §12.6), not a Register list.
-import { useEffect, useMemo, useState } from "react";
+// The dated Warehouse work over outgoing arrangements, as a governed
+// Register (unified Inbound/Outbound card, 2026-09-07).
+import { blue } from "@radix-ui/colors";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronRight as ChevronRightSmall,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from "lucide-react";
-import {
-  addWorkingDays,
+  buildOutboundRegisterView,
+  warehouseEmptyDaySentence,
   DELIVERY_PHOTO_MAX_BYTES,
   DELIVERY_PHOTO_MIMES,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
   driverCollectedLine,
-  myHolidaySet,
-  subtractWorkingDays,
-  WAREHOUSE_OFF_DAYS,
+  outboundExceptionLines,
+  outboundStatusWordOf,
   warehouseAssignedDriverLine,
-  warehouseEmptyDaySentence,
   warehouseLoadedLine,
   warehouseOutboundCards,
   warehouseRecordLoadedSentence,
@@ -30,13 +26,16 @@ import {
   type WarehousePrepFact,
 } from "@carres/shared";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+import EvidenceUploadField, {
+  type EvidenceEntry,
+} from "@/components/EvidenceUploadField";
 import {
   useDeliveryWarehouseSchedule,
   useRecordHandoverEvent,
   useRecordOutboundPrep,
 } from "@/lib/queries";
+import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import ModuleHeader from "./components/ModuleHeader";
 import { Modal, ModalActions } from "./components/Modal";
@@ -47,39 +46,41 @@ import {
 } from "./components/workspace-rail";
 
 /**
- * WAREHOUSE — OUTBOUND: the dated physical work the Warehouse owns
- * (owner replacement Card 2026-09-06 §7–§8; Stock MASTER §2).
+ * WAREHOUSE — OUTBOUND: one row = one dated pickup arrangement (one DO
+ * scope), in the same Register grammar as Inbound: Destination Header, one
+ * toolbar row, 240px rail, wrap-not-truncate Product and Exceptions columns,
+ * explicit clicks only.
  *
- * `240px page-specific filter rail + Outbound Register`. The rail filters
- * the same outgoing work by pickup status and Site; the toolbar's compact
- * selected-date control is only a filter — never another Calendar summary
- * (Monitor alone owns the Calendar).
+ * From the menu the Register lists EVERY unfinished arrangement under its
+ * original date; a Monitor card inherits its exact date, Site and DO scope.
+ * The rail counts, the listed rows, the footer totals and the export all
+ * read one shared filter pipeline — a `Loaded 1` beside an empty day can no
+ * longer happen, because both numbers describe the same scope.
  *
- * The work itself is governed and exact: scan exact Unit IDs, record check
- * and pack, then record which exact Units were LOADED to the individually
- * named receiver, with proof. Partial results persist under their original
- * date. The two evidence records stay separate forever:
+ * The three quantities stay three facts, per product and per Unit:
  *
- *   Warehouse loaded    what the identified operator scanned and submitted
- *   Driver collected    what the driver independently confirms
+ *   Required           the DO scope
+ *   Warehouse loaded   what the identified operator scanned and submitted
+ *   Driver confirmed   what the Logistics side itself confirmed receiving
  *
  * Only matching exact-Unit evidence changes `Who has it` (the server's
- * rule). The transport company and the individual driver are separate
- * stored facts and render separately; no value here is ever invented.
+ * rule). The governed acts — scan, check, pack, record loaded — live inside
+ * the expansion, the arrangement's own detail; the row itself acts nowhere.
  */
 
-type OutboundView = "all" | "not-loaded" | "loaded" | "no-evidence";
 
-/** At agenda width the 240px rail would crush the list — it opens on demand
- *  from [Filters] and closes after a pick (the Monitor's own narrow rule). */
-const NARROW_BREAKPOINT = 1280;
-
+/** Below Tailwind's `md` the 45px toolbar cannot hold the date controls in
+ *  one row — they move into the Filters drawer (the mobile filter surface). */
 function useIsNarrow(): boolean {
-  const query = `(max-width: ${NARROW_BREAKPOINT - 1}px)`;
+  const query = "(max-width: 767px)";
   const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(query).matches,
   );
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
     const mq = window.matchMedia(query);
     const onChange = () => setNarrow(mq.matches);
     mq.addEventListener("change", onChange);
@@ -88,16 +89,22 @@ function useIsNarrow(): boolean {
   return narrow;
 }
 
+const STATUSES = [
+  ["open", "Not finished"],
+  ["loaded", "Loaded"],
+  ["no-evidence", "Evidence not submitted"],
+  ["all", "All pickups"],
+] as const;
+
 export default function WarehouseOutboundWork() {
   const [params, setParams] = useSearchParams();
-  const holidays = useMemo(() => myHolidaySet(), []);
   const today = appTodayIso();
-  const view = (params.get("view") ?? "all") as OutboundView;
-  const site = params.get("site");
-  const search = params.get("q") ?? "";
   const selectedDo = params.get("do");
+  /* Menu default = every unfinished arrangement; an exact Monitor deep link
+     must show its arrangement even when the work is already done. */
+  const effectiveView = params.get("view") ?? (selectedDo ? "all" : "open");
 
-  const { data, isLoading } = useDeliveryWarehouseSchedule();
+  const { data, isLoading, error, refetch } = useDeliveryWarehouseSchedule();
   const allCards = useMemo(
     () =>
       warehouseOutboundCards(
@@ -105,29 +112,11 @@ export default function WarehouseOutboundWork() {
       ),
     [data],
   );
-
-  const selectedCard = allCards.find((c) => c.doNumber === selectedDo) ?? null;
-  /* A deep link may carry `do` without `date` — the work date is the card's
-     own date, never a guess. */
-  const date = selectedCard?.eventDate ?? params.get("date") ?? today;
-
-  const isNarrow = useIsNarrow();
-  const [railHidden, setRailHidden] = useState(isNarrow);
-  useEffect(() => {
-    if (isNarrow) setRailHidden(true);
-  }, [isNarrow]);
-
-  function setParam(key: string, value: string | null) {
-    const next = new URLSearchParams(params);
-    if (value === null || value === "") next.delete(key);
-    else next.set(key, value);
-    setParams(next, { replace: false });
-  }
-  function pickRail(key: string, value: string | null) {
-    setParam(key, value);
-    if (isNarrow) setRailHidden(true);
-  }
-
+  const view = useMemo(() => {
+    const p = new URLSearchParams(params);
+    p.set("view", effectiveView);
+    return buildOutboundRegisterView(allCards, p);
+  }, [allCards, params, effectiveView]);
   const siteNames = useMemo(
     () =>
       [...new Set(allCards.map((c) => c.fromLocation))]
@@ -136,147 +125,344 @@ export default function WarehouseOutboundWork() {
     [allCards],
   );
 
-  /** Rail + search narrow the SAME records (card §7). */
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allCards.filter((c) => {
-      if (site && c.fromLocation !== site) return false;
-      if (view === "not-loaded" && c.notHandedOver === 0) return false;
-      if (view === "loaded" && c.notHandedOver !== 0) return false;
-      if (view === "no-evidence" && !c.evidenceNotSubmitted) return false;
-      if (!q) return true;
-      return (
-        c.doNumber.toLowerCase().includes(q) ||
-        c.source.toLowerCase().includes(q) ||
-        c.toCustomer.toLowerCase().includes(q) ||
-        c.logisticsPartner.toLowerCase().includes(q) ||
-        (c.driverName ?? "").toLowerCase().includes(q) ||
-        c.units.some((u) => u.unitId.toLowerCase().includes(q))
+  const [showFilters, setShowFilters] = useState(false);
+  const [railHidden, setRailHidden] = useState(false);
+  const isNarrow = useIsNarrow();
+  const root = useRef<HTMLDivElement>(null);
+  const scrollKey = `outbound-scroll:${params.toString()}`;
+  useEffect(() => {
+    if (isLoading) return;
+    const scroll =
+      root.current?.querySelector<HTMLElement>('[data-testid="grid-scroll"]');
+    if (scroll)
+      scroll.scrollTop = Number(sessionStorage.getItem(scrollKey) ?? 0);
+  }, [isLoading, scrollKey]);
+
+  const setFilter = useCallback(
+    (key: string, value: string) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set(key, value);
+          else next.delete(key);
+          return next;
+        },
+        { replace: true },
       );
-    });
-  }, [allCards, site, view, search]);
-
-  /* A status view shows its work under the ORIGINAL dates (unfinished work
-     is never re-dated); the default view shows the selected date. */
-  const dayRows = useMemo(
-    () => filtered.filter((c) => c.eventDate === date),
-    [filtered, date],
+    },
+    [setParams],
   );
-  const groupedDates = useMemo(
-    () => [...new Set(filtered.map((c) => c.eventDate))].sort(),
-    [filtered],
+  const onSearch = useCallback(
+    (value: string) => setFilter("q", value),
+    [setFilter],
   );
-  const grouped = view !== "all";
 
-  const backParams = new URLSearchParams(params);
-  backParams.set("tab", "warehouse-monitor");
-  backParams.delete("do");
-  backParams.delete("view");
-  backParams.delete("q");
+  const columns = useMemo<DataGridColumn<WarehouseOutboundCard>[]>(
+    () => [
+      {
+        key: "date",
+        label: "Scheduled handover",
+        width: 140,
+        wrap: true,
+        searchValue: (c) => c.eventDate,
+        accessor: (c) => (
+          <div className="py-0.5 leading-[18px]">
+            <div>{fmtDate(c.eventDate)}</div>
+            <div className="text-base-500">
+              {c.expectedCollectionWindow
+                ? `Driver pickup ${c.expectedCollectionWindow}`
+                : "Time not provided"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "document",
+        label: "Document",
+        width: 150,
+        wrap: true,
+        searchValue: (c) => `DO No ${c.doNumber} ${c.source}`,
+        accessor: (c) => (
+          <div className="py-0.5 leading-[18px]">
+            <div className="text-label uppercase tracking-wide text-base-400">
+              DO No
+            </div>
+            <Link
+              className="font-mono text-kit-blue-11 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+              to={c.deliveryOrderHref}
+              data-testid={`outbound-document-${c.doNumber}`}
+            >
+              {c.doNumber}
+            </Link>
+          </div>
+        ),
+      },
+      {
+        key: "products",
+        label: "Product",
+        width: 230,
+        wrap: true,
+        searchValue: (c) =>
+          c.products
+            .map((x) => `${x.name ?? ""} ${x.sku ?? ""}`)
+            .concat(c.units.map((u) => u.unitId))
+            .join(" "),
+        accessor: (c) =>
+          c.products.length === 0 ? (
+            <span>Products not recorded</span>
+          ) : (
+            <div className="space-y-0.5 py-0.5 leading-[18px]">
+              {c.products.map((x) => (
+                <div key={x.sku ?? "no-sku"}>
+                  {x.name ?? x.sku ?? "Product not recorded"}
+                  {x.name && x.sku ? (
+                    <span className="text-base-500"> · {x.sku}</span>
+                  ) : null}
+                  <span className="tabular-nums"> × {x.qty}</span>
+                </div>
+              ))}
+            </div>
+          ),
+      },
+      {
+        key: "from",
+        label: "From",
+        width: 140,
+        wrap: true,
+        searchValue: (c) => c.fromLocation,
+        accessor: (c) => c.fromLocation,
+      },
+      {
+        key: "to",
+        label: "To",
+        width: 190,
+        wrap: true,
+        searchValue: (c) => c.toCustomer,
+        accessor: (c) => c.toCustomer,
+      },
+      {
+        key: "partner",
+        label: "Logistics Partner",
+        width: 125,
+        searchValue: (c) => c.logisticsPartner,
+        accessor: (c) => c.logisticsPartner,
+      },
+      {
+        key: "driver",
+        label: "Assigned Driver",
+        width: 150,
+        wrap: true,
+        searchValue: (c) => c.driverName ?? "",
+        accessor: (c) => (
+          <span data-testid={`wo-driver-${c.doNumber}`}>
+            {warehouseAssignedDriverLine(c.logisticsPartner, c.driverName)}
+          </span>
+        ),
+      },
+      {
+        key: "tally",
+        label: "Units",
+        width: 165,
+        wrap: true,
+        accessor: (c) => (
+          <div
+            className="py-0.5 tabular-nums leading-[18px]"
+            data-testid={`outbound-tally-${c.doNumber}`}
+          >
+            <div>
+              Required {c.unitsRequired} · Loaded {c.handedOver}
+            </div>
+            <div>Not loaded {c.notHandedOver}</div>
+            <div>Driver confirmed {c.driverConfirmed}</div>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        width: 125,
+        searchValue: (c) => outboundStatusWordOf(c),
+        accessor: (c) => outboundStatusWordOf(c),
+      },
+      {
+        key: "exceptions",
+        label: "Exceptions",
+        width: 230,
+        wrap: true,
+        searchValue: (c) => outboundExceptionLines(c, today, fmtDate).join(" "),
+        accessor: (c) => {
+          const lines = outboundExceptionLines(c, today, fmtDate);
+          return lines.length === 0 ? (
+            ""
+          ) : (
+            <div className="space-y-0.5 py-0.5 leading-[18px]">
+              {lines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        key: "so",
+        label: "SO No",
+        defaultHidden: true,
+        width: 110,
+        accessor: (c) => (
+          <Link
+            className="font-mono text-kit-blue-11 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            to={c.sourceHref}
+          >
+            {c.source}
+          </Link>
+        ),
+      },
+      {
+        key: "soDate",
+        label: "SO date",
+        defaultHidden: true,
+        width: 110,
+        accessor: (c) => (c.soDate ? fmtDate(c.soDate) : ""),
+      },
+      {
+        key: "vehicle",
+        label: "Vehicle",
+        defaultHidden: true,
+        width: 110,
+        accessor: (c) => c.vehicle ?? "",
+      },
+      {
+        key: "loadedAt",
+        label: "Loaded at",
+        defaultHidden: true,
+        width: 150,
+        accessor: (c) =>
+          c.actualHandoverAt ? fmtDate(c.actualHandoverAt, { time: true }) : "",
+      },
+      {
+        key: "collectedAt",
+        label: "Driver collected at",
+        defaultHidden: true,
+        width: 150,
+        accessor: (c) =>
+          c.actualCollectionAt
+            ? fmtDate(c.actualCollectionAt, { time: true })
+            : "",
+      },
+    ],
+    [today],
+  );
 
+  const context = params.get("date") || params.get("from");
+  /* One exact date keeps the governed empty sentence; a range or other
+     filters say what they are. */
+  const exactDate =
+    params.get("date") ||
+    (params.get("from") &&
+    (!params.get("to") || params.get("to") === params.get("from"))
+      ? params.get("from")
+      : null);
+  const empty = exactDate
+    ? warehouseEmptyDaySentence(fmtDate(exactDate))
+    : effectiveView === "open" && !context && !params.get("q") && !selectedDo
+      ? "No unfinished pickups. Every arranged pickup is loaded."
+      : "No pickups match these filters.";
+
+  const dateControls = (
+    <>
+      <label className="text-meta">
+        From{" "}
+        <input
+          className="h-7 rounded-control border border-kit-slate-5 px-2"
+          type="date"
+          aria-label="Handover from"
+          value={params.get("date") || params.get("from") || ""}
+          onChange={(e) => {
+            setParams(
+              (prev) => {
+                const p = new URLSearchParams(prev);
+                p.delete("date");
+                if (e.target.value) p.set("from", e.target.value);
+                else p.delete("from");
+                return p;
+              },
+              { replace: true },
+            );
+          }}
+        />
+      </label>
+      <label className="text-meta">
+        To{" "}
+        <input
+          className="h-7 rounded-control border border-kit-slate-5 px-2"
+          type="date"
+          aria-label="Handover to"
+          min={params.get("date") || params.get("from") || undefined}
+          value={params.get("to") || ""}
+          onChange={(e) => setFilter("to", e.target.value)}
+        />
+      </label>
+      <button
+        className="h-7 px-2 text-body text-kit-blue-11"
+        onClick={() =>
+          setParams({ tab: "warehouse-outbound" }, { replace: true })
+        }
+      >
+        Clear filters
+      </button>
+    </>
+  );
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-outbound">
+    <div
+      ref={root}
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+      data-testid="warehouse-outbound"
+      onScrollCapture={(e) => {
+        const el = e.target as HTMLElement;
+        if (el.getAttribute("data-testid") === "grid-scroll")
+          sessionStorage.setItem(scrollKey, String(el.scrollTop));
+      }}
+    >
       <ModuleHeader
         testId="warehouse-outbound-header"
         word="Outbound"
         docTitle="Outbound · Warehouse — Carres"
         destinationHeader
       />
-      <div className="flex items-center gap-3 border-b border-kit-slate-5 bg-white px-3 py-1.5">
-        <button
-          type="button"
-          className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint"
-          onClick={() => setRailHidden((h) => !h)}
-          data-testid="wo-toggle-filters"
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <div
+          className={`${showFilters ? "flex" : "hidden"} min-h-0 shrink-0 ${railHidden ? "md:hidden" : "md:flex"}`}
         >
-          {railHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-          {railHidden ? "Filters" : "Hide filters"}
-        </button>
-        <Link
-          to={`/operation?${backParams.toString()}`}
-          className="text-meta text-base-600 underline-offset-2 hover:underline"
-          data-testid="wo-back-monitor"
-        >
-          ← Monitor
-        </Link>
-        {!grouped && (
-          <div className="flex items-center gap-1" data-testid="wo-date-control">
-            <button
-              type="button"
-              aria-label="Previous date"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-              onClick={() =>
-                setParam(
-                  "date",
-                  subtractWorkingDays(date, 1, {
-                    offDays: WAREHOUSE_OFF_DAYS,
-                    holidays,
-                  }),
-                )
-              }
-              data-testid="wo-prev"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="min-w-0 px-1 text-[13px] font-medium text-base-800" data-testid="wo-date">
-              {fmtDate(date)}
-            </span>
-            <button
-              type="button"
-              aria-label="Next date"
-              className="inline-flex h-7 w-7 items-center justify-center rounded border border-kit-slate-5 hover:bg-hovertint"
-              onClick={() =>
-                setParam(
-                  "date",
-                  addWorkingDays(date, 1, {
-                    offDays: WAREHOUSE_OFF_DAYS,
-                    holidays,
-                  }),
-                )
-              }
-              data-testid="wo-next"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        )}
-        <div className="ml-auto">
-          <input
-            type="search"
-            value={search}
-            placeholder="Search"
-            aria-label="Search outbound work"
-            className="h-7 w-52 rounded border border-kit-slate-5 px-2 text-[13px]"
-            onChange={(e) => setParam("q", e.target.value)}
-            data-testid="wo-search"
-          />
-        </div>
-      </div>
-      <div className="flex min-h-0 flex-1">
-        {!railHidden && (
-          <FilterRail testId="wo-rail">
+          <FilterRail
+            testId="wo-rail"
+            onHide={() => {
+              setRailHidden(true);
+              setShowFilters(false);
+            }}
+          >
+            {isNarrow && (
+              <div className="flex flex-wrap items-center gap-2">
+                {dateControls}
+              </div>
+            )}
             <FilterRailGroup title="PICKUP STATUS">
-              <FilterRailRow
-                label="Not loaded yet"
-                count={allCards.filter((c) => c.notHandedOver > 0).length}
-                active={view === "not-loaded"}
-                onClick={() => pickRail("view", view === "not-loaded" ? null : "not-loaded")}
-                testId="wo-view-not-loaded"
-              />
-              <FilterRailRow
-                label="Loaded"
-                count={allCards.filter((c) => c.notHandedOver === 0).length}
-                active={view === "loaded"}
-                onClick={() => pickRail("view", view === "loaded" ? null : "loaded")}
-                testId="wo-view-loaded"
-              />
-              <FilterRailRow
-                label="Evidence not submitted"
-                count={allCards.filter((c) => c.evidenceNotSubmitted).length}
-                active={view === "no-evidence"}
-                onClick={() => pickRail("view", view === "no-evidence" ? null : "no-evidence")}
-                testId="wo-view-no-evidence"
-              />
+              {STATUSES.map(([value, label]) => (
+                <FilterRailRow
+                  key={value}
+                  label={label}
+                  active={effectiveView === value}
+                  count={
+                    isLoading || error ? undefined : view.facets.view[value] ?? 0
+                  }
+                  testId={`wo-view-${value}`}
+                  onClick={() => {
+                    setFilter("view", value);
+                    setShowFilters(false);
+                  }}
+                />
+              ))}
             </FilterRailGroup>
             {siteNames.length > 1 && (
               <FilterRailGroup title="SITE">
@@ -284,172 +470,134 @@ export default function WarehouseOutboundWork() {
                   <FilterRailRow
                     key={name}
                     label={name}
-                    count={allCards.filter((c) => c.fromLocation === name).length}
-                    active={site === name}
-                    onClick={() => pickRail("site", site === name ? null : name)}
+                    active={params.get("site") === name}
+                    count={
+                      isLoading || error
+                        ? undefined
+                        : view.facets.site[name] ?? 0
+                    }
                     testId={`wo-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    onClick={() => {
+                      setFilter(
+                        "site",
+                        params.get("site") === name ? "" : name,
+                      );
+                      setShowFilters(false);
+                    }}
                   />
                 ))}
               </FilterRailGroup>
             )}
-            {/* SOURCE is not rendered while `Delivery Order` is the only live
-                source: a one-option group is a dead control. The source stays
-                explicit on every row. */}
           </FilterRail>
-        )}
-        <div className={`min-h-0 min-w-0 flex-1 overflow-y-auto p-3${!railHidden && isNarrow ? " hidden" : ""}`}>
-          {isLoading ? (
-            <p className="text-[13px] text-base-500">Loading…</p>
-          ) : grouped ? (
-            groupedDates.length === 0 ? (
-              <p className="text-[13px] text-base-500">Nothing here. Every pickup on this view is done.</p>
-            ) : (
-              groupedDates.map((d) => (
-                <section key={d} className="mb-4" data-testid={`wo-group-${d}`}>
-                  <h2 className="mb-2 text-label font-semibold uppercase tracking-wide text-base-600">
-                    {fmtDate(d)}
-                  </h2>
-                  <RowList
-                    cards={filtered.filter((c) => c.eventDate === d)}
-                    selectedDo={selectedCard?.doNumber ?? null}
-                    onSelectDo={(doNumber) => setParam("do", doNumber)}
-                  />
-                </section>
-              ))
-            )
-          ) : dayRows.length === 0 ? (
-            <p className="text-[13px] text-base-500" data-testid={`wo-empty-${date}`}>
-              {warehouseEmptyDaySentence(fmtDate(date))}
-            </p>
+        </div>
+        <div
+          className={`${showFilters ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col p-2`}
+        >
+          {error ? (
+            <div
+              role="alert"
+              className="flex flex-1 flex-col items-center justify-center gap-3 bg-white"
+            >
+              <p>Outbound could not be opened</p>
+              <p>{error.message}</p>
+              <button
+                className="rounded-control border border-base-200 px-3 py-1.5 text-body"
+                onClick={() => void refetch()}
+              >
+                Try again
+              </button>
+            </div>
           ) : (
-            <RowList
-              cards={dayRows}
-              selectedDo={selectedCard?.doNumber ?? dayRows[0]?.doNumber ?? null}
-              onSelectDo={(doNumber) => setParam("do", doNumber)}
+            <DataGrid<WarehouseOutboundCard>
+              stickyIdentity={{ columnKey: "document" }}
+              key={params.get("q") === null ? "clear" : "search"}
+              appearance="reference"
+              rows={view.rows}
+              columns={columns}
+              rowKey={(c) => c.doNumber}
+              rowTestId={(c) => `wo-row-${c.doNumber}`}
+              storageKey="carres.outbound.register.v1"
+              exportName="Outbound"
+              searchPlaceholder="DO, SO, product, customer, driver or Unit ID…"
+              initialSearch={params.get("q") ?? ""}
+              onSearchChange={onSearch}
+              isLoading={isLoading}
+              groupBanner={false}
+              emptyMessage={empty}
+              rowStyle={(c) =>
+                selectedDo === c.doNumber
+                  ? { background: blue.blue3 }
+                  : undefined
+              }
+              toolbarStart={
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:hidden"
+                    onClick={() => setShowFilters((v) => !v)}
+                    data-testid="wo-toggle-filters"
+                  >
+                    <PanelLeftOpen size={14} /> Filters
+                  </button>
+                  {railHidden && (
+                    <button
+                      type="button"
+                      className="hidden h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:inline-flex"
+                      onClick={() => setRailHidden(false)}
+                      data-testid="wo-show-filters"
+                    >
+                      <PanelLeftClose size={14} /> Show filters
+                    </button>
+                  )}
+                  <Link
+                    to={`/operation?${(() => {
+                      const back = new URLSearchParams(params);
+                      back.set("tab", "warehouse-monitor");
+                      back.delete("do");
+                      back.delete("view");
+                      back.delete("q");
+                      return back.toString();
+                    })()}`}
+                    className="text-meta text-base-600 underline-offset-2 hover:underline"
+                    data-testid="wo-back-monitor"
+                  >
+                    ← Monitor
+                  </Link>
+                  {!isNarrow && dateControls}
+                  {selectedDo && (
+                    <span className="text-meta" data-testid="wo-do-context">
+                      Document: {selectedDo}
+                    </span>
+                  )}
+                </div>
+              }
+              expandTitle="Show every product and Unit"
+              expandable={{
+                trigger: { columnKey: "products" },
+                testId: (c) => `wo-row-toggle-${c.doNumber}`,
+                defaultExpandedKeys: selectedDo ? [selectedDo] : [],
+                renderExpansion: (c) => <OutboundUnitWork card={c} />,
+              }}
+              statusSummary={(visible) => {
+                const cards = visible as WarehouseOutboundCard[];
+                const required = cards.reduce((n, c) => n + c.unitsRequired, 0);
+                const loaded = cards.reduce((n, c) => n + c.handedOver, 0);
+                const confirmed = cards.reduce(
+                  (n, c) => n + c.driverConfirmed,
+                  0,
+                );
+                return (
+                  <span data-testid="wo-range-summary">
+                    {cards.length} pickup arrangement
+                    {cards.length === 1 ? "" : "s"} · Units: Required {required}{" "}
+                    · Loaded {loaded} · Driver confirmed {confirmed}
+                  </span>
+                );
+              }}
             />
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RowList({
-  cards,
-  selectedDo,
-  onSelectDo,
-}: {
-  cards: WarehouseOutboundCard[];
-  selectedDo: string | null;
-  onSelectDo: (doNumber: string | null) => void;
-}) {
-  return (
-    <div className="max-w-6xl space-y-2">
-      {cards.map((card) => (
-        <OutboundSourceRow
-          key={card.doNumber}
-          card={card}
-          expanded={card.doNumber === selectedDo}
-          onToggle={() => onSelectDo(card.doNumber === selectedDo ? null : card.doNumber)}
-        />
-      ))}
-    </div>
-  );
-}
-
-/** One work row = one source document scope. The transport company and the
- *  individual driver are SEPARATE fields (card §8); the two evidence records
- *  are separate lines. The formal DO is LINKED, never copied into this page. */
-function OutboundSourceRow({
-  card,
-  expanded,
-  onToggle,
-}: {
-  card: WarehouseOutboundCard;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const handed = card.units.filter((u) => u.unitHandedOverAt);
-  const operator = handed.map((u) => u.unitWarehouseOperator).find(Boolean) ?? null;
-  const work =
-    card.notHandedOver === 0
-      ? `Loaded ${card.handedOver} of ${card.unitsRequired} Units`
-      : `Scan, check, pack and load ${card.notHandedOver} Unit${card.notHandedOver === 1 ? "" : "s"}`;
-
-  return (
-    <div className="rounded border border-kit-slate-5 bg-white" data-testid={`wo-row-${card.doNumber}`}>
-      <button
-        type="button"
-        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-hovertint"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        data-testid={`wo-row-toggle-${card.doNumber}`}
-      >
-        {expanded ? (
-          <ChevronDown size={16} className="mt-0.5 shrink-0 text-base-500" />
-        ) : (
-          <ChevronRightSmall size={16} className="mt-0.5 shrink-0 text-base-500" />
-        )}
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-0.5 text-[13px] md:grid-cols-4">
-          <Field label="Pickup date" value={fmtDate(card.eventDate)} />
-          <Field
-            label="DO No"
-            value={
-              <Link
-                to={card.deliveryOrderHref}
-                className="font-mono text-base-800 underline-offset-2 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-                data-testid={`wo-do-link-${card.doNumber}`}
-              >
-                {card.doNumber}
-              </Link>
-            }
-          />
-          <Field
-            label="SO No"
-            value={
-              <Link
-                to={card.sourceHref}
-                className="font-mono text-base-800 underline-offset-2 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {card.source}
-              </Link>
-            }
-          />
-          <Field label="SO date" value={card.soDate ? fmtDate(card.soDate) : "—"} />
-          <Field label="From" value={card.fromLocation} />
-          <Field label="To" value={card.toCustomer} />
-          <Field label="Logistics Partner" value={card.logisticsPartner} />
-          <Field
-            label="Assigned Driver"
-            value={
-              <span data-testid={`wo-driver-${card.doNumber}`}>
-                {warehouseAssignedDriverLine(card.logisticsPartner, card.driverName)}
-              </span>
-            }
-          />
-          <Field label="Vehicle" value={card.vehicle ?? "—"} />
-          <Field label="Units required" value={String(card.unitsRequired)} />
-          <Field label="Warehouse operator" value={operator ?? "—"} />
-          <Field
-            label="Evidence"
-            value={
-              handed.length === 0 ? "—" : card.evidenceNotSubmitted ? "Not submitted" : "Submitted"
-            }
-          />
-          <Field
-            label="Warehouse loaded"
-            value={<span data-testid={`wo-loaded-${card.doNumber}`}>{warehouseLoadedLine(card)}</span>}
-          />
-          <Field
-            label="Driver collected"
-            value={<span data-testid={`wo-collected-${card.doNumber}`}>{driverCollectedLine(card)}</span>}
-          />
-          <Field label="Work" value={work} />
-        </div>
-      </button>
-      {expanded && <OutboundUnitWork card={card} />}
     </div>
   );
 }
@@ -462,9 +610,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
-
-const ALLOWED_MIMES = DELIVERY_PHOTO_MIMES;
-const MAX_SIZE = DELIVERY_PHOTO_MAX_BYTES;
 
 /** The exact Units of one DO scope, and the governed acts on them. */
 export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
@@ -522,10 +667,36 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
     setScanValue("");
   }
 
+  const operator =
+    card.units
+      .filter((u) => u.unitHandedOverAt)
+      .map((u) => u.unitWarehouseOperator)
+      .find(Boolean) ?? null;
   return (
     <div className="border-t border-kit-slate-5 px-3 py-2" data-testid={`wo-units-${card.doNumber}`}>
       <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
         Goods scheduled for pickup
+      </div>
+      {/* The two evidence records, never merged (§8): the Warehouse's own
+          submission and the driver's independent confirmation. */}
+      <div className="mb-2 space-y-0.5 text-meta text-base-600">
+        <p data-testid={`wo-loaded-${card.doNumber}`}>
+          {warehouseLoadedLine(card)}
+          {operator ? ` · recorded by ${operator}` : ""}
+          {card.handedOver > 0
+            ? card.evidenceNotSubmitted
+              ? " · evidence not submitted"
+              : " · evidence submitted"
+            : ""}
+        </p>
+        <p data-testid={`wo-collected-${card.doNumber}`}>
+          {/* A per-Unit confirmation IS a confirmation — the sentence may
+              never say `not confirmed yet` beside a confirmed count. */}
+          {card.driverConfirmed > 0
+            ? `${(card.driverName ?? "").trim() || card.logisticsPartner} confirmed ${card.driverConfirmed} of ${card.unitsRequired} Units`
+            : driverCollectedLine(card)}
+        </p>
+        {card.vehicle && <p>Vehicle {card.vehicle}</p>}
       </div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-meta text-base-600">
@@ -623,6 +794,7 @@ export function OutboundUnitWork({ card }: { card: WarehouseOutboundCard }) {
             <th className="py-1 pr-3 font-medium">Checked</th>
             <th className="py-1 pr-3 font-medium">Packed</th>
             <th className="py-1 pr-3 font-medium">Loaded</th>
+            <th className="py-1 pr-3 font-medium">Driver confirmed</th>
             <th className="py-1 font-medium">Still to do</th>
           </tr>
         </thead>
@@ -661,6 +833,12 @@ function UnitRow({ unit }: { unit: DeliveryWarehouseScheduleEvent }) {
           ? `${at(unit.unitHandedOverAt)}${unit.unitDeliveryPerson ? ` · ${unit.unitDeliveryPerson}` : ""}`
           : "—"}
       </td>
+      <td
+        className="py-1.5 pr-3 text-base-600"
+        data-testid={`wo-unit-confirmed-${unit.unitId}`}
+      >
+        {at(unit.unitDriverConfirmedAt)}
+      </td>
       <td className="py-1.5 text-base-600" data-testid={`wo-unit-reason-${unit.unitId}`}>
         {reason ?? "Done"}
       </td>
@@ -687,45 +865,26 @@ function RecordLoadedModal({
   );
   const [receiver, setReceiver] = useState("");
   const [vehicle, setVehicle] = useState("");
-  const [proofPath, setProofPath] = useState<string | null>(null);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceEntry[]>([]);
 
-  async function uploadProof(e: React.ChangeEvent<HTMLInputElement>) {
-    setUploadError(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!(ALLOWED_MIMES as readonly string[]).includes(file.type)) {
-      setUploadError(`${file.name}: use a JPG, PNG or WEBP photo.`);
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      setUploadError(`${file.name} is too large (max 10 MB).`);
-      return;
-    }
-    setUploadBusy(true);
-    try {
-      const sign = await apiFetch<{ token: string; path: string }>(
+  /* The server names every object key; the field only carries the file. */
+  const signEvidence = useCallback(
+    (file: File) =>
+      apiFetch<{ token: string; path: string }>(
         `/api/operation/delivery-orders/${encodeURIComponent(doId)}/handover-proof/sign-upload`,
-        { method: "POST", body: JSON.stringify({ mimeType: file.type, sizeBytes: file.size }) },
-      );
-      const { error } = await supabase.storage
-        .from("proof-of-delivery")
-        .uploadToSignedUrl(sign.path, sign.token, file);
-      if (error) throw error;
-      setProofPath(sign.path);
-    } catch (err) {
-      setUploadError(
-        err instanceof ApiError || err instanceof Error ? err.message : "Upload failed",
-      );
-    } finally {
-      setUploadBusy(false);
-      e.target.value = "";
-    }
-  }
+        {
+          method: "POST",
+          body: JSON.stringify({ mimeType: file.type, sizeBytes: file.size }),
+        },
+      ),
+    [doId],
+  );
 
   const canSubmit =
-    picked.size > 0 && receiver.trim().length > 0 && Boolean(proofPath) && !record.isPending;
+    picked.size > 0 &&
+    receiver.trim().length > 0 &&
+    evidence.length > 0 &&
+    !record.isPending;
   const primaryLabel = warehouseRecordLoadedSentence(
     picked.size,
     receiver.trim() || (card.driverName ?? "").trim() || card.logisticsPartner,
@@ -791,18 +950,23 @@ function RecordLoadedModal({
         </label>
         <div>
           <span className="text-label uppercase tracking-wide text-base-500">
-            Proof — signature, photo or reply
+            Proof — photos and videos of the loaded goods
           </span>
-          <input
-            type="file"
-            accept={(ALLOWED_MIMES as readonly string[]).join(",")}
-            onChange={uploadProof}
-            disabled={uploadBusy}
-            className="mt-0.5 block w-full text-[13px]"
-            data-testid="wo-proof"
-          />
-          {proofPath && <p className="mt-0.5 text-label text-base-600">Proof attached.</p>}
-          {uploadError && <p className="mt-0.5 text-label text-base-600">{uploadError}</p>}
+          <div className="mt-0.5" data-testid="wo-proof">
+            <EvidenceUploadField
+              entries={evidence}
+              onChange={setEvidence}
+              sign={signEvidence}
+              bucket="proof-of-delivery"
+              imageMimes={DELIVERY_PHOTO_MIMES}
+              videoMimes={HANDOVER_EVIDENCE_VIDEO_MIMES}
+              imageMaxBytes={DELIVERY_PHOTO_MAX_BYTES}
+              videoMaxBytes={HANDOVER_EVIDENCE_VIDEO_MAX_BYTES}
+              maxFiles={HANDOVER_EVIDENCE_MAX_FILES}
+              ariaLabel="Loading evidence"
+              testId="wo-evidence"
+            />
+          </div>
         </div>
       </div>
       <ModalActions
@@ -816,7 +980,7 @@ function RecordLoadedModal({
               kind: "handed_over",
               receiverName: receiver.trim(),
               vehicle: vehicle.trim() || undefined,
-              proofPath: proofPath as string,
+              evidence,
               unitCodes: [...picked],
             },
             {

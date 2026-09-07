@@ -146,7 +146,7 @@ describe("soRemaining — the SO across every live invoice kind", () => {
     }));
     expect(soRemaining(keyed, "o1").outstanding).toBe(658);
   });
-  it("a voided storage paper is dead, but its DRAFT replacement keeps the money owed", () => {
+  it("a correction in flight asks nothing — §2 exactly, no draft-debt rule", () => {
     const rows = [
       { ...row({ paid: 400 }), id: "i-sales", kind: "sales", status: "issued" },
       // The correction in flight: voided RM150 with a draft replacement RM150.
@@ -154,13 +154,13 @@ describe("soRemaining — the SO across every live invoice kind", () => {
         voided_at: "2026-09-06", amount: 150 },
       { ...row({ paid: 400 }), id: "i-replacement", kind: "storage", status: "draft",
         amount: 150, replaces_invoice_id: "i-void" },
-      // A FRESH draft (no lineage) still asks nothing.
-      { ...row({ paid: 400 }), id: "i-fresh-draft", kind: "additional_storage",
-        status: "draft", amount: 60 },
     ] as InvoiceRegisterRow[];
-    // 1000 + 150 (replacement) − 400 = 750 — the void did not lose the money
-    // and the dead paper did not double it.
-    expect(soRemaining(rows, "o1")).toMatchObject({ outstanding: 750, storageOwing: 150 });
+    // §2: outstanding = ISSUED live obligations − paid. During void → reissue
+    // the paper is in flight and not asked; the voided one is dead and never
+    // double-counted. Continuity is the lifecycle's (billed_through_period
+    // never rolls back; the replacement is there to ISSUE) — not a reader
+    // inventing debt from a draft.
+    expect(soRemaining(rows, "o1")).toMatchObject({ outstanding: 600, storageOwing: 0 });
   });
   it("the timing's paid check is the SO across kinds when the rows are given", () => {
     // Goods fully paid, storage RM150 issued, delivery confirmed and past —

@@ -159,6 +159,7 @@ export default function ReceivingRecord({
   };
 
   const startAmend = () => {
+    if (!r.po_id) return;
     setDraft({
       reason: "",
       goodsReceivedAt: r.goods_received_at ?? "",
@@ -221,9 +222,9 @@ export default function ReceivingRecord({
         </div>
       )}
 
-      {amending && draft ? (
+      {amending && draft && r.po_id ? (
         <AmendPanel
-          receipt={r}
+          receipt={{...r,po_id:r.po_id}}
           lines={lines}
           draft={draft}
           onDraft={setDraft}
@@ -280,6 +281,21 @@ export default function ReceivingRecord({
                 <span className="text-body text-kit-slate-12">
                   {evidenceSentence(r.arrival_evidence ?? [])}
                 </span>
+                {/* Saved evidence can be RE-SEEN, not only counted (§9). */}
+                {(r.arrival_evidence_files ?? []).map((f, i) =>
+                  f.url ? (
+                    <a
+                      key={f.path}
+                      href={f.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-2 text-body text-kit-blue-11 hover:underline"
+                      data-testid="arrival-evidence-view"
+                    >
+                      {f.kind === "video" ? "Video" : "Photo"} {i + 1}
+                    </a>
+                  ) : null,
+                )}
               </Prop>
             )}
             {isGrn ? (
@@ -437,7 +453,7 @@ export default function ReceivingRecord({
 
           {/* ── The governed doors — Amend is primary; Void hides in
                  More ▾ (owner correction §5: not a normal action). ──────── */}
-          {r.status === "posted" && dutyAllowed && !voiding && (
+          {r.po_id && r.status === "posted" && dutyAllowed && !voiding && (
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"

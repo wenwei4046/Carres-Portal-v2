@@ -175,9 +175,8 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
  *  Storage obligation.
  *
  *  Storage obligations are the SO's live ISSUED storage-kind invoices with
- *  their tax, plus a DRAFT that replaces a voided one (the correction keeps
- *  the money owed) — a fresh draft asks for nothing yet, a voided one is
- *  dead. Goods
+ *  their tax (§2 exactly — a draft asks nothing yet, a voided one is dead;
+ *  a correction in flight is visible on the case, never a debt rule). Goods
  *  value comes from the same `orderMoney` stores as `invoiceNeeded`.
  *  `orders.paid` is subtracted ONCE from the combined obligation — the Work
  *  engine's law (`sales-order-work-source`) — so a payment posted against a
@@ -197,13 +196,15 @@ export function soRemaining(
   const mine = rows.filter((r) => r.order_id === orderId);
   const door = mine.find((r) => r.kind === "sales") ?? mine[0];
   if (!door) return { known: false, outstanding: 0, storageOwing: 0, overpaid: 0 };
-  // A live obligation is an ISSUED storage-kind invoice — plus a DRAFT that
-  // REPLACES a voided one: the correction lineage (0429) exists precisely so
-  // the obligation survives the void, and dropping it until reissue would let
-  // the money silently vanish from every reader between void and reissue.
+  // A live obligation is an ISSUED storage-kind invoice — §2 exactly:
+  // `issued live invoice obligations`. A draft asks nothing yet, EVEN a
+  // replacement draft: the correction window (void → reissue) is a paper in
+  // flight, not a second debt rule, and the reader must not invent one. The
+  // lineage (0429) plus billed_through_period (0438) keep the obligation from
+  // being lost — the replacement is there to ISSUE, and the case card says a
+  // correction is in progress.
   const storageOwing = mine
-    .filter((r) => r.kind !== "sales" && !r.voided_at
-      && (r.status === "issued" || (r.status === "draft" && r.replaces_invoice_id != null)))
+    .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
     .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
   const goods = invoiceNeeded(door);
   if (!goods.known) return { known: false, outstanding: 0, storageOwing, overpaid: 0 };

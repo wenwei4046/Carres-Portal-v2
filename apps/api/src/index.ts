@@ -50,7 +50,6 @@ import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
-import poDutyRouter from "./routes/operation/po-duty";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -60,6 +59,7 @@ import recentCostRouter from "./routes/operation/recent-cost";
 import stockAlertsRouter from "./routes/operation/stock-alerts";
 import thresholdsRouter from "./routes/operation/thresholds";
 import operationSuppliersRouter from "./routes/operation/suppliers";
+import arrivalSourcesRouter from "./routes/operation/arrival-sources";
 import operationWarehouseRouter from "./routes/operation/warehouse";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
 import salesOrderMaintenanceRouter from "./routes/operation/sales-order-maintenance";
@@ -223,8 +223,6 @@ api.route("/operation/purchasing/requests", manualPurchaseRouter);
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
-// 0236 PO duty rotation — GET current holder / PUT manager override
-api.route("/operation/po-duty", poDutyRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
@@ -239,6 +237,7 @@ api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
+api.route("/operation/arrival-sources", arrivalSourcesRouter);
 // 0174 — Sales Order Maintenance grid + shared column config.
 api.route("/operation/sales-order-maintenance", salesOrderMaintenanceRouter);
 api.route("/bd/accounts", bdAccountsRouter);

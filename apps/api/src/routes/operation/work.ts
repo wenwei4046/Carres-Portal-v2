@@ -17,7 +17,9 @@ import {
   orderActionsInDisplayOrder,
   receivingWorkItems,
   salesOrderActionSignalsFromFacts,
+  invoiceStorageSumOf,
   storageHold,
+  storageObligation,
   workItemsForOrder,
   type DeliveryQueueLeads,
   type ManualPurchaseWorkInput,
@@ -114,6 +116,9 @@ export function projectSalesOrdersFromModuleFacts(input: {
   dutyResolutions: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
   today: string;
   safetyDays: number | null;
+  /** Gate convergence (2026-09-07): Σ live ISSUED storage papers per order —
+   *  the canonical §2 storage obligation. Absent ⇒ legacy C9 only. */
+  invoiceStorageByOrder?: ReadonlyMap<string, number>;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -133,7 +138,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
           0,
         )
       : null;
-    const storage = storageHold({
+    const hold = storageHold({
       storageFrom: control?.storage_from ?? null,
       override: control?.storage_fee_override ?? null,
       importedMsbf: control?.storage_fee_msbf ?? null,
@@ -142,6 +147,16 @@ export function projectSalesOrdersFromModuleFacts(input: {
       asOf: input.today,
       collectedAt: control?.storage_collected_at ?? null,
       waiverStatus: control?.storage_waiver_status ?? null,
+    });
+    // Gate convergence (2026-09-07): invoice-backed storage beats legacy C9
+    // when papers exist, netted so `paid` subtracts once — the ONE
+    // `storageObligation` precedence law the Delivery gate reads too.
+    const storage = storageObligation({
+      invoiceStorageSum: input.invoiceStorageByOrder?.get(row.id) ?? 0,
+      goodsTotal: lineTotal == null || addonTotal == null ? null : lineTotal + addonTotal,
+      paid: row.paid ?? null,
+      legacyOwing: hold.owing,
+      legacyReleased: hold.released,
     });
     const signals = salesOrderActionSignalsFromFacts({
       status: row.status,
@@ -799,6 +814,17 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     ...(poDuty ? { po_duty: poDuty } : {}),
     ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
   };
+  // Gate convergence (2026-09-07): the same invoices read that feeds the
+  // collection work also answers the §2 storage obligation per order.
+  const invoiceStorageByOrder = new Map<string, number>();
+  for (const inv of invoices) {
+    if (!invoiceStorageByOrder.has(inv.order_id)) {
+      invoiceStorageByOrder.set(
+        inv.order_id,
+        invoiceStorageSumOf(invoices.filter((i) => i.order_id === inv.order_id)),
+      );
+    }
+  }
   const orderItems = projectSalesOrdersFromModuleFacts({
     orders: orders.orders,
     stock: stock.skus,
@@ -806,6 +832,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     dutyResolutions,
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
+    invoiceStorageByOrder,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),

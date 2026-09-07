@@ -286,7 +286,7 @@ SUPPLY CHAIN
 │       ├── Consignment Returns
 │       └── Consignment Sale Notices
 ├── Warehouse
-│   ├── Dashboard
+│   ├── Monitor
 │   ├── Inbound
 │   ├── Inventory
 │   └── Outbound

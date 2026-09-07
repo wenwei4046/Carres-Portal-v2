@@ -764,10 +764,10 @@ the position being worked, never to a queue of nodes nobody has reached.
 
 **Owners come from the Work Engine roster only** (buddy cover included) — never hand-picked, never
 stored by the canvas, never hard-coded. The node shows initials; Team Work shows full names; the
-action sentence never repeats the person. **MEASURED BOUNDARY 2026-08-16:** only PO duty
-(`useOperationPoDuty` → Purchasing, Receiving) has a roster read on this page. Stock, Delivery,
-Sales and Payment resolve to no holder today, so those nodes render the instruction with no chip
-rather than an invented owner. Wiring their duty reads is approved-target, not built.
+action sentence never repeats the person. **MEASURED BOUNDARY 2026-09-07:** Purchasing and
+Receiving read PO Duty and GRN Duty from the shared Workspace resolver. Stock, Delivery, Sales and
+Payment render no owner chip until their own governed owner rule is admitted; the page never
+invents one.
 
 ### Connectors
 
@@ -3038,7 +3038,7 @@ feed wiring), and `workItemsForOrder` resolves the person per RULE instead of bo
 fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
 the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
 unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
-what `/api/operation/po-duty` already applies is not re-derived here.
+what the shared Workspace Duty resolver already applies is not re-derived here.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -4719,7 +4719,11 @@ Nobody else may create, edit or delete a decision; deletion is refused by trigge
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
 itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
 an owing order with no approved approval, whichever path writes it — including the legacy 0098
-dispatch backstop.
+dispatch backstop. Since `0441` (2026-09-07, payment/MASTER.md §2 convergence) the trigger's
+outstanding also counts the SO's live ISSUED Storage / Additional Storage Invoices, with `paid`
+subtracted exactly once from the combined obligation — an unpaid storage paper blocks the mint;
+a voided one (the waiver path) does not; the LEGACY C9 storage columns stay asserted by the TS
+API gate as before.
 
 ### WHAT AN APPROVAL MEANS — COD, defined by the owner 2026-08-19
 

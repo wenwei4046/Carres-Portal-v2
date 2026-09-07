@@ -210,7 +210,6 @@ import {
   type OpsOrderControlResponse,
   type UpdateOpsOrderControlInput,
   type OpsStaffListResponse,
-  type OpsPoDutyResponse,
   type UpdateOpsStaffSettingInput,
   type OrderPaymentRow,
   type RecordPaymentInput,
@@ -446,8 +445,6 @@ export const qk = {
       ["operation", "orders", id, "partner-check", date] as const,
     /** Staff assignment pool (migration 0232) — operation accounts + pool state. */
     staff: ["operation", "staff"] as const,
-    /** PO duty rotation (migration 0236) — this month's PO holder. */
-    poDuty: ["operation", "po-duty"] as const,
     /** Balance job (migration 0184) — the multi-entry payment ledger for an
      *  order. Nested under the order id so a blunt ["operation","orders"]
      *  invalidation after any order mutation refreshes it too. */
@@ -4216,8 +4213,11 @@ export function useWarehouseSubmitReceiptMutation(
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  arrival_source_id?: string | null;
   id: string;
-  po_id: string;
+  po_id: string | null;
+  source_no?: string | null;
+  source_party_name?: string | null;
   warehouse_id: string;
   warehouse_name: string | null;
   supplier_name: string | null;
@@ -4248,6 +4248,12 @@ export interface WarehouseReceiptQueueRow {
   posted_duty_cover_name?: string | null;
   posted_authority?: "grn_duty" | "cover" | "superuser" | null;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  /** 0440-era detail read: the same files, each with a signed VIEW url. */
+  arrival_evidence_files?: Array<{
+    path: string;
+    kind: "photo" | "video";
+    url: string | null;
+  }>;
   extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
   void_at?: string | null;
   void_by_name?: string | null;
@@ -7345,52 +7351,6 @@ export function useUploadDeliveryPhoto(
 /** Active operation accounts + their pool/availability state. Fails soft
  *  (retry off): on a Worker that predates the route the list page simply sees
  *  an empty pool and the whole assignment layer stays inert. */
-/** PO duty rotation (0236) — this month's PO holder. Fails soft (retry:false):
- *  an old Worker (404) or a pre-0236 DB leaves data undefined → the whole
- *  duty layer stays dormant (Raise PO behaves as before, no badge/banner). */
-export function useOperationPoDuty(
-  opts?: Partial<UseQueryOptions<OpsPoDutyResponse>>,
-) {
-  return useQuery({
-    queryKey: qk.operation.poDuty,
-    queryFn: () => apiFetch<OpsPoDutyResponse>(`/api/operation/po-duty`),
-    staleTime: 5 * 60_000,
-    retry: false,
-    ...opts,
-  });
-}
-
-/** Manager override of a month's PO-duty holder (0236, PUT — API 403s
- *  non-management). Invalidates the duty query so every surface (title chip,
- *  queue chips, Team board) flips together. */
-export function useUpdatePoDuty(
-  opts?: Partial<
-    UseMutationOptions<
-      { ok: boolean; month: string },
-      ApiError,
-      { userId: string; month?: string }
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    { ok: boolean; month: string },
-    ApiError,
-    { userId: string; month?: string }
-  >({
-    mutationFn: (input) =>
-      apiFetch<{ ok: boolean; month: string }>(`/api/operation/po-duty`, {
-        method: "PUT",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.poDuty, exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 export function useOperationStaff(
   opts?: Partial<UseQueryOptions<OpsStaffListResponse>>,
 ) {
@@ -8202,6 +8162,12 @@ export interface ReceivingSession {
   grn_no?: string | null;
   actual_site_id?: string | null;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  /** 0440-era detail read: the same files, each with a signed VIEW url. */
+  arrival_evidence_files?: Array<{
+    path: string;
+    kind: "photo" | "video";
+    url: string | null;
+  }>;
   extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
   void_at?: string | null;
   void_reason?: string | null;

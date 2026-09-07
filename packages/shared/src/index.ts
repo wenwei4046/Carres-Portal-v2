@@ -1353,28 +1353,14 @@ export {
 } from "./delivery-board";
 
 export {
-  monthKeyMYT,
-  grnDutyMonth,
   isPoDayMYT,
   poUrgentBypass,
-  opsPoDutySchema,
-  opsPoDutyResponseSchema,
-  opsPoDutyRosterEntrySchema,
   nextPoDayMYT,
-  type OpsPoDutyRosterEntry,
-  updateOpsPoDutyInput,
-  pickNextDutyHolder,
-  canRaisePo,
-  isPoDutyEditor,
-  type OpsPoDuty,
-  type OpsPoDutyResponse,
-  type UpdateOpsPoDutyInput,
 } from "./schemas/ops-po-duty";
 
 // HR-P2 (0260) — permissions that follow the position, not the person.
-// `isOpsManager` / `isPoDutyEditor` are re-exported above from their original
-// modules so no existing importer had to change; everything genuinely new to
-// duty keys is exported here.
+// Duty keys and their authorization helpers are exported from their one
+// shared authority.
 export {
   DUTY_KEYS,
   isDutyKey,
@@ -2079,11 +2065,17 @@ export {
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
   DELIVERY_HANDOVER_KINDS,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_MIMES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
+  handoverEvidenceFileSchema,
   handoverGoodsLineSchema,
   recordHandoverInput,
   recordOutboundPrepInput,
   signHandoverProofUploadInput,
   WAREHOUSE_PREP_FACTS,
+  type HandoverEvidenceFile,
   type HandoverGoodsLine,
   type RecordHandoverInput,
   type RecordOutboundPrepInput,
@@ -2108,6 +2100,11 @@ export {
   type DeliveryWarehouseScheduleInput,
 } from "./delivery-warehouse-schedule";
 export {
+  buildOutboundRegisterView,
+  filterOutboundCards,
+  outboundExceptionLines,
+  outboundStatusWordOf,
+  outboundViewMatches,
   WAREHOUSE_DASHBOARD_DATE_COUNT,
   WAREHOUSE_OFF_DAYS,
   warehouseEmptyDaySentence,
@@ -2115,6 +2112,8 @@ export {
   warehouseOutboundCards,
   warehouseRangeShift,
   warehouseUnitPendingReason,
+  type OutboundProduct,
+  type OutboundRegisterFacets,
   type WarehouseOutboundCard,
 } from "./warehouse-outbound";
 export {
@@ -3008,9 +3007,14 @@ export * from "./workspace-duty";
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./sales-order-work-source";
+export * from "./storage-obligation";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 
 export { recordSupplierReplyInput } from "./schemas/operation";
 
 export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+
+export * from "./warehouse-inbound";
+
+export * from "./arrival-source";

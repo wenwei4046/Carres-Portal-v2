@@ -170,6 +170,8 @@ function tables(over?: {
     order_addons: tableMock({ data: [], error: null }),
     ops_order_control: tableMock({ data: control, error: null }),
     ops_stock_items: tableMock({ data: [], error: null }),
+    // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+    invoices: tableMock({ data: [], error: null }),
     // Decision A (0355) — the gate's one money question, read from the owning
     // table. Empty by default: Finance has opened nothing.
     ops_delivery_orders: tableMock({ data: [], error: null }),

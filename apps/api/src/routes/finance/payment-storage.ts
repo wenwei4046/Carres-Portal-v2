@@ -26,7 +26,10 @@ paymentStorageRouter.get("/", async (c) => {
   }
   const orderId = c.req.query("orderId");
   const sb = userClient(c.env, auth.jwt);
-  let query = sb.from("payment_storage_cases").select("*")
+  // The approver resolves to a NAME — a stored id never reaches the screen
+  // untranslated (COPY-STANDARD); §11 wants every waiver with its approver.
+  let query = sb.from("payment_storage_cases")
+    .select("*, approved_by_user:app_users!payment_storage_cases_approved_by_fkey(name)")
     .order("created_at", { ascending: false });
   if (orderId) {
     const check = z.string().uuid().safeParse(orderId);

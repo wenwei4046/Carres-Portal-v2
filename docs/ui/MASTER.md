@@ -961,7 +961,9 @@ scrolls horizontally. Normal state spends the left side on the current View cont
 Register Search, and the right side on page-owned Export/display controls, frequent actions, one
 primary create action and a low-frequency overflow when needed. `View: {current view}` is explicit;
 scope capabilities such as All orders / Not delivered are saved/reusable Views, never a permanent
-row of pills. Header-column filters remain the direct per-column filter door; the Toolbar does not
+row of pills. A View control is conditional on a useful, distinct view capability; do not render
+one merely to repeat status filters. Supplier Claims defaults to all permitted new and historical
+records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
@@ -1393,6 +1395,19 @@ counters above the table; the 32px status footer carries the summary.
 
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
+
+**WAREHOUSE INBOUND / OUTBOUND — OWNER-APPROVED 2026-09-06, unified 2026-09-07.** Warehouse
+navigation is `Monitor · Inbound · Inventory · Outbound`. Monitor alone is the Calendar-summary
+page. Inbound AND Outbound use the shared 240px page-specific Filter Rail + remaining-width
+Register in one row grammar (stock MASTER §7); no six-working-day strip, Calendar cards or
+35%/65% composition. A compact date/range control is a filter only. Status, document type, Site
+and search filter one shared scope — the rail counts, the rows, the footer and the export can
+never describe different ranges. Exact Monitor deep links preserve date, Site ID and document
+scope. Two engine capabilities exist for this grammar and are opt-in per column/page:
+`wrap: true` (a completeness column wraps and the row grows — Product, Exceptions) and
+`expandable.trigger` (a named data column is the ONE expansion entry — its arrow and content
+are one button; no second expand control). Every other register keeps the single-line,
+gutter-chevron contract byte-identical.
 
 **APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
 fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.

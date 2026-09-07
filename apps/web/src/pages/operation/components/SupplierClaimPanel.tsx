@@ -30,14 +30,8 @@ export function ClaimSource({ claim }: { claim: SupplierClaimListRow }) {
 /** Short inspector: facts and one door, never a mounted editor. */
 export function SupplierClaimInspector({ claim, onOpen }: { claim: SupplierClaimListRow; onOpen: () => void }) {
   return <div className="p-4 text-body space-y-2" data-testid="claim-inspector">
-    <p className="font-semibold">{claim.product_description || absent}</p>
-    <p>Variant: {claim.product_variant || absent}</p>
-    <p>SKU: {claim.sku}</p>
-    <p>Qty: {claim.qty}</p>
     <p>Problem: {supplierClaimTypeLabel(claim.claim_type)}</p>
     {claim.note && <p className="whitespace-pre-wrap">{claim.note}</p>}
-    <ClaimSource claim={claim} />
-    <p>Supplier Response: {claim.supplier_response ? supplierClaimResponseLabel(claim.supplier_response) : absent}</p>
     <p>Evidence: {claim.photo_count} photos</p>
     {!!claim.held_unit_codes?.length && <p>Units on hold: {claim.held_unit_codes.join(" · ")}</p>}
     <Button variant="neutral" onClick={onOpen}>Open Claim</Button>
@@ -99,6 +93,14 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
     <ClaimSection title="Carres Execution">
       <p>{claim.carres_execution ? carresExecutionLabel(claim.carres_execution) : absent}</p>
       {claim.carres_execution_note && <p>{claim.carres_execution_note}</p>}
+      {(claim.customer_resolution === "repair" || claim.customer_resolution === "replace") && (
+        <Link
+          className="inline-block text-kit-blue-11 underline"
+          to={`/operation?tab=arrival-source&kind=${claim.customer_resolution === "repair" ? "repair-return" : "supplier-replacement"}&claim=${encodeURIComponent(claim.id)}`}
+        >
+          {claim.customer_resolution === "repair" ? "Plan Repair" : "Plan Supplier replacement"}
+        </Link>
+      )}
       <p className="text-label font-normal text-base-600">Approved execution scope is not available.</p>
     </ClaimSection>
     <ClaimSection title="Item Outcome">

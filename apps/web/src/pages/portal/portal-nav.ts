@@ -510,12 +510,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         financePath: "/finance/rental-approver",
       },
       {
-        key: "recon",
-        label: "Reconciliation",
-        icon: Scale,
-        financePath: "/finance/recon",
-      },
-      {
         key: "reports",
         label: "Reports",
         icon: BarChart3,

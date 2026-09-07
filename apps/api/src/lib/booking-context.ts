@@ -1,7 +1,9 @@
 import { HTTPException } from "hono/http-exception";
 import {
   bookingConfirmGate,
+  invoiceStorageSumOf,
   storageHold,
+  storageObligation,
   stockMatchKey,
   type BookingGateResult,
   type DeliveryGroupKey,
@@ -69,7 +71,7 @@ export async function loadBookingContext(
   // C5: the `order_payments` read is GONE. It holds zero rows and no live
   // payment path writes it, so summing it made "collected" RM 0 for every
   // order and the gate refused bookings for customers who had already paid.
-  const [linesRes, addonsRes, controlRes, reservedRes] = await Promise.all([
+  const [linesRes, addonsRes, controlRes, reservedRes, invoicesRes] = await Promise.all([
     sb.from("order_lines").select("sku, qty, unit_price").eq("order_id", orderId),
     sb.from("order_addons").select("qty, unit_price").eq("order_id", orderId),
     sb
@@ -86,8 +88,15 @@ export async function loadBookingContext(
       .select("sku, qty")
       .eq("status", "reserved")
       .eq("reserved_ref", soRef),
+    // Gate convergence (2026-09-07): the SO's live ISSUED storage papers are
+    // the canonical storage obligation (payment/MASTER.md §2) — the gate must
+    // see the SAME figure Payment's own readers print.
+    sb
+      .from("invoices")
+      .select("kind, status, amount, tax_amount, voided_at")
+      .eq("order_id", orderId),
   ]);
-  for (const r of [linesRes, addonsRes, controlRes, reservedRes]) {
+  for (const r of [linesRes, addonsRes, controlRes, reservedRes, invoicesRes]) {
     if (r.error) {
       const m = mapPgError(r.error);
       return { ok: false, body: m.body, status: m.status };
@@ -119,15 +128,31 @@ export async function loadBookingContext(
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });
-  const money = {
-    lineSum: sum(lines),
-    addonSum: sum(
-      (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
+  // GATE CONVERGENCE (2026-09-07): invoice-backed storage beats the legacy
+  // C9 figure when papers exist (never both — never a double count), netted
+  // so `paid` subtracts exactly once; with no paper the C9 answer passes
+  // through byte-identical. One precedence law: `storageObligation`.
+  const lineSum = sum(lines);
+  const addonSum = sum(
+    (addonsRes.data ?? []) as { qty: number; unit_price: number | null }[],
+  );
+  const paid = (order as { paid?: number | string | null }).paid ?? 0;
+  const storage = storageObligation({
+    invoiceStorageSum: invoiceStorageSumOf(
+      (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0],
     ),
-    paid: (order as { paid?: number | string | null }).paid ?? 0,
+    goodsTotal: lineSum + addonSum,
+    paid,
+    legacyOwing: hold.owing,
+    legacyReleased: hold.released,
+  });
+  const money = {
+    lineSum,
+    addonSum,
+    paid,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    storageOwing: hold.owing,
-    storageReleased: hold.released,
+    storageOwing: storage.owing,
+    storageReleased: storage.released,
   };
   const reservedQtyByKey: Record<string, number> = {};
   for (const u of (reservedRes.data ?? []) as { sku: string; qty: number | null }[]) {

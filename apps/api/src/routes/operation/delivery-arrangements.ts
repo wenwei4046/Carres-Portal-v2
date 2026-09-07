@@ -320,14 +320,20 @@ deliveryArrangementsRouter.get(
       fact: string;
       recorded_at: string;
     }>;
-    const acceptedUnits = (
-      (eventUnitsRes.data ?? []) as Array<{
-        delivery_order_id: string;
-        item_id: string;
-        event_id: string;
-        recorded_side: string;
-      }>
-    ).filter((row) => row.recorded_side === "warehouse");
+    const eventUnits = (eventUnitsRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+      event_id: string;
+      recorded_side: string;
+    }>;
+    const acceptedUnits = eventUnits.filter(
+      (row) => row.recorded_side === "warehouse",
+    );
+    /* The Logistics side's own exact-Unit receipt statement — the
+       counterparty's fact, kept beside the Warehouse's, never merged. */
+    const logisticsUnits = eventUnits.filter(
+      (row) => row.recorded_side === "logistics",
+    );
 
     const events = arrangements.flatMap((arrangement) => {
       const order = orderById.get(arrangement.order_id);
@@ -356,6 +362,21 @@ deliveryArrangementsRouter.get(
         const acceptedEvent = accepted
           ? handoverById.get(accepted.event_id)
           : undefined;
+        const driverConfirmed = logisticsUnits.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.item_id === scope.item_id,
+        );
+        const driverConfirmedEvent = driverConfirmed
+          ? handoverById.get(driverConfirmed.event_id)
+          : undefined;
+        /* `Driver collected` is the LOGISTICS side's own receipt event —
+           never the Warehouse's loading record wearing the driver's name. */
+        const logisticsReceipt = handovers.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.kind === "received_by_logistics",
+        );
         return deliveryWarehouseScheduleEvents({
           unitId: unit.unit_code,
           deliveryOrderId: deliveryOrder.id,
@@ -373,9 +394,9 @@ deliveryArrangementsRouter.get(
           collectionDate: arrangement.confirmed_date as string,
           collectionWindow: arrangement.confirmed_time,
           customerHandoverDate: arrangement.confirmed_date,
-          actualCollectionAt: acceptedEvent?.recorded_at ?? null,
+          actualCollectionAt: logisticsReceipt?.recorded_at ?? null,
           actualArrivalAt: order.delivered_at,
-          hasCollectionEvidence: Boolean(acceptedEvent?.proof_path),
+          hasCollectionEvidence: Boolean(logisticsReceipt?.proof_path),
           hasDeliveryEvidence: Boolean(
             order.pod_signature_url || order.do_file_path,
           ),
@@ -386,6 +407,9 @@ deliveryArrangementsRouter.get(
           unitCheckedAt: prepAt("checked"),
           unitPackedAt: prepAt("packed"),
           unitHandedOverAt: acceptedEvent?.recorded_at ?? null,
+          unitDriverConfirmedAt:
+            driverConfirmedEvent?.recorded_at ??
+            (driverConfirmed ? logisticsReceipt?.recorded_at ?? null : null),
           unitHasEvidence: accepted ? Boolean(acceptedEvent?.proof_path) : false,
           unitWarehouseOperator: acceptedEvent?.recorded_by
             ? recorderName.get(acceptedEvent.recorded_by) ?? null
