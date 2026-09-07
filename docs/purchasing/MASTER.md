@@ -2222,6 +2222,12 @@ the saved default. A collection address may be supplier premises or another show
 it never automatically creates a Carres Stock Site or grants access. This approves collection
 location entry only; the remaining Showroom Blueprint and post-submission change flow stay under review.
 
+**Destination selection — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Send to selects an
+existing Carres Site and fills its saved address automatically. Staff confirm floor, access and
+receiver for this request. If the destination is missing, link to the existing authorised Site
+setup; adding a delivery address alone must not create a Stock Site. This uses the existing Site
+authority, not a second destination editor or Site registry in Showroom.
+
 Operations may prepare a draft and use Request details to copy/send its link to the requester.
 The requester completes and submits that same record. Copy request link also opens an existing
 request for progress and missing information. Sign-in and record permissions apply; opening or
