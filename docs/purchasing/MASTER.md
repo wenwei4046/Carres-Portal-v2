@@ -2335,10 +2335,14 @@ duplicate request.
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.
 **Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
-**Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
+**Columns:** CO No., Supplier, Display Request / Supplier Claim, Coming In Units, Going Back Units, Showroom, Supplier
 Date, Received, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
 send one PDF → record promise → receive through Receiving → prove outgoing handover.
+**Clear origin wording — OWNER-APPROVED 2026-09-07:** Do not show Source Request in Showroom
+screens. Name the actual originating document, such as Display Request or Supplier Claim, with
+its linked number. Physical locations use Collect from and Send to; a document reference must
+not stand in for the location where goods will be collected or sent.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
 **Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
 swap, supplier changes model/date.
