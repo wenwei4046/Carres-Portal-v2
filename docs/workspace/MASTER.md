@@ -180,6 +180,13 @@ honest Work for admitted modules.
   retired browser composition and Quick Rail Team/duty editor have been removed.
 - My Work is the default for everyone. It routes by acting person; Team Work groups by normal
   owner and shows dated cover evidence without rewriting ownership.
+- Stock/Warehouse admission was re-audited against the production-verified replacement Monitor,
+  Inbound and Outbound surfaces on 2026-09-07. Supplier arrivals already enter through Receiving's
+  GRN-owned action; Monitor is read-only management visibility and creates no Work. Physical
+  Outbound work is deliberately not admitted yet: its approved owner is an individually signed-in
+  NETS Warehouse operator, falling back to an authorised Site queue until accepted, while the
+  current central Work endpoint is Operation-only and has neither Site-queue routing nor personal
+  acceptance facts. Naming Carres staff, `NETS` or a shared warehouse login would violate section 3.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
@@ -188,10 +195,12 @@ honest Work for admitted modules.
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
 3. Remove legacy PIC/duty fallbacks.
-4. Admit the remaining qualified modules to the server feed.
-5. Retire remaining duplicate generated-task paths after source-by-source proof.
-6. Emit Notifications from Work transitions.
-7. Last, complete and owner-review Dashboard against production data.
+4. Add permission-scoped Warehouse Site queues and personal operator acceptance/resolution, then
+   admit physical Outbound actions; never turn Monitor events into actions.
+5. Admit the remaining qualified modules to the server feed.
+6. Retire remaining duplicate generated-task paths after source-by-source proof.
+7. Emit Notifications from Work transitions.
+8. Last, complete and owner-review Dashboard against production data.
 
 Cards follow dependency slices; this MASTER is not an implementation queue.
 
