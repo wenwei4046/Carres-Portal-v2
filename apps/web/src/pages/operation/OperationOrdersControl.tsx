@@ -3762,7 +3762,7 @@ export default function OperationOrdersControl({ onImport }: Props) {
            is only worth its rent if it says something the first does not.
            MEASURED on production 2026-08-05 at 1440×900, the two read the same
            list: toolbar `Everyone 28 · SH 11 · YJ 16 · No PIC 1` against rail
-           `Shasha 11 · Yu Jun · PO duty 16 · Khor Yee · pending 0 · No PIC 1` —
+           `Shasha 11 · Yu Jun · PO duty 16 · Staff · pending 0 · No PIC 1` —
            same facet, same counts, and the RAIL is the richer of the two (it
            carries presence dots, the PO-duty badge and the pending roster row,
            none of which fit on a chip).

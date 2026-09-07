@@ -246,7 +246,7 @@ required result. Shape:
 Examples (all pass):
 
     ✔ Yu Jun · Send PO-86 to Ohana · Ask them to confirm delivery · Wed 12 Aug.
-    ✔ Khor Yee · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
+    ✔ Shasha · Check in PO-2041 goods for Purchasing · Record full or partial · Thu 13 Aug.
     ✔ Shasha · Call AL about SO-1318 · Record the delivery date · Fri 14 Aug.
 
 Anti-patterns (all fail):

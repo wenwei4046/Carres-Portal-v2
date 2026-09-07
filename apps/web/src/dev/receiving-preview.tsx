@@ -55,7 +55,7 @@ const POSTED_ROW = {
   grn_no: "GRN-20260903-1184",
   actual_site_id: null,
   actual_site_name: null,
-  posted_duty_holder_name: "Khor Yee",
+  posted_duty_holder_name: "Shasha",
   posted_duty_cover_name: null,
   posted_authority: "grn_duty",
   arrival_evidence: [
@@ -295,11 +295,11 @@ const DETAIL = {
 
 const DUTY = {
   duty_key: "grn_duty",
-  normal_user_id: "u-ky",
-  normal_user_name: "Khor Yee",
+  normal_user_id: "u-yj",
+  normal_user_name: "Yu Jun",
   acting_user_id: null,
   acting_user_name: null,
-  actor_user_id: "u-ky",
+  actor_user_id: "u-yj",
   is_cover: false,
   is_superuser: true,
   allowed: true,
@@ -315,8 +315,8 @@ const WORKSPACE_DUTIES = {
       resolution: {
         duty_key: "grn_duty",
         on_date: "2026-09-04",
-        normal_user_id: "u-ky",
-        normal_user_name: "Khor Yee",
+        normal_user_id: "u-yj",
+        normal_user_name: "Yu Jun",
         acting_user_id: "u-sha",
         acting_user_name: "Shasha",
         actor_user_id: "u-sha",
@@ -328,8 +328,8 @@ const WORKSPACE_DUTIES = {
         {
           id: "a1",
           duty_key: "grn_duty",
-          holder_id: "u-ky",
-          holder_name: "Khor Yee",
+          holder_id: "u-yj",
+          holder_name: "Yu Jun",
           effective_from: "2026-09-01",
           effective_until: null,
           assigned_by: "u-jess",
@@ -342,8 +342,8 @@ const WORKSPACE_DUTIES = {
         {
           id: "c1",
           duty_key: "grn_duty",
-          normal_user_id: "u-ky",
-          normal_user_name: "Khor Yee",
+          normal_user_id: "u-yj",
+          normal_user_name: "Yu Jun",
           acting_user_id: "u-sha",
           acting_user_name: "Shasha",
           starts_on: "2026-09-04",

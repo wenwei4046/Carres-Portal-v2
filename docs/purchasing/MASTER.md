@@ -291,6 +291,11 @@ creation authority `purchasing_issue_pos_batch`, and the evidence door
 authority used as distinct fields; a superuser is never rewritten as Yu Jun or the cover. Cover has
 no browser write policy.
 
+**Current roster, effective 2026-09-07:** Yu Jun and Shasha are the two Operation staff in the
+monthly PO/GRN rotation. The two duties remain opposite in every month so the person who issues a PO
+does not receive it. September 2026 is PO Duty = Yu Jun and GRN Duty = Shasha; October reverses.
+Khor Yee retains only historical actor/assignment evidence and receives no current or future Work.
+
 ### 5.4 Deliver To
 
 The destination comes from the source PO/CO `Deliver To`. When a new buy needs a default, use the
