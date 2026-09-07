@@ -1036,6 +1036,31 @@ on-screen law *sending is not confirmation*) and the reply proof as a REAL uploa
 `POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
 bucket under `arrangement/{order}/{leg}/…`.
 
+**DEPLOYED 2026-09-07 — Monitor Day · Week · Month and rail correction, PR #1157, main SHA
+`4f35842c87acea49cd0fcc0716d6acc0a3e31ce6`, all four canonical surfaces converged (erp ·
+pos · pages.dev `/__carres_deploy.json` and the Worker `/health` each report that exact SHA;
+the served entry bundle carries `Upload delivery proof` · `LOGISTICS PARTNER` · `DELIVERY
+STATUS` and no `Delivered — Proof Required` or `delivery scopes selected`).** The §8 owner
+correction is live and was verified through an authenticated Operations session on production:
+`/operation?tab=delivery` lands on the **Week** calendar (Mon 7 – Sat 12 Sep) with `Day · Week ·
+Month` in the page toolbar, the honest spanning state and the REAL `86 deliveries need a
+confirmed date.` door; the rail reads the four ruled groups with real counts — WORK TO DO
+(All delivery work 87 · No logistics picked 33 · No confirmed date 86 · Overdue 1 · Failed
+Delivery 0 · Upload delivery proof 0), STATE as 13 direct names (Kuala Lumpur 37 · Selangor 23
+· Pahang 6 · …), LOGISTICS PARTNER (NETS 46 · AL 7 · HOUZS 1) and DELIVERY STATUS (0 · 0 · 0)
+— with no `Calendar` row, no `All …` rows and no proof-required status; `Month` on an empty
+September showed the one spanning state, the toolbar's `Previous month` opened AUGUST 2026
+printing `27 · Deliveries 1 · Exceptions 1`, and clicking 27 opened that date's `Day` with the
+real card (afternoon window · `No delivery order yet` · customer · Likas, Sabah · goods · HOUZS
+· `Delivery confirmed`); `No logistics picked` → header select-all read `33 selected · Clear ·
+Assign logistics` in place with the footer `33 deliveries` (cleared; no production assignment
+was submitted); `Week` returned the Calendar. Measured over SQL the same day: production holds
+no recorded delivery attempt, photo ledger or signed document yet, so the `Upload delivery
+proof` and `Failed Delivery` queues honestly read 0. Windows verified at all three breakpoints
+on the seeded preview (desktop Week / Day / Month · tablet three-day Week and Month · phone Day
+list with the kit date control and no Day/Week/Month control). Typecheck clean, 3,983 web tests
+green (119 in the two Monitor suites). No migration, no RLS change, no new writer.
+
 **DEPLOYED 2026-09-07 — Monitor default landing correction, PR #1125, main SHA
 `ccc4c63b4aa8294fe91103dda0b36395606514a5`, production converged (deploy probe reports that
 exact SHA and the served bundle carries the ruled view order).** The §8 owner correction is
