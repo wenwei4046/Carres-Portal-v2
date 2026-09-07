@@ -1,0 +1,264 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair, type JWK, type KeyLike } from "jose";
+import app from "../../index";
+import { _setJwksForTesting } from "../../middleware/auth";
+
+vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
+import { userClient } from "../../lib/supabase";
+
+const env = {
+  SUPABASE_URL: "https://t.x",
+  SUPABASE_ANON_KEY: "a",
+  SUPABASE_SERVICE_ROLE_KEY: "s",
+  SUPABASE_JWT_SECRET: "",
+};
+const KID = "k1";
+let signKey: KeyLike;
+let publicJwk: JWK;
+
+async function makeJwt(role: string) {
+  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
+    .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
+    .setSubject("11111111-1111-1111-1111-000000000001")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(signKey);
+}
+
+beforeAll(async () => {
+  const kp = await generateKeyPair("ES256", { extractable: true });
+  signKey = kp.privateKey;
+  publicJwk = await exportJWK(kp.publicKey);
+  publicJwk.kid = KID;
+  publicJwk.alg = "ES256";
+  publicJwk.use = "sig";
+});
+
+beforeEach(() => {
+  _setJwksForTesting(createLocalJWKSet({ keys: [publicJwk] }));
+  vi.mocked(userClient).mockReset();
+});
+
+afterAll(() => _setJwksForTesting(null));
+
+const ORDER_ID = "00000000-0000-0000-0000-000000b99001";
+const INVOICE_ID = "00000000-0000-0000-0000-000000b99002";
+
+describe("GET /api/finance/invoices/register", () => {
+  function invoices(error: unknown = null) {
+    const rows = [{
+      id: INVOICE_ID, invoice_no: null, status: "draft", kind: "sales",
+      amount: 1000, tax_amount: 0, issued_at: null, voided_at: null,
+      orders: { id: ORDER_ID, so: 1300, customer_name: "Customer" },
+    }];
+    const chain = { select: vi.fn(), order: vi.fn(), range: vi.fn() };
+    chain.select.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    chain.range.mockResolvedValue({ data: error ? null : rows, error, count: 1 });
+    const sb = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return { sb, chain, rows };
+  }
+  async function request(role: string, query = "") {
+    return app.fetch(new Request(`http://t/api/finance/invoices/register${query}`, {
+      headers: { Authorization: `Bearer ${await makeJwt(role)}` },
+    }), env);
+  }
+  it.each(["operation", "finance", "principal"])("reads invoice source facts for %s", async (role) => {
+    const { sb, rows } = invoices();
+    const res = await request(role);
+    expect(res.status).toBe(200);
+    expect(sb.from).toHaveBeenCalledWith("invoices");
+    expect(await res.json()).toEqual({ rows, total: 1 });
+  });
+  it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading", async (role) => {
+    const res = await request(role);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("does not turn a failed source read into an empty register", async () => {
+    invoices({ message: "source unavailable", code: "08006" });
+    expect((await request("finance")).status).toBe(500);
+  });
+  it("pages deterministically and refuses invalid offsets", async () => {
+    const { chain } = invoices();
+    expect((await request("finance", "?offset=200&limit=100")).status).toBe(200);
+    expect(chain.range).toHaveBeenCalledWith(200, 299);
+    expect((await request("finance", "?offset=-1")).status).toBe(422);
+  });
+});
+
+describe("POST /api/finance/invoices/prepare", () => {
+  function withOrder(order: unknown, rpcResult: unknown = { invoice: { id: INVOICE_ID } }) {
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: order, error: null }),
+          }),
+        }),
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: rpcResult, error: null }),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function request(role: string, body: unknown) {
+    return app.fetch(new Request("http://t/api/finance/invoices/prepare", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("prepares with the one orderMoney total, never the outstanding", async () => {
+    const sb = withOrder({
+      id: ORDER_ID, paid: 400,
+      order_lines: [{ qty: 2, unit_price: 500 }],
+      order_addons: [{ qty: 1, unit_price: 100 }],
+      ops_order_control: [{ balance: null }],
+    });
+    const res = await request("operation", { orderId: ORDER_ID });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_invoice_prepare", {
+      p_order_id: ORDER_ID, p_amount: 1100, p_tax_amount: 0,
+    });
+  });
+  it("refuses an order whose value nobody has entered", async () => {
+    const sb = withOrder({
+      id: ORDER_ID, paid: 0, order_lines: [], order_addons: [],
+      ops_order_control: [{ balance: null }],
+    });
+    const res = await request("finance", { orderId: ORDER_ID });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("keyed-balance orders invoice paid + owing (the keyed total)", async () => {
+    const sb = withOrder({
+      id: ORDER_ID, paid: 300, order_lines: [], order_addons: [],
+      ops_order_control: [{ balance: 700 }],
+    });
+    const res = await request("finance", { orderId: ORDER_ID });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_invoice_prepare", {
+      p_order_id: ORDER_ID, p_amount: 1000, p_tax_amount: 0,
+    });
+  });
+  it("refuses a dealer", async () => {
+    expect((await request("dealer", { orderId: ORDER_ID })).status).toBe(403);
+  });
+});
+
+describe("POST /api/finance/invoices/:id/issue", () => {
+  it("captures the snapshot and calls the SQL issue door", async () => {
+    const tables: Record<string, unknown> = {
+      invoices: { id: INVOICE_ID, order_id: ORDER_ID, amount: 1100, tax_amount: 0, kind: "sales", status: "draft" },
+      orders: {
+        id: ORDER_ID, so: 1300, customer_name: "LIM KUAN YANG",
+        customer_phone: "0123", customer_address: "1 Jalan",
+        order_lines: [{ sku: "MS01-K", qty: 2, unit_price: 500 }],
+      },
+    };
+    const sb = {
+      from: vi.fn().mockImplementation((table: string) => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: tables[table], error: null }),
+          }),
+        }),
+      })),
+      rpc: vi.fn().mockResolvedValue({ data: { invoice: { id: INVOICE_ID, status: "issued" } }, error: null }),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/issue`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_invoice_issue", {
+      p_invoice_id: INVOICE_ID,
+      p_snapshot: expect.objectContaining({
+        so: "SO-1300", amount: 1100,
+        customer: expect.objectContaining({ name: "LIM KUAN YANG" }),
+        lines: [{ sku: "MS01-K", qty: 2, unit_price: 500 }],
+      }),
+    });
+  });
+});
+
+describe("POST /api/finance/invoices/:id/record-message", () => {
+  function withInvoice() {
+    const sb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: INVOICE_ID, order_id: ORDER_ID }, error: null }),
+          }),
+        }),
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: { id: "c1" }, error: null }),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function request(role: string, body: unknown) {
+    return app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/record-message`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("records the sent message with its proof through the one door", async () => {
+    const sb = withInvoice();
+    const res = await request("operation", {
+      kind: "reminder", messageText: "Hi…", templateKey: "customer_reminder",
+      screenshotUrl: "orders-attachments/orders/o/comm/1.png",
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_record_message_sent", {
+      p_order_id: ORDER_ID, p_invoice_id: INVOICE_ID, p_kind: "reminder",
+      p_message_text: "Hi…", p_template_key: "customer_reminder",
+      p_screenshot_url: "orders-attachments/orders/o/comm/1.png",
+    });
+  });
+  it("refuses a record without the sent screenshot before SQL", async () => {
+    const sb = withInvoice();
+    const res = await request("operation", { kind: "reminder", messageText: "Hi…", screenshotUrl: "" });
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("refuses a dealer", async () => {
+    expect((await request("dealer", { kind: "reminder", messageText: "Hi…", screenshotUrl: "x" })).status).toBe(403);
+  });
+});
+
+describe("POST /api/finance/invoices/:id/void-replace", () => {
+  async function request(role: string, body: unknown) {
+    return app.fetch(new Request(`http://t/api/finance/invoices/${INVOICE_ID}/void-replace`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+  it("passes the reason to the duty-gated SQL door", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: { voided: {}, replacement: {} }, error: null }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await request("finance", { reason: "Wrong amount on the paper" });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_invoice_void_replace", {
+      p_invoice_id: INVOICE_ID, p_reason: "Wrong amount on the paper",
+    });
+  });
+  it("refuses a blank reason before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await request("finance", { reason: "  " })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("maps the SQL duty refusal to 403", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "42501", message: "forbidden" } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await request("operation", { reason: "Wrong amount" })).status).toBe(403);
+  });
+});

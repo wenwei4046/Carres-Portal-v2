@@ -482,7 +482,7 @@ export function receivingExtraQty(
 
 /**
  * RECEIVING SUMMARY — the five governed quantity words for a source's lines
- * (`purchasing/MASTER.md` §5.7 / COPY-STANDARD): each fact prints its own
+ * (`purchasing/MASTER.md` §5.8 / COPY-STANDARD): each fact prints its own
  * number; the operator never subtracts. Damaged/wrong never reduce
  * `Pending Delivery Qty`.
  */

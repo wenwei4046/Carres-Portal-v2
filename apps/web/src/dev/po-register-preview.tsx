@@ -32,6 +32,7 @@ function po(overrides: Record<string, unknown>) {
     so: null,
     so_refs: null,
     expected_ready_date: null,
+    official_delivery_date: null,
     purpose: "customer_sales",
     placed_at: "2026-08-28T08:00:00Z",
     sources: [{ kind: "sales_order", reference: "SO-4001" }],
@@ -61,15 +62,20 @@ const POS = [
   po({
     id: "PO-20260901-1001",
     eta_date: "2026-09-12",
+    official_delivery_date: "2026-09-12",
     version: 2,
     purchase_order_lines: [line("l1", 3, 1)],
-    promises: [{ kind: "tomorrow_delivery", answer: "shipping", about_date: "2026-09-12", previous_date: null, new_date: null, reason: null, recorded_at: "2026-09-01T09:00:00Z" }],
+    /* 0430 — a V1 reply recorded WITHOUT evidence: readable history, never a
+       confirmation of the current V2. */
+    promises: [{ kind: "tomorrow_delivery", answer: "shipping", about_date: "2026-09-12", previous_date: null, new_date: null, reason: null, po_version: 1, recorded_at: "2026-09-01T09:00:00Z" }],
     sends: [{ channel: "whatsapp", note: null, sent_at: "2026-09-03T09:00:00Z", kind: "confirmed_sent", recipient: "Hooka Purchasing Group", po_version: 1, sent_by_name: "Yee Jean", duty_name: "Yee Jean", acting_name: null, po_revisions: null }],
   }),
-  /* Current version sent by email — PO V2 / PO V2. */
+  /* Current version sent by email — PO V2 / PO V2. The reply form is OPEN
+     here: type an earlier/later date to walk the 0430 classification. */
   po({
     id: "PO-20260902-1002",
     eta_date: "2026-09-20",
+    official_delivery_date: "2026-09-20",
     version: 2,
     purchase_order_lines: [line("l2", 5, 0)],
     sends: [{ channel: "email", note: null, sent_at: "2026-09-04T02:00:00Z", kind: "confirmed_sent", recipient: "buy@hooka.my", po_version: 2, sent_by_name: "Yee Jean", duty_name: "Yee Jean", acting_name: null, po_revisions: null }],
@@ -78,9 +84,26 @@ const POS = [
   po({
     id: "PO-20260903-1003",
     eta_date: "2026-09-25",
+    official_delivery_date: "2026-09-25",
     version: 1,
     purchase_order_lines: [line("l3", 2, 0)],
     sends: [],
+  }),
+  /* 0430 — original date genuinely unknown (ready-date recompute, pre-0428):
+     the PO Delivery Date column states the absence; a reply records the
+     supplier date without any relative claim. An evidenced earlier reply and
+     an unevidenced older one share the Reply history. */
+  po({
+    id: "PO-20260830-1004",
+    eta_date: "2026-09-18",
+    official_delivery_date: null,
+    version: 1,
+    purchase_order_lines: [line("l5", 2, 0)],
+    promises: [
+      { kind: "tomorrow_delivery", answer: "reported", about_date: null, previous_date: null, new_date: "2026-09-17", reason: null, po_version: 1, channel: "whatsapp", recipient: "Hooka Purchasing Group", evidence: "PO-20260830-1004/reply.png", reported_by: "Factory staff", reported_at: "2026-09-05T03:00:00Z", recorded_by: "user-duty", recorded_by_name: "Yee Jean", recorded_at: "2026-09-05T03:10:00Z" },
+      { kind: "tomorrow_delivery", answer: "shipping", about_date: "2026-09-18", previous_date: null, new_date: null, reason: null, po_version: 1, recorded_at: "2026-09-02T08:00:00Z" },
+    ],
+    sends: [{ channel: "whatsapp", note: null, sent_at: "2026-09-01T09:00:00Z", kind: "confirmed_sent", recipient: "Hooka Purchasing Group", po_version: 1, sent_by_name: "Yee Jean", duty_name: "Yee Jean", acting_name: null, po_revisions: null }],
   }),
   /* Legacy: goods fully received, no send record — evidence stays missing. */
   po({

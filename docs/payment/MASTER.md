@@ -53,7 +53,9 @@ everything back. Partial payment keeps the remainder open.
 
 `Finance → Payments` has **Payments** and **Invoices** listings. Payment actions live only in
 shared **Work → My Work / Team Work**. Settings and Reports use their shared destinations.
-There is no Payment Monitor, Dashboard, module-local Work page, KPI preamble or left filter rail.
+There is no Payment Monitor, Dashboard, module-local Work page or KPI preamble. Payments and
+Invoices Registers have no left filter rail. The Calendar view uses the dated owner ruling in
+§17; this does not create another Work owner or replace the Registers.
 
 Shared Payment Work sorts by risk: delivery tomorrow and unpaid; storage holding the DO; missed promise;
 balance entering its collection window; then balance with no delivery date. A row shows SO,
@@ -211,8 +213,9 @@ collection`, `1 customer promise was missed`. `8 open · 2 late` is forbidden.
 ## 11 · History, calendar and reports
 
 History is append-only/filterable by date, customer, SO, amount, method, invoice, receipt, actor and
-exception, and links immutable documents/source SO. Calendar shows only dated promise/deadline,
-free end, charge start and approved-free end. Payment record is not a calendar event. Quick Rail
+exception, and links immutable documents/source SO. Calendar shows dated promise/deadline,
+free end, charge start and approved-free end, plus read-only Expected arrival and Customer Delivery
+context under §17. Payment record is not a calendar event. Quick Rail
 uses concrete copy and source deep-link.
 
 One read-only customer statement derives invoices, allocations, payments, voids and amount needed.
@@ -276,30 +279,138 @@ entrance, idempotency mapping, role gate and void contract; focused web tests pr
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
 
-### BUILD in progress — Payment Register foundation, 2026-09-06
+### Deployed — the Payments Register answers the Finance door, 2026-09-06
 
-The delivery branch adds a read-only canonical receipt Register endpoint and reader. It preserves
-voids and allocation history, resolves recorded actors from shared staff, pages explicitly, and
-refuses failed or incomplete source reads instead of reporting a false zero. The draft Register
-uses the shared grid, sticky Receipt No, six approved columns, view-scoped selection/export and
-void-aware footer total. Exports retain the VOIDED mark beside the original receipt number and
-amount. Its Inspect is read-only; the draft object uses one continuous scroll.
+PR #1104 merged as `caebd3e3` and the production deploy converged that exact SHA on the ERP
+page, the POS page and the API Worker; the served bundle carries the Register's own strings.
+`Finance → Payments` opens the canonical receipt Register: fail-closed paginated
+`GET /finance/payments/register`, six approved columns with sticky Receipt No, view-scoped
+selection/export retaining the VOIDED mark, void-aware footer total, read-only Inspect and the
+one-scroll payment object. The sidebar row says the governed word `Payments`; the Phase-5
+bucket page left the route. The shared Order/Work action engine now checks collection
+readiness: goods not ready with no usable arrival date creates no collection action; arrival
+confirmation creates it; delivered balances stay collectible. No money arithmetic or Delivery
+gate changed. An authenticated owner walk of the live page is still owed; exact-SHA and bundle
+evidence are the current production proof.
 
-The delivery branch also makes the existing shared Order/Work action engine check collection
-readiness. A live order with goods not ready and no usable arrival date creates no collection
-action, even when a customer delivery date exists. Arrival confirmation creates the action;
-withdrawing it restores waiting. Already-delivered balances stay collectible. This changes no
-money arithmetic or Delivery gate; an actual Finance Exception remains independent Work.
-Focused shared and source-mapping tests cover the rule, and removing the guard fails the three
-Work integration cases. This remains branch evidence, not a production verification claim.
+### Deployed — invoice lifecycle and the Invoices Register, 2026-09-06
 
-This UI is not connected to production navigation. Existing payment writers and entrances remain
-unchanged. Invoice objects, immutable documents/Print, evidence opening, authorised corrections,
-message/template persistence, Settings, Reports and full business workflows remain unfinished.
-Local preview checks are fixture evidence only; they are not authenticated production proof.
-No Payment UI completion or exact-SHA deployment is claimed. The complete approved customer
-Important Notes wording has not yet been located in the repository and has been requested from
-its owner; it must not be invented or shortened during implementation.
+Migration `0429` is APPLIED (tracker tail confirmed) and PR #1108 merged as `60e8814c`;
+the ERP page, POS page and API Worker converged that exact SHA and the served bundle carries
+the Invoices Register's own strings. `invoices` now carries the governed lifecycle: kind
+(Sales/Storage/Additional Storage), draft → issued → voided status, immutable issue snapshot,
+void reason/actors and the replacement lineage; one live Sales Invoice per order; allocations
+may name an invoice. `payment_invoice_prepare` drafts idempotently, `payment_invoice_issue`
+mints the governed `INV-DDMMYY-NNNN` number and freezes the snapshot, and
+`payment_invoice_void_replace` — Payment Approver duty via the Shared Duty Resolver, or
+principal — voids with a required reason and drafts the linked replacement. The dispatch
+trigger adopts a prepared live invoice instead of minting a twin. `Finance → Invoices` opens
+the §16 Register (eight approved columns; Needed/Goods/arrival/timing derived through the one
+shared `orderMoney`/`collectionClock` arithmetic), read-only Inspect, and the one-scroll
+invoice object with honest empty states. The rolled-back production probe's negative controls
+were run before apply; an authenticated owner walk is still owed.
+
+### Deployed — record payment, and a void wears its reason, 2026-09-06
+
+Migration `0430` is APPLIED and PR #1110 merged as `124140a5` (deploy convergence in
+progress at this edit; the closure note carries the proof). `payment_void` requires a reason
+and gates on Payment Approver duty (Shared Duty Resolver) or principal; the posting service +
+column CHECK speak the §16 manual methods (`duitnow_qr` · `credit_card` · `debit_card`) with
+the arithmetic byte-for-byte 0351. The Invoice object carries the §16 Record payment
+composition — 50/50 action-and-receipt-preview, the six manual methods with their required
+evidence words, Review stating `This records customer money.` / `This does not confirm the
+bank account.`, one idempotency key per opening, upload-first posting through the canonical
+door, and typed input retained on failure. The void doors in the order drawer and control
+panel ask the reason inline. `/finance/*` admits operation staff to the Payments and Invoices
+destinations only (§12); finance-only pages bounce them.
+
+### Merged — Payment Settings foundation, 2026-09-06
+
+Migration `0431` is APPLIED and PR #1112 merged as `f43bdbf9` (the rolled-back production
+probe proved the manager gate refuses a non-manager, saves keep old/new/actor in the change
+log, and the last Active method cannot be switched off). `Settings → Payment` has its storage:
+receiving bank accounts keyed by the governed routing source (PJ own-showroom → Hong Leong
+Bank · Dealer → RHB — the BANKS are seeded approved truth, the account numbers are the
+manager's to enter), the six §16 manual methods with Active flags (`online` deliberately has
+no row), and append-only effective-dated §7 storage rules seeded with the approved rates. The
+Settings Workspace gains the Payment section: readable summaries, focused bank-account Edit,
+method toggles, the two storage cards, and the numbering summary that says only the next
+example and `Numbers are created automatically.` Record payment's method list now reads the
+Active set. No approver name, Payment Duty or roster appears in Payment Settings.
+
+### BUILD in progress — a sent message is recorded with its proof, 2026-09-06
+
+Migration `0434` (branch evidence; verified on production in a rolled-back transaction — a
+screenshotless record is refused, a cross-order invoice is refused, and a real record lands
+with its proof, the order-history fact and the shared chase stamp; not yet applied) creates
+`payment_communications`, the append-only sent-message ledger, and
+`payment_record_message_sent`, its one recording door. The Invoice object gains
+`Ask the customer to pay` — the door exists only when the shared clock says due or late, never
+while `Wait` — opening the 50/50 message composition: editable ordinary wording beside the
+real message the customer receives, Copy message → Open WhatsApp → Upload sent screenshot →
+Record message sent. Opening WhatsApp records nothing. Communication History renders the
+ledger. The message body is the CURRENT locked customer template (Jess 2026-07-13); the
+complete §16 payment message swaps in when its owner-approved Important Notes wording
+arrives — the bottom rules are never invented or shortened. `waLink` converged from two
+page-local copies into the one shared implementation.
+
+### Deployed — the invoice document prints from its snapshot, and the §17 Calendar, 2026-09-06
+
+PR #1115 merged as `53853a12` and production converged that exact SHA (ERP page + Worker); PR
+#1114 (`52659282` — the sent-message ledger and Ask the customer to pay, migration 0434
+applied) converged before it. `GET /finance/invoices/:id/document` serves the issued
+invoice's IMMUTABLE snapshot as the governed InvoiceTemplate data (a voided invoice keeps its
+paper and says VOIDED in the title; a pre-0429 invoice has no snapshot, falls back to a live
+read and says so); the Invoice object header gains the direct `Print` output. The §17 Calendar
+navigation is built as ruled: Customer/SO/Invoice cells open the collection details (never an
+automatic Calendar switch); a Customer Delivery or Expected arrival date cell opens the
+Calendar at that date's fixed workweek with the exact SO highlighted and the Expected arrival
+label explicit; a record without a usable date keeps its honest words and no door. The
+Calendar view: 240px rail with the complete month fixed on top (arrows one month at a time),
+business date filters scrolling below, one fixed Mon–Sun workweek with Sunday visible and
+muted as `not a working day` (Malaysian holidays too), the selected date on the blue token,
+every indicator carrying words. Entries are read-only facts from their authoritative owners;
+an Expected arrival entry creates no deadline and no chase, and voided invoices place nothing.
+
+### Deployed — the template library keeps every version, 2026-09-06
+
+Migration `0435` is APPLIED and PR #1116 merged as `012887af`; production converged that exact
+SHA. The rolled-back production probe proved: a non-manager is refused, an edit appends
+version 2 while version 1 stays history, one Default per purpose holds, and an inactive
+template cannot be the Default. The migration creates
+`payment_message_templates`, the append-only version store, and its three manager doors
+(save · set default · set active) through the same settings gate and change log. Seeds carry
+ONLY the two already-locked customer wordings (Jess 2026-07-13) as the `Gentle reminder` and
+`Payment should have been received` Defaults, with protected merge fields
+`{customer} {ref} {outstanding} {items}`; every other governed purpose says
+`No template yet. The approved wording must come from its owner.` — nothing invents customer
+copy. `Settings → Payment → WhatsApp templates` gains the library: heads under the governed
+§16 purpose words, New template · Duplicate · Edit · Set as default · Make inactive · View
+history, and the governed 50/50 editor (ordinary wording left, real preview right, protected
+fields, a lost amount field blocks Review, Review changes before Save). `Ask the customer to
+pay` now recommends the Default template from the shared clock's answer, offers
+`Change template` across Active templates, renders protected fields from structured facts,
+and falls back to the built-in locked wording when the library is unreachable.
+
+### BUILD in progress — Send receipt, 2026-09-06
+
+Branch evidence, no migration: after a successful posting, the done panel says Payment
+recorded · Receipt number · Amount still needed and offers **Send receipt** — template-driven
+ONLY. A full payment recommends the `Payment received` template, a partial one
+`Partial payment received`; the composition renders the manager's wording with the receipt
+facts (`{receipt_no}` `{amount}` `{still_needed}` join the protected fields) and records into
+the immutable ledger as kind `receipt` with the sent-screenshot proof. With no Active receipt
+template the panel says `No receipt template yet. Ask a manager to add the approved wording
+in Settings.` — nothing invents customer copy.
+
+Message assembly with bank routing and Partner contact, Reports, Stripe convergence, storage
+journeys, full responsive 390px/200% verification and the retirement of the rejected
+Refund/Bank Matching surfaces remain unfinished target work. The complete approved customer
+Important Notes wording has not been located in the repository and has been requested from its
+owner; it must not be invented or shortened during implementation — the manager can also paste
+it into a `Standard bank transfer` template once approved. The production Calendar walk is
+still owed (the walk aborted on a frozen browser extension; the shipped path is covered by
+the local walk and its tests).
 
 ### Approved target / not claimed built by this scope
 
@@ -434,3 +545,37 @@ Shared Reports → Payment: Money received; Customer balances; Storage charged a
 Storage waived; Payment corrections; Money needing review. No Refund, Bank Matching or Negative
 Payment report. Loading, empty, error, stale and permission states use Primary School English.
 Upload, Review, Record, Send, Back and recovery remain usable at 390px and 200% zoom.
+
+## 17 · Calendar navigation — owner-approved target, 2026-09-06
+
+**RULING / APPROVED TARGET, NOT CLAIMED BUILT.** The owner approved the recommendation:
+click a customer or document to inspect the relevant collection object; click a date to see its
+schedule. This supersedes the earlier suggestion that clicking a customer automatically switches
+to Calendar and chooses Delivery before Expected arrival. It qualifies the earlier blanket
+no-left-rail wording only for the Calendar view. Payments / Invoices remain Registers.
+
+| Selection | Required result |
+|---|---|
+| Customer / SO / Invoice in the collection listing | Open the corresponding order's collection details, including money needed, goods arrival and delivery facts; preserve the selected SO identity when a customer has several orders |
+| Customer Delivery date | Open Calendar at that date's fixed workweek and highlight the selected SO |
+| Expected arrival date | Open Calendar at that date's fixed workweek and highlight the selected SO; explicitly label Expected arrival |
+| Date in the left month calendar | Show the fixed workweek containing that date |
+| Record without a relevant date | Keep it available in the listing, explain the missing date, and never invent a calendar position |
+
+The Calendar view uses the owner-described shared composition: 240px page rail with a complete
+month fixed at its top, month arrows moving one month at a time, and business filters scrolling
+vertically below it independently. Sunday remains visible and is muted when non-working. The
+selected date uses the standard blue selection token. A work indicator must have a textual or
+accessible explanation and must not rely on colour alone. The right side shows a fixed workweek,
+without infinite horizontal scrolling. Choosing a business listing filter keeps the month visible;
+choosing a month date returns to Calendar. Apply the shared responsive authority at narrow widths.
+
+Expected arrival, Customer Delivery and collection follow-up are distinct date types. Read arrival
+and delivery facts from their authoritative modules; never create editable copies in Payment.
+Appearance on an Expected arrival date does not itself create a collection deadline or chase.
+Preserve the shared collection clock and readiness rules, including Wait when goods are not ready
+and arrival is unconfirmed. Do not merge two dated facts for one SO into two apparent payments.
+
+This ruling specifies Payment's Calendar interaction and source boundaries. It does not introduce
+a Payment Monitor, module-local Work queue, new sidebar destination or changes to other modules.
+Implementation and production verification remain required; this documentation is not delivery proof.

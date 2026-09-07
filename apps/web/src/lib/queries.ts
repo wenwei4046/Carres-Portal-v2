@@ -515,6 +515,11 @@ export const qk = {
      *  and this queue all move together. */
     warehouseReceipts: (status: string) =>
       ["operation", "warehouse-receipts", status] as const,
+    /** The paged GRN Register (owner correction 2026-09-06) — one key per
+     *  filter/page combination, under the same invalidation root as the
+     *  queue: a check-in mints the row this register must show. */
+    grnRegister: (filters: Record<string, string | number | null>) =>
+      ["operation", "warehouse-receipts", "grn", filters] as const,
     /** Slice B — one PO's Receiving Sessions + their event ledger. The
      *  Workspace's Summary and Activity both read this ONE call, so the two
      *  sections can never describe the same delivery differently. */
@@ -590,6 +595,7 @@ export const qk = {
     payments:         (filters?: FinancePaymentsFilters) =>
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
+    invoiceRegister: () => ["finance", "invoice-register"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -4244,6 +4250,12 @@ export interface WarehouseReceiptQueueRow {
    *  2026-09-06) — computed server-side through the ONE shared ladder from
    *  the catalog's answer; the rail only counts them. */
   categories?: string[];
+  /** The linked PO's governed `Supplier Delivery Date` (ISO) — the ONE reply
+   *  arithmetic (`poSupplierDeliveryDateOf`), resolved server-side. */
+  supplier_delivery_date?: string | null;
+  /** The Product cell's words — the GRN paper's own line description
+   *  (`product_skus.variant`, else the SKU), distinct, server-resolved. */
+  product_labels?: string[];
 }
 
 /** GET /api/operation/warehouse-receipts/duty — the resolved GRN authority
@@ -4524,6 +4536,57 @@ export function useOperationWarehouseReceipts(
         // history in one fetch (the server hard-caps the limit).
         `/api/operation/warehouse-receipts?status=${status}&limit=1000`,
       ),
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+/** The paged GRN Register's ask and answer (owner correction 2026-09-06). */
+export interface GrnRegisterFilters {
+  offset: number;
+  category: string | null;
+  supplier: string | null;
+  site: string | null;
+  /** The rail Calendar's picked `Supplier Delivery Date` (ISO). */
+  expected: string | null;
+  q: string;
+}
+export interface GrnRegisterResponse {
+  receipts: WarehouseReceiptQueueRow[];
+  page: { offset: number; limit: number; total: number };
+  facets: {
+    category: Record<string, number>;
+    supplier: Record<string, number>;
+    site: Record<string, number>;
+  };
+  counts: { waiting: number };
+}
+
+/**
+ * The GRN Register, paged on the SERVER — `Showing 1–50 of 10,000` and every
+ * rail count are the truth about the WHOLE filtered result set, computed by
+ * the one shared arithmetic (`buildGrnRegisterView`) behind `?scope=grn`.
+ * `keepPreviousData` holds the current page while the next one loads so
+ * Previous/Next never blinks the register empty.
+ */
+export function useOperationGrnRegister(
+  filters: GrnRegisterFilters,
+  opts?: Partial<UseQueryOptions<GrnRegisterResponse>>,
+) {
+  const params = new URLSearchParams({ scope: "grn" });
+  if (filters.offset > 0) params.set("offset", String(filters.offset));
+  if (filters.category) params.set("category", filters.category);
+  if (filters.supplier) params.set("supplier", filters.supplier);
+  if (filters.site) params.set("site", filters.site);
+  if (filters.expected) params.set("expected", filters.expected);
+  if (filters.q.trim()) params.set("q", filters.q.trim());
+  return useQuery({
+    queryKey: qk.operation.grnRegister({ ...filters }),
+    queryFn: () =>
+      apiFetch<GrnRegisterResponse>(
+        `/api/operation/warehouse-receipts?${params.toString()}`,
+      ),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     ...opts,
   });
@@ -5203,9 +5266,9 @@ export function useRecordSupplierDate(poId: string | null) {
       evidence?: string;
       reportedBy?: string;
       reportedAt?: string;
-      answer: "shipping" | "delayed";
-      firstDate?: string;
-      newDate?: string;
+      /* 0430 — ONE date; the server classifies the answer against the PO's
+         recorded original date. The browser never writes "delayed". */
+      supplierDate: string;
       reason?: string;
       remarks?: string;
     }) =>
@@ -6785,6 +6848,23 @@ export interface DeliveryOrderRow {
      *  (owner column ruling 2026-08-18). */
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
+    /** The signed DO on file (0087) — the `Upload signed Delivery Order`
+     *  queue's canonical fact (register correction 2026-09-06). */
+    do_file_path?: string | null;
+    /** The order's goods lines — the register expansion derives THIS TRIP's
+     *  lines from them via `trip_groups` (one arithmetic with the DO page). */
+    order_lines?: Array<{
+      id?: string;
+      sku: string;
+      qty: number;
+      attrs?: Record<string, unknown> | null;
+    }>;
+    /** T6 (0280) — the delivery-photo ledger; PostgREST may embed the overlay
+     *  as an object or a one-row array. null/absent = UNKNOWN, never empty. */
+    ops_order_control?:
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }
+      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }[]
+      | null;
   };
 }
 export interface DeliveryOrderAttemptRow {
@@ -7438,17 +7518,18 @@ export function useRecordPayment(
   });
 }
 
-/** Void a mis-keyed ledger entry (principal only — server-enforced). */
+/** Void a mis-keyed ledger entry. The reason is REQUIRED (0430) and the
+ *  server gate is the Payment Approver duty or principal — SQL-enforced. */
 export function useVoidPayment(
   orderId: string,
-  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, string>>,
+  opts?: Partial<UseMutationOptions<{ ok: true }, ApiError, { paymentId: string; reason: string }>>,
 ) {
   const qc = useQueryClient();
-  return useMutation<{ ok: true }, ApiError, string>({
-    mutationFn: (paymentId) =>
+  return useMutation<{ ok: true }, ApiError, { paymentId: string; reason: string }>({
+    mutationFn: ({ paymentId, reason }) =>
       apiFetch<{ ok: true }>(
         `/api/operation/orders/${orderId}/payments/${paymentId}`,
-        { method: "DELETE" },
+        { method: "DELETE", body: JSON.stringify({ reason }) },
       ),
     ...opts,
     onSuccess: async (...args) => {
@@ -8533,6 +8614,31 @@ export function usePaymentRegister() {
         rows.push(...page.rows);
       } while (rows.length < total);
       if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Payments changed. Try again.");
+      return rows;
+    },
+    staleTime: 15_000,
+  });
+}
+
+/** The Invoices Register — the same fail-closed complete read as Payments:
+ *  a page that cannot be completed is an error, never a shorter list. */
+export function useInvoiceRegister() {
+  return useQuery({
+    queryKey: qk.finance.invoiceRegister(),
+    queryFn: async () => {
+      const rows: import("@carres/shared/payment-invoice-register").InvoiceRegisterRow[] = [];
+      let total: number | null = null;
+      do {
+        const page = await apiFetch<import("@carres/shared/payment-invoice-register").InvoiceRegisterPage>(
+          `/api/finance/invoices/register?offset=${rows.length}&limit=200`,
+        );
+        if (!Number.isInteger(page.total) || page.total < 0) throw new Error("Invoices could not be loaded. Try again.");
+        if (total !== null && total !== page.total) throw new Error("Invoices changed. Try again.");
+        total = page.total;
+        if (page.rows.length === 0 && rows.length < total) throw new Error("Invoices could not be loaded. Try again.");
+        rows.push(...page.rows);
+      } while (rows.length < total);
+      if (rows.length !== total || new Set(rows.map((r) => r.id)).size !== rows.length) throw new Error("Invoices changed. Try again.");
       return rows;
     },
     staleTime: 15_000,

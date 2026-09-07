@@ -91,6 +91,25 @@ export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
   return toBlob(DoTemplate(data));
 }
 
+/**
+ * MANY Delivery Orders, one file — `Print {n} delivery orders` from the
+ * register's selection (owner correction 2026-09-06). The same lift as
+ * `renderCombinedSalesOrderPdf`: each document keeps its GOVERNED single-DO
+ * page unmodified — its `<Page>` is moved out of its own `<Document>` into one
+ * shared Document, and the template's footer reads the sub-document counters,
+ * so DO 7 of 12 still prints its own `Page 1 of 1`.
+ */
+export function renderCombinedDoPdf(list: DoTemplateData[]): Promise<Blob> {
+  const pages = list.map((data, i) => {
+    const doc = DoTemplate(data) as ReactElement<{ children: ReactElement }>;
+    return createElement(
+      doc.props.children.type,
+      { ...doc.props.children.props, key: `do-${i}` },
+    );
+  });
+  return toBlob(createElement(Document, null, ...pages) as ReactElement);
+}
+
 /** The formal Goods Received Note (owner correction 2026-09-06) — the GRN
  *  object's preview, its Print and its Download PDF share this one call. */
 export function renderGrnPdf(data: GrnTemplateData): Promise<Blob> {

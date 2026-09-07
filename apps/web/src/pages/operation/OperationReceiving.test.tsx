@@ -2,7 +2,7 @@ import { useState } from "react";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
@@ -55,6 +55,10 @@ const h = vi.hoisted(() => ({
   receipts: [] as unknown[],
   waiting: 0,
   receiptsError: false,
+  /** The paged register's page size — small in the pagination test. */
+  pageLimit: 50,
+  /** Every ask the page sent the paged register hook — filters + offset. */
+  registerAsks: [] as Array<Record<string, unknown>>,
   pos: [] as unknown[],
   poReceiving: {
     sessions: [] as unknown[],
@@ -71,6 +75,8 @@ const h = vi.hoisted(() => ({
 vi.mock("@/lib/queries", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
+  const shared =
+    await vi.importActual<typeof import("@carres/shared")>("@carres/shared");
   return {
     ...actual,
     useReceivingDuty: () => ({
@@ -78,14 +84,65 @@ vi.mock("@/lib/queries", async () => {
       isLoading: false,
       isError: false,
     }),
-    useOperationWarehouseReceipts: () => ({
-      data: h.receiptsError
-        ? undefined
-        : { receipts: h.receipts, counts: { waiting: h.waiting } },
-      isLoading: false,
-      isError: h.receiptsError,
-      refetch: () => Promise.resolve(),
-    }),
+    /* The paged register, emulated with the SAME shared arithmetic the
+     * Worker runs (`buildGrnRegisterView`) over the fixtures — the test and
+     * the server cannot hold two filtering rules. */
+    useOperationGrnRegister: (filters: {
+      offset: number;
+      category: string | null;
+      supplier: string | null;
+      site: string | null;
+      expected: string | null;
+      q: string;
+    }) => {
+      h.registerAsks.push({ ...filters });
+      if (h.receiptsError)
+        return {
+          data: undefined,
+          isLoading: false,
+          isError: true,
+          refetch: () => Promise.resolve(),
+        };
+      type R = Record<string, unknown>;
+      const grn = (h.receipts as R[]).filter(
+        (r) => r.status === "posted" || r.status === "voided",
+      );
+      const view = shared.buildGrnRegisterView(
+        grn.map((r) => ({
+          id: r.id as string,
+          categories: (r.categories as string[] | undefined) ?? [],
+          supplierName: (r.supplier_name as string | null) ?? null,
+          siteName:
+            (r.actual_site_name as string | null) ??
+            (r.warehouse_name as string | null) ??
+            null,
+          supplierDeliveryDateIso:
+            (r.supplier_delivery_date as string | null) ?? null,
+          searchText: [r.grn_no, r.po_id, r.do_number, r.supplier_name]
+            .filter(Boolean)
+            .join(" "),
+        })),
+        filters,
+        filters.offset,
+        h.pageLimit,
+      );
+      const byId = new Map(grn.map((r) => [r.id as string, r]));
+      return {
+        data: {
+          receipts: view.pageIds.map((id) => byId.get(id)),
+          page: {
+            offset: filters.offset,
+            limit: h.pageLimit,
+            total: view.total,
+          },
+          facets: view.facets,
+          counts: { waiting: h.waiting },
+        },
+        isLoading: false,
+        isError: false,
+        refetch: () => Promise.resolve(),
+      };
+    },
     useOperationPos: () => ({
       data: { pos: h.pos },
       isLoading: false,
@@ -186,10 +243,32 @@ const WAREHOUSES = [
   { id: "wh-setia", name: "Carres Setia" },
 ];
 
+/** An EVIDENCED supplier reply — the only thing the governed
+ *  `Supplier Delivery Date` (and so a Calendar marker) may come from. */
+function supplierReply(date: string) {
+  return {
+    kind: "tomorrow_delivery",
+    answer: "confirmed",
+    about_date: null,
+    new_date: date,
+    po_version: 1,
+    channel: "whatsapp",
+    recipient: "Supplier group",
+    evidence: "evidence/reply.jpg",
+    reported_by: "Factory PIC",
+    reported_at: "2026-09-01T02:00:00Z",
+    recorded_by: "u-1",
+    recorded_at: "2026-09-01T03:00:00Z",
+    reason: null,
+    remarks: null,
+  };
+}
+
 function po(p: {
   id: string;
   supplier_id: string;
   status?: string;
+  promises?: unknown[];
   lines: Array<{
     id: string;
     sku: string;
@@ -209,6 +288,8 @@ function po(p: {
     so_refs: null,
     eta_date: "2026-09-10",
     placed_at: "2026-08-01T00:00:00Z",
+    version: 1,
+    promises: p.promises ?? [],
     purchase_order_lines: p.lines,
   } as unknown as operationPoListRow;
 }
@@ -249,6 +330,10 @@ function receipt(over: Record<string, unknown>) {
     posted_by_name: "Shasha",
     /* Server-resolved through the ONE shared ladder — the rail only counts. */
     categories: ["Mattress"],
+    /* Server-resolved: the linked PO's governed Supplier Delivery Date and
+       the GRN paper's own product words. */
+    supplier_delivery_date: "2026-09-08",
+    product_labels: ["Dream Queen"],
     ...over,
   };
 }
@@ -278,6 +363,8 @@ const REGISTER_ROWS = [
     void_reason: "Duplicate entry",
     supplier_name: "Ohana",
     categories: ["Sofa"],
+    supplier_delivery_date: "2026-09-12",
+    product_labels: ["Cloud Sofa 3-seater"],
   }),
 ];
 
@@ -285,6 +372,7 @@ const FIND_POS = [
   po({
     id: "PO-2001",
     supplier_id: "sup-nf",
+    promises: [supplierReply("2026-09-08")],
     lines: [
       { id: "l-ms01", sku: "MS01", qty: 3, received_qty: 0 },
       { id: "l-bf01", sku: "BF01", qty: 2, received_qty: 0 },
@@ -293,12 +381,15 @@ const FIND_POS = [
   po({
     id: "PO-2002",
     supplier_id: "sup-oh",
+    promises: [supplierReply("2026-09-08")],
     lines: [{ id: "l-sf02", sku: "SF02", qty: 4, received_qty: 1 }],
   }),
-  // Fully received — owes nothing, so it never reaches Find PO or CO.
+  // Fully received — owes nothing, so it never reaches Find PO or CO, and
+  // its supplier date stops being an EXPECTED arrival on the Calendar.
   po({
     id: "PO-2003",
     supplier_id: "sup-nf",
+    promises: [supplierReply("2026-09-15")],
     lines: [{ id: "l-bf02", sku: "BF02", qty: 3, received_qty: 3 }],
   }),
 ];
@@ -402,10 +493,16 @@ function WorkspaceHarness({
 }
 
 beforeEach(() => {
+  // A fixed BUSINESS clock (only Date is faked — waitFor keeps real timers):
+  // the Calendar must open on September 2026, the fixtures' own month, on
+  // any machine in any timezone.
+  vi.useFakeTimers({ now: new Date("2026-09-06T12:00:00+08:00"), toFake: ["Date"] });
   h.dutyAllowed = true;
   h.receipts = [...REGISTER_ROWS];
   h.waiting = 0;
   h.receiptsError = false;
+  h.pageLimit = 50;
+  h.registerAsks.length = 0;
   h.pos = [...FIND_POS];
   h.poReceiving = { sessions: [], events: [], expected_units: [] };
   h.sessionDetail = null;
@@ -420,27 +517,39 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 /* ═══ THE REGISTER ═════════════════════════════════════════════════════════ */
 
 describe("OperationReceiving — the formal GRN Register", () => {
-  it("draws the 240px rail with exactly CATEGORY · SUPPLIER · GOODS ARRIVED AT · Clear filters", () => {
+  it("draws the 240px rail — Calendar fixed on top, CATEGORY · SUPPLIER · GOODS ARRIVED AT · Clear filters beneath", () => {
     renderPage();
     const rail = screen.getByTestId("receiving-rail");
     expect(rail.className).toContain("w-[240px]");
     const inRail = within(rail);
-    // The exact five governed category labels, in the shared ladder's order.
-    const categoryRows = [
-      "Mattress",
-      "Bedframe",
-      "Sofa",
-      "Pillow",
-      "Mattress protector",
-    ];
-    const rendered = categoryRows.map(
-      (w) => inRail.getByTestId(`rail-category-${w}`).textContent ?? "",
-    );
-    categoryRows.forEach((w, i) => expect(rendered[i]).toContain(w));
-    // No invented or absent category ever renders a row.
+    // The Calendar lives in the FIXED block; the business filters live in
+    // their own independently scrolling block (owner correction 2026-09-06).
+    const fixed = inRail.getByTestId("receiving-rail-fixed");
+    expect(
+      within(fixed).getByTestId("receiving-calendar"),
+    ).toBeInTheDocument();
+    const scroll = inRail.getByTestId("receiving-rail-scroll");
+    expect(scroll.className).toContain("overflow-y-auto");
+    expect(
+      within(scroll).getByTestId("rail-category-Mattress"),
+    ).toBeInTheDocument();
+    // Only the governed categories PRESENT in the result set render — the
+    // fixtures hold Mattress and Sofa GRNs, so Bedframe/Pillow/Mattress
+    // protector rows do not appear (owner correction 2026-09-06).
+    expect(inRail.getByTestId("rail-category-Sofa")).toBeInTheDocument();
+    for (const absent of ["Bedframe", "Pillow", "Mattress protector"]) {
+      expect(
+        inRail.queryByTestId(`rail-category-${absent}`),
+      ).not.toBeInTheDocument();
+    }
+    // No invented category ever renders a row.
     for (const banned of ["Accessory", "Topper", "Footrest", "Service", "Any"]) {
       expect(
         inRail.queryByTestId(`rail-category-${banned}`),
@@ -452,7 +561,8 @@ describe("OperationReceiving — the formal GRN Register", () => {
       "Clear filters",
     );
     // The old Receiving state rail is retired — no `All …`, no state rows,
-    // and no date filter (the table's date column owns dates).
+    // and no second received-date filter (the table's `Goods received on`
+    // column owns detailed date filtering).
     for (const gone of [
       "All receiving",
       "All suppliers",
@@ -520,17 +630,19 @@ describe("OperationReceiving — the formal GRN Register", () => {
     );
   });
 
-  it("shows real counts from the current GRN result set", () => {
+  it("shows real counts from the COMPLETE GRN result set", () => {
     renderPage();
     // One Mattress GRN, one Sofa GRN — the submitted Sofa count is NOT a
-    // record and must not inflate the number.
+    // record and must not inflate the number. Counts come from the server's
+    // facets over the whole filtered set, never the loaded page.
     expect(
       screen.getByTestId("rail-category-Mattress").textContent,
     ).toContain("1");
     expect(screen.getByTestId("rail-category-Sofa").textContent).toContain("1");
+    // A governed category with no receiving shows NO row (never a `0` row).
     expect(
-      screen.getByTestId("rail-category-Pillow").textContent,
-    ).toContain("0");
+      screen.queryByTestId("rail-category-Pillow"),
+    ).not.toBeInTheDocument();
   });
 
   it("Start Receiving opens Find PO or CO, and typing narrows the candidates", async () => {
@@ -574,10 +686,12 @@ describe("OperationReceiving — the formal GRN Register", () => {
     expect(register.className).toContain("invisible");
   });
 
-  it("the status footer counts GRN records only", () => {
+  it("the status footer speaks the server page — Showing 1–2 of 2", () => {
     renderPage();
     // Two GRNs (Valid + Cancelled); the submitted count is Work, not a record.
-    expect(screen.getByText(/2 receiving records/)).toBeInTheDocument();
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+      "Showing 1–2 of 2",
+    );
   });
 
   it("a failed listing says what broke and offers Try again", () => {
@@ -594,6 +708,169 @@ describe("OperationReceiving — the formal GRN Register", () => {
     renderPage();
     expect(screen.getByText("No receiving activity yet.")).toBeInTheDocument();
     expect(screen.queryByText(/Nothing received/i)).not.toBeInTheDocument();
+  });
+
+  it("carries the corrected register columns — Supplier Delivery Date · PO/CO No · Product", () => {
+    renderPage();
+    expect(screen.getByText("Supplier Delivery Date")).toBeInTheDocument();
+    expect(screen.getByText("PO/CO No")).toBeInTheDocument();
+    expect(screen.getByText("Product")).toBeInTheDocument();
+    // The cells speak the server-resolved facts: the governed supplier date
+    // and the GRN paper's own product words.
+    expect(screen.getAllByText("Dream Queen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Cloud Sofa 3-seater").length).toBeGreaterThan(0);
+  });
+});
+
+/* ═══ THE RAIL CALENDAR · ONE DESTINATION · SERVER PAGINATION ═════════════ */
+
+describe("OperationReceiving — the rail Calendar and the paged register", () => {
+  it("is ONE destination — no Calendar/Register view switch, no Receiving Monitor", async () => {
+    renderPage();
+    // The month Calendar and the complete GRN Register render TOGETHER —
+    // there is nothing to switch.
+    expect(screen.getByTestId("receiving-calendar")).toBeInTheDocument();
+    expect(screen.getByTestId("receiving-register")).toBeInTheDocument();
+    for (const banned of [
+      "Calendar View",
+      "GRN Register View",
+      "Receiving Monitor",
+    ]) {
+      expect(screen.queryByText(banned)).not.toBeInTheDocument();
+    }
+    // The portal rail holds exactly ONE Receiving destination.
+    const { PORTAL_NAV } = await import("../portal/portal-nav");
+    const receivingRows = PORTAL_NAV.flatMap((g) => g.items).filter((i) =>
+      i.label.toLowerCase().includes("receiving"),
+    );
+    expect(receivingRows.map((i) => i.label)).toEqual(["Receiving"]);
+  });
+
+  it("opens on the operator's month, spelled out, with Sunday visible but muted", () => {
+    renderPage();
+    const cal = screen.getByTestId("receiving-calendar");
+    expect(within(cal).getByText("SEPTEMBER 2026")).toBeInTheDocument();
+    expect(within(cal).getAllByText(/^Su/i).length).toBeGreaterThan(0);
+    // 2026-09-06 is a Sunday — a non-working day wears the muted state; the
+    // working calendar is Monday–Saturday.
+    const sunday = within(cal).getByTestId("month-day-2026-09-06");
+    expect(sunday.closest("td")?.className ?? "").toContain("kit-slate-9");
+    const monday = within(cal).getByTestId("month-day-2026-09-07");
+    expect(monday.closest("td")?.className ?? "").not.toContain("kit-slate-9");
+  });
+
+  it("the month arrows move exactly one month", async () => {
+    renderPage();
+    const cal = screen.getByTestId("receiving-calendar");
+    fireEvent.click(
+      within(cal).getByRole("button", { name: /next month/i }),
+    );
+    await within(cal).findByText("OCTOBER 2026");
+    fireEvent.click(
+      within(cal).getByRole("button", { name: /previous month/i }),
+    );
+    await within(cal).findByText("SEPTEMBER 2026");
+  });
+
+  it("marks expected supplier arrivals with an accessible COUNT — never colour alone", () => {
+    renderPage();
+    const cal = screen.getByTestId("receiving-calendar");
+    // Two open, still-owing POs answered 8 Sep — the marker is the number 2
+    // and the day button says it in words.
+    const day = within(cal).getByTestId("month-day-2026-09-08");
+    expect(day).toHaveAccessibleName(
+      "2026-09-08 — 2 expected supplier arrivals",
+    );
+    expect(day.textContent).toContain("2");
+    // The fully received PO-2003 stops being expected — 15 Sep is unmarked.
+    const done = within(cal).getByTestId("month-day-2026-09-15");
+    expect(done).toHaveAccessibleName("2026-09-15");
+  });
+
+  it("picking a date filters the SAME register by Supplier Delivery Date; picking again restores", async () => {
+    renderPage();
+    const cal = screen.getByTestId("receiving-calendar");
+    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
+    // Only the GRN whose PO answered 8 Sep remains; the 12 Sep one is gone.
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+    );
+    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+    expect(
+      h.registerAsks.some((a) => a.expected === "2026-09-08"),
+    ).toBe(true);
+    // The right side stays the Register — never a weekly calendar, never
+    // work cards.
+    expect(screen.getByTestId("receiving-register-column")).toBeInTheDocument();
+
+    // The same date again restores the complete listing.
+    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
+    await waitFor(() =>
+      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
+    );
+  });
+
+  it("Clear filters clears the Calendar pick too", async () => {
+    renderPage();
+    const cal = screen.getByTestId("receiving-calendar");
+    fireEvent.click(within(cal).getByTestId("month-day-2026-09-08"));
+    await waitFor(() =>
+      expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("rail-clear-filters"));
+    await waitFor(() =>
+      expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0),
+    );
+    expect(h.registerAsks[h.registerAsks.length - 1]?.expected).toBeNull();
+  });
+
+  it("paginates on the SERVER — Showing 1–1 of 2, Next asks for the next offset", async () => {
+    h.pageLimit = 1;
+    renderPage();
+    expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+      "Showing 1–1 of 2",
+    );
+    // Page 1 holds only the newest record; the second is NOT rendered.
+    expect(screen.getAllByText("GRN-20260901-1234").length).toBeGreaterThan(0);
+    expect(screen.queryByText("GRN-20260830-7777")).not.toBeInTheDocument();
+    expect(screen.getByTestId("grn-page-previous")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("grn-page-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+        "Showing 2–2 of 2",
+      ),
+    );
+    expect(
+      h.registerAsks.some((a) => a.offset === 1),
+    ).toBe(true);
+    expect(screen.getAllByText("GRN-20260830-7777").length).toBeGreaterThan(0);
+    expect(screen.queryByText("GRN-20260901-1234")).not.toBeInTheDocument();
+    expect(screen.getByTestId("grn-page-next")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("grn-page-previous"));
+    await waitFor(() =>
+      expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+        "Showing 1–1 of 2",
+      ),
+    );
+  });
+
+  it("a changed filter returns the register to page 1", async () => {
+    h.pageLimit = 1;
+    renderPage();
+    fireEvent.click(screen.getByTestId("grn-page-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+        "Showing 2–2 of 2",
+      ),
+    );
+    fireEvent.click(screen.getByTestId("rail-category-Sofa"));
+    await waitFor(() =>
+      expect(screen.getByTestId("grn-page-range")).toHaveTextContent(
+        "Showing 1–1 of 1",
+      ),
+    );
   });
 });
 

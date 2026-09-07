@@ -25,6 +25,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/build-info";
 import { TASKS_KEY } from "./rail/TasksPanel";
 import JumpTo from "./JumpTo";
 import type { OpsTasksListResponse } from "@carres/shared";
@@ -113,6 +114,8 @@ export function TopBarIcons() {
   }, [orders, tasksQ.data]);
 
   const [open, setOpen] = useState<null | "alerts" | "help" | "settings">(null);
+  /* 0430 — the Help menu's version check. null = not asked this open. */
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -240,6 +243,48 @@ export function TopBarIcons() {
                 </span>
               </span>
             </button>
+            {/* 0430 — the running version is IDENTIFIABLE, and updating is the
+                operator's own safe click: nothing reloads on its own, so an
+                unfinished form is never thrown away by a version check. */}
+            <div className="border-t border-base-100 px-3 py-2" data-testid="help-version">
+              <span className="text-body text-base-800 block">
+                Version {shortCommit(buildInfo.commit)}
+              </span>
+              {buildInfo.builtAt ? (
+                <span className="text-meta text-base-400 block">
+                  Built {new Date(buildInfo.builtAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              ) : null}
+              {update?.state === "available" ? (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  data-testid="help-update-reload"
+                  className="mt-1.5 h-7 rounded-md border border-base-200 px-2 text-meta text-primary hover:bg-hovertint"
+                >
+                  Reload to update
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="help-update-check"
+                  onClick={() => {
+                    setUpdate(null);
+                    void checkForUpdate().then(setUpdate);
+                  }}
+                  className="mt-1.5 h-7 rounded-md border border-base-200 px-2 text-meta text-base-600 hover:bg-hovertint"
+                >
+                  Check for update
+                </button>
+              )}
+              {update?.state === "latest" ? (
+                <span className="text-meta text-base-400 block mt-1">You are on the latest version</span>
+              ) : update?.state === "available" ? (
+                <span className="text-meta text-base-400 block mt-1">A newer version is ready</span>
+              ) : update?.state === "unreachable" ? (
+                <span className="text-meta text-base-400 block mt-1">The version check did not reach the server</span>
+              ) : null}
+            </div>
           </div>
         )}
       </div>

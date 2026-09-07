@@ -406,7 +406,47 @@ does not decide it.
   communication history and completes nothing; a `confirmed_sent` for an EARLIER version stays
   history and never completes the current one.
 
-### 5.7 PO states and balances
+### 5.7 The original date, the truthful reply, one arrival arithmetic, the kept document
+
+**HOW IT IS ENFORCED — BUILT, migrations 0428 / 0430 (correction card, Jess 2026-09-06).**
+
+- **THE ORIGINAL DATE IS CAPTURED AT BIRTH AND NEVER CHANGES.**
+  `purchase_orders.official_delivery_date` is stamped from the birth `eta_date` by trigger at
+  INSERT; once it holds a value no UPDATE may change it. `eta_date` stays the LIVE planning
+  arrival (the ready-date door may recompute it); the register's `PO Delivery Date`, the PDF's
+  `Deliver by` and every reply comparison read the immutable original. Pre-0428 records were
+  recovered from evidence, not invented: a PO whose eta no door ever moved kept it as the
+  original; a PO the legacy delayed door rewrote took the date the earliest delayed reply moved
+  FROM; a PO the ready-date door recomputed stays NULL — **an unknown original is recorded as
+  unknown, never replaced by today's planning date.**
+- **THE SERVER CLASSIFIES THE SUPPLIER ANSWER.** The reply wire carries ONE date. Compared with
+  the recorded original it is written as `confirmed`, `earlier`, `delayed` (later — and only then
+  is a governed reason required; none is ever pre-selected) or `reported` (original unknown). A
+  browser's own classification is ignored. An earlier date is not a delay. Every reply still
+  carries channel, recipient, supplier reporter, actual recorder, evidence file, reported time,
+  the exact PO version and duty/cover, enforced by trigger on the table itself.
+- **REPLIES STAY READABLE BY VERSION, AND ONLY EVIDENCE QUALIFIES.** A previous-version reply
+  never confirms the current version. A pre-evidence reply on a never-revised PO is linked to
+  version 1 (the only link its evidence supports) and is shown as *recorded without evidence* —
+  a recorded answer is not a proven absence, and an unevidenced answer is not the governed
+  Supplier Delivery Date.
+- **ONE ARRIVAL-PLANNING ARITHMETIC (Architecture Law D).** `purchasing_project_line_etas`
+  recomputes each affected customer (order, SKU) arrival as the LATEST effective supplier date
+  across ALL open POs still owing units for that order line, from the exact `po_line_sources`
+  lineage — never from SO numbers or SKU similarity, and never from whichever reply was recorded
+  last. The reply door and the balance-date door both call it; the SO-ref-inferring
+  `purchasing_push_supplier_date` projection is retired. It writes goods-arrival planning only;
+  the customer promise is a separate Sales fact it never touches.
+- **THE SENT DOCUMENT IS KEPT, PER VERSION.** The first confirmed send of a version freezes the
+  full `purchasing_po_document` payload in `po_version_documents`; a resend of the same version
+  reuses the same recorded facts, and Revisions can reprint exactly what the supplier received
+  (`print-data?version=N`). A version sent before keeping began answers with a named absence —
+  history is never reconstructed or back-invented.
+- **A RECEIPT IS NOT A BUY.** A demand an open PO already fully covers stays visible as a
+  receipt but is refused at the issue door BY NAME (`already_on_po`). Production carried the
+  proof this rule was missing: six open POs each sourcing the same 1-unit line of SO-1340.
+
+### 5.8 PO states and balances
 
 **APPROVED / LOCKED — owner correction 2026-09-04.**
 
@@ -1349,7 +1389,13 @@ carries every corrected word and zero retired words; committed production smoke 
 GRN-20260904-1064 proved the 0427 evidence amend (DO paper replaced with before/after preserved,
 evidence appended append-only, idempotent retry `already_saved`, and an out-of-authority caller
 refused `no_grn_duty_holder`). GRN Duty is honestly unassigned until the manager assigns it in
-`Workspace → Staff & Duties`.** The operating rule is:
+`Workspace → Staff & Duties`. The SECOND 2026-09-06 owner correction — one Receiving
+destination with the rail month Calendar, governed Supplier-Delivery-Date filtering and
+server-side pagination — is PRODUCTION-VERIFIED 2026-09-07: PR #1117 merged `00bf3ced`,
+both canonical surfaces on that exact SHA, served bundle carrying every new governed word and
+zero retired/view-switch words, and a read-only authenticated walk proving the fixed calendar,
+the date-pick filter round-trip, only-present categories, `Showing 1–7 of 7` server paging and
+the intact 50/50 GRN object (evidence in CARD-2026-09-04-receiving-01).** The operating rule is:
 
 ```text
 Warehouse submits count                (or Operation enters goods directly)
@@ -1359,6 +1405,13 @@ Warehouse submits count                (or Operation enters goods directly)
 → Inventory updated automatically at Goods arrived at
 ```
 
+- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
+  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
+  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
+  proposal is superseded. The page is: left, the 240px rail with the full month Calendar FIXED
+  on top and the business filters scrolling independently beneath it; right, always the complete
+  GRN Register. The right side never becomes a weekly calendar and never shows work cards —
+  daily Receiving actions stay in My Work / Team Work.
 - **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
   Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
   review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
@@ -1368,15 +1421,38 @@ Warehouse submits count                (or Operation enters goods directly)
 - **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
   database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
   name.
-- **The Filter Rail (owner correction §2)** holds exactly: `CATEGORY` (the five governed rows —
-  `Mattress` · `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`, the shared display order;
-  `MP` always prints as `Mattress protector`) · `SUPPLIER` (the suppliers present in the
-  records) · `GOODS ARRIVED AT` (the receiving locations present in the records) ·
-  `Clear filters`. No `Any`, no `All …`, no invented category, no rail date filter — the
-  table's `Goods received on` column owns date filtering. Re-clicking the active row clears its
-  section; counts are real counts from the current result set. Category comes from the governed
-  catalog truth through the ONE shared ladder (`goodsCategoryWordOf`, the same rule the Sales
-  Orders register speaks); Receiving never derives its own category from SKU text.
+- **THE RAIL MONTH CALENDAR (owner correction 2026-09-06, second ruling).** The full month
+  Calendar stays fixed at the top of the rail; the ‹ › arrows move exactly one month. Sunday
+  stays visible for understanding the month and wears the muted non-working state — Receiving
+  follows the Warehouse working calendar, Monday–Saturday. A date with expected supplier
+  arrivals prints a visible COUNT (colour is never the only signal, and the day's aria sentence
+  says it in words); expected dates come from the linked POs' governed `Supplier Delivery Date`
+  (`poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
+  marks a day, and a fully received or closed PO stops being expected). Selecting a date filters
+  the SAME right-hand GRN Register by that Supplier Delivery Date; selecting it again, or
+  `Clear filters`, restores the complete listing. The Calendar shows no work cards.
+- **The Filter Rail (owner correction §2)** holds, beneath the Calendar: `CATEGORY` ·
+  `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED AT` (the receiving
+  locations present in the records) · `Clear filters`. CATEGORY shows ONLY the governed rows
+  actually present in the Receiving result set, in the shared display order (`Mattress` ·
+  `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
+  protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
+  table's `Goods received on` column owns detailed date filtering. Re-clicking the active row
+  clears its section. Category comes from the governed catalog truth through the ONE shared
+  ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
+  never derives its own category from SKU text.
+- **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
+  renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
+  Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
+  result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
+  `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
+  filters, Columns and Export stay; a changed filter or search term returns to page 1.
+- **Register columns** lead with identity and the arrival story: `GRN No` · `Supplier Delivery
+  Date` (the linked PO's governed supplier answer — the same date the Calendar filters by;
+  `Not confirmed` while no evidenced reply exists) · `Goods received on` · `PO/CO No` ·
+  `Supplier` · `Product` (the GRN paper's own line words — `product_skus.variant`, else the
+  SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` · `Status`, with `Supplier DO No.`
+  and the damaged/wrong/extra quantity facts behind them.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`

@@ -710,6 +710,30 @@ interchangeable:
 | `Supplier Delivery Date` | the supplier's answer to the PO date: `Not confirmed` before evidenced supplier reply; `Same as PO` after the supplier confirms the PO date; otherwise the different date supplied by the supplier |
 | `Goods received on` | the physical arrival date and time; never keyed/submitted/posted time. Owner correction 2026-09-06 — the retired spelling `Goods Received At` may not appear. |
 
+**Supplier reply truth — correction card 2026-09-06.** The reply form's date field is labelled
+`Supplier Delivery Date` (never a bare `Date`), and the form states the comparison beside it:
+`Same as PO` · `Earlier than the PO date` · `Later than the PO date`. Only a LATER date asks
+`Why has it moved?`, and nothing is pre-chosen — the select opens on `Choose a reason`. A reply
+recorded before the evidence law reads `Supplier reply recorded without evidence · {date}`; it never
+claims the governed `Supplier Delivery Date` and never reads as `Not confirmed`, because a recorded
+answer is not a proven absence. The object's `Reply history` lists every reply by version —
+`PO V{n} · {date} ·` one of `Confirms the PO date` · `Earlier than the PO date` ·
+`Delayed — {reason}` · `Date reported` — with its `Reply evidence` link where evidence exists.
+A demand an open purchase order already fully covers refuses issue with
+`An open purchase order ({PO No}) already covers this line.` /
+`Nothing to buy here. Check the covering purchase order instead.`
+
+**Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
+actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
+`Download PDF`. A version sent before document keeping began answers
+`No kept document for this PO version` — a named absence, never a reconstruction.
+
+**Help version words — correction card 2026-09-06.** The Help menu shows `Version {code}` and
+`Built {time}`, with `Check for update` answering one of `You are on the latest version` ·
+`A newer version is ready` (with the `Reload to update` button — the reload is always the
+operator's own click, so unfinished input is never thrown away) ·
+`The version check did not reach the server`.
+
 No recorded business date is silently moved to fit a calendar. Purchasing/Operation work uses the
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
@@ -1300,6 +1324,12 @@ dictionary with the approved Receiving build; each is registered here so no chat
 | `Receiving & Inbound` | Reports destination (PurchasingTabs `receiving-report`) | The central receiving report: every non-draft session with its GRN, plus `Still owed by suppliers`. |
 | `Still owed by suppliers` | the report's pending section | Open PO quantities not yet received — supplier debt in goods, not a queue. |
 | `No supplier yet` | report cell for a missing supplier | An honest absence, never `—` and never a raw id. |
+| `PO/CO No` | GRN Register column | The receiving's exact source — a Purchase Order or a consignment CO — through one column; the one Receiving engine serves both (owner correction 2026-09-06, second ruling). |
+| `Supplier Delivery Date` | GRN Register column · the rail Calendar's filter fact | The SAME governed word as the Purchase Orders register (the evidenced supplier answer — see the Purchasing date dictionary): the Calendar's expected-arrival markers and this column read one arithmetic, so the picked day and the cell can never disagree. `Not confirmed` while no evidenced reply exists. |
+| `Product` | GRN Register column | The GRN paper's own line words (`product_skus.variant`, else the SKU) — the register speaks the document, never a second product spelling. |
+| `Showing {from}–{to} of {total}` | GRN Register footer | Server-side pagination speaks for the WHOLE filtered result set (owner correction 2026-09-06, second ruling) — never `{n} loaded` over an unknown remainder. |
+| `Previous` · `Next` | GRN Register footer page moves | One server page back / forward; disabled at the ends rather than hidden. |
+| `{date} — {n} expected supplier arrival(s)` | the rail Calendar day's aria sentence | The marker COUNT said in words — colour is never the only signal (owner correction 2026-09-06, second ruling). |
 
 ### The Claims decision words (ruled by Loo, 2026-08-05 — transcribed here 2026-08-06)
 
@@ -2303,21 +2333,36 @@ A Monitor card carries the arrangement facts, DO number and Delivery Status in o
 does not merge their authority: Delivery arrangement remains editable operational truth (edited
 on Edit Delivery, never on Monitor) and the issued DO remains a formal historical document.
 
-**Monitor words — PROPOSAL, not yet owner-accepted.** These strings shipped with the Monitor
-Card and await Jess's word; each is labelled here so no chat mistakes it for ruled vocabulary:
+**Monitor + Delivery Orders register words — owner UI correction 2026-09-06.** The correction
+ruled these strings (the 2026-09-04 `NEEDS CHECKING` / `DELIVERY SCHEDULE` proposals are
+RETIRED — the rail is ONE `WORK TO DO` group):
 
 | String | Where it appears | Status |
 |---|---|---|
-| `Monitor` | the page title and sidebar child | **PROPOSAL** |
-| `Calendar` | the DELIVERY SCHEDULE rail's default row (cards inside the visible window) | **PROPOSAL** |
-| `NEEDS CHECKING` | the rail group holding `Failed Delivery` · `Delivered — Proof Required` · `Waiting for warehouse` | **PROPOSAL** |
-| `Search deliveries…` | the toolbar search placeholder | **PROPOSAL** |
-| `Previous days` · `Next days` | the range arrows' accessible labels | **PROPOSAL** |
+| `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
+| `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
+| `Calendar` | the WORK TO DO default row (cards inside the visible window) | **RULED 2026-09-06** |
+| `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
+| `All regions` · `All logistics` | the two group-clearing rows | **RULED 2026-09-06** |
+| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`) | **RULED 2026-09-06** (month-calendar correction) |
+| `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
+| `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
+| `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
+| `Open No confirmed date` | that state's one door | **RULED 2026-09-06** |
+| `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
+| `{N} delivery scopes selected` · `{N} delivery orders selected` | the two selection toolbars' count sentences | **RULED 2026-09-06** |
+| `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
+| `Record delivery result` · `Upload delivery photo` · `Upload signed Delivery Order` | the register's WORK TO DO queues (`Check delivery proof` joins only when a proof-review record exists) | **RULED 2026-09-06** |
+| `DOCUMENT STATUS` | the register rail's status group | **RULED 2026-09-06** |
+| `Search deliveries…` | the toolbar search placeholder | kept |
+| `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 
-Already governed and merely REUSED by Monitor (not proposals): `No confirmed date` · `Overdue` ·
-`No delivery order yet` · `No logistics picked` · `No deliveries booked this day.` (T10) ·
-`Expected arrival` · `Hide filters` / `Show filters` · the seven operational status words ·
-`Delivered — Proof Required` (Delivery MASTER §15).
+Already governed and merely REUSED (not new words): `No confirmed date` · `Overdue` ·
+`No delivery order yet` · `No logistics picked` · `Expected arrival` · `Hide filters` /
+`Show filters` · the seven operational status words · `Delivered — Proof Required` (Delivery
+MASTER §15) · `Requested Delivery Date` · `Confirmed Delivery` · `Confirmed Time` ·
+`Not delivered yet` · `No delivery photo yet` · `Delivery photo saved` ·
+`Signed document on file` / `No signed document yet` (the DO object's own shipped pair).
 
 **The delivery-rule word law (T9, Jess 2026-07-27):** every one of these lines
 WARNS and none of them blocks, so every one of them must name the logistics company and

@@ -1371,6 +1371,38 @@ operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
 
+  // 0430 — `?version=N` reprints the KEPT document of an already-sent version,
+  // exactly as recorded at its first confirmed send. Without the parameter the
+  // live document authority answers, as it always has. A version nobody kept
+  // is a named absence, never a reconstruction.
+  const versionRaw = c.req.query("version");
+  if (versionRaw != null && versionRaw !== "") {
+    const version = Number(versionRaw);
+    if (!Number.isInteger(version) || version <= 0) {
+      return c.json({ error: "invalid_version", code: "invalid_param" }, 400);
+    }
+    const kept = await sb.rpc("purchasing_po_version_document", {
+      p_po_id: poId,
+      p_version: version,
+    });
+    if (kept.error) {
+      const details = String((kept.error as { details?: string }).details ?? "");
+      if (details === "version_document_missing") {
+        return c.json(
+          {
+            error: "not_found",
+            code: "version_document_missing",
+            message: "No kept document for this PO version",
+          },
+          404,
+        );
+      }
+      const m = mapPgError(kept.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(kept.data as Record<string, unknown>);
+  }
+
   const { data: doc, error } = await sb.rpc("purchasing_po_document", { p_po_id: poId });
   if (error) {
     // The RPC raises with a machine-readable `detail` (PostgREST → .details).
