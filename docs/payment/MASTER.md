@@ -411,7 +411,7 @@ the immutable ledger as kind `receipt` with the sent-screenshot proof. With no A
 template the panel says `No receipt template yet. Ask a manager to add the approved wording
 in Settings.` — nothing invents customer copy.
 
-### Deployed and production-walked — the Calendar review corrections, 2026-09-07
+### Deployed — the Calendar review corrections, 2026-09-07
 
 The #1115 review found five gaps; the correction rebuilds the Calendar view on the kit's ONE
 pinned `MonthCalendar` primitive (shared with Receiving and Delivery) instead of the
@@ -427,27 +427,52 @@ across every MonthCalendar consumer, design guard clean, walked at desktop, 390p
   arrival — Payment-owned words only, no Delivery logistics-assignment copied) opens its
   dated LISTING while the complete month stays visible and its markers follow the filter;
   choosing any month date returns to Calendar at that week. `All dates` is the Calendar.
-- **One SO, once**: entries dedupe on SO · date · type, so an SO carrying Sales, Storage and
-  Additional Storage invoices is ONE Customer Delivery and ONE Expected arrival, its balance
-  said once through the canonical `orderMoney` arithmetic; the Sales invoice is the door and
-  the other obligations stay reachable through the Register and the opened details.
+- **One SO, once — and the money is the SO across kinds**: entries dedupe on SO · date ·
+  type, so an SO carrying Sales, Storage and Additional Storage invoices is ONE Customer
+  Delivery and ONE Expected arrival; the Sales invoice is the door and the other obligations
+  stay reachable through the Register and the opened details. The card's amount is the
+  shared `soRemaining` derivation — goods value from the same `orderMoney` stores as
+  `Needed`, PLUS the SO's live ISSUED storage-kind invoice obligations with their tax
+  (a draft asks for nothing, a voided one is dead), MINUS `orders.paid` subtracted exactly
+  ONCE (the Work engine's combined law), so the Sales door never hides an unpaid storage
+  obligation and a payment posted against a storage invoice is never double-counted. Proven
+  by the fixture the review asked for: all three kinds + partial payment + a voided
+  obligation asserts RM 758 from goods 1,000 + live storage 158 − paid 400, with the
+  never-values (600 · 858 · 918 · 508) each excluded, and the paid-past-goods case (1,100)
+  spills into storage (58) instead of inflating it.
 - **The kit fix the correction surfaced**: `MonthCalendar` passed no `onSelect` to
   `react-day-picker` v10, so selection was internal-state only and a day set from OUTSIDE
   (a register date door, a week arrow) never repainted; it now uses DayPicker's own
   controlled `onSelect`, keeping the pick-again-clears contract for every consumer.
 
 PR #1124 merged as `4d717422` and the ERP page, POS page and API Worker all reported that
-exact SHA. The authenticated production walk was completed the same day through the operator's
-signed-in browser session: the live Invoices Register's Customer Delivery cell opened the
-Calendar at its fixed workweek with the exact SO highlighted and its balance said once;
-the month headed `Sun Mon Tue Wed Thu Fri Sat`; `‹ Previous week` moved the week and the
-month repainted its selected day (the controlled-selection kit fix, live); the Customer
-Delivery filter opened its dated listing with the complete month still visible; and choosing
-a month date returned to Calendar at that week with `All dates` active. The one live invoice
-could not exercise the multi-invoice dedupe on production data — that behaviour is proven by
-the focused tests and the local multi-invoice fixture walk, and every live row is TEST data
-anyway. The 390px and ≈200% responsive checks ran on the local build of the same SHA's code;
-the production DOM walk was desktop-only.
+exact SHA. The verification evidence, each result stated for exactly what it proves:
+
+- **Production DOM-interaction walk — DONE** (same day, through the operator's signed-in
+  browser session): the live Register's Customer Delivery cell opened the Calendar at its
+  fixed workweek with the exact SO highlighted; the month headed `Sun Mon Tue Wed Thu Fri
+  Sat`; `‹ Previous week` moved the week and the month repainted its selected day (the
+  controlled-selection kit fix, live); the filter opened its dated listing with the month
+  visible; a month date returned to Calendar with `All dates` active. This proves the
+  interactions; it does NOT prove visual layout.
+- **Production VISUAL inspection — NOT DONE, precise blocker**: the authenticated session
+  exists only in the owner's own browser, whose window is minimised (a zero-width window
+  cannot be captured), and signing in from any automated browser would mean handling the
+  owner's credentials, which is refused on principle. One owner action clears it: keep a
+  normal-sized signed-in window open and ask for the visual pass.
+- **200% zoom — layout-equivalent evidence, not native-zoom acceptance**: a browser's 200%
+  page zoom on a 1280px window lays out at a 640px viewport, and that exact walk ran locally
+  at 640×400 — week navigation, month repaint, filter → listing with the month visible,
+  month-date return, ZERO elements clipped outside the viewport, no horizontal scroll, and
+  the filter list owns its own scroller with the month outside it (fixed). Neither
+  automation surface can drive the browser-chrome zoom control itself, and a CSS `zoom`
+  emulation was rejected as evidence because it does not re-evaluate media queries the way
+  real page zoom does — so glyph rasterisation at true 200% remains unexercised and this is
+  recorded as layout-equivalent proof, not full visual acceptance.
+- The multi-invoice dedupe could not be exercised on production data (one live invoice, and
+  every live row is TEST data): its proof is the shared-arithmetic fixture tests and the
+  local multi-invoice fixture walk, where the deduped SO card said RM 2,350 = goods 5,400 +
+  storage 150 − paid 3,200.
 
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
@@ -457,8 +482,9 @@ target work. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
 it into a `Standard bank transfer` template once approved. The Calendar correction's
-authenticated production walk is done (above); an owner walk of the whole Payment surface and
-the remaining target work keep the overall status PARTIALLY DELIVERED.
+production DOM-interaction walk is done (above); the production VISUAL pass (blocked on a
+visible signed-in owner window), a native-zoom 200% pass, an owner walk of the whole Payment
+surface and the remaining target work keep the overall status PARTIALLY DELIVERED.
 
 ### Approved target / not claimed built by this scope
 
