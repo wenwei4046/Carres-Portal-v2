@@ -65,6 +65,11 @@ export const productModelSchema = z.object({
 });
 export type ProductModelDto = z.infer<typeof productModelSchema>;
 
+/** 0442 — the Catalog-owned stock identity mode of a SKU. Declared here, above
+ *  its first use, because zod objects evaluate at import time. */
+export const stockIdentityModeSchema = z.enum(["exact_unit", "quantity"]);
+export type StockIdentityModeInput = z.infer<typeof stockIdentityModeSchema>;
+
 export const productSkuSchema = z.object({
   id: z.string().uuid(),
   modelId: z.string().uuid(),
@@ -104,6 +109,10 @@ export const productSkuSchema = z.object({
   // as "not priced at this size" and falls through to the flat price.
   // Additive/optional so pre-0204 serialized SKUs stay valid.
   pricesBySize: z.record(z.number().nullable()).nullable().optional(),
+  /** 0442 — how Stock identifies this SKU: `exact_unit` (one permanent Carres
+   *  Unit ID per piece, born with the official PO) or `quantity` (counted, no
+   *  Unit ID). Null/absent = Catalog has not said, and PO issue refuses it. */
+  stockIdentityMode: stockIdentityModeSchema.nullable().optional(),
 });
 export type ProductSkuDto = z.infer<typeof productSkuSchema>;
 
@@ -467,6 +476,10 @@ export const modelSofaCompartmentInput = z
      * always wins. Absent leaves whatever the row already holds, so a re-offer
      * never blanks a code somebody keyed. */
     supplierCode: z.string().trim().max(60).optional(),
+    /** 0442 — the stock identity mode the compartment's SKU is minted with.
+     *  Absent leaves whatever the row holds (NULL on a new row, and official
+     *  PO issue then refuses it by name until Catalog sets it). */
+    stockIdentityMode: stockIdentityModeSchema.optional(),
   })
   .strict();
 export type ModelSofaCompartmentInput = z.infer<typeof modelSofaCompartmentInput>;
@@ -1134,6 +1147,10 @@ export const productSkuCreateInput = z
     supplierCode: z.string().trim().max(80).nullable().optional(),
     description: z.string().trim().max(200).nullable().optional(),
     posActive: z.boolean().optional(),
+    /** 0442 — Catalog states how Stock identifies the SKU. Omitted = NULL =
+     *  "Catalog has not said", and official PO issue refuses the SKU by name
+     *  until it is set. Never derived server-side from the category. */
+    stockIdentityMode: stockIdentityModeSchema.nullable().optional(),
     // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (the price a
     // PWP-rule reward line is sold at). Mirrors `cost`: economic, nullable.
     // The route gate (gateSkuCreatePriceCost) + the DB trigger enforce
@@ -1165,6 +1182,8 @@ export const productSkuPatchInput = z
     // 0170 — Edit-Prices / Modular toggle / inline description edit.
     posActive: z.boolean().optional(),
     description: z.string().trim().max(200).nullable().optional(),
+    /** 0442 — the stored stock identity mode; every change is ledgered. */
+    stockIdentityMode: stockIdentityModeSchema.nullable().optional(),
     // 0186 (PWP Phase 8a) — principal-only per-SKU reward price (mirrors `cost`).
     // Presence = intent to change → gated to principal in the route.
     pwpPrice: z.number().nonnegative().nullable().optional(),
@@ -1272,6 +1291,9 @@ export const generateSkusInput = z
      * repeats across sizes, so a batch default would only invent numbers. */
     prices: z.record(z.string(), z.number().nonnegative()).optional(),
     pwpPrices: z.record(z.string(), z.number().nonnegative()).optional(),
+    /** 0442 — the stock identity mode every generated SKU is created with.
+     *  Omitted = NULL on every row (PO issue refuses until Catalog sets it). */
+    stockIdentityMode: stockIdentityModeSchema.optional(),
   })
   .strict();
 export type GenerateSkusInput = z.infer<typeof generateSkusInput>;

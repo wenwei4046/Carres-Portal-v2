@@ -68,15 +68,27 @@ not theirs. 100% legible on a cheap B/W laser, a fax, a WhatsApp photo.
   that exact name and address. For several, it prints `Multiple destinations`
   and every exact name/address used by the goods lines. Nice Future prints its
   fixed collection sentence via `delivery_instructions`.
-- **Items table**: `# · SO NO · ITEM ID · DESCRIPTION · DELIVER TO · QTY`.
+- **Items table**: `# · SO NO · UNIT ID · DESCRIPTION · DELIVER TO · QTY`.
   - Every goods line prints its effective governed destination name and address.
     `purchase_order_lines.destination_id` overrides the PO default; a null line
     destination follows `purchase_orders.destination_id`. This is document
     truth, not display inference.
-  - **Item ID = `ops_stock_items.unit_code` (0153)** — minted at PO-open, one
-    scannable id per physical unit. The column the 2026-08-01 law reserved is
-    now LIVE: the supplier labels each unit by id; the warehouse scans on
-    receive. Prints `—` until codes arrive. **Never the SKU.**
+  - **UNIT ID — the only approved word; `ITEM ID` is retired (owner ruling
+    2026-09-07).** The column prints `ops_stock_items.unit_code` for the
+    Units THIS LINE was born with: an exact-unit line (Catalog
+    `stock_identity_mode = exact_unit` — traceable furniture and independently
+    saleable or replaceable modules) is born with exactly one permanent
+    `U1-000-001` per ordered piece **in the same transaction as the PO
+    number** (0442 · 0443), bound to the line by `po_line_id`, so two lines of
+    one SKU print disjoint IDs. A quantity line (governed interchangeable
+    goods — pillows, protectors) has no Unit IDs by law and prints `—`; that
+    dash is intentional, not "not allocated". A revision prints the current
+    Units only (a reduced line's retired IDs leave the paper; they are never
+    reused). The paper and the opened PO's `Document → Goods lines` read the
+    same line-bound rows, so they can never disagree. **Never the SKU.** The
+    supplier's instruction is one line on its own package label —
+    `CARRES UNIT ID: U1-000-001` — no QR, barcode or Carres label template
+    is required. A source-scan test fails the template if `Item ID` returns.
   - **Per-line `SO No` comes from the LINE's own lineage** (`po_line_sources`,
     0382). One aggregated SKU serving three customers prints all three with the
     quantity beside each — `SO-1318 × 2` — because ten mattresses stop being
@@ -147,3 +159,4 @@ PO. The paper therefore carries `PO No` **and** `Version` (§2).
 | 2026-08-09 | FAMILY REWRITE: chrome deferred to SO-PDF-STANDARD (§2.1/§8.5); logo-stamp header, 35mm label gutter, caps header dates and the zero-fill table DELETED per the Master Overwrite Law; `Sales Order` column → `SO No`; `TOTAL QUANTITY` → family `TOTAL` row; Item ID column goes LIVE with 0153 unit codes; `Delivery by` bold in PO DETAILS; footer keeps the Issued-by audit. Business rules (no money, consolidation, one destination, sofa drawing) unchanged. | Loo |
 | 2026-08-24 | **P5 CLOSED**: per-line `SO No` reads `po_line_sources` (0382), so a bulk PO prints its per-customer breakdown instead of a blank column. `Issued by` is the real `audit_log` actor and the supplier's FULL address is read from `suppliers.address` (0383) — both were hard-coded `null` before. Item ID is fed by the `U1-000-001` allocator (0381). No visual or business rule changed. | CARD-2026-08-22-purchasing-02 |
 | 2026-08-28 | **Owner B**: one PO may carry several governed Deliver To destinations. The header names every exact destination and the items table prints each line's effective destination. A post-send destination change still mints a new version and must be sent again. | Owner |
+| 2026-09-07 | **UNIT ID BORN WITH THE OFFICIAL PO.** Column heading `ITEM ID` → `UNIT ID` (the only approved word). IDs are born in the PO's own transaction for exact-unit lines only, bound to the line (0442 · 0443); a quantity line prints `—` by law; the document reads each line's own Units (`purchasing_po_document`, 0443) and therefore shows exactly what the PO object shows. Supplier instruction stays `CARRES UNIT ID: U1-000-001` on the supplier's own label. | Owner (Purchasing CARD 10) |

@@ -69,12 +69,20 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
       "PURCHASE ORDER",
       "Computer-generated document · No signature required.",
       "SO No",
-      "Item ID",
+      "Unit ID",
       "TOTAL",
       "Top view. Back at the top. TV in front.",
     ]) {
       expect(SRC, s).toContain(s);
     }
+  });
+
+  it("never prints the retired word `Item ID` — the ERP word is `Unit ID` (owner ruling 2026-09-07)", () => {
+    /* COPY-STANDARD: `Item ID` is a banned substitute for `Unit ID`. A
+       heading that regresses to it fails here before it reaches a supplier. */
+    expect(SRC).not.toMatch(/Item ID/);
+    expect(SRC).not.toMatch(/ITEM ID/);
+    expect(SRC).toMatch(/>Unit ID</);
   });
 
   it("has no signature block and no End-of-PO line (both rejected by Loo)", () => {
@@ -90,7 +98,7 @@ describe("po-template obeys docs/pdf/PO-PDF-STANDARD.md", () => {
  * ⭐ THE DOCUMENT CARRIES THE FACTS IT CLAIMS
  * (0382 · 0383; CARD-2026-08-22-purchasing-02 closure §6 · §7).
  *
- * `SO NO` and `Item ID` were columns with nothing behind them: the schema kept
+ * `SO NO` and the Unit ID column were columns with nothing behind them: the schema kept
  * `so_refs` on the DOCUMENT, so every bulk purchase order printed a blank
  * customer column, and the route hard-coded the issuer to `null`.
  */
@@ -145,7 +153,7 @@ describe("po-template prints the lineage and the issuer it is given", () => {
     expect(SRC).toMatch(/so_refs && so_refs\.length === 1/);
   });
 
-  it("still fills Item ID from the units the issue actually minted", () => {
+  it("still fills Unit ID from the units the issue actually minted", () => {
     expect(SRC).toMatch(/line\.unit_codes/);
     /* An em dash, not an empty cell — a blank column reads as a defect. */
     expect(SRC).toMatch(/unit_codes\.join\("\\n"\) : "—"/);

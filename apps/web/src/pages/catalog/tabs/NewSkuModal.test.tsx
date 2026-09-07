@@ -197,6 +197,10 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(mockOfferMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
       compartmentIds: ["c1", "c2"],
+      supplierId: undefined,
+      /* 0442 — Catalog states how Stock identifies the SKU with the SKU itself.
+         The form defaults from the category and the keyer confirms it. */
+      stockIdentityMode: "exact_unit",
     });
     expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
   });
@@ -214,6 +218,8 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(mockOfferMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
       compartmentIds: ["c1"],
+      supplierId: undefined,
+      stockIdentityMode: "exact_unit",
     });
   });
 
@@ -248,6 +254,8 @@ describe("NewSkuModal — sofa compartment picker", () => {
     expect(mockOfferMutateAsync).toHaveBeenLastCalledWith({
       modelId: "m-new",
       compartmentIds: ["c2"],
+      supplierId: undefined,
+      stockIdentityMode: "exact_unit",
     });
   });
 
@@ -325,7 +333,15 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     });
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
-      input: { variants: ["Single", "King"], price: 1990 },
+      input: {
+        variants: ["Single", "King"],
+        price: 1990,
+        supplierId: undefined,
+        supplierCode: undefined,
+      /* 0442 — Catalog states how Stock identifies the SKU with the SKU itself.
+         The form defaults from the category and the keyer confirms it. */
+        stockIdentityMode: "exact_unit",
+      },
     });
     expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
   });
@@ -341,7 +357,13 @@ describe("NewSkuModal — mattress/bedframe size chips", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-new",
-      input: { variants: ["Single", "Queen", "King"], price: undefined },
+      input: {
+        variants: ["Single", "Queen", "King"],
+        price: undefined,
+        supplierId: undefined,
+        supplierCode: undefined,
+        stockIdentityMode: "exact_unit",
+      },
     });
   });
 
@@ -465,6 +487,9 @@ describe("NewSkuModal — accessory/service: no variant axis", () => {
       supplierId: null,
       /* 0375 — the supplier's own item code rides the payload; untouched here. */
       supplierCode: null,
+      /* 0442 — Catalog states how Stock identifies the SKU with the SKU itself.
+         The form defaults from the category and the keyer confirms it. */
+      stockIdentityMode: "quantity",
     });
   });
 
@@ -575,6 +600,8 @@ describe("NewSkuModal — Add to existing model: option chips", () => {
     expect(mockOfferMutateAsync).toHaveBeenCalledWith({
       modelId: "m-sofa",
       compartmentIds: ["c2"],
+      supplierId: undefined,
+      stockIdentityMode: "exact_unit",
     });
     expect(mockCreateSkuMutateAsync).not.toHaveBeenCalled();
   });
@@ -621,7 +648,13 @@ describe("NewSkuModal — Add to existing model: option chips", () => {
     expect(mockCreateModelMutateAsync).not.toHaveBeenCalled();
     expect(mockGenerateSkusMutateAsync).toHaveBeenCalledWith({
       modelId: "m-mat",
-      input: { variants: ["King"], price: 1990 },
+      input: {
+        variants: ["King"],
+        price: 1990,
+        supplierId: undefined,
+        supplierCode: undefined,
+        stockIdentityMode: "exact_unit",
+      },
     });
   });
 
@@ -836,6 +869,7 @@ describe("NewSkuModal — the supplier's own code on a bulk batch", () => {
       modelId: "m-new",
       compartmentIds: ["c1", "c2"],
       supplierCodes: { c1: "HK-390", c2: "HK-390-1NA" },
+      stockIdentityMode: "exact_unit",
     });
   });
 

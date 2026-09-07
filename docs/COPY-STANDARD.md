@@ -723,6 +723,23 @@ interchangeable:
 | `Supplier Delivery Date` | the supplier's answer to the PO date: `Not confirmed` before evidenced supplier reply; `Same as PO` after the supplier confirms the PO date; otherwise the different date supplied by the supplier |
 | `Goods received on` | the physical arrival date and time; never keyed/submitted/posted time. Owner correction 2026-09-06 — the retired spelling `Goods Received At` may not appear. |
 
+**Unit ID words — owner ruling 2026-09-07 (Purchasing CARD 10, Unit ID Born With Official PO).**
+`Unit ID` is the only visible word for a physical identity; `Item ID` is retired everywhere,
+including the official PO PDF heading (`UNIT ID`). A Unit ID exists only for goods Catalog
+traces one by one; quantity goods have none, and the screen must say so with a dash, never
+with an absence word that implies one is owed.
+
+| Fact | Word | Do NOT use |
+|---|---|---|
+| The goods-line column of an opened PO, and the PO PDF heading | **`Unit ID`** (screen) · **`UNIT ID`** (paper) | Item ID · Unit IDs · Serial · Code |
+| A quantity-scoped goods line — it has no Unit ID by law | **`—`** | Not allocated · No Unit ID · Not created yet · Pending |
+| An exact-unit line with no Unit IDs after official issue — an integrity failure, never an ordinary empty state | **`Unit IDs missing on this line — do not send this PO`** | No Unit ID · a blank cell · Not allocated |
+| Catalog's per-SKU answer to *how does Stock count this?* | **`Stock identity`** with the values **`Unit ID`** · **`Quantity`**, and **`Not set`** while Catalog has not said | Tracking mode · Serialised · Bulk · Traceable flag |
+| Official PO issue refused because Catalog has not said | **`Set the stock identity (Unit ID or Quantity) for {sku} in Catalog before issuing a PO`** | Unknown mode · Configuration missing · Contact admin |
+| Receiving refuses a quantity-only count on a traced line | **`line {sku} is traced by Unit ID — record one result for each expected Unit`** | Units required · Invalid submission |
+| Receiving refuses Unit IDs named against a counted line | **`line {sku} is counted by quantity — it has no Unit IDs to scan`** | Bulk item · Not serialised |
+| The supplier's package-label instruction | **`CARRES UNIT ID: U1-000-001`** | QR · barcode · label template · Item ID |
+
 **Supplier reply truth — correction card 2026-09-06.** The reply form's date field is labelled
 `Supplier Delivery Date` (never a bare `Date`), and the form states the comparison beside it:
 `Same as PO` · `Earlier than the PO date` · `Later than the PO date`. Only a LATER date asks

@@ -185,7 +185,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     poIds,
     (ids) => sb
       .from("purchase_order_lines")
-      .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark, demand_id")
+      .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark, demand_id, identity_mode")
       .in("po_id", ids)
       .order("id"),
   );
@@ -1342,10 +1342,14 @@ operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
  */
 operationPosRouter.get("/:id/units", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  // 0442/0443 — Units are LINE-bound (`po_line_id`) and only `identity_scope
+  // = 'unit'` rows are Carres Unit IDs; a quantity line's bulk register rows
+  // are never shown as Unit IDs.
   const { data, error } = await sb
     .from("ops_stock_items")
-    .select("unit_code, sku, status")
+    .select("unit_code, sku, status, po_line_id")
     .eq("po_no", c.req.param("id"))
+    .eq("identity_scope", "unit")
     .order("unit_code", { ascending: true });
   if (error) {
     const m = mapPgError(error);
@@ -1668,8 +1672,9 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   // none and the quantity line stays the lawful path.
   const { data: unitRows } = await sb
     .from("ops_stock_items")
-    .select("id, unit_code, sku, status")
+    .select("id, unit_code, sku, status, po_line_id")
     .eq("po_no", poId)
+    .eq("identity_scope", "unit")
     .order("unit_code");
 
   const { data: evs } = ids.length

@@ -1165,7 +1165,11 @@ breathing gap
   moving `Deliver To` next to `Unit ID`: both answer *where is this piece*, and separating them by
   three columns made the operator read across the whole table to pair them). It may use its own column
   tracks; it must retain the parent Register's seven-column structure and horizontal behaviour.
-  Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location.
+  Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location. The
+  word is `Unit ID` everywhere (`Item ID` is retired); on the opened Purchase Order's
+  `Document → Goods lines` a quantity-scoped line prints `—` because it has no Unit ID by law,
+  and an exact-unit line with none after issue reads `Unit IDs missing on this line — do not send
+  this PO` (owner ruling 2026-09-07, Purchasing §6.2).
 - Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
   Selection may scope Export; it may not introduce register-owned execution. Direct SO/PO/DO
   numbers are links to their owner. Only explicit `Edit` opens the formal edit context; View,

@@ -13,7 +13,8 @@
  *   RPC (0307) — no RM figure ever reaches this component.
  * - `Delivery by` is the supplier's 3-second fact — first row of PO DETAILS,
  *   bold value.
- * - Item ID = ops_stock_items.unit_code (0153), minted at PO-open — the
+ * - Unit ID = ops_stock_items.unit_code, born at official PO issue and bound
+ *   to its line (0442/0443); a quantity line prints `—` because it has none — the
  *   column the old law reserved is now LIVE: supplier labels each unit by
  *   id, the warehouse scans on receive. Prints `—` until codes arrive.
  * - Sofa plan-view layout drawing per model (direction contract).
@@ -320,7 +321,7 @@ export function PoTemplate(data: PoTemplateData) {
         <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
           <Text style={[styles.th, styles.colSo]}>SO No</Text>
-          <Text style={[styles.th, styles.colUnit]}>Item ID</Text>
+          <Text style={[styles.th, styles.colUnit]}>Unit ID</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colDestination]}>Deliver To</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>

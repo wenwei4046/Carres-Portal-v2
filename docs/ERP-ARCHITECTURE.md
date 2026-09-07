@@ -377,6 +377,14 @@ else is a consequence of it.**
 - What a SKU **IS**: its category (mattress · bedframe · sofa · accessory · service ·
   guarantee), its model, its size, its supplier, its cost and its price.
 - **The category is the CATALOG's answer and nobody else's.**
+- **How Stock identifies the SKU — OWNER RULING 2026-09-07.** Every purchasable SKU carries
+  one stored stock identity mode: **exact Unit** (traceable furniture and independently
+  saleable or replaceable modules — every physical piece is one permanent Carres Unit ID) or
+  **quantity** (governed interchangeable accessories and bulk goods — counted, never given a
+  Unit ID; pure packaging is never an independent Unit). The stored mode is the only
+  authority: no module derives it at runtime from supplier, destination, SKU text,
+  `pos_active` or category. A SKU with no stored mode blocks official PO issue by name with
+  the concrete Catalog act to perform; nothing chooses for it.
 
 **ACTIONS** — author a SKU · set its category and supplier · price it · retire it.
 
@@ -493,6 +501,15 @@ each supplier call the things they sell us?"*, derived from the catalog and neve
 - The **purchase order** — what we asked a factory for, when we asked, what they promised.
 - The approved `purchase_demand` remainder, whether its source is a Sales Order or Manual Purchase.
 - `Deliver To`, supplier-facing versions and proof that the current PDF was actually sent.
+- **The birth of every Carres Unit ID — OWNER RULING 2026-09-07.** An official PO issue
+  creates the PO number, the PO lines (each snapshotting its Catalog stock identity mode)
+  and, for every exact-unit line, exactly one permanent Unit ID per ordered piece — in ONE
+  transaction, bound to the line's immutable id, for every governed destination. A quantity
+  line is born with none. If classification, allocation, line binding or the ledger check
+  fails, nothing is born: no PO, no consumed number, no partial line, no demand movement, no
+  orphan Unit. A revision that grows an exact-unit line allocates only the additional Units;
+  a reduction or cancellation retires the affected Units and never deletes or reuses an ID.
+  The Unit-ID allocator is reachable only by this authority, never by a browser.
 - The supplier conversation and every promise on it (append-only; a promise is never
   overwritten).
 - The engine numbers: production days, order-by buffer, PO days, supplier work week.
@@ -534,9 +551,13 @@ amend it · void it · return a count for a re-check.
 **LINKS TO** — Purchasing (the PO) · Stock (where the units landed) · Supplier Claim (what the
 count opened).
 
-**UNIT RECONCILIATION — OWNER RULING 2026-09-01.** Receiving never maintains a second stock
-quantity. It starts from the exact Source Document line and records one physical result for each
-expected Unit ID: `Received` · `Received with issue` · `Not received`. Posting the numbered GRN
+**UNIT RECONCILIATION — OWNER RULINGS 2026-09-01 / 2026-09-07.** Receiving never maintains a
+second stock quantity, and **it verifies the identities Purchasing created — it never creates,
+replaces or renumbers one.** It starts from the exact Source Document line and answers by that
+line's snapshotted stock identity mode: an **exact-unit line** records one physical result for
+each expected Unit ID — `Received` · `Received with issue` · `Not received` — and refuses a
+quantity-only count, a foreign, duplicated, wrong-line or already-received Unit; a **quantity
+line** reconciles by count and refuses any Unit ID named against it. Posting the numbered GRN
 publishes those authoritative events. Stock derives the current Unit consequences; Purchasing
 reads the missing remainder. The control is derived, never re-keyed:
 

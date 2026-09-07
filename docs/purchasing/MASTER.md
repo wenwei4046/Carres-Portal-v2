@@ -536,18 +536,43 @@ U1-000-001
 - Non-separable set pieces may use `U1-000-001-A/B`; independently saleable pieces get separate
   Unit IDs as defined by Catalog.
 
-**HOW IT IS ENFORCED — BUILT, migrations 0381 / 0382, PR #894.** `unit_id_series` is ONE row, locked
-`FOR UPDATE` while allocating, so two receipts cannot mint one Unit ID; it is a table rather than a
-sequence because a sequence cannot roll `U1-999-999` into `U2-000-001` and cannot be read back
-without consuming. `allocate_unit_id()` is the only door and the table is revoked from
-`authenticated`. `normalise_unit_id()` makes `U1-000-001`, `U1-000001` and `U1000001` the same Unit
-for search and scan. Units are minted for EVERY governed destination, not only Carres-owned
-warehouses, because §6.2 requires the supplier to write the Unit ID on a showroom or external
-delivery's package too. The series is seeded ABOVE anything already in the locked format:
-**existing units are never recoded.**
+**WHICH GOODS GET A UNIT ID — OWNER RULING 2026-09-07 (Purchasing CARD 10).** Catalog stores one
+stock identity mode per SKU (`product_skus.stock_identity_mode`, 0442): **exact unit** for
+traceable furniture and independently saleable or replaceable modules; **quantity** for governed
+interchangeable accessories and bulk goods (pillows, protectors), which are counted and never
+given a Unit ID; pure packaging is never an independent Unit. The stored mode is the only
+authority — nothing derives it at runtime from supplier, destination, SKU text, `pos_active` or
+category (category decided ONCE, in the audited 0442 classification). A purchasable SKU with no
+stored mode **blocks official PO issue by name** — `Set the stock identity (Unit ID or Quantity)
+for {sku} in Catalog before issuing a PO` — and nothing chooses for it.
 
-Unit IDs are allocated when the PO/CO is confirmed for issue so the supplier-facing document can
-list every expected Unit. Current supplier capability requires one simple extra line on its own
+**UNIT ID BIRTH — BUILT, migrations 0442 / 0443 / 0444.** When an official PO is issued, the PO
+number, its lines (each snapshotting the Catalog mode as `purchase_order_lines.identity_mode`) and
+every exact-unit line's Unit IDs are born **in the same transaction**: exactly one permanent
+`U1-000-001` per ordered piece, bound to the line's immutable id (`ops_stock_items.po_line_id`),
+for EVERY governed destination — a showroom or external delivery gets its IDs too, because the
+supplier writes them on the package wherever it goes. A quantity line is born with zero Unit IDs.
+Two lines of one SKU are two lines with disjoint IDs. If classification, allocation, line binding
+or the ledger check fails, the whole issue rolls back: no PO, no consumed number, no partial line,
+no demand movement, no orphan Unit. Both governed entrances — SO Batch Purchase and Manual
+Purchase — reach the one authority (`purchasing_issue_pos_batch` → `_operation_create_po_inner`).
+`unit_id_series` is ONE row, locked `FOR UPDATE` while allocating, so two issues cannot mint one
+Unit ID; it is a table rather than a sequence because a sequence cannot roll `U1-999-999` into
+`U2-000-001`. **`allocate_unit_id()` and `gen_unit_code()` are revoked from every client role**;
+only the SECURITY DEFINER PO authority allocates. `normalise_unit_id()` makes `U1-000-001`,
+`U1-000001` and `U1000001` the same Unit for search and scan. The destination never voids or
+mints a Unit (0443 replaced the 0366 trigger that did). **Existing Unit IDs are never recoded,
+deleted, reused or renumbered.** A revision that grows an exact-unit line allocates only the
+additional Units; a reduction retires the surplus not-yet-received Units (`voided`, newest first)
+and a cancellation retires them all — retired IDs stay in the ledger forever.
+
+The opened PO's `Document → Goods lines` shows a `Unit ID` column: an exact-unit line lists its
+real line-bound IDs immediately after issue; a quantity line prints `—` (intentional — it has
+none by law); an exact-unit line with no IDs after issue is an integrity failure and says `Unit
+IDs missing on this line — do not send this PO`, never an ordinary empty state. The official PO
+PDF heads the same column `UNIT ID` and prints the same line-bound IDs
+(`docs/pdf/PO-PDF-STANDARD.md`). The main Purchase Orders register stays one row per PO and
+carries no Unit ID column. Current supplier capability requires one simple extra line on its own
 package label:
 
 ```text
@@ -610,7 +635,8 @@ PO/CO carries the official Deliver To and original PO Delivery Date
 → Receiving starts from that exact PO/CO; it never authors another purchase or receipt source
 → record Goods received on as the physical arrival date, and Goods arrived at as the physical arrival location
 → record Order Qty, Received Qty, Damaged Qty, Wrong Item Qty and Pending Delivery Qty
-→ attach Supplier DO/evidence and exact Unit IDs where required
+→ attach Supplier DO/evidence; on a traced line record one outcome per expected Unit ID,
+  on a quantity line count the pieces — Receiving verifies, it never creates an ID
 → finish physical receiving; Carres creates the numbered GRN
 ├─ valid received goods → Stock receives custody/location
 ├─ damaged/wrong/extra → no available stock and no reduction of Pending Delivery Qty
@@ -1509,19 +1535,29 @@ Warehouse submits count                (or Operation enters goods directly)
 - **Save Receiving is idempotent** (`save_key`): a retried uncertain response returns the first
   posting — never a second GRN, Unit receipt or stock movement. A retried check-in of a posted
   session returns the first result.
-- **Per-Unit outcomes** (ERP-ARCHITECTURE §3.4): a governed expected Unit records exactly
-  `Received · Received with issue · Not received` (`receiving_unit_results`); posting flips the
-  EXACT named Units (received → free at Goods arrived at; with-issue → the claim hold). Quantities
-  are DERIVED from the outcomes; a line without minted Units keeps the lawful quantity inputs.
-  Duplicate scans, foreign Units and already-received Units refuse by name. The external
-  Warehouse count uses the same outcomes: `warehouse_incoming_pos()` lists the expected Units,
-  the count modal records one physical result per Unit, and the submission carries the per-Unit
-  outcomes plus arrival photo/video evidence.
-- **Stock posts by Units only (0366 unit authority).** The receive engine flips/mints
-  `ops_stock_items`; `stock_balances` is DERIVED by the rollup triggers and is never written
+- **Per-Unit outcomes and quantity counts — RECEIVING VERIFIES, NEVER ISSUES (owner ruling
+  2026-09-07, 0444).** Every line is answered by its snapshotted stock identity mode. An
+  **exact-unit line** records exactly `Received · Received with issue · Not received` for each
+  expected Unit (`receiving_unit_results`); posting flips the EXACT named Units (received → free at
+  Goods arrived at; with-issue → the claim hold); quantities are DERIVED from the outcomes, and a
+  quantity-only submission is refused (`exact_unit_line_needs_units`). A **quantity line** takes
+  typed counts, refuses any Unit ID named against it (`quantity_line_takes_no_units`), and posts
+  its received pieces as bulk register rows (`identity_scope = quantity`, 0218's model) that carry
+  a technical register key and are never shown as Unit IDs. Missing, foreign, duplicated,
+  wrong-line (a Unit of another line of the same SKU) and already-received Units refuse by name;
+  a Unit is looked up by its line binding, never by `(PO, SKU)`. Receiving never allocates: the
+  0426/0427 shortfall mint (`gen_unit_code()` at receipt or amendment) is gone, and the allocators
+  are unreachable from every client role. The external Warehouse count uses the same outcomes:
+  `warehouse_incoming_pos()` lists each line's mode and the expected Units with their line, the
+  count modal records one physical result per Unit, and the submission carries the per-Unit
+  outcomes plus arrival photo/video evidence. `expected = cumulatively received + not yet
+  received` holds per line in both modes; damaged, wrong and not-received outcomes never change an
+  identity.
+- **Stock posts by the register only (0366 unit authority).** The receive engine flips the
+  named Units of an exact-unit line and posts a quantity line's count as bulk register rows — it
+  mints no identity; `stock_balances` is DERIVED by the rollup triggers and is never written
   directly, and the pre-0366 aggregate-reserve write is gone — reservation is the Sales Order's
-  exact-Unit binding, owned by the Stock reserve door. (0426 corrects the live engine, which
-  still carried both pre-0366 writes and would have refused any stock-posting receive.)
+  exact-Unit binding, owned by the Stock reserve door.
 - **CO / consignment receiving runs through the SAME engine.** `purchase_orders.is_consignment`
   marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
   named, and the posting creates no AP consequence — supplier ownership is preserved, never

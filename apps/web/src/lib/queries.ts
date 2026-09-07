@@ -3427,6 +3427,10 @@ export interface operationPoListRow {
     sku: string;
     qty: number;
     received_qty: number;
+    /** 0442 — the Catalog stock identity mode SNAPSHOTTED at issue.
+     *  `exact_unit`: the line owns one permanent Unit ID per piece;
+     *  `quantity`: counted goods, no Unit IDs (the column prints `—`). */
+    identity_mode?: "exact_unit" | "quantity" | null;
     /** R1 (0284) — what arrived broken / as the wrong item, cumulative across
      *  every DO on this line. Neither counts as received: the supplier still
      *  owes a good unit, so the qty stays PENDING DELIVERY (never "missing").
@@ -6377,12 +6381,14 @@ export interface operationPoSourceOrder {
 export interface operationPoSourceOrdersResponse {
   orders: operationPoSourceOrder[];
 }
-/** GET /api/operation/pos/:id/units — the Item ID column's real data:
- *  `unit_code` per physical piece (0153), keyed back to lines by sku. */
+/** GET /api/operation/pos/:id/units — the Unit ID column's real data: one
+ *  `unit_code` per physical piece, bound to its line by `po_line_id` (0442).
+ *  Only `identity_scope = 'unit'` rows come back; a quantity line has none. */
 export interface operationPoUnitRow {
   unit_code: string;
   sku: string;
   status: string;
+  po_line_id?: string | null;
 }
 export interface operationPoUnitsResponse {
   units: operationPoUnitRow[];
@@ -8201,12 +8207,14 @@ export interface ReceivingEvent {
   };
 }
 
-/** One expected Unit of the PO — minted `incoming` at issue (0382). */
+/** One expected Unit of the PO — born `incoming` at official issue (0443),
+ *  bound to its line (0442). */
 export interface ReceivingExpectedUnit {
   id: string;
   unit_code: string;
   sku: string;
   status: string;
+  po_line_id?: string | null;
 }
 
 export interface PoReceivingResponse {
@@ -10336,9 +10344,13 @@ export function useOfferModelCompartments() {
       compartmentIds,
       supplierId,
       supplierCodes,
+      stockIdentityMode,
     }: {
       modelId: string;
       compartmentIds: string[];
+      /** 0442 — the stock identity mode every offered compartment SKU is
+       *  minted with (a sofa module is a traceable piece by default). */
+      stockIdentityMode?: "exact_unit" | "quantity";
       /* An explicit pick wins outright (2026-08-26) — the server's one
        * precedence is explicit → sibling inherit → category cover, so every
        * compartment in the batch lands on the supplier the keyer chose. */
@@ -10359,6 +10371,7 @@ export function useOfferModelCompartments() {
             catalogJson("PUT", {
               ...(supplierId ? { supplierId } : {}),
               ...(code ? { supplierCode: code } : {}),
+              ...(stockIdentityMode ? { stockIdentityMode } : {}),
             }),
           );
         } catch (e) {

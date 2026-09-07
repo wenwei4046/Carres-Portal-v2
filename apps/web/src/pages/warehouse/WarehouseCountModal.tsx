@@ -95,18 +95,21 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     return Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
   }
 
-  /** The governed Units still expected, grouped by line SKU — the exact IDs
-   *  the supplier was told to write on the packages. */
-  const unitsBySku = useMemo(() => {
+  /** The governed Units still expected, grouped by the LINE they were born
+   *  for (0442 `po_line_id`) — the exact IDs the supplier was told to write
+   *  on the packages. Two lines of one SKU are two lines. */
+  const unitsByLine = useMemo(() => {
     const m = new Map<string, ExpectedUnit[]>();
-    for (const u of po.expected_units ?? []) {
-      if (u.status !== "incoming") continue;
-      const list = m.get(u.sku) ?? [];
-      list.push(u);
-      m.set(u.sku, list);
+    for (const l of po.lines ?? []) {
+      m.set(
+        l.id,
+        (po.expected_units ?? []).filter(
+          (u) => u.status === "incoming" && (u.po_line_id ? u.po_line_id === l.id : u.sku === l.sku),
+        ),
+      );
     }
     return m;
-  }, [po.expected_units]);
+  }, [po.expected_units, po.lines]);
 
   /** Prefilled `received` up to the line's remaining count — a complete
    *  delivery is zero typing — and `not_received` beyond it (the same rule
@@ -115,7 +118,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
     const o: Record<string, UnitState> = {};
     for (const l of po.lines ?? []) {
       const units = (po.expected_units ?? []).filter(
-        (u) => u.sku === l.sku && u.status === "incoming",
+        (u) => u.status === "incoming" && (u.po_line_id ? u.po_line_id === l.id : u.sku === l.sku),
       );
       const cap = Math.max(0, Number(l.qty || 0) - Number(l.received_qty || 0));
       units.forEach((u, i) => {
@@ -142,7 +145,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
   const draftLines: WarehouseReceiptLineDraft[] = useMemo(
     () =>
       lines.map((l) => {
-        const units = unitsBySku.get(l.sku) ?? [];
+        const units = unitsByLine.get(l.id) ?? [];
         let receivedNow = recv[l.id] || 0;
         let damagedQty = dmg[l.id] || 0;
         let wrongItemQty = wrong[l.id] || 0;
@@ -179,7 +182,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
       dmgPhotos,
       wrongType,
       wrongPhotos,
-      unitsBySku,
+      unitsByLine,
       unitStates,
     ],
   );
@@ -242,7 +245,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
             (l) => l.receivedNow > 0 || l.damagedQty > 0 || l.wrongItemQty > 0,
           )
           .map((l) => {
-            const units = unitsBySku.get(l.sku) ?? [];
+            const units = unitsByLine.get(l.id) ?? [];
             return {
               id: l.id,
               receivedNow: l.receivedNow,
@@ -316,7 +319,7 @@ export default function WarehouseCountModal({ po, onClose }: Props) {
 
         {lines.map((l) => {
           const pending = pendingOf(l);
-          const units = unitsBySku.get(l.sku) ?? [];
+          const units = unitsByLine.get(l.id) ?? [];
           const hasUnits = units.length > 0;
           const disabled = pending === 0 && !hasUnits;
           const v = viewBy.get(l.id);

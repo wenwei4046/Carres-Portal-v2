@@ -376,6 +376,16 @@ function ReadMode({
  * Payload Dictionary (§6.1) is what makes this readable without opening the
  * session; `posted` carries the GRN number since 0426.
  */
+/** 0442 — a Unit belongs to the line it was born for. A Unit without a line
+ *  binding (born before 0442 on a PO with one line of its SKU) falls back to
+ *  the SKU match, which is exact for that case. */
+export function unitBelongsToLine(
+  u: { sku: string; po_line_id?: string | null },
+  l: { id: string; sku: string },
+): boolean {
+  return u.po_line_id ? u.po_line_id === l.id : u.sku === l.sku;
+}
+
 export function eventSentence(e: ReceivingEvent): string {
   const who = e.actor_name ?? "Staff identity not recorded";
   const p = e.payload ?? {};
@@ -454,17 +464,18 @@ function ReceivingMode({
    *  uncertain Save returns the first posting, never a second GRN. */
   const [saveKey] = useState(() => crypto.randomUUID());
 
-  /** The governed Units still expected, grouped by line SKU. */
-  const unitsBySku = useMemo(() => {
+  /** The governed Units still expected, grouped by the LINE they were born
+   *  for (0442 `po_line_id`) — two lines of one SKU are two lines. */
+  const unitsByLine = useMemo(() => {
     const m = new Map<string, ReceivingExpectedUnit[]>();
-    for (const u of expectedUnits) {
-      if (u.status !== "incoming") continue;
-      const list = m.get(u.sku) ?? [];
-      list.push(u);
-      m.set(u.sku, list);
+    for (const l of lines) {
+      m.set(
+        l.id,
+        expectedUnits.filter((u) => u.status === "incoming" && unitBelongsToLine(u, l)),
+      );
     }
     return m;
-  }, [expectedUnits]);
+  }, [expectedUnits, lines]);
 
   /** One physical result per governed Unit. Prefilled `received` up to the
    *  line's remaining count — a complete delivery is zero typing — and
@@ -473,7 +484,7 @@ function ReceivingMode({
     const o: Record<string, UnitState> = {};
     for (const l of po.purchase_order_lines ?? []) {
       const units = (expectedUnits ?? []).filter(
-        (u) => u.sku === l.sku && u.status === "incoming",
+        (u) => unitBelongsToLine(u, l) && u.status === "incoming",
       );
       const cap = poLineReportable(l);
       units.forEach((u, i) => {
@@ -504,7 +515,7 @@ function ReceivingMode({
 
   /** The ONE per-line view both the button gate and the payload read. */
   const lineViews = lines.map((l) => {
-    const units = unitsBySku.get(l.sku) ?? [];
+    const units = unitsByLine.get(l.id) ?? [];
     const c = counts[l.id] ?? EMPTY_COUNT;
     if (units.length === 0) {
       return { line: l, units: [] as ReceivingExpectedUnit[], ...c };

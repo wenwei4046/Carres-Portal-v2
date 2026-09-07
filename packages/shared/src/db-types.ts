@@ -164,6 +164,10 @@ export interface ProductSkuRow {
   supplier_id: string | null;
   /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
   supplier_code?: string | null;
+  /** 0442 — how Stock identifies this SKU: `exact_unit` (one permanent Carres
+   *  Unit ID per piece, born at official PO issue) or `quantity` (counted,
+   *  never given Unit IDs). NULL = Catalog has not said; PO issue refuses. */
+  stock_identity_mode?: "exact_unit" | "quantity" | null;
   // 0074 — fixed procurement cost per unit. NULL = "not yet set" (Create-PO
   // refuses lines whose SKU has cost=null until operation sets a value via
   // the catalog admin UI).

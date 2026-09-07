@@ -623,6 +623,26 @@ const SkuRowView = memo(function SkuRowView({
     );
   }
 
+  /* 0442 — the Catalog-owned stock identity mode. Every change is ledgered
+     server-side; official PO issue refuses a SKU with none. */
+  function commitIdentityMode(next: string) {
+    const value = next === "exact_unit" || next === "quantity" ? next : null;
+    if (value === (sku.stockIdentityMode ?? null)) return;
+    patch.mutate(
+      { id: sku.id, patch: { stockIdentityMode: value } },
+      {
+        onSuccess: () =>
+          toast.success(`${sku.sku} · stock identity ${value === "quantity" ? "Quantity" : value === "exact_unit" ? "Unit ID" : "not set"}`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof ApiError ? e.message : "Update failed"),
+      },
+    );
+  }
+  const identityModeWord =
+    sku.stockIdentityMode === "exact_unit" ? "Unit ID"
+    : sku.stockIdentityMode === "quantity" ? "Quantity"
+    : "Not set";
+
   /** Inline CODE cell: the WHOLE code is one free-text input (Loo 2026-07-11 —
    *  not a locked prefix + suffix; codes are AutoCount-style free strings). */
   const codeCell = inlineEdit ? (
@@ -794,26 +814,52 @@ const SkuRowView = memo(function SkuRowView({
       <div className="text-body text-base-800 truncate" title={productName}>
         {productName}
       </div>
-      {inlineEdit && model ? (
-        <select
-          defaultValue={model.category}
-          onChange={(e) => commitCategory(e.target.value)}
-          aria-label={`${sku.sku} category`}
-          title="Category lives on the product — changing it moves ALL of this product's SKUs"
-          className={`${INPUT_CLS} text-meta`}
-          data-testid={`sku-category-select-${sku.sku}`}
-        >
-          {PRODUCT_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABEL[c]}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <div className="text-meta text-base-600">
-          {category ? CATEGORY_LABEL[category] : "—"}
-        </div>
-      )}
+      {/* Category, with the SKU's stock identity mode beneath it (0442): the
+          two answer "what is this thing" and "how does Stock count it" and
+          share one cell so the grid tracks stay as the header draws them. */}
+      <div className="min-w-0">
+        {inlineEdit && model ? (
+          <select
+            defaultValue={model.category}
+            onChange={(e) => commitCategory(e.target.value)}
+            aria-label={`${sku.sku} category`}
+            title="Category lives on the product — changing it moves ALL of this product's SKUs"
+            className={`${INPUT_CLS} text-meta`}
+            data-testid={`sku-category-select-${sku.sku}`}
+          >
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="text-meta text-base-600">
+            {category ? CATEGORY_LABEL[category] : "—"}
+          </div>
+        )}
+        {inlineEdit ? (
+          <select
+            defaultValue={sku.stockIdentityMode ?? ""}
+            onChange={(e) => commitIdentityMode(e.target.value)}
+            aria-label={`${sku.sku} stock identity`}
+            title="How Stock identifies this SKU — Unit ID: one permanent ID per piece, born with the official PO · Quantity: counted, no Unit ID"
+            className={`${INPUT_CLS} text-meta mt-1`}
+            data-testid={`sku-identity-select-${sku.sku}`}
+          >
+            <option value="">Not set</option>
+            <option value="exact_unit">Unit ID</option>
+            <option value="quantity">Quantity</option>
+          </select>
+        ) : (
+          <div
+            className={`text-meta ${sku.stockIdentityMode ? "text-base-500" : "text-kit-red-11"}`}
+            data-testid={`sku-identity-${sku.sku}`}
+          >
+            {identityModeWord}
+          </div>
+        )}
+      </div>
       {showSize &&
         (inlineEdit && !sizeless ? (
           <input
