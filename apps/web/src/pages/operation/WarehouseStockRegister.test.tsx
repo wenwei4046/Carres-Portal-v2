@@ -66,8 +66,7 @@ async function renderLoaded() {
   return r;
 }
 
-function renderRegister() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderRegister(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/operation/stock"]}>
@@ -86,6 +85,55 @@ beforeEach(() => {
     return Promise.resolve({});
   });
   window.localStorage.clear();
+});
+
+describe("an unavailable source is never zero stock", () => {
+  function expectNoStockClaims() {
+    expect(screen.queryByTestId("rail-all-stock")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing needs checking")).not.toBeInTheDocument();
+    expect(screen.queryByText(/No Unit has moved yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No Units yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/you can promise/)).not.toBeInTheDocument();
+  }
+
+  it("waits for the source before showing counts or empty claims", () => {
+    apiFetchMock.mockReturnValue(new Promise(() => {}));
+    renderRegister();
+    expectNoStockClaims();
+  });
+
+  it("shows the failure and retries into real Unit counts", async () => {
+    apiFetchMock.mockImplementation((path: string) => path.startsWith("/api/ops/stock/register")
+      ? Promise.reject(new Error("column stock_unit_register_v.site_name does not exist"))
+      : Promise.resolve({}));
+    renderRegister();
+    await screen.findByText("Stock could not be loaded");
+    expectNoStockClaims();
+    apiFetchMock.mockImplementation((path: string) => Promise.resolve(path.startsWith("/api/ops/stock/register")
+      ? { units: UNITS, total: UNITS.length } : {}));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByText("id-aaa111111");
+    expect(within(screen.getByTestId("rail-all-stock")).getByText("4")).toBeInTheDocument();
+  });
+
+  it("withdraws cached counts when a refresh fails", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderRegister(qc);
+    await screen.findByText("id-aaa111111");
+    apiFetchMock.mockRejectedValue(new Error("Stock request failed"));
+    await qc.invalidateQueries({ queryKey: ["operation", "stock-register"] });
+    await screen.findByText("Stock could not be loaded");
+    expectNoStockClaims();
+    expect(screen.queryByText("id-aaa111111")).not.toBeInTheDocument();
+  });
+
+  it("shows zero only after a successful empty response", async () => {
+    apiFetchMock.mockResolvedValue({ units: [], total: 0 });
+    renderRegister();
+    await screen.findByText(/No Units yet/);
+    expect(within(screen.getByTestId("rail-all-stock")).getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("Nothing needs checking")).toBeInTheDocument();
+  });
 });
 
 describe("the destination is Inventory", () => {

@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260811.1",
+    "@electric-sql/pglite": "^0.5.8",
     "@types/react": "^18.3.28",
     "@vitejs/plugin-react": "^4.7.0",
     "msw": "^2.6.0",

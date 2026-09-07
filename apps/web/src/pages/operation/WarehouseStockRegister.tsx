@@ -395,6 +395,7 @@ export default function WarehouseStockRegister() {
           data-testid="stock-rail"
           aria-label="Filter stock"
         >
+          {!isLoading && !isError && data ? <>
           <RailButton
             label="All stock"
             n={allUnits.filter(isCurrentUnit).length}
@@ -516,6 +517,7 @@ export default function WarehouseStockRegister() {
               testId="rail-history"
             />
           </RailSection>
+          </> : null}
         </aside>
 
         {/* ── THE REGISTER ───────────────────────────────────────────────── */}

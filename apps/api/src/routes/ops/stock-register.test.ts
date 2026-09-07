@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import { authMiddleware, _setJwksForTesting } from "../../middleware/auth";
 import stockRouter from "./stock";
 import type { AppEnv } from "../../types";
+import { migration, stockRegisterDatabase, verifyInventorySql } from "../../test/stock-register-database";
 
 /**
  * GET /api/ops/stock/register — the Stock Register's read surface.
@@ -62,7 +63,7 @@ const app = buildApp();
 let signKey: KeyLike;
 let publicJwk: JWK;
 
-async function makeJwt(role: string, email = "khoryee@carres.com") {
+async function makeJwt(role: string, email = "inventory-test@example.test") {
   return new SignJWT({ email, app_metadata: { role } })
     .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
     .setSubject("11111111-1111-1111-1111-000000000999")
@@ -87,8 +88,8 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
-/** A row exactly as `stock_unit_register_v` returns it (shape taken from the
- *  live view on 2026-08-21). */
+/** Mapping fixture only. The SQL-backed contract regression below verifies
+ *  which columns the committed view actually supplies. */
 function viewRow(over: Record<string, unknown> = {}) {
   return {
     id: "u-1",
@@ -158,6 +159,63 @@ function buildSb(opts: SbOpts = {}) {
 }
 
 describe("GET /register — the one current listing", () => {
+  it("executes both real route projections against the committed SQL and catches the missing migration", async () => {
+    const db = await stockRegisterDatabase();
+    const tables: string[] = [];
+    const sb = {
+      from(table: string) {
+        tables.push(table);
+        let projection = "*";
+        let filter: { column: string; value: unknown } | undefined;
+        let order = "";
+        const execute = async (single = false) => {
+          try {
+            const result = await db.query(`select ${projection} from public.${table}${filter ? ` where ${filter.column} = $1` : ""}${order}`, filter ? [filter.value] : []);
+            return { data: single ? result.rows[0] ?? null : result.rows, error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
+        };
+        const chain = {
+          select(columns: string) { projection = columns; return chain; },
+          eq(column: string, value: unknown) { filter = { column, value }; return chain; },
+          order(column: string, options?: { ascending?: boolean }) { order = ` order by ${column} ${options?.ascending === false ? "desc" : "asc"}`; return chain; },
+          limit() { return chain; },
+          maybeSingle() { return execute(true); },
+          then(resolve: (value: unknown) => unknown) { return execute().then(resolve); },
+        };
+        return chain;
+      },
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const headers = { Authorization: `Bearer ${await makeJwt("operation")}` };
+    try {
+      // Negative control is the actual production shape (0373), not a
+      // fabricated Supabase error: PostgreSQL must reject the route's SELECT.
+      for (const path of ["/api/ops/stock/register", "/api/ops/stock/register/id-contract1"]) {
+        const broken = await app.request(path, { headers }, env);
+        expect(broken.status).toBe(500);
+        expect(await broken.json()).toMatchObject({ message: expect.stringContaining('site_name') });
+      }
+      await db.exec(migration("0417_the_register_names_the_site_and_the_holder"));
+      await db.exec(verifyInventorySql);
+      const response = await app.request("/api/ops/stock/register", { headers }, env);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { total: number; units: Record<string, unknown>[] };
+      expect(body.total).toBe(2);
+      expect(body.units[0]).toMatchObject({ siteName: "Fixture site", holderName: "Fixture holder", availability: "not_available", lastEvent: "latest" });
+      expect(body.units[1]).toMatchObject({ siteName: null, holderName: null, lifecycleOutcome: "delivered" });
+      const detail = await app.request("/api/ops/stock/register/id-contract2", { headers }, env);
+      expect(detail.status).toBe(200);
+      expect(await detail.json()).toMatchObject({ unit: { unitCode: "id-contract2", lifecycleOutcome: "delivered" } });
+      expect(new Set(tables)).toEqual(new Set(["stock_unit_register_v", "stock_unit_events"]));
+      const grants = await db.query("select grantee, privilege_type from information_schema.role_table_grants where table_name='stock_unit_register_v' and grantee in ('authenticated','anon')");
+      expect(grants.rows).toEqual([{ grantee: "authenticated", privilege_type: "SELECT" }]);
+    } finally {
+      await db.close();
+    }
+  }, 30_000);
+
   it("reads the governed view, and nothing else", async () => {
     const { sb, tables } = buildSb({ rows: [viewRow()] });
     vi.mocked(userClient).mockReturnValue(sb as never);

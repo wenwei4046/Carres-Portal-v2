@@ -1763,9 +1763,18 @@ relocate — replenishment to Purchasing/Settings under this Blueprint, the hist
 History/Inventory. Those relocations join the `OperationStockOnHand` debt above as the named
 next scopes. Production proof rides the PR's deploy record.
 
-### 13.6 · BUILT — Inventory works and tells the truth (CARD 02, PR #TBD)
+### 13.6 · Code built; Inventory database apply still pending (CARD 02, PR #1066)
 
-`CARD-2026-09-03-warehouse-02-inventory` closed three measured P0s. **The register API had
+**Production correction, 2026-09-07:** authenticated Inventory still answers the missing
+`site_name` error. Direct schema inspection confirms the live 0373 view lacks both name
+columns; the tracker contains Delivery's other 0417, but not
+`0417_the_register_names_the_site_and_the_holder`. The live Unit authority has 221 rows,
+not the zero claimed by the failed page's rail. See
+[WAREHOUSE — INVENTORY production defect](../cards/CARD-2026-09-07-warehouse-inventory-production-defect.md)
+for deployment ancestry, full migration identities and the governed apply/verification step.
+The earlier production-complete wording was incorrect; the database apply awaits explicit go.
+
+`CARD-2026-09-03-warehouse-02-inventory` supplied fixes for three measured P0s. **The register API had
 answered 500 since birth**: the route selected `site_name`/`holder_name` from
 `stock_unit_register_v` and no migration ever gave the view either column — the route merged
 2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
