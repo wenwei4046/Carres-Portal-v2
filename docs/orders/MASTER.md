@@ -4710,7 +4710,11 @@ Nobody else may create, edit or delete a decision; deletion is refused by trigge
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
 itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
 an owing order with no approved approval, whichever path writes it — including the legacy 0098
-dispatch backstop.
+dispatch backstop. Since `0441` (2026-09-07, payment/MASTER.md §2 convergence) the trigger's
+outstanding also counts the SO's live ISSUED Storage / Additional Storage Invoices, with `paid`
+subtracted exactly once from the combined obligation — an unpaid storage paper blocks the mint;
+a voided one (the waiver path) does not; the LEGACY C9 storage columns stay asserted by the TS
+API gate as before.
 
 ### WHAT AN APPROVAL MEANS — COD, defined by the owner 2026-08-19
 

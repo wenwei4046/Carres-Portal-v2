@@ -52,10 +52,13 @@ function todayIso() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
 }
 
-export default function InvoiceStorage({ orderId, canAct }: {
+export default function InvoiceStorage({ orderId, canAct, correctionInFlight = false }: {
   orderId: string;
   /** The posting door's staff (operation / principal) may open the doors. */
   canAct: boolean;
+  /** A voided storage paper's replacement DRAFT exists (§2: it asks nothing
+   *  until issued — the section says so instead of inventing a debt). */
+  correctionInFlight?: boolean;
 }) {
   const qc = useQueryClient();
   const casesQ = useQuery<{ cases: StorageCaseRow[] }>({
@@ -75,6 +78,10 @@ export default function InvoiceStorage({ orderId, canAct }: {
           onExtend={() => setExtending(c.id)}
           onDone={() => { setExtending(null);
             void qc.invalidateQueries({ queryKey: ["finance", "storage-cases", orderId] }); }} />)}
+        {correctionInFlight && <p className="text-label font-normal text-base-500"
+          data-testid="storage-correction-note">
+          A Storage Invoice correction is in progress — the replacement is a draft and asks
+          for nothing until it is issued. Issue it so the money is asked again.</p>}
         {cases.length === 0 && !casesQ.isLoading &&
           <p className="text-label font-normal text-base-400">
             No storage case. Storage begins only when the goods are ready AND the customer

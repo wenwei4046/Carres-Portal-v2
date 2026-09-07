@@ -8,15 +8,15 @@ import FinanceAP from "./FinanceAP";
 import PaymentRegister from "./PaymentRegister";
 import InvoiceRegister from "./InvoiceRegister";
 import FinanceRefunds from "./FinanceRefunds";
-import FinanceRecon from "./FinanceRecon";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
- * Master Plan §6 + Phase 5 spec §4.1: 8 tabs (Dashboard / AR / AP /
- * Payments / Invoices / Refunds / Recon / Reports).
+ * Phase 5 born with 8 tabs; the Recon workspace retired 2026-09-07 under
+ * payment/MASTER.md §13 (Bank Matching is an intentional reject — its data
+ * and API remain, the page and navigation left).
  *
  * Phase 5 100% — all 8 pages live (Chunk A + Chunk B + Chunk C). The
  * ChunkBCStub component is no longer used; preserved for the (currently
@@ -49,7 +49,11 @@ export default function FinanceApp() {
           <Route path="payments"  element={<PaymentRegister />} />
           <Route path="invoices"  element={<InvoiceRegister />} />
           <Route path="refunds"   element={financeOnly(<FinanceRefunds />)} />
-          <Route path="recon"     element={financeOnly(<FinanceRecon />)} />
+          {/* payment/MASTER.md §13 — the Bank Matching workspace is an
+              intentional reject; the route retired 2026-09-07 (approved
+              scope). The recon DATA and its API routes remain; an old link
+              lands on Payments instead of a dead page. */}
+          <Route path="recon"     element={<Navigate to="/finance/payments" replace />} />
           <Route path="reports"   element={financeOnly(<FinanceReports />)} />
           {/* Payment MASTER §16 — Reports → Payment: the six approved
               read-only listings over the same register wires. */}
