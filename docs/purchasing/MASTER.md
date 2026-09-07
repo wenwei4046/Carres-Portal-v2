@@ -655,13 +655,12 @@ Purchase/PO. When the model changes, the Unit returns to Carres custody, may go 
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
-**Showroom loans — OWNER-APPROVED 2026-09-07:** Carres lends display sofas to customers waiting
-for purchased sofas through the existing Sales Order loan journey. Purchasing must record supplier
-permission covering the exact Unit and return terms before a Supplier Consignment display Unit
-may be lent. Without permission, use an eligible Carres Owned Unit. Supplier permission does not
-replace normal loan authority. Purchasing owns this supplier agreement only; the loan obligation
-lives in `orders/MASTER.md` under Loan Mattress / Loan Sofa Obligations, physical control in
-`stock/MASTER.md` §12.9, and execution in Delivery. This is a temporary loan, not a sale.
+**Showroom loan practice — OWNER-CONFIRMED 2026-09-07:** Carres temporarily lends showroom
+display sofas to customers waiting for their purchased sofas. This uses the existing Sales Order
+loan journey; Sales Orders owns the loan obligation, Delivery owns its execution and Stock owns
+the exact Unit's custody and return inspection. This confirmation establishes the operating
+practice only; it does not authorise lending supplier-owned display Units. The supplier-consent
+boundary remains unresolved pending owner review.
 
 ### 7.6 Supplier-consignment showroom display
 
@@ -684,10 +683,8 @@ record is auto-linked; no duplicate supplier message. Document issue alone does 
 
 ### 7.7 Consignment sale notice trigger
 
-Only a successful/partially successful customer SALE delivery attempt for an exact supplier-owned
-Unit creates a notice. SO creation, deposit, reservation, delivery planning and temporary loan
-handover do not. **OWNER-APPROVED 2026-09-07:** Delivery success must distinguish sale scope from
-loan scope before this trigger consumes it; lending a supplier-owned display Unit creates no CSN.
+Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
+notice. SO creation, deposit, reservation and delivery planning do not.
 
 One notice is created idempotently per supplier × delivery attempt and contains only successfully
 delivered Units. It excludes customer identity/contact/address, customer selling price, discount and
@@ -2199,26 +2196,6 @@ replacement offered.
 
 **Purpose / source:** showroom staff request a new model, replacement, removal or display change;
 Purchasing chooses the commercial path.
-**Complete Showroom Blueprint — OWNER-APPROVED 2026-09-07 / APPROVED TARGET, NOT BUILT.**
-The owner approved the consolidated four-page operating model and cross-module journeys. This
-section and §§7.5–7.7, 9.9–9.11 own Showroom commercial truth; Stock owns physical truth. There is
-no separate Showroom MASTER, stock ledger, receipt engine, supplier-payment page or work queue.
-The four current navigation entries remain `Coming soon`; approval is not a delivery claim.
-
-Record Showroom, requested goods/quantity, Needed Date, reason, photos and affected Unit IDs. Link
-the actual source: sale, damaged Unit, supplier offer or existing display. Staff may submit before
-the SKU is known; Purchasing resolves Catalog/supplier facts before commitment. A supplier offer
-is evidence, not approval. Check suitable existing Units before buying. A suitable existing Unit
-fulfils the request through Stock Transfer; keep that source link without inventing a sixth
-commercial decision. Carry source facts into the owning continuation; staff complete only missing
-facts there and never re-enter the same request.
-
-Buy creates linked Manual Purchase with purpose `Showroom Display`, then normal approval and PO.
-Consignment creates CO; Swap creates linked incoming/outgoing scope; Remove creates the ownership-
-appropriate Transfer or authorised supplier return; No Action retains the explanation and History.
-Ready Stock replenishment remains separate. A sold display may propose a replacement request but
-never automatically approves or orders another display. The request's decision and actual
-fulfilment remain separate facts; partial incoming/outgoing work cannot masquerade as completion.
 **Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
 Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
 next Office working day after submission, PO Duty records the first decision and its linked
@@ -2228,7 +2205,7 @@ not a universal owner of the Display Request. History preserves the normal Prima
 dated cover and actual actor. Paid-buy approval and governed commercial exceptions remain with
 Purchasing Approver; choosing Buy does not approve the Manual Purchase or issue a PO.
 **Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
-**Columns:** Request No., Showroom, Requested By, Current Unit/Model, Requested Model, Reason, Needed
+**Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
 Date, Purchasing Decision, Source Order, Work.
 **Journey:** showroom logs in → records simple request/photo/current Unit → Purchasing decides Buy,
 Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
@@ -2280,65 +2257,6 @@ Finance later reads the same object.
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
 **Connections:** Delivery attempt/proof, Stock Unit ownership, source CO/GRN, Sales reference, Finance
 invoice/settlement.
-
-### 9.12 Showroom document control, exceptions and acceptance
-
-**OWNER-APPROVED 2026-09-07.** Apply the existing Shell/Register/Object Detail contract: search,
-filter, sort, display and permitted export; full-width viewing with connected records and History;
-one-scroll internal DR without PDF preview; split editing only for the external supplier document.
-Use the concrete filters in §§9.8–9.11. No extra Showroom dashboard or separate action queue.
-
-The source tells staff which record is required: submitted display need → DR; paid path → Manual
-Purchase then approved PO; supplier placement/swap → CO; arrival → Supplier DO evidence and posted
-Goods Receipt; unsold supplier return → CRTN or combined swap instruction; authorised repair/paid
-return → RO/PRTN; loan → Sales Order Loan Note; customer movement → Delivery-owned document;
-successful consignment sale → CSN; customer money → Payment Invoice/Receipt; supplier money →
-Finance/AP evidence. Shared numbering and version authority in §6 applies; Manual Purchase has no
-visible number. Transfer, Count, inspection and handover use their existing owning records.
-
-For Showroom-only supplier documents, first send is due by the next Office working day after the
-approved document is ready. Existing PO Order By rules are unchanged. Each action keeps its stable
-source/rule/occurrence, owner, calendar, exact deep link and source completion; Work never supplies
-manual Done. Collection/arrival work uses actual agreed dates; Stock supplies Count dates.
-
-Opening WhatsApp, downloading a PDF or preparing a message is not sending. Record exact version,
-recipient, channel, actual sent time, actor and evidence; link replies to the instruction answered.
-Changed Unit/model/quantity/destination/return scope requires controlled revision. Keep prior sent
-and signed versions and reproduce stored versions on reprint. Swap uses one combined instruction,
-but incoming and outgoing results remain independent. Supplier notice privacy follows §7.7.
-
-Duplicate requests, missing SKU/provenance, disputed ownership, partial/wrong collection, missing
-proof, late promises and damage retain source evidence and a specific owning continuation. Use
-the governed problem intake; never invent an ownership value or make disputed goods available to
-clear a document. Supplier remedy approval does not move goods, clear a loan or post money. A
-customer return preserves the original delivery/CSN and links any correction and financial result.
-Cancellation retains reasons, actor and surviving commitments; it cannot erase performed movement
-or silently cancel another module's obligation.
-
-Empty/error states distinguish no records, no filter matches, missing facts, access denied and
-failed loading. Failed sources never read zero stock/no work. A stale version requires reload
-before sending; failed saves preserve entered information. Every total drills to source records.
-Central Settings owns Sites/destinations, supplier agreements/contacts/label capability, calendars
-and templates under the existing module boundaries. Workspace alone assigns Duties. Central Reports
-covers ownership/condition, reserved displays, outstanding loans, late arrivals/collections,
-unfinished swaps, repairs/checks, display age/count differences and CSN send/correction status,
-reading permitted Finance evidence without another settlement calculation.
-
-Acceptance requires a new hire to complete each normal and partial journey from the stated source
-door; exact Unit custody and commercial ownership must stay separate; loan handover must emit no
-sale notice; repeat sale success must not duplicate a notice; all remaining swap/loan/return
-obligations remain visible; duties/cover/actual actor and document versions remain auditable.
-
-**PLAN MISSION COMPLETE — 2026-09-07.** Consolidated owner review is complete. Intentional rejects:
-duplicate Showroom stock/receipt/payment/work authorities, automatic display rebuy, blank CO/CRTN/
-CSN create, loan-as-sale, universal document owner and external cutover. No application work or
-production verification is claimed. Dependency-ordered handoff boundaries, all READY FOR CARD in a
-later BUILD/DELIVERY lane: shared Site-scoped Showroom Duty and physical-work admission; Display
-Requests through existing-stock/Manual Purchase/CO continuation; consignment placement/swap/return
-through Receiving and exact-Unit handover; display loan and sale execution with CSN exclusion/
-generation and Finance links; complete governed reports and cross-journey operator verification.
-These are business acceptance scopes, not Cards or an engineering execution plan. Each slice must
-honour its upstream authority before shipping; external onboarding/cutover requires its own authority.
 
 ---
 

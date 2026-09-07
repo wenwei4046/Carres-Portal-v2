@@ -582,11 +582,10 @@ Related Documents and Order Route only link to the documents. For Singapore, eac
 its own DO/document scope; split or rebooked documents remain separate history rather than
 overwriting one number.
 
-If a successful customer-sale scope in a Delivery Visit contains an exact supplier-consignment Unit, the resulting
+If a successful Delivery Visit contains an exact supplier-consignment Unit, the resulting
 Consignment Sale Notice is created under Purchasing and appears only as a linked Related Document /
 Order Route consequence. Sales Order creation, reservation, deposit and planning never create that
-notice, and Sales cannot issue or correct it. Temporary loan handover also creates no notice;
-Delivery preserves the sale/loan scope distinction under Purchasing §7.7.
+notice, and Sales cannot issue or correct it.
 
 ## Completion, empty, loading and error truth
 
@@ -2757,18 +2756,6 @@ Issue Tracker may record the same incident for accountability and learning, but 
 the attempt, Unit movement or remaining customer obligation.
 
 ## Card 6 · Loan Mattress / Loan Sofa Obligations — approved and built
-
-**Display-sofa loan extension — OWNER-APPROVED 2026-09-07 / APPROVED TARGET, NOT BUILT.**
-Carres lends showroom display sofas while customers wait for purchased sofas. Use this existing
-loan journey and Loan Note/required acceptance, retaining exact eligible Unit, source SO, outward
-date, structured return obligation and evidence. Supplier-owned display Units require Purchasing's
-recorded permission for the exact Unit and return terms (`purchasing/MASTER.md` §7.5); without it,
-use an eligible Carres Owned Unit. Normal loan authority still applies. Stock controls availability
-and custody; Delivery records loan handover and recovery separately from sale delivery. A loan
-handover never triggers a Consignment Sale Notice. Customer recovery, inspection and any required
-supplier return are distinct outcomes; returning to the showroom cannot falsely confirm supplier
-receipt. Delivery of purchased goods leaves any unrecovered loan obligation open. This approved
-extension does not claim the existing built loan doors already cover supplier-owned display stock.
 
 A temporary item is an independent obligation. The customer receiving real goods does not close
 the loan; the temporary item must be recovered. Distinguish:

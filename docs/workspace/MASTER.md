@@ -73,17 +73,6 @@ Distinct Duties include Payment Duty, Storage Waiver Approver, Payment Approver,
 Approver, Delivery Charge Approver, Stock Adjustment Approver and Service Case Approver. There is
 no fake `ERP Owner`.
 
-**Showroom Duty — OWNER-APPROVED 2026-09-07 / APPROVED TARGET, NOT BUILT.** Routine showroom
-arrival, departure, Count, condition-check and required physical-evidence actions use a Site-scoped
-`Showroom Duty`. Each Site has one governed Primary holder and optional effective-dated Buddy cover
-in this shared registry. The Shared Duty Resolver resolves the Site and work date; modules keep no
-local roster or fallback identity. Authorised staff record their own acts without replacing the
-resolved owner; history retains Primary, cover and actual actor. A missing assignment is visible
-to authorised supervision as `Not assigned`. Site-scoped access and action admission must exist
-before these obligations enter shared Work; a shared showroom login is not personal evidence.
-Purchasing/GRN/Delivery/Payment/Stock Adjustment approval duties retain their existing boundaries.
-Stock supplies physical completion and Count/appointment dates; Workspace stores no second result.
-
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
 

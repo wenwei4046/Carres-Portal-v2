@@ -327,11 +327,9 @@ Delivered requires actual time, receiver, delivered goods/quantity and governed 
 Until proof is complete and accepted, show **Delivered — Proof Required**; after acceptance show
 **Delivered — Complete**.
 
-For each exact delivered Unit, Delivery emits one idempotent success fact with sale or loan scope
-explicit. **OWNER-APPROVED 2026-09-07:** temporary display-loan handover is not a sale and never
-triggers a Consignment Sale Notice. If the successful scope is a customer sale and Stock says that
-Unit was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for
-that supplier × Delivery Visit. Failed/refused goods create no notice; a partial result creates notice
+For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
+was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
+supplier × Delivery Visit. Failed/refused goods create no notice; a partial result creates notice
 lines only for the exact Units successfully handed to the customer. Delivery owns the result and
 proof, but cannot issue/correct the supplier document or settle supplier money.
 
