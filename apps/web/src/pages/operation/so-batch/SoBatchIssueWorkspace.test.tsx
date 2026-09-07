@@ -151,6 +151,35 @@ beforeEach(() => {
 });
 
 describe("50% work + 50% the actual document", () => {
+  it("renders a money-free draft on entry, changes with navigation, and creates nothing", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
+    vi.mocked(renderPoPdf).mockClear();
+    const view = renderWorkspace([doc(), SECOND]);
+    await screen.findByTitle("Draft purchase order preview");
+    expect(renderPoPdf).toHaveBeenLastCalledWith(expect.objectContaining({
+      draft: true, po_number: "DRAFT", po_id: "", issue_date: "", eta_date: null,
+      supplier: expect.objectContaining({ name: "Hooka" }),
+      lines: [{ sku: "B1201S-K", description: "Booqit · King", qty: 2, unit: "unit", sources: [{ so: 1318, qty: 2 }] }],
+    }));
+    expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
+    fireEvent.click(screen.getByTestId("so-batch-issue-next"));
+    await waitFor(() => expect(renderPoPdf).toHaveBeenLastCalledWith(expect.objectContaining({
+      supplier: expect.objectContaining({ name: "Ohana" }),
+      destination: expect.objectContaining({ name: "AL Sungai Buloh" }),
+    })));
+    view.unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it("lets the operator retry a failed draft without issuing a PO", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
+    vi.mocked(renderPoPdf).mockRejectedValueOnce(new Error("render failed"));
+    renderWorkspace();
+    await screen.findByText("Could not load the preview.");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByTitle("Draft purchase order preview");
+    expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
+  });
   /**
    * ⭐ 50 / 50 AT 1130px AND WIDER; STACKED BELOW IT (closure §10).
    *
@@ -343,6 +372,20 @@ describe("Issue PO creates every document in one request", () => {
     await screen.findByTestId("so-batch-evidence-PO-2041");
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO-2041");
     expect(screen.queryByTestId("so-batch-issue-create")).not.toBeInTheDocument();
+  });
+
+  it("Back to buying stays reachable after Issue PO, and it is the SAME door as before — not Purchase Orders", async () => {
+    issued();
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTestId("so-batch-evidence-PO-2041");
+    /* Leaving is safe (file header): the numbered PO already exists, so the
+       same `Back to buying` door stays open — same label, same handler,
+       never a route to a different module's register. */
+    const back = screen.getByTestId("so-batch-issue-back");
+    expect(back).toHaveTextContent("Back to buying");
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 

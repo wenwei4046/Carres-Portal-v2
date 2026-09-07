@@ -44,6 +44,7 @@
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./purchase-orders/purchase-order-detail.css";
 import { Plus, Printer, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -1926,7 +1927,7 @@ export default function SalesOrderWorkspace() {
        keeps it out of the layout. */
     <fieldset
       disabled={mode === "oldrev"}
-      className="contents"
+      className="so-detail-style contents"
       data-testid="sales-order-workspace"
       id="sales-order-workspace"
     >
@@ -1953,24 +1954,17 @@ export default function SalesOrderWorkspace() {
           contact` and `Money`; a reader looking up "where does this go" had to
           pass two unrelated sections to find it. It is the same party's fact,
           so it is the same card, under its own locked name. */}
-      <Block
-        title="Customer"
-        headerSlot={
-          customerBuiltins["customerType"]?.enabled !== false ? (
-            <span data-pos-field="customerType">
-              {/* NEUTRAL, not the accent. `01-design-tokens.md` §2.2 spends blue
-                  once per screen and the tab underline already holds it — and a
-                  new customer is news, not a warning, so amber is wrong too. */}
+      <Block title="Customer">
+          {customerBuiltins["customerType"]?.enabled !== false ? (
+            <div className="mb-2 flex justify-start" data-pos-field="customerType">
               <span
-                className="inline-flex rounded-full bg-kit-slate-3 px-2 py-0.5 text-label font-semibold text-base-700"
+                className="so-customer-status font-mono text-label uppercase tracking-[0.08em]"
                 data-testid="customer-type-chip"
               >
                 {customerTypeWord}
               </span>
-            </span>
-          ) : undefined
-        }
-      >
+            </div>
+          ) : null}
         {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
             per row, which made the card six rows tall for facts that are one
             line each. At three they land as exactly two rows: who they are,
@@ -2157,21 +2151,7 @@ export default function SalesOrderWorkspace() {
           unchanged; only the row is gone. It still writes nothing: it
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
-      <Block
-        title="Money"
-        headerSlot={
-          !isNew && order ? (
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
-            >
-              Open this order in Payments
-            </button>
-          ) : undefined
-        }
-      >
+      <Block title="Money">
         {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
             2026-08-15 `Total large · Paid medium · Outstanding loudest`
             weighting). The weighting never reached the numerals anyway:
@@ -2230,6 +2210,18 @@ export default function SalesOrderWorkspace() {
             }
           />
         </div>
+        {!isNew && order ? (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
+            >
+              Open this order in Payment
+            </button>
+          </div>
+        ) : null}
       </Block>
 
       {/* ② ORDER INFO */}

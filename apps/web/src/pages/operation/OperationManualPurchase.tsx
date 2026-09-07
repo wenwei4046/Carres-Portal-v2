@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import "./manual-purchase-create.css";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -800,7 +801,6 @@ export default function OperationManualPurchase() {
   if (mode === "create") {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
           defaultDestinationId={q.data?.defaultDestinationId ?? null}
@@ -1713,32 +1713,42 @@ function CreateRequestWorkspace({
   const namedStaff = staff.filter((s) => (s.name ?? "").trim() !== "");
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4"
-      data-testid="manual-purchase-create"
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-body font-semibold uppercase tracking-[0.1em] text-base-900">
-          {MW.createTitle}
+    <>
+      {/* The action pair lives on the shell's own header row (壳画头), aligned
+          with the `Manual Purchase` nameplate and pushed to the right — never
+          inside the card. The dark card bar carries only the section title. */}
+      <PurchasingTabs
+        right={
+          <span className="flex items-center gap-3">
+            <Button variant="ghost" onClick={onDone}>
+              {MW.cancel}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!canSend}
+              loading={saving}
+              onClick={() => void send()}
+              data-testid="mp-send"
+            >
+              {sendLabel}
+            </Button>
+          </span>
+        }
+      />
+      <div
+        className="mp-create-page flex min-h-0 flex-1 flex-col overflow-auto p-4"
+        data-testid="manual-purchase-create"
+      >
+      <section className="mp-create-card">
+      <div className="mp-create-header">
+        <h2 className="mp-create-title">
+          New Manual Purchase
         </h2>
-        <span className="flex items-center gap-3">
-          <Button variant="ghost" onClick={onDone}>
-            {MW.cancel}
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!canSend}
-            loading={saving}
-            onClick={() => void send()}
-            data-testid="mp-send"
-          >
-            {sendLabel}
-          </Button>
-        </span>
       </div>
 
       {/* ── The header — asked once for the whole request ── */}
-      <div className="grid max-w-[720px] grid-cols-2 gap-3">
+      <div className="mp-create-body flex flex-col gap-6">
+      <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label htmlFor="mp-purpose" className="text-meta text-kit-slate-11">
             {MW.needFor}
@@ -1895,9 +1905,9 @@ function CreateRequestWorkspace({
           captions drifted (owner, 2026-09-03). A line is `contents`: its four
           cells join the grid directly; whatever stacks under it (supplier,
           lead gap, already-have, error, picker) spans the full row. */}
-      <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-lines">
-        <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-          {MW.items}
+      <div className="mp-create-items flex min-w-0 flex-col gap-3" data-testid="mp-lines">
+        <h3 className="text-body font-semibold text-base-900">
+          Order Items
         </h3>
 
         <div
@@ -2029,7 +2039,10 @@ function CreateRequestWorkspace({
           </Button>
         </div>
       </div>
+      </div>
+      </section>
     </div>
+    </>
   );
 }
 
@@ -2115,7 +2128,7 @@ function LinePicker({
      browser. 256px = the head plus five rows and half of the sixth, the
      kit's own bounded-list height (DataTable's column filter). */
   return (
-    <div className="flex max-h-64 min-h-0 flex-col">
+    <div className="mp-create-picker flex max-h-64 min-h-0 flex-col">
       <DataTable<DemandPickItem>
         rows={shown}
         columns={PICK_COLUMNS}
