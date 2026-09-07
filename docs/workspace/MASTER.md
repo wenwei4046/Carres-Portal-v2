@@ -172,7 +172,9 @@ honest Work for admitted modules.
   MASTER. Remaining Purchasing screens and the PO-day reminder must move to the Workspace contract
   before that adapter is deleted.
 - `GET /api/operation/work` is now the one server-composed feed for admitted Sales Orders,
-  Manual Purchase and Receiving actions. It reuses the owning modules' reads and projectors;
+  Manual Purchase, Purchase Order supplier-reply and Receiving actions. Purchase Order reply work
+  reads the exact current-version send and evidenced supplier-answer facts, resolves PO Duty and
+  opens the exact PO; it does not restore the retired browser composition. The feed reuses the owning modules' reads and projectors;
   invalid source data fails visibly instead of presenting a false clear desk.
 - My Work, Team Work and the Quick Rail My Work counts read that same cached response. The
   retired browser composition and Quick Rail Team/duty editor have been removed.
