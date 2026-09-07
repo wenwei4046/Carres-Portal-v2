@@ -119,6 +119,14 @@ const INVOICES = [
     issued_at: "2026-09-03", voided_at: "2026-09-04",
     void_reason: "Wrong amount on the paper", order_id: ORDER.id,
     orders: INVOICE_ORDER },
+  // The dedupe walk: a Storage invoice on the SAME order as i-1 — the
+  // calendar must still show ONE delivery and ONE arrival for that SO.
+  { ...INVOICE_BASE, id: "i-4", invoice_no: "INV-060926-7710", status: "issued",
+    kind: "storage", amount: 150, issued_at: "2026-09-06", voided_at: null,
+    order_id: ORDER.id,
+    orders: { ...INVOICE_ORDER,
+      ops_order_control: [{ balance: null, confirmed_date: soon(10),
+        line_etas: null, line_stock_status: { "MS01-K": "ready" } }] } },
 ];
 
 const realFetch = window.fetch.bind(window);
@@ -133,7 +141,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/finance/payments/register"))
     return json({ rows: [PARTIAL, LIVE, VOIDED], total: 3 });
   if (url.includes("/api/finance/invoices/register"))
-    return json({ rows: INVOICES, total: 3 });
+    return json({ rows: INVOICES, total: INVOICES.length });
   if (url.startsWith("/api/")) {
     return new Response(JSON.stringify({}), { status: 404 });
   }

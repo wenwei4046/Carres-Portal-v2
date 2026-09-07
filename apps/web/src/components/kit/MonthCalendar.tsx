@@ -113,10 +113,12 @@ export default function MonthCalendar({
               )
             : undefined
         }
-        onDayClick={(day) => {
-          const iso = dayToIso(day);
-          onSelect(iso === selected ? null : iso);
-        }}
+        // DayPicker's OWN onSelect, not onDayClick: providing it makes the
+        // selection CONTROLLED (react-day-picker v10 `useSingle` keeps its own
+        // internal state otherwise, so a selected day set from OUTSIDE — a
+        // register date door, a week arrow — would never repaint), and its
+        // single-mode select already fires undefined on pick-again.
+        onSelect={(day) => onSelect(day ? dayToIso(day) : null)}
         // Sunday leads the row and stays visible — a muted non-working day,
         // never a hidden one.
         weekStartsOn={0}
@@ -126,6 +128,11 @@ export default function MonthCalendar({
             m
               .toLocaleDateString("en-GB", { month: "long", year: "numeric" })
               .toUpperCase(),
+          // The approved month sketch heads the columns SUN MON TUE WED THU
+          // FRI SAT (Payment §17 review, 2026-09-07) — three letters, never
+          // an ambiguous single character. The CSS uppercases.
+          formatWeekdayName: (d: Date) =>
+            d.toLocaleDateString("en-GB", { weekday: "short" }),
         }}
         modifiers={{ nonworking: { dayOfWeek: [0] } }}
         modifiersClassNames={{ nonworking: "[&>button]:text-kit-slate-9" }}

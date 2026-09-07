@@ -6,24 +6,27 @@ import {
   invoiceNeeded,
 } from "@carres/shared/payment-invoice-register";
 import { myHolidaySet } from "@carres/shared/my-holidays";
+import MonthCalendar from "@/components/kit/MonthCalendar";
 import { SectionCard } from "@/components/SectionPanel";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 
 /**
- * The Payment Calendar view (payment/MASTER.md §17 — owner ruling 2026-09-06).
+ * The Payment Calendar view (payment/MASTER.md §17 — owner ruling 2026-09-06;
+ * layout corrections 2026-09-07).
  *
- * 240px page rail: the COMPLETE month fixed at its top (never a one-week
- * mini calendar), month arrows one month at a time, business filters
- * scrolling below it independently. The right side is one FIXED workweek —
- * no infinite horizontal scrolling. Sunday stays visible and is muted as
- * non-working. Selected date wears the standard blue token. Every work
- * indicator carries a textual meaning — never colour alone.
+ * 240px page rail: the kit's ONE pinned MonthCalendar primitive fixed at the
+ * top — the complete month, Sunday-first with SUN MON TUE headings, arrows
+ * one month at a time, the selected date on the governed blue, non-working
+ * days muted, count markers with words — and the business filters scrolling
+ * below it independently. The right side is one FIXED workweek with
+ * Previous week / Next week beside the range — never an endless scroll.
  *
- * The entries are READ-ONLY facts from their authoritative owners
- * (Customer Delivery from the order/booking; Expected arrival from Stock's
- * line ETAs) — Payment keeps no editable copy, and an Expected arrival
- * entry creates no deadline and no chase.
+ * A business filter opens its LISTING while the month stays visible;
+ * choosing a month date returns to Calendar. Entries are READ-ONLY facts
+ * from their authoritative owners; one SO appears ONCE per date and type
+ * whatever invoices it carries, its balance said once through the canonical
+ * arithmetic; an Expected arrival entry creates no deadline and no chase.
  */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -33,7 +36,8 @@ function isoAddDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Monday of the week containing `iso`. */
+/** Monday of the week containing `iso` (the fixed workweek's first day;
+ *  the month grid itself is Sunday-first per the approved sketch). */
 export function weekMondayOf(iso: string): string {
   const d = new Date(`${iso}T00:00:00.000Z`);
   const dow = d.getUTCDay(); // 0=Sun
@@ -43,24 +47,36 @@ export function weekMondayOf(iso: string): string {
 export type CalendarEntryKind = "delivery" | "arrival";
 
 export interface CalendarEntry {
+  /** The door row — the Sales invoice when the SO carries several kinds. */
   row: InvoiceRegisterRow;
   kind: CalendarEntryKind;
   dateIso: string;
 }
 
-/** The dated facts of one register row, exactly as the register derives them
- *  (one arithmetic — Law D). A record without a usable date has no calendar
+/** The dated facts, ONE entry per SO · date · type — an SO carrying Sales,
+ *  Storage and Additional Storage invoices is still one delivery and one
+ *  arrival, and its balance is said once (the canonical SO arithmetic). The
+ *  Sales invoice is the door; the other obligations stay reachable through
+ *  the opened details. A record without a usable date has no calendar
  *  position and stays in the listing. */
 export function calendarEntriesOf(rows: InvoiceRegisterRow[]): CalendarEntry[] {
-  const out: CalendarEntry[] = [];
+  const seen = new Map<string, CalendarEntry>();
   for (const row of rows) {
     if (row.status === "voided") continue;
-    const delivery = invoiceCustomerDelivery(row);
-    if (delivery.dateIso) out.push({ row, kind: "delivery", dateIso: delivery.dateIso });
-    const goods = invoiceGoodsFacts(row);
-    if (goods.arrivalIso) out.push({ row, kind: "arrival", dateIso: goods.arrivalIso });
+    const facts: Array<{ kind: CalendarEntryKind; dateIso: string | null }> = [
+      { kind: "delivery", dateIso: invoiceCustomerDelivery(row).dateIso },
+      { kind: "arrival", dateIso: invoiceGoodsFacts(row).arrivalIso },
+    ];
+    for (const f of facts) {
+      if (!f.dateIso) continue;
+      const key = `${row.order_id}|${f.dateIso}|${f.kind}`;
+      const existing = seen.get(key);
+      if (!existing || (existing.row.kind !== "sales" && row.kind === "sales")) {
+        seen.set(key, { row, kind: f.kind, dateIso: f.dateIso });
+      }
+    }
   }
-  return out;
+  return [...seen.values()];
 }
 
 const KIND_WORD: Record<CalendarEntryKind, string> = {
@@ -69,10 +85,6 @@ const KIND_WORD: Record<CalendarEntryKind, string> = {
 };
 
 const WEEKDAY_WORD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTH_WORD = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderId, highlightKind, filter, onPickDate, onFilter, onOpenInvoice, onBack }: {
   rows: InvoiceRegisterRow[];
@@ -90,7 +102,10 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
   const holidays = useMemo(() => myHolidaySet(), []);
   const entries = useMemo(() => calendarEntriesOf(rows), [rows]);
   const visible = filter === "all" ? entries : entries.filter((e) => e.kind === filter);
-  const monday = weekMondayOf(ISO_DATE.test(selectedDateIso) ? selectedDateIso : new Date().toISOString().slice(0, 10));
+  const safeDate = ISO_DATE.test(selectedDateIso)
+    ? selectedDateIso
+    : new Date().toISOString().slice(0, 10);
+  const monday = weekMondayOf(safeDate);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => isoAddDays(monday, i)), [monday]);
   const byDay = useMemo(() => {
     const m = new Map<string, CalendarEntry[]>();
@@ -101,51 +116,61 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
     }
     return m;
   }, [visible]);
-
-  // The complete month holding the selected date.
-  const sel = new Date(`${selectedDateIso}T00:00:00.000Z`);
-  const monthStart = `${selectedDateIso.slice(0, 7)}-01`;
-  const firstDow = new Date(`${monthStart}T00:00:00.000Z`).getUTCDay(); // 0=Sun
-  const lead = firstDow === 0 ? 6 : firstDow - 1; // Monday-first grid
-  const daysInMonth = new Date(Date.UTC(sel.getUTCFullYear(), sel.getUTCMonth() + 1, 0)).getUTCDate();
-  const monthCells: Array<string | null> = [
-    ...Array.from({ length: lead }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => isoAddDays(monthStart, i)),
-  ];
-  const monthWord = `${MONTH_WORD[sel.getUTCMonth()]} ${sel.getUTCFullYear()}`;
-  const moveMonth = (delta: number) => {
-    const d = new Date(`${monthStart}T00:00:00.000Z`);
-    d.setUTCMonth(d.getUTCMonth() + delta);
-    onPickDate(d.toISOString().slice(0, 10));
-  };
-  const dayCount = (iso: string) => byDay.get(iso)?.length ?? 0;
+  const markers = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const e of visible) m[e.dateIso] = (m[e.dateIso] ?? 0) + 1;
+    return m;
+  }, [visible]);
   const nonWorking = (iso: string) => {
     const dow = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
     return dow === 0 || holidays.has(iso);
   };
+  // A business filter shows its LISTING; `All dates` is the Calendar week.
+  const mode: "week" | "listing" = filter === "all" ? "week" : "listing";
+  const listing = useMemo(() =>
+    [...visible].sort((a, b) => a.dateIso.localeCompare(b.dateIso)),
+  [visible]);
+
+  const entryButton = (e: CalendarEntry, withDate: boolean) => {
+    const money = invoiceNeeded(e.row);
+    const highlighted = highlightOrderId != null && e.row.order_id === highlightOrderId
+      && (highlightKind == null || highlightKind === e.kind);
+    return <button key={`${e.row.order_id}-${e.kind}-${e.dateIso}`} type="button"
+      onClick={() => onOpenInvoice(e.row)}
+      data-testid={highlighted ? "calendar-highlight" : undefined}
+      className={`block w-full rounded-control border px-1.5 py-1 text-left ${
+        highlighted ? "border-kit-blue-9 bg-kit-blue-3" : "border-base-200 bg-white hover:bg-hovertint"}`}>
+      <span className="block text-label font-normal">
+        {KIND_WORD[e.kind]}{withDate ? ` · ${fmtDate(e.dateIso)}` : ""}{highlighted ? " · selected" : ""}
+      </span>
+      <span className="block text-body font-semibold">
+        {e.row.orders ? `SO-${e.row.orders.so}` : "SO not available"} · {e.row.orders?.customer_name ?? "Customer not available"}
+      </span>
+      <span className="block text-label font-normal">
+        {money.known ? `${rm(money.outstanding)} still needed` : "Value not recorded"}
+      </span>
+    </button>;
+  };
 
   return <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 md:flex-row" data-testid="invoice-calendar">
-    {/* 240px rail — complete month fixed on top, filters scroll below. */}
+    {/* 240px rail — the kit month fixed on top, filters scroll below. */}
     <div className="flex w-full shrink-0 flex-col gap-3 md:w-[240px]">
       <SectionCard><div className="p-3" data-testid="calendar-month">
-        <div className="mb-1 flex items-center justify-between">
-          <button className="text-body" aria-label="Previous month" onClick={() => moveMonth(-1)}>‹</button>
-          <span className="text-body font-semibold">{monthWord}</span>
-          <button className="text-body" aria-label="Next month" onClick={() => moveMonth(1)}>›</button>
-        </div>
-        <div className="grid grid-cols-7 text-center text-label">
-          {WEEKDAY_WORD.map((w) => <span key={w} className={w === "Sun" ? "text-base-400" : ""}>{w[0]}</span>)}
-          {monthCells.map((iso, i) => iso ? <button key={iso} type="button"
-            onClick={() => onPickDate(iso)}
-            aria-label={`${fmtDate(iso)}${dayCount(iso) ? ` · ${dayCount(iso)} dated` : ""}`}
-            className={`relative rounded-control py-1 text-body font-normal ${
-              iso === selectedDateIso ? "bg-kit-blue-3 text-kit-blue-11 font-semibold"
-              : nonWorking(iso) ? "text-base-400" : "text-base-800 hover:bg-hovertint"}`}>
-            {Number(iso.slice(8, 10))}
-            {dayCount(iso) > 0 && <span aria-hidden
-              className="absolute inset-x-0 bottom-0 mx-auto h-1 w-1 rounded-full bg-kit-blue-9" />}
-          </button> : <span key={`lead-${i}`} />)}
-        </div>
+        <MonthCalendar
+          month={safeDate.slice(0, 7)}
+          onMonthChange={(m) => onPickDate(`${m}-01`)}
+          selected={safeDate}
+          onSelect={(iso) => {
+            // Choosing a month date RETURNS TO CALENDAR at that week;
+            // pick-again keeps the day rather than clearing it.
+            onFilter("all");
+            if (iso) onPickDate(iso);
+          }}
+          markers={markers}
+          markerWord={filter === "delivery" ? "customer delivery"
+            : filter === "arrival" ? "expected arrival" : "dated delivery or arrival"}
+          testId="calendar-month-grid"
+        />
       </div></SectionCard>
       <div className="min-h-0 overflow-auto">
         <SectionCard><div className="p-3" data-testid="calendar-filters">
@@ -165,51 +190,54 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
       </div>
     </div>
 
-    {/* One fixed workweek — never an endless scroll. */}
-    <div className="min-w-0 flex-1">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-body font-semibold" data-testid="calendar-week-word">
-          Week of {fmtDate(monday)}
-        </span>
-        <button className="btn-secondary" onClick={onBack}>Back to Invoices</button>
+    {mode === "listing"
+      ? <div className="min-w-0 flex-1" data-testid="calendar-listing">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-body font-semibold">
+            {filter === "delivery" ? "Customer Delivery dates" : "Expected arrival dates"}
+          </span>
+          <button className="btn-secondary" onClick={onBack}>Back to Invoices</button>
+        </div>
+        <div className="space-y-1">
+          {listing.map((e) => entryButton(e, true))}
+          {listing.length === 0 && <p className="text-label font-normal text-base-400">
+            No dated work for this filter. Pick a month date to go back to the Calendar.
+          </p>}
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7" data-testid="calendar-week">
-        {weekDays.map((iso) => {
-          const dow = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
-          const off = nonWorking(iso);
-          const list = byDay.get(iso) ?? [];
-          return <div key={iso}
-            className={`rounded-card border border-base-200 p-2 ${off ? "bg-base-50" : "bg-white"}`}>
-            <div className={`text-label ${off ? "text-base-400" : "text-base-600"} ${
-              iso === selectedDateIso ? "font-semibold text-kit-blue-11" : ""}`}>
-              {WEEKDAY_WORD[dow === 0 ? 6 : dow - 1]}, {Number(iso.slice(8, 10))}
-              {iso === selectedDateIso && <span className="ml-1">· selected</span>}
-              {off && <span className="ml-1">· not a working day</span>}
-            </div>
-            <div className="mt-1 space-y-1">
-              {list.map((e) => {
-                const money = invoiceNeeded(e.row);
-                const highlighted = highlightOrderId != null && e.row.order_id === highlightOrderId
-                  && (highlightKind == null || highlightKind === e.kind);
-                return <button key={`${e.row.id}-${e.kind}`} type="button"
-                  onClick={() => onOpenInvoice(e.row)}
-                  data-testid={highlighted ? "calendar-highlight" : undefined}
-                  className={`block w-full rounded-control border px-1.5 py-1 text-left ${
-                    highlighted ? "border-kit-blue-9 bg-kit-blue-3" : "border-base-200 bg-white hover:bg-hovertint"}`}>
-                  <span className="block text-label font-normal">{KIND_WORD[e.kind]}{highlighted ? " · selected" : ""}</span>
-                  <span className="block text-body font-semibold">
-                    {e.row.orders ? `SO-${e.row.orders.so}` : "SO not available"} · {e.row.orders?.customer_name ?? "Customer not available"}
-                  </span>
-                  <span className="block text-label font-normal">
-                    {money.known ? `${rm(money.outstanding)} still needed` : "Value not recorded"}
-                  </span>
-                </button>;
-              })}
-              {list.length === 0 && <p className="text-label font-normal text-base-400">No dated work.</p>}
-            </div>
-          </div>;
-        })}
-      </div>
-    </div>
+      : <div className="min-w-0 flex-1">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="flex items-center gap-2">
+            <button className="btn-secondary" aria-label="Previous week"
+              onClick={() => onPickDate(isoAddDays(monday, -7))}>‹ Previous week</button>
+            <span className="text-body font-semibold" data-testid="calendar-week-word">
+              {fmtDate(monday)} – {fmtDate(isoAddDays(monday, 6))}
+            </span>
+            <button className="btn-secondary" aria-label="Next week"
+              onClick={() => onPickDate(isoAddDays(monday, 7))}>Next week ›</button>
+          </span>
+          <button className="btn-secondary" onClick={onBack}>Back to Invoices</button>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7" data-testid="calendar-week">
+          {weekDays.map((iso) => {
+            const dow = new Date(`${iso}T00:00:00.000Z`).getUTCDay();
+            const off = nonWorking(iso);
+            const list = byDay.get(iso) ?? [];
+            return <div key={iso}
+              className={`rounded-card border border-base-200 p-2 ${off ? "bg-base-50" : "bg-white"}`}>
+              <div className={`text-label ${off ? "text-base-400" : "text-base-600"} ${
+                iso === safeDate ? "font-semibold text-kit-blue-11" : ""}`}>
+                {WEEKDAY_WORD[dow === 0 ? 6 : dow - 1]}, {Number(iso.slice(8, 10))}
+                {iso === safeDate && <span className="ml-1">· selected</span>}
+                {off && <span className="ml-1">· not a working day</span>}
+              </div>
+              <div className="mt-1 space-y-1">
+                {list.map((e) => entryButton(e, false))}
+                {list.length === 0 && <p className="text-label font-normal text-base-400">No dated work.</p>}
+              </div>
+            </div>;
+          })}
+        </div>
+      </div>}
   </div>;
 }
