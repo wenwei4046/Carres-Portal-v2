@@ -115,7 +115,7 @@ describe("soRemaining — the SO across every live invoice kind", () => {
     // omitted), never 858 (the voided obligation revived), never 918 (the
     // draft charged), never 508 (paid subtracted from goods AND storage).
     expect(soRemaining(so(), "o1")).toEqual({
-      known: true, outstanding: 758, storageOwing: 158,
+      known: true, outstanding: 758, storageOwing: 158, overpaid: 0,
     });
   });
   it("a payment larger than goods spills into storage instead of inflating it", () => {
@@ -125,7 +125,12 @@ describe("soRemaining — the SO across every live invoice kind", () => {
     // 1000 + 158 − 1100 = 58: the customer who paid past the goods value has
     // that excess honoured against storage — the clamp-goods-first shape
     // would have said 158.
-    expect(soRemaining(rows, "o1").outstanding).toBe(58);
+    expect(soRemaining(rows, "o1")).toMatchObject({ outstanding: 58, overpaid: 0 });
+    // Past EVERY obligation the excess is the §5 review money, said as such.
+    const over = so().map((r) => ({
+      ...r, orders: r.orders ? { ...r.orders, paid: 1300 } : r.orders,
+    }));
+    expect(soRemaining(over, "o1")).toMatchObject({ outstanding: 0, overpaid: 142 });
   });
   it("a keyed (imported) order adds storage to the keyed outstanding", () => {
     const keyed = so().map((r) => ({
@@ -147,7 +152,7 @@ describe("soRemaining — the SO across every live invoice kind", () => {
     }));
     expect(soRemaining(unknown, "o1").known).toBe(false);
     expect(soRemaining(so(), "o-else")).toEqual({
-      known: false, outstanding: 0, storageOwing: 0,
+      known: false, outstanding: 0, storageOwing: 0, overpaid: 0,
     });
   });
 });

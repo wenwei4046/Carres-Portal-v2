@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import FinanceReports from "./FinanceReports";
 
@@ -23,7 +24,8 @@ function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
-      {ui}
+      {/* The page now carries the Reports → Payment door (a router Link). */}
+      <MemoryRouter>{ui}</MemoryRouter>
       <Toaster />
     </QueryClientProvider>
   );

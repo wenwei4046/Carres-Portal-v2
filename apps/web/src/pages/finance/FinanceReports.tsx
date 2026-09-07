@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   useFinanceMonthlyPl,
   useFinanceTopSkus,
@@ -82,7 +83,11 @@ export default function FinanceReports() {
             Reports
           </h1>
           <div className="text-body text-muted-foreground">
-            Monthly P&amp;L · revenue trend · top SKUs
+            Monthly P&amp;L · revenue trend · top SKUs ·{" "}
+            {/* Payment MASTER §16 — the door to Reports → Payment. */}
+            <Link to="/finance/reports/payment" className="text-kit-blue-11 hover:underline">
+              Payment
+            </Link>
           </div>
         </div>
         {/* No Export button: there is no export yet. A button that only toasts
