@@ -388,7 +388,7 @@ describe("workItemsForOrder — WHO + ACTION + actual working day", () => {
   it("groups by actual working day — days ascend, broken first, No date last", () => {
     const mk = (over: Partial<WorkItem>): WorkItem => ({
       ruleKey: "assign_logistics",
-      module: "orders",
+      module: "delivery",
       soRef: "SO-1",
       orderId: "o",
       action: "Assign logistics",

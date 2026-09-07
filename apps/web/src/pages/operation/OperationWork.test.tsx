@@ -136,6 +136,21 @@ describe("Operation Work — one server feed", () => {
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
+  it("keeps a Delivery item on its exact Delivery Order door", () => {
+    workState.data!.items = [item({
+      id: "delivery:DO-2041:deliver_today",
+      module: "delivery",
+      ruleKey: "deliver_today",
+      object: { kind: "delivery_order", id: "DO-2041", label: "DO-2041" },
+      problem: "Delivery due today",
+      action: "Record the delivery result",
+      destination: "/operation/delivery-orders/DO-2041",
+    })];
+    show();
+    fireEvent.click(screen.getByTestId("work-row-DO-2041-deliver_today"));
+    expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
+  });
+
   it("shows server failure as an error rather than a clear desk", () => {
     workState = { data: undefined, isLoading: false, isError: true };
     show();
@@ -148,4 +163,3 @@ describe("Operation Work — one server feed", () => {
     expect(screen.getByTestId("work-empty")).toBeInTheDocument();
   });
 });
-

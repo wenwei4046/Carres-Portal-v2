@@ -187,6 +187,11 @@ honest Work for admitted modules.
   NETS Warehouse operator, falling back to an authorised Site queue until accepted, while the
   current central Work endpoint is Operation-only and has neither Site-queue routing nor personal
   acceptance facts. Naming Carres staff, `NETS` or a shared warehouse login would violate section 3.
+- Delivery-owned arrangement, company assignment, customer booking, delivery-day result, proof and
+  loan-return actions now retain Delivery as their module in the shared engine. Their stable object
+  is the Delivery scope until a Delivery Order exists, then the exact DO where the result/proof act
+  belongs; the server supplies the Delivery editor/DO door. The source Sales Order remains linked
+  context and is no longer presented as the universal owner of those actions.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
