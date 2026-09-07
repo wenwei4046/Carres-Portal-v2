@@ -169,6 +169,39 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
   });
 }
 
+/** The SO's remaining money across EVERY live invoice kind — what a deduped
+ *  Calendar entry (or any SO-level "still needed") says, so choosing the
+ *  Sales Invoice as the door never hides an unpaid Storage or Additional
+ *  Storage obligation.
+ *
+ *  Storage obligations are the SO's live ISSUED storage-kind invoices with
+ *  their tax — a draft asks for nothing yet, a voided one is dead. Goods
+ *  value comes from the same `orderMoney` stores as `invoiceNeeded`.
+ *  `orders.paid` is subtracted ONCE from the combined obligation — the Work
+ *  engine's law (`sales-order-work-source`) — so a payment posted against a
+ *  storage invoice is neither counted twice nor left inflating goods owing.
+ *  (`orderMoney`'s keyed source is already an outstanding, so the combined
+ *  subtraction reduces to `keyed + storage` there — no second subtraction.) */
+export function soRemaining(
+  rows: InvoiceRegisterRow[],
+  orderId: string,
+): { known: boolean; outstanding: number; storageOwing: number } {
+  const mine = rows.filter((r) => r.order_id === orderId);
+  const door = mine.find((r) => r.kind === "sales") ?? mine[0];
+  if (!door) return { known: false, outstanding: 0, storageOwing: 0 };
+  const storageOwing = mine
+    .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
+    .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
+  const goods = invoiceNeeded(door);
+  if (!goods.known) return { known: false, outstanding: 0, storageOwing };
+  const total = goods.total ?? 0;
+  return {
+    known: true,
+    outstanding: Math.max(0, total + storageOwing - goods.paid),
+    storageOwing,
+  };
+}
+
 /** The Customer Delivery cell fact: the customer-confirmed day, else the
  *  requested day, else the honest absence. */
 export function invoiceCustomerDelivery(row: InvoiceRegisterRow): {

@@ -127,6 +127,28 @@ describe("InvoiceCalendar view", () => {
     expect(within(week).getByText(/Sun, 20/)).toBeInTheDocument();
     expect(within(week).getAllByText("· not a working day").length).toBeGreaterThan(0);
   });
+  it("the deduped SO card says the SO's money across kinds — storage included, paid once", () => {
+    const shared = { so: 1319, order_id: "o1", confirmed: "2026-09-16" };
+    const multi = [
+      { ...row({ id: "i-sales", kind: "sales", status: "issued", ...shared }) },
+      { ...row({ id: "i-storage", kind: "storage", status: "issued", ...shared }),
+        amount: 150, tax_amount: 8 },
+      { ...row({ id: "i-void", kind: "additional_storage", status: "voided", ...shared }),
+        amount: 100 },
+    ];
+    const onOpen = vi.fn();
+    render(<InvoiceCalendar rows={multi} selectedDateIso="2026-09-16"
+      highlightOrderId="o1" highlightKind="delivery" filter="all"
+      onPickDate={vi.fn()} onFilter={vi.fn()} onOpenInvoice={onOpen} onBack={vi.fn()} />);
+    // Goods 1000 + live storage 158 − paid 400 = 758: the Sales door does not
+    // hide the storage obligation, the voided one stays dead, and the ONE
+    // deduped card says it once.
+    const highlight = screen.getByTestId("calendar-highlight");
+    expect(highlight).toHaveTextContent("RM 758.00 still needed");
+    expect(screen.getAllByText(/still needed/)).toHaveLength(1);
+    fireEvent.click(highlight);
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "i-sales" }));
+  });
   it("entries open the collection object", () => {
     const { onOpen } = show();
     fireEvent.click(screen.getByTestId("calendar-highlight"));

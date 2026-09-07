@@ -3,7 +3,7 @@ import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register
 import {
   invoiceCustomerDelivery,
   invoiceGoodsFacts,
-  invoiceNeeded,
+  soRemaining,
 } from "@carres/shared/payment-invoice-register";
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import MonthCalendar from "@/components/kit/MonthCalendar";
@@ -132,7 +132,10 @@ export default function InvoiceCalendar({ rows, selectedDateIso, highlightOrderI
   [visible]);
 
   const entryButton = (e: CalendarEntry, withDate: boolean) => {
-    const money = invoiceNeeded(e.row);
+    // The deduped SO card's money is the SO across EVERY live invoice kind —
+    // the Sales door must not hide an unpaid Storage obligation, and the
+    // combined law subtracts the paid money exactly once.
+    const money = soRemaining(rows, e.row.order_id);
     const highlighted = highlightOrderId != null && e.row.order_id === highlightOrderId
       && (highlightKind == null || highlightKind === e.kind);
     return <button key={`${e.row.order_id}-${e.kind}-${e.dateIso}`} type="button"
