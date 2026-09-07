@@ -1836,7 +1836,7 @@ Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every
 and the partial-batch holder transition were proven on production in rolled-back probes before
 merge (`PROBE_COMPLETE_ALL_PASS`).
 
-### 13.8 · BUILT — the replacement Card: Monitor, Inbound, and the rail + Register pages
+### 13.8 · BUILT / PRODUCTION-VERIFIED — the replacement Card: Monitor, Inbound, and the rail + Register pages
 
 The 2026-09-06 owner replacement Card cancelled the Warehouse `Dashboard` name, the
 Calendar-on-every-page pattern, the `35% / 65%` Inbound/Outbound layouts and the generic
@@ -1862,6 +1862,15 @@ Calendar-on-every-page pattern, the `35% / 65%` Inbound/Outbound layouts and the
   remains with {site}.`).
 - The shared projector lives in `packages/shared/src/warehouse-monitor.ts` (one arithmetic;
   Law D); the outbound empty day says `No pickups on {date}. Choose another date.`
+
+**Production proof (2026-09-07):** PR #1123 merged as `d45e9047`; the production deploy proof
+(`__carres_deploy.json`) reports build `4d717422`, whose ancestry contains that merge, and the
+served bundle carries the shipped surface verbatim — `warehouse-monitor` / `warehouse-inbound`
+addresses, `Goods scheduled for pickup`, `No arrivals or pickups on`, `Driver pickup`,
+`Time not provided`, `to assign a driver`, ` loaded to ` and `was not confirmed by` all grep
+positive in `/assets/index-BZQ9N_Ss.js`. Desktop (1512px, six days full-width) and mobile
+(375px one-day agenda; Outbound Filters drawer) were walked on the identical code via the
+dev preview entry before merge. CI `verify` passed on the PR head.
 
 ## 14 · Whole-domain completion gate
 
