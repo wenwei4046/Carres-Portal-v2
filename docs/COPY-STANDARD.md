@@ -607,6 +607,11 @@ do not create a second business status, work queue or source of truth.
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
 | Showroom physical-result Duty — owner-approved 2026-09-07 | `Showroom Duty`; Site, Primary holder and cover are structured context. Assignment law lives in `workspace/MASTER.md` §4; the action sentence never hard-codes the holder's name. |
+| Display Request form — owner-approved 2026-09-07 | `New display` · `Move` · `Install` · `Swap` · `Remove` · `Installation needed?` · `Installer arranged?` · `Floor` · `Access` · `Lift` · `Stairs` · `Not sure` · `Not decided` · `Photos and videos` · `Add files` · `Remarks (optional)` |
+| Showroom location/contact fields — owner-approved 2026-09-07 | `Collect from` · `Send to` · `Add location` · `Location name` · `Address` · `Map link` · `Collection contact` · `Phone number` · `Save and use` · `Who should we contact?` · `Who will receive the goods?` · `Same as contact person` |
+| Display Request controls — owner-approved 2026-09-07 | `Request details` · `Copy request link` · `Check your request` · `Edit` · `Submit request` · `Request a change` · `Request cancellation`; their behaviour lives once in `purchasing/MASTER.md` §9.8 |
+| Showroom documents — owner-approved 2026-09-07 | Name `Display Request`, `Supplier Claim` or `Consignment Order` with its linked number; never `Source Request`. Locations always say `Collect from` / `Send to`. `Requested by` is requester identity, not universal action ownership. |
+| Showroom arrangement/result facts — owner-approved 2026-09-07 | `Expected arrival` · `Expected collection` · `Not confirmed` · `Collected Units` · `Still waiting` · `Sent to` · `Sent date`; requested dates, confirmed appointments and actual results remain distinct |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability

@@ -815,7 +815,8 @@ Each count opens its exact Units or requests; a customer-held loan Unit never co
 at the showroom. These are overlapping purpose-specific views, not quantities to add into one
 stock total. Supplier cost and settlement visibility follows Finance permissions. The report has
 no separate stock/status editor, and its request/loan/financial facts remain read-only projections
-of their owning modules. This approves the report presentation, not the entire Showroom Blueprint.
+of their owning modules. Complete Showroom Blueprint approval and handoff live in
+`purchasing/MASTER.md` §§9.8–9.12.
 
 Report visibility follows need: Sales receives Ready Stock and permitted showroom availability;
 NETS receives its authorised organisation/Site work/evidence; Purchasing receives Receiving,
