@@ -142,6 +142,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ rows: [PARTIAL, LIVE, VOIDED], total: 3 });
   if (url.includes("/api/finance/invoices/register"))
     return json({ rows: INVOICES, total: INVOICES.length });
+  // The §16 Online link walk: one standing open link on the walk order.
+  if (/\/stripe\/checkout$/.test(url) && (!init || init.method !== "POST"))
+    return json({ sessions: [{
+      sessionId: "cs_test_walk", url: "https://checkout.stripe.com/pay/cs_test_walk",
+      amount: 2200, status: "open", paidAt: null,
+      expiresAt: new Date(Date.now() + 86_000_000).toISOString(),
+      paymentMethodDetail: null, receiptUrl: null,
+    }] });
+  if (url.includes("/stripe/checkout/"))
+    return json({ session: { sessionId: "cs_test_walk", status: "open" } });
+  if (url.includes("/api/finance/payment-settings/templates"))
+    return json({ templates: [] });
   if (url.startsWith("/api/")) {
     return new Response(JSON.stringify({}), { status: 404 });
   }
