@@ -86,7 +86,7 @@ describe("warehouseRangeShift", () => {
 describe("warehouseEmptyDaySentence", () => {
   it("is the exact governed sentence", () => {
     expect(warehouseEmptyDaySentence("Sat, 5 Sep")).toBe(
-      "No outbound handovers on Sat, 5 Sep. Choose another date.",
+      "No pickups on Sat, 5 Sep. Choose another date.",
     );
   });
 });
@@ -224,7 +224,7 @@ describe("warehouseUnitPendingReason", () => {
         unitCheckedAt: "t",
         unitPackedAt: "t",
       }),
-    ).toBe("Waiting for handover");
+    ).toBe("Waiting to be loaded");
     expect(
       warehouseUnitPendingReason({ ...base, unitHandedOverAt: "t" }),
     ).toBeNull();

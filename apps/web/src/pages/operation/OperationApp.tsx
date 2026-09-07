@@ -82,6 +82,8 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseWorkspace from "./WarehouseWorkspace";
+import WarehouseInbound from "./WarehouseInbound";
+import WarehouseOutboundWork from "./WarehouseOutboundWork";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
 // K2 (0287) — Ready stock, the middle Stock tab K0 reserved.
 import OperationStockPlan from "./OperationStockPlan";
@@ -236,7 +238,10 @@ export default function OperationApp() {
       return;
     setMovementsPrefill((p) => (urlTab === "movements" ? p : undefined));
     setWarehousePrefill((p) => (urlTab === "warehouse" ? p : undefined));
-    setTab(urlTab);
+    /* 2026-09-06 replacement Card renamed the Warehouse Calendar page to
+       Monitor; the old `?tab=warehouse-dashboard` address still lands there
+       so no bookmark breaks (the stock-onhand precedent). */
+    setTab(urlTab === "warehouse-dashboard" ? "warehouse-monitor" : urlTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab, isProcurementUrl, isToOrderUrl, isOrdersUrl, isOldOrdersUrl, isDeliveryOrdersUrl, isSettingsUrl, isIssuesUrl]);
 
@@ -369,9 +374,10 @@ export default function OperationApp() {
           tab !== "stock-onhand" &&
           tab !== "stock-plan" &&
           tab !== "movements" &&
-          /* 【WAREHOUSE】 CARD 03 — Dashboard and Outbound draw their own
+          /* WAREHOUSE — Monitor, Inbound and Outbound draw their own
              Destination Header; the slim bar would be a second top row. */
-          tab !== "warehouse-dashboard" &&
+          tab !== "warehouse-monitor" &&
+          tab !== "warehouse-inbound" &&
           tab !== "warehouse-outbound" &&
           !isStockUnitUrl && <GlobalTopBar />}
         <div
@@ -554,11 +560,12 @@ export default function OperationApp() {
             {/* CARD-2026-08-20-stock-register: the Stock Register replaces the
                 On hand surface. Same `?tab=` address, new page. */}
             {tab === "stock-onhand" && <WarehouseStockRegister />}
-            {/* 【WAREHOUSE】 CARD 03 — Dashboard Calendar + Outbound share ONE
-                mounted workspace so Back restores the board's filters/scroll. */}
-            {(tab === "warehouse-dashboard" || tab === "warehouse-outbound") && (
-              <WarehouseWorkspace />
-            )}
+            {/* WAREHOUSE (2026-09-06 replacement Card) — Monitor is the one
+                Calendar-summary page; Inbound and Outbound are their own
+                rail + Register work pages. */}
+            {tab === "warehouse-monitor" && <WarehouseWorkspace />}
+            {tab === "warehouse-inbound" && <WarehouseInbound />}
+            {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}

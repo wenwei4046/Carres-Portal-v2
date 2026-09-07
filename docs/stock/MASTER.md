@@ -29,12 +29,19 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has four operator destinations: **Dashboard · Inbound · Inventory · Outbound**.
+Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**
+(owner replacement Card, 2026-09-06). The ERP keeps ONE global Dashboard; no Warehouse-local
+`Dashboard` label exists, and Calendar, Transfer, Ready Stock and Dashboard are not
+additional Warehouse destinations. The navigation rail contains page names only.
 
-- Dashboard: dated read-only projection of Warehouse work and exceptions; never a second truth.
-- Inbound: physical goods expected at and received into a governed Site.
-- Inventory: the one current Unit authority, including Ready Stock and Counts & Adjustments views.
-- Outbound: dated physical work for Units that must leave a governed Site.
+- Monitor: the module's ONLY Calendar-summary page — a dated read-only projection of both
+  incoming and outgoing Warehouse work; never a second truth.
+- Inbound: physical goods expected at a governed Site — a 240px filter rail + Inbound
+  Register that routes actual receipt work to the governed Receiving Session.
+- Inventory: the one current Unit authority (240px rail + Register), including Ready Stock
+  and Counts & Adjustments views. No Calendar summary and no six-day date strip.
+- Outbound: dated physical work for Units that must leave a governed Site — a 240px filter
+  rail + Outbound Register over the same work.
 
 Ready Stock is one shared eligible-Unit view of Inventory. Operations reaches it through Warehouse
 Inventory; Sales reaches the same authority through `Sales → Ready Stock`. It is not another stock
@@ -47,11 +54,19 @@ Purchasing, Delivery, Payments and Service Cases keep their own doors.
 Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
 
-**WAREHOUSE DASHBOARD CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Dashboard's
-page-owned filter groups are `OUTBOUND SCHEDULE · SITE · SOURCE`. These are read-only filters over
-the dated Warehouse projection, never new records or destinations. A valid empty day says
-`No outbound handovers on {date}. Choose another date.` The Calendar card uses the owning source's
-actual words and never invents a shorter Warehouse status vocabulary.
+**WAREHOUSE MONITOR CALENDAR — OWNER RULING 2026-09-06 (replaces the 2026-09-04 Dashboard
+Calendar law).** Monitor renders the full-width six-working-day Calendar and carries NO 240px
+page filter rail — filtering belongs to the destination pages its cards open. Each date shows
+the actual weekday and date; inside a date, work is arranged by actual time. Both directions
+render: ARRIVAL (`Supplier arrival` · `Transfer arrival` · `Customer/failed-delivery return` ·
+`Return from repair`) and PICKUP (`Customer-delivery pickup` · `Transfer pickup` ·
+`Supplier-return pickup` · `Repair pickup`). Every event says what its time means —
+`Supplier arrival 09:00–10:00` · `Driver pickup 14:30` — or exactly `Time not provided`;
+an unexplained bare time may not render. A valid empty day says
+`No arrivals or pickups on {date}. Choose another date.` The Calendar card uses the owning
+source's actual words and never invents a shorter Warehouse status vocabulary. On mobile the
+same projection is one selected day as a vertical time-ordered list with previous/next
+working-date controls.
 
 Rejected Warehouse UI words include On hand as the master-list name, Stock Units as the list name,
 Movements, Custody, bare Hold, Quarantine, and generic Review, Handle, Follow up,
@@ -329,37 +344,35 @@ For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep
 5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
 later working date come from the Warehouse calendar rather than staff memory.
 
-**DASHBOARD CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Dashboard is the
-read-only date overview; it does not replace Outbound's exact-Unit work listing. On desktop the six
-operating dates remain one chronological horizontal sequence. Date columns have a readable minimum
-width and the Dashboard work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
-grid whose tall first row pushes later days below the fold. There is one shared vertical scroll,
-not an independent scroll inside every day column. At narrow width the same projection becomes a
-single-day agenda with previous/next date controls; data, permissions and destinations do not
-change.
+**MONITOR CALENDAR COMPOSITION — OWNER RULING 2026-09-06 (replaces the 2026-09-04
+composition law).** Monitor is the read-only date overview; it does not replace Outbound's
+exact-Unit work listing. On desktop the six operating dates remain one chronological
+horizontal sequence at full page width — no page filter rail beside them. Date columns have a
+readable minimum width and the Monitor work area owns horizontal overflow; the dates may not
+wrap into a `3 × 2` grid whose tall first row pushes later days below the fold. There is one
+shared vertical scroll, not an independent scroll inside every day column. At narrow width the
+same projection becomes a single-day agenda with previous/next date controls; data,
+permissions and destinations do not change.
 
-This card Calendar is the Dashboard's selected `OUTBOUND SCHEDULE` projection. It does not remove
-the same Dashboard's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
-one of those opens that owner's dated rows rather than repainting them as outbound cards.
+One Calendar card is one dated piece of physical work from its owning module — a PICKUP card
+is one governed outbound source scope (never one whole customer order, never a second DO); an
+ARRIVAL card is one expected-arrival source scope. It shows, in this order: the governed time
+sentence · the event name with its direction · the source document identity · the party and
+what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
+shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
+or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
+return/collection work that requires a Warehouse physical act.
 
-One Calendar card is one governed outbound source scope, never one whole customer order and never a
-second DO. It shows, in this order: actual handover time when one exists · clickable source document
-(`DO No` for customer delivery) · `From → To` · named Logistics Partner/receiving party · `Units
-required` · `Handed over` · `Not handed over` · the current Warehouse fact or shared Work action.
-The card may aggregate for scanning only when every count drills to the exact Unit IDs. It never
-shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem, or an
-`Edit Delivery` control. A Failed Delivery appears only through the exact governed return/collection
-work that now requires a Warehouse physical act.
-
-Clicking the card opens **Outbound** already scoped to that date and source. It does not make the
-formal DO the Warehouse work surface. The `DO No` inside Outbound remains a door to the read-only
-source document. The signed-in Warehouse operator checks, packs, scans and confirms the handover in
-Outbound; Delivery remains the only owner of its partner/date/time/route editor. Return restores the
-Dashboard date, Site, Source filter and scroll position.
+Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
+document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
+nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
+may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
+never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
+editor.
 
 For any selected date, the operator journey is always:
 
-1. **Open Dashboard:** read everything that must happen on that actual date across Inbound,
+1. **Open Monitor:** read everything that must happen on that actual date across Inbound,
    Inventory, `Needs checking`, Outbound and Month-end.
 2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
    Units through Receiving; unresolved arrivals remain under their promised date.
@@ -368,20 +381,20 @@ For any selected date, the operator journey is always:
    Zone, Rack or Bin.
 4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
    the accepted event transfers holder authority to the individually identified next person.
-5. **Close the date:** Dashboard separates `Completed on {date}`, `{n} not done`, `Evidence not
+5. **Close the date:** Monitor separates `Completed on {date}`, `{n} not done`, `Evidence not
    submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
    Units.
 
 The sequence changes presentation only, never ownership. Receiving completes receipt facts;
 Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
-re-resolves the responsible person. Dashboard and the date strip store none of them.
+re-resolves the responsible person. Monitor and the date strip store none of them.
 
 Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
 done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
 Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
 opens another date.
 
-Dashboard is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
+Monitor is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
 from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
 an actual date, the page groups the one work set in business order:
 
@@ -403,7 +416,7 @@ found in the stock count` / `Find out why U-1005 did not match the count`, and `
 - DO handover → the Outbound work with linked Delivery Order;
 - Month-end requirement → the Month-end Stock Confirmation.
 
-Dashboard stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
+Monitor stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
 or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
 work. Completion occurs only when the authoritative source fact exists, after which the shared row
 updates everywhere.
@@ -793,7 +806,7 @@ facts; management receives all Warehouse reports and approval evidence. Cost, se
 payment and unrelated-outlet information remain hidden where the role does not require them.
 
 The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
-Dashboard, panel or object menu may create a second Settings door. The page sections are `Sites &
+Monitor, panel or object menu may create a second Settings door. The page sections are `Sites &
 operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence ·
 Unit ID · Permissions & approvals · External partners`. Settings governs rules/master data only; it
 never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
@@ -911,7 +924,7 @@ with the physical Units. No page or integration may directly set an `Available` 
 `Who has it` and ownership through the left rail; expand every total to exact Units; open Unit
 Detail for source, reservation, handover, problem and append-only history.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Dashboard · Inbound ·
+**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Monitor · Inbound ·
 Inventory · Outbound`. Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
 · SO No · SO date · PO No · PO date · Expected arrival · Last verified · Work`. Ready Stock is a
 saved view of the same authority; Sales and Operations read the same eligible Units with different
@@ -1040,7 +1053,7 @@ outcome.
 **UI / PAGE / OBJECT PLACEMENT →** Inventory rail uses `Needs checking`. Every row shows `Unit ID ·
 What happened · recorded Who has it · actual Site · reported date · reporter avatar · evidence ·
 resolved owner avatar · action · source document`. Unit Detail shows `Current control · Observed
-problem · Evidence · Work · Business consequence · Physical outcome · History`. Dashboard,
+problem · Evidence · Work · Business consequence · Physical outcome · History`. Monitor,
 Inventory, My Work and Team Work render the one Action; no second Problems Register is created.
 
 **CROSS-MODULE CONNECTION →** Stock owns physical availability, last confirmed holder and
@@ -1305,7 +1318,7 @@ or requests Adjustment. COO reviews remaining material/unexplained Units. Financ
 actual Count, submission, version and difference/approval evidence, then acknowledges the chosen
 version without changing physical truth.
 
-**UI / PAGE / OBJECT PLACEMENT →** Dashboard shows the month, Count window and concrete submission
+**UI / PAGE / OBJECT PLACEMENT →** Monitor shows the month, Count window and concrete submission
 date under `MONTH-END`. Month-end Detail shows `Stock month · Stock date · Count window · actual
 Count date · submitted date · version · confirmed Units · unresolved differences · approved
 Adjustments · movement reconciliation · Finance acknowledgement · History`. Reports provides
@@ -1394,7 +1407,7 @@ holder. NETS sees only authorised Site/journey work and evidence.
 pages do not repeat report buttons. Catalogue is `Current Stock · Ready Stock · Showroom Stock ·
 Stock by Ownership · Receiving & Inbound · Outbound & Handovers · Transfers · Stock Counts · Stock
 Differences & Adjustments · Problems & Condition · Month-end Stock Confirmations · Partner Evidence
-· Unit History`. Reports use the Register Template with filter rail and drill-through. Dashboard
+· Unit History`. Reports use the Register Template with filter rail and drill-through. Monitor
 keeps dated work/exceptions ahead of analytical KPI bands.
 
 **CROSS-MODULE CONNECTION →** Stock supplies physical facts; Purchasing owns incoming/shortage/buy
@@ -1823,6 +1836,33 @@ Zero console errors; every `/api/*` call 200. Warehouse-role Site scoping, every
 and the partial-batch holder transition were proven on production in rolled-back probes before
 merge (`PROBE_COMPLETE_ALL_PASS`).
 
+### 13.8 · BUILT — the replacement Card: Monitor, Inbound, and the rail + Register pages
+
+The 2026-09-06 owner replacement Card cancelled the Warehouse `Dashboard` name, the
+Calendar-on-every-page pattern, the `35% / 65%` Inbound/Outbound layouts and the generic
+`Handover / Receiver / Ready / Needs checking` outbound wording, and this build applied it:
+
+- The rail reads **Monitor · Inbound · Inventory · Outbound**; `?tab=warehouse-dashboard`
+  still lands on Monitor (address alias, the `stock-onhand` precedent), and the collapsed icon's
+  named landing is Monitor.
+- **Monitor** renders the full-width six-working-day Calendar with NO 240px rail, both ARRIVAL
+  and PICKUP events time-ordered per governed §2 law, and routes each card to filtered
+  Inbound/Outbound. Supplier arrivals project from Purchasing's open POs (`eta_date`, Pending
+  Delivery Qty); pickups from Delivery's schedule feed. Event kinds with no live source yet
+  (transfers, returns, repair) exist in the shared taxonomy and project nothing — no invented
+  rows.
+- **Inbound** is a 240px rail + Inbound Register over expected arrivals (`Waiting goods
+  arrival · Overdue goods arrival · Waiting Carres check`, Site) that ROUTES to the governed
+  Receiving Session (`?tab=receiving&po=` / `&session=`) and posts nothing itself.
+- **Outbound** is a 240px rail (`PICKUP STATUS`, Site) + the dated work rows; `Logistics
+  Partner`, `Assigned Driver` and `Vehicle` are separate fields (`Waiting for {partner} to
+  assign a driver` when unassigned); the loading act is `Record {n} Units loaded to {person}`;
+  `Warehouse loaded` and `Driver collected` stay two evidence lines, and a confirmed collection
+  with an unloaded Unit names that exact Unit (`{unit} was not confirmed by {person}. It
+  remains with {site}.`).
+- The shared projector lives in `packages/shared/src/warehouse-monitor.ts` (one arithmetic;
+  Law D); the outbound empty day says `No pickups on {date}. Choose another date.`
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings
@@ -1868,7 +1908,7 @@ one movement status to collection, transit and arrival; bulk reservation to Sale
 binding; missing month-end to Stock date, window, reconciliation and version; generic task to the
 shared Action contract; and hard-coded NETS to role-based partner/future-self-operation.
 
-Intentional rejects now: Dashboard as a second truth/KPI wall, second exception register, manual totals,
+Intentional rejects now: Monitor as a second truth/KPI wall, second exception register, manual totals,
 negative stock, generic status editing, Position or slot at current scale, heavy WMS without
 measured need, and assumed external cutover.
 

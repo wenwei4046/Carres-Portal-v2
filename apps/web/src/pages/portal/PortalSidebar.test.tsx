@@ -232,8 +232,8 @@ describe("the accordion", () => {
   it("clicking a module opens its first live page", () => {
     renderAt("/operation");
     fireEvent.click(module_("warehouse"));
-    // Dashboard is Warehouse's first live page (Card 03) — the rail navigated there.
-    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
+    // Monitor is Warehouse's landing (2026-09-06 Card) — the rail navigated there.
+    expect(child("wh-monitor").className).toContain("bg-kit-blue-3");
   });
 
   it("clicking the open module closes it again", () => {
@@ -260,7 +260,7 @@ describe("the accordion", () => {
     fireEvent.click(module_("warehouse"));
     expect(screen.getByTestId("nav-children-warehouse")).toBeInTheDocument();
     expect(screen.queryByTestId("nav-children-purchasing")).not.toBeInTheDocument();
-    expect(child("wh-dashboard").className).toContain("bg-kit-blue-3");
+    expect(child("wh-monitor").className).toContain("bg-kit-blue-3");
   });
 
   it("a module shut by hand stays shut while you stand on its page", () => {
@@ -1215,39 +1215,42 @@ describe("PortalSidebar — the Delivery module's two destinations", () => {
 });
 
 describe("PortalSidebar — the Warehouse module's four destinations", () => {
-  /* THE MAP IS FOUR DESTINATIONS (owner-approved Blueprint 2026-09-01 —
-   * Stock MASTER §2, ERP-ARCHITECTURE §2.1; CARD-2026-09-01-warehouse-01-
-   * sidebar). The former `Stock · Ready stock · In & out · Transfers · Counts`
-   * subtree is superseded; the complete approved map shows from day one and
-   * never reshuffles after this. */
-  it("the map is Dashboard · Inbound · Inventory · Outbound, in that order", () => {
+  /* THE MAP IS FOUR DESTINATIONS (owner replacement Card 2026-09-06 —
+   * Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor · Inbound ·
+   * Inventory · Outbound`. The ERP keeps ONE global Dashboard; no
+   * Warehouse-local Dashboard label remains, and no Calendar, Transfer,
+   * Ready Stock or Dashboard row joins the rail. */
+  it("the map is Monitor · Inbound · Inventory · Outbound, in that order", () => {
     renderAt("/operation?tab=stock-onhand");
     const rows = Array.from(
       screen
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Dashboard", "Inbound", "Inventory", "Outbound"]);
+    expect(rows).toEqual(["Monitor", "Inbound", "Inventory", "Outbound"]);
   });
 
-  it("Inventory is the one live door and keeps the `?tab=stock-onhand` address", () => {
+  it("Inventory is a live door and keeps the `?tab=stock-onhand` address", () => {
     renderAt("/operation?tab=stock-onhand");
     expect(child("stock")).toHaveAttribute("href", "/operation?tab=stock-onhand");
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("Dashboard and Outbound are live links; Inbound still prints `Coming soon`", () => {
+  it("all four destinations are live links — Monitor, Inbound, Outbound included", () => {
     renderAt("/operation?tab=stock-onhand");
-    const dash = child("wh-dashboard") as HTMLAnchorElement;
-    expect(dash.tagName).toBe("A");
-    expect(dash).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
+    const monitor = child("wh-monitor") as HTMLAnchorElement;
+    expect(monitor.tagName).toBe("A");
+    expect(monitor).toHaveAttribute("href", "/operation?tab=warehouse-monitor");
+    const inbound = child("wh-inbound") as HTMLAnchorElement;
+    expect(inbound.tagName).toBe("A");
+    expect(inbound).toHaveAttribute("href", "/operation?tab=warehouse-inbound");
     const outbound = child("wh-outbound") as HTMLAnchorElement;
     expect(outbound.tagName).toBe("A");
     expect(outbound).toHaveAttribute("href", "/operation?tab=warehouse-outbound");
-    const inbound = child("wh-inbound");
-    expect(inbound.tagName).toBe("SPAN");
-    expect(inbound.getAttribute("aria-disabled")).toBe("true");
-    expect(within(inbound).getByText("Coming soon")).toBeInTheDocument();
+    // No Warehouse-local Dashboard label remains.
+    expect(
+      within(screen.getByTestId("nav-children-warehouse")).queryByText("Dashboard"),
+    ).toBeNull();
   });
 
   /* The superseded subtree is GONE from the rail. The pages behind
@@ -1269,14 +1272,14 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
   });
 
   /* ⭐ THE 60px ICON GOES WHERE IT IS TOLD (the Purchasing law, applied):
-   * Warehouse names `Dashboard` as its landing (Card 03) — by name, never
-   * derived from row order. */
-  it("the collapsed Warehouse icon links to Dashboard, and lights on a Warehouse page", () => {
+   * Warehouse names `Monitor` as its landing (2026-09-06 Card) — by name,
+   * never derived from row order. */
+  it("the collapsed Warehouse icon links to Monitor, and lights on a Warehouse page", () => {
     localStorage.setItem("ops-sidebar-collapsed", "1");
     try {
       renderAt("/operation?tab=stock-onhand");
       const icon = screen.getByTitle("Warehouse") as HTMLAnchorElement;
-      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-dashboard");
+      expect(icon).toHaveAttribute("href", "/operation?tab=warehouse-monitor");
       expect(icon.className).toContain("bg-kit-blue-3");
     } finally {
       localStorage.removeItem("ops-sidebar-collapsed");
