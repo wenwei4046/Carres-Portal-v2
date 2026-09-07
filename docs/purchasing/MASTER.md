@@ -2097,48 +2097,34 @@ change is included in these acceptance boundaries.
 
 #### Current local build evidence — 2026-09-07
 
-Card 09 in `docs/cards/CARD-2026-09-06-purchasing-09-supplier-claims-ui.md` implements
-this Blueprint's **register/object UI and the first READY scope's Case-linked engine
-locally** — reviewed diff only; nothing is applied, merged or deployed.
+The independently released slice is the governed factual Register, full-width read-only
+SC object and paginated source/Catalog/held-Unit reads. The shared FilterRail replaces
+the retired queue/card chrome; View, Search, Export and Columns use one Register toolbar.
+Hide/Show filters preserves the active predicates, filtered totals name the complete set,
+and opening/returning from a Claim preserves the Register state. The object reads the
+independent supplier/customer/execution/stock layers and explicitly identifies unavailable
+Case writes, versioned communication, physical completion and Finance settlement.
 
-The Register composes exactly like the Sales Orders reference: governed destination
-header, the shared 240px `FilterRail` with wrap-not-truncate factual predicates and
-truthful counts, its `Hide filters`/`Show filters` collapse remembered by the browser,
-and the one `register/DataGrid` toolbar (Search · Export · Columns) over the borderless
-36/38/32 listing with the status footer. The retired SectionCard facet chrome is gone.
-The short inspector opens the full-width Claim through the shared object header; the
-mounted register retains filters, sort, selection and scroll on return, and named Claim
-links read across lifecycle and PO filters. The object preserves the four layers
-independently, offers no duplicate editor, claimed send, fabricated owner, money result
-or premature closure, and its Documents section names the six send-ledger facts while
-stating the ledger is not connected.
+**Delivery evidence:** [PR #1138](https://github.com/wenwei4046/Carres-Portal-v2/pull/1138)
+records the release, scoped validation and authenticated production verification;
+[the release workflow](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/34081474775)
+records deployment of main `90a8f3ef`. The PR's complete CI passed, including 9,685 tests,
+type checks, production build and bundle-secret checks. The Catalog-field negative control
+fails as required; desktop and 768px fixture checks cover search, View, rail collapse,
+full-width object and return. Workflow success and the authenticated checks in the PR are
+the production evidence; a local fixture is never production proof.
 
-The Case-linked engine is an unnumbered local proposal
-(`docs/cards/supplier-claims-case-intake.sql`) plus shared/API/web wiring, exercised
-against an isolated PostgreSQL fixture: the one Receiving posting hook opens/joins the
-shared stock-only Case atomically for each new Claim with its exact
-`receiving_unit_results` occurrences in the permanent `service_case_units` link
-(occurrences attach once; the incident link survives hold release); duplicate matching
-by source occurrence/Unit/problem appends evidence to the same open Case without lost
-concurrent updates and keeps different Units and later failures distinct; Case evidence
-references claim photos with source bucket and original attribution, never copied; the
-stock intake accepts a real Unit label, refuses a product mismatch by name, preserves an
-unresolvable label as `source_unit_label`, and stays retry-idempotent per report
-identity; and every ongoing source-free stock Case projects the governed source-search
-action (`The purchase source is not recorded` → `Check the Unit label and link its
-purchase record`) into the one shared Work set, owned by the CURRENT PO Duty
-holder/cover with the next-Office-working-day due date. The stale opening-month
-claim-duty owner rule in the shared Work vocabulary is corrected to the current
-resolver per the 2026-09-06 ruling.
-
-**Still unbuilt:** versioned supplier instructions/replies and send recording, the
-configurable 2+2 Settings dates, approved physical continuations (PRTN/CRTN/RO and
-replacement legs), Finance-backed closure, and the Claim object's own current-action
-presentation. The legacy mutation API remains in place and is not made compliant merely
-by removing its UI controls. This local build is not an operational replacement until
-those owning continuations are built and the proposal SQL is numbered, reviewed and
-applied through the governed path. No deployment, production migration or live cutover
-was performed.
+The separate Case-linked intake/Receiving implementation remains a local, unnumbered SQL
+proposal and associated API/web/shared changes. It is **NOT PRODUCTION-READY**. Code review
+on 2026-09-07 found that `service_case_match_unit_problem(stock_item_id, issue_type)` matches
+an open Case by Unit + problem only; it does not compare source occurrence. It can therefore
+collapse a later fault into an earlier still-open Case. Permanent occurrence links alone
+do not prove correct duplicate matching. Before release, match the verified incident/source
+occurrence, keep later faults distinct even while an earlier Case remains open, and add that
+regression case. Current isolated SQL tests do not cover this boundary. Receiving orchestration,
+source-search Work, Case linking and intake remain unverified for production until that fix,
+full dependency review and the governed migration/apply path are complete. No such database
+change or Case write control is part of PR #1138.
 
 #### Decision rationale and future review triggers
 
