@@ -279,8 +279,9 @@ export default function OperationReceiving() {
         label: "PO/CO No",
         width: 150,
         sortable: true,
-        searchValue: (r) => r.po_id,
-        exportValue: (r) => r.po_id,
+        /* An arrival-source receipt has no PO — the cell stays honest-empty. */
+        searchValue: (r) => r.po_id ?? "",
+        exportValue: (r) => r.po_id ?? "",
         accessor: (r) => (
           <span className="font-mono text-meta text-base-900">{r.po_id}</span>
         ),
