@@ -11,7 +11,6 @@ import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import { carresExecutionLabel, customerResolutionLabel, supplierClaimRequestLabel, supplierClaimResponseLabel, supplierClaimTypeLabel } from "@carres/shared";
 import { useOperationSupplierClaims, type SupplierClaimListRow } from "@/lib/queries";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import DropdownMenu from "@/components/kit/DropdownMenu";
 import Button from "@/components/kit/Button";
 import EmptyState from "@/components/kit/EmptyState";
 import StatusPill from "@/components/kit/StatusPill";
@@ -82,6 +81,8 @@ export default function OperationSupplierClaims() {
   }), [setParams]);
   const anyFilter = po != null || Object.keys(picks).length > 0;
 
+  // Keep the recorded source identity visible when Catalog cannot name a product.
+  const needsSku = claims.some((row) => !row.product_description);
   const columns = useMemo<DataGridColumn<SupplierClaimListRow>[]>(() => [
     { key: "claim", label: "Supplier Claim No.", width: 210, accessor: (row) => <button className="text-kit-blue-11 underline font-semibold" onClick={(event) => { event.stopPropagation(); open(row); }}>{row.claim_no || "Not issued"}</button>, searchValue: (row) => row.claim_no || "Not issued", filterType: "numbering" },
     { key: "reported", label: "Reported", width: 144, accessor: (row) => fmtDate(row.reported_at), dateValue: (row) => row.reported_at, filterType: "date", exportValue: (row) => fmtDate(row.reported_at) },
@@ -90,7 +91,7 @@ export default function OperationSupplierClaims() {
     { key: "grn", label: "GRN No.", width: 220, accessor: (row) => row.grn_no && row.warehouse_receipt_id ? <Link className="text-kit-blue-11 underline" to={`/operation?tab=receiving&session=${encodeURIComponent(row.warehouse_receipt_id)}`}>{row.grn_no}</Link> : row.grn_no || absent, searchValue: (row) => row.grn_no || "", exportValue: (row) => row.grn_no || "" },
     { key: "product", label: "Product", width: 240, accessor: (row) => row.product_description || absent, searchValue: (row) => row.product_description || "", exportValue: (row) => row.product_description || "" },
     { key: "size", label: "Variant", width: 160, accessor: (row) => row.product_variant || absent, searchValue: (row) => row.product_variant || "", exportValue: (row) => row.product_variant || "" },
-    { key: "sku", label: "SKU", width: 190, defaultHidden: true, accessor: (row) => row.sku, searchValue: (row) => row.sku, exportValue: (row) => row.sku },
+    { key: "sku", label: "SKU", width: 190, defaultHidden: !needsSku, accessor: (row) => row.sku, searchValue: (row) => row.sku, exportValue: (row) => row.sku },
     { key: "supplier_do", label: "Supplier DO", width: 180, defaultHidden: true, accessor: (row) => row.do_number || absent, searchValue: (row) => row.do_number || "", exportValue: (row) => row.do_number || "" },
     { key: "qty", label: "Qty", width: 110, align: "right", accessor: (row) => row.qty, numberValue: (row) => row.qty, filterType: "number", exportValue: (row) => row.qty },
     { key: "problem", label: "Problem", width: 176, accessor: (row) => supplierClaimTypeLabel(row.claim_type), searchValue: (row) => `${supplierClaimTypeLabel(row.claim_type)} ${row.note || ""}`, exportValue: (row) => supplierClaimTypeLabel(row.claim_type) },
@@ -100,7 +101,7 @@ export default function OperationSupplierClaims() {
     { key: "requested", label: "Requested Result", width: 190, defaultHidden: true, accessor: (row) => row.requested_action ? supplierClaimRequestLabel(row.requested_action) : absent, searchValue: (row) => row.requested_action ? supplierClaimRequestLabel(row.requested_action) : absent },
     { key: "customer", label: "Customer Resolution", width: 205, defaultHidden: true, accessor: (row) => row.customer_resolution ? customerResolutionLabel(row.customer_resolution) : absent, searchValue: (row) => row.customer_resolution ? customerResolutionLabel(row.customer_resolution) : absent },
     { key: "execution", label: "Carres Execution", width: 205, defaultHidden: true, accessor: (row) => row.carres_execution ? carresExecutionLabel(row.carres_execution) : absent, searchValue: (row) => row.carres_execution ? carresExecutionLabel(row.carres_execution) : absent },
-  ], [open]);
+  ], [open, needsSku]);
 
   return <div className="relative flex h-full min-h-0 flex-col" data-testid="operation-supplier-claims">
     <div className={`flex h-full min-h-0 flex-col ${claimId ? "hidden" : ""}`} aria-hidden={claimId ? true : undefined}>
@@ -126,7 +127,7 @@ export default function OperationSupplierClaims() {
             <DataGrid rows={rows} columns={columns} rowKey={(row) => row.id} storageKey="carres.supplier-claims.register.v2"
               appearance="reference" exportName="Supplier Claims" groupBanner={false}
               isLoading={query.isLoading} emptyMessage="No matching claims." searchPlaceholder="Search claims…"
-              toolbarStart={<><DropdownMenu label="View" align="start" trigger={<Button variant="neutral" size="sm">View: {picks.status || "All"}</Button>} items={["All", "Open", "Closed"].map((label) => ({ key: label, label, onSelect: () => setPicks((previous) => { const next = { ...previous }; if (label === "All") delete next.status; else next.status = label; return next; }) }))} />{!railOpen ? <button type="button" aria-label="Show filters" title="Show filters" data-testid="claims-show-filters"
+              toolbarStart={<>{!railOpen ? <button type="button" aria-label="Show filters" title="Show filters" data-testid="claims-show-filters"
                 onClick={() => setRailVisible(true)}
                 className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12">
                 <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />

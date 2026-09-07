@@ -30,14 +30,8 @@ export function ClaimSource({ claim }: { claim: SupplierClaimListRow }) {
 /** Short inspector: facts and one door, never a mounted editor. */
 export function SupplierClaimInspector({ claim, onOpen }: { claim: SupplierClaimListRow; onOpen: () => void }) {
   return <div className="p-4 text-body space-y-2" data-testid="claim-inspector">
-    <p className="font-semibold">{claim.product_description || absent}</p>
-    <p>Variant: {claim.product_variant || absent}</p>
-    <p>SKU: {claim.sku}</p>
-    <p>Qty: {claim.qty}</p>
     <p>Problem: {supplierClaimTypeLabel(claim.claim_type)}</p>
     {claim.note && <p className="whitespace-pre-wrap">{claim.note}</p>}
-    <ClaimSource claim={claim} />
-    <p>Supplier Response: {claim.supplier_response ? supplierClaimResponseLabel(claim.supplier_response) : absent}</p>
     <p>Evidence: {claim.photo_count} photos</p>
     {!!claim.held_unit_codes?.length && <p>Units on hold: {claim.held_unit_codes.join(" · ")}</p>}
     <Button variant="neutral" onClick={onOpen}>Open Claim</Button>
