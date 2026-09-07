@@ -2300,9 +2300,12 @@ Settings lives under the global header gear and requires authorised roles. It in
   stores no roster and performs no Duty calculation;
 - `/api/operation/po-duty` is a one-release response-shape adapter only. It reads and writes the
   shared Workspace Duty resolver and must be deleted when `PurchaseOrdersPage`,
-  `SalesOrderWorkspace`, `OperationOrdersControl`, the Quick Rail `TeamPanel`, and the PO-day
-  reminder consume the Workspace Duty contract directly; no caller may restore a direct
+  `SalesOrderWorkspace`, `OperationOrdersControl`, and the Quick Rail `TeamPanel` consume the
+  Workspace Duty contract directly; no caller may restore a direct
   `ops_po_duty` or cover-table read behind it.
+- PO Days remain scheduling facts. They do not create reminders or `ops_tasks`; every order that
+  requires issue is already one structured `issue_po` Work projection, resolved to current PO Duty
+  and closed only by the owning order/purchase facts.
 - approval limits and Manual Purchase purposes;
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
