@@ -70,6 +70,17 @@ export default function FinanceRecon() {
         </button>
       </header>
 
+      {/* payment/MASTER.md §13 — the full Bank Matching workspace is an
+          intentional Payment reject; Finance checks the bank OUTSIDE daily
+          Payment. Retiring this surface stays approved target work — nothing
+          here is removed destructively, and this note converges the entry
+          point onto the current authority meanwhile. */}
+      <div className="mb-6 px-4 py-3 rounded-md border border-border bg-muted/30 text-meta text-muted-foreground">
+        Finance checks the bank outside daily Payment. This matching workspace is scheduled
+        to retire under the Payment rules; collection itself runs from Work and the Payments
+        and Invoices pages.
+      </div>
+
       <div className="grid grid-cols-4 gap-3.5 mb-6">
         <FinanceKpi label="Inflow" value={rmCompact(inflow)} hint="Across visible window" tone="ok" />
         <FinanceKpi label="Outflow" value={rmCompact(outflow)} hint="Across visible window" tone="warn" />

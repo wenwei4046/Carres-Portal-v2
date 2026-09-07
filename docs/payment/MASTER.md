@@ -649,6 +649,36 @@ derives only from a start that REQUIRES the readiness witness); mixed product gr
 separate cases per 0436; automatic close on delivery completion is Delivery-side wiring and
 stays a named next step.
 
+### BUILD — export, waivers on the report, the visible Reports door, and the §13 convergence, 2026-09-07
+
+Reports → Payment gains: **Export Excel** (one sheet per section, computed at export time
+from the same reads — the report still stores nothing); the **Storage waived** section now
+lists every approved free-storage decision with its free-until date, reason and approver's
+NAME (the §11 promise; the same case wire the Storage section reads, approver resolved
+server-side so an id never reaches the screen); and the shared `Finance → Reports` page
+carries a first-class **Payment** door card — the destination is discoverable, not a bare
+route. The §13 convergence, non-destructively: **Refunds & Credit Notes is now READ-ONLY
+history** — the create door and its modal left with the ruling (Carres has a no-refund
+policy; the exceptional path runs Service Case → Management decision → Finance external
+transfer, said on the page); the data, the list read and the API route remain untouched.
+**Recon** keeps its function and gains the governed note (Finance checks the bank outside
+daily Payment; the workspace is scheduled to retire under §13). Destructive retirement of
+either surface still requires its own explicit authorization and has not been performed.
+
+### Stripe business verification — what is proven, and what live keys refuse
+
+A rolled-back production probe proved the §16 Online-link money contract end-to-end on the
+real posting service: a paid session posts Payment + Receipt atomically (`orders.paid`
+moved once, an `RC-` receipt minted, the session flipped to paid); the DUPLICATE
+callback/poll answers `already` and records nothing twice (one live payment per session
+key, money unchanged); an unpaid expiry posts nothing and the amount needed stays
+unchanged. Creation with the exact amount and expiry is covered by the route tests and the
+signed-in production walk of the composition. The one unexercised path is a FRESH live
+end-to-end payment: the production Stripe keys are LIVE mode (`cs_live_` sessions on
+record), so a real end-to-end verification would mint a genuinely payable link — refused
+deliberately; a Stripe TEST-mode key set would unlock it and is noted as an owner-side
+option, not requested.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified

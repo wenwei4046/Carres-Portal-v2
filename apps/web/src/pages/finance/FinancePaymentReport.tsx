@@ -7,6 +7,9 @@ import { soRemaining } from "@carres/shared/payment-invoice-register";
 import EmptyState from "@/components/kit/EmptyState";
 import Select from "@/components/kit/Select";
 import { SectionCard } from "@/components/SectionPanel";
+import { useQuery } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
+import { apiFetch } from "@/lib/api";
 import { useInvoiceRegister, usePaymentRegister } from "@/lib/queries";
 import { fmtDate, fmtMonth } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
@@ -99,9 +102,28 @@ function Row({ to, children }: { to: string; children: React.ReactNode }) {
   </Link>;
 }
 
+interface WaiverCaseRow {
+  id: string; order_id: string;
+  product_group: "mattress_bedframe" | "sofa";
+  approved_free_until: string | null;
+  approved_at: string | null;
+  approval_reason: string | null;
+  approved_by_user?: { name: string | null } | null;
+}
+
+const GROUP_WORD: Record<WaiverCaseRow["product_group"], string> = {
+  mattress_bedframe: "Mattress / Bedframe",
+  sofa: "Sofa",
+};
+
 export default function FinancePaymentReport() {
   const paymentsQ = usePaymentRegister();
   const invoicesQ = useInvoiceRegister();
+  // §11 — Storage waived reads the same case wire the Storage section reads.
+  const casesQ = useQuery<{ cases: WaiverCaseRow[] }>({
+    queryKey: ["finance", "storage-cases", "all"],
+    queryFn: () => apiFetch("/api/finance/payment-storage"),
+  });
   const payments = useMemo(() => paymentsQ.data ?? [], [paymentsQ.data]);
   const invoices = useMemo(() => invoicesQ.data ?? [], [invoicesQ.data]);
 
@@ -137,6 +159,45 @@ export default function FinancePaymentReport() {
     () => invoices.filter((r) => r.kind !== "sales" && r.status !== "draft"),
     [invoices]);
   const needsReview = balances.filter((b) => b.overpaid > 0);
+  const soWordOf = (orderId: string) => {
+    const door = invoices.find((r) => r.order_id === orderId);
+    return door?.orders ? `SO-${door.orders.so} · ${door.orders.customer_name}` : "SO not available";
+  };
+  const waivers = (casesQ.data?.cases ?? []).filter((c) => c.approved_free_until != null);
+
+  // §11 read-only EXPORT — the same figures the sections print, one sheet per
+  // section, computed at export time from the same reads (stores nothing).
+  const exportExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const add = (name: string, rows: Record<string, unknown>[]) =>
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name);
+    add("Money received", received.map((p) => ({
+      "Receipt No": p.receipt_no ?? "Receipt number missing",
+      "Paid Date": p.paid_on, SO: p.orders ? `SO-${p.orders.so}` : "",
+      Customer: p.orders?.customer_name ?? "", Amount: Number(p.amount),
+      Method: METHODS[p.method ?? ""] ?? p.method ?? "" })));
+    add("Customer balances", owing.map((b) => ({
+      SO: b.so !== null ? `SO-${b.so}` : "", Customer: b.customer,
+      "Still needed": b.outstanding, "Includes storage": b.storageOwing })));
+    add("Storage charged", storageInvoices.map((r) => ({
+      "Invoice No": r.invoice_no ?? "Number not issued", Kind: KIND_WORD[r.kind],
+      SO: r.orders ? `SO-${r.orders.so}` : "", Customer: r.orders?.customer_name ?? "",
+      Amount: Number(r.amount) + Number(r.tax_amount),
+      Status: r.status === "voided" ? "VOIDED" : r.status })));
+    add("Storage waived", waivers.map((c) => ({
+      SO: soWordOf(c.order_id), Goods: GROUP_WORD[c.product_group],
+      "Free until": c.approved_free_until, Reason: c.approval_reason ?? "",
+      Approver: c.approved_by_user?.name ?? "Name not available",
+      "Approved on": c.approved_at?.slice(0, 10) ?? "" })));
+    add("Payment corrections", corrections.map((p) => ({
+      "Receipt No": p.receipt_no ?? "Receipt number missing",
+      "Voided on": p.voided_at?.slice(0, 10) ?? "", Reason: p.void_reason ?? "",
+      SO: p.orders ? `SO-${p.orders.so}` : "", Amount: Number(p.amount) })));
+    add("Needs review", needsReview.map((b) => ({
+      SO: b.so !== null ? `SO-${b.so}` : "", Customer: b.customer,
+      "Needs review": b.overpaid })));
+    XLSX.writeFile(wb, `Payment report ${month ?? "all"}.xlsx`);
+  };
 
   if (paymentsQ.isError || invoicesQ.isError) {
     return <div className="p-6"><EmptyState
@@ -152,6 +213,9 @@ export default function FinancePaymentReport() {
         <div className="text-label uppercase tracking-[0.12em] text-base-500">Reports · Payment</div>
         <h1 className="text-xl font-semibold">Payment</h1>
       </div>
+      <div className="flex items-end gap-2">
+        <button className="btn-secondary" onClick={exportExcel} disabled={loading}
+          data-testid="report-export">Export Excel</button>
       <div className="w-[180px]">
         <Select id="payment-report-month" label="Month"
           value={month ?? undefined}
@@ -159,6 +223,7 @@ export default function FinancePaymentReport() {
           disabled={months.length === 0}
           placeholder="No month yet"
           options={months.map((m) => ({ value: m, label: fmtMonth(m) }))} />
+      </div>
       </div>
     </header>
 
@@ -218,10 +283,19 @@ export default function FinancePaymentReport() {
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-storage-waived">
-        <Head>Storage waived</Head>
-        <p className="text-label font-normal text-base-400">
-          No storage waiver is recorded yet. The storage waiver journey is not built; when it is,
-          every waiver appears here with its reason and approver.</p>
+        <Head note="Approved free-storage decisions, each with its reason and approver (§11). The written request stays on the case.">
+          Storage waived</Head>
+        <div className="space-y-1">
+          {waivers.map((c) => <div key={c.id}
+            className="rounded-control border border-base-200 bg-white px-2 py-1.5">
+            <span className="block text-body font-semibold">
+              {soWordOf(c.order_id)} · {GROUP_WORD[c.product_group]}</span>
+            <span className="block text-label font-normal">
+              Free until {c.approved_free_until} · {c.approval_reason ?? "Reason not available"} · approved by {c.approved_by_user?.name ?? "Name not available"}</span>
+          </div>)}
+          {waivers.length === 0 && <p className="text-label font-normal text-base-400">
+            No free storage has been approved.</p>}
+        </div>
       </div></SectionCard>
 
       <SectionCard><div className="p-3" data-testid="report-corrections">
