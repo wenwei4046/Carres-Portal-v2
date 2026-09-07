@@ -2211,6 +2211,17 @@ Known item/Site facts prefill; ask only missing questions. Photos/videos and opt
 below the questions, before Submit request. Uncertainty remains explicit and creates a specific
 check; it never silently becomes No or a confirmed arrangement.
 
+**Saved collection locations — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Collect from
+searches/selects a saved location and offers Add location inside the request. Add location asks
+for required Location name, Address, Collection contact name and Phone number; Map link is
+optional, with Floor/access choices. Save and use saves and selects the location immediately.
+Check similar existing locations before creating a duplicate. Saved locations are reusable and
+managed in central Settings; the in-request door uses that same authority, not a separate list.
+Prefill contact/access for confirmation. A different contact for this request does not change
+the saved default. A collection address may be supplier premises or another showroom; creating
+it never automatically creates a Carres Stock Site or grants access. This approves collection
+location entry only; the remaining Showroom Blueprint and post-submission change flow stay under review.
+
 Operations may prepare a draft and use Request details to copy/send its link to the requester.
 The requester completes and submits that same record. Copy request link also opens an existing
 request for progress and missing information. Sign-in and record permissions apply; opening or
