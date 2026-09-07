@@ -1952,12 +1952,17 @@ reads the actual Catalog model name; Variant reads the variant separately, never
 product name. SKU is its own optional column. Preserve existing SC document numbers and explain
 them through the full Supplier Claim No. header; do not rename historical documents or invent
 another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
-identity column covering adjacent content. One row is one supplier workstream.
+identity column covering adjacent content. One row is one supplier workstream, never one row
+per photo or Work action. An unissued claim shows Not issued. Wider detail/reference fields
+remain optional Columns: Units, Requested Result, Customer Resolution, Carres Execution,
+Item Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version
+and Sent to Supplier. Only relevant date facts appear; no generic workflow field. Unknown
+optional facts are not promoted to permanent empty columns; measure before final layout.
 
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-SUPPLIER               Claim No. | Reported | Supplier | Source | Product | Qty | Problem ...
+SUPPLIER               Supplier Claim No. | Reported | Supplier | PO No | GRN No. | Product | Variant | Qty ...
   actual suppliers     one row per supplier workstream; facts and evidence only
 PROBLEM
   observed types       footer: matching claims · affected Units/quantity with clear scope
