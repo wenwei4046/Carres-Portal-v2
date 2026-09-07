@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
-import { invoiceNeeded } from "@carres/shared/payment-invoice-register";
+import { soRemaining } from "@carres/shared/payment-invoice-register";
 import {
   PAYMENT_TEMPLATE_PURPOSE_WORD,
   renderPaymentTemplate,
@@ -69,12 +69,15 @@ export function expiryWord(iso: string | null): string {
   return `${day} · ${time}`;
 }
 
-export default function InvoicePaymentLink({ invoice, onClose }: {
+export default function InvoicePaymentLink({ invoice, rows, onClose }: {
   invoice: InvoiceRegisterRow;
+  /** The SO's sibling register rows — the amount speaks the SO across every
+   *  live invoice kind, matching the widened server cap. */
+  rows: InvoiceRegisterRow[];
   onClose: () => void;
 }) {
   const order = invoice.orders;
-  const money = invoiceNeeded(invoice);
+  const money = soRemaining(rows, invoice.order_id);
   const qc = useQueryClient();
   const nowIso = new Date().toISOString();
 

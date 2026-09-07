@@ -175,7 +175,9 @@ export function invoiceNeeded(row: InvoiceRegisterRow): ReturnType<typeof orderM
  *  Storage obligation.
  *
  *  Storage obligations are the SO's live ISSUED storage-kind invoices with
- *  their tax — a draft asks for nothing yet, a voided one is dead. Goods
+ *  their tax, plus a DRAFT that replaces a voided one (the correction keeps
+ *  the money owed) — a fresh draft asks for nothing yet, a voided one is
+ *  dead. Goods
  *  value comes from the same `orderMoney` stores as `invoiceNeeded`.
  *  `orders.paid` is subtracted ONCE from the combined obligation — the Work
  *  engine's law (`sales-order-work-source`) — so a payment posted against a
@@ -195,8 +197,13 @@ export function soRemaining(
   const mine = rows.filter((r) => r.order_id === orderId);
   const door = mine.find((r) => r.kind === "sales") ?? mine[0];
   if (!door) return { known: false, outstanding: 0, storageOwing: 0, overpaid: 0 };
+  // A live obligation is an ISSUED storage-kind invoice — plus a DRAFT that
+  // REPLACES a voided one: the correction lineage (0429) exists precisely so
+  // the obligation survives the void, and dropping it until reissue would let
+  // the money silently vanish from every reader between void and reissue.
   const storageOwing = mine
-    .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
+    .filter((r) => r.kind !== "sales" && !r.voided_at
+      && (r.status === "issued" || (r.status === "draft" && r.replaces_invoice_id != null)))
     .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
   const goods = invoiceNeeded(door);
   if (!goods.known) return { known: false, outstanding: 0, storageOwing, overpaid: 0 };
@@ -237,6 +244,11 @@ export function invoicePaymentTiming(
   row: InvoiceRegisterRow,
   todayIso: string,
   opts: WorkingDayOptions = {},
+  /** The SO's sibling register rows. Given, the paid/needed check is the SO
+   *  across every live invoice kind (`soRemaining`) — an SO settled on goods
+   *  but owing storage is NOT `paid`. Absent, the goods arithmetic answers
+   *  (a caller holding one row alone). */
+  rows?: InvoiceRegisterRow[],
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);
   const clock = collectionClock(
@@ -247,7 +259,7 @@ export function invoicePaymentTiming(
     todayIso,
     opts,
   );
-  const money = invoiceNeeded(row);
+  const money = rows ? soRemaining(rows, row.order_id) : invoiceNeeded(row);
   if (money.known && money.outstanding <= 0) return { timing: { kind: "paid" }, clock };
   const readiness = paymentCollectionReadiness({
     completed: goods.completed,

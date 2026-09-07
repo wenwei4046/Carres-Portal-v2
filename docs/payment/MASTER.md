@@ -591,6 +591,61 @@ the storage-foundation blocker above (the signed-in browser's frozen renderer); 
 behaviour — including the real INV number minted inside the rolled-back probe — is
 production-proven.
 
+### BUILD — one money answer: the reader audit, 2026-09-07
+
+Every Payment reader of "what this SO still needs" was audited against the §2 model and
+converged on the ONE shared `soRemaining` arithmetic (SO across every live invoice kind;
+`orders.paid` subtracted exactly once): the Calendar card, the Reports listings, the
+Register's `Needed` cells and number filter, the Register FOOTER (a real defect found and
+fixed — it summed the SO's outstanding once per ROW, so an SO carrying Sales and Storage
+papers was double-counted; each SO with a live visible row now counts exactly once), the
+Invoice object's Money section (`includes storage RM x` named), the timing's paid check
+(an SO settled on goods but owing storage is NOT `paid` — the collection door stays open),
+the Record payment prefill, the Ask-to-pay `{outstanding}` fact, and the payment link's
+prefill AND server cap (the cap is now goods value + live storage obligations − paid, the
+subtract-once shape; the invariant — a payment may never exceed what is owed — is
+unchanged, and a link can now collect a storage fee).
+
+**The obligation model, stated precisely.** Goods obligation reads the order's own live
+value (priced lines/addons; the keyed imported balance is the explicit LEGACY FALLBACK for
+unpriced imported rows, and it is already an outstanding, so nothing subtracts `paid` from
+it twice). The issued Sales Invoice equals that value at issue by construction (the paper
+snapshots it; corrections travel revision → void/replace), and reading the value keeps the
+money visible BEFORE a paper is prepared. Storage obligation reads the SO's live ISSUED
+storage-kind invoices with tax, PLUS a draft that REPLACES a voided one — the 0429
+correction lineage exists precisely so an obligation survives its void, and the reader must
+not lose the money between void and reissue (test-pinned); a fresh draft asks nothing and a
+voided paper is dead.
+
+**REAL GAP / CONTRADICTION — two storage money sources.** The shared Work engine and the
+Delivery money gate read the LEGACY C9 storage figure (`storageHold` over
+`ops_order_control.storage_from / storage_fee_override / imported fees /
+storage_waiver_status` — the shipped release-and-waiver ruling), NOT the 0436/0438 case-and-
+invoice model. Until they converge: an SO whose storage exists only as a 0438 Storage
+Invoice does not hold its DO through the gate, and a fee keyed only in the legacy columns
+never reaches Payment's invoice arithmetic. The goods side of the gate reads the same
+`orderMoney` stores and stays consistent. Converging the gate is its OWN slice and must
+carry the C9 semantics across (a manager's release lifts the HOLD and never forgives the
+money) — the gate is the money-in-full law's enforcement point and is not changed casually
+in a reader audit. Work's inline combined formula
+(`sales-order-work-source`) and `soRemaining` are the same subtract-once law with the two
+different storage sources above; they unify when the gate does.
+
+### Verification evidence — the four categories, stated separately
+
+Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
+convergence + served-bundle strings — proves the code shipped, nothing more) ·
+**AUTHENTICATED INTERACTION** (signed-in production DOM walks — proves the interactions,
+not the pixels) · **VISUAL INSPECTION** (a human-visible rendered page at real sizes and
+real browser zoom) · **BUSINESS VERIFICATION** (the business outcome proven end-to-end —
+rolled-back production probes with negative controls, or a live walk that exercises the
+rule). Current standing: deployment evidence exists for every shipped slice; authenticated
+interaction walks exist for the Calendar, Reports and the payment-link door; DB-layer
+business verification exists for every migration (probes) and the §7 arithmetic; **visual
+inspection and native-200%-zoom acceptance exist for NO slice** — they need a visible
+signed-in browser window, and automation cannot drive the browser-chrome zoom control; the
+Storage journey's authenticated interaction walk is also still owed (frozen renderer).
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
 Message assembly with bank routing and Partner contact, storage
