@@ -2207,7 +2207,11 @@ requires evidence to proceed. A future Sales Portal may create a Display Request
 Purchasing-owned creation authority and link to that exact record. It is another entry point, not
 a second request store, status, attachment copy or approval workflow. Preserve the actual requester
 and Showroom context; access follows the governed permissions. Purchasing remains the record owner
-and its existing decision/approval boundaries apply. This reserves the future entry capability;
+and its existing decision/approval boundaries apply. Sales Portal staff may view the request's
+progress and answer requests for missing information there, through the same Purchasing-owned
+record authority and governed permissions. Supplier decisions and approvals remain in Purchasing;
+the Sales Portal gains no second decision editor or independent progress status.
+This reserves the future entry capability;
 it does not commission a Sales Portal build or approve the remaining Showroom Blueprint.
 **Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
 Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
