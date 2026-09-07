@@ -74,11 +74,25 @@ describe("Supplier Claims factual Register and owning object", () => {
   it("uses facts and truthful totals without a local Work queue", () => {
     show();
     expect(claimsQuery).toHaveBeenCalledWith("all");
-    expect(screen.getByText("2 claims · 4 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("2 claims · 4 units")).toBeInTheDocument();
     expect(screen.queryByText("Next move")).not.toBeInTheDocument();
     expect(screen.queryByText("Queues")).not.toBeInTheDocument();
     expect(screen.queryByText("New Claim")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "SC-1001" })).toBeInTheDocument();
+  });
+  it("separates PO, GRN, product name and size into their own cells", () => {
+    claimsQuery.mockReturnValue({ data: { claims: [row({
+      product_description: "Carres Cloud", product_variant: "Super Single",
+      warehouse_receipt_id: "receipt-1", grn_no: "GRN-20260907-1",
+    })] }, isLoading: false, isError: false });
+    show();
+    const po = screen.getByRole("link", { name: "PO-2050" });
+    const grn = screen.getByRole("link", { name: "GRN-20260907-1" });
+    expect(po.closest("td")).not.toBe(grn.closest("td"));
+    expect(within(po.closest("td")!).getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByText("Carres Cloud").closest("td")).not.toBe(screen.getByText("Super Single").closest("td"));
+    expect(screen.getByRole("columnheader", { name: /Supplier Claim No/ })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: /^Source/ })).not.toBeInTheDocument();
   });
   it("keeps the inspector read-only and opens the full Claim", () => {
     show(); fireEvent.click(screen.getByTestId("claim-inspect-SC-1001"));
@@ -122,18 +136,18 @@ describe("Supplier Claims factual Register and owning object", () => {
     claimsQuery.mockReturnValue({ isError: true, error: Object.assign(new Error("Access denied"), { status: 403 }), refetch: vi.fn() });
     show(); expect(screen.getByRole("alert")).toHaveTextContent("You do not have access to Supplier Claims.");
     expect(screen.queryByText("No matching claims.")).not.toBeInTheDocument();
-    expect(screen.queryByText("0 claims · 0 affected quantity")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 claims · 0 units")).not.toBeInTheDocument();
   });
   it("filters by a factual supplier and retains the result after viewing a Claim", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: "Hooka 1" }));
-    expect(screen.getByText("1 of 2 claims · 2 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "SC-1001" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "SC-1002" }));
     fireEvent.click(screen.getByRole("link", { name: "Supplier Claims" }));
-    expect(screen.getByText("1 of 2 claims · 2 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByText("2 claims · 4 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("2 claims · 4 units")).toBeInTheDocument();
   });
   it("keeps a missing object distinct from an empty register", () => {
     show("/operation?tab=claims&claim=missing"); expect(screen.getByText("Claim is not available.")).toBeInTheDocument();
@@ -160,8 +174,8 @@ describe("Supplier Claims factual Register and owning object", () => {
     claimsQuery.mockReturnValue({ data: { claims: [row(), row({ id: "c3", claim_no: "", po_id: "", supplier_name: "Hooka" })] }, isLoading: false, isError: false });
     show();
     fireEvent.click(screen.getByTestId("claims-rail-evidence-Source not linked"));
-    expect(screen.getByText("1 of 2 claims · 2 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
-    expect(screen.getByText("1 of 2 claims · 2 affected quantity")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 claims · 2 units")).toBeInTheDocument();
   });
 });

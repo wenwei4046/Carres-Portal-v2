@@ -107,6 +107,19 @@ export default function FinanceReports() {
         </div>
       </header>
 
+      {/* Payment MASTER §16 — Reports → Payment is a first-class destination
+          of this shared Reports page, not a hidden route. */}
+      <Link to="/finance/reports/payment" data-testid="reports-payment-door"
+        className="mb-6 flex items-center justify-between rounded-md border border-border bg-card px-4 py-3 hover:bg-muted/40">
+        <span>
+          <span className="block text-meta font-semibold">Payment</span>
+          <span className="block text-label text-muted-foreground">
+            Money received · Customer balances · Storage charged and collected · Storage
+            waived · Payment corrections · Money needing review</span>
+        </span>
+        <span className="text-label text-muted-foreground">Open →</span>
+      </Link>
+
       <div className="grid grid-cols-4 gap-3.5 mb-6">
         <FinanceKpi
           label={`Revenue · ${latest?.m ?? "—"}`}

@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -109,6 +109,11 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
     customer_email: string | null;
     order_lines: Array<{ unit_price: number | string; qty: number }>;
     order_addons: Array<{ unit_price: number | string; qty: number }>;
+    invoices?: Array<{
+      kind: string; status: string; amount: number | string;
+      tax_amount: number | string; voided_at: string | null;
+      replaces_invoice_id: string | null;
+    }>;
   };
 }
 
@@ -131,6 +136,19 @@ function orderTotal(order: { order_lines: Array<{ unit_price: number | string; q
   const lines = (order.order_lines ?? []).reduce((s, l) => s + Number(l.unit_price) * l.qty, 0);
   const addons = (order.order_addons ?? []).reduce((s, a) => s + Number(a.unit_price) * a.qty, 0);
   return lines + addons;
+}
+
+/** The SO's live storage obligations (0438 papers) — the same rule the shared
+ *  `soRemaining` prints: an ISSUED storage-kind invoice with its tax, plus a
+ *  DRAFT that replaces a voided one (the correction keeps the money owed). A
+ *  storage fee is money the customer owes (payment/MASTER.md §2), so the link
+ *  cap includes it; the invariant is unchanged — a payment may never exceed
+ *  what is owed, and `paid` is subtracted ONCE from the combined obligation. */
+function storageObligations(order: { invoices?: Array<{ kind: string; status: string; amount: number | string; tax_amount: number | string; voided_at: string | null; replaces_invoice_id: string | null }> }): number {
+  return (order.invoices ?? [])
+    .filter((i) => i.kind !== "sales" && !i.voided_at
+      && (i.status === "issued" || (i.status === "draft" && i.replaces_invoice_id != null)))
+    .reduce((s, i) => s + Number(i.amount) + Number(i.tax_amount), 0);
 }
 
 // POST /:id/stripe/checkout — mint one Checkout link for RM<amount>.
@@ -160,7 +178,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  const outstanding = Math.max(0, total - Number(order.paid));
+  const outstanding = Math.max(0, total + storageObligations(order) - Number(order.paid));
   if (outstanding <= 0) {
     return c.json(
       { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },

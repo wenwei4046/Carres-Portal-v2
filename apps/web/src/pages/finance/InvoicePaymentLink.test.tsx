@@ -54,7 +54,7 @@ function show() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const onClose = vi.fn();
   render(<QueryClientProvider client={qc}>
-    <InvoicePaymentLink invoice={invoice} onClose={onClose} />
+    <InvoicePaymentLink invoice={invoice} rows={[invoice]} onClose={onClose} />
   </QueryClientProvider>);
   return { onClose };
 }

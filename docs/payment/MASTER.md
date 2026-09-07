@@ -591,6 +591,109 @@ the storage-foundation blocker above (the signed-in browser's frozen renderer); 
 behaviour — including the real INV number minted inside the rolled-back probe — is
 production-proven.
 
+### BUILD — one money answer: the reader audit, 2026-09-07
+
+Every Payment reader of "what this SO still needs" was audited against the §2 model and
+converged on the ONE shared `soRemaining` arithmetic (SO across every live invoice kind;
+`orders.paid` subtracted exactly once): the Calendar card, the Reports listings, the
+Register's `Needed` cells and number filter, the Register FOOTER (a real defect found and
+fixed — it summed the SO's outstanding once per ROW, so an SO carrying Sales and Storage
+papers was double-counted; each SO with a live visible row now counts exactly once), the
+Invoice object's Money section (`includes storage RM x` named), the timing's paid check
+(an SO settled on goods but owing storage is NOT `paid` — the collection door stays open),
+the Record payment prefill, the Ask-to-pay `{outstanding}` fact, and the payment link's
+prefill AND server cap (the cap is now goods value + live storage obligations − paid, the
+subtract-once shape; the invariant — a payment may never exceed what is owed — is
+unchanged, and a link can now collect a storage fee).
+
+**The obligation model, stated precisely.** Goods obligation reads the order's own live
+value (priced lines/addons; the keyed imported balance is the explicit LEGACY FALLBACK for
+unpriced imported rows, and it is already an outstanding, so nothing subtracts `paid` from
+it twice). The issued Sales Invoice equals that value at issue by construction (the paper
+snapshots it; corrections travel revision → void/replace), and reading the value keeps the
+money visible BEFORE a paper is prepared. Storage obligation reads the SO's live ISSUED
+storage-kind invoices with tax, PLUS a draft that REPLACES a voided one — the 0429
+correction lineage exists precisely so an obligation survives its void, and the reader must
+not lose the money between void and reissue (test-pinned); a fresh draft asks nothing and a
+voided paper is dead.
+
+**REAL GAP / CONTRADICTION — two storage money sources.** The shared Work engine and the
+Delivery money gate read the LEGACY C9 storage figure (`storageHold` over
+`ops_order_control.storage_from / storage_fee_override / imported fees /
+storage_waiver_status` — the shipped release-and-waiver ruling), NOT the 0436/0438 case-and-
+invoice model. Until they converge: an SO whose storage exists only as a 0438 Storage
+Invoice does not hold its DO through the gate, and a fee keyed only in the legacy columns
+never reaches Payment's invoice arithmetic. The goods side of the gate reads the same
+`orderMoney` stores and stays consistent. Converging the gate is its OWN slice and must
+carry the C9 semantics across (a manager's release lifts the HOLD and never forgives the
+money) — the gate is the money-in-full law's enforcement point and is not changed casually
+in a reader audit. Work's inline combined formula
+(`sales-order-work-source`) and `soRemaining` are the same subtract-once law with the two
+different storage sources above; they unify when the gate does.
+
+### BUILD — the storage facts are immutable, and a case can close, 2026-09-07
+
+Migration `0439` makes the §6 permanence STRUCTURAL instead of disciplinary: a BEFORE
+UPDATE trigger refuses any change to the witnessed facts, the derived start or the rule
+snapshot (even a definer-function bug or a privileged hand cannot recalculate an old case),
+refuses rolling `billed_through_period` backwards (a paper, once minted, is corrected
+through the 0429 void lineage — never un-billed by an update), and refuses reopening a
+closed case. `payment_storage_close` is the one closing door — Operation/principal, a
+stated reason, the order history fact — and a closed case refuses charging, extra-free
+decisions and every other door. The case card gains `End storage` (reason first) and a
+closed case shows history with no doors. The rolled-back production probe passed with
+negative controls: start/snapshot edits refused · billed rollback refused · close stored ·
+charge and extra-free refused on the closed case · reopen refused · double close refused ·
+unknown caller refused. Supplier/Carres delay staying unchargeable is structural (a charge
+derives only from a start that REQUIRES the readiness witness); mixed product groups run as
+separate cases per 0436; automatic close on delivery completion is Delivery-side wiring and
+stays a named next step.
+
+### BUILD — export, waivers on the report, the visible Reports door, and the §13 convergence, 2026-09-07
+
+Reports → Payment gains: **Export Excel** (one sheet per section, computed at export time
+from the same reads — the report still stores nothing); the **Storage waived** section now
+lists every approved free-storage decision with its free-until date, reason and approver's
+NAME (the §11 promise; the same case wire the Storage section reads, approver resolved
+server-side so an id never reaches the screen); and the shared `Finance → Reports` page
+carries a first-class **Payment** door card — the destination is discoverable, not a bare
+route. The §13 convergence, non-destructively: **Refunds & Credit Notes is now READ-ONLY
+history** — the create door and its modal left with the ruling (Carres has a no-refund
+policy; the exceptional path runs Service Case → Management decision → Finance external
+transfer, said on the page); the data, the list read and the API route remain untouched.
+**Recon** keeps its function and gains the governed note (Finance checks the bank outside
+daily Payment; the workspace is scheduled to retire under §13). Destructive retirement of
+either surface still requires its own explicit authorization and has not been performed.
+
+### Stripe business verification — what is proven, and what live keys refuse
+
+A rolled-back production probe proved the §16 Online-link money contract end-to-end on the
+real posting service: a paid session posts Payment + Receipt atomically (`orders.paid`
+moved once, an `RC-` receipt minted, the session flipped to paid); the DUPLICATE
+callback/poll answers `already` and records nothing twice (one live payment per session
+key, money unchanged); an unpaid expiry posts nothing and the amount needed stays
+unchanged. Creation with the exact amount and expiry is covered by the route tests and the
+signed-in production walk of the composition. The one unexercised path is a FRESH live
+end-to-end payment: the production Stripe keys are LIVE mode (`cs_live_` sessions on
+record), so a real end-to-end verification would mint a genuinely payable link — refused
+deliberately; a Stripe TEST-mode key set would unlock it and is noted as an owner-side
+option, not requested.
+
+### Verification evidence — the four categories, stated separately
+
+Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
+convergence + served-bundle strings — proves the code shipped, nothing more) ·
+**AUTHENTICATED INTERACTION** (signed-in production DOM walks — proves the interactions,
+not the pixels) · **VISUAL INSPECTION** (a human-visible rendered page at real sizes and
+real browser zoom) · **BUSINESS VERIFICATION** (the business outcome proven end-to-end —
+rolled-back production probes with negative controls, or a live walk that exercises the
+rule). Current standing: deployment evidence exists for every shipped slice; authenticated
+interaction walks exist for the Calendar, Reports and the payment-link door; DB-layer
+business verification exists for every migration (probes) and the §7 arithmetic; **visual
+inspection and native-200%-zoom acceptance exist for NO slice** — they need a visible
+signed-in browser window, and automation cannot drive the browser-chrome zoom control; the
+Storage journey's authenticated interaction walk is also still owed (frozen renderer).
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
 Message assembly with bank routing and Partner contact, storage

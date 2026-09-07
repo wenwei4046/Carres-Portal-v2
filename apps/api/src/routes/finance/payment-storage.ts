@@ -26,7 +26,10 @@ paymentStorageRouter.get("/", async (c) => {
   }
   const orderId = c.req.query("orderId");
   const sb = userClient(c.env, auth.jwt);
-  let query = sb.from("payment_storage_cases").select("*")
+  // The approver resolves to a NAME — a stored id never reaches the screen
+  // untranslated (COPY-STANDARD); §11 wants every waiver with its approver.
+  let query = sb.from("payment_storage_cases")
+    .select("*, approved_by_user:app_users!payment_storage_cases_approved_by_fkey(name)")
     .order("created_at", { ascending: false });
   if (orderId) {
     const check = z.string().uuid().safeParse(orderId);
@@ -111,6 +114,28 @@ paymentStorageRouter.post("/charge", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data as Record<string, unknown>, 201);
+});
+
+const closeInput = z.object({
+  caseId: z.string().uuid(),
+  reason: z.string().trim().min(1, "The reason is required.").max(300),
+});
+
+// 0439 — the one closing door: the storage ended. A closed case refuses
+// charging, extra-free decisions and reopening (trigger-guarded).
+paymentStorageRouter.post("/close", async (c) => {
+  const parsed = await parseJsonBody(c, closeInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("payment_storage_close", {
+    p_case_id: parsed.data.caseId,
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ case: data });
 });
 
 export default paymentStorageRouter;

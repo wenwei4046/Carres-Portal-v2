@@ -36,7 +36,7 @@ function show() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <InvoiceRecordPayment invoice={INVOICE} onClose={vi.fn()} />
+      <InvoiceRecordPayment invoice={INVOICE} rows={[INVOICE]} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }

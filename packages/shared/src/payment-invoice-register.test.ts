@@ -146,6 +146,35 @@ describe("soRemaining — the SO across every live invoice kind", () => {
     }));
     expect(soRemaining(keyed, "o1").outstanding).toBe(658);
   });
+  it("a voided storage paper is dead, but its DRAFT replacement keeps the money owed", () => {
+    const rows = [
+      { ...row({ paid: 400 }), id: "i-sales", kind: "sales", status: "issued" },
+      // The correction in flight: voided RM150 with a draft replacement RM150.
+      { ...row({ paid: 400 }), id: "i-void", kind: "storage", status: "voided",
+        voided_at: "2026-09-06", amount: 150 },
+      { ...row({ paid: 400 }), id: "i-replacement", kind: "storage", status: "draft",
+        amount: 150, replaces_invoice_id: "i-void" },
+      // A FRESH draft (no lineage) still asks nothing.
+      { ...row({ paid: 400 }), id: "i-fresh-draft", kind: "additional_storage",
+        status: "draft", amount: 60 },
+    ] as InvoiceRegisterRow[];
+    // 1000 + 150 (replacement) − 400 = 750 — the void did not lose the money
+    // and the dead paper did not double it.
+    expect(soRemaining(rows, "o1")).toMatchObject({ outstanding: 750, storageOwing: 150 });
+  });
+  it("the timing's paid check is the SO across kinds when the rows are given", () => {
+    // Goods fully paid, storage RM150 issued, delivery confirmed and past —
+    // WITH the rows the SO is not `paid`; without them the goods answer stands.
+    const rows = [
+      { ...row({ paid: 1000, control: { confirmed_date: "2026-09-01",
+        line_stock_status: { A: "ready" } } }), id: "i-sales", kind: "sales", status: "issued" },
+      { ...row({ paid: 1000, control: { confirmed_date: "2026-09-01",
+        line_stock_status: { A: "ready" } } }), id: "i-storage", kind: "storage",
+        status: "issued", amount: 150 },
+    ] as InvoiceRegisterRow[];
+    expect(invoicePaymentTiming(rows[0], TODAY, OPTS).timing.kind).toBe("paid");
+    expect(invoicePaymentTiming(rows[0], TODAY, OPTS, rows).timing.kind).not.toBe("paid");
+  });
   it("an unpriced SO stays honestly unknown, and an absent SO answers nothing", () => {
     const unknown = so().map((r) => ({
       ...r, orders: r.orders ? { ...r.orders, order_lines: [] } : r.orders,
