@@ -1126,6 +1126,10 @@ export {
   carresExecutionMeaning,
   isCarresExecution,
   type CarresExecution,
+  // §9.5 — the source-search continuation for source-free stock Cases.
+  CLAIM_SOURCE_SEARCH_WORDS,
+  stockCaseSourceSearchWorkItems,
+  type StockCaseSourceSearchInput,
 } from "./supplier-claim";
 
 // R6 · The warehouse files its own receiving — a queued call to R1's engine

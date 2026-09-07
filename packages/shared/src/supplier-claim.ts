@@ -49,6 +49,11 @@ import {
 // R8 — the claim's one dictionary-backed step is worded by the mirror, never
 // here. COPY-STANDARD, PURCHASING: `Confirm what happens next`.
 import { purchasingActionLine } from "./order-action-words";
+import { addWorkingDays, countWorkingDays } from "./working-days";
+import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import { myHolidaySet } from "./my-holidays";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
+import type { WorkItem } from "./work-engine";
 
 // ── The claim type ───────────────────────────────────────────────────────────
 
@@ -771,4 +776,68 @@ export function supplierClaimSummary(c: {
 }): string {
   const units = `${c.qty} unit${c.qty === 1 ? "" : "s"}`;
   return `${units} · ${supplierClaimTypeLabel(c.claim_type)} · ${c.sku}`;
+}
+
+// ── §9.5 · the source-search continuation ────────────────────────────────────
+//
+// A source-free stock report SAVES its Case and creates Purchasing
+// source-search work — never a guessed source, supplier or Unit ID
+// (purchasing/MASTER.md §9.5, "Source or Unit cannot be found"). The words are
+// the MASTER's own dictionary row; the owner is the CURRENT PO Duty holder or
+// cover through the one shared resolver (the opening-month rule is stale —
+// owner ruling 2026-09-06). The work completes when a supplier claim with a
+// verified purchase source links the Case.
+
+export const CLAIM_SOURCE_SEARCH_WORDS = {
+  problem: "The purchase source is not recorded",
+  action: "Check the Unit label and link its purchase record",
+} as const;
+
+export interface StockCaseSourceSearchInput {
+  id: string;
+  caseNo: string;
+  /** ISO day the Case was opened; §9.5 intake timing makes the source check
+   *  due the NEXT Office working day. */
+  openedAt: string | null;
+  customerImpact: "customer" | "stock_only" | null | undefined;
+  /** True when any supplier claim links this Case — the claim writer already
+   *  verified the original purchase source, so the search is complete. */
+  hasVerifiedSource: boolean;
+}
+
+/** The Case supplies the same source-search facts to central Work; no local
+ *  queue, no second assignment list. */
+export function stockCaseSourceSearchWorkItems(
+  cases: readonly StockCaseSourceSearchInput[],
+  owner: WorkspaceDutyResolution | null,
+  today: string,
+  holidays: ReadonlySet<string> = myHolidaySet(),
+): WorkItem[] {
+  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  return cases
+    .filter((c) => c.customerImpact === "stock_only" && !c.hasVerifiedSource)
+    .map((c) => {
+      const due = c.openedAt ? addWorkingDays(c.openedAt.slice(0, 10), 1, options) : null;
+      return {
+        ruleKey: "claims.link_source",
+        module: "claims" as const,
+        soRef: c.caseNo,
+        orderId: c.id,
+        action: CLAIM_SOURCE_SEARCH_WORDS.action,
+        ownerRule: "po_duty" as const,
+        ownerDutyKey: "po_duty",
+        normalOwner: owner?.normalOwner ?? null,
+        activeCover: owner?.activeCover ?? null,
+        actingPerson: owner?.actingPerson ?? null,
+        ownerState: owner?.state ?? "not_assigned",
+        ownerName: owner?.actingPerson?.name ?? null,
+        ownerUserId: owner?.actingPerson?.userId ?? null,
+        ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
+        tone: "warning" as const,
+        locked: false,
+        broken: false,
+        dueIso: due,
+        workingDaysLate: due && due < today ? countWorkingDays(due, today, options) : 0,
+      };
+    });
 }

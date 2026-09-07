@@ -253,6 +253,29 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
   });
 
+  it("files unsold stock without a customer or customer confirmation", async () => {
+    const onSaved = vi.fn();
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={onSaved} />));
+    await click(screen.getByRole("button", { name: "Warehouse" }));
+    await click(screen.getByRole("button", { name: /No sales order/ }));
+    await click(screen.getByRole("button", { name: "Unsold stock" }));
+    expect(screen.queryByLabelText("Customer name")).toBeNull();
+    await click(screen.getByRole("button", { name: "Bed frame" }));
+    await click(screen.getByRole("button", { name: "Next" }));
+    await click(screen.getByRole("button", { name: "Missing parts" }));
+    expect(screen.queryByText("What does the customer want?")).toBeNull();
+    expect(screen.getByText(/Unsold stock. No customer affected./)).toBeInTheDocument();
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem");
+    await click(screen.getByRole("button", { name: "Create Case" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const post = apiFetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")!;
+    const body = JSON.parse((post[1] as RequestInit).body as string);
+    expect(body).toMatchObject({ customerImpact: "stock_only", customerName: "", customerWants: [] });
+    expect(body.usable).toBeUndefined();
+    expect(body.orderId).toBeUndefined();
+  });
+
   it("still lets a case be filed when there is no sales order", async () => {
     // Every service case on file today has no linked order — the wizard must
     // not dead-end there.

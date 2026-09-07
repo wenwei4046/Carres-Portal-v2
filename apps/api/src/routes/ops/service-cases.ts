@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
+import { mapPgError } from "../../lib/route-helpers";
 import {
   CASE_EVIDENCE_BUCKET,
   caseCloseBlockerMessage,
@@ -67,6 +69,55 @@ const scRouter = new Hono<AppEnv>();
  */
 const CASE_SELECT =
   "*, service_case_types(label), service_case_statuses(label,is_closed), orders(so), suppliers(name)";
+
+/** Case-owned source-search facts; central Work only projects this read. */
+scRouter.get("/source-search", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const items = [];
+  for (let from = 0; ; from += 200) {
+    const { data, error } = await sb.from("service_cases")
+      .select("id, case_no, opened_at, customer_impact, service_case_statuses(is_closed), supplier_claims(id)")
+      .eq("customer_impact", "stock_only").order("id").range(from, from + 199);
+    if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+    for (const row of data ?? []) {
+      const raw = row as unknown as { id: string; case_no: string; opened_at: string; service_case_statuses: { is_closed: boolean } | null; supplier_claims: { id: string }[] };
+      if (!raw.service_case_statuses?.is_closed) items.push({
+        id: raw.id, caseNo: raw.case_no, openedAt: raw.opened_at,
+        customerImpact: "stock_only", hasVerifiedSource: raw.supplier_claims.length > 0,
+      });
+    }
+    if ((data?.length ?? 0) < 200) break;
+  }
+  return c.json({ items });
+});
+
+scRouter.post("/:id/supplier-claims", requireOperationOrPrincipal, async (c) => {
+  const caseId = z.string().uuid().safeParse(c.req.param("id"));
+  if (!caseId.success) throw new HTTPException(400, { message: "Invalid Case identity." });
+  const parsed = await parseBody(c, z.object({ claimId: z.string().uuid() }));
+  const { data, error } = await userClient(c.env, c.var.auth.jwt).rpc("service_case_link_supplier_claim", {
+    p_case_id: caseId.data, p_claim_id: parsed.claimId,
+  });
+  if (error?.code === "23505") return c.json({ error: "conflict", message: error.message }, 409);
+  if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+  return c.json(data);
+});
+
+scRouter.get("/:id/supplier-claims", requireOperationOrPrincipal, async (c) => {
+  const id = z.string().uuid().safeParse(c.req.param("id"));
+  if (!id.success) throw new HTTPException(400, { message: "Invalid Case identity." });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const claims: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += 200) {
+    const { data, error } = await sb.from("supplier_claims")
+      .select("id, claim_no, sku, qty, status").eq("case_id", id.data)
+      .order("id").range(from, from + 199);
+    if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+    claims.push(...(data ?? []));
+    if ((data?.length ?? 0) < 200) break;
+  }
+  return c.json({ claims });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /config — config-driven Case Type + Status (active only, sorted)
@@ -187,7 +238,7 @@ scRouter.get("/numbers", requireOperationOrPrincipal, async (c) => {
   const { data, error } = await sb
     .from("service_cases")
     .select(
-      "id, case_no, opened_at, product_category, issue_type, progress, sla_events, service_case_statuses(is_closed), suppliers(name)",
+      "id, case_no, customer_impact, opened_at, product_category, issue_type, progress, sla_events, service_case_statuses(is_closed), suppliers(name)",
     )
     .gte("opened_at", from);
   if (error) throw new HTTPException(500, { message: error.message });
@@ -195,6 +246,7 @@ scRouter.get("/numbers", requireOperationOrPrincipal, async (c) => {
   const cases: CaseNumbersCase[] = ((data ?? []) as unknown as NumbersRow[]).map((r) => ({
     id:              r.id,
     caseNo:          r.case_no,
+    customerImpact:  r.customer_impact ?? null,
     openedAt:        r.opened_at,
     closed:          r.service_case_statuses?.is_closed ?? false,
     productCategory: r.product_category ?? null,
@@ -294,6 +346,9 @@ function shapeEvidence(raw: unknown): {
   at: string;
   by: string;
   byRole: string;
+  /** Receiving-referenced files name their SOURCE bucket (MASTER §9.5: the
+   *  claim's photos are referenced, never copied). Absent = the Case bucket. */
+  bucket: string | null;
 }[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((e) => {
@@ -305,6 +360,7 @@ function shapeEvidence(raw: unknown): {
       at: String(r.at ?? ""),
       by: String(r.by ?? ""),
       byRole: String(r.by_role ?? ""),
+      bucket: r.bucket ? String(r.bucket) : null,
     };
   });
 }
@@ -336,12 +392,14 @@ function shapeProgress(raw: unknown): CaseProgressEntry[] {
 
 /** The parties whose names the chain's labels carry. */
 function followUpInput(r: {
+  customer_impact?: "customer" | "stock_only" | null;
   customer_wants?: string[] | null;
   customer_name?: string | null;
   suppliers?: { name: string } | { name: string }[] | null;
 }): CaseFollowUpInput {
   const sup = Array.isArray(r.suppliers) ? r.suppliers[0] : r.suppliers;
   return {
+    customerImpact: r.customer_impact ?? null,
     customerWants: (r.customer_wants ?? []) as CaseWantKey[],
     customerName:  r.customer_name ?? null,
     supplierName:  sup?.name ?? null,
@@ -460,6 +518,30 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
     }
   }
 
+  if (parsed.customerImpact === "stock_only") {
+    // One permanent report identity survives a lost response. The RPC owns the
+    // atomic retry check and actor stamp; a source-free report names no supplier.
+    const { data, error } = await sb.rpc("service_case_create_stock_report", {
+      p_report_id: parsed.draftId,
+      p_payload: {
+        reported_by: parsed.reportedBy,
+        product_sku: parsed.productSku ?? null,
+        product_category: parsed.productCategory,
+        issue_type: parsed.issueType,
+        what_happened: parsed.whatHappened ?? null,
+        // The reporter's real Unit label. The RPC resolves it against the Unit
+        // register and either matches only the verified source occurrence for that Unit + problem
+        // or preserves the label for Purchasing source search — never a guess.
+        ...(parsed.unitCode ? { unit_code: parsed.unitCode } : {}),
+        ...(parsed.receivingUnitResultId ? { receiving_unit_result_id: parsed.receivingUnitResultId } : {}),
+        evidence,
+      },
+    });
+    if (error) { const mapped = mapPgError(error); return c.json(mapped.body, error.code === "23505" ? 409 : mapped.status); }
+    if (!data) throw new HTTPException(500, { message: "Could not save the report." });
+    return c.json(data, 201);
+  }
+
   // S3 — which factory this is about, so the follow-up can name it.
   const supplierId = await resolveSupplierId(sb, parsed.productSku);
 
@@ -562,6 +644,9 @@ scRouter.patch("/:id", requireOperationOrPrincipal, async (c) => {
       if (!row) throw new HTTPException(404, { message: "Service case not found" });
 
       const cur = row as unknown as RawCase;
+      if (cur.customer_impact === "stock_only" && target?.is_closed) {
+        return c.json({ error: "invalid_input", code: "product_outcome_required", message: "Record the authorised item and supplier outcomes before closing this Case." }, 422);
+      }
       const alreadyClosed = cur.service_case_statuses?.is_closed ?? false;
       if (!alreadyClosed) {
         const open = caseOpenSteps(
@@ -632,11 +717,25 @@ scRouter.get("/:id/evidence", requireOperationOrPrincipal, async (c) => {
   const entries = shapeEvidence(row.evidence);
   if (entries.length === 0) return c.json({ evidence: [] });
 
+  const receivingPaths = new Set<string>();
+  if (entries.some((e) => e.bucket === "delivery-orders")) {
+    const { data: sources, error: sourceError } = await sb.from("supplier_claims")
+      .select("photos").eq("case_id", id);
+    if (sourceError) throw new HTTPException(500, { message: sourceError.message });
+    for (const source of sources ?? []) {
+      for (const photo of Array.isArray(source.photos) ? source.photos : []) {
+        if (typeof photo?.path === "string") receivingPaths.add(photo.path);
+      }
+    }
+  }
   const admin = adminClient(c.env);
   const evidence = await Promise.all(
     entries.map(async (e) => {
+      if (e.bucket && e.bucket !== CASE_EVIDENCE_BUCKET && (e.bucket !== "delivery-orders" || !receivingPaths.has(e.path))) return { ...e, url: null };
+      // A receiving-referenced file signs from ITS bucket — the claim photo is
+      // referenced where it lives, never copied into the Case bucket.
       const { data: signed } = await admin.storage
-        .from(CASE_EVIDENCE_BUCKET)
+        .from(e.bucket === "delivery-orders" ? "delivery-orders" : CASE_EVIDENCE_BUCKET)
         .createSignedUrl(e.path, 3600);
       // `url: null` rather than dropping the row: a file that cannot be signed
       // right now still EXISTS, and a ledger that quietly shortens is a ledger
@@ -716,6 +815,9 @@ scRouter.post("/:id/progress", requireOperationOrPrincipal, async (c) => {
   if (!row) throw new HTTPException(404, { message: "Service case not found" });
 
   const cur      = row as unknown as RawCase;
+  if (cur.customer_impact === "stock_only") {
+    return c.json({ error: "invalid_input", message: "Customer follow-up does not apply to unsold stock." }, 422);
+  }
   const progress = shapeProgress(cur.progress);
 
   // One outcome per step. A second record would make "when did it happen"
@@ -795,6 +897,9 @@ scRouter.post("/:id/sla", requireOperationOrPrincipal, async (c) => {
   if (!row) throw new HTTPException(404, { message: "Service case not found" });
 
   const cur  = row as unknown as RawCase;
+  if (cur.customer_impact === "stock_only") {
+    return c.json({ error: "invalid_input", message: "Customer deadlines do not apply to unsold stock." }, 422);
+  }
   const opts = { holidays: myHolidaySet() };
 
   const clock = caseSlaClock(
@@ -902,6 +1007,7 @@ function shapeSlaEvents(raw: unknown): CaseSlaEvent[] {
  *  reported, and which status it carries), so a case filed before S1/S3/S4
  *  counts rather than crashing the read. */
 interface NumbersRow {
+  customer_impact?: "customer" | "stock_only" | null;
   id: string;
   case_no: string;
   opened_at: string;
@@ -924,6 +1030,7 @@ interface OrderRow {
 }
 
 interface RawCase {
+  customer_impact?: "customer" | "stock_only" | null;
   id: string;
   case_no: string;
   order_id: string | null;
@@ -977,6 +1084,7 @@ function shapeCase(r: RawCase) {
     orderId:             r.order_id,
     refNo:               r.ref_no,
     customerName:        r.customer_name,
+    customerImpact:      r.customer_impact ?? null,
     customerPhone:       r.customer_phone,
     customerAddress:     r.customer_address,
     caseTypeId:          r.case_type_id,

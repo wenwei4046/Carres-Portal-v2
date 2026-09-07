@@ -219,7 +219,7 @@ export default function OperationServiceCases() {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-base-900 text-body">{r.customerName || "—"}</div>
+                    <div className="text-base-900 text-body">{r.customerImpact === "stock_only" ? "Unsold stock" : r.customerName || "—"}</div>
                     {r.refNo && <div className="text-meta text-base-500 font-mono">{r.refNo}</div>}
                   </td>
                   <td className="px-3 py-2 max-w-xs">
@@ -239,7 +239,7 @@ export default function OperationServiceCases() {
                     {fmtDate(r.openedAt)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <DeadlineCell clock={clock} />
+                    {r.customerImpact === "stock_only" ? "—" : <DeadlineCell clock={clock} />}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button
@@ -283,6 +283,7 @@ export default function OperationServiceCases() {
  */
 function NextStepCell({ row, clock }: { row: ServiceCase; clock: CaseSlaClock }) {
   if (row.statusIsClosed) return <span className="text-meta text-base-500">Done</span>;
+  if (row.customerImpact === "stock_only") return <span className="text-body text-base-700">Open Case</span>;
 
   const open = caseOpenSteps(
     caseFollowUpPlan({

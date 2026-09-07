@@ -69,7 +69,6 @@ export type WorkOwnerRule =
    * feed wiring cannot misresolve a month (their feeds are not composed by
    * `workItemsForOrder`; Card 9's recorded boundary): */
   | "grn_duty" // the effective GRN Duty resolution from Workspace
-  | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
   | "purchasing_approver";
 
 export interface WorkRule {
@@ -354,12 +353,25 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
   {
     key: "claims.confirm_what_happens_next",
     module: "claims",
+    /* The opening-month owner rule this entry once carried is STALE — MASTER
+     * §9.5 (owner ruling 2026-09-06): keep historical holder evidence, route
+     * CURRENT work to the current PO Duty/cover through the one resolver. */
     trigger: "a claim has the supplier's answer and no Carres resolution",
-    owner: "the PO-duty holder of the month the claim was OPENED — forever",
-    ownerRule: "claim_month_po_duty",
+    owner: "the current PO Duty holder or cover from the Shared Duty Resolver",
+    ownerRule: "po_duty",
     action: "Confirm what happens next",
     dueRule: "no clock yet — the claims queue lists it until resolved",
     completionFact: "customer_resolution recorded (supplier_claims, 0324)",
+  },
+  {
+    key: "claims.link_source",
+    module: "claims",
+    trigger: "a stock-only Case has no verified purchase source (§9.5 source-gap rule)",
+    owner: "the current PO Duty holder or cover from the Shared Duty Resolver",
+    ownerRule: "po_duty",
+    action: "Check the Unit label and link its purchase record",
+    dueRule: "the next Office working day after intake (§9.5 intake timing)",
+    completionFact: "a supplier claim with a verified source links the Case (supplier_claims.case_id)",
   },
 ];
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Search, X } from "lucide-react";
+import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import {
   CASE_REPORTERS,
@@ -91,6 +92,12 @@ export default function ServiceCaseWizard({
   const [manualCategory, setManualCategory] = useState<CaseProductCategory | null>(null);
   const [manualName, setManualName]         = useState("");
   const [noOrder, setNoOrder]               = useState(false);
+  const [stockOnly, setStockOnly] = useState(false);
+  /** The REAL Unit label on the item, stock-only path. The server resolves it
+   *  against the Unit register: a resolved Unit joins the same open Case for
+   *  that Unit + problem; an unresolved label is saved as the reporter's fact
+   *  and Purchasing searches for the source. Never a guessed source. */
+  const [unitLabel, setUnitLabel] = useState("");
 
   const [note, setNote] = useState("");
 
@@ -126,6 +133,7 @@ export default function ServiceCaseWizard({
   const priority = casePriorityFor(usable);
 
   const answers = {
+    customerImpact: stockOnly ? "stock_only" as const : "customer" as const,
     reportedBy,
     productCategory: category,
     productSku: line?.sku ?? null,
@@ -135,11 +143,11 @@ export default function ServiceCaseWizard({
     customerWants: wants,
   };
 
-  const customerName = (order?.customerName || manualName).trim();
+  const customerName = stockOnly ? "" : (order?.customerName || manualName).trim();
 
   /** S3 — what filing this case sets in motion. Derived from the same answers,
    *  so the preview cannot promise work the case will not carry. */
-  const followUps = caseFollowUpPlan({ customerWants: wants, customerName });
+  const followUps = caseFollowUpPlan({ customerWants: wants, customerName, customerImpact: answers.customerImpact });
 
   const lookupMut = useMutation({
     mutationFn: (term: string) => {
@@ -150,6 +158,7 @@ export default function ServiceCaseWizard({
     },
     onSuccess: (res) => {
       if (res.order) {
+        setStockOnly(false);
         setOrder(res.order);
         setNoOrder(false);
         setLineId(res.order.lines.length === 1 ? res.order.lines[0].id : null);
@@ -172,6 +181,7 @@ export default function ServiceCaseWizard({
         orderId:      order?.id ?? undefined,
         refNo:        order?.refNos[0] ?? undefined,
         customerName,
+        ...(stockOnly ? { customerImpact: "stock_only" } : {}),
         customerPhone:   order?.customerPhone ?? undefined,
         customerAddress: order?.customerAddress ?? undefined,
         // Status starts at the first configured status (Pending). Case Type is
@@ -192,13 +202,22 @@ export default function ServiceCaseWizard({
         // S2 — the evidence. `at` / `by` are NOT sent: the server stamps them.
         draftId,
         evidence,
+
+        // The Unit label the reporter actually read, stock-only path.
+        ...(stockOnly && unitLabel.trim() ? { unitCode: unitLabel.trim() } : {}),
       };
-      return apiFetch("/api/ops/service-cases", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      return apiFetch<{ id: string; caseNo?: string; matchedExisting?: boolean }>(
+        "/api/ops/service-cases",
+        { method: "POST", body: JSON.stringify(body) },
+      );
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // §9.5 duplicate matching: the same Unit with the same problem is ONE
+      // incident. Say so — the reporter must know their photos were added to
+      // the existing Case, not filed as a second one.
+      if (saved?.matchedExisting && saved.caseNo) {
+        toast.success(`This problem is already reported. Your photos were added to Case ${saved.caseNo}.`);
+      }
       qc.invalidateQueries({ queryKey: ["ops", "service-cases"] });
       onSaved();
     },
@@ -211,13 +230,13 @@ export default function ServiceCaseWizard({
 
   const canAdvance: Record<Step, boolean> = {
     1: !!reportedBy,
-    2: (!!line || (noOrder && !!manualCategory)) && customerName.length > 0,
+    2: (!!line || (noOrder && !!manualCategory)) && (stockOnly || customerName.length > 0),
     3: !!issueType,
     4: !!usable,
     5: wants.length > 0,
     6:
       caseIntakeComplete(answers) &&
-      customerName.length > 0 &&
+      (stockOnly || customerName.length > 0) &&
       caseEvidenceComplete(issueType, reportedBy, evidence),
   };
 
@@ -245,7 +264,7 @@ export default function ServiceCaseWizard({
               {step > 1 && (
                 <button
                   type="button"
-                  onClick={() => setStep((step - 1) as Step)}
+                  onClick={() => setStep(stockOnly && step === 6 ? 3 : (step - 1) as Step)}
                   className="text-base-400 hover:text-base-700"
                   aria-label="Back"
                 >
@@ -285,7 +304,7 @@ export default function ServiceCaseWizard({
                   key={r.key}
                   label={r.label}
                   selected={reportedBy === r.key}
-                  onClick={() => { setReportedBy(r.key); setStep(2); }}
+                  onClick={() => { setReportedBy(r.key); if (r.key === "customer") setStockOnly(false); setStep(2); }}
                 />
               ))}
             </div>
@@ -370,6 +389,12 @@ export default function ServiceCaseWizard({
 
               {noOrder && (
                 <div className="space-y-3 rounded border border-base-200 p-3">
+                  {reportedBy !== "customer" && <div className="flex flex-wrap gap-2">
+                    <ChoiceButton label="Customer affected" selected={!stockOnly} onClick={() => setStockOnly(false)} />
+                    <ChoiceButton label="Unsold stock" selected={stockOnly} onClick={() => {
+                      setStockOnly(true); setManualName(""); setUsable(null); setWants([]);
+                    }} />
+                  </div>}
                   <div>
                     <label className="text-meta uppercase tracking-wider text-base-500">
                       What kind of product?
@@ -385,7 +410,7 @@ export default function ServiceCaseWizard({
                       ))}
                     </div>
                   </div>
-                  <div>
+                  {!stockOnly && <div>
                     <label htmlFor="sc-customer-name" className="text-meta uppercase tracking-wider text-base-500">
                       Customer name
                     </label>
@@ -395,7 +420,22 @@ export default function ServiceCaseWizard({
                       onChange={(e) => setManualName(e.target.value)}
                       className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-body"
                     />
-                  </div>
+                  </div>}
+                  {stockOnly && <div>
+                    <label htmlFor="sc-unit-label" className="text-meta uppercase tracking-wider text-base-500">
+                      Unit ID on the item (optional)
+                    </label>
+                    <input
+                      id="sc-unit-label"
+                      value={unitLabel}
+                      onChange={(e) => setUnitLabel(e.target.value)}
+                      placeholder="id-abc123456"
+                      className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-body"
+                    />
+                    <p className="mt-1 text-meta text-base-500">
+                      Copy the Unit ID from the item label. Leave empty if the item has no label.
+                    </p>
+                  </div>}
                 </div>
               )}
             </div>
@@ -414,7 +454,7 @@ export default function ServiceCaseWizard({
                     key={i.key}
                     label={i.label}
                     selected={issueType === i.key}
-                    onClick={() => { setIssueType(i.key); setStep(4); }}
+                    onClick={() => { setIssueType(i.key); setStep(stockOnly ? 6 : 4); }}
                   />
                 ))}
               </div>

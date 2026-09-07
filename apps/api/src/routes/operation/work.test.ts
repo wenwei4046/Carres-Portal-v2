@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import {
   composeOperationWorkResponse,
+  projectClaimSourceSearchWork,
   createOperationWorkRouter,
   manualPurchaseWorkInputsFromRegister,
   receivingWorkSourceFromModuleFacts,
@@ -514,5 +515,27 @@ describe("operation Work response composition", () => {
     });
     expect(item?.completionFact).toContain("outstanding balance is RM 0");
     expect(item?.action).not.toContain("Shasha");
+  });
+});
+
+
+describe("Case source-search Work", () => {
+  it("uses the same Case destination and current cover, excluding verified sources", () => {
+    const cases = [
+      { id: "case-a", caseNo: "SC-1", customerImpact: "stock_only" as const, openedAt: "2026-09-07", hasVerifiedSource: false },
+      { id: "case-b", caseNo: "SC-2", customerImpact: "stock_only" as const, openedAt: "2026-09-07", hasVerifiedSource: true },
+    ];
+    const items = projectClaimSourceSearchWork({ cases, poDuty: {
+      dutyKey: "po_duty", onDate: "2026-09-07", assignmentId: null,
+      normalOwner: { userId: "primary", name: "Primary" },
+      buddy: { userId: "cover", name: "Cover" }, activeCover: { userId: "cover", name: "Cover" },
+      actingPerson: { userId: "cover", name: "Cover" }, state: "covered",
+    }, today: "2026-09-07" });
+    expect(items).toHaveLength(1);
+    expect(items[0].owner.acting?.userId).toBe("cover");
+    expect(items[0].destination).toBe("/operation?tab=service-notes&case=case-a");
+    expect(items[0].object.kind).toBe("service_case");
+    expect(items[0].timing.dueOn).toBe("2026-09-08");
+    expect(composeOperationWorkResponse([items], [], "2026-09-07").items).toHaveLength(1);
   });
 });

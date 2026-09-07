@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import {
   CASE_REPORTERS,
@@ -52,6 +53,13 @@ export default function ServiceCaseModal({
     queryKey: ["ops", "service-cases", id],
     queryFn: () => apiFetch(`/api/ops/service-cases/${id}`),
     enabled: mode === "edit" && !!id,
+  });
+
+  const stockOnly = existingQ.data?.customerImpact === "stock_only";
+  const claimsQ = useQuery<{ claims: { id: string; claim_no: string; sku: string; qty: number; status: string }[] }>({
+    queryKey: ["ops", "service-cases", id, "supplier-claims"],
+    queryFn: () => apiFetch(`/api/ops/service-cases/${id}/supplier-claims`),
+    enabled: mode === "edit" && Boolean(id),
   });
 
   // ── form state ──────────────────────────────────────────────────────────────
@@ -128,7 +136,7 @@ export default function ServiceCaseModal({
       const body = {
         orderId:         orderId ?? undefined,
         refNo:           refNo.trim() || undefined,
-        customerName:    customerName.trim(),
+        customerName:    stockOnly ? undefined : customerName.trim(),
         customerPhone:   customerPhone.trim() || undefined,
         customerAddress: customerAddress.trim() || undefined,
         caseTypeId:      caseTypeId || null,
@@ -149,7 +157,7 @@ export default function ServiceCaseModal({
     },
   });
 
-  const canSave = customerName.trim().length > 0 && !saveMut.isPending;
+  const canSave = (stockOnly || customerName.trim().length > 0) && !saveMut.isPending;
 
   /**
    * S3 — may this case be closed? The same shared answer the server's gate
@@ -157,7 +165,7 @@ export default function ServiceCaseModal({
    * that is ALREADY closed keeps its closing statuses selectable: the rule is
    * about entering the state, not about staying in it.
    */
-  const canClose =
+  const canClose = !stockOnly && (
     (existingQ.data?.statusIsClosed ?? false) ||
     caseMayClose(
       caseFollowUpPlan({
@@ -166,7 +174,7 @@ export default function ServiceCaseModal({
         supplierName:  existingQ.data?.supplierName ?? null,
       }),
       existingQ.data?.progress ?? [],
-    );
+    ));
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
@@ -210,7 +218,7 @@ export default function ServiceCaseModal({
           )}
 
           {/* Order / Ref binding */}
-          <div className="grid grid-cols-2 gap-3">
+          {!stockOnly && <div className="grid grid-cols-2 gap-3">
             <Field label={`Ref No${mode === "create" ? " (alias)" : ""}`}>
               <input value={refNo} onChange={(e) => setRefNo(e.target.value)}
                 className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body font-mono" />
@@ -229,9 +237,9 @@ export default function ServiceCaseModal({
                 )}
               </div>
             </Field>
-          </div>
-
+          </div>}
           {/* Customer */}
+          {stockOnly ? <p className="text-body">Unsold stock. No customer affected.</p> : <>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Customer Name *">
               <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
@@ -246,6 +254,8 @@ export default function ServiceCaseModal({
             <input value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)}
               className="w-full rounded border border-base-300 px-2.5 py-1.5 text-body" />
           </Field>
+
+          </>}
 
           {/* Classification */}
           <div className="grid grid-cols-3 gap-3">
@@ -334,7 +344,7 @@ export default function ServiceCaseModal({
               the chain on purpose: it is the one thing on this screen with a
               date the customer is waiting on. Edit mode only — a case that
               does not exist yet has not been reported. */}
-          {mode === "edit" && id && existingQ.data && (
+          {mode === "edit" && id && existingQ.data && !stockOnly && (
             <CaseDeadline
               caseId={id}
               openedAt={existingQ.data.openedAt ?? null}
@@ -348,7 +358,7 @@ export default function ServiceCaseModal({
               for, so it needs no state of its own and cannot drift from the
               case; only the OUTCOMES are stored. Edit mode only — a case that
               does not exist yet has nothing to follow up. */}
-          {mode === "edit" && id && existingQ.data && (
+          {mode === "edit" && id && existingQ.data && !stockOnly && (
             <CaseFollowUps
               caseId={id}
               answers={{
@@ -359,6 +369,14 @@ export default function ServiceCaseModal({
               progress={existingQ.data.progress ?? []}
             />
           )}
+
+          {mode === "edit" && <div className="space-y-2">
+            <p className="text-strong">Supplier Claims</p>
+            {claimsQ.isError ? <p role="alert">Supplier Claims could not be loaded.</p> : claimsQ.data?.claims.map((claim) => <p key={claim.id}>
+              <Link className="text-kit-blue-11 underline" to={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`}>{claim.claim_no}</Link>
+              {` · ${claim.sku} · ${claim.qty}`}
+            </p>)}
+          </div>}
 
           {/* S2 — the evidence the case was filed with, each file naming who
               uploaded it and when. Edit mode only: on create the wizard owns

@@ -66,9 +66,9 @@ beforeEach(() => {
   photosQuery.mockReturnValue({ data: { photos: [] }, isLoading: false, isError: false });
 });
 describe("Supplier Claims factual Register and owning object", () => {
-  it("does not expose Case writes before their database dependency is released", () => {
+  it("offers the Case link only in the owning object without writing on open", () => {
     show("/operation?tab=claims&claim=c1");
-    expect(screen.queryByRole("button", { name: "Link Case" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link Case" })).toBeInTheDocument();
     expect(apiMock).not.toHaveBeenCalled();
   });
   it("uses facts and truthful totals without a local Work queue", () => {
@@ -86,7 +86,7 @@ describe("Supplier Claims factual Register and owning object", () => {
     expect(within(inspector).queryByRole("combobox")).not.toBeInTheDocument();
     fireEvent.click(within(inspector).getByRole("button", { name: "Open Claim" }));
     expect(screen.getByTestId("claim-object")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Link Case" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link Case" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close claim" })).not.toBeInTheDocument();
   });
   it("opens a closed Claim outside the PO filter and preserves that filter on return", async () => {

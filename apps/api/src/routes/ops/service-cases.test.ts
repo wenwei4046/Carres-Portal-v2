@@ -340,6 +340,40 @@ describe("GET /api/ops/service-cases", () => {
   });
 });
 
+describe("stock-only Case intake", () => {
+  it.each([["42501", 403], ["23505", 409], ["22023", 422]])("preserves a refused source link (%s)", async (code, status) => {
+    const { sb } = buildInsertSb();
+    sb.rpc.mockResolvedValue({ data: null, error: { code, message: "Source link refused" } });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.request(`/api/ops/service-cases/${DRAFT_ID}/supplier-claims`, {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "content-type": "application/json" },
+      body: JSON.stringify({ claimId: DRAFT_ID }),
+    }, env);
+    expect(res.status).toBe(status);
+    expect(sb.rpc).toHaveBeenCalledWith("service_case_link_supplier_claim", { p_case_id: DRAFT_ID, p_claim_id: DRAFT_ID });
+  });
+  it("sends the permanent report ID to the atomic writer without deriving a supplier", async () => {
+    const { sb, inserts } = buildInsertSb();
+    sb.rpc.mockResolvedValue({ data: { id: DRAFT_ID, caseNo: "SC2609-01" }, error: null });
+    const res = await post({
+      customerImpact: "stock_only", reportedBy: "warehouse", productCategory: "sofa",
+      issueType: "damaged", draftId: DRAFT_ID, evidence: FULL_EVIDENCE,
+    }, sb);
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: DRAFT_ID, caseNo: "SC2609-01" });
+    expect(sb.rpc).toHaveBeenCalledWith("service_case_create_stock_report", expect.objectContaining({ p_report_id: DRAFT_ID }));
+    expect(sb.from).not.toHaveBeenCalled();
+    expect(inserts).toEqual([]);
+  });
+
+  it("still refuses missing evidence before the stock writer", async () => {
+    const { sb } = buildInsertSb();
+    const res = await post({ customerImpact: "stock_only", reportedBy: "warehouse", productCategory: "sofa", issueType: "damaged", draftId: DRAFT_ID }, sb);
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/ops/service-cases — the S1 guided intake", () => {
   it("lands all five answers in their own columns, not only in the prose", async () => {
     const { sb, inserts } = buildInsertSb();
@@ -701,6 +735,20 @@ describe("S3 — the case drives the follow-ups", () => {
 
     expect(res.status).toBe(201);
     expect(inserts[0].supplier_id).toBe("sup-ohana");
+  });
+
+  it("does not close stock-only Cases through the customer completion gate", async () => {
+    const { sb, updates } = buildCaseSb({ ...CASE_ROW, customer_impact: "stock_only", customer_name: "", progress: [] });
+    const res = await patch("c1", { statusId: DRAFT_ID }, sb);
+    expect(res.status).toBe(422);
+    expect(updates).toEqual([]);
+  });
+
+  it("refuses a fabricated customer confirmation for stock", async () => {
+    const { sb, updates } = buildCaseSb({ ...CASE_ROW, customer_impact: "stock_only", customer_name: "", progress: [] });
+    const res = await record("c1", { step: "customer_confirmed", on: "2026-07-27" }, sb);
+    expect(res.status).toBe(422);
+    expect(updates).toEqual([]);
   });
 
   it("still files the case when the SKU traces to no factory", async () => {

@@ -150,6 +150,7 @@ export const CASE_SUPPLIER_UNKNOWN_LABEL = "No factory on the case";
  * because a browser on this build can reach a Worker that predates them.
  */
 export interface CaseNumbersCase {
+  customerImpact?: "customer" | "stock_only" | null;
   id: string;
   caseNo: string;
   /** Day 0 — the day it was reported. */
@@ -318,10 +319,10 @@ export function computeCaseNumbers(
 
   // ── The clock, once per case ──────────────────────────────────────────────
   const judged = scoped.map((c) => {
-    const finishedOn = caseFinishedOn(c.progress);
+    const finishedOn = c.customerImpact === "stock_only" ? null : caseFinishedOn(c.progress);
     const clock = caseSlaClock(
       {
-        openedAt: c.openedAt,
+        openedAt: c.customerImpact === "stock_only" ? null : c.openedAt,
         todayIso: input.todayIso,
         events: c.slaEvents ?? [],
         closed: c.closed,
