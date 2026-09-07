@@ -208,6 +208,16 @@ honest Work for admitted modules.
   also have no step owner or governed per-step due law. Workspace therefore reports this as an
   admission gap and does not invent an `Operation team` owner, a global fallback or duplicate task
   rows. Their outcome dates remain the authoritative completion facts in the Service Case.
+- Issue Tracker admission was re-audited against its approved MASTER, migration 0352, shared input
+  contract, API and shipped Register on 2026-09-07. Production currently stores the action owner
+  name and action parts as mutable Issue columns, then creates a second free-text `ops_tasks` row.
+  The person id is optional, no Duty/person rule or Buddy-cover evidence is resolved, and the UI
+  repeats the owner inside the action sentence. There is also no authoritative result write that
+  completes/replaces the current action identity and no deep link that opens the exact Issue. These
+  records therefore fail sections 2, 3 and 6 and are not admitted to shared Work. Repair must make
+  the Issue's structured current-action transition the single truth, resolve its owner rule through
+  Workspace, preserve actual-actor history, expose exact Issue routing and retire the duplicate
+  generated task only after source-by-source migration proof.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
@@ -221,9 +231,12 @@ honest Work for admitted modules.
 5. Define a routine Service Case owner rule/Duty (separate from approval) and decide whether its
    derived follow-ups are governed `No date` actions or receive per-step clocks; then admit only the
    qualified projections to the server feed.
-6. Retire remaining duplicate generated-task paths after source-by-source proof.
-7. Emit Notifications from Work transitions.
-8. Last, complete and owner-review Dashboard against production data.
+6. Replace Issue Tracker's stored owner prose and duplicate `ops_tasks` creation with a governed
+   owner rule, versioned current-action result transition and exact Issue deep link; migrate existing
+   truth before admitting it to Work.
+7. Retire remaining duplicate generated-task paths after source-by-source proof.
+8. Emit Notifications from Work transitions.
+9. Last, complete and owner-review Dashboard against production data.
 
 Cards follow dependency slices; this MASTER is not an implementation queue.
 
