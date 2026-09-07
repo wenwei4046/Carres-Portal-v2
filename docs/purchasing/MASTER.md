@@ -2196,6 +2196,10 @@ replacement offered.
 
 **Purpose / source:** showroom staff request a new model, replacement, removal or display change;
 Purchasing chooses the commercial path.
+**Photo and video evidence — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Display Requests
+must support uploading photos and videos when needed to explain the request. Both media types
+are optional supporting evidence; a video is not mandatory for every request. This approves the
+upload capability only, not the remaining proposed Showroom Blueprint or application implementation.
 **Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
 Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
 next Office working day after submission, PO Duty records the first decision and its linked
@@ -2207,7 +2211,7 @@ Purchasing Approver; choosing Buy does not approve the Manual Purchase or issue 
 **Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
 **Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
 Date, Purchasing Decision, Source Order, Work.
-**Journey:** showroom logs in → records simple request/photo/current Unit → Purchasing decides Buy,
+**Journey:** showroom logs in → records simple request/current Unit and photos/videos when needed → Purchasing decides Buy,
 Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
 **Object/placement:** internal full-width object; no PDF preview.
 **Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
