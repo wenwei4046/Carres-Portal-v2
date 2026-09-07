@@ -411,7 +411,7 @@ the immutable ledger as kind `receipt` with the sent-screenshot proof. With no A
 template the panel says `No receipt template yet. Ask a manager to add the approved wording
 in Settings.` — nothing invents customer copy.
 
-### BUILD — the Calendar review corrections, 2026-09-07
+### Deployed and production-walked — the Calendar review corrections, 2026-09-07
 
 The #1115 review found five gaps; the correction rebuilds the Calendar view on the kit's ONE
 pinned `MonthCalendar` primitive (shared with Receiving and Delivery) instead of the
@@ -436,8 +436,18 @@ across every MonthCalendar consumer, design guard clean, walked at desktop, 390p
   (a register date door, a week arrow) never repainted; it now uses DayPicker's own
   controlled `onSelect`, keeping the pick-again-clears contract for every consumer.
 
-Merge, exact-SHA convergence and the production walk of this correction are recorded in the
-closure below when they exist — this paragraph does not claim them early.
+PR #1124 merged as `4d717422` and the ERP page, POS page and API Worker all reported that
+exact SHA. The authenticated production walk was completed the same day through the operator's
+signed-in browser session: the live Invoices Register's Customer Delivery cell opened the
+Calendar at its fixed workweek with the exact SO highlighted and its balance said once;
+the month headed `Sun Mon Tue Wed Thu Fri Sat`; `‹ Previous week` moved the week and the
+month repainted its selected day (the controlled-selection kit fix, live); the Customer
+Delivery filter opened its dated listing with the complete month still visible; and choosing
+a month date returned to Calendar at that week with `All dates` active. The one live invoice
+could not exercise the multi-invoice dedupe on production data — that behaviour is proven by
+the focused tests and the local multi-invoice fixture walk, and every live row is TEST data
+anyway. The 390px and ≈200% responsive checks ran on the local build of the same SHA's code;
+the production DOM walk was desktop-only.
 
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
@@ -446,11 +456,9 @@ journeys and the retirement of the rejected Refund/Bank Matching surfaces remain
 target work. The complete approved customer
 Important Notes wording has not been located in the repository and has been requested from its
 owner; it must not be invented or shortened during implementation — the manager can also paste
-it into a `Standard bank transfer` template once approved. The authenticated production walk
-is still owed: the in-app browser walk covers the local build, but the live-site walk aborted
-because the Claude Chrome extension reports site access for `erp.carresofficial.com` turned
-off in `chrome://extensions` — recorded as the precise verification blocker, not as
-acceptance.
+it into a `Standard bank transfer` template once approved. The Calendar correction's
+authenticated production walk is done (above); an owner walk of the whole Payment surface and
+the remaining target work keep the overall status PARTIALLY DELIVERED.
 
 ### Approved target / not claimed built by this scope
 
