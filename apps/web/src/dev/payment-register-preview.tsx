@@ -154,6 +154,18 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     return json({ session: { sessionId: "cs_test_walk", status: "open" } });
   if (url.includes("/api/finance/payment-settings/templates"))
     return json({ templates: [] });
+  // The §6 storage walk: one mattress case on day 21 (one period commenced).
+  if (url.includes("/api/finance/payment-storage") && (!init || init.method !== "POST"))
+    return json({ cases: [{
+      id: "sc-1", order_id: ORDER.id, product_group: "mattress_bedframe",
+      readiness_witnessed_on: soon(-20), customer_delay_witnessed_on: soon(-20),
+      delay_witness_note: "Customer asked to hold the delivery",
+      storage_start: soon(-20), rule_free_days: 14, rule_charge_amount: 150,
+      rule_cycle_days: 30, rule_extra_free_allowed: true,
+      approved_free_until: null, approval_reason: null, status: "open",
+    }] });
+  if (url.includes("/api/finance/payment-storage") )
+    return json({ case: {} });
   if (url.startsWith("/api/")) {
     return new Response(JSON.stringify({}), { status: 404 });
   }
