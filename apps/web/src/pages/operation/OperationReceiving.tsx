@@ -1,3 +1,4 @@
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -147,7 +148,7 @@ export default function OperationReceiving() {
     if (
       except !== "supplier" &&
       supplierSel &&
-      (r.supplier_name ?? "") !== supplierSel
+      (r.source_party_name ?? r.supplier_name ?? "") !== supplierSel
     )
       return false;
     if (except !== "site" && siteSel && arrivedAtOf(r) !== siteSel)
@@ -242,25 +243,25 @@ export default function OperationReceiving() {
       },
       {
         key: "po",
-        label: "PO No",
+        label: "Source",
         width: 150,
         sortable: true,
-        searchValue: (r) => r.po_id,
-        exportValue: (r) => r.po_id,
+        searchValue: (r) => r.source_no ?? r.po_id ?? "",
+        exportValue: (r) => r.source_no ?? r.po_id ?? "",
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.po_id}</span>
+          <span className="font-mono text-meta text-base-900">{r.source_no ?? r.po_id ?? "Source needs checking"}</span>
         ),
       },
       {
         key: "supplier",
-        label: "Supplier",
+        label: "Source party",
         minWidth: 140,
         sortable: true,
-        searchValue: (r) => r.supplier_name ?? "",
-        exportValue: (r) => r.supplier_name ?? "",
+        searchValue: (r) => r.source_party_name ?? r.supplier_name ?? "",
+        exportValue: (r) => r.source_party_name ?? r.supplier_name ?? "",
         accessor: (r) => (
           <span className="truncate text-body text-base-900">
-            {r.supplier_name ?? ""}
+            {r.source_party_name ?? r.supplier_name ?? ""}
           </span>
         ),
       },
@@ -414,17 +415,21 @@ export default function OperationReceiving() {
   const narrowed =
     categorySel !== null || supplierSel !== null || siteSel !== null;
 
-  const openObject = sessionId ?? poId ?? (finding ? "find" : null);
+  const arrivalId = params.get("arrival") ?? receipts.find(r=>r.id===sessionId)?.arrival_source_id;
+  const openObject = arrivalId ?? sessionId ?? poId ?? (finding ? "find" : null);
 
   function openSession(id: string) {
     const next = new URLSearchParams(params);
     next.delete("po");
     next.delete("find");
     next.set("session", id);
+    const source=receipts.find(r=>r.id===id)?.arrival_source_id;
+    if(source)next.set("arrival",source);else next.delete("arrival");
     setParams(next);
   }
   function closeObject() {
     const next = new URLSearchParams(params);
+    next.delete("arrival");
     next.delete("session");
     next.delete("po");
     next.delete("find");
@@ -438,7 +443,9 @@ export default function OperationReceiving() {
       {/* ── The open object takes the stage; the Register stays MOUNTED
              underneath (`invisible`, never display:none) so Back restores the
              complete listing state. ─────────────────────────────────────── */}
-      {sessionId ? (
+      {arrivalId ? (
+        <ArrivalSourceWorkspace receiving sourceId={arrivalId} />
+      ) : sessionId ? (
         <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
       ) : poId ? (
         <PoReceivingView

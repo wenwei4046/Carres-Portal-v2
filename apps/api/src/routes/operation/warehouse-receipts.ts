@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+  arrivalReceivingInput,
   goodsCategoryWordOf,
   receiptCategoryWords,
   receivingAmendInput,
@@ -39,6 +40,50 @@ import type { AppEnv } from "../../types";
  * the only lock.
  */
 const warehouseReceiptsRouter = new Hono<AppEnv>();
+
+// Source receipts remain a Receiving operation, under the same GRN Duty gate.
+warehouseReceiptsRouter.post(
+  "/arrival/:sourceId",
+  requireOperation,
+  async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("sourceId"));
+    if (!id.success) return c.json({ message: "Invalid source" }, 422);
+    const p = await parseJsonBody(c, arrivalReceivingInput);
+    if (!p.ok) return c.json(p.body, p.status);
+    const r = await userClient(c.env, c.var.auth.jwt).rpc(
+      "receiving_arrival_post",
+      { p_source_id: id.data, p_input: p.data },
+    );
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(r.data, 201);
+  },
+);
+
+warehouseReceiptsRouter.post(
+  "/arrival-receipts/:id/void",
+  requireOperation,
+  async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    if (!id.success) return c.json({ message: "Invalid Receiving" }, 422);
+    const p = await parseJsonBody(
+      c,
+      z.object({ reason: z.string().trim().min(1).max(2000) }).strict(),
+    );
+    if (!p.ok) return c.json(p.body, p.status);
+    const r = await userClient(c.env, c.var.auth.jwt).rpc(
+      "receiving_arrival_void",
+      { p_receipt_id: id.data, p_reason: p.data.reason },
+    );
+    if (r.error) {
+      const m = mapPgError(r.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(r.data);
+  },
+);
 
 const DEFAULT_LIMIT = 200;
 /** The Register may ask for more (`?limit=`) — it virtualises its rows, so a
@@ -86,7 +131,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
       // 0426 widened this: grn_no · actual_site_id · arrival_evidence ·
       // extra_lines · the posted duty-evidence trio · void_* are what the
       // Receiving Register and the GRN record read.
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
+      "id, arrival_source_id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
     )
     // The register is a HISTORY, so it sorts by the BUSINESS date — when the
     // goods physically arrived — not by when somebody keyed them in. The
@@ -122,7 +167,9 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
         .filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
-  const poIds = [...new Set(rows.map((r) => r.po_id as string).filter(Boolean))];
+  const poIds = [
+    ...new Set(rows.map((r) => r.po_id as string).filter(Boolean)),
+  ];
   const userIds = [
     ...new Set(
       rows
@@ -162,17 +209,53 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     }
   }
 
+  const arrivalIds = [
+    ...new Set(
+      rows
+        .map((r) => r.arrival_source_id)
+        .filter((v): v is string => typeof v === "string"),
+    ),
+  ];
+  const arrivalNames = new Map<
+    string,
+    { source_no: string; party_name: string | null }
+  >();
+  if (arrivalIds.length) {
+    const { data: sources, error: sourceError } = await sb
+      .from("arrival_sources")
+      .select("id,source_no,stock_operating_parties(name)")
+      .in("id", arrivalIds);
+    if (sourceError) {
+      const m = mapPgError(sourceError);
+      return c.json(m.body, m.status);
+    }
+    for (const source of sources ?? [])
+      arrivalNames.set(source.id, {
+        source_no: source.source_no,
+        party_name:
+          (source.stock_operating_parties as unknown as { name: string } | null)
+            ?.name ?? null,
+      });
+  }
+
   /**
    * The signed DO — a short-lived URL per row, batch-signed exactly the way
    * `supplier-claims` signs its claim photos. The signed DO IS the record's
    * evidence, so a register that cannot open it is a filing cabinet with the
    * paper removed. Signed only for the rows this page returns.
    */
-  const doPaths = rows
-    .map((r) => r.do_file_path as string | null)
-    .filter((p): p is string => typeof p === "string" && p.length > 0);
+
   const doUrls = new Map<string, string>();
-  if (doPaths.length > 0) {
+  for (const bucket of ["delivery-orders", "arrival-proofs"]) {
+    const doPaths = rows
+      .filter(
+        (r) =>
+          (r.arrival_source_id ? "arrival-proofs" : "delivery-orders") ===
+          bucket,
+      )
+      .map((r) => r.do_file_path)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    if (!doPaths.length) continue;
     // Best-effort, and deliberately so: the register's job is to LIST the
     // records. If storage refuses to sign, the row still appears and its
     // record reads `Not on file` — a queue that 500s because one attachment
@@ -180,7 +263,7 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
     try {
       const admin = adminClient(c.env);
       const { data: signed } = await admin.storage
-        .from("delivery-orders")
+        .from(bucket)
         .createSignedUrls(doPaths, SIGNED_URL_TTL_SECONDS);
       for (const s of signed ?? [])
         if (s.path && s.signedUrl) doUrls.set(s.path, s.signedUrl);
@@ -211,9 +294,19 @@ warehouseReceiptsRouter.get("/", requireOperation, async (c) => {
 
   return c.json({
     receipts: rows.map((r) => {
-      const lines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
+      const lines = (
+        Array.isArray(r.lines) ? r.lines : []
+      ) as WarehouseReceiptLine[];
       return {
         ...r,
+        source_no:
+          arrivalNames.get(r.arrival_source_id as string)?.source_no ??
+          r.po_id ??
+          null,
+        source_party_name:
+          arrivalNames.get(r.arrival_source_id as string)?.party_name ??
+          supplierByPo.get(r.po_id as string) ??
+          null,
         categories: receiptCategoryWords(lines, catalogCategories),
         warehouse_name: warehouseNames.get(r.warehouse_id as string) ?? null,
         supplier_name: supplierByPo.get(r.po_id as string) ?? null,
@@ -345,7 +438,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   const { data: row, error } = await sb
     .from("warehouse_receipts")
     .select(
-      "id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
+      "id, arrival_source_id, po_id, warehouse_id, do_number, do_file_path, note, lines, status, submitted_from, goods_received_at, submitted_by, submitted_at, posted_by, posted_at, reviewed_by, reviewed_at, return_reason, grn_no, actual_site_id, arrival_evidence, extra_lines, posted_duty_holder, posted_duty_cover, posted_authority, void_at, void_by, void_reason",
     )
     .eq("id", id)
     .maybeSingle();
@@ -369,7 +462,9 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .order("event_at", { ascending: false }),
     sb
       .from("purchase_orders")
-      .select("id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)")
+      .select(
+        "id, supplier_id, warehouse_id, destination_id, is_consignment, suppliers(name), purchase_order_lines(id, sku, qty, received_qty, damaged_qty, wrong_item_qty)",
+      )
       .eq("id", r.po_id as string)
       .maybeSingle(),
   ]);
@@ -383,7 +478,9 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
         r.posted_duty_holder,
         r.posted_duty_cover,
         r.void_by,
-        ...((evs ?? []) as Array<Record<string, unknown>>).map((e) => e.actor_id),
+        ...((evs ?? []) as Array<Record<string, unknown>>).map(
+          (e) => e.actor_id,
+        ),
       ].filter((v): v is string => typeof v === "string" && v.length > 0),
     ),
   ];
@@ -393,22 +490,30 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .from("app_users")
       .select("id, name")
       .in("id", userIds);
-    for (const u of users ?? []) userNames.set(u.id as string, u.name as string);
+    for (const u of users ?? [])
+      userNames.set(u.id as string, u.name as string);
   }
   const whIds = [r.warehouse_id, r.actual_site_id].filter(
     (v): v is string => typeof v === "string" && v.length > 0,
   );
   const whNames = new Map<string, string>();
   if (whIds.length > 0) {
-    const { data: whs } = await sb.from("warehouses").select("id, name").in("id", whIds);
+    const { data: whs } = await sb
+      .from("warehouses")
+      .select("id, name")
+      .in("id", whIds);
     for (const w of whs ?? []) whNames.set(w.id as string, w.name as string);
   }
   // The formal GRN document's product facts: the human description (the same
   // `product_skus.variant` lookup the DO print path uses) and the governed
   // category word through the ONE shared ladder — never a SKU-text rule of
   // Receiving's own.
-  const receiptLines = (Array.isArray(r.lines) ? r.lines : []) as WarehouseReceiptLine[];
-  const extraLines = (Array.isArray(r.extra_lines) ? r.extra_lines : []) as Array<{
+  const receiptLines = (
+    Array.isArray(r.lines) ? r.lines : []
+  ) as WarehouseReceiptLine[];
+  const extraLines = (
+    Array.isArray(r.extra_lines) ? r.extra_lines : []
+  ) as Array<{
     sku: string;
   }>;
   const docSkus = [
@@ -417,7 +522,10 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       ...extraLines.map((x) => x.sku),
     ]),
   ];
-  const lineInfo: Record<string, { description: string | null; category: string }> = {};
+  const lineInfo: Record<
+    string,
+    { description: string | null; category: string }
+  > = {};
   if (docSkus.length > 0) {
     const catalog = await skuCategories(sb, docSkus);
     const descriptions = new Map<string, string>();
@@ -425,13 +533,19 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
       .from("product_skus")
       .select("sku, variant")
       .in("sku", docSkus);
-    for (const row2 of (skuRows ?? []) as Array<{ sku: string; variant: string | null }>) {
+    for (const row2 of (skuRows ?? []) as Array<{
+      sku: string;
+      variant: string | null;
+    }>) {
       if (row2.variant) descriptions.set(row2.sku, row2.variant);
     }
     for (const sku of docSkus) {
       lineInfo[sku] = {
         description: descriptions.get(sku) ?? null,
-        category: goodsCategoryWordOf({ sku, category: catalog.get(sku) ?? null }),
+        category: goodsCategoryWordOf({
+          sku,
+          category: catalog.get(sku) ?? null,
+        }),
       };
     }
   }
@@ -441,7 +555,7 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
     try {
       const admin = adminClient(c.env);
       const { data: signed } = await admin.storage
-        .from("delivery-orders")
+        .from(r.arrival_source_id ? "arrival-proofs" : "delivery-orders")
         .createSignedUrl(r.do_file_path, SIGNED_URL_TTL_SECONDS);
       doUrl = signed?.signedUrl ?? null;
     } catch (e) {
@@ -450,9 +564,9 @@ warehouseReceiptsRouter.get("/:id", requireOperation, async (c) => {
   }
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (userNames.get(v) ?? null) : null;
-  const sup = (po as Record<string, unknown> | null)?.suppliers as
-    | { name?: string }
-    | null;
+  const sup = (po as Record<string, unknown> | null)?.suppliers as {
+    name?: string;
+  } | null;
   return c.json({
     receipt: {
       ...r,
@@ -492,14 +606,18 @@ warehouseReceiptsRouter.post("/:id/amend", requireOperation, async (c) => {
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const d = parsed.data;
   const changes: Record<string, unknown> = {};
-  if (d.goodsReceivedAt !== undefined) changes.goods_received_at = d.goodsReceivedAt;
+  if (d.goodsReceivedAt !== undefined)
+    changes.goods_received_at = d.goodsReceivedAt;
   if (d.doNumber !== undefined) changes.do_number = d.doNumber;
   if (d.actualSiteId !== undefined) changes.actual_site_id = d.actualSiteId;
   if (d.doFilePath !== undefined) changes.do_file_path = d.doFilePath;
   if (d.arrivalEvidenceAdd !== undefined)
     changes.arrival_evidence_add = d.arrivalEvidenceAdd;
   if (d.lines !== undefined)
-    changes.lines = d.lines.map((l) => ({ id: l.id, received_now: l.receivedNow }));
+    changes.lines = d.lines.map((l) => ({
+      id: l.id,
+      received_now: l.receivedNow,
+    }));
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("receiving_amend", {
     p_receipt_id: c.req.param("id"),

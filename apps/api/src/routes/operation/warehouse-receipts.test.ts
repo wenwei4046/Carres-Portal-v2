@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  vi,
+} from "vitest";
 import {
   SignJWT,
   createLocalJWKSet,
@@ -10,7 +18,10 @@ import {
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
-vi.mock("../../lib/supabase", () => ({ userClient: vi.fn(), adminClient: vi.fn() }));
+vi.mock("../../lib/supabase", () => ({
+  userClient: vi.fn(),
+  adminClient: vi.fn(),
+}));
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -75,7 +86,9 @@ function makeSb(
           const headBuilder: Record<string, unknown> = {};
           headBuilder.eq = vi.fn(() => headBuilder);
           headBuilder.then = (resolve: (r: unknown) => unknown) =>
-            Promise.resolve({ count: cfg.count ?? 0, error: null }).then(resolve);
+            Promise.resolve({ count: cfg.count ?? 0, error: null }).then(
+              resolve,
+            );
           return headBuilder;
         }
         return builder;
@@ -83,7 +96,11 @@ function makeSb(
       builder.then = (
         resolve: (r: Result) => unknown,
         reject?: (e: unknown) => unknown,
-      ) => Promise.resolve(cfg.list ?? { data: [], error: null }).then(resolve, reject);
+      ) =>
+        Promise.resolve(cfg.list ?? { data: [], error: null }).then(
+          resolve,
+          reject,
+        );
       return builder;
     },
   };
@@ -148,14 +165,20 @@ const RECEIPT_ROW = {
 function opsTables(row: Record<string, unknown> = RECEIPT_ROW) {
   return {
     warehouse_receipts: { list: { data: [row], error: null }, count: 1 },
-    warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+    warehouses: {
+      list: { data: [{ id: WH, name: "Carres Klang" }], error: null },
+    },
     purchase_orders: {
       list: {
-        data: [{ id: "PO-1001", supplier_id: "s1", suppliers: { name: "Ohana" } }],
+        data: [
+          { id: "PO-1001", supplier_id: "s1", suppliers: { name: "Ohana" } },
+        ],
         error: null,
       },
     },
-    app_users: { list: { data: [{ id: USER, name: "Klang counter" }], error: null } },
+    app_users: {
+      list: { data: [{ id: USER, name: "Klang counter" }], error: null },
+    },
   };
 }
 
@@ -184,6 +207,53 @@ describe("who may review a warehouse count", () => {
 });
 
 describe("GET /api/operation/warehouse-receipts", () => {
+  it("names an arrival source without inventing a purchase order", async () => {
+    const tables = {
+      ...opsTables(),
+      warehouse_receipts: {
+        list: {
+          data: [
+            {
+              ...RECEIPT_ROW,
+              po_id: null,
+              arrival_source_id: RECEIPT,
+              do_file_path: null,
+            },
+          ],
+          error: null,
+        },
+        count: 1,
+      },
+      arrival_sources: {
+        list: {
+          data: [
+            {
+              id: RECEIPT,
+              source_no: "TR-20260907-1",
+              stock_operating_parties: { name: "Recorded carrier" },
+            },
+          ],
+          error: null,
+        },
+      },
+    };
+    vi.mocked(userClient).mockReturnValue(makeSb(tables) as never);
+    const res = await req(
+      "/api/operation/warehouse-receipts",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      receipts: Array<Record<string, unknown>>;
+    };
+    expect(body.receipts[0]).toMatchObject({
+      po_id: null,
+      source_no: "TR-20260907-1",
+      source_party_name: "Recorded carrier",
+    });
+  });
+
   it("names the warehouse, the supplier and who counted, and says what arrived", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(makeSb(opsTables()) as any);
@@ -229,7 +299,9 @@ describe("GET /api/operation/warehouse-receipts", () => {
       "GET",
       await makeJwt("operation"),
     );
-    const body = (await res.json()) as { receipts: Array<Record<string, unknown>> };
+    const body = (await res.json()) as {
+      receipts: Array<Record<string, unknown>>;
+    };
     expect(body.receipts[0].opens_claims).toBe(false);
     expect(body.receipts[0].summary).toBe("4 good");
   });
@@ -246,7 +318,9 @@ describe("GET /api/operation/warehouse-receipts", () => {
     );
     // The first builder is the list query; its `.eq` must have narrowed to
     // submitted.
-    const builder = spy.mock.results[0].value as { eq: ReturnType<typeof vi.fn> };
+    const builder = spy.mock.results[0].value as {
+      eq: ReturnType<typeof vi.fn>;
+    };
     expect(builder.eq).toHaveBeenCalledWith("status", "submitted");
   });
 
@@ -260,7 +334,9 @@ describe("GET /api/operation/warehouse-receipts", () => {
       "GET",
       await makeJwt("operation"),
     );
-    const builder = spy.mock.results[0].value as { eq: ReturnType<typeof vi.fn> };
+    const builder = spy.mock.results[0].value as {
+      eq: ReturnType<typeof vi.fn>;
+    };
     expect(builder.eq).not.toHaveBeenCalled();
   });
 
@@ -274,7 +350,9 @@ describe("GET /api/operation/warehouse-receipts", () => {
       "GET",
       await makeJwt("operation"),
     );
-    const builder = spy.mock.results[0].value as { eq: ReturnType<typeof vi.fn> };
+    const builder = spy.mock.results[0].value as {
+      eq: ReturnType<typeof vi.fn>;
+    };
     expect(builder.eq).toHaveBeenCalledWith("status", "submitted");
   });
 });
@@ -582,7 +660,10 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
       },
     ]);
     expect(body.po).toMatchObject({ id: "PO-1001" });
-    expect(body.events[0]).toMatchObject({ event: "posted", actor_name: "Buddy cover" });
+    expect(body.events[0]).toMatchObject({
+      event: "posted",
+      actor_name: "Buddy cover",
+    });
   });
 
   it("404 when the record is not there", async () => {
@@ -753,7 +834,11 @@ describe("POST /:id/void", () => {
 describe("GET / — the rail's governed categories (owner correction 2026-09-06)", () => {
   it("resolves each receipt's category words from the CATALOG through the one shared ladder", async () => {
     const tables = {
-      ...opsTables({ ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260906-0001" }),
+      ...opsTables({
+        ...RECEIPT_ROW,
+        status: "posted",
+        grn_no: "GRN-20260906-0001",
+      }),
       product_skus: {
         list: {
           data: [{ sku: "MS01-K", product_models: { category: "mattress" } }],
@@ -809,7 +894,11 @@ describe("GET /:id — the GRN document's product facts (line_info)", () => {
     const tables = {
       warehouse_receipts: {
         single: {
-          data: { ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260906-0002" },
+          data: {
+            ...RECEIPT_ROW,
+            status: "posted",
+            grn_no: "GRN-20260906-0002",
+          },
           error: null,
         },
       },
@@ -829,7 +918,9 @@ describe("GET /:id — the GRN document's product facts (line_info)", () => {
         },
       },
       app_users: { list: { data: [], error: null } },
-      warehouses: { list: { data: [{ id: WH, name: "Carres Klang" }], error: null } },
+      warehouses: {
+        list: { data: [{ id: WH, name: "Carres Klang" }], error: null },
+      },
       product_skus: {
         list: {
           data: [
@@ -852,7 +943,10 @@ describe("GET /:id — the GRN document's product facts (line_info)", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      line_info: Record<string, { description: string | null; category: string }>;
+      line_info: Record<
+        string,
+        { description: string | null; category: string }
+      >;
     };
     // ⚠️ the mocked product_skus list answers BOTH the catalog-category read
     // and the variant read with the same rows — which is exactly what the
@@ -885,7 +979,9 @@ describe("POST /:id/amend — the paper's evidence (0427)", () => {
       p_reason: "clerk photographed the wrong DO",
       p_changes: {
         do_file_path: "PO-1001/corrected-do.jpg",
-        arrival_evidence_add: [{ path: "PO-1001/arrival-2.jpg", kind: "photo" }],
+        arrival_evidence_add: [
+          { path: "PO-1001/arrival-2.jpg", kind: "photo" },
+        ],
       },
       p_save_key: null,
     });

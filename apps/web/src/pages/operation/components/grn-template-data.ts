@@ -111,7 +111,7 @@ export function grnTemplateDataOf(
     grn_no: receivingDisplayNo(r),
     status_label: warehouseReceiptStatusLabel(r.status),
     source: {
-      po_number: r.po_id,
+      po_number: r.po_id ?? "",
       is_consignment: Boolean(
         (detail.po as { is_consignment?: boolean } | null)?.is_consignment,
       ),

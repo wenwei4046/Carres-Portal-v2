@@ -1,5 +1,6 @@
 // design-standard: not-a-list-page — the expanded row body of the Claims
 // table (Purchasing → Claims). No shell of its own.
+import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -249,6 +250,7 @@ export default function SupplierClaimPanel({
 
   return (
     <div className="grid gap-5 md:grid-cols-2" data-testid={`claim-panel-${claim.claim_no}`}>
+      {(claim.customer_resolution === "repair" || claim.customer_resolution === "replace") && <div className="md:col-span-2"><Link className="text-kit-blue-11 text-body" to={`/operation?tab=arrival-source&kind=${claim.customer_resolution === "repair" ? "repair-return" : "supplier-replacement"}&claim=${claim.id}`}>{claim.customer_resolution === "repair" ? "Plan Repair" : "Plan Supplier replacement"}</Link></div>}
       {/* ── left: the evidence ───────────────────────────────────────────── */}
       <div>
         <SectionTitle>Evidence</SectionTitle>

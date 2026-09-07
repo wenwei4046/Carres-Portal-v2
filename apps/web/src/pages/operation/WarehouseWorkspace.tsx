@@ -28,6 +28,7 @@ import {
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
 
 /**
@@ -148,7 +149,10 @@ export default function WarehouseWorkspace() {
       : "—";
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-workspace">
+    <div
+      className="flex h-full min-h-0 flex-1 flex-col"
+      data-testid="warehouse-workspace"
+    >
       {/* Dashboard stays mounted underneath Outbound — visibility only, so
           Back restores filters and scroll (the Manual Purchase pattern). */}
       <div
@@ -169,7 +173,11 @@ export default function WarehouseWorkspace() {
             onClick={() => setRailHidden((h) => !h)}
             data-testid="wd-toggle-filters"
           >
-            {railHidden ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            {railHidden ? (
+              <PanelLeftOpen size={14} />
+            ) : (
+              <PanelLeftClose size={14} />
+            )}
             {railHidden ? "Filters" : "Hide filters"}
           </button>
           <div className="flex items-center gap-1" data-testid="wd-range">
@@ -241,14 +249,21 @@ export default function WarehouseWorkspace() {
                   label="Not done"
                   count={allCards.filter((c) => c.notHandedOver > 0).length}
                   active={sched === "not-done"}
-                  onClick={() => pickRail("sched", sched === "not-done" ? null : "not-done")}
+                  onClick={() =>
+                    pickRail("sched", sched === "not-done" ? null : "not-done")
+                  }
                   testId="wd-sched-not-done"
                 />
                 <FilterRailRow
                   label="Evidence not submitted"
                   count={allCards.filter((c) => c.evidenceNotSubmitted).length}
                   active={sched === "no-evidence"}
-                  onClick={() => pickRail("sched", sched === "no-evidence" ? null : "no-evidence")}
+                  onClick={() =>
+                    pickRail(
+                      "sched",
+                      sched === "no-evidence" ? null : "no-evidence",
+                    )
+                  }
                   testId="wd-sched-no-evidence"
                 />
               </FilterRailGroup>
@@ -258,9 +273,13 @@ export default function WarehouseWorkspace() {
                     <FilterRailRow
                       key={name}
                       label={name}
-                      count={allCards.filter((c) => c.fromLocation === name).length}
+                      count={
+                        allCards.filter((c) => c.fromLocation === name).length
+                      }
                       active={site === name}
-                      onClick={() => pickRail("site", site === name ? null : name)}
+                      onClick={() =>
+                        pickRail("site", site === name ? null : name)
+                      }
                       testId={`wd-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                     />
                   ))}
@@ -271,11 +290,16 @@ export default function WarehouseWorkspace() {
                   The source stays explicit on every card. */}
             </FilterRail>
           )}
-          <div className={`min-h-0 min-w-0 flex-1 flex-col${!railHidden && isAgenda ? " hidden" : " flex"}`}>
+          <div
+            className={`min-h-0 min-w-0 flex-1 flex-col${!railHidden && isAgenda ? " hidden" : " flex"}`}
+          >
             {isLoading ? (
               <p className="p-4 text-[13px] text-base-500">Loading…</p>
             ) : error ? (
-              <p className="p-4 text-[13px] text-base-600" data-testid="wd-error">
+              <p
+                className="p-4 text-[13px] text-base-600"
+                data-testid="wd-error"
+              >
                 The schedule could not be loaded. {error.message}
               </p>
             ) : sched !== "calendar" ? (
@@ -301,15 +325,18 @@ export default function WarehouseWorkspace() {
         </div>
       </div>
 
-      {isOutbound && (
-        <WarehouseOutboundWork
-          cards={allCards}
-          date={selectedDate}
-          selectedDo={selectedDo}
-          isLoading={isLoading}
-          onSelectDo={(doNumber) => setParam("do", doNumber)}
-        />
-      )}
+      {isOutbound &&
+        (params.get("arrival") ? (
+          <ArrivalSourceWorkspace outbound sourceId={params.get("arrival")!} />
+        ) : (
+          <WarehouseOutboundWork
+            cards={allCards}
+            date={selectedDate}
+            selectedDo={selectedDo}
+            isLoading={isLoading}
+            onSelectDo={(doNumber) => setParam("do", doNumber)}
+          />
+        ))}
     </div>
   );
 }
@@ -330,7 +357,9 @@ function CalendarBoard({
     <div className="min-h-0 flex-1 overflow-auto" data-testid="wd-board">
       <div
         className="grid min-w-max gap-px bg-kit-slate-5"
-        style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(232px, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${dates.length}, minmax(232px, 1fr))`,
+        }}
       >
         {dates.map((date) => (
           <div key={date} className="bg-base-50" data-testid={`wd-col-${date}`}>
@@ -360,7 +389,10 @@ function DayColumn({
 }) {
   if (cards.length === 0) {
     return (
-      <p className="px-3 py-4 text-[13px] leading-5 text-base-500" data-testid={`wd-empty-${date}`}>
+      <p
+        className="px-3 py-4 text-[13px] leading-5 text-base-500"
+        data-testid={`wd-empty-${date}`}
+      >
         {warehouseEmptyDaySentence(fmtDate(date))}
       </p>
     );
@@ -391,7 +423,10 @@ function AgendaDay({
         {fmtDate(date)}
       </h2>
       {cards.length === 0 ? (
-        <p className="text-[13px] leading-5 text-base-500" data-testid={`wd-empty-${date}`}>
+        <p
+          className="text-[13px] leading-5 text-base-500"
+          data-testid={`wd-empty-${date}`}
+        >
           {warehouseEmptyDaySentence(fmtDate(date))}
         </p>
       ) : (
@@ -420,7 +455,9 @@ function GroupedCardList({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3" data-testid={testId}>
       {dates.length === 0 ? (
-        <p className="text-[13px] text-base-500">Nothing here. Every handover on this view is done.</p>
+        <p className="text-[13px] text-base-500">
+          Nothing here. Every handover on this view is done.
+        </p>
       ) : (
         dates.map((date) => (
           <section key={date} className="mb-4">
@@ -431,7 +468,11 @@ function GroupedCardList({
               {cards
                 .filter((c) => c.eventDate === date)
                 .map((card) => (
-                  <OutboundCard key={card.doNumber} card={card} onOpen={onOpen} />
+                  <OutboundCard
+                    key={card.doNumber}
+                    card={card}
+                    onOpen={onOpen}
+                  />
                 ))}
             </div>
           </section>
@@ -484,16 +525,25 @@ export function OutboundCard({
         </Link>
         <span className="text-label text-base-500">{card.source}</span>
       </div>
-      <div className="mt-0.5 truncate text-[13px] text-base-700" title={`${card.fromLocation} → ${card.toCustomer}`}>
+      <div
+        className="mt-0.5 truncate text-[13px] text-base-700"
+        title={`${card.fromLocation} → ${card.toCustomer}`}
+      >
         {card.fromLocation} → {card.toCustomer}
       </div>
       <div className="text-[13px] text-base-600">{card.logisticsPartner}</div>
-      <div className="mt-1 text-[13px] text-base-700" data-testid="wd-card-tally">
-        Required {card.unitsRequired} · Handed over {card.handedOver} · Not handed over{" "}
-        {card.notHandedOver}
+      <div
+        className="mt-1 text-[13px] text-base-700"
+        data-testid="wd-card-tally"
+      >
+        Required {card.unitsRequired} · Handed over {card.handedOver} · Not
+        handed over {card.notHandedOver}
       </div>
       {remaining.length > 0 && (
-        <div className="mt-0.5 text-label text-base-500" data-testid="wd-card-fact">
+        <div
+          className="mt-0.5 text-label text-base-500"
+          data-testid="wd-card-fact"
+        >
           {remaining.length === 1
             ? `${remaining[0].unitId} still needs handover`
             : `${remaining.length} Units still need handover`}

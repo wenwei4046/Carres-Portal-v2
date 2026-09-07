@@ -159,6 +159,7 @@ export default function ReceivingRecord({
   };
 
   const startAmend = () => {
+    if (!r.po_id) return;
     setDraft({
       reason: "",
       goodsReceivedAt: r.goods_received_at ?? "",
@@ -221,9 +222,9 @@ export default function ReceivingRecord({
         </div>
       )}
 
-      {amending && draft ? (
+      {amending && draft && r.po_id ? (
         <AmendPanel
-          receipt={r}
+          receipt={{...r,po_id:r.po_id}}
           lines={lines}
           draft={draft}
           onDraft={setDraft}
@@ -437,7 +438,7 @@ export default function ReceivingRecord({
 
           {/* ── The governed doors — Amend is primary; Void hides in
                  More ▾ (owner correction §5: not a normal action). ──────── */}
-          {r.status === "posted" && dutyAllowed && !voiding && (
+          {r.po_id && r.status === "posted" && dutyAllowed && !voiding && (
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"

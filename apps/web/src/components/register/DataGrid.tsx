@@ -175,6 +175,8 @@ export type DataGridProps<T> = {
    * setter.
    */
   onSearchChange?: (q: string) => void;
+  /** Restores a destination URL search when returning from an owned object. */
+  initialSearch?: string;
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
@@ -439,6 +441,7 @@ function DataGridInner<T>({
   rowTestId,
   onFilteredRowsChange,
   onSearchChange,
+  initialSearch = "",
   appearance = "default",
   toolbar,
   toolbarStart,
@@ -488,7 +491,7 @@ function DataGridInner<T>({
     [storageKey],
   );
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [ctx, setCtx] = useState<{ x: number; y: number; colKey: string } | null>(null);
@@ -505,7 +508,7 @@ function DataGridInner<T>({
      discoverable toolbar button + popover with a per-column checkbox + Reset
      link, matching houzs-erp/src/pages/SalesOrderPage.tsx lines 576-624. */
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(initialSearch.length > 0);
   const [outputMenuOpen, setOutputMenuOpen] = useState(false);
   /* The Columns popover is fixed-positioned (not absolute) so it escapes the
      grid card's `overflow: hidden`, which otherwise clips the dropdown when the

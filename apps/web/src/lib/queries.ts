@@ -4202,8 +4202,11 @@ export function useWarehouseSubmitReceiptMutation(
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  arrival_source_id?: string | null;
   id: string;
-  po_id: string;
+  po_id: string | null;
+  source_no?: string | null;
+  source_party_name?: string | null;
   warehouse_id: string;
   warehouse_name: string | null;
   supplier_name: string | null;

@@ -1529,7 +1529,7 @@ it is in the wrong element.
 delay" — the word on screen is `Delay planning`)
 
 **`Inventory` is no longer banned globally — owner ruling 2026-09-01.** It is the approved
-Warehouse master Register destination under `Dashboard · Inbound · Inventory · Outbound`. It does
+Warehouse master Register destination under `Monitor · Inbound · Inventory · Outbound`. It does
 not become a synonym for Finance valuation, Purchasing planning or another module's goods pool.
 
 **`Recovery` is banned by MEANING, not by spelling.** Account recovery on the login page is a
@@ -1592,10 +1592,10 @@ Information Architecture and live in [`ERP-ARCHITECTURE.md`](ERP-ARCHITECTURE.md
 | The physical-goods domain in explanatory copy | **Stock** | Warehouse as a quantity noun |
 | The module's rail heading (CARD-2026-08-19-warehouse-rail) | **Warehouse** | Stock (as a heading) · Supply Chain |
 | The Warehouse master Register destination | **Inventory** | On hand · Stock Units |
-| Warehouse Dashboard's outbound-date filter group | **`OUTBOUND SCHEDULE`** | Delivery Schedule · Dispatch · Shipments |
-| Warehouse Dashboard's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
-| Warehouse Dashboard's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
-| Warehouse Dashboard valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
+| Warehouse Monitor's outbound-date filter group | **`OUTBOUND SCHEDULE`** | Delivery Schedule · Dispatch · Shipments |
+| Warehouse Monitor's governed-Site filter group | **`SITE`** | Warehouse Location · Branch · Place |
+| Warehouse Monitor's source-object filter group | **`SOURCE`** | Type · Reason · Document Type |
+| Warehouse Monitor valid empty date | **`No outbound handovers on {date}. Choose another date.`** | No handovers · Empty · Nothing |
 | The Outbound §3.5.1 tally (Warehouse Card 03) | **`Required {n} · Handed over {n} · Not handed over {n}`** | Progress · Completed · Pending · Done |
 | The three per-Unit preparation facts, in order | **Scanned · Checked · Packed** | Picked · Staged · Loaded · Ready (as a stored status) |
 | A Unit's derived not-yet reason on Outbound | **`Not scanned yet` · `Not checked yet` · `Not packed yet` · `Waiting for handover`** | Pending · In progress · Blocked |
@@ -2404,7 +2404,7 @@ the screen already has one word for it — the booking, spelt **`{logistics} · 
 the ruling's phrase stays in the documents and the screen keeps the word it has.
 
 **SUPERSEDED Stock word law — owner ruling 2026-09-01.** The former `On hand · Ready stock · In &
-out` top-page model is historical evidence only. Warehouse now has exactly `Dashboard · Inbound ·
+out` top-page model is historical evidence only. Warehouse now has exactly `Monitor · Inbound ·
 Inventory · Outbound`. Inventory is the one current Unit Register; Ready Stock is a saved eligible-
 Unit view shared with Sales; History is a rail/detail/report view; Transfer projects into Inbound,
 Outbound and Inventory; `Counts & Adjustments` is one Inventory control view. `Movements`, `Stock
@@ -2550,6 +2550,18 @@ it has actually been broken so a chat can grep for them:
 reason both failures exist, so a caller that formats first is the thing to look for.
 
 ---
+
+## Arrival source work (owner-approved scope, 2026-09-07)
+
+Use the source words Transfer, Customer Return, Failed Delivery return, Return from repair and
+Supplier replacement. Actions are Request Transfer, Plan Customer Return, Plan Repair,
+Plan Supplier replacement, Open Outbound, Open Receiving, Save Receiving and Cancel Receiving.
+Physical evidence fields use Actual Site, Receiving party, Handover person, Handover document
+number and Handover proof. Case approval uses Approve physical work and dated Case evidence.
+The condition gate uses Doorstep check before loading, Doorstep photos and the existing service
+wording Do not collect — condition failed. Checks name stain, liquid/odour, pests, unsanitary
+condition, tear/burn/cut, customer damage, correct item and safe wrapped transport directly.
+These words describe the approved physical chain; they do not announce a commercial remedy.
 
 ## Header rules (see UI-KIT for the shell)
 

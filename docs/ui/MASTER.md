@@ -1380,6 +1380,13 @@ counters above the table; the 32px status footer carries the summary.
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
 
+**WAREHOUSE INBOUND — OWNER-APPROVED 2026-09-06.** Warehouse navigation is
+`Monitor · Inbound · Inventory · Outbound`. Monitor alone is the Calendar-summary page.
+Inbound uses the shared 240px page-specific Filter Rail + remaining-width Register; no
+six-working-day strip, Calendar cards or 35%/65% composition. A compact date/range control is
+a filter only. Arrival status, source type, Site and search filter the same read-only Receiving
+projection. Exact Monitor deep links preserve date, Site ID, source type and source record.
+
 **APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
 fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.
 

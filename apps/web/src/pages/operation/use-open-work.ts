@@ -446,7 +446,7 @@ export function useOpenWorkSet(): OpenWorkSet {
       actingPerson;
     const src = {
       submitted: receipts
-        .filter((r) => r.status === "submitted")
+        .filter((r): r is typeof r & {po_id:string} => r.status === "submitted" && typeof r.po_id === "string")
         .map((r) => ({
           id: r.id,
           po_id: r.po_id,

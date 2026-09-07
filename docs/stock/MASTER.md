@@ -29,9 +29,9 @@ never transfers write ownership.
 
 ## 2 · Navigation and words
 
-Warehouse has four operator destinations: **Dashboard · Inbound · Inventory · Outbound**.
+Warehouse has four operator destinations: **Monitor · Inbound · Inventory · Outbound**.
 
-- Dashboard: dated read-only projection of Warehouse work and exceptions; never a second truth.
+- Monitor: dated read-only projection of Warehouse work and exceptions; never a second truth.
 - Inbound: physical goods expected at and received into a governed Site.
 - Inventory: the one current Unit authority, including Ready Stock and Counts & Adjustments views.
 - Outbound: dated physical work for Units that must leave a governed Site.
@@ -47,7 +47,7 @@ Purchasing, Delivery, Payments and Service Cases keep their own doors.
 Approved operator words include **Where · Who has it · Carres Owned · Supplier Consignment ·
 Report issue · Count again**.
 
-**WAREHOUSE DASHBOARD CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Dashboard's
+**WAREHOUSE MONITOR CALENDAR — OWNER-APPROVED / LOCKED 2026-09-04.** The Monitor's
 page-owned filter groups are `OUTBOUND SCHEDULE · SITE · SOURCE`. These are read-only filters over
 the dated Warehouse projection, never new records or destinations. A valid empty day says
 `No outbound handovers on {date}. Choose another date.` The Calendar card uses the owning source's
@@ -318,28 +318,25 @@ approval. It is not a stock adjustment. No physical event or submitted report is
 
 All surfaces reuse the governed Shell, Register, Workspace and Object Detail grammar.
 
-Each of the four Warehouse destinations starts with the governed six-working-day strip. It prints
-actual weekday and calendar date, for example `Tue, 1 Sep · 4`, never `Today`, `Tomorrow`,
-`Upcoming` or an undated priority bucket. Clicking a date reveals the work governed for that date.
-Unfinished work remains under its original date and reads `{n} not done`; the Portal does not move
-it into a misleading current-day bucket.
+Monitor is the only Warehouse Calendar-summary page. Its six-working-day Calendar prints
+actual weekday and date, omits governed closures and keeps unfinished work on its original date.
+Inbound uses exactly **240px page-specific filter rail + Inbound Register**, with the Register
+occupying the remaining width. Inbound never renders a Calendar, calendar cards or six-day strip.
+Its compact date/date-range control filters the Register only. This owner-approved implementation
+card supersedes the earlier all-destinations date strip and 35%/65% Inbound composition.
+Monitor arrival cards deep-link with the exact date, governed Site ID, source type and source record.
 
-The shared six-working-day strip is the Warehouse daily operating spine, not a decorative filter.
-For a week beginning Tue, 1 Sep it reads `Tue, 1 Sep · Wed, 2 Sep · Thu, 3 Sep · Fri, 4 Sep · Sat,
-5 Sep · Mon, 7 Sep`; the governed weekly closure is omitted. Public/partner closed dates and every
-later working date come from the Warehouse calendar rather than staff memory.
-
-**DASHBOARD CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Dashboard is the
+**MONITOR CALENDAR COMPOSITION — OWNER-APPROVED / LOCKED 2026-09-04.** Monitor is the
 read-only date overview; it does not replace Outbound's exact-Unit work listing. On desktop the six
 operating dates remain one chronological horizontal sequence. Date columns have a readable minimum
-width and the Dashboard work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
+width and the Monitor work area owns horizontal overflow; the dates may not wrap into a `3 × 2`
 grid whose tall first row pushes later days below the fold. There is one shared vertical scroll,
 not an independent scroll inside every day column. At narrow width the same projection becomes a
 single-day agenda with previous/next date controls; data, permissions and destinations do not
 change.
 
-This card Calendar is the Dashboard's selected `OUTBOUND SCHEDULE` projection. It does not remove
-the same Dashboard's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
+This card Calendar is the Monitor's selected `OUTBOUND SCHEDULE` projection. It does not remove
+the same Monitor's governed Inbound, Inventory, Needs checking or Month-end projections; choosing
 one of those opens that owner's dated rows rather than repainting them as outbound cards.
 
 One Calendar card is one governed outbound source scope, never one whole customer order and never a
@@ -355,11 +352,11 @@ Clicking the card opens **Outbound** already scoped to that date and source. It 
 formal DO the Warehouse work surface. The `DO No` inside Outbound remains a door to the read-only
 source document. The signed-in Warehouse operator checks, packs, scans and confirms the handover in
 Outbound; Delivery remains the only owner of its partner/date/time/route editor. Return restores the
-Dashboard date, Site, Source filter and scroll position.
+Monitor date, Site, Source filter and scroll position.
 
 For any selected date, the operator journey is always:
 
-1. **Open Dashboard:** read everything that must happen on that actual date across Inbound,
+1. **Open Monitor:** read everything that must happen on that actual date across Inbound,
    Inventory, `Needs checking`, Outbound and Month-end.
 2. **Complete Inbound work:** receive and check the exact PO/Consignment/Return/Transfer/Repair
    Units through Receiving; unresolved arrivals remain under their promised date.
@@ -368,20 +365,20 @@ For any selected date, the operator journey is always:
    Zone, Rack or Bin.
 4. **Complete Outbound work:** check, pack and hand over the exact DO/Transfer/Return/Repair Units;
    the accepted event transfers holder authority to the individually identified next person.
-5. **Close the date:** Dashboard separates `Completed on {date}`, `{n} not done`, `Evidence not
+5. **Close the date:** Monitor separates `Completed on {date}`, `{n} not done`, `Evidence not
    submitted` and `Units still with NETS Delivery`. Each total drills to the source object and exact
    Units.
 
 The sequence changes presentation only, never ownership. Receiving completes receipt facts;
 Inventory/Count completes physical facts; Delivery completes journey facts; the Work Engine
-re-resolves the responsible person. Dashboard and the date strip store none of them.
+re-resolves the responsible person. Monitor and the date strip store none of them.
 
 Work not completed stays visibly under its original actual date, for example `Wed, 2 Sep · 2 not
 done`, followed by `[JL] Receive and check 3 Units for PO-2041` and `[AM] Count U-1012 again at NETS
 Warehouse`. It is not silently carried forward, relabelled `Overdue` or hidden when the operator
 opens another date.
 
-Dashboard is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
+Monitor is the dated Warehouse morning-to-close workspace. It projects, but never copies, facts
 from Inbound, Inventory, Outbound, Month-end and the shared Work Engine. After the operator chooses
 an actual date, the page groups the one work set in business order:
 
@@ -403,7 +400,7 @@ found in the stock count` / `Find out why U-1005 did not match the count`, and `
 - DO handover → the Outbound work with linked Delivery Order;
 - Month-end requirement → the Month-end Stock Confirmation.
 
-Dashboard stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
+Monitor stores no status, quantity, owner, completion tick or copied action. It cannot edit a PO
 or GRN, change a Unit's holder, finish Delivery, approve an Adjustment or manually assign routine
 work. Completion occurs only when the authoritative source fact exists, after which the shared row
 updates everywhere.
@@ -793,7 +790,7 @@ facts; management receives all Warehouse reports and approval evidence. Cost, se
 payment and unrelated-outlet information remain hidden where the role does not require them.
 
 The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
-Dashboard, panel or object menu may create a second Settings door. The page sections are `Sites &
+Monitor, panel or object menu may create a second Settings door. The page sections are `Sites &
 operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence ·
 Unit ID · Permissions & approvals · External partners`. Settings governs rules/master data only; it
 never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
@@ -911,7 +908,7 @@ with the physical Units. No page or integration may directly set an `Available` 
 `Who has it` and ownership through the left rail; expand every total to exact Units; open Unit
 Detail for source, reservation, handover, problem and append-only history.
 
-**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Dashboard · Inbound ·
+**UI / PAGE / OBJECT PLACEMENT →** Inventory is the one Register under `Monitor · Inbound ·
 Inventory · Outbound`. Defaults are `Unit ID · Product · Stock use · Who has it · Site · Condition
 · SO No · SO date · PO No · PO date · Expected arrival · Last verified · Work`. Ready Stock is a
 saved view of the same authority; Sales and Operations read the same eligible Units with different
@@ -1040,7 +1037,7 @@ outcome.
 **UI / PAGE / OBJECT PLACEMENT →** Inventory rail uses `Needs checking`. Every row shows `Unit ID ·
 What happened · recorded Who has it · actual Site · reported date · reporter avatar · evidence ·
 resolved owner avatar · action · source document`. Unit Detail shows `Current control · Observed
-problem · Evidence · Work · Business consequence · Physical outcome · History`. Dashboard,
+problem · Evidence · Work · Business consequence · Physical outcome · History`. Monitor,
 Inventory, My Work and Team Work render the one Action; no second Problems Register is created.
 
 **CROSS-MODULE CONNECTION →** Stock owns physical availability, last confirmed holder and
@@ -1305,7 +1302,7 @@ or requests Adjustment. COO reviews remaining material/unexplained Units. Financ
 actual Count, submission, version and difference/approval evidence, then acknowledges the chosen
 version without changing physical truth.
 
-**UI / PAGE / OBJECT PLACEMENT →** Dashboard shows the month, Count window and concrete submission
+**UI / PAGE / OBJECT PLACEMENT →** Monitor shows the month, Count window and concrete submission
 date under `MONTH-END`. Month-end Detail shows `Stock month · Stock date · Count window · actual
 Count date · submitted date · version · confirmed Units · unresolved differences · approved
 Adjustments · movement reconciliation · Finance acknowledgement · History`. Reports provides
@@ -1394,7 +1391,7 @@ holder. NETS sees only authorised Site/journey work and evidence.
 pages do not repeat report buttons. Catalogue is `Current Stock · Ready Stock · Showroom Stock ·
 Stock by Ownership · Receiving & Inbound · Outbound & Handovers · Transfers · Stock Counts · Stock
 Differences & Adjustments · Problems & Condition · Month-end Stock Confirmations · Partner Evidence
-· Unit History`. Reports use the Register Template with filter rail and drill-through. Dashboard
+· Unit History`. Reports use the Register Template with filter rail and drill-through. Monitor
 keeps dated work/exceptions ahead of analytical KPI bands.
 
 **CROSS-MODULE CONNECTION →** Stock supplies physical facts; Purchasing owns incoming/shortage/buy
@@ -1736,12 +1733,11 @@ buttons on screen whose refusals nobody had designed. They are the scope after t
 
 ### 13.5 · BUILT — the four destinations in the rail (CARD 01, PR #1045)
 
-`CARD-2026-09-01-warehouse-01-sidebar` shipped the §2 map: the Warehouse module rows are
-**Dashboard · Inbound · Inventory · Outbound**, complete from day one. `Inventory` is the one
-live door — the same Unit Register page, key and `?tab=stock-onhand` address unchanged, its
-destination header/docTitle/export renamed to the rail's word. Dashboard, Inbound and Outbound
-print `Coming soon` as non-controls and go live in their own pages' PRs. The collapsed 60px
-icon opens the NAMED landing (`WAREHOUSE_LANDING_KEY` = Inventory) until Dashboard exists.
+The current Warehouse module rows are **Monitor · Inbound · Inventory · Outbound**.
+Inventory retains `?tab=stock-onhand`; Monitor retains the compatible `?tab=warehouse-dashboard`
+address, and Outbound uses `?tab=warehouse-outbound`. The local Inbound implementation now links
+`?tab=warehouse-inbound` instead of printing `Coming soon`; its acceptance limits are recorded in
+“Inbound local implementation” below. The collapsed icon opens the named Monitor landing.
 
 The superseded `Stock · Ready stock · In & out · Transfers · Counts` rows left the rail.
 **De-navigated, not deleted:** `?tab=stock-plan` (reorder points K1 · urgent restock K3 · pool
@@ -1757,7 +1753,7 @@ answered 500 since birth**: the route selected `site_name`/`holder_name` from
 `stock_unit_register_v` and no migration ever gave the view either column — the route merged
 2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
 governed-name joins on 0373's exact shape. **A Unit's permanent address rendered the
-Dashboard**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
+Monitor**: `stock/unit/:unitCode` had a Route but never joined `isUrlDriven`; fixed with the
 route-gate test that only mounting the app can provide. **Every Warehouse surface drew two top
 rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
 Header and none suppressed the slim global bar; all four do now, with a dashboard control test.
@@ -1895,3 +1891,86 @@ scope, without exact-Unit binding.
 
 **PLAN MISSION COMPLETE.** The complete Warehouse operating model is approved and persisted. PLAN
 does not author Cards or choose implementation mechanics.
+
+### Inbound local implementation — 2026-09-07, not deployed
+
+**Approved scope — owner confirmation 2026-09-07:** implement Transfer, Customer/failed-delivery
+Return, Repair and Replacement source and Receiving chains with Inbound. Receiving remains the
+sole receipt writer. This authorisation does not permit push, merge, deployment or production
+migration. No additional scope approval is required for these chains.
+
+The operation route `?tab=warehouse-inbound` uses the shared 240px FilterRail and DataGrid without
+Calendar. Supplier delivery and the five additional source types project exact expected, received,
+not-yet-received and issue Unit tallies. Source opens its owning object; Work opens Receiving.
+URL filters and Register scroll restore on browser Back. Dates retain their recorded authority;
+`poSupplierDeliveryDateOf` resolves supplier replies. Paginated user-token reads report failures.
+There is no fabricated empty-data fallback or commercial quantity inference. A later Not received
+entry cannot erase an earlier valid receipt; voiding that receipt removes its physical evidence.
+Missing identities/results remain explicit unknowns. Split PO destinations without exact Unit
+lineage remain investigation work rather than guessed arrival allocations.
+
+The local source object records exact Units, dates, reasons, Claim/Case lineage and append-only
+handover evidence. Transfer collection, carrier receipt and destination Receiving are separate
+per-Unit facts; a missing confirmation is visible without moving an untouched Unit. Handover
+rechecks current eligibility and custody. Dates/cancellation retain reasons and history;
+cancellation is blocked after movement. Repair retains Unit identity; replacement allocates a new
+identity linked to the old Unit without consuming the original PO receipt scope. Existing formal
+TR/RO and Unit allocators are reused. Claim outcome and execution layers remain independent.
+
+Case-backed work requires an explicit recorded physical-work approval and linked dated evidence.
+Condition-dependent collection additionally requires passed pre-collection checks and doorstep
+photo/check evidence. A refused collection records the refusal without changing custody. This is
+the local physical chain, not the entire policy/playbook engine or urgent shared-Work integration.
+
+Receiving uses the existing GRN header, exact Unit-result ledger and GRN Duty resolver. Each actual
+arrival records date, Site, holder, handover person, document and private proof. Partial and issue
+outcomes leave other Units untouched. Returns/repair require inspection; reserved Units keep their
+pledge and receive a repair flag. Safe cancellation retains receipt history and restores prior
+Unit state only when no later Unit change exists. There is no second Warehouse receipt ledger.
+
+**Database readiness:** `supabase/drafts/arrival_sources_and_receiving.sql` is an unnumbered,
+unapplied local draft. It adds source facts, private proofs and a nullable PO/arrival-source XOR
+on existing GRNs, plus narrowly evidenced hold-transition exceptions. Measured 2026-09-07: the
+production migration tracker was read; its tail is `0436` → `0438` **applied** (the earlier
+0435 reading is stale), and `0437_offboard_khor_yee_and_keep_two_person_duty` sits on
+`origin/main` but is **not yet in the tracker** — the governed apply is still owed by its own
+lane. The next free number today is `0439`; take the MAX across tracker and every ref again at
+promotion, because sibling lanes race for it. Then verify the complete migration chain, real
+Supabase RLS/storage and signed-in workflows. The new API requires these tables; do not deploy
+it before that database work. No production change, push, merge or deployment has occurred.
+
+**Remaining broader acceptance gaps:** Monitor arrival-card integration, exact split-PO Unit/Site
+lineage, complete legacy receipt results, formal Repair/Purchase Return document workflows,
+automated Case policy/photo completeness and urgent refusal Work remain outside this local
+physical-chain implementation. Their approved module targets remain open.
+
+**Convergence gap — measured 2026-09-07:** this branch's base (`a3813e5e`) is ~89 commits behind
+`origin/main` (`90a8f3ef`). `main` already ships its own supplier-only Inbound page and the
+Monitor rename (PR #1123), the server-paged GRN Register (PR #1117) and later Payment/Claims
+work (`0436`–`0438`, PR #1138); this branch touches the same files (`WarehouseInbound.tsx` ·
+`warehouse-receipts.ts` · `WarehouseWorkspace.tsx` · `portal-nav.ts` · `OperationApp.tsx`).
+Before any PR, merge `origin/main` and converge the two Inbound implementations into ONE page —
+this branch's six-source Register should absorb `main`'s PO projection, never sit beside it.
+During that convergence the full-table `GET /operation/warehouse/inbound` read must be re-cut
+onto `main`'s scoped, server-paged read pattern; a whole-table scan of `ops_stock_items`,
+`warehouse_receipts` and `receiving_unit_results` per page open does not survive real volume.
+
+Local verification preview: `/warehouse-inbound-preview.html` on this worktree's Vite dev server
+(launch entry `warehouse-inbound-preview`, port 5212; requires a local-machine `.env.local`),
+explicitly labelled sample data, with six source types and read-only source/Receiving/Outbound
+navigation.
+Sample writes are rejected. Earlier Inbound browser checks covered 1440px desktop and 390px phone,
+240px rail, no page overflow, filters, loading and retry. Expanded source navigation and partial
+Receiving were subsequently checked in the browser; actual date/person remain blank and only the
+outstanding Unit is offered for receipt. The expanded Receiving form was also checked at 390px:
+page scroll width equalled viewport width, with no horizontal overflow.
+
+Latest focused verification (review pass, 2026-09-07): 176 targeted tests passed (25 shared
+source/projection, 41 API and 110 page/sidebar/workspace). Web, API and shared TypeScript checks
+passed — the API check had been failing on a stale receipts-test fixture and was repaired in this
+pass. The register empty state, source detail, partial Receiving form and void door were
+re-walked in the browser on the labelled sample preview. The isolated PostgreSQL contract script
+checks the draft against fixture tables and the existing receipt-result function/hold trigger:
+partial/issue receipt, retained custody, duplicate prevention, duty denial, exact repair/replacement
+identity, Case approval, doorstep refusal, preserved reservations and safe void refusal after later
+changes, post-plan eligibility, direct-write denial and dealer read/RPC denial. It is not proof of the complete production migration chain or production permissions.

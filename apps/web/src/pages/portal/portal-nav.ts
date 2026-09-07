@@ -411,12 +411,12 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * Stock MASTER §13; a direct URL still lands. */
       {
         key: "wh-dashboard",
-        label: "Dashboard",
+        label: "Monitor",
         icon: LayoutDashboard,
         tab: "warehouse-dashboard",
         section: "Warehouse",
       },
-      { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, soon: true, section: "Warehouse" },
+      { key: "wh-inbound", label: "Inbound", icon: ArrowDownLeft, tab: "warehouse-inbound", section: "Warehouse" },
       { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
       {
         key: "wh-outbound",

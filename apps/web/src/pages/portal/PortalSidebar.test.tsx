@@ -1220,14 +1220,14 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
    * sidebar). The former `Stock · Ready stock · In & out · Transfers · Counts`
    * subtree is superseded; the complete approved map shows from day one and
    * never reshuffles after this. */
-  it("the map is Dashboard · Inbound · Inventory · Outbound, in that order", () => {
+  it("the map is Monitor · Inbound · Inventory · Outbound, in that order", () => {
     renderAt("/operation?tab=stock-onhand");
     const rows = Array.from(
       screen
         .getByTestId("nav-children-warehouse")
         .querySelectorAll("[data-testid^='nav-child-']"),
     ).map((el) => el.textContent?.replace("Coming soon", "").trim());
-    expect(rows).toEqual(["Dashboard", "Inbound", "Inventory", "Outbound"]);
+    expect(rows).toEqual(["Monitor", "Inbound", "Inventory", "Outbound"]);
   });
 
   it("Inventory is the one live door and keeps the `?tab=stock-onhand` address", () => {
@@ -1236,7 +1236,7 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(screen.getByTestId("nav-child-stock")).toHaveTextContent("Inventory");
   });
 
-  it("Dashboard and Outbound are live links; Inbound still prints `Coming soon`", () => {
+  it("Monitor, Inbound and Outbound are live links", () => {
     renderAt("/operation?tab=stock-onhand");
     const dash = child("wh-dashboard") as HTMLAnchorElement;
     expect(dash.tagName).toBe("A");
@@ -1245,9 +1245,8 @@ describe("PortalSidebar — the Warehouse module's four destinations", () => {
     expect(outbound.tagName).toBe("A");
     expect(outbound).toHaveAttribute("href", "/operation?tab=warehouse-outbound");
     const inbound = child("wh-inbound");
-    expect(inbound.tagName).toBe("SPAN");
-    expect(inbound.getAttribute("aria-disabled")).toBe("true");
-    expect(within(inbound).getByText("Coming soon")).toBeInTheDocument();
+    expect(inbound.tagName).toBe("A");
+    expect(inbound).toHaveAttribute("href", "/operation?tab=warehouse-inbound");
   });
 
   /* The superseded subtree is GONE from the rail. The pages behind
