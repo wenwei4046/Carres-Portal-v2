@@ -1918,11 +1918,10 @@ dev preview entry before merge. CI `verify` passed on the PR head. The Inbound/O
 PRESENTATION in this entry is since superseded by the unified Register (§13.9); the Monitor
 law and the governed act sentences stand.
 
-### 13.9 · LOCAL BUILD — the unified Inbound/Outbound Register (owner card 2026-09-07, NOT deployed)
+### 13.9 · BUILT / PRODUCTION-VERIFIED — the unified Inbound/Outbound Register (owner card 2026-09-07)
 
-The Jess-approved unification card was implemented on `codex/warehouse-inbound-converge`
-(local build; **no merge, no deploy, no production verification — nothing here claims to be
-live**):
+The Jess-approved unification card shipped as PR #1153, squash-merged to `main` as
+`819d6764`:
 
 - Both pages speak ONE Register grammar (§7's two UNIFIED REGISTER ROW blocks): Destination
   Header, one toolbar row (Filters toggle · compact From/To date range · search ·
@@ -1937,15 +1936,30 @@ live**):
 - Outbound surfaces the LOGISTICS side's own per-Unit receipt (`recorded_side='logistics'`)
   as `Driver confirmed {n}` — three counts, never merged; `Driver collected` no longer borrows
   the Warehouse's loading event.
-- Migration `0440_a_handover_keeps_every_evidence_file.sql` (WRITTEN, **NOT APPLIED**) adds the
-  append-only `delivery_handover_evidence` ledger and re-creates the one handover door with
+- Migration `0440_a_handover_keeps_every_evidence_file.sql` — **APPLIED to production as
+  `20260907073647`, BEFORE the merge** (so no worker ever called a missing signature). It adds
+  the append-only `delivery_handover_evidence` ledger and re-creates the one handover door with
   `p_evidence`: many photos/videos per act, per-file upload with retry, first file mirrored
-  into `proof_path` for legacy readers. Receiving's stored `arrival_evidence` files are now
-  signed for RE-VIEWING on the record.
-- Still owed before this can be called live: apply 0440 through the governed path; land the
-  arrival-sources draft (`supabase/drafts/arrival_sources_and_receiving.sql`, still
-  unnumbered — the non-PO Inbound rows have no production tables); merge/deploy/walk
-  production under an operator login.
+  into `proof_path` for legacy readers. Its own sanity gate caught the 0367 defect on the first
+  attempt (a new table inherits TRUNCATE/REFERENCES/TRIGGER grants) and the applied version
+  revokes the full set — verified: exactly one 9-argument `delivery_handover_record`, zero
+  client write grants on the ledger. Receiving's stored `arrival_evidence` files are now signed
+  for RE-VIEWING on the record.
+
+**Production proof (2026-09-07):** `Deploy production` for `819d6764` succeeded;
+`erp.carresofficial.com/__carres_deploy.json` reports exactly `819d6764`, and the served bundle
+(`/assets/index-CsU7sDQh.js`) greps positive for `Scheduled handover`, `DOCUMENT TYPE`,
+`Not finished`, `Driver confirmed`, `Repair Order No`, `Loaded, not confirmed by`,
+`no Warehouse loading record`, `Show every product and Unit`,
+`photos and videos of the loaded goods` and the evidence-picker copy. The Worker and the
+Inbound endpoint answer 401 unauthenticated — alive behind their role gates. CI `verify`
+passed on the PR head (shared 3004 · api 2806 · web 3951 tests; strict `tsconfig.app.json`
+typecheck; design-standard lint). Authenticated operator walks remain the owner's checklist.
+
+Still owed (not this card's build): land the arrival-sources draft
+(`supabase/drafts/arrival_sources_and_receiving.sql`, still unnumbered — the non-PO Inbound
+rows have no production tables), and migration 0437 (Khor Yee offboard / two-person duty) is
+on `main` but **NOT applied** in production while 0438–0440 are — flagged to its owning stream.
 
 ## 14 · Whole-domain completion gate
 
