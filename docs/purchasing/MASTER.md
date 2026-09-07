@@ -2390,10 +2390,20 @@ value posting.
 **Purpose / source:** system report of exact supplier-owned Units successfully delivered to a
 customer; no `+ New`.
 **Left rail:** `Ready to issue`, `PDF not sent`, `Supplier contact missing`, `Correction must be sent`, `Sent`. Finance invoice/match facts are read-only links, not Purchasing work.
-**Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Source CO, Notice,
+**Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Consignment Order, Notice,
 Finance. Customer personal information and selling price are absent.
 **Journey:** Delivery success auto-creates → Current PO Duty checks exact Units → sends notice →
 Finance later reads the same object.
+**Consignment Sale Notice presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header
+shows Consignment Sale Notice and number, Supplier and linked Consignment Order. Units sold lists
+exact Unit ID, Model, Quantity and Customer received date. Delivery evidence provides internal,
+permission-scoped Sales Order / Delivery record / accepted-proof links. Send to supplier shows
+contact, phone/email, PDF version, sent date and sent evidence. Finance shows permission-scoped,
+read-only supplier invoice and matching information; History follows. System creation and PO Duty
+check/send follow §7.7, with no manual create. The supplier PDF excludes customer personal details,
+selling prices and settlement amounts. Failed Units are excluded and repeated delivery submission
+must not duplicate a notice. Internal evidence is not automatically included in the supplier PDF.
+This approves this page presentation, not the entire Showroom Blueprint or implementation.
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
