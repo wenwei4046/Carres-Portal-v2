@@ -704,7 +704,7 @@ access (a Stripe test-mode key set); where the governed acceptance requires the 
 provider lifecycle, that access is a requirement, not an option. No live payable link is
 ever created for testing.
 
-### BUILD — the gate consumes the canonical obligations, 2026-09-07
+### Deployed — the gate consumes the canonical obligations, 2026-09-07
 
 The convergence slice itself (the RESOLVED entry above records the model): shared
 `storageObligation` + `invoiceStorageSumOf`; feeders wired in `booking-context` (the one
@@ -719,8 +719,12 @@ its navigation row and its page; the route lands on Payments; the reconciliation
 its API routes remain untouched, and git is the history. Refunds stays as read-only
 history. Verified by the 0441 rolled-back production probe (seven controls, both
 directions), 9 composer tests, the Work both-directions test (26 work tests), 234
-finance+portal page tests, design guard and typecheck; convergence and walk facts land in
-the closure when they exist.
+finance+portal page tests, design guard and typecheck. Closure: migration `0441` is
+APPLIED (tracker tail confirmed; the Warehouse lane took `0440` mid-CI and the later file
+renumbered — the 0398 law) and PR #1154 merged as `5cdccd13`; the ERP page, POS page and
+Worker all reported that exact SHA. The DB-door behaviour is production-proven by the
+rolled-back probe; the authenticated interaction and visual passes share the standing
+blocker recorded under the verification categories.
 
 ### Verification evidence — the four categories, stated separately
 
