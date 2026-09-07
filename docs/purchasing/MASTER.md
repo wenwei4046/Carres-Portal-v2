@@ -1949,7 +1949,7 @@ These values reuse the shared authority; this Blueprint reuses existing kit comp
 Reported, Supplier, PO No, GRN No., Product, Variant, Qty, Problem, Supplier Response and Claim
 status. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
 reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
-product name. SKU is its own optional column. Preserve existing SC document numbers and explain
+product name. SKU and Supplier DO each have their own optional column. Preserve existing SC document numbers and explain
 them through the full Supplier Claim No. header; do not rename historical documents or invent
 another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
 identity column covering adjacent content. One row is one supplier workstream, never one row

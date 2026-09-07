@@ -91,6 +91,7 @@ export default function OperationSupplierClaims() {
     { key: "product", label: "Product", width: 240, accessor: (row) => row.product_description || absent, searchValue: (row) => row.product_description || "", exportValue: (row) => row.product_description || "" },
     { key: "size", label: "Variant", width: 160, accessor: (row) => row.product_variant || absent, searchValue: (row) => row.product_variant || "", exportValue: (row) => row.product_variant || "" },
     { key: "sku", label: "SKU", width: 190, defaultHidden: true, accessor: (row) => row.sku, searchValue: (row) => row.sku, exportValue: (row) => row.sku },
+    { key: "supplier_do", label: "Supplier DO", width: 180, defaultHidden: true, accessor: (row) => row.do_number || absent, searchValue: (row) => row.do_number || "", exportValue: (row) => row.do_number || "" },
     { key: "qty", label: "Qty", width: 110, align: "right", accessor: (row) => row.qty, numberValue: (row) => row.qty, filterType: "number", exportValue: (row) => row.qty },
     { key: "problem", label: "Problem", width: 176, accessor: (row) => supplierClaimTypeLabel(row.claim_type), searchValue: (row) => `${supplierClaimTypeLabel(row.claim_type)} ${row.note || ""}`, exportValue: (row) => supplierClaimTypeLabel(row.claim_type) },
     { key: "response", label: "Supplier Response", width: 180, accessor: (row) => valueOf(row, "response"), searchValue: (row) => valueOf(row, "response") ?? absent },
@@ -133,7 +134,7 @@ export default function OperationSupplierClaims() {
               onFilteredRowsChange={setVisibleRows} onRowDoubleClick={open}
               expandable={{ renderExpansion: (row) => <SupplierClaimInspector claim={row} onOpen={() => open(row)} />, testId: (row) => `claim-inspect-${row.claim_no}` }}
               selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((previous) => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; }), onToggleAll: (keys, all) => setSelectedKeys((previous) => { const next = new Set(previous); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next; }) }}
-              statusSummary={(visible) => <span>{visible.length}{visible.length !== claims.length ? ` of ${claims.length}` : ""} {claims.length === 1 ? "claim" : "claims"} · {visible.reduce((sum, row) => sum + row.qty, 0)} units</span>}
+              statusSummary={(visible) => <span>{visible.length}{visible.length !== claims.length ? ` of ${claims.length}` : ""} {claims.length === 1 ? "claim" : "claims"} · {visible.reduce((sum, row) => sum + row.qty, 0)} {visible.reduce((sum, row) => sum + row.qty, 0) === 1 ? "unit" : "units"}</span>}
             />
           </div>
         </div>}
