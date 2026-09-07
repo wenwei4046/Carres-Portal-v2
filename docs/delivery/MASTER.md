@@ -325,9 +325,10 @@ Employee results are:
 
 **Rescheduled** and **Delivery Cancelled** are arrangement states, not actual Delivery Results.
 
-Delivered requires actual time, receiver, delivered goods/quantity and governed signature/photos.
-Until proof is complete and accepted, show **Delivered — Proof Required**; after acceptance show
-**Delivered — Complete**.
+Delivered requires actual time, receiver, delivered goods/quantity and the governed evidence.
+The recorded result always reads **Delivered**. Missing evidence creates the separate
+**Upload delivery proof** work queue, whose row names `Upload delivery photo` and/or
+`Upload signed Delivery Order`; completing or reviewing proof never renames the result.
 
 For each exact delivered Unit, Delivery emits one idempotent success fact. If Stock says that Unit
 was `Supplier Consignment`, Purchasing automatically creates the Consignment Sale Notice for that
@@ -409,36 +410,35 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**MONITOR — the complete work list first, calendar planning behind an explicit pick (owner UI
-correction 2026-09-07, overwriting the 2026-09-06 calendar-default landing).** Monitor answers
+**MONITOR — calendar first, with operational queues that open the selectable work list (owner UI
+correction 2026-09-07, overwriting the earlier `Calendar` rail row and work-list-default landing).** Monitor answers
 the operator's morning question — *what customer deliveries are planned, and which record do I
 open or act on?* — through **two projections of the SAME canonical scope rows**:
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
 page-owned 240px FilterRail  ·  the COMPLETE MONTH CALENDAR fixed on top, then
-                                WORK TO DO + REGION + LOGISTICS scrolling below it
-All delivery work (DEFAULT)  ·  the standard selectable Register work list (shared DataGrid):
+                                WORK TO DO + STATE + LOGISTICS PARTNER + DELIVERY STATUS
+                                scrolling below it
+Calendar (DEFAULT)           ·  Day / Week / Month in the page toolbar; Week is the desktop default
+                                and its six Mon–Sat columns fit without horizontal date scrolling
+Operational queue selected  ·  the standard selectable Register work list (shared DataGrid):
                                 selection ☐ · ▸ expansion · SO No · Customer · State ·
                                 Delivery Location · Requested Delivery Date ·
                                 Confirmed Delivery · Confirmed Time · Goods · DO No ·
                                 Logistics Partner · Delivery Status — sticky identity,
                                 real horizontal scrolling
-Calendar (explicit pick)     ·  ‹ fixed operating week › + Search · week-aligned day
-                                columns, delivery cards, NO checkboxes, no batch selection
 ```
 
-**`All delivery work` IS THE DEFAULT LANDING (owner correction 2026-09-07).** Measured before
-the correction, 86 of 87 delivery scopes carried no confirmed date, so the Calendar landing
-opened empty and the workspace appeared to contain no orders. Opening Monitor now shows the
-complete selectable DataGrid of every delivery-eligible Sales Order scope immediately —
-including scopes with **no formal DO yet, no confirmed delivery date, and no logistics partner
-yet**. The governed entry rule below still gates the population (no cancelled orders, no orders
-that need no delivery, no scope missing its minimum facts), and one row remains ONE delivery
-scope / Journey leg, never necessarily one Sales Order. Calendar is not removed: its rail row,
-or a date click on the rail's month calendar, opens the fixed operating-week Calendar, which
-continues to show only scopes with a confirmed date and never places undated scopes into date
-columns.
+**Calendar is a VIEW, never a `WORK TO DO` row.** `Day · Week · Month` stays in the page toolbar
+on BOTH projections (nothing lit while the work list shows, never on a phone). Choosing any of the
+three clears the selected work queue and every STATE / LOGISTICS PARTNER / DELIVERY STATUS pick and
+returns the right workspace to the Calendar. Choosing `All delivery work` or another work queue replaces the Calendar with the
+selectable DataGrid. `All delivery work` still contains every delivery-eligible Sales Order row,
+including rows with **no formal DO yet, no confirmed delivery date, and no Logistics Partner yet**.
+The governed entry rule below still gates the population (no cancelled orders, no orders that need
+no delivery, no row missing its minimum facts). Calendar continues to show only rows with a
+confirmed date and never places undated work into date columns.
 
 **THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
 region is the complete current month — never a one-week strip, never the Portal sidebar:
@@ -448,26 +448,44 @@ stay visible in the governed muted treatment and take no click; a date holding c
 deliveries carries a dot mark (shape, never colour alone); the arithmetic is real and
 locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
 pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
-independently BELOW it; scrolling them never removes the month from view. **Clicking a date
-opens the fixed operating week containing it in the right workspace** — Calendar becomes the
-explicit pick and the other operational picks clear so the week actually appears.
+independently BELOW it; scrolling them never removes the month from view. **Clicking a date opens
+that date's Day view in the right workspace** and clears the selected work queue. Clicking a day
+in the right-side Month view does the same.
 
-A work queue (`No logistics picked` · `No confirmed date` · `Overdue` · `Failed Delivery` ·
-`Delivered — Proof Required` · `Waiting for warehouse`), a REGION row or a LOGISTICS row is an
-operational question, and its answer is the Register grammar every other module answers with —
-**never a full-width card wall**. The ▸ expansion has exactly one job: the scope's goods lines,
-read-only. `SO No` opens the Sales Order, `DO No` opens the Delivery Order, double-click opens
-Edit Delivery.
+A work queue (`All delivery work` · `No logistics picked` · `No confirmed date` · `Overdue` ·
+`Failed Delivery` · `Upload delivery proof`), a STATE row, a LOGISTICS PARTNER row or a DELIVERY
+STATUS row is an operational question, and its answer is the Register grammar every other module
+answers with — **never a full-width card wall**. The ▸ expansion has exactly one job: the row's
+goods lines, read-only. `SO No` opens the Sales Order, `DO No` opens the Delivery Order,
+double-click opens Edit Delivery. **`scope` and `leg` are never employee-facing words** (owner
+correction 2026-09-07): the footer counts `{n} deliveries` / `{n} of {m} deliveries`, the empty
+list says `No deliveries` / `No matching deliveries.`, the assignment door counts `{n} deliveries`,
+and a Journey row prints its own route (`Klang WH → JB transit`) with no `Leg` prefix — the leg
+number rides only the Edit Delivery URL.
+
+`Upload delivery proof` contains recorded delivered results whose required evidence is incomplete
+— the Delivery Orders register's OWN missing-evidence arithmetic (`missingDeliveryProofOf`: the
+T6 photo ledger known and empty, and/or no signed document on `orders.do_file_path`), never a
+second copy. The queue name tells the operator the job; each row then names the exact missing
+evidence beneath its `Delivered` status as `Upload delivery photo` and/or `Upload signed Delivery
+Order` — both when both are missing. Completed evidence leaves this queue. `Delivered — Proof
+Required` does not appear on Monitor. `Overdue` never holds a recorded delivery: a confirmed date
+behind us with a delivered result is proof work, not a late trip.
+
+`Waiting for warehouse` remains a Delivery Status filter, not a `WORK TO DO` queue. It means the
+delivery has been arranged but Warehouse has not recorded `Ready for handover`; it never means
+that stock is missing or that delivery is in progress. Warehouse records the readiness fact and
+the row then advances to `Ready for handover`.
 
 **BULK INITIAL LOGISTICS ASSIGNMENT LIVES ON MONITOR (owner correction 2026-09-06)** — the
-planning population includes delivery scopes that have no formal DO yet, so the journey is
+planning population includes deliveries that have no formal DO yet, so the journey is
 `Monitor → No logistics picked → header select-all → Assign logistics`, and the queue answers
 across ALL dates — rows without a DO and rows without a confirmed date included. Selection
 follows the shared engine: every row has a checkbox; the header checkbox selects only the
 visible filtered rows (a combined `Selangor · No logistics picked` narrowing selects only those
 Selangor rows); changing a filter clears the selection; a completed assignment clears the
 selection and refreshes the rail counts; the selection toolbar replaces the normal toolbar
-at the same height and reads `{N} delivery scopes selected · Clear · Assign logistics`. The
+at the same height and reads `{N} selected · Clear · Assign logistics`. The
 write goes through the ONE governed assignment door (coverage-checked partners, Klang Valley
 pre-selects NETS, history preserved). **Bulk assignment is offered only while every selected
 row is unassigned**; a selected row that already carries a partner turns the act into the
@@ -486,31 +504,43 @@ REAL `{n} deliveries need a confirmed date.` count when true, and the `Open No c
 door — never the same absence repeated in every column; an individually empty day says
 `No deliveries`.
 
-- **THE FIXED OPERATING WEEK (owner correction 2026-09-06, superseding the rolling six-day
-  window).** Desktop shows the week-aligned Mon–Sat containing the selected date, fitting its
+- **DAY / WEEK / MONTH (owner correction 2026-09-07).** Desktop defaults to `Week` and may switch
+  to `Day` or `Month`. `Day` shows the selected operating day with full work cards; its arrows
+  move one operating day. `Month` is a capacity overview on the kit's one calendar primitive:
+  each date prints compact counts in the rail row's own grammar — `Deliveries {n}`, then
+  `Exceptions {n}` (only when > 0: exactly the rows the `Overdue` + `Failed Delivery` + `Upload
+  delivery proof` queues would list, one arithmetic) and `No logistics picked {n}` (only when
+  > 0) — never full delivery cards; a date with nothing prints only its number; Sunday stays
+  visible, muted and unclickable; a Sunday-recorded delivery is still counted; the toolbar's
+  `Previous month` / `Next month` replace the whole month; clicking a date opens `Day`. A month
+  holding nothing shows the same ONE spanning state as an empty week. `Week` shows the week-aligned Mon–Sat containing
+  the selected date, fitting its
   available width — no unlimited horizontal date scrolling; previous/next REPLACES the whole
   displayed work week (six operating days). A tablet shows the fixed three-day half-week
-  (Mon–Wed / Thu–Sat), previous/next replacing the visible window. The default selected date
+  (Mon–Wed / Thu–Sat) for the week projection, previous/next replacing the visible window. The default selected date
   is business today, a Sunday snapping forward to Monday.
 - **No hour-by-hour vertical timeline.** The planned window is text; card height never implies
   duration. Cards order by window start, then customer (locale-aware), then stable scope id. An
   empty day says `No deliveries` (owner correction 2026-09-06).
-- **One card shows only:** planned window · DO No (or `No delivery order yet`) · Customer ·
-  City/locality · Goods summary · Logistics Partner · Expected arrival when recorded · ONE
-  derived delivery status. **Never** a customer or partner phone, money, internal owner, driver,
-  vehicle, upload timestamp or actual delivery time.
+- **One card shows only (owner correction 2026-09-07):** confirmed time · DO No (or `No delivery
+  order yet`) · Customer · City and State · Goods summary · Logistics Partner · Delivery Status.
+  **Never** a customer or partner phone, money, an internal employee name, driver, vehicle,
+  expected arrival, upload timestamp or actual delivery time. Staff facts, where a Delivery
+  surface ever needs one, come from the shared Staff & Duties resolver — never a hard-coded name.
 - **The status is the shared seven-word operational ladder** (`deliveryWorkStatusOf`) — one
   arithmetic with the old workspace, never a second copy. **A planned time window ending proves
   nothing**: no failure, no "result needed", no invented status reads the clock.
-  `Delivered — Proof Required` is derived only from a RECORDED delivery result whose photo
-  ledger is known and empty — never from time.
+  A delivered result with incomplete evidence remains `Delivered` on the Calendar and enters the
+  `Upload delivery proof` work queue only from recorded proof facts — never from time.
 - **The URL is the state** — ONE selected date (`?date=`) drives every viewport's window,
-  plus `?view=` · `?region=` · `?logistics=` · `?q=`, so refresh, share and Back all restore
-  the same view. An absent `?view=` is the default `All delivery work`; the retired
-  `?schedule=`/`?checking=`/`?start=`/`?day=` spellings still resolve so an old shared link
-  keeps answering — `?start=`/`?day=` only ever named the calendar, so they still open its
-  week.
-- **Mobile is a one-day list, never the grid squeezed into a phone.** Below the phone breakpoint
+  plus `?view=` (`day` · `week` · `month`, or the one WORK TO DO queue) · `?region=` (the STATE
+  pick) · `?logistics=` · `?status=` · `?q=`, so refresh, share and Back all restore the same
+  view. An absent `?view=` is the default `Week`; the retired `?schedule=` / `?checking=` /
+  `?start=` / `?day=` / `?view=calendar` / `?view=delivered_proof_required` /
+  `?view=waiting_warehouse` spellings still resolve so an old shared link keeps answering —
+  `calendar`, `?start=` and `?day=` open the week, the old proof queue opens `Upload delivery
+  proof`, and the old `waiting_warehouse` queue opens the DELIVERY STATUS filter.
+- **Mobile is the `Day` list, never the Week or Month grid squeezed into a phone.** Below the phone breakpoint
   the rail becomes the filter drawer, the visible range becomes one selected operating day with a
   sticky date heading and 44px rows, previous/next skips Sunday, **the full month opens through
   the kit's one standard date control (UI-KIT §11)**, and the cards and href arithmetic are
@@ -520,22 +550,27 @@ door — never the same absence repeated in every column; an individually empty 
 `FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px
 minimum rows, wrapping labels, right-aligned counts, blue active row, `Hide filters` /
 `Show filters` collapse remembered by the browser; on a phone the rail becomes the filter
-drawer). **Three single-pick groups that COMBINE**; each group's counts are computed over the
+drawer). **Four single-pick groups that COMBINE**; each group's counts are computed over the
 cards the other groups already narrowed (Architecture Law D):
 
 - **`WORK TO DO` is ONE group (owner correction 2026-09-06 — never split into "Delivery
   Schedule" and "Needs Checking"), in the ruled order (owner correction 2026-09-07):**
-  **`All delivery work`** (the default landing — every open scope, the unfiltered selectable
+  **`All delivery work`** (every open row, the unfiltered selectable
   listing) · **`No logistics picked`** (a PRIMARY work queue, visible without scrolling past
-  REGION and the partner rows — never buried in, or duplicated under, LOGISTICS) ·
-  `No confirmed date` · `Calendar` · **`Overdue`** · `Failed Delivery` ·
-  `Delivered — Proof Required` · `Waiting for warehouse` — never `Today`, never `Tomorrow`;
-  every queue a recorded fact, never a clock inference.
-- **`REGION`** — `All regions`, then the direct rows ruled below. A REGION pick combines with
-  a work queue (`Selangor · No logistics picked`), and header select-all then takes only those
-  visible filtered rows.
-- **`LOGISTICS`** — `All logistics`, then only the governed partners genuinely carrying a
-  matching scope, per the rows ruled below.
+  STATE and the partner rows — never buried in, or duplicated under, LOGISTICS PARTNER) ·
+  `No confirmed date` · **`Overdue`** · `Failed Delivery` · `Upload delivery proof` — never
+  `Calendar`, `Today` or `Tomorrow`; every queue comes from recorded facts, never a clock inference.
+- **`STATE`** (owner correction 2026-09-07, the heading formerly `REGION`) — the direct state
+  names ruled below, straight from the data, no `All …` row: picking again unpicks, and `Clear
+  filters` above the list clears everything. A STATE pick combines with a work queue
+  (`Selangor · No logistics picked`), and header select-all then takes only those visible
+  filtered rows.
+- **`LOGISTICS PARTNER`** (the heading formerly `LOGISTICS`) — only the governed partners
+  genuinely carrying a matching row, per the rows ruled below; no invented company, no `All …`
+  row.
+- **`DELIVERY STATUS`** — `Waiting for warehouse` · `Ready for handover` · `Out for delivery`.
+  These are filters over recorded operational progress, not actions and not document statuses;
+  the three rows are fixed and print their live counts, zero included.
 
 **DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
 correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**
@@ -599,8 +634,9 @@ its address stays **Sales-owned Work** and must not appear here as a card of `No
 before the correction, 59 of 90 rows carried no location at all, which is two thirds of a logistics
 screen that no logistics operator could act on.
 
-**`REGION` (owner correction 2026-09-06, overwriting the 2026-09-01 sub-heading grammar)**
-answers *where is each delivery going?* with **direct state/jurisdiction names only, derived
+**`STATE` (owner correction 2026-09-07, the heading formerly `REGION`; the flat grammar is the
+2026-09-06 correction overwriting the 2026-09-01 sub-headings)** answers *where is each delivery
+going?* with **direct state/jurisdiction names only, derived
 from the real records** — Johor, Kedah, Kelantan, Kuala Lumpur, Melaka, Pahang, Penang,
 Putrajaya, Sabah, Sarawak, Selangor, Singapore and the rest as the data genuinely carries them:
 
@@ -615,13 +651,13 @@ Putrajaya, Sabah, Sarawak, Selangor, Singapore and the rest as the data genuinel
   state joins no region row and shows while no region is picked — fixing its address is Sales
   work through `Open Sales Order to change`.
 
-**`LOGISTICS` (owner correction 2026-09-07)** lists `All logistics`, then only the partners
-**genuinely carrying a matching scope** — the governed roster order (NETS · AL · TEOW · TT ·
+**`LOGISTICS PARTNER` (owner correction 2026-09-07)** lists only the partners
+**genuinely carrying a matching row** — the governed roster order (NETS · AL · TEOW · TT ·
 EU · SSY · HOUZS) among those present, then others by name, a picked partner staying visible
 at 0. **`No logistics picked` does NOT appear here**: it is a primary WORK TO DO queue (the
 bulk-assignment journey's entry) and is never duplicated in two groups. A long list of
-irrelevant zero-count partners is not a planning fact. Counts are **delivery scopes or
-Journey legs, never whole Sales Orders.**
+irrelevant zero-count partners is not a planning fact. Counts are **deliveries — a Journey leg
+is its own delivery — never whole Sales Orders.**
 
 **One card = one Delivery scope, or one Journey leg.** A Singapore order's two legs are two
 cards, each with its own Logistics Partner, day, arrangement and result: leg 1 completing means the
@@ -916,8 +952,8 @@ signed loading manifest or per-trip cost.
 | Today / Tomorrow | actual weekday + date |
 
 The formal audit object remains Delivery Visit; employee navigation remains Delivery History.
-Delivered, Delivered — Proof Required, Delivered — Complete, Partially Delivered and Failed
-Delivery have the meanings governed above. Rescheduled and Delivery Cancelled are arrangement
+Delivered, Partially Delivered and Failed Delivery have the meanings governed above. Missing
+evidence is work under `Upload delivery proof`, never a second spelling of the result. Rescheduled and Delivery Cancelled are arrangement
 states. `Recorded on behalf of` always names the true Partner and Carres recorder.
 
 The Blueprint covers DO splits, multiple Warehouses/Partners/dates, NETS default/rejection,

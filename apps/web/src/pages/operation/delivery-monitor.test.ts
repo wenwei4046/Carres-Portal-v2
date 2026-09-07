@@ -1,24 +1,29 @@
 /**
  * DELIVERY MONITOR — the calendar + work-list arithmetic, held as tests.
- * Owner UI correction 2026-09-06.
+ * Owner UI corrections 2026-09-06 / 2026-09-07.
  *
- * Six properties the page cannot check for itself once the pixels render:
+ * Seven properties the page cannot check for itself once the pixels render:
  *
- *  1. The six-operating-day window is EXACT — consecutive days, Sunday
- *     omitted, and previous/next move by exactly six operating days.
+ *  1. The windows are EXACT — the six-operating-day week (Sunday omitted),
+ *     the tablet half-week, the Day, the Month — and previous/next replace
+ *     the whole window.
  *  2. A card is a mapping of facts other owners already recorded — the DO id,
- *     the arrangement's window, the partner — never a second arithmetic.
+ *     the arrangement's window, the partner, the register's missing-evidence
+ *     facts — never a second arithmetic.
  *  3. A card with an issued DO opens the Delivery Order; a card without one
  *     opens Edit Delivery. There is no third door.
  *  4. An expired planned window alone changes NOTHING — no failure, no
  *     "result needed", no invented status.
- *  5. THE PROJECTION RULE — the calendar renders only for the explicit
- *     Calendar pick with no other filter; any operational pick answers with
+ *  5. THE PROJECTION RULE — the calendar renders only while NO operational
+ *     pick holds (no queue, state, partner or status); any pick answers with
  *     the work list.
  *  6. The rail filters combine, every count is what clicking it produces,
- *     REGION is flat direct names, LOGISTICS lists only partners genuinely
- *     carrying matching scopes, and `No logistics picked` is a WORK TO DO
- *     queue — never duplicated under LOGISTICS (owner correction 2026-09-07).
+ *     STATE is flat direct names, LOGISTICS PARTNER lists only partners
+ *     genuinely carrying matching rows, DELIVERY STATUS is the three fixed
+ *     rungs, and `No logistics picked` is a WORK TO DO queue — never
+ *     duplicated under LOGISTICS PARTNER.
+ *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
+ *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
  */
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
@@ -40,10 +45,22 @@ import {
   emptyRangeSentence,
   needConfirmedDateSentence,
   activeFilterLabels,
+  monthDaysOf,
+  monthStepStart,
+  monthDayCounts,
+  monthDaySentence,
+  missingProofLabels,
+  needsProof,
+  deliveriesFooter,
+  selectedSentence,
   MONITOR_DAYS,
   MONITOR_COPY,
   MONITOR_WORK_VIEWS,
   MONITOR_VIEW_LABEL,
+  MONITOR_STATUS_FILTERS,
+  MONITOR_STATUS_LABEL,
+  MONITOR_CALENDAR_VIEWS,
+  DEFAULT_CALENDAR_VIEW,
   type DeliveryMonitorCard,
   type DeliveryMonitorFilters,
 } from "./delivery-monitor";
@@ -154,35 +171,33 @@ function cards(
 }
 
 const noFilters: DeliveryMonitorFilters = {
-  view: "calendar",
+  view: null,
   region: null,
   logisticsPartnerId: null,
+  status: null,
   search: "",
   todayIso: TODAY,
 };
 
-/* ── 1 · The six-operating-day window ──────────────────────────────────── */
+const NO_PROOF_MISSING = { photo: false, signedDo: false };
+
+/* ── 1 · The windows ───────────────────────────────────────────────────── */
 
 describe("operatingDaysFrom", () => {
   it("returns the exact six dates from Thu 3 Sep, omitting Sun 6 Sep", () => {
-    expect(operatingDaysFrom("2026-09-03", 6)).toEqual(WINDOW);
+    expect(operatingDaysFrom("2026-09-03")).toEqual(WINDOW);
   });
 
   it("defaults to six days", () => {
     expect(MONITOR_DAYS).toBe(6);
-    expect(operatingDaysFrom("2026-09-03")).toEqual(WINDOW);
+    expect(operatingDaysFrom("2026-09-03")).toHaveLength(6);
   });
 
   it("starts on the requested day even mid-window and still skips Sunday", () => {
-    expect(operatingDaysFrom("2026-09-05", 3)).toEqual([
-      "2026-09-05",
-      "2026-09-07",
-      "2026-09-08",
-    ]);
+    expect(operatingDaysFrom("2026-09-05", 3)).toEqual(["2026-09-05", "2026-09-07", "2026-09-08"]);
   });
 
   it("never asks the browser's timezone — bare-date arithmetic only", () => {
-    // 31 Dec → 2 Jan across a year boundary, Sunday 2027-01-03 not reached.
     expect(operatingDaysFrom("2026-12-31", 2)).toEqual(["2026-12-31", "2027-01-01"]);
   });
 });
@@ -197,40 +212,57 @@ describe("the fixed operating week (owner correction 2026-09-06)", () => {
       "2026-09-04",
       "2026-09-05",
     ]);
-    // Monday and Saturday land in their OWN week — the window is aligned.
     expect(operatingWeekOf("2026-08-31")[0]).toBe("2026-08-31");
     expect(operatingWeekOf("2026-09-05")[0]).toBe("2026-08-31");
   });
 
   it("a Sunday snaps FORWARD to Monday's week — no operating week holds a Sunday", () => {
     expect(operatingWeekOf("2026-09-06")[0]).toBe("2026-09-07");
-    for (const week of [operatingWeekOf("2026-09-04"), operatingWeekOf("2026-09-06")]) {
-      expect(week).toHaveLength(6);
-      expect(week).not.toContain("2026-09-06");
-    }
+    expect(operatingWeekOf("2026-09-06")).not.toContain("2026-09-06");
   });
 
   it("the tablet window is the aligned three-day half-week containing the date", () => {
-    expect(tabletWindowOf("2026-09-01")).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
     expect(tabletWindowOf("2026-09-04")).toEqual(["2026-09-03", "2026-09-04", "2026-09-05"]);
+    expect(tabletWindowOf("2026-09-01")).toEqual(["2026-08-31", "2026-09-01", "2026-09-02"]);
   });
 
   it("the arrows replace the whole window: ±6 operating days is exactly one week, ±3 the other half", () => {
     expect(nextOperatingWindowStart("2026-09-04", 6)).toBe("2026-09-11");
-    expect(previousOperatingWindowStart("2026-09-04", 6)).toBe("2026-08-28");
-    // Thu + 3 operating days crosses the weekend into Monday's half.
-    expect(nextOperatingWindowStart("2026-09-03", 3)).toBe("2026-09-07");
-    // The two directions are inverses.
-    expect(nextOperatingWindowStart(previousOperatingWindowStart("2026-09-03"))).toBe(
-      "2026-09-03",
-    );
+    expect(previousOperatingWindowStart("2026-09-11", 6)).toBe("2026-09-04");
+    expect(nextOperatingWindowStart("2026-09-04", 3)).toBe("2026-09-08");
+    expect(previousOperatingWindowStart("2026-09-08", 3)).toBe("2026-09-04");
+    expect(nextOperatingWindowStart("2026-09-05", 1)).toBe("2026-09-07");
   });
 });
 
-/* ── 2 · Card mapping — read facts, never a second arithmetic ──────────── */
+describe("the month (owner correction 2026-09-07)", () => {
+  it("lists every calendar day of the month — Sundays included, so a Sunday delivery is still counted", () => {
+    const days = monthDaysOf("2026-09-04");
+    expect(days).toHaveLength(30);
+    expect(days[0]).toBe("2026-09-01");
+    expect(days[29]).toBe("2026-09-30");
+    expect(days).toContain("2026-09-06");
+    expect(monthDaysOf("2026-02-10")).toHaveLength(28);
+  });
+
+  it("previous/next replace the whole month and land on its first OPERATING day", () => {
+    expect(monthStepStart("2026-09-04", 1)).toBe("2026-10-01");
+    expect(monthStepStart("2026-09-04", -1)).toBe("2026-08-01");
+    // 1 Nov 2026 is a Sunday — the month opens on Monday 2 Nov.
+    expect(monthStepStart("2026-10-15", 1)).toBe("2026-11-02");
+    expect(monthStepStart("2026-01-10", -1)).toBe("2025-12-01");
+  });
+
+  it("the toolbar control is Day · Week · Month with Week the desktop default", () => {
+    expect(MONITOR_CALENDAR_VIEWS).toEqual(["day", "week", "month"]);
+    expect(DEFAULT_CALENDAR_VIEW).toBe("week");
+  });
+});
+
+/* ── 2 · A card is a mapping of recorded facts ─────────────────────────── */
 
 describe("buildDeliveryMonitorCards", () => {
-  it("maps an arranged scope's own facts onto one card", () => {
+  it("maps an arranged row's own facts onto one card", () => {
     const out = cards(
       [order({ id: "a", so: 1301 })],
       {
@@ -241,7 +273,6 @@ describe("buildDeliveryMonitorCards", () => {
             partner_name: "NETS",
             confirmed_date: "2026-09-04",
             confirmed_time: "11:00–13:00",
-            expected_arrival: "12:00",
           }),
         ],
       },
@@ -251,16 +282,17 @@ describe("buildDeliveryMonitorCards", () => {
     expect(c.orderId).toBe("a");
     expect(c.confirmedDate).toBe("2026-09-04");
     expect(c.confirmedTime).toBe("11:00–13:00");
-    expect(c.expectedArrival).toBe("12:00");
     expect(c.logisticsPartnerId).toBe("p-nets");
     expect(c.logisticsPartnerName).toBe("NETS");
     expect(c.customerName).toBe("Kong Chai Yin");
+    /* City and State — the one locality spelling. */
     expect(c.locality).toBe("Klang, Selangor");
     expect(c.region).toBe("Selangor");
     expect(c.goodsSummary).toBeTruthy();
     expect(c.deliveryOrderId).toBeNull();
     expect(c.doNumber).toBeNull();
-    /* The work list's columns read the scope row itself — it rides the card. */
+    expect(c.missingProof).toEqual(NO_PROOF_MISSING);
+    /* The work list's columns read the row itself — it rides the card. */
     expect(c.scope.so).toBe(1301);
   });
 
@@ -277,7 +309,7 @@ describe("buildDeliveryMonitorCards", () => {
     expect(out[0]!.doNumber).toBe("DO-040926-0001");
   });
 
-  it("a scope with no confirmed date stays a card, dateless", () => {
+  it("a row with no confirmed date stays a card, dateless", () => {
     const out = cards([order({ id: "a", so: 1301, delivery_date: null })]);
     expect(out).toHaveLength(1);
     expect(out[0]!.confirmedDate).toBeNull();
@@ -294,52 +326,74 @@ describe("buildDeliveryMonitorCards", () => {
     expect(out[0]!.statusLabel).toBe("Delivery confirmed");
   });
 
-  it("marks a recorded delivery with an empty photo ledger as proof required", () => {
-    const delivered = cards(
-      [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [] } })],
-      {
-        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
-        attempts: [
-          { do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
-        ],
-      },
-    );
-    expect(delivered[0]!.statusKey).toBe("delivered");
-    expect(delivered[0]!.proofRequired).toBe(true);
+  describe("the missing evidence — the Delivery Orders register's own arithmetic", () => {
+    const delivered = (over: Partial<operationOrderListRow>, docOver: Partial<DeliveryOrderRow> = {}) =>
+      cards(
+        [order({ id: "a", so: 1301, do_number: "DO-1", ...over })],
+        {
+          deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...docOver })],
+          attempts: [
+            { do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
+          ],
+        },
+      )[0]!;
 
-    const withPhoto = cards(
-      [
-        order({
-          id: "a",
-          so: 1301,
-          do_number: "DO-1",
-          ops_order_control: {
-            delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }],
-          },
-        }),
-      ],
-      {
-        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
-        attempts: [
-          { do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
-        ],
-      },
-    );
-    expect(withPhoto[0]!.proofRequired).toBe(false);
-  });
+    it("a recorded delivery with an empty photo ledger and no signed DO is owed BOTH files", () => {
+      const c = delivered({ ops_order_control: { delivery_photos: [] } });
+      expect(c.statusKey).toBe("delivered");
+      /* The result stays `Delivered` — the evidence is a separate fact. */
+      expect(c.statusLabel).toBe("Delivered");
+      expect(c.missingProof).toEqual({ photo: true, signedDo: true });
+      expect(needsProof(c)).toBe(true);
+      expect(missingProofLabels(c)).toEqual(["Upload delivery photo", "Upload signed Delivery Order"]);
+    });
 
-  it("an UNKNOWN photo ledger claims nothing", () => {
-    // No overlay row at all means the answer is UNKNOWN — not a missing proof.
-    const out = cards(
-      [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: null })],
-      {
-        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
-        attempts: [
-          { do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
-        ],
-      },
-    );
-    expect(out[0]!.proofRequired).toBe(false);
+    it("a photo on file leaves only the signed Delivery Order owed", () => {
+      const c = delivered({
+        ops_order_control: {
+          delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }],
+        },
+      });
+      expect(c.missingProof).toEqual({ photo: false, signedDo: true });
+      expect(missingProofLabels(c)).toEqual(["Upload signed Delivery Order"]);
+    });
+
+    it("the signed document on file (`orders.do_file_path`) clears that half", () => {
+      const c = delivered(
+        { ops_order_control: { delivery_photos: [] } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+      );
+      expect(c.missingProof).toEqual({ photo: true, signedDo: false });
+      expect(missingProofLabels(c)).toEqual(["Upload delivery photo"]);
+    });
+
+    it("both on file — nothing owed, the row leaves the queue", () => {
+      const c = delivered(
+        { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }] } },
+        { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
+      );
+      expect(needsProof(c)).toBe(false);
+    });
+
+    it("an UNKNOWN photo ledger claims no missing photo", () => {
+      // No overlay row at all means the answer is UNKNOWN — not a missing proof.
+      const c = delivered({ ops_order_control: null });
+      expect(c.missingProof.photo).toBe(false);
+    });
+
+    it("a result that never reached the customer owes no proof", () => {
+      const c = cards(
+        [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [] } })],
+        {
+          deliveryOrders: [doc({ id: "do-1", do_number: "DO-1" })],
+          attempts: [
+            { do_number: "DO-1", result: "failed", reason_key: "customer_absent", recorded_at: "2026-09-03T10:00:00Z" },
+          ],
+        },
+      )[0]!;
+      expect(c.statusKey).toBe("failed");
+      expect(c.missingProof).toEqual(NO_PROOF_MISSING);
+    });
   });
 });
 
@@ -359,7 +413,7 @@ describe("monitorCardHref", () => {
     expect(monitorCardHref(out[0]!)).toBe("/operation/delivery/edit/a");
   });
 
-  it("a Journey leg's door carries its leg", () => {
+  it("a Journey row's door carries its leg in the URL only", () => {
     const out = cards([
       order({
         id: "b",
@@ -385,22 +439,24 @@ describe("expired planned time", () => {
     );
     // Not failed, not "result needed" — the calendar passing records nothing.
     expect(out[0]!.statusKey).toBe("confirmed");
-    expect(out[0]!.proofRequired).toBe(false);
+    expect(out[0]!.missingProof).toEqual(NO_PROOF_MISSING);
   });
 });
 
 /* ── 5 · The projection rule ───────────────────────────────────────────── */
 
 describe("isCalendarProjection", () => {
-  it("the untouched Calendar view is the only calendar projection", () => {
+  it("no operational pick is the only calendar projection", () => {
     expect(isCalendarProjection(noFilters)).toBe(true);
   });
 
   it("any operational pick answers with the work list, never a card wall", () => {
+    expect(isCalendarProjection({ ...noFilters, view: "all" })).toBe(false);
     expect(isCalendarProjection({ ...noFilters, view: "no_confirmed_date" })).toBe(false);
     expect(isCalendarProjection({ ...noFilters, view: "failed" })).toBe(false);
     expect(isCalendarProjection({ ...noFilters, region: "Johor" })).toBe(false);
     expect(isCalendarProjection({ ...noFilters, logisticsPartnerId: "none" })).toBe(false);
+    expect(isCalendarProjection({ ...noFilters, status: "waiting_warehouse" })).toBe(false);
   });
 });
 
@@ -414,7 +470,6 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     doNumber: null,
     confirmedDate: "2026-09-04",
     confirmedTime: null,
-    expectedArrival: null,
     customerName: "Kong Chai Yin",
     locality: "Klang, Selangor",
     goodsSummary: "Mattress ×1",
@@ -423,7 +478,7 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     region: "Selangor",
     statusKey: "confirmed",
     statusLabel: "Delivery confirmed",
-    proofRequired: false,
+    missingProof: NO_PROOF_MISSING,
     scope: { so: 0, refs: [] } as unknown as DeliveryScopeRow,
     ...over,
   };
@@ -458,13 +513,45 @@ describe("filterMonitorCalendarCards", () => {
 
 describe("filterMonitorListRows", () => {
   it("No confirmed date keeps only dateless rows", () => {
-    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date" }, WINDOW);
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date" });
     expect(out.map((c) => c.scopeId)).toEqual(["dateless"]);
   });
 
-  it("Overdue keeps only dated rows behind today", () => {
-    const out = filterMonitorListRows(SET, { ...noFilters, view: "overdue" }, WINDOW);
+  it("Overdue keeps only dated rows behind today — and never a recorded delivery", () => {
+    const withDelivered = [
+      ...SET,
+      datedCard({
+        scopeId: "done-yesterday",
+        confirmedDate: "2026-09-03",
+        statusKey: "delivered",
+        statusLabel: "Delivered",
+        missingProof: { photo: true, signedDo: false },
+      }),
+    ];
+    const out = filterMonitorListRows(withDelivered, { ...noFilters, view: "overdue" });
     expect(out.map((c) => c.scopeId)).toEqual(["overdue"]);
+  });
+
+  it("Upload delivery proof keeps only recorded results still owed evidence — across ALL dates", () => {
+    const withProof = [
+      ...SET,
+      datedCard({
+        scopeId: "old-no-photo",
+        confirmedDate: "2026-08-20",
+        statusKey: "delivered",
+        statusLabel: "Delivered",
+        missingProof: { photo: true, signedDo: false },
+      }),
+      datedCard({
+        scopeId: "no-signed",
+        statusKey: "delivered",
+        statusLabel: "Delivered",
+        missingProof: { photo: false, signedDo: true },
+      }),
+      datedCard({ scopeId: "complete", statusKey: "delivered", statusLabel: "Delivered" }),
+    ];
+    const out = filterMonitorListRows(withProof, { ...noFilters, view: "upload_proof" });
+    expect(out.map((c) => c.scopeId).sort()).toEqual(["no-signed", "old-no-photo"]);
   });
 
   it("a work queue answers across ALL dates — an exception is not a calendar question", () => {
@@ -478,19 +565,19 @@ describe("filterMonitorListRows", () => {
       }),
     ];
     expect(
-      filterMonitorListRows(withPastFailure, { ...noFilters, view: "failed" }, WINDOW)
+      filterMonitorListRows(withPastFailure, { ...noFilters, view: "failed" })
         .map((c) => c.scopeId)
         .sort(),
     ).toEqual(["failed", "old-failed"]);
   });
 
-  it("`All delivery work` lists every open scope — the unfiltered selectable listing", () => {
-    const out = filterMonitorListRows(SET, { ...noFilters, view: "all" }, WINDOW);
+  it("`All delivery work` lists every open row — the unfiltered selectable listing", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "all" });
     expect(out).toHaveLength(SET.length);
   });
 
-  it("`No logistics picked` keeps every unassigned scope across ALL dates — DO-less and dateless included", () => {
-    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics" }, WINDOW);
+  it("`No logistics picked` keeps every unassigned row across ALL dates — DO-less and dateless included", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics" });
     expect(out.map((c) => c.scopeId).sort()).toEqual([
       "dateless",
       "failed",
@@ -502,12 +589,8 @@ describe("filterMonitorListRows", () => {
     expect(out.some((c) => c.scopeId === "nets")).toBe(false);
   });
 
-  it("a REGION pick combines with `No logistics picked` — Selangor · No logistics picked", () => {
-    const out = filterMonitorListRows(
-      SET,
-      { ...noFilters, view: "no_logistics", region: "Selangor" },
-      WINDOW,
-    );
+  it("a STATE pick combines with `No logistics picked` — Selangor · No logistics picked", () => {
+    const out = filterMonitorListRows(SET, { ...noFilters, view: "no_logistics", region: "Selangor" });
     expect(out.map((c) => c.scopeId).sort()).toEqual([
       "dateless",
       "failed",
@@ -517,26 +600,29 @@ describe("filterMonitorListRows", () => {
     ]);
   });
 
-  it("a region or logistics pick alone lists EVERY matching open scope", () => {
+  it("a state, partner or status pick alone lists EVERY matching open row", () => {
     expect(
-      filterMonitorListRows(SET, { ...noFilters, region: "Selangor" }, WINDOW)
+      filterMonitorListRows(SET, { ...noFilters, region: "Selangor" })
         .map((c) => c.scopeId)
         .sort(),
     ).toEqual(["dateless", "failed", "in-window", "overdue", "sunday"]);
     expect(
-      filterMonitorListRows(SET, { ...noFilters, logisticsPartnerId: "p-nets" }, WINDOW).map(
-        (c) => c.scopeId,
-      ),
+      filterMonitorListRows(SET, { ...noFilters, logisticsPartnerId: "p-nets" }).map((c) => c.scopeId),
     ).toEqual(["nets"]);
+    const withWh = [
+      ...SET,
+      datedCard({ scopeId: "wh", statusKey: "waiting_warehouse", statusLabel: "Waiting for warehouse" }),
+    ];
+    expect(
+      filterMonitorListRows(withWh, { ...noFilters, status: "waiting_warehouse" }).map((c) => c.scopeId),
+    ).toEqual(["wh"]);
   });
 
   it("the filters COMBINE — No confirmed date · No logistics picked", () => {
     expect(
-      filterMonitorListRows(
-        SET,
-        { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none" },
-        WINDOW,
-      ).map((c) => c.scopeId),
+      filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none" }).map(
+        (c) => c.scopeId,
+      ),
     ).toEqual(["dateless"]);
   });
 });
@@ -563,6 +649,43 @@ describe("groupCardsByDay", () => {
   });
 });
 
+/* ── 7 · The Month's counts are the rail's own queues ──────────────────── */
+
+describe("monthDayCounts", () => {
+  it("counts deliveries, exceptions (Overdue + Failed Delivery + Upload delivery proof) and No logistics picked per date", () => {
+    const set = [
+      datedCard({ scopeId: "a" }),
+      datedCard({ scopeId: "b", statusKey: "failed", statusLabel: "Failed Delivery" }),
+      datedCard({ scopeId: "c", logisticsPartnerId: "p-nets", logisticsPartnerName: "NETS" }),
+      datedCard({ scopeId: "overdue", confirmedDate: "2026-09-01" }),
+      datedCard({
+        scopeId: "proof",
+        confirmedDate: "2026-09-01",
+        statusKey: "delivered",
+        statusLabel: "Delivered",
+        logisticsPartnerId: "p-nets",
+        missingProof: { photo: true, signedDo: true },
+      }),
+      datedCard({ scopeId: "dateless", confirmedDate: null }),
+    ];
+    const counts = monthDayCounts(set, TODAY);
+    expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, exceptions: 1, noLogistics: 2 });
+    expect(counts.get("2026-09-01")).toEqual({ deliveries: 2, exceptions: 2, noLogistics: 1 });
+    // A dateless row sits on no day.
+    expect(counts.size).toBe(2);
+  });
+
+  it("the cell's sentence says the same three facts in words — zero lines omitted", () => {
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 3, exceptions: 1, noLogistics: 2 })).toBe(
+      "Fri, 4 Sep — 3 deliveries · 1 exception · 2 No logistics picked",
+    );
+    expect(monthDaySentence("Fri, 4 Sep", { deliveries: 1, exceptions: 0, noLogistics: 0 })).toBe(
+      "Fri, 4 Sep — 1 delivery",
+    );
+    expect(monthDaySentence("Fri, 4 Sep", undefined)).toBe("Fri, 4 Sep — No deliveries");
+  });
+});
+
 describe("the spanning empty range", () => {
   it("prints ONE sentence for the whole empty window", () => {
     expect(emptyRangeSentence(["2026-09-05", "2026-09-11"], (iso) => iso)).toBe(
@@ -576,14 +699,34 @@ describe("the spanning empty range", () => {
   });
 });
 
+describe("the work list's own words — never `scope` (owner correction 2026-09-07)", () => {
+  it("the footer counts deliveries", () => {
+    expect(deliveriesFooter(1, 1)).toBe("1 delivery");
+    expect(deliveriesFooter(3, 3)).toBe("3 deliveries");
+    expect(deliveriesFooter(2, 9)).toBe("2 of 9 deliveries");
+  });
+
+  it("the selection toolbar counts with no invented unit word", () => {
+    expect(selectedSentence(1)).toBe("1 selected");
+    expect(selectedSentence(3)).toBe("3 selected");
+  });
+
+  it("no visible word says scope or leg", () => {
+    for (const word of Object.values(MONITOR_COPY)) {
+      expect(word).not.toMatch(/\bscopes?\b/i);
+      expect(word).not.toMatch(/\blegs?\b/i);
+    }
+  });
+});
+
 describe("activeFilterLabels", () => {
   it("names every active pick in rail order — the combined narrowing is visible", () => {
     expect(
       activeFilterLabels(
-        { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none" },
+        { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none", status: "waiting_warehouse" },
         () => null,
       ),
-    ).toEqual([MONITOR_COPY.noConfirmedDate, MONITOR_COPY.noLogistics]);
+    ).toEqual([MONITOR_COPY.noConfirmedDate, MONITOR_COPY.noLogistics, MONITOR_STATUS_LABEL.waiting_warehouse]);
   });
 
   it("a partner pick prints the partner's NAME, never a raw id", () => {
@@ -599,8 +742,10 @@ describe("activeFilterLabels", () => {
     expect(activeFilterLabels(noFilters, () => null)).toEqual([]);
   });
 
-  it("the default `All delivery work` landing is not a pick and prints no summary", () => {
-    expect(activeFilterLabels({ ...noFilters, view: "all" }, () => null)).toEqual([]);
+  it("`All delivery work` is a pick like any other and prints — the way back to the Calendar stays on screen", () => {
+    expect(activeFilterLabels({ ...noFilters, view: "all" }, () => null)).toEqual([
+      MONITOR_COPY.allDeliveryWork,
+    ]);
   });
 });
 
@@ -610,9 +755,15 @@ describe("buildMonitorRails", () => {
     datedCard({ scopeId: "dateless", confirmedDate: null }),
     datedCard({ scopeId: "overdue", confirmedDate: "2026-09-01" }),
     datedCard({ scopeId: "failed", statusKey: "failed", statusLabel: "Failed Delivery" }),
-    datedCard({ scopeId: "proof", statusKey: "delivered", statusLabel: "Delivered", proofRequired: true }),
+    datedCard({
+      scopeId: "proof",
+      statusKey: "delivered",
+      statusLabel: "Delivered",
+      missingProof: { photo: true, signedDo: false },
+    }),
     datedCard({ scopeId: "wh", statusKey: "waiting_warehouse", statusLabel: "Waiting for warehouse" }),
-    datedCard({ scopeId: "nets", logisticsPartnerId: "p-nets", logisticsPartnerName: "NETS", region: "Kuala Lumpur" }),
+    datedCard({ scopeId: "ready", statusKey: "ready_for_handover", statusLabel: "Ready for handover" }),
+    datedCard({ scopeId: "nets", logisticsPartnerId: "p-nets", logisticsPartnerName: "NETS", region: "Kuala Lumpur", statusKey: "out_for_delivery", statusLabel: "Out for delivery" }),
   ];
   const partners = [
     { id: "p-nets", name: "NETS" },
@@ -620,53 +771,58 @@ describe("buildMonitorRails", () => {
     { id: "p-houzs", name: "HOUZS" },
   ];
 
-  it("counts every WORK TO DO row over the OTHER filters' narrowing", () => {
-    const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
-    // Five of the seven cards sit inside the window (dateless + overdue don't).
-    expect(rails.work.calendar).toBe(5);
-    expect(rails.work.all).toBe(7);
+  it("counts every WORK TO DO row over the OTHER filters' narrowing — no Calendar row, no Waiting for warehouse row", () => {
+    const rails = buildMonitorRails(set, noFilters, partners);
+    expect(rails.work.all).toBe(8);
     // Every card but the NETS one is unassigned — the primary queue's count.
-    expect(rails.work.no_logistics).toBe(6);
+    expect(rails.work.no_logistics).toBe(7);
     expect(rails.work.no_confirmed_date).toBe(1);
     expect(rails.work.overdue).toBe(1);
     expect(rails.work.failed).toBe(1);
-    expect(rails.work.delivered_proof_required).toBe(1);
-    expect(rails.work.waiting_warehouse).toBe(1);
+    expect(rails.work.upload_proof).toBe(1);
+    expect(Object.keys(rails.work).sort()).toEqual([...MONITOR_WORK_VIEWS].sort());
   });
 
-  it("a picked partner narrows the region counts but not its own group", () => {
-    const rails = buildMonitorRails(
-      set,
-      { ...noFilters, logisticsPartnerId: "p-nets" },
-      WINDOW,
-      partners,
-    );
-    // Regions are counted over the partner narrowing…
+  it("DELIVERY STATUS counts the three fixed rungs, zero printed", () => {
+    const rails = buildMonitorRails(set, noFilters, partners);
+    expect(rails.status).toEqual({ waiting_warehouse: 1, ready_for_handover: 1, out_for_delivery: 1 });
+    const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
+    expect(narrowed.status.out_for_delivery).toBe(0);
+  });
+
+  it("a picked partner narrows the state counts but not its own group", () => {
+    const rails = buildMonitorRails(set, { ...noFilters, logisticsPartnerId: "p-nets" }, partners);
+    // States are counted over the partner narrowing…
     expect(rails.regions.find((r) => r.key === "Kuala Lumpur")!.count).toBe(1);
     expect(rails.regions.find((r) => r.key === "Selangor")).toBeUndefined();
     // …but the logistics group still shows what each partner WOULD give.
     expect(rails.logistics.find((r) => r.key === "p-nets")!.count).toBe(1);
-    // The unassigned queue lives in WORK TO DO, never as a logistics row —
+    // The unassigned queue lives in WORK TO DO, never as a partner row —
     // and under the NETS pick its count is honestly what clicking gives: 0.
     expect(rails.logistics.some((r) => r.key === "none")).toBe(false);
     expect(rails.work.no_logistics).toBe(0);
   });
 
-  it("REGION is FLAT direct names — no sub-headings, no fixed zero rows (owner correction 2026-09-06)", () => {
-    const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
-    const keys = rails.regions.map((r) => r.key);
-    expect(keys).toEqual(["Selangor", "Kuala Lumpur"]);
-    // No heading rows exist in the model at all.
+  it("a picked status narrows the work counts", () => {
+    const rails = buildMonitorRails(set, { ...noFilters, status: "waiting_warehouse" }, partners);
+    expect(rails.work.all).toBe(1);
+    expect(rails.work.no_logistics).toBe(1);
+    expect(rails.work.failed).toBe(0);
+  });
+
+  it("STATE is FLAT direct names — no sub-headings, no fixed zero rows", () => {
+    const rails = buildMonitorRails(set, noFilters, partners);
+    expect(rails.regions.map((r) => r.key)).toEqual(["Selangor", "Kuala Lumpur"]);
     expect(rails.regions.every((r) => !("heading" in r && r.heading))).toBe(true);
   });
 
-  it("a picked region never disappears — it stays listed at 0", () => {
-    const rails = buildMonitorRails(set, { ...noFilters, region: "Sabah" }, WINDOW, partners);
+  it("a picked state never disappears — it stays listed at 0", () => {
+    const rails = buildMonitorRails(set, { ...noFilters, region: "Sabah" }, partners);
     expect(rails.regions.find((r) => r.key === "Sabah")!.count).toBe(0);
   });
 
-  it("LOGISTICS lists only partners genuinely carrying a matching scope — never a duplicated No logistics picked row", () => {
-    const rails = buildMonitorRails(set, noFilters, WINDOW, partners);
+  it("LOGISTICS PARTNER lists only partners genuinely carrying a matching row — never a duplicated No logistics picked row", () => {
+    const rails = buildMonitorRails(set, noFilters, partners);
     const labels = rails.logistics.map((r) => r.label);
     // NETS carries one; AL and HOUZS carry nothing and are not listed.
     expect(labels).toEqual(["NETS"]);
@@ -678,7 +834,7 @@ describe("buildMonitorRails", () => {
       ...set,
       datedCard({ scopeId: "leg", logisticsPartnerId: "p-ssy", logisticsPartnerName: "SSY" }),
     ];
-    const rails = buildMonitorRails(withLeg, noFilters, WINDOW, partners);
+    const rails = buildMonitorRails(withLeg, noFilters, partners);
     const ssy = rails.logistics.find((r) => r.label === "SSY")!;
     expect(ssy.count).toBe(1);
     expect(ssy.key).toBe("p-ssy");
@@ -691,25 +847,40 @@ describe("buildMonitorRails", () => {
       datedCard({ scopeId: "h1", logisticsPartnerId: "p-houzs", logisticsPartnerName: "HOUZS" }),
       datedCard({ scopeId: "a1", logisticsPartnerId: "p-al", logisticsPartnerName: "AL" }),
     ];
-    const rails = buildMonitorRails(withMore, noFilters, WINDOW, partners);
+    const rails = buildMonitorRails(withMore, noFilters, partners);
     // NETS · AL · HOUZS is the governed order — never alphabetical.
     expect(rails.logistics.map((r) => r.label)).toEqual(["NETS", "AL", "HOUZS"]);
   });
 });
 
-describe("the ruled WORK TO DO order (owner correction 2026-09-07)", () => {
-  it("lists the primary queues before Calendar, No logistics picked second", () => {
+describe("the ruled rail groups (owner correction 2026-09-07)", () => {
+  it("WORK TO DO is the six queues in the ruled order — no Calendar, no Waiting for warehouse, no Proof Required", () => {
     expect(MONITOR_WORK_VIEWS).toEqual([
       "all",
       "no_logistics",
       "no_confirmed_date",
-      "calendar",
       "overdue",
       "failed",
-      "delivered_proof_required",
-      "waiting_warehouse",
+      "upload_proof",
     ]);
     expect(MONITOR_VIEW_LABEL.all).toBe(MONITOR_COPY.allDeliveryWork);
     expect(MONITOR_VIEW_LABEL.no_logistics).toBe(MONITOR_COPY.noLogistics);
+    expect(MONITOR_VIEW_LABEL.upload_proof).toBe("Upload delivery proof");
+    expect(Object.values(MONITOR_VIEW_LABEL)).not.toContain("Calendar");
+    expect(Object.values(MONITOR_VIEW_LABEL)).not.toContain("Delivered — Proof Required");
+  });
+
+  it("DELIVERY STATUS is the three fixed rungs in the shared words", () => {
+    expect(MONITOR_STATUS_FILTERS).toEqual(["waiting_warehouse", "ready_for_handover", "out_for_delivery"]);
+    expect(MONITOR_STATUS_LABEL.waiting_warehouse).toBe("Waiting for warehouse");
+    expect(MONITOR_STATUS_LABEL.ready_for_handover).toBe("Ready for handover");
+    expect(MONITOR_STATUS_LABEL.out_for_delivery).toBe("Out for delivery");
+  });
+
+  it("the group headings are the owner's words", () => {
+    expect(MONITOR_COPY.railWork).toBe("WORK TO DO");
+    expect(MONITOR_COPY.railState).toBe("STATE");
+    expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS PARTNER");
+    expect(MONITOR_COPY.railStatus).toBe("DELIVERY STATUS");
   });
 });

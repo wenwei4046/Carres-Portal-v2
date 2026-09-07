@@ -6,23 +6,30 @@
  * as a WHITE chip floating on it (content brighter than container — the
  * locked layering rule). Use for view toggles (Grouped/Flat), rows-per-page,
  * quick modes. NOT for status (pills) and NOT for actions (Btn).
+ *
+ * `value` may be null (Delivery Monitor, 2026-09-07): the control stays on
+ * screen while a different projection shows — no chip lit — so the way back
+ * is always one click. Every existing caller passes a value and is unchanged.
  */
 export default function Segmented<T extends string>({
   options,
   value,
   onChange,
   ariaLabel,
+  testId,
 }: {
   options: { value: T; label: string }[];
-  value: T;
+  value: T | null;
   onChange: (v: T) => void;
   ariaLabel: string;
+  testId?: string;
 }) {
   return (
     <div
       className="inline-flex items-center gap-0.5 bg-base-100 rounded-full p-0.5 h-8 shrink-0"
       role="tablist"
       aria-label={ariaLabel}
+      data-testid={testId}
     >
       {options.map((o) => {
         const on = value === o.value;
@@ -33,6 +40,7 @@ export default function Segmented<T extends string>({
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
+            data-testid={testId ? `${testId}-${o.value}` : undefined}
             className={`h-7 px-3 rounded-full text-meta font-semibold whitespace-nowrap transition-colors ${
               on
                 ? "bg-white text-base-900 shadow-sm"

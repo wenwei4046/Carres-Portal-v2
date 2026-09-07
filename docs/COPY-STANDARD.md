@@ -461,9 +461,22 @@ governed actions on the workspace are **`Assign logistics`** (first carrier on a
 `Reassign`, `Set partner` or `Update logistics`. The Delivery-owned editor is **`Edit Delivery`**
 and its save is **`Save Delivery`**; neither may be spelled `Edit delivery order`, because the
 document is not what is being edited. A wrong Sales fact offers the door **`Open Sales Order to
-change`**. The selection bar counts in the page's own unit: `1 delivery scope selected` /
-`3 delivery scopes selected`. The disclosure's hover reads **`Show delivery items`**. The Loan block
+change`**. The Monitor selection bar does not invent a unit word: `1 selected` /
+`3 selected`. The Delivery Orders Register keeps its document count. The disclosure's hover reads
+**`Show delivery items`**. The Loan block
 inside an expansion is headed **`Items to collect`**.
+
+**Monitor rail and calendar words — owner correction 2026-09-07.** `Calendar` is a view, never a
+`WORK TO DO` row. The page toolbar uses exactly **`Day · Week · Month`**. The rail's four group
+headings are **`WORK TO DO` · `STATE` · `LOGISTICS PARTNER` · `DELIVERY STATUS`** (`REGION` and
+`LOGISTICS` are retired as Monitor headings; the groups carry no `All …` row — picking again
+unpicks and `Clear filters` clears). `scope` and `leg` are not employee-facing words anywhere on
+Monitor or its assignment door: the footer counts `{n} deliveries`, a Journey row prints its route. The rail's proof job is
+**`Upload delivery proof`**, never `Delivered — Proof Required`; its rows name the concrete missing
+evidence as `Upload delivery photo` and/or `Upload signed Delivery Order`. `Waiting for warehouse`
+remains an operational status and appears only under **`DELIVERY STATUS`** on Monitor. It means the
+delivery is arranged but Warehouse has not recorded `Ready for handover`; it does not claim missing
+stock or an active delivery.
 
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
@@ -2360,26 +2373,32 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 |---|---|---|
 | `Monitor` | the page title and sidebar child | **RULED 2026-09-06** (carried in the correction's own wording) |
 | `WORK TO DO` | Monitor's one work group, and the Delivery Orders register's queue group — the same word Purchasing's rail already governs | **RULED 2026-09-06** |
-| `Calendar` | the WORK TO DO default row (cards inside the visible window) | **RULED 2026-09-06** |
+| `Day` · `Week` · `Month` | Monitor's calendar-view control in the page toolbar; `Week` is the desktop default | **RULED 2026-09-07** |
 | `All delivery work` | the WORK TO DO row listing every open scope — the unfiltered selectable listing | **RULED 2026-09-06** (month-calendar correction) |
-| `All regions` · `All logistics` | the two group-clearing rows | **RULED 2026-09-06** |
-| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`) | **RULED 2026-09-06** (month-calendar correction) |
+| `STATE` · `LOGISTICS PARTNER` | Monitor's second and third rail groups — direct state names, governed partners genuinely carrying rows; no `All …` row in either | **RULED 2026-09-07** (`All regions` · `All logistics` · the `REGION` / `LOGISTICS` headings RETIRED on Monitor) |
+| `Deliveries {n}` · `Exceptions {n}` · `No logistics picked {n}` | the Month view's compact cell lines, label then count (the rail row grammar); `Exceptions` = the Overdue + Failed Delivery + Upload delivery proof rows of that date; zero lines are omitted | **RULED 2026-09-07** (`Unassigned` stays banned — the third line reuses `No logistics picked`) |
+| `{n} deliveries` / `{n} of {m} deliveries` · `No deliveries` · `No matching deliveries.` | Monitor's work-list footer and empty states; `1 delivery` / `{n} deliveries` on the Assign logistics door | **RULED 2026-09-07** (`delivery scope(s)` RETIRED from every employee surface) |
+| `Calendar view` | the Day · Week · Month control's accessible name only | **RULED 2026-09-07** |
+| `Previous month` · `Next month` | the rail month calendar's arrow labels (the month itself prints locale-aware, e.g. `SEPTEMBER 2026`), and the toolbar arrows while `Month` shows (`Sep 2026` in the one month spelling) | **RULED 2026-09-06** (month-calendar correction) |
 | `No deliveries` | one individually empty calendar day (the long T10 sentence is retired on Monitor) | **RULED 2026-09-06** |
 | `No deliveries are scheduled from {first} to {last}.` | the ONE spanning state of a fully empty visible range | **RULED 2026-09-06** |
 | `{n} deliveries need a confirmed date.` / `1 delivery needs a confirmed date.` | under the spanning state, from the REAL count only | **RULED 2026-09-06** |
 | `Open No confirmed date` | that state's one door | **RULED 2026-09-06** |
 | `Clear filters` | the combined active-filter summary above the work list | **RULED 2026-09-06** |
-| `{N} delivery scopes selected` · `{N} delivery orders selected` | the two selection toolbars' count sentences | **RULED 2026-09-06** |
+| `{N} selected` · `{N} delivery orders selected` | the Monitor and Delivery Orders selection toolbars respectively | **RULED 2026-09-07** |
 | `Print {N} delivery orders` | the register's selection output | **RULED 2026-09-06** |
 | `Record delivery result` · `Upload delivery photo` · `Upload signed Delivery Order` | the register's WORK TO DO queues (`Check delivery proof` joins only when a proof-review record exists) | **RULED 2026-09-06** |
+| `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
+| `DELIVERY STATUS` | Monitor's operational-status filter group; `Waiting for warehouse` lives here, never in WORK TO DO | **RULED 2026-09-07** |
 | `DOCUMENT STATUS` | the register rail's status group | **RULED 2026-09-06** |
 | `Search deliveries…` | the toolbar search placeholder | kept |
 | `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 
 Already governed and merely REUSED (not new words): `No confirmed date` · `Overdue` ·
-`No delivery order yet` · `No logistics picked` · `Expected arrival` · `Hide filters` /
-`Show filters` · the seven operational status words · `Delivered — Proof Required` (Delivery
-MASTER §15) · `Requested Delivery Date` · `Confirmed Delivery` · `Confirmed Time` ·
+`No delivery order yet` · `No logistics picked` · `Hide filters` /
+`Show filters` · the seven operational status words (`Waiting for warehouse` · `Ready for
+handover` · `Out for delivery` are the DELIVERY STATUS rows) · `Requested Delivery Date` ·
+`Confirmed Delivery` · `Confirmed Time` ·
 `Not delivered yet` · `No delivery photo yet` · `Delivery photo saved` ·
 `Signed document on file` / `No signed document yet` (the DO object's own shipped pair).
 

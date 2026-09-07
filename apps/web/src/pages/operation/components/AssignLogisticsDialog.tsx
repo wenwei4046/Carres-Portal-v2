@@ -238,9 +238,9 @@ export default function AssignLogisticsDialog({
             {needsReason ? AL_WORDS.changeTitle : AL_WORDS.title}
           </h2>
           <p className="mt-0.5 text-meta text-kit-slate-11">
-            {scopes.length === 1
-              ? "1 delivery scope"
-              : `${scopes.length} delivery scopes`}
+            {/* `scope` is not an employee-facing word (owner correction
+                2026-09-07) — the door counts deliveries. */}
+            {scopes.length === 1 ? "1 delivery" : `${scopes.length} deliveries`}
           </p>
         </div>
 

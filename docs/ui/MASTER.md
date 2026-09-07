@@ -1032,8 +1032,10 @@ it again to clear, ‹ › move exactly one month). It prints the month spelled 
 keeps Sunday visible in the muted non-working state, and marks a day by printing a COUNT under
 the date with the same fact in the day's aria sentence — colour is never the only signal.
 Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the kit's exported
-DatePicker skin, dot markers, opens the week) predates the kit component by hours and migrates
-onto it in its own card — §6.1's second-occurrence rule; nobody draws a third month grid.
+DatePicker skin and dot markers) predates the kit component by hours and migrates onto it in its
+own card — §6.1's second-occurrence rule; nobody draws a third month grid. On Monitor, the month
+calendar is the persistent date picker: choosing a date opens that date's `Day` view. The page
+toolbar owns `Day · Week · Month`; `Calendar` is never repeated as a `WORK TO DO` rail row.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width

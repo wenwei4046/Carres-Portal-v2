@@ -154,6 +154,32 @@ function goodsSummaryOf(
   return rest > 0 ? `${named.join(" · ")} · +${rest} more` : named.join(" · ");
 }
 
+/**
+ * THE MISSING EVIDENCE of a recorded delivered result — the ONE arithmetic
+ * (Architecture Law D) behind this register's two upload queues AND Monitor's
+ * `Upload delivery proof` queue (owner correction 2026-09-07). A result that
+ * has not reached the customer needs no proof; an UNKNOWN photo ledger
+ * (older payload) claims nothing; the signed document is `orders.do_file_path`.
+ */
+export interface MissingDeliveryProof {
+  photo: boolean;
+  signedDo: boolean;
+}
+
+export function missingDeliveryProofOf(row: {
+  latestResult: DoRegisterRow["latestResult"];
+  photosPresent: boolean | null;
+  signedDoPresent: boolean;
+}): MissingDeliveryProof {
+  const reached = row.latestResult === "delivered" || row.latestResult === "partial";
+  if (!reached) return { photo: false, signedDo: false };
+  return {
+    /* photosPresent === null is UNKNOWN — never a missing photo. */
+    photo: row.photosPresent === false,
+    signedDo: !row.signedDoPresent,
+  };
+}
+
 /** The ONE primary queue (priority order; a voided document queues nowhere). */
 export function doWorkQueueOf(row: {
   status: DeliveryOrderStatus;
@@ -163,11 +189,9 @@ export function doWorkQueueOf(row: {
 }): DoWorkQueue | null {
   if (row.status.kind === "cancelled") return null;
   if (row.status.kind === "out_for_delivery") return "record_result";
-  const reached = row.latestResult === "delivered" || row.latestResult === "partial";
-  if (!reached) return null;
-  /* photosPresent === null is UNKNOWN — never a missing photo. */
-  if (row.photosPresent === false) return "upload_photo";
-  if (!row.signedDoPresent) return "upload_signed_do";
+  const missing = missingDeliveryProofOf(row);
+  if (missing.photo) return "upload_photo";
+  if (missing.signedDo) return "upload_signed_do";
   return null;
 }
 
