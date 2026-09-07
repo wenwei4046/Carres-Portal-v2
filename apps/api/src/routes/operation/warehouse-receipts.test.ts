@@ -60,7 +60,14 @@ async function makeJwt(role: string) {
 }
 
 type Result = { data: unknown; error: unknown };
-type TableCfg = { list?: Result; count?: number; single?: Result };
+type TableCfg = {
+  list?: Result;
+  count?: number;
+  single?: Result;
+  /** Answer according to the SELECTED columns — lets a test reproduce a
+   *  deployed schema that does not carry one optional column. */
+  listBySelect?: (columns: string) => Result;
+};
 
 function makeSb(
   tables: Record<string, TableCfg>,
@@ -80,7 +87,9 @@ function makeSb(
       builder.maybeSingle = vi.fn(() =>
         Promise.resolve(cfg.single ?? { data: null, error: null }),
       );
+      let selectedColumns = "";
       builder.select = vi.fn((_cols: string, opts?: { head?: boolean }) => {
+        selectedColumns = _cols;
         if (opts?.head) {
           // A head-count resolves straight to { count } — no rows.
           const headBuilder: Record<string, unknown> = {};
@@ -97,10 +106,10 @@ function makeSb(
         resolve: (r: Result) => unknown,
         reject?: (e: unknown) => unknown,
       ) =>
-        Promise.resolve(cfg.list ?? { data: [], error: null }).then(
-          resolve,
-          reject,
-        );
+        Promise.resolve(
+          cfg.listBySelect?.(selectedColumns) ??
+            cfg.list ?? { data: [], error: null },
+        ).then(resolve, reject);
       return builder;
     },
   };
@@ -252,6 +261,46 @@ describe("GET /api/operation/warehouse-receipts", () => {
       source_no: "TR-20260907-1",
       source_party_name: "Recorded carrier",
     });
+  });
+
+  it("opens on the deployed schema, where warehouse_receipts has no arrival_source_id", async () => {
+    /* PRODUCTION SHAPE, 2026-09-07: `arrival_source_id` lands with the
+       arrival-source tables, still an unnumbered draft. The register read
+       must fall back to the same rows without that one column instead of
+       failing — this is the shape that shipped broken. */
+    const selects: string[] = [];
+    const base = opsTables();
+    const rows = base.warehouse_receipts?.list ?? { data: [], error: null };
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({
+        ...base,
+        warehouse_receipts: {
+          ...base.warehouse_receipts,
+          listBySelect: (columns: string) => {
+            selects.push(columns);
+            return columns.includes("arrival_source_id")
+              ? {
+                  data: null,
+                  error: {
+                    code: "42703",
+                    message:
+                      "column warehouse_receipts.arrival_source_id does not exist",
+                  },
+                }
+              : (rows as never);
+          },
+        },
+      }) as never,
+    );
+    const res = await req(
+      "/api/operation/warehouse-receipts",
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { receipts: unknown[] };
+    expect(body.receipts.length).toBeGreaterThan(0);
+    expect(selects.some((c) => !c.includes("arrival_source_id"))).toBe(true);
   });
 
   it("names the warehouse, the supplier and who counted, and says what arrived", async () => {

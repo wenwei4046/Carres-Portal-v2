@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, type InboundInput } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
+import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -70,6 +71,12 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       if ((result.data?.length ?? 0) < 500) return rows;
     }
   }
+  /* The arrival-source objects are approved Inbound truth whose tables are
+     still an unnumbered draft (docs/stock/MASTER.md §13.9). Their absence
+     means this source kind has no records — it may never mean the register
+     failed to open. A real authority failure still travels untouched. */
+  const optional = (table: string, fields: string) =>
+    readOptionalRelation(() => read(table, fields), [] as Record<string, unknown>[]);
   try {
     const [pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, productSkus] = await Promise.all([
       read("purchase_orders", "id,version,supplier_id,warehouse_id,destination_id,status,official_delivery_date,eta_date,placed_at,so"),
@@ -77,14 +84,22 @@ operationWarehouseRouter.get("/inbound", async (c) => {
       read("suppliers", "id,name"),
       read("purchasing_destinations", "id,warehouse_id"),
       read("ops_stock_items", "id,unit_code,po_no,qty,sku"),
-      read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+      /* `arrival_source_id` arrives with those same draft tables; without it
+         every receipt is simply PO-backed, which is what production holds. */
+      readOptionalRelation(
+        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+        null,
+      ).then((rows) =>
+        rows ??
+        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+      ),
       read("receiving_unit_results", "id,receipt_id,stock_item_id,outcome,issue_kind"),
       read("purchase_order_lines", "id,po_id,qty,destination_id,sku"),
       read("po_supplier_promises", "id,po_id,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
-      read("arrival_sources", "id,source_no,kind,claim_id,case_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
-      read("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
-      read("stock_operating_parties", "id,name"),
-      read("arrival_source_events", "id,source_id,kind,unit_ids"),
+      optional("arrival_sources", "id,source_no,kind,claim_id,case_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
+      optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
+      optional("stock_operating_parties", "id,name"),
+      optional("arrival_source_events", "id,source_id,kind,unit_ids"),
       read("product_skus", "id,sku,variant"),
     ]);
     const skuNames = (productSkus as Array<{ sku: string; variant: string | null }>).map(
