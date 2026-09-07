@@ -12,6 +12,7 @@ import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
+import InvoiceStorage from "./InvoiceStorage";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
@@ -212,7 +213,8 @@ export default function InvoiceRegister() {
             tone={invoiceTiming?.kind === "late" ? "chase" : "reminder"}
             onClose={() => setAsking(false)} />
         : <InvoiceObject invoice={invoice} today={today} opts={opts}
-            onAsk={canAsk ? () => setAsking(true) : undefined} />
+            onAsk={canAsk ? () => setAsking(true) : undefined}
+            canStorage={role === "operation" || role === "principal"} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
     : params.get("view") === "calendar"
@@ -269,11 +271,14 @@ function Inspect({ row, today, opts, onOpen }: {
   </div>;
 }
 
-/** One continuous scroll — Money → Goods and Delivery → What to do → Invoice
- *  → Related Payments → Communication History (payment/MASTER.md §16). */
-function InvoiceObject({ invoice, today, opts, onAsk }: {
+/** One continuous scroll — Money → Goods and Delivery → Storage → What to do
+ *  → Invoice → Related Payments → Communication History (payment/MASTER.md
+ *  §16; Storage joined with 0436 — a goods-side fact that becomes money). */
+function InvoiceObject({ invoice, today, opts, onAsk, canStorage = false }: {
   invoice: InvoiceRegisterRow; today: string; opts: { holidays?: Set<string> };
   onAsk?: () => void;
+  /** The posting door's staff may open the §6 storage doors. */
+  canStorage?: boolean;
 }) {
   const f = factsOf(invoice, today, opts);
   const partner = invoice.orders?.delivery_partners?.name ?? invoice.orders?.ops_assigned_logistic ?? null;
@@ -292,6 +297,9 @@ function InvoiceObject({ invoice, today, opts, onAsk }: {
         <p>Customer Delivery: {f.deliveryWord}</p>
         <p>{partner ? `Logistics Partner: ${partner}${contact ? ` · ${contact}` : " · No customer contact on file yet."}` : "No Logistics Partner assigned yet."}</p>
       </Facts>
+      {/* §6/§7 — the storage case lives between the goods facts and the
+          money action: it is a goods-side fact that becomes money. */}
+      <InvoiceStorage orderId={invoice.order_id} canAct={canStorage} />
       <Facts title="What to do">
         {f.timing.kind === "paid" ? <p>The money is in. Nothing to do.</p>
         : f.timing.kind === "wait" ? <>

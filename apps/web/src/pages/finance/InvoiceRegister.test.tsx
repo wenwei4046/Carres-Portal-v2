@@ -16,6 +16,14 @@ vi.mock("@/lib/queries", () => ({
   } },
 }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+// The object scroll now carries the §6 Storage section, which reads its own
+// wire — answered empty here so the register tests stay about the register.
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(async (url: string) => {
+    if (url.includes("/payment-storage")) return { cases: [] };
+    return {};
+  }),
+}));
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),

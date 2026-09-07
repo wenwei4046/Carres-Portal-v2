@@ -517,6 +517,43 @@ on the order read) — no migration. Verified by 8 focused composition tests + 2
 tests (31 stripe route tests green); production convergence and the walk of this slice are
 recorded when they exist.
 
+### BUILD — the storage case foundation, 2026-09-07
+
+Migration `0436` creates `payment_storage_cases` — one case per order + product group,
+FOREVER — and its two doors. The §6 truth is structural: a case is born only from BOTH
+witnessed facts (Carres can complete the delivery scope · the customer delays it), the
+system derives Storage Start as the LATER fact (a CHECK pins it; staff cannot key an
+earlier one), the first valid start is permanent (a second start for the same order + group
+is refused by the unique constraint), and the then-effective §7 rule is SNAPSHOTTED onto
+the case so a later Settings change never recalculates an old case.
+`payment_storage_extra_free` carries the §7 decision ladder: Operation through its limit
+day, the Storage Waiver Approver duty (Shared Duty Resolver) through its limit day, nobody
+beyond — even principal is refused past every limit; sofa always refuses; a WRITTEN request
+is required and an approval may only extend. Both doors append the order history fact. The
+shared `storageChargeOf` arithmetic (Law D) reproduces the §7 worked examples exactly
+(1–14 RM0 · 15–44 RM150 · 45–74 RM300; approved-day-21 shift; sofa 14-day cycles) and is
+the ONE derivation any card, report or future Storage Invoice may print.
+`GET/POST /api/finance/payment-storage` are thin RPC wrappers.
+
+The operator journey is on the Invoice object: a **Storage** section between the goods facts
+and the money action (the §16 one-scroll order gains it — storage is a goods-side fact that
+becomes money). A case says its witnessed start, which storage day today is, the free end
+with its approval named, and the §7 charge so far through the ONE shared arithmetic —
+honestly marked `not on a Storage Invoice yet.` The posting door's staff get
+`Record storage start` (both witnessed facts + the note; the page says the system derives
+the LATER date) and, where §7 allows, `Request more free days` — the customer's WRITTEN
+request is uploaded first, and the form says a phone call is not enough. Finance reads the
+same facts with no doors.
+
+The rolled-back production probe proved, with negative controls: a future witness refused ·
+the later-fact start with the seeded rule snapshot · a second start refused · Operation
+refused past day 21 while the waiver duty is unassigned · approval without written evidence
+refused · Operation approving day 21 exactly · principal refused beyond every limit · sofa
+extra-free refused · an unknown caller refused (`app_role()` resolves from `app_users`, so
+a forged JWT role claim changes nothing). Charging (commenced cycles → Storage Invoice) and
+the operator journey UI (the delivery-window form, the case surfaces, §16 composition
+extension) are the named next slices — this one records the facts they derive from.
+
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
 Message assembly with bank routing and Partner contact, storage
@@ -583,7 +620,7 @@ Evidence → Receipt → History. Persistent identity: Receipt No · Customer, s
 state. Print is direct output. Authorised Correct allocation / Void payment live in header overflow;
 unauthorised staff never see them. A void preserves the original Receipt with VOIDED, reason and history.
 
-Invoice order: Money → Goods and Delivery → What to do → Invoice → Related Payments → Communication
+Invoice order: Money → Goods and Delivery → Storage → What to do → Invoice → Related Payments → Communication
 History. Check money, goods readiness/arrival and customer Delivery before creating collection Work.
 When goods are not ready and arrival is unknown, show `Wait`; never create a blind payment chase.
 Draft may be edited and issued. Issued Invoice has no ordinary Edit; correction voids the old
