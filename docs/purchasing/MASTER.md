@@ -2298,11 +2298,10 @@ Settings lives under the global header gear and requires authorised roles. It in
 - document number format/version and locked Unit ID family;
 - a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
-- `/api/operation/po-duty` is a one-release response-shape adapter only. It reads and writes the
-  shared Workspace Duty resolver and must be deleted when `PurchaseOrdersPage`,
-  `SalesOrderWorkspace`, `OperationOrdersControl`, and the Quick Rail `TeamPanel` consume the
-  Workspace Duty contract directly; no caller may restore a direct
-  `ops_po_duty` or cover-table read behind it.
+- The legacy `/api/operation/po-duty` response-shape adapter is retired. `PurchaseOrdersPage`,
+  `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
+  the Quick Rail reads the shared Work response. No caller may restore a direct `ops_po_duty`,
+  cover-table read, page-local rota or compatibility response.
 - PO Days remain scheduling facts. They do not create reminders or `ops_tasks`; every order that
   requires issue is already one structured `issue_po` Work projection, resolved to current PO Duty
   and closed only by the owning order/purchase facts.

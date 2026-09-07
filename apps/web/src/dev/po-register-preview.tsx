@@ -132,9 +132,24 @@ const ROUTES: Array<[test: (url: string) => boolean, body: () => unknown]> = [
   [(url) => url.includes("/api/operation/warehouse"), () => ({
     warehouses: [{ id: "warehouse-1", name: "Carres Klang", address: "Klang" }],
   })],
-  [(url) => url.includes("/api/operation/po-duty"), () => ({
-    month: "2026-09",
-    holder: { userId: "user-duty", name: "Yee Jean", email: "yj@carres.com", assignedBy: null },
+  [(url) => url.includes("/api/operation/workspace-duties"), () => ({
+    can_assign: false,
+    duties: [{
+      key: "po_duty",
+      label: "PO Duty",
+      resolution: {
+        duty_key: "po_duty",
+        normal_user_id: "user-duty",
+        normal_user_name: "Yu Jun",
+        acting_user_id: null,
+        acting_user_name: null,
+        actor_user_id: "user-duty",
+        is_cover: false,
+        source: "assignment",
+      },
+      assignments: [],
+      covers: [],
+    }],
   })],
   [(url) => url.includes("/api/operation/supplier-claims"), () => ({
     claims: [],

@@ -50,7 +50,6 @@ import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
 import opsStaffRouter from "./routes/operation/staff";
-import poDutyRouter from "./routes/operation/po-duty";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -223,8 +222,6 @@ api.route("/operation/purchasing/requests", manualPurchaseRouter);
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
-// 0236 PO duty rotation — GET current holder / PUT manager override
-api.route("/operation/po-duty", poDutyRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
