@@ -2461,7 +2461,17 @@ counted as supplier failure; address creation treated as Site creation; silent c
 Future Sales Portal creation/progress/replies reuse the same record but do not commission that
 portal now. External partner onboarding/cutover remains separately authorised.
 
-**READY FOR CARD — unnumbered acceptance boundaries for a later BUILD/DELIVERY takeover**, in
+**BUILD/DELIVERY authorised — 2026-09-07.** The owner approved starting implementation after
+the complete blueprint approval. No further business-rule reconfirmation is required. The first
+local change adds Site selection and Site-scoped assignment/dated cover in Workspace Staff &
+Duties, with the existing shared resolver and assignment history. The exact database draft is
+`supabase/drafts/showroom_site_duties.sql`; it remains unnumbered and unapplied pending the
+ENGINEERING §5 exact-file approval. Dependent code must not deploy before that database gate.
+This is only the shared-duty foundation: physical action admission/result evidence, Display
+Requests, requester links/media, consignment journeys, loans/sale notices and reports remain
+unimplemented by this slice. Local checks do not constitute production acceptance.
+
+**Acceptance boundaries for the authorised BUILD/DELIVERY takeover**, in
 recommended dependency order:
 
 - Site-scoped Showroom Duty, permission-scoped action routing and result evidence: one resolver,
@@ -2476,9 +2486,9 @@ recommended dependency order:
 - Reports and end-to-end acceptance: source-owned counts/remaining work, permitted money data,
   failed-source honesty, all partial/problem journeys and actual actor/version traceability.
 
-These are acceptance scopes, not Cards or implementation instructions. Follow dependency order;
-each scope must connect its existing owning module rather than clone it. This PLAN writes no Cards,
-application code or migrations and performs no merge/deploy. BUILD must remeasure current main and
+These are acceptance scopes, not Cards. Follow dependency order;
+each scope must connect its existing owning module rather than clone it. The preceding PLAN wrote
+no application code or migrations and performed no merge/deploy. BUILD must remeasure current main and
 prove each complete operator journey before claiming delivery. No new business interview is needed
 for these approved rules; real contradictions still follow the constitutional decision gate.
 

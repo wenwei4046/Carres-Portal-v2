@@ -369,6 +369,18 @@ honest Work for admitted modules.
 
 ## 11 · Next governed work
 
+**Showroom dependency — local BUILD progress, 2026-09-07.** Following the owner-approved
+Purchasing §9.12 takeover, Staff & Duties now has a local Site selector and Site-scoped assignment
+and dated cover forms. API validation requires a Carres Site for Showroom Duty and rejects a Site
+on global duties. The SQL draft extends the existing assignment/cover tables and delegates old
+global RPC signatures to one scoped resolver; it creates no assignments or separate roster.
+`supabase/drafts/showroom_site_duties.sql` is unnumbered, unapplied and awaits exact-file approval
+under ENGINEERING §5. No production or completed Showroom Work admission claim is made.
+Local verification covers two-Site isolation, cover expiry, active-holder eligibility, the existing
+manager gate, RPC-only writes and global compatibility. An in-memory negative control removes
+the scope filters and correctly fails the Site assertion. Physical source transitions, actual
+result evidence and Showroom Work feed admission remain subsequent work.
+
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
 3. Remove legacy PIC/duty fallbacks.

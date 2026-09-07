@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { z } from "zod";
+import { WORKSPACE_DUTY_ASSIGNMENTS, WORKSPACE_DUTY_COVERS } from "@carres/shared/tables";
+import { WORKSPACE_SCOPED_RPCS } from "@carres/shared/workspace-duty";
 import {
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
@@ -42,23 +45,34 @@ const DUTIES = [
 ] as const;
 
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {
+  const query = z.object({ siteId: z.string().uuid().optional() }).safeParse(c.req.query());
+  if (!query.success) return c.json({ error: "Choose a valid Site." }, 400);
+  const siteId = query.data.siteId;
   const sb = userClient(c.env, c.var.auth.jwt);
+  const sites = await sb.from("warehouses").select("id, name").eq("kind", "own").order("name");
+  if (sites.error) { const m = mapPgError(sites.error); return c.json(m.body, m.status); }
+  const site = siteId ? (sites.data ?? []).find((s) => s.id === siteId) : undefined;
+  if (siteId && !site) return c.json({ error: "Choose a Carres Site." }, 400);
+  const duties: Array<{ key: string; label: string; siteId?: string }> = [...DUTIES];
+  if (siteId) duties.push({ key: "showroom_duty", label: "Showroom Duty", siteId });
 
   const [canAssignRes, assignments, covers] = await Promise.all([
     sb.rpc("workspace_can_assign_duties"),
     sb
-      .from("workspace_duty_assignments")
+      .from(WORKSPACE_DUTY_ASSIGNMENTS)
       .select(
-        "id, duty_key, holder_id, effective_from, effective_until, assigned_by, note, created_at",
+        "id, duty_key, site_id, holder_id, effective_from, effective_until, assigned_by, note, created_at",
       )
+      .or(siteId ? `site_id.is.null,site_id.eq.${siteId}` : "site_id.is.null")
       .order("effective_from", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200),
     sb
-      .from("workspace_duty_covers")
+      .from(WORKSPACE_DUTY_COVERS)
       .select(
-        "id, duty_key, normal_user_id, acting_user_id, starts_on, ends_on, reason, assigned_by, created_at",
+        "id, duty_key, site_id, normal_user_id, acting_user_id, starts_on, ends_on, reason, assigned_by, created_at",
       )
+      .or(siteId ? `site_id.is.null,site_id.eq.${siteId}` : "site_id.is.null")
       .order("starts_on", { ascending: false })
       .limit(200),
   ]);
@@ -79,14 +93,18 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   const canAssign = canAssignRes.data;
 
   const resolutions: Record<string, unknown> = {};
-  for (const d of DUTIES) {
-    const { data, error } = await sb.rpc("workspace_resolve_duty", {
+  for (const d of duties) {
+    const { data, error } = await sb.rpc(d.siteId ? WORKSPACE_SCOPED_RPCS.resolve : "workspace_resolve_duty", {
       p_duty_key: d.key,
       p_on: null,
+      ...(d.siteId ? { p_site_id: d.siteId } : {}),
     });
     if (error) {
       const m = mapPgError(error);
       return c.json(m.body, m.status);
+    }
+    if (!data || typeof data !== "object") {
+      return c.json({ error: "The Duty could not be loaded. Try again." }, 502);
     }
     resolutions[d.key] = data;
   }
@@ -110,36 +128,44 @@ workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   ];
   const names = new Map<string, string>();
   if (ids.length > 0) {
-    const { data: users } = await sb
+    const { data: users, error: namesError } = await sb
       .from("app_users")
       .select("id, name")
       .in("id", ids);
+    if (namesError) { const m = mapPgError(namesError); return c.json(m.body, m.status); }
     for (const u of users ?? []) names.set(u.id as string, u.name as string);
   }
   const name = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? (names.get(v) ?? null) : null;
 
+  const eligible = siteId ? await sb.from("app_users")
+    .select("id, name, email").eq("status", "active").neq("role", "dealer").order("name") : null;
+  if (eligible?.error) { const m = mapPgError(eligible.error); return c.json(m.body, m.status); }
   return c.json({
+    sites: sites.data ?? [],
+    site_staff: (eligible?.data ?? []).map((u) => ({ user_id: u.id, name: u.name, email: u.email })),
     can_assign: canAssign === true,
-    duties: DUTIES.map((d) => {
+    duties: duties.map((d) => {
       const r = resolutions[d.key] as Record<string, unknown>;
       return {
         key: d.key,
         label: d.label,
+        site_id: d.siteId ?? null,
+        site_name: d.siteId ? site?.name : null,
         resolution: {
           ...r,
           normal_user_name: name(r?.normal_user_id),
           acting_user_name: name(r?.acting_user_id),
         },
         assignments: (assignments.data ?? [])
-          .filter((a) => a.duty_key === d.key)
+          .filter((a) => a.duty_key === d.key && (a.site_id ?? null) === (d.siteId ?? null))
           .map((a) => ({
             ...a,
             holder_name: name(a.holder_id),
             assigned_by_name: name(a.assigned_by),
           })),
         covers: (covers.data ?? [])
-          .filter((v) => v.duty_key === d.key)
+          .filter((v) => v.duty_key === d.key && (v.site_id ?? null) === (d.siteId ?? null))
           .map((v) => ({
             ...v,
             normal_user_name: name(v.normal_user_id),
@@ -155,12 +181,13 @@ workspaceDutiesRouter.post("/assign", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, workspaceAssignDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("workspace_assign_duty", {
+  const { data, error } = await sb.rpc(parsed.data.siteId ? WORKSPACE_SCOPED_RPCS.assign : "workspace_assign_duty", {
     p_duty_key: parsed.data.dutyKey,
     p_holder_id: parsed.data.holderId,
     p_effective_from: parsed.data.effectiveFrom,
     p_effective_until: parsed.data.effectiveUntil ?? null,
     p_note: parsed.data.note ?? null,
+    ...(parsed.data.siteId ? { p_site_id: parsed.data.siteId } : {}),
   });
   if (error) {
     const m = mapPgError(error);
@@ -173,12 +200,13 @@ workspaceDutiesRouter.post("/cover", requireOperation, async (c) => {
   const parsed = await parseJsonBody(c, workspaceCoverDutyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  const { data, error } = await sb.rpc("workspace_cover_duty", {
+  const { data, error } = await sb.rpc(parsed.data.siteId ? WORKSPACE_SCOPED_RPCS.cover : "workspace_cover_duty", {
     p_duty_key: parsed.data.dutyKey,
     p_acting_user_id: parsed.data.actingUserId,
     p_starts_on: parsed.data.startsOn,
     p_ends_on: parsed.data.endsOn,
     p_reason: parsed.data.reason ?? null,
+    ...(parsed.data.siteId ? { p_site_id: parsed.data.siteId } : {}),
   });
   if (error) {
     const m = mapPgError(error);

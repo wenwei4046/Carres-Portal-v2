@@ -63,7 +63,7 @@ function makeSb(
       const cfg = tables[table] ?? {};
       const builder: Record<string, unknown> = {};
       const chain = () => builder;
-      for (const m of ["select", "eq", "in", "order", "limit"])
+      for (const m of ["select", "eq", "in", "order", "limit", "or", "neq"])
         builder[m] = vi.fn(chain);
       builder.then = (
         resolve: (r: Result) => unknown,
@@ -463,5 +463,51 @@ describe("POST /cover", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("no_holder_to_cover");
+  });
+});
+
+
+describe("Site-scoped Showroom Duty", () => {
+  const SITE = "00000000-0000-4000-8000-000000000010";
+  it("requires Site only for Showroom Duty before reaching the database", async () => {
+    const sb = makeSb({});
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    for (const body of [
+      { dutyKey: "showroom_duty", holderId: HOLDER, effectiveFrom: "2026-09-08" },
+      { dutyKey: "po_duty", siteId: SITE, holderId: HOLDER, effectiveFrom: "2026-09-08" },
+    ]) {
+      expect((await req("/api/operation/workspace-duties/assign", "POST", await makeJwt("operation"), body)).status).toBe(422);
+    }
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+  it("carries the Site into assignment and cover without using the global write", async () => {
+    const sb = makeSb({});
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await req("/api/operation/workspace-duties/assign", "POST", await makeJwt("operation"),
+      { dutyKey: "showroom_duty", siteId: SITE, holderId: HOLDER, effectiveFrom: "2026-09-08" })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("workspace_assign_scoped_duty", expect.objectContaining({ p_site_id: SITE, p_holder_id: HOLDER }));
+    expect((await req("/api/operation/workspace-duties/cover", "POST", await makeJwt("operation"),
+      { dutyKey: "showroom_duty", siteId: SITE, actingUserId: COVER, startsOn: "2026-09-08", endsOn: "2026-09-09" })).status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("workspace_cover_scoped_duty", expect.objectContaining({ p_site_id: SITE, p_acting_user_id: COVER }));
+  });
+  it("reads the selected Site through the shared resolver and separates its history", async () => {
+    const tables = dutyTables();
+    tables.workspace_duty_assignments.list.data.push({ ...tables.workspace_duty_assignments.list.data[0], duty_key: "showroom_duty", site_id: SITE } as never);
+    const sb = makeSb({ ...tables, warehouses: { list: { data: [{ id: SITE, name: "Showroom A" }], error: null } } }, {
+      workspace_can_assign_duties: { data: true }, workspace_resolve_duty: { data: RESOLVED },
+      workspace_resolve_scoped_duty: { data: { ...RESOLVED, duty_key: "showroom_duty", site_id: SITE } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(`/api/operation/workspace-duties?siteId=${SITE}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { duties: Array<{ key: string; site_id: string | null; assignments: unknown[] }> };
+    expect(body.duties.find(d => d.key === "showroom_duty")).toMatchObject({ site_id: SITE, assignments: [expect.anything()] });
+    expect(body.duties.find(d => d.key === "po_duty")?.assignments).toEqual([]);
+    expect(sb.rpc).toHaveBeenCalledWith("workspace_resolve_scoped_duty", { p_duty_key: "showroom_duty", p_on: null, p_site_id: SITE });
+  });
+  it("does not turn an unavailable Site into an unassigned global duty", async () => {
+    const sb = makeSb({}); vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await req(`/api/operation/workspace-duties?siteId=${SITE}`, "GET", await makeJwt("operation"))).status).toBe(400);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
