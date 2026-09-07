@@ -287,7 +287,7 @@ describe("Inventory saved views", () => {
     ], total: 2 });
     renderRegister();
     await screen.findByText("Dream · King");
-    fireEvent.click(screen.getByRole("button", { name: "Search", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /^Search$/ }));
     fireEvent.change(screen.getByPlaceholderText("Unit ID, product, PO, SO or supplier…"), { target: { value: "dream" } });
     await waitFor(() => expect(screen.queryByText("id-other")).not.toBeInTheDocument());
     expect(screen.getByText("id-dream")).toBeInTheDocument();

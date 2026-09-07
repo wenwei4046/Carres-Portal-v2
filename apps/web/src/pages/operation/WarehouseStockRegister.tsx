@@ -273,8 +273,7 @@ export default function WarehouseStockRegister() {
           u.holderName ? (
             <span className="truncate text-meta text-base-800">{u.holderName}</span>
           ) : (
-            /* NULL on every Unit today: the column shipped hours ago and no door
-               populates it yet. It says so rather than showing a false owner. */
+            /* An absent holder stays absent instead of inventing an owner. */
             <span className="text-meta text-base-400">Not recorded</span>
           ),
       },
