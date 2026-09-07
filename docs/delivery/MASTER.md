@@ -998,6 +998,22 @@ on-screen law *sending is not confirmation*) and the reply proof as a REAL uploa
 `POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
 bucket under `arrangement/{order}/{leg}/…`.
 
+**DEPLOYED 2026-09-07 — Monitor default landing correction, PR #1125, main SHA
+`ccc4c63b4aa8294fe91103dda0b36395606514a5`, production converged (deploy probe reports that
+exact SHA and the served bundle carries the ruled view order).** The §8 owner correction is
+live and was verified through an authenticated Operations session on production:
+`/operation?tab=delivery` lands on **`All delivery work`** — the selectable DataGrid listing
+all 87 real delivery scopes, DO-less/dateless/partnerless rows included, footer `87 delivery
+scopes`; the rail reads the ruled order with the real counts (All delivery work 87 ·
+No logistics picked 35 · No confirmed date 86 · Calendar 0 · Overdue 1 · Failed Delivery 0 ·
+Delivered — Proof Required 0 · Waiting for warehouse 0) and LOGISTICS carries no duplicated
+unassigned row; `No logistics picked` → header select-all read `35 delivery scopes selected ·
+Clear · Assign logistics` (the governed dialog opened on the seeded preview; no production
+assignment was submitted); the explicit `Calendar` pick opened the fixed week Mon 7 – Sat 12
+Sep with the honest spanning state and the REAL `86 deliveries need a confirmed date.` door.
+Typecheck clean, 3,979 web tests green (91 in the two Monitor suites, including the default
+landing, the ruled order, the all-dates unassigned queue and the Selangor combination).
+
 **DEPLOYED 2026-09-03 — Delivery Card 07, PRs #1065 + #1068, production converged at
 `1ffb21e8882ebd7e46b2851ce090f24f17d1570a`.** The ruled partner screen (§5/§13) is live:
 `Delivery dates` at `/delivery-partner/arrange` — one phone-first column, the ruled minimum
