@@ -474,7 +474,7 @@ exact SHA. The verification evidence, each result stated for exactly what it pro
   local multi-invoice fixture walk, where the deduped SO card said RM 2,350 = goods 5,400 +
   storage 150 − paid 3,200.
 
-### BUILD — Reports → Payment, 2026-09-07
+### Deployed — Reports → Payment, 2026-09-07
 
 `Finance → Reports` gains the Payment door and `/finance/reports/payment` renders the six
 approved §16 listings — Money received · Customer balances · Storage charged and collected ·
@@ -492,10 +492,14 @@ feeds `RM {amount} needs review` (§5) without a second arithmetic. Storage waiv
 honestly that the waiver journey is not built. The page stays finance-only under the §12
 door (operation staff reach Payments and Invoices only). Verified by 9 focused report tests
 (102 finance page tests green), a preview walk of all six sections with fixture data, and
-390px/640px checks with zero clipped elements; production convergence and the walk of this
-slice are recorded when they exist.
+390px/640px checks with zero clipped elements. PR #1130 merged as `da00900f`; the live SHA
+carries it on the ERP page, POS page and Worker (ancestry-verified — a sibling push had
+cancelled the exact-SHA run). Production-walked through the signed-in session: all six
+heads render, the exclusion sentences are on screen, the month control stands, a balance
+row doors to its invoice object, and SO-1313 said the SAME number the Calendar says —
+Law D holding live.
 
-### BUILD — the Online link journey on the Invoice, 2026-09-07
+### Deployed — the Online link journey on the Invoice, 2026-09-07
 
 The §16 "Online link and Receipt" operator journey is built around the ALREADY-converged
 Stripe checkout (0223 → 0351 — only a successful provider callback/poll posts Payment and
@@ -514,10 +518,13 @@ fact, not wording) can be copied. An unpaid expiry says `Payment link expired` �
 reconcile route, so a counter payment records within one poll even before the webhook. The
 API gains read-only `GET /orders/:id/stripe/checkout` (the order's recent links, RLS-gated
 on the order read) — no migration. Verified by 8 focused composition tests + 2 API route
-tests (31 stripe route tests green); production convergence and the walk of this slice are
-recorded when they exist.
+tests (31 stripe route tests green). PR #1131 merged as `b3fc3c3b`; the live SHA carries it
+on all three surfaces (ancestry-verified). Production-walked through the signed-in session:
+the `Create payment link` door stands on the invoice header, the composition renders with
+the amount prefilled from the shared outstanding (RM 2,499 on the walk invoice) and the
+honest empty preview — no real Stripe link was minted during the walk, deliberately.
 
-### BUILD — the storage case foundation, 2026-09-07
+### Deployed — the storage case foundation, 2026-09-07
 
 Migration `0436` creates `payment_storage_cases` — one case per order + product group,
 FOREVER — and its two doors. The §6 truth is structural: a case is born only from BOTH
@@ -544,6 +551,13 @@ honestly marked `not on a Storage Invoice yet.` The posting door's staff get
 the LATER date) and, where §7 allows, `Request more free days` — the customer's WRITTEN
 request is uploaded first, and the form says a phone call is not enough. Finance reads the
 same facts with no doors.
+
+Closure: migration `0436` is APPLIED (tracker tail confirmed) and PR #1132 merged as
+`f4aea2a5`; the ERP page, POS page and Worker all converged on a SHA carrying it, and the
+served bundle prints the Storage section's own strings. The production DOM walk of the
+section is owed: the signed-in browser's renderer froze mid-walk (a minimized window that
+stopped answering the debugger) — recorded as the precise blocker, not as acceptance; the
+DB layer's behaviour is production-proven by the rolled-back probe above.
 
 The rolled-back production probe proved, with negative controls: a future witness refused ·
 the later-fact start with the seeded rule snapshot · a second start refused · Operation
