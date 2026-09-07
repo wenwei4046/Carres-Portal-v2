@@ -171,9 +171,10 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
     ]) {
       expect(read(f), f).not.toMatch(/function FacetRow\(/);
     }
-    for (const f of ["pages/operation/OperationSupplierClaims.tsx"]) {
-      expect(read(f), f).toMatch(/from "@\/components\/FacetRow"/);
-    }
+    // UI MASTER's current rail grammar supersedes the old FacetRow import.
+    const claims = read("pages/operation/OperationSupplierClaims.tsx");
+    expect(claims).toMatch(/import \{ FilterRail, FilterRailGroup, FilterRailRow \} from "\.\/components\/workspace-rail"/);
+    expect(claims).not.toMatch(/from "@\/components\/FacetRow"/);
     // Receiving left this list on 2026-08-03 (Slice B): it is no longer a
     // facet-rail list page, it is the Purchasing module's WORKSPACE template —
     // 200px navigation rail + kit DataTable + a 400px workspace pane, copied
@@ -210,10 +211,10 @@ describe("R8 · the Purchasing lane speaks the dictionary", () => {
         /`Factory: /,
       );
     }
-    // Claims still names the facet on its ✕-able chip.
+    // Claims names its governed rail group Supplier; the old chip is retired.
     expect(
       visibleSource("pages/operation/OperationSupplierClaims.tsx"),
-    ).toMatch(/Supplier: /);
+    ).toMatch(/supplier: "Supplier"/);
     // Receiving names it as the FILTER RAIL group's title — the governed
     // 240px FilterRail prints group headings uppercase (Card 02-C grammar),
     // so the word moved to `SUPPLIER` but the law did not: it is `Supplier`,
