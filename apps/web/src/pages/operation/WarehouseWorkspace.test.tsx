@@ -265,8 +265,8 @@ describe("Warehouse Monitor — the only Calendar", () => {
   });
 });
 
-describe("Warehouse Outbound — rail + dated work rows", () => {
-  it("has the pickup-status rail, and the carrier and driver as separate fields", async () => {
+describe("Warehouse Outbound — the unified Register", () => {
+  it("has the pickup-status rail and separate carrier/driver facts, and keeps the two evidence records apart", async () => {
     stubApi();
     mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
     await waitFor(() =>
@@ -274,27 +274,36 @@ describe("Warehouse Outbound — rail + dated work rows", () => {
     );
     const rail = screen.getByTestId("wo-rail");
     expect(within(rail).getByText("PICKUP STATUS")).toBeInTheDocument();
-    expect(within(rail).getByTestId("wo-view-not-loaded")).toBeInTheDocument();
+    expect(within(rail).getByTestId("wo-view-open")).toBeInTheDocument();
     expect(within(rail).getByTestId("wo-view-loaded")).toBeInTheDocument();
     // One Site today — the group never renders as a dead one-option control.
     expect(within(rail).queryByText("SITE")).toBeNull();
-    // The identities are separate, and no driver is invented.
+    // The column headers speak the shared row grammar.
+    expect(screen.getByText("Scheduled handover")).toBeInTheDocument();
+    expect(screen.getByText("Document")).toBeInTheDocument();
+    expect(screen.getByText("Exceptions")).toBeInTheDocument();
     const row = screen.getByTestId("wo-row-DO-2609-019");
-    expect(within(row).getByText("Logistics Partner")).toBeInTheDocument();
-    expect(within(row).getByText("Assigned Driver")).toBeInTheDocument();
     expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent(
       "Waiting for NETS Delivery to assign a driver",
     );
-    // The two evidence records stay separate lines.
-    expect(within(row).getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
+    // Required / Loaded / Driver confirmed stay three numbers.
+    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
+      "Required 2 · Loaded 0",
+    );
+    expect(within(row).getByTestId("outbound-tally-DO-2609-019")).toHaveTextContent(
+      "Driver confirmed 0",
+    );
+    // The two evidence records live in the arrangement's own detail.
+    fireEvent.click(screen.getByTestId("wo-row-toggle-DO-2609-019"));
+    expect(screen.getByTestId("wo-loaded-DO-2609-019")).toHaveTextContent(
       "Warehouse loaded — nothing yet",
     );
-    expect(within(row).getByTestId("wo-collected-DO-2609-019")).toHaveTextContent(
+    expect(screen.getByTestId("wo-collected-DO-2609-019")).toHaveTextContent(
       "NETS Delivery has not confirmed collection yet",
     );
   });
 
-  it("an assigned driver renders by name, and the vehicle is its own field", async () => {
+  it("an assigned driver renders by name, and the vehicle stays its own fact", async () => {
     stubApi({
       events: [
         ...deliveryWarehouseScheduleEvents(
@@ -306,20 +315,18 @@ describe("Warehouse Outbound — rail + dated work rows", () => {
         ),
       ],
     });
-    mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-04");
+    mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
     const row = await screen.findByTestId("wo-row-DO-2609-019");
     expect(within(row).getByTestId("wo-driver-DO-2609-019")).toHaveTextContent("Ahmad Rahman");
-    expect(within(row).getByText("VBM 1234")).toBeInTheDocument();
+    expect(screen.getByText("Vehicle VBM 1234")).toBeInTheDocument();
   });
 
-  it("opens scoped to the deep-linked DO with `Goods scheduled for pickup` and derived reasons", async () => {
+  it("a Monitor deep link opens its exact arrangement already unfolded, with derived per-Unit reasons", async () => {
     stubApi();
     mountOutbound("/operation?tab=warehouse-outbound&do=DO-2609-019");
     await waitFor(() =>
       expect(screen.getByTestId("wo-units-DO-2609-019")).toBeInTheDocument(),
     );
-    // The work date is the card's own date even without a date param.
-    expect(screen.getByTestId("wo-date")).toHaveTextContent("Fri, 4 Sep");
     const units = screen.getByTestId("wo-units-DO-2609-019");
     expect(within(units).getByText("Goods scheduled for pickup")).toBeInTheDocument();
     expect(within(units).getByTestId("wo-unit-reason-U1-260-019")).toHaveTextContent(
@@ -328,13 +335,55 @@ describe("Warehouse Outbound — rail + dated work rows", () => {
     // No loading act before scan/check/pack; no generic Mark done ever.
     expect(screen.queryByTestId("wo-record-loaded")).toBeNull();
     expect(screen.queryByText("Mark done")).toBeNull();
+    // The whole row navigates nowhere; the DO No is the document door.
+    expect(screen.getByTestId("outbound-document-DO-2609-019")).toHaveAttribute(
+      "href",
+      "/operation/delivery-orders/DO-2609-019",
+    );
   });
 
-  it("an empty Outbound date says the governed pickup sentence", async () => {
+  it("the menu default lists every unfinished arrangement; a done arrangement stays queryable", async () => {
+    stubApi({
+      events: [
+        ...TWO_UNIT_EVENTS,
+        ...deliveryWarehouseScheduleEvents(
+          unitInput({
+            unitId: "U1-260-030",
+            doNumber: "DO-2609-030",
+            orderId: "order-30",
+            collectionDate: "2026-09-05",
+            unitHandedOverAt: "2026-09-05T09:00:00+08:00",
+            unitHasEvidence: true,
+          }),
+        ),
+      ],
+    });
+    mountOutbound();
+    await waitFor(() =>
+      expect(screen.getByTestId("wo-row-DO-2609-019")).toBeInTheDocument(),
+    );
+    // Finished work is not in the default scope…
+    expect(screen.queryByTestId("wo-row-DO-2609-030")).toBeNull();
+    // …but its count is honest in the SAME scope, and one click shows it.
+    expect(screen.getByTestId("wo-view-loaded")).toHaveTextContent("Loaded1");
+    fireEvent.click(screen.getByTestId("wo-view-loaded"));
+    await waitFor(() =>
+      expect(screen.getByTestId("wo-row-DO-2609-030")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("wo-row-DO-2609-019")).toBeNull();
+  });
+
+  it("an empty exact date says the governed pickup sentence and the summary matches the range", async () => {
     stubApi();
     mountOutbound("/operation?tab=warehouse-outbound&date=2026-09-05");
-    const empty = await screen.findByTestId("wo-empty-2026-09-05");
-    expect(empty).toHaveTextContent("No pickups on Sat, 5 Sep. Choose another date.");
+    await waitFor(() =>
+      expect(
+        screen.getByText("No pickups on Sat, 5 Sep. Choose another date."),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("wo-range-summary")).toHaveTextContent(
+      "0 pickup arrangements · Units: Required 0 · Loaded 0 · Driver confirmed 0",
+    );
   });
 
   it("scanning a Unit outside this DO's scope is refused in words; a valid scan calls the governed door", async () => {

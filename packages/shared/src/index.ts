@@ -2065,11 +2065,17 @@ export {
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
   DELIVERY_HANDOVER_KINDS,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_MIMES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
+  handoverEvidenceFileSchema,
   handoverGoodsLineSchema,
   recordHandoverInput,
   recordOutboundPrepInput,
   signHandoverProofUploadInput,
   WAREHOUSE_PREP_FACTS,
+  type HandoverEvidenceFile,
   type HandoverGoodsLine,
   type RecordHandoverInput,
   type RecordOutboundPrepInput,
@@ -2094,6 +2100,11 @@ export {
   type DeliveryWarehouseScheduleInput,
 } from "./delivery-warehouse-schedule";
 export {
+  buildOutboundRegisterView,
+  filterOutboundCards,
+  outboundExceptionLines,
+  outboundStatusWordOf,
+  outboundViewMatches,
   WAREHOUSE_DASHBOARD_DATE_COUNT,
   WAREHOUSE_OFF_DAYS,
   warehouseEmptyDaySentence,
@@ -2101,6 +2112,8 @@ export {
   warehouseOutboundCards,
   warehouseRangeShift,
   warehouseUnitPendingReason,
+  type OutboundProduct,
+  type OutboundRegisterFacets,
   type WarehouseOutboundCard,
 } from "./warehouse-outbound";
 export {
@@ -3000,3 +3013,7 @@ export * from "./purchase-order-register";
 export { recordSupplierReplyInput } from "./schemas/operation";
 
 export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+
+export * from "./warehouse-inbound";
+
+export * from "./arrival-source";

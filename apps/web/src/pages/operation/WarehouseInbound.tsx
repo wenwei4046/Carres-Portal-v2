@@ -1,349 +1,690 @@
-import { useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { type WarehouseReceiptRow } from "@carres/shared";
-import { appTodayIso, fmtDate } from "@/lib/fmt-date";
+import { blue } from "@radix-ui/colors";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
-  useOperationPos,
-  useOperationSuppliers,
-  useOperationWarehouse,
-  useOperationWarehouseReceipts,
-  type operationPoListRow,
-} from "@/lib/queries";
+  ARRIVAL_SOURCE_TYPES,
+  inboundExceptionLines,
+  inboundStatusWordOf,
+  type InboundArrival,
+} from "@carres/shared";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
+import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import ModuleHeader from "./components/ModuleHeader";
 import {
   FilterRail,
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import { useWarehouseInbound } from "./useWarehouseInbound";
 
 /**
- * WAREHOUSE — INBOUND: expected physical arrivals at a governed Site
- * (owner replacement Card 2026-09-06 §5; Stock MASTER §2).
+ * WAREHOUSE — INBOUND (unified Inbound/Outbound card, 2026-09-07).
  *
- * `240px page-specific filter rail + Inbound Register`. One row per open
- * source document still owing goods — what the Warehouse should expect at
- * its door. The toolbar's compact date control is only a filter; Monitor
- * alone owns the Calendar summary.
+ * One row = one dated arrival arrangement with its own goods scope. The main
+ * list carries every fact the operator needs to judge the arrival — Document,
+ * every Product, From, To, the date, the three counts, one progress word and
+ * the exceptions beside it. Completeness outranks row height: the Product and
+ * Exceptions columns wrap, never truncate.
  *
- * INBOUND ROUTES, IT NEVER POSTS (Law C — a door, never a duplicate):
- * actual receipt work lives in the governed Receiving Session. Opening a
- * row lands on `Receiving` — the waiting count review when one exists,
- * else the PO's own pre-start — and this page stores no receiving fact,
- * duplicates no GRN and owns no second form.
- *
- * Status words are the governed existing vocabulary, derived per row:
- * `Waiting goods arrival` · `Overdue goods arrival` · `Waiting Carres
- * check` (a warehouse count is already in front of Carres).
+ * Clicks are explicit: the Document number opens the document; the Product
+ * cell (arrow + content, ONE entry) expands the row; a Unit ID inside the
+ * expansion opens that Unit's record. The row itself navigates nowhere.
+ * Receiving stays the only receipt writer — the one action door here is
+ * `Open Receiving Session`, inside the expansion.
  */
 
-// design-standard: not-a-list-page — the Inbound Register renders through
-// the shared register DataGrid engine (UI MASTER §6.7), not ListPageShell.
-
-interface InboundRow {
-  poId: string;
-  supplierName: string;
-  siteName: string;
-  etaDate: string | null;
-  orderQty: number;
-  receivedQty: number;
-  pendingQty: number;
-  statusWord:
-    | "Waiting goods arrival"
-    | "Overdue goods arrival"
-    | "Waiting Carres check";
-  /** The waiting count's session id, when the warehouse already filed one. */
-  openReceiptId: string | null;
+/** Below Tailwind's `md` the 45px toolbar cannot hold the date controls in
+ *  one row — they move into the Filters drawer (the mobile filter surface). */
+function useIsNarrow(): boolean {
+  const query = "(max-width: 767px)";
+  const [narrow, setNarrow] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(query);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+  return narrow;
 }
 
-function pendingOf(po: operationPoListRow): number {
-  return (po.purchase_order_lines ?? []).reduce(
-    (n, l) => n + Math.max(0, (l.qty ?? 0) - (l.received_qty ?? 0)),
-    0,
-  );
+const STATUSES = [
+  ["open", "Not finished"],
+  ["expected", "Expected"],
+  ["part-received", "Part received"],
+  ["received", "Received"],
+  ["with-issue", "With issue"],
+  ["all", "All arrivals"],
+] as const;
+
+function receivingHref(r: InboundArrival) {
+  // Remaining work always opens the PO's governed Receiving workspace, never an old completed session.
+  const p = new URLSearchParams({ tab: "receiving" });
+  if (r.sourceType !== "supplier-delivery") {
+    p.set("arrival", r.sourceId);
+    return `/operation?${p}`;
+  }
+  if (r.sessionId && r.remaining === 0 && !r.identitiesMissing)
+    p.set("session", r.sessionId);
+  else p.set("po", r.sourceId);
+  return `/operation?${p}`;
+}
+
+/** The Document number opens the DOCUMENT — never the work surface. */
+function documentHref(r: InboundArrival) {
+  if (r.sourceType === "supplier-delivery")
+    return `/operation/procurement?po=${encodeURIComponent(r.sourceId)}`;
+  return `/operation?tab=arrival-source&arrival=${encodeURIComponent(r.sourceId)}`;
 }
 
 export default function WarehouseInbound() {
   const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [offset, setOffset] = useState(0);
+  /* From the menu the register shows every UNFINISHED arrangement under its
+     original date; an exact Monitor deep link (`source=…`) must show that
+     arrangement even when it is already finished, so the default widens. */
+  const effectiveStatus =
+    params.get("status") ?? (params.get("source") || params.get("po") ? "all" : "open");
+  const queryParams = useMemo(() => {
+    const p = new URLSearchParams(params);
+    /* Monitor's ARRIVAL card names the PO as `po`; the register's own
+       contract is `source`. One scope, two spellings — honour both. */
+    if (p.get("po") && !p.get("source")) p.set("source", p.get("po")!);
+    p.delete("po");
+    if (effectiveStatus === "all") p.delete("status");
+    else p.set("status", effectiveStatus);
+    return p;
+  }, [params, effectiveStatus]);
+  const q = useWarehouseInbound(queryParams, offset);
+  const rows = q.data?.arrivals ?? [];
+  const page = q.data?.page ?? { offset: 0, limit: 50, total: 0 };
+  const facets = q.data?.facets ?? { status: {}, sourceType: {}, site: {} };
+  const [showFilters, setShowFilters] = useState(false);
+  const [railHidden, setRailHidden] = useState(false);
+  const isNarrow = useIsNarrow();
+  const root = useRef<HTMLDivElement>(null);
+  const scrollKey = `inbound-scroll:${params.toString()}`;
+  useEffect(() => {
+    if (q.isLoading) return;
+    const scroll =
+      root.current?.querySelector<HTMLElement>('[data-testid="grid-scroll"]') ??
+      root.current?.querySelector<HTMLElement>(".overflow-auto");
+    if (scroll)
+      scroll.scrollTop = Number(sessionStorage.getItem(scrollKey) ?? 0);
+  }, [q.isLoading, scrollKey]);
+  const setFilter = useCallback(
+    (key: string, value: string) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set(key, value);
+          else next.delete(key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
+  const filterKey = [
+    params.get("status"), params.get("sourceType"), params.get("site"),
+    params.get("source"), params.get("po"), params.get("date"),
+    params.get("from"), params.get("to"), params.get("q"),
+  ].join("|");
+  useEffect(() => setOffset(0), [filterKey]);
+  const onSearch = useCallback(
+    (value: string) => setFilter("q", value),
+    [setFilter],
+  );
   const today = appTodayIso();
-
-  const posQ = useOperationPos();
-  const suppliersQ = useOperationSuppliers();
-  const warehouseQ = useOperationWarehouse();
-  const receiptsQ = useOperationWarehouseReceipts("all");
-
-  const statusSel = params.get("status");
-  const siteSel = params.get("site");
-  const dateSel = params.get("date");
-  const poSel = params.get("po");
-
-  const allRows = useMemo(() => {
-    const supplierName = new Map(
-      (suppliersQ.data?.suppliers ?? []).map((s: { id: string; name: string }) => [
-        s.id,
-        s.name,
-      ]),
-    );
-    const siteName = new Map(
-      (warehouseQ.data?.warehouses ?? []).map((w: { id: string; name: string }) => [
-        w.id,
-        w.name,
-      ]),
-    );
-    /* A SUBMITTED count means the arrival already happened and the session
-       is waiting for Carres — the row must say so, not `Waiting goods
-       arrival`. Posted/voided sessions are GRN records and live on the
-       Receiving Register, never here. */
-    const openReceiptByPo = new Map<string, string>();
-    for (const r of (receiptsQ.data?.receipts ?? []) as WarehouseReceiptRow[]) {
-      if (r.status === "submitted") openReceiptByPo.set(r.po_id, r.id);
-    }
-    const rows: InboundRow[] = [];
-    for (const po of posQ.data?.pos ?? []) {
-      if (po.status !== "open") continue;
-      const pendingQty = pendingOf(po);
-      if (pendingQty <= 0) continue;
-      const lines = po.purchase_order_lines ?? [];
-      const openReceiptId = openReceiptByPo.get(po.id) ?? null;
-      rows.push({
-        poId: po.id,
-        supplierName: supplierName.get(po.supplier_id) ?? "—",
-        siteName:
-          siteName.get(po.destination_id ?? po.warehouse_id) ??
-          siteName.get(po.warehouse_id) ??
-          "—",
-        etaDate: po.eta_date,
-        orderQty: lines.reduce((n, l) => n + Math.max(0, l.qty ?? 0), 0),
-        receivedQty: lines.reduce((n, l) => n + Math.max(0, l.received_qty ?? 0), 0),
-        pendingQty,
-        statusWord: openReceiptId
-          ? "Waiting Carres check"
-          : po.eta_date && po.eta_date < today
-            ? "Overdue goods arrival"
-            : "Waiting goods arrival",
-        openReceiptId,
-      });
-    }
-    return rows;
-  }, [posQ.data, suppliersQ.data, warehouseQ.data, receiptsQ.data, today]);
-
-  /** One filter per rail section; sections combine with AND; counts are
-   *  computed against the OTHER selections so a number never lies. */
-  const matchesExcept = (r: InboundRow, except: string) => {
-    if (except !== "status" && statusSel && r.statusWord !== statusSel) return false;
-    if (except !== "site" && siteSel && r.siteName !== siteSel) return false;
-    if (dateSel && r.etaDate !== dateSel) return false;
-    if (poSel && r.poId !== poSel) return false;
-    return true;
-  };
-
-  const rows = useMemo(
-    () => allRows.filter((r) => matchesExcept(r, "")),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allRows, statusSel, siteSel, dateSel, poSel],
-  );
-
-  const statusCount = (word: InboundRow["statusWord"]) =>
-    allRows.filter((r) => r.statusWord === word && matchesExcept(r, "status")).length;
-  const siteNames = useMemo(
-    () => [...new Set(allRows.map((r) => r.siteName))].filter((s) => s !== "—").sort(),
-    [allRows],
-  );
-
-  function setFacet(key: string, value: string | null) {
-    const next = new URLSearchParams(params);
-    if (value === null || next.get(key) === value) next.delete(key);
-    else next.set(key, value);
-    setParams(next, { replace: true });
-  }
-
-  /** THE DOOR (card §5): a row opens the governed Receiving surface —
-   *  the waiting count review when one exists, else the PO's pre-start. */
-  function openRow(r: InboundRow) {
-    const next = new URLSearchParams();
-    next.set("tab", "receiving");
-    if (r.openReceiptId) next.set("session", r.openReceiptId);
-    else next.set("po", r.poId);
-    navigate(`/operation?${next.toString()}`);
-  }
-
-  const columns: DataGridColumn<InboundRow>[] = useMemo(
+  const columns = useMemo<DataGridColumn<InboundArrival>[]>(
     () => [
       {
-        key: "eta",
-        label: "Expected arrival",
-        accessor: (r) => (r.etaDate ? fmtDate(r.etaDate) : "No date from supplier"),
+        key: "document",
+        label: "Document",
         width: 150,
-        sortable: true,
-        sortFn: (a, b) => (a.etaDate ?? "9999").localeCompare(b.etaDate ?? "9999"),
-        filterType: "date",
-        dateValue: (r) => r.etaDate,
-        exportValue: (r) => r.etaDate ?? "",
+        searchValue: (r) => `${r.documentWord} ${r.documentNo} ${r.sourceId}`,
+        accessor: (r) => (
+          <div className="py-0.5 leading-[18px]">
+            <div className="text-label uppercase tracking-wide text-base-400">
+              {r.documentWord}
+            </div>
+            <Link
+              className="font-mono text-kit-blue-11 hover:underline"
+              onClick={(event) => event.stopPropagation()}
+              to={documentHref(r)}
+              data-testid={`inbound-document-${r.id}`}
+            >
+              {r.documentNo}
+            </Link>
+          </div>
+        ),
+        wrap: true,
       },
       {
-        key: "po",
-        label: "PO No",
-        accessor: (r) => <span className="font-mono">{r.poId}</span>,
-        searchValue: (r) => r.poId,
-        exportValue: (r) => r.poId,
-        width: 150,
-        sortable: true,
-        filterType: "numbering",
-        filterValue: (r) => r.poId,
+        key: "products",
+        label: "Product",
+        width: 230,
+        wrap: true,
+        searchValue: (r) =>
+          r.products
+            .map((p) => `${p.name ?? ""} ${p.sku ?? ""}`)
+            .concat(r.units.map((u) => u.code))
+            .join(" "),
+        accessor: (r) =>
+          r.products.length === 0 ? (
+            <span>Products not recorded</span>
+          ) : (
+            <div className="space-y-0.5 py-0.5 leading-[18px]">
+              {r.products.map((p) => (
+                <div key={p.sku ?? "no-sku"}>
+                  {p.name ?? p.sku ?? "Product not recorded"}
+                  {p.name && p.sku ? (
+                    <span className="text-base-500"> · {p.sku}</span>
+                  ) : null}
+                  <span className="tabular-nums"> × {p.qty}</span>
+                </div>
+              ))}
+            </div>
+          ),
       },
       {
-        key: "supplier",
-        label: "Supplier",
-        accessor: (r) => r.supplierName,
-        width: 180,
-        sortable: true,
-        groupable: true,
+        key: "from",
+        label: "From",
+        width: 140,
+        wrap: true,
+        searchValue: (r) => r.from,
+        accessor: (r) => r.from,
       },
       {
         key: "site",
-        label: "Site",
-        accessor: (r) => r.siteName,
-        width: 180,
-        sortable: true,
-        groupable: true,
+        label: "To",
+        width: 120,
+        wrap: true,
+        searchValue: (r) => r.site,
+        accessor: (r) => r.site,
       },
       {
-        key: "orderQty",
-        label: "Order Qty",
-        accessor: (r) => String(r.orderQty),
-        align: "right",
-        width: 100,
-        sortable: true,
-        sortFn: (a, b) => a.orderQty - b.orderQty,
-        filterType: "number",
-        numberValue: (r) => r.orderQty,
+        key: "date",
+        label: "Expected arrival",
+        width: 125,
+        searchValue: (r) => r.date ?? "",
+        accessor: (r) => (
+          <span>{r.date ? fmtDate(r.date) : "Date not recorded"}</span>
+        ),
       },
       {
-        key: "receivedQty",
-        label: "Received Qty",
-        accessor: (r) => String(r.receivedQty),
-        align: "right",
-        width: 110,
-        sortable: true,
-        sortFn: (a, b) => a.receivedQty - b.receivedQty,
-        filterType: "number",
-        numberValue: (r) => r.receivedQty,
+        key: "receivedOn",
+        label: "Received on",
+        width: 120,
+        accessor: (r) => {
+          const last = r.sessions.at(-1)?.receivedAt;
+          if (!last || r.received === 0) return "";
+          return (
+            <span>
+              {fmtDate(last)}
+              {r.sessions.length > 1 ? ` · ${r.sessions.length} receipts` : ""}
+            </span>
+          );
+        },
       },
       {
-        key: "pendingQty",
-        label: "Pending Delivery Qty",
-        accessor: (r) => String(r.pendingQty),
-        align: "right",
-        width: 150,
-        sortable: true,
-        sortFn: (a, b) => a.pendingQty - b.pendingQty,
-        filterType: "number",
-        numberValue: (r) => r.pendingQty,
+        key: "tally",
+        label: "Units",
+        width: 165,
+        wrap: true,
+        accessor: (r) => (
+          <div className="py-0.5 tabular-nums leading-[18px]">
+            {r.identitiesMissing ? (
+              "Unit results need checking"
+            ) : (
+              <>
+                <div>
+                  Expected {r.expected} · Received {r.received}
+                </div>
+                <div>Not yet received {r.remaining}</div>
+                {/* With issue counts INSIDE received — 4 received, 1 damaged
+                    stays 4, never 5. */}
+                {r.issues > 0 && <div>With issue {r.issues} of {r.received}</div>}
+              </>
+            )}
+          </div>
+        ),
       },
       {
         key: "status",
         label: "Status",
-        accessor: (r) => r.statusWord,
-        width: 170,
-        sortable: true,
-        groupable: true,
+        width: 140,
+        searchValue: (r) => inboundStatusWordOf(r),
+        accessor: (r) => inboundStatusWordOf(r),
+      },
+      {
+        key: "exceptions",
+        label: "Exceptions",
+        width: 230,
+        wrap: true,
+        searchValue: (r) => inboundExceptionLines(r, today, fmtDate).join(" "),
+        accessor: (r) => {
+          const lines = inboundExceptionLines(r, today, fmtDate);
+          return lines.length === 0 ? (
+            ""
+          ) : (
+            <div className="space-y-0.5 py-0.5 leading-[18px]">
+              {lines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          );
+        },
+      },
+      ...(["expected", "received", "remaining", "issues"] as const).map(
+        (key) => ({
+          key,
+          defaultHidden: true,
+          label: {
+            expected: "Expected",
+            received: "Received",
+            remaining: "Not yet received",
+            issues: "With issue",
+          }[key],
+          width: key === "remaining" ? 125 : 90,
+          align: "right" as const,
+          accessor: (r: InboundArrival) =>
+            r.identitiesMissing ? "Not recorded" : String(r[key]),
+        }),
+      ),
+      {
+        key: "poDate",
+        label: "PO date",
+        defaultHidden: true,
+        width: 140,
+        accessor: (r) => (r.poDate ? fmtDate(r.poDate) : ""),
+      },
+      {
+        key: "so",
+        label: "SO No",
+        defaultHidden: true,
+        width: 100,
+        accessor: (r) => r.so ?? "",
       },
     ],
-    [],
+    [today],
   );
-
-  const isLoading = posQ.isLoading || receiptsQ.isLoading;
-
+  const context = params.get("date") || params.get("from");
+  const dateContext = context
+    ? ` for ${fmtDate(context)}${params.get("to") ? ` — ${fmtDate(params.get("to")!)}` : ""}`
+    : params.get("to")
+      ? ` through ${fmtDate(params.get("to")!)}`
+      : "";
+  const empty =
+    effectiveStatus === "open" && !context && !params.get("q")
+      ? "No unfinished arrivals. Every arranged arrival is received."
+      : `No arrivals match these filters${dateContext}.`;
+  const activeSource = params.get("source") || params.get("po");
+  const dateControls = (
+    <>
+      <label className="text-meta">
+        From{" "}
+        <input
+          className="h-7 rounded-control border border-kit-slate-5 px-2"
+          type="date"
+          aria-label="Arrival from"
+          value={params.get("date") || params.get("from") || ""}
+          onChange={(e) => {
+            setParams(
+              (prev) => {
+                const p = new URLSearchParams(prev);
+                p.delete("date");
+                if (e.target.value) p.set("from", e.target.value);
+                else p.delete("from");
+                return p;
+              },
+              { replace: true },
+            );
+          }}
+        />
+      </label>
+      <label className="text-meta">
+        To{" "}
+        <input
+          className="h-7 rounded-control border border-kit-slate-5 px-2"
+          type="date"
+          aria-label="Arrival to"
+          min={params.get("date") || params.get("from") || undefined}
+          value={params.get("to") || ""}
+          onChange={(e) => setFilter("to", e.target.value)}
+        />
+      </label>
+      <button
+        className="h-7 px-2 text-body text-kit-blue-11"
+        onClick={() =>
+          setParams({ tab: "warehouse-inbound" }, { replace: true })
+        }
+      >
+        Clear filters
+      </button>
+    </>
+  );
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" data-testid="warehouse-inbound">
+    <div
+      ref={root}
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+      data-testid="warehouse-inbound"
+      onScrollCapture={(e) => {
+        const el = e.target as HTMLElement;
+        if (el.getAttribute("data-testid") === "grid-scroll")
+          sessionStorage.setItem(scrollKey, String(el.scrollTop));
+      }}
+    >
       <ModuleHeader
-        testId="warehouse-inbound-header"
+        testId="inbound-header"
         word="Inbound"
         docTitle="Inbound · Warehouse — Carres"
         destinationHeader
       />
-      <div className="flex min-h-0 flex-1">
-        <FilterRail testId="wi-rail">
-          <FilterRailGroup title="ARRIVAL STATUS">
-            {(
-              [
-                "Waiting goods arrival",
-                "Overdue goods arrival",
-                "Waiting Carres check",
-              ] as const
-            ).map((word) => (
-              <FilterRailRow
-                key={word}
-                label={word}
-                count={statusCount(word)}
-                active={statusSel === word}
-                onClick={() => setFacet("status", word)}
-                testId={`wi-status-${word.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-              />
-            ))}
-          </FilterRailGroup>
-          {siteNames.length > 1 && (
-            <FilterRailGroup title="SITE">
-              {siteNames.map((name) => (
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <div
+          className={`${showFilters ? "flex" : "hidden"} min-h-0 shrink-0 ${railHidden ? "md:hidden" : "md:flex"}`}
+        >
+          <FilterRail
+            testId="inbound-rail"
+            onHide={() => {
+              setRailHidden(true);
+              setShowFilters(false);
+            }}
+          >
+            {isNarrow && (
+              <div className="flex flex-wrap items-center gap-2">
+                {dateControls}
+              </div>
+            )}
+            <FilterRailGroup title="ARRIVAL STATUS">
+              {STATUSES.map(([value, label]) => (
                 <FilterRailRow
-                  key={name}
-                  label={name}
-                  count={allRows.filter((r) => r.siteName === name && matchesExcept(r, "site")).length}
-                  active={siteSel === name}
-                  onClick={() => setFacet("site", name)}
-                  testId={`wi-site-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                  key={value}
+                  label={label}
+                  active={effectiveStatus === value}
+                  count={
+                    q.isLoading || q.error
+                      ? undefined
+                      : facets.status[value] ?? 0
+                  }
+                  testId={`inbound-status-${value}`}
+                  onClick={() => {
+                    setFilter("status", value);
+                    setShowFilters(false);
+                  }}
                 />
               ))}
             </FilterRailGroup>
-          )}
-          {/* SOURCE is not rendered while `Purchase Order` is the only live
-              source (Transfers and returns arrive in their own slices): a
-              one-option group is a dead control. */}
-        </FilterRail>
-        <div className="min-h-0 min-w-0 flex-1">
-          <DataGrid<InboundRow>
-            appearance="reference"
-            rows={rows}
-            columns={columns}
-            storageKey="carres.warehouse.inbound.v1"
-            rowKey={(r) => r.poId}
-            exportName="Inbound"
-            searchPlaceholder="PO, supplier or Site…"
-            isLoading={isLoading}
-            onRowClick={openRow}
-            toolbarStart={
-              (dateSel || poSel) && (
-                <button
-                  type="button"
-                  className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint"
+            <FilterRailGroup title="DOCUMENT TYPE">
+              {ARRIVAL_SOURCE_TYPES.map(([type, label]) => (
+                <FilterRailRow
+                  key={type}
+                  label={label}
+                  active={params.get("sourceType") === type}
+                  count={
+                    q.isLoading || q.error
+                      ? undefined
+                      : facets.sourceType[type] ?? 0
+                  }
+                  testId={
+                    type === "supplier-delivery"
+                      ? "inbound-source-supplier"
+                      : `inbound-source-${type}`
+                  }
                   onClick={() => {
-                    const next = new URLSearchParams(params);
-                    next.delete("date");
-                    next.delete("po");
-                    setParams(next, { replace: true });
+                    setFilter(
+                      "sourceType",
+                      params.get("sourceType") === type ? "" : type,
+                    );
+                    setShowFilters(false);
                   }}
-                  data-testid="wi-clear-scope"
+                />
+              ))}
+            </FilterRailGroup>
+            <FilterRailGroup title="SITE">
+              {(q.data?.sites ?? []).map((site) => (
+                <FilterRailRow
+                  key={site.id}
+                  label={site.name}
+                  active={params.get("site") === site.id}
+                  count={
+                    q.isLoading || q.error
+                      ? undefined
+                      : facets.site[site.id] ?? 0
+                  }
+                  testId={`inbound-site-${site.id}`}
+                  onClick={() => {
+                    setFilter(
+                      "site",
+                      params.get("site") === site.id ? "" : site.id,
+                    );
+                    setShowFilters(false);
+                  }}
+                />
+              ))}
+            </FilterRailGroup>
+          </FilterRail>
+        </div>
+        <div
+          className={`${showFilters ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col p-2`}
+        >
+          {!q.error && q.data?.unresolvedSources?.length ? (
+            <div
+              role="status"
+              className="border-b border-kit-slate-5 bg-white p-3 text-body"
+            >
+              These sources have different destination instructions. Check their
+              exact Units in Receiving:{" "}
+              {q.data.unresolvedSources.map((id) => (
+                <Link
+                  key={id}
+                  className="ml-2 text-kit-blue-11 hover:underline"
+                  to={`/operation?${new URLSearchParams({ tab: "receiving", po: id })}`}
                 >
-                  {[
-                    dateSel ? fmtDate(dateSel) : null,
-                    poSel ?? null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}{" "}
-                  ✕
-                </button>
-              )
-            }
-            statusSummary={(filteredRows) => (
-              <span>
-                {filteredRows.length} expected arrival{filteredRows.length === 1 ? "" : "s"} ·{" "}
-                {filteredRows.reduce((n, r) => n + r.pendingQty, 0)} pending delivery
-              </span>
-            )}
-          />
+                  {id}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {q.error ? (
+            <div
+              role="alert"
+              className="flex flex-1 flex-col items-center justify-center gap-3 bg-white"
+            >
+              <p>Inbound could not be opened</p>
+              <p>{q.error.message}</p>
+              <button
+                className="rounded-control border border-base-200 px-3 py-1.5 text-body"
+                onClick={() => void q.refetch()}
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <DataGrid<InboundArrival>
+              stickyIdentity={{ columnKey: "document" }}
+              key={params.get("q") === null ? "clear" : "search"}
+              appearance="reference"
+              rows={rows}
+              columns={columns}
+              rowKey={(r) => r.id}
+              rowTestId={(r) => `inbound-row-${r.id}`}
+              storageKey="carres.inbound.register.v2"
+              exportName="Inbound"
+              searchPlaceholder="Document, product, supplier or Unit ID…"
+              initialSearch={params.get("q") ?? ""}
+              onSearchChange={onSearch}
+              isLoading={q.isLoading}
+              groupBanner={false}
+              emptyMessage={empty}
+              rowStyle={(r) =>
+                activeSource === r.sourceId
+                  ? { background: blue.blue3 }
+                  : undefined
+              }
+              toolbarStart={
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:hidden"
+                    onClick={() => setShowFilters((v) => !v)}
+                    data-testid="inbound-toggle-filters"
+                  >
+                    <PanelLeftOpen size={14} /> Filters
+                  </button>
+                  {railHidden && (
+                    <button
+                      type="button"
+                      className="hidden h-7 items-center gap-1 rounded border border-kit-slate-5 bg-white px-2 text-meta text-base-600 hover:bg-hovertint md:inline-flex"
+                      onClick={() => setRailHidden(false)}
+                      data-testid="inbound-show-filters"
+                    >
+                      <PanelLeftClose size={14} /> Show filters
+                    </button>
+                  )}
+                  {!isNarrow && dateControls}
+                  {activeSource && (
+                    <span className="text-meta" data-testid="inbound-source-context">
+                      Document: {activeSource}
+                    </span>
+                  )}
+                </div>
+              }
+              expandTitle="Show every product and Unit"
+              expandable={{
+                trigger: { columnKey: "products" },
+                testId: (r) => `inbound-expand-${r.id}`,
+                renderExpansion: (r) => <InboundExpansion row={r} />,
+              }}
+              statusSummary={() => {
+                const from = page.total === 0 ? 0 : page.offset + 1;
+                const to = Math.min(page.offset + page.limit, page.total);
+                return (
+                  <span className="flex items-center gap-3">
+                    <span data-testid="inbound-page-range">
+                      Showing {from}–{to} of {page.total} arrangements
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="inbound-page-previous"
+                      disabled={page.offset === 0}
+                      onClick={() => setOffset(Math.max(0, offset - page.limit))}
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-9"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="inbound-page-next"
+                      disabled={to >= page.total}
+                      onClick={() => setOffset(offset + page.limit)}
+                      className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 disabled:text-kit-slate-9"
+                    >
+                      Next
+                    </button>
+                  </span>
+                );
+              }}
+            />
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The expansion: complete product data, exact Units with per-Unit results,
+ *  every posted receipt, and the ONE action door — read to decide, act in
+ *  Receiving. */
+function InboundExpansion({ row: r }: { row: InboundArrival }) {
+  return (
+    <div className="space-y-3 p-3 text-body">
+      {r.identitiesMissing && (
+        <p>
+          Unit IDs or Receiving results are not fully recorded. Open Receiving
+          Session to check the source.
+        </p>
+      )}
+      {r.products.length > 0 && (
+        <div>
+          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+            Products
+          </div>
+          {r.products.map((p) => (
+            <div key={p.sku ?? "no-sku"} className="flex flex-wrap gap-3">
+              <span>{p.name ?? p.sku ?? "Product not recorded"}</span>
+              {p.sku && <span className="font-mono text-base-500">{p.sku}</span>}
+              <span className="tabular-nums">
+                Expected {p.qty} · Received {p.received}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {r.units.length > 0 && (
+        <div>
+          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+            Units
+          </div>
+          {r.units.map((u) => (
+            <div key={u.id} className="flex flex-wrap gap-3">
+              <Link
+                className="font-mono text-kit-blue-11"
+                to={`/operation/stock/unit/${encodeURIComponent(u.code)}`}
+              >
+                {u.code}
+              </Link>
+              {u.product && <span className="text-base-600">{u.product}</span>}
+              <span>
+                {u.outcome === "received"
+                  ? "Received"
+                  : u.outcome === "received_with_issue"
+                    ? `Received with issue · ${u.issue === "wrong_item" ? "Wrong item" : "Damaged"}`
+                    : u.outcome === "unknown"
+                      ? "Receiving result not recorded"
+                      : "Not yet received"}
+              </span>
+              {u.receivedSite && u.receivedSite !== r.site && (
+                <span>Received at {u.receivedSite}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {r.sessions.length > 0 && (
+        <div>
+          <div className="mb-1 text-label font-semibold uppercase tracking-wide text-base-600">
+            Receiving records
+          </div>
+          {r.sessions.map((s) => (
+            <div key={s.id} className="flex flex-wrap gap-3">
+              <Link
+                className="font-mono text-kit-blue-11"
+                to={`/operation?${new URLSearchParams({ tab: "receiving", session: s.id })}`}
+              >
+                {s.grnNo ?? "Receipt"}
+              </Link>
+              {s.receivedAt && <span>Goods received on {fmtDate(s.receivedAt)}</span>}
+              {s.actualSite && <span>at {s.actualSite}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      <Link
+        className="inline-block text-kit-blue-11 hover:underline"
+        onClick={(event) => event.stopPropagation()}
+        to={receivingHref(r)}
+      >
+        Open Receiving Session
+      </Link>
     </div>
   );
 }

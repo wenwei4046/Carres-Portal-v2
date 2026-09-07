@@ -189,6 +189,7 @@ describe("GET /api/operation/delivery-orders/:id — the document", () => {
       { data: [ATTEMPT_ROW] }, // attempts
       { data: [] }, // loans
       { data: [] }, // handover events (0363)
+      { data: [] }, // handover evidence ledger (0440)
       { data: [{ sku: "JAGER-SS", variant: "Jager Super Single" }] },
     ]);
     const res = await call("/DO-180826-3035", "operation");
@@ -281,6 +282,61 @@ describe("POST /:id/handover — the §4 chain door (0363)", () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { message: string };
     expect(body.message).toContain("does not belong to this delivery order");
+  });
+
+  it("many evidence files ride one act, and each must belong to THIS document (0440)", async () => {
+    const bad = await (async () => {
+      mockSb([]);
+      return call(`/${DO_ID}/handover`, "operation", {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "handed_over",
+          receiverName: "Ahmad",
+          goods: [{ sku: "JAGER-SS", qty: 1 }],
+          evidence: [
+            { path: `handover/${DO_ID}/a.jpg`, kind: "photo" },
+            { path: "handover/other-document/b.mp4", kind: "video" },
+          ],
+          unitCodes: ["U1-260-019"],
+        }),
+      });
+    })();
+    expect(bad.status).toBe(422);
+
+    const { rpc } = mockSb(
+      [
+        {
+          data: {
+            id: DO_ID,
+            trip_groups: null,
+            orders: { order_lines: [{ sku: "JAGER-SS", qty: 2 }] },
+          },
+        },
+      ],
+      [{ data: { id: "ev9", kind: "handed_over", acceptedUnits: 1, requiredUnits: 2 } }],
+    );
+    const res = await call(`/${DO_ID}/handover`, "operation", {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "handed_over",
+        receiverName: "Ahmad",
+        evidence: [
+          { path: `handover/${DO_ID}/a.jpg`, kind: "photo" },
+          { path: `handover/${DO_ID}/b.mp4`, kind: "video" },
+        ],
+        unitCodes: ["U1-260-019"],
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith(
+      "delivery_handover_record",
+      expect.objectContaining({
+        p_evidence: [
+          { path: `handover/${DO_ID}/a.jpg`, kind: "photo" },
+          { path: `handover/${DO_ID}/b.mp4`, kind: "video" },
+        ],
+      }),
+    );
   });
 
   it("passes the batch's exact Unit IDs to the governed door (0424)", async () => {

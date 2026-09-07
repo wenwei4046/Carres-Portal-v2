@@ -59,6 +59,7 @@ import recentCostRouter from "./routes/operation/recent-cost";
 import stockAlertsRouter from "./routes/operation/stock-alerts";
 import thresholdsRouter from "./routes/operation/thresholds";
 import operationSuppliersRouter from "./routes/operation/suppliers";
+import arrivalSourcesRouter from "./routes/operation/arrival-sources";
 import operationWarehouseRouter from "./routes/operation/warehouse";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
 import salesOrderMaintenanceRouter from "./routes/operation/sales-order-maintenance";
@@ -236,6 +237,7 @@ api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
+api.route("/operation/arrival-sources", arrivalSourcesRouter);
 // 0174 — Sales Order Maintenance grid + shared column config.
 api.route("/operation/sales-order-maintenance", salesOrderMaintenanceRouter);
 api.route("/bd/accounts", bdAccountsRouter);

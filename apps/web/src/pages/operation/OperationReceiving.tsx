@@ -30,6 +30,7 @@ import {
 import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 
 /**
  * OperationReceiving — the ONE Receiving destination
@@ -113,6 +114,7 @@ export default function OperationReceiving() {
   const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
   const poId = params.get("po");
+  const arrivalId = params.get("arrival");
   const finding = params.get("find") === "1";
 
   const posQ = useOperationPos();
@@ -277,8 +279,9 @@ export default function OperationReceiving() {
         label: "PO/CO No",
         width: 150,
         sortable: true,
-        searchValue: (r) => r.po_id,
-        exportValue: (r) => r.po_id,
+        /* An arrival-source receipt has no PO — the cell stays honest-empty. */
+        searchValue: (r) => r.po_id ?? "",
+        exportValue: (r) => r.po_id ?? "",
         accessor: (r) => (
           <span className="font-mono text-meta text-base-900">{r.po_id}</span>
         ),
@@ -497,10 +500,11 @@ export default function OperationReceiving() {
     siteSel !== null ||
     expectedSel !== null;
 
-  const openObject = sessionId ?? poId ?? (finding ? "find" : null);
+  const openObject = arrivalId ?? sessionId ?? poId ?? (finding ? "find" : null);
 
   function openSession(id: string) {
     const next = new URLSearchParams(params);
+    next.delete("arrival");
     next.delete("po");
     next.delete("find");
     next.set("session", id);
@@ -508,6 +512,7 @@ export default function OperationReceiving() {
   }
   function closeObject() {
     const next = new URLSearchParams(params);
+    next.delete("arrival");
     next.delete("session");
     next.delete("po");
     next.delete("find");
@@ -521,7 +526,9 @@ export default function OperationReceiving() {
       {/* ── The open object takes the stage; the Register stays MOUNTED
              underneath (`invisible`, never display:none) so Back restores the
              complete listing state. ─────────────────────────────────────── */}
-      {sessionId ? (
+      {arrivalId ? (
+        <ArrivalSourceWorkspace receiving sourceId={arrivalId} />
+      ) : sessionId ? (
         <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
       ) : poId ? (
         <PoReceivingView

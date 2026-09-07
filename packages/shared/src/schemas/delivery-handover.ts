@@ -13,6 +13,30 @@ import { DELIVERY_PHOTO_MIMES, DELIVERY_PHOTO_MAX_BYTES } from "./ops-order-cont
  * document — they are deliberately absent here.
  */
 
+/** Evidence files per act (0440): several photos and videos, never one.
+ *  Images stay the 0280 photo family; videos match the Service-Case family.
+ *  The limits are DISPLAYED before the operator picks files. */
+export const HANDOVER_EVIDENCE_VIDEO_MIMES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+] as const;
+export const HANDOVER_EVIDENCE_MIMES = [
+  ...DELIVERY_PHOTO_MIMES,
+  ...HANDOVER_EVIDENCE_VIDEO_MIMES,
+] as const;
+export const HANDOVER_EVIDENCE_VIDEO_MAX_BYTES = 25 * 1024 * 1024; // 25 MiB
+export const HANDOVER_EVIDENCE_MAX_FILES = 20;
+
+/** One stored evidence file of one handover act. */
+export const handoverEvidenceFileSchema = z
+  .object({
+    path: z.string().min(1).max(500),
+    kind: z.enum(["photo", "video"]),
+  })
+  .strict();
+export type HandoverEvidenceFile = z.infer<typeof handoverEvidenceFileSchema>;
+
 export const DELIVERY_HANDOVER_KINDS = [
   "ready_for_handover",
   "handed_over",
@@ -37,8 +61,15 @@ export const recordHandoverInput = z
     /** The recorder's own goods count. Omitted = the document's derived lines. */
     goods: z.array(handoverGoodsLineSchema).max(200).optional(),
     note: z.string().trim().max(500).optional(),
-    /** Object key under handover/{delivery_order_id}/ — required for Handed Over. */
+    /** Object key under handover/{delivery_order_id}/ — legacy single proof.
+     *  A Handed Over needs this OR at least one `evidence` file. */
     proofPath: z.string().min(1).max(500).optional(),
+    /** 0440 — every evidence file of this act, photos and videos mixed.
+     *  New files append; the server refuses duplicates inside one act. */
+    evidence: z
+      .array(handoverEvidenceFileSchema)
+      .max(HANDOVER_EVIDENCE_MAX_FILES)
+      .optional(),
     /** Warehouse Card 03 — the exact Unit IDs this batch physically hands
      *  over. Required for `handed_over` on a DO with a recorded exact-Unit
      *  scope; the server refuses codes outside that scope and Units already
@@ -64,13 +95,24 @@ export const recordOutboundPrepInput = z
 export type RecordOutboundPrepInput = z.infer<typeof recordOutboundPrepInput>;
 
 /** POST /api/operation/delivery-orders/:id/handover-proof/sign-upload —
- *  same photo family as the delivery photo (0280): photos only, 10 MiB. */
+ *  photos (0280 family, 10 MiB) and videos (25 MiB) since 0440. */
 export const signHandoverProofUploadInput = z
   .object({
-    mimeType: z.enum(DELIVERY_PHOTO_MIMES),
-    sizeBytes: z.number().int().positive().max(DELIVERY_PHOTO_MAX_BYTES),
+    mimeType: z.enum(HANDOVER_EVIDENCE_MIMES),
+    sizeBytes: z.number().int().positive().max(HANDOVER_EVIDENCE_VIDEO_MAX_BYTES),
   })
-  .strict();
+  .strict()
+  .superRefine((v, c) => {
+    const isVideo = (HANDOVER_EVIDENCE_VIDEO_MIMES as readonly string[]).includes(
+      v.mimeType,
+    );
+    if (!isVideo && v.sizeBytes > DELIVERY_PHOTO_MAX_BYTES)
+      c.addIssue({
+        code: "custom",
+        path: ["sizeBytes"],
+        message: "A photo is at most 10 MB",
+      });
+  });
 export type SignHandoverProofUploadInput = z.infer<
   typeof signHandoverProofUploadInput
 >;

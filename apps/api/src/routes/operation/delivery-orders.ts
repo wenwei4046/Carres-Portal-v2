@@ -212,6 +212,43 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     }
   }
   const admin = adminClient(c.env);
+  // 0440 — every evidence file of every act, signed for viewing. Until the
+  // migration lands the table may not exist; absence reads as no files,
+  // never as a failure of the whole document.
+  const evidenceByEvent = new Map<
+    string,
+    Array<{ path: string; kind: string; recorded_at: string; url: string | null }>
+  >();
+  try {
+    const evidenceRes = await sb
+      .from("delivery_handover_evidence")
+      .select("event_id, path, kind, recorded_at")
+      .eq("delivery_order_id", (row as { id: string }).id)
+      .order("recorded_at", { ascending: true });
+    if (!evidenceRes.error && (evidenceRes.data ?? []).length > 0) {
+      const files = evidenceRes.data as Array<{
+        event_id: string;
+        path: string;
+        kind: string;
+        recorded_at: string;
+      }>;
+      const { data: signedFiles } = await admin.storage
+        .from("proof-of-delivery")
+        .createSignedUrls(files.map((f) => f.path), 3600);
+      files.forEach((f, i) => {
+        const list = evidenceByEvent.get(f.event_id) ?? [];
+        list.push({
+          path: f.path,
+          kind: f.kind,
+          recorded_at: f.recorded_at,
+          url: signedFiles?.[i]?.signedUrl ?? null,
+        });
+        evidenceByEvent.set(f.event_id, list);
+      });
+    }
+  } catch {
+    /* absent ledger = no files */
+  }
   const handoverEvents = await Promise.all(
     (eventsRes.data ?? []).map(async (e) => {
       let proofUrl: string | null = null;
@@ -225,6 +262,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
         ...e,
         recorded_by_name: recorderNames[e.recorded_by as string] ?? null,
         proofUrl,
+        evidence: evidenceByEvent.get(e.id as string) ?? [],
       };
     }),
   );
@@ -353,9 +391,13 @@ deliveryOrdersRouter.post("/:id/handover", async (c) => {
     );
   }
 
-  // Proof binds to the exact event it proves (§6): the path must sit under
+  // Proof binds to the exact event it proves (§6): every path must sit under
   // THIS document's own prefix — never another document's, never outside it.
-  if (parsed.data.proofPath && !parsed.data.proofPath.startsWith(`handover/${id}/`)) {
+  const evidencePaths = [
+    ...(parsed.data.proofPath ? [parsed.data.proofPath] : []),
+    ...(parsed.data.evidence ?? []).map((f) => f.path),
+  ];
+  if (evidencePaths.some((path) => !path.startsWith(`handover/${id}/`))) {
     return c.json(
       { error: "invalid_input", message: "Proof path does not belong to this delivery order" },
       422,
@@ -394,6 +436,7 @@ deliveryOrdersRouter.post("/:id/handover", async (c) => {
     p_note: parsed.data.note ?? null,
     p_proof_path: parsed.data.proofPath ?? null,
     p_unit_codes: parsed.data.unitCodes ?? null,
+    p_evidence: parsed.data.evidence ?? null,
   });
   if (error) {
     const m = mapPgError(error);
@@ -519,11 +562,14 @@ deliveryOrdersRouter.post(
     }
 
     const ext =
-      parsed.data.mimeType === "image/png"
-        ? "png"
-        : parsed.data.mimeType === "image/webp"
-          ? "webp"
-          : "jpg";
+      {
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/jpeg": "jpg",
+        "video/mp4": "mp4",
+        "video/quicktime": "mov",
+        "video/webm": "webm",
+      }[parsed.data.mimeType] ?? "jpg";
     const path = `handover/${id}/${crypto.randomUUID()}-handover.${ext}`;
     const admin = adminClient(c.env);
     const { data, error: signErr } = await admin.storage

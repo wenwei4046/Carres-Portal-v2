@@ -147,7 +147,7 @@ export default function OperationReceivingReport() {
     );
     const supplierByPo = new Map<string, string>();
     for (const r of receiptsQ.data?.receipts ?? []) {
-      if (r.supplier_name) supplierByPo.set(r.po_id, r.supplier_name);
+      if (r.po_id && r.supplier_name) supplierByPo.set(r.po_id, r.supplier_name);
     }
     return (posQ.data?.pos ?? [])
       .filter((p: operationPoListRow) => p.status === "open")

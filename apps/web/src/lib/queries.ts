@@ -4213,8 +4213,11 @@ export function useWarehouseSubmitReceiptMutation(
 /** The ops queue row: one filed count, with the names a human needs and the
  *  one sentence the shared module composes. */
 export interface WarehouseReceiptQueueRow {
+  arrival_source_id?: string | null;
   id: string;
-  po_id: string;
+  po_id: string | null;
+  source_no?: string | null;
+  source_party_name?: string | null;
   warehouse_id: string;
   warehouse_name: string | null;
   supplier_name: string | null;
@@ -4245,6 +4248,12 @@ export interface WarehouseReceiptQueueRow {
   posted_duty_cover_name?: string | null;
   posted_authority?: "grn_duty" | "cover" | "superuser" | null;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  /** 0440-era detail read: the same files, each with a signed VIEW url. */
+  arrival_evidence_files?: Array<{
+    path: string;
+    kind: "photo" | "video";
+    url: string | null;
+  }>;
   extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
   void_at?: string | null;
   void_by_name?: string | null;
@@ -8153,6 +8162,12 @@ export interface ReceivingSession {
   grn_no?: string | null;
   actual_site_id?: string | null;
   arrival_evidence?: Array<{ path: string; kind: "photo" | "video" }>;
+  /** 0440-era detail read: the same files, each with a signed VIEW url. */
+  arrival_evidence_files?: Array<{
+    path: string;
+    kind: "photo" | "video";
+    url: string | null;
+  }>;
   extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
   void_at?: string | null;
   void_reason?: string | null;

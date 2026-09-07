@@ -93,6 +93,14 @@ export default function SupplierClaimPanel({ claim }: { claim: SupplierClaimList
     <ClaimSection title="Carres Execution">
       <p>{claim.carres_execution ? carresExecutionLabel(claim.carres_execution) : absent}</p>
       {claim.carres_execution_note && <p>{claim.carres_execution_note}</p>}
+      {(claim.customer_resolution === "repair" || claim.customer_resolution === "replace") && (
+        <Link
+          className="inline-block text-kit-blue-11 underline"
+          to={`/operation?tab=arrival-source&kind=${claim.customer_resolution === "repair" ? "repair-return" : "supplier-replacement"}&claim=${encodeURIComponent(claim.id)}`}
+        >
+          {claim.customer_resolution === "repair" ? "Plan Repair" : "Plan Supplier replacement"}
+        </Link>
+      )}
       <p className="text-label font-normal text-base-600">Approved execution scope is not available.</p>
     </ClaimSection>
     <ClaimSection title="Item Outcome">

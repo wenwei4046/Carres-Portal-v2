@@ -2182,6 +2182,14 @@ missing/different.
 
 ### 9.7 Repair Orders
 
+**Local physical-chain implementation — 2026-09-07, not deployed:** an authorised Claim repair or
+replacement outcome can now open exact-Unit arrival source work, with recorded handover and return
+Receiving through the existing GRN/result ledger and GRN Duty. Repair preserves identity;
+replacement allocates a new Unit linked to the original. This does not complete the formal Repair
+Order/Purchase Return document target below. Database draft readiness and local evidence are
+recorded once in `docs/stock/MASTER.md` under Inbound local implementation.
+
+
 **Purpose / source:** send a specific Carres-owned Unit for approved supplier/repairer work; no blank
 `+ New`.
 **Left rail:** `PDF not sent`, `Handover out missing`, `Expected back date missing`, `Expected back date passed`, `Return inspection missing`, `Closed`.

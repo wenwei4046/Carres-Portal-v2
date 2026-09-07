@@ -207,7 +207,9 @@ other leg.
 
 **DELIVERY-TO-OUTBOUND RECONCILIATION — owner-approved 2026-09-01.** The DO owns the exact required
 goods scope; Warehouse Outbound reads that scope and does not re-create it. For each DO and each
-separate journey leg, the shared read-only tally prints `Required · Handed over · Not handed over`
+separate journey leg, the shared read-only tally prints `Required · Loaded · Not loaded ·
+Driver confirmed` (the 2026-09-06 `Loaded` copy ruling plus the unified card 2026-09-07: the
+Logistics side's own per-Unit receipt is the fourth number, never merged into the loading count)
 and drills to the same Unit IDs. A partial handover changes only the scanned Units: handed-over
 Units move to the evidence-backed journey holder; Units not handed over remain with their last
 confirmed holder and retain the original dated Warehouse work.

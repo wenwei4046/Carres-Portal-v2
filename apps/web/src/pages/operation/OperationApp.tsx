@@ -82,6 +82,7 @@ import OperationOpsRepair from "./OperationOpsRepair";
 import OperationOpsInventory from "./OperationOpsInventory";
 import WarehouseStockRegister from "./WarehouseStockRegister";
 import WarehouseWorkspace from "./WarehouseWorkspace";
+import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 import WarehouseInbound from "./WarehouseInbound";
 import WarehouseOutboundWork from "./WarehouseOutboundWork";
 import WarehouseUnitDetail from "./WarehouseUnitDetail";
@@ -566,6 +567,9 @@ export default function OperationApp() {
             {tab === "warehouse-monitor" && <WarehouseWorkspace />}
             {tab === "warehouse-inbound" && <WarehouseInbound />}
             {tab === "warehouse-outbound" && <WarehouseOutboundWork />}
+            {/* Non-PO inbound source object. Inbound owns the register; this
+                hidden destination owns creating and reviewing one source. */}
+            {tab === "arrival-source" && <ArrivalSourceWorkspace />}
             {/* K2 — Ready stock: the monthly propose → approve plan. */}
             {tab === "stock-plan" && <OperationStockPlan />}
             {tab === "stock" && <OperationStock />}

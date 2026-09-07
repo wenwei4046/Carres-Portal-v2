@@ -1396,6 +1396,19 @@ counters above the table; the 32px status footer carries the summary.
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
 
+**WAREHOUSE INBOUND / OUTBOUND — OWNER-APPROVED 2026-09-06, unified 2026-09-07.** Warehouse
+navigation is `Monitor · Inbound · Inventory · Outbound`. Monitor alone is the Calendar-summary
+page. Inbound AND Outbound use the shared 240px page-specific Filter Rail + remaining-width
+Register in one row grammar (stock MASTER §7); no six-working-day strip, Calendar cards or
+35%/65% composition. A compact date/range control is a filter only. Status, document type, Site
+and search filter one shared scope — the rail counts, the rows, the footer and the export can
+never describe different ranges. Exact Monitor deep links preserve date, Site ID and document
+scope. Two engine capabilities exist for this grammar and are opt-in per column/page:
+`wrap: true` (a completeness column wraps and the row grows — Product, Exceptions) and
+`expandable.trigger` (a named data column is the ONE expansion entry — its arrow and content
+are one button; no second expand control). Every other register keeps the single-line,
+gutter-chevron contract byte-identical.
+
 **APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
 fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.
 
