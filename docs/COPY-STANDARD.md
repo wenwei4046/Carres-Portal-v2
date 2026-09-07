@@ -606,6 +606,7 @@ do not create a second business status, work queue or source of truth.
 | RECEIVE pages | `Receiving` |
 | PROBLEMS pages | `Supplier Claims` · `Purchase Returns` · `Repair Orders` |
 | SHOWROOM pages | `Display Requests` · `Consignment Orders` · `Consignment Returns` · `Consignment Sale Notices` |
+| Showroom physical-work Duty — owner-approved 2026-09-07 | `Showroom Duty`; Site scope and owner/cover are structured context, never a person's name inside the action sentence. Assignment authority: `workspace/MASTER.md` §4. |
 
 Purchasing has no Home, module-specific Work, Purchase Demands, New Supplier/New SKU request,
 Consignment Overview, Consignment Receipts, Report or Settings sidebar destination. The capability

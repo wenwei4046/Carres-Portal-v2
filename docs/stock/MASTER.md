@@ -121,10 +121,11 @@ page or integration maintains another available quantity.
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
 
-Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
+Successful customer sale delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
 event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
 consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
-refused delivery emits no sale event.
+refused delivery emits no sale event. Temporary loan handover emits no sale event; the approved
+sale/loan scope distinction is governed by Delivery and Purchasing §7.7.
 
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
@@ -1242,6 +1243,19 @@ Outbound owns supplier/repair handover; Finance owns refund, Credit Note, write-
 supplier settlement.
 
 ### 12.9 Showroom Stock and Supplier Consignment
+
+**Showroom completion — OWNER-APPROVED 2026-09-07.** Commercial display request, permission,
+documents and exceptions live in `purchasing/MASTER.md` §§7.5–7.7 and 9.8–9.12. The Site-scoped
+Showroom Duty and cover rule lives once in `workspace/MASTER.md` §4; Stock supplies its exact-Unit
+arrival/departure, Count, condition-check and required evidence actions. Use existing Inbound,
+Inventory and Outbound surfaces and shared Work, not a showroom stock editor or separate queue.
+Routine Counts follow configured Stock cycle/month-end rules. Condition checks occur at arrival,
+before departure and after loan/repair return; periodic checks follow governed Stock settings.
+A loan makes the exact Unit unavailable for another sale/loan. Return inspection determines its
+approved next use; collection alone never restores availability. Sales Orders owns the loan
+obligation and Purchasing owns supplier permission. Inventory shows actual current physical goods;
+outstanding loan reports read the same Unit history and Sales Order obligation, never count a
+customer-held loan sofa as physically at the showroom.
 
 **CURRENT CARRES →** display sofas can live in staff memory, a supplier list or separate showroom
 sheet; Carres-owned, Consignment, sold-awaiting-Delivery and repair/change/collection goods may be
