@@ -70,6 +70,30 @@ const scRouter = new Hono<AppEnv>();
 const CASE_SELECT =
   "*, service_case_types(label), service_case_statuses(label,is_closed), orders(so), suppliers(name)";
 
+/** Candidate incident identities, never an automatic same-Unit merge. */
+scRouter.get("/unit-problems", requireOperationOrPrincipal, async (c) => {
+  const parsed = z.object({ unitCode: z.string().trim().min(1).max(100), issueType: z.string().min(1), productCategory: z.string().min(1) }).safeParse(c.req.query());
+  if (!parsed.success) throw new HTTPException(400, { message: "Record the Unit and product problem." });
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const cases = [];
+  for (let from = 0; ; from += 200) {
+    const { data, error } = await sb.from("service_case_units")
+      .select("case_id, service_cases!inner(case_no, opened_at, what_happened, product_category, service_case_statuses(is_closed))")
+      .eq("unit_code", parsed.data.unitCode).eq("issue_type", parsed.data.issueType)
+      .eq("service_cases.product_category", parsed.data.productCategory)
+      .order("added_at", { ascending: false }).range(from, from + 199);
+    if (error) { const mapped = mapPgError(error); return c.json(mapped.body, mapped.status); }
+    for (const row of data ?? []) {
+      const value = row.service_cases;
+      const sc = (Array.isArray(value) ? value[0] : value) as unknown as { case_no: string; opened_at: string; what_happened: string | null; service_case_statuses: { is_closed: boolean } | null };
+      if (sc) cases.push({ id: row.case_id, caseNo: sc.case_no, openedAt: sc.opened_at,
+        whatHappened: sc.what_happened, statusIsClosed: sc.service_case_statuses?.is_closed ?? false });
+    }
+    if ((data?.length ?? 0) < 200) break;
+  }
+  return c.json({ cases });
+});
+
 /** Case-owned source-search facts; central Work only projects this read. */
 scRouter.get("/source-search", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -441,23 +465,22 @@ scRouter.get("/", requireOperationOrPrincipal, async (c) => {
   // discarding it in the browser.
   const orderId = (c.req.query("orderId") ?? "").trim();
 
-  let q = sb
-    .from("service_cases")
-    .select(CASE_SELECT)
-    .order("opened_at", { ascending: false })
-    .order("case_no",   { ascending: false });
+  const rows: ReturnType<typeof shapeCase>[] = [];
+  for (let from = 0; ; from += 200) {
+    let q = sb.from("service_cases").select(CASE_SELECT)
+      .order("opened_at", { ascending: false }).order("case_no", { ascending: false })
+      .range(from, from + 199);
+    if (orderId) q = q.eq("order_id", orderId);
+    const { data, error } = await q;
+    if (error) throw new HTTPException(500, { message: error.message });
+    rows.push(...(data ?? []).map(shapeCase));
+    if ((data?.length ?? 0) < 200) break;
+  }
+  let filtered = rows;
+  if (state === "closed")  filtered = rows.filter((r) => r.statusIsClosed);
+  if (state === "ongoing") filtered = rows.filter((r) => !r.statusIsClosed);
 
-  if (orderId) q = q.eq("order_id", orderId);
-
-  const { data, error } = await q;
-
-  if (error) throw new HTTPException(500, { message: error.message });
-
-  let rows = (data ?? []).map(shapeCase);
-  if (state === "closed")  rows = rows.filter((r) => r.statusIsClosed);
-  if (state === "ongoing") rows = rows.filter((r) => !r.statusIsClosed);
-
-  return c.json({ items: rows, total: rows.length });
+  return c.json({ items: filtered, total: filtered.length });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -534,6 +557,7 @@ scRouter.post("/", requireOperationOrPrincipal, async (c) => {
         // or preserves the label for Purchasing source search — never a guess.
         ...(parsed.unitCode ? { unit_code: parsed.unitCode } : {}),
         ...(parsed.receivingUnitResultId ? { receiving_unit_result_id: parsed.receivingUnitResultId } : {}),
+        ...(parsed.existingCaseId ? { existing_case_id: parsed.existingCaseId } : {}),
         evidence,
       },
     });

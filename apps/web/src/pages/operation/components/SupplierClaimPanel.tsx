@@ -1,7 +1,7 @@
 // design-standard: not-a-list-page — full-width Claim object content.
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   carresExecutionLabel, customerResolutionLabel, heldUnitsLine,
   supplierClaimRequestLabel, supplierClaimResponseLabel, supplierClaimTypeLabel,
@@ -22,7 +22,8 @@ const absent = "Not recorded";
 
 function ClaimCaseLink({ claim }: { claim: SupplierClaimListRow }) {
   const [editing, setEditing] = useState(false);
-  const [caseId, setCaseId] = useState("");
+  const [params] = useSearchParams();
+  const [caseId, setCaseId] = useState(params.get("caseToLink") ?? "");
   const qc = useQueryClient();
   const cases = useQuery<ServiceCaseListResponse>({
     queryKey: ["ops", "service-cases", "claim-link"],
@@ -33,7 +34,7 @@ function ClaimCaseLink({ claim }: { claim: SupplierClaimListRow }) {
     mutationFn: () => apiFetch(`/api/ops/service-cases/${caseId}/supplier-claims`, {
       method: "POST", body: JSON.stringify({ claimId: claim.id }),
     }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }); setEditing(false); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["operation", "supplier-claims"] }); void qc.invalidateQueries({ queryKey: ["ops", "service-cases"] }); setEditing(false); },
   });
   const candidates = (cases.data?.items ?? []).filter((row) => row.issueType === claim.claim_type && row.productCategory === claim.product_category && (!row.productSku || row.productSku === claim.sku));
   if (claim.case_id) return <Link className="text-kit-blue-11 underline" to={`/operation?tab=service-notes&case=${encodeURIComponent(claim.case_id)}`}>Open Case</Link>;
@@ -47,7 +48,7 @@ function ClaimCaseLink({ claim }: { claim: SupplierClaimListRow }) {
       {cases.isSuccess && candidates.length === 0 && <p>No matching Cases.</p>}
       {cases.isError && <p role="alert">Cases could not be loaded.</p>}
       {link.isError && <p role="alert">{link.error.message}</p>}
-      <div className="flex flex-wrap items-center gap-2"><Button variant="neutral" disabled={!caseId || link.isPending} onClick={() => link.mutate()}>Link Case</Button>
+      <div className="flex flex-wrap items-center gap-2"><Button variant="neutral" disabled={!candidates.some((row) => row.id === caseId) || link.isPending} onClick={() => link.mutate()}>Link Case</Button>
       <Button variant="neutral" disabled={link.isPending} onClick={() => setEditing(false)}>Cancel</Button>
       <Link className="text-kit-blue-11 underline" to="/operation?tab=service-notes">Open Cases</Link>
       </div>

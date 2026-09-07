@@ -359,10 +359,14 @@ const serviceCaseInputFields = z.object({
    */
   unitCode:        z.string().trim().optional(),
   receivingUnitResultId: z.string().uuid().optional(),
+  existingCaseId: z.string().uuid().optional(),
 });
 export const createServiceCaseInputSchema = serviceCaseInputFields.superRefine((value, ctx) => {
   if (value.customerImpact !== "stock_only" && !value.customerName) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customerName"], message: "Customer name is required." });
+  }
+  if (value.existingCaseId && (value.customerImpact !== "stock_only" || !value.unitCode)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["existingCaseId"], message: "Select the Unit before selecting its Case." });
   }
   if (value.customerImpact === "stock_only") {
     if (value.orderId || value.orderLineId || value.customerName || value.customerPhone || value.customerAddress || value.customerWants?.length || value.usable || value.reportedBy === "customer") {
@@ -383,7 +387,7 @@ export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema
  */
 export const updateServiceCaseInputSchema = serviceCaseInputFields
   .extend({ customerName: z.string().trim().min(1) })
-  .omit({ evidence: true, draftId: true, customerImpact: true, unitCode: true, receivingUnitResultId: true })
+  .omit({ evidence: true, draftId: true, customerImpact: true, unitCode: true, receivingUnitResultId: true, existingCaseId: true })
   .partial();
 export type UpdateServiceCaseInput = z.infer<typeof updateServiceCaseInputSchema>;
 

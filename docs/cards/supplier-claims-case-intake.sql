@@ -138,6 +138,7 @@ declare
   v_fingerprint text := md5(p_payload::text);
   v_unit_label text := nullif(btrim(coalesce(p_payload->>'unit_code', '')), '');
   v_occurrence uuid := nullif(p_payload->>'receiving_unit_result_id', '')::uuid;
+  v_existing_case uuid := nullif(p_payload->>'existing_case_id', '')::uuid;
   v_unit_id uuid;
   v_unit_sku text;
   v_unit_code text;
@@ -191,6 +192,22 @@ begin
     end if;
   end if;
 
+  -- An explicit choice is the reporter's same-incident assertion. Unit identity
+  -- alone never chooses an old Case; verify all selected facts before appending.
+  if v_existing_case is not null then
+    if v_unit_id is null or not exists (
+      select 1 from public.service_case_units u
+      join public.service_cases sc on sc.id = u.case_id
+      where u.case_id = v_existing_case and u.stock_item_id = v_unit_id
+        and u.issue_type = p_payload->>'issue_type'
+        and sc.product_category = p_payload->>'product_category'
+    ) or (v_case_id is not null and v_case_id <> v_existing_case) then
+      raise exception 'The selected Case does not match this Unit and problem' using errcode = '22023';
+    end if;
+    perform 1 from public.service_cases where id = v_existing_case for update;
+    v_case_id := v_existing_case;
+  end if;
+
   if v_occurrence is not null and v_case_id is null then
     raise exception 'Open the verified source Case before adding this report' using errcode = '22023';
   end if;
@@ -217,7 +234,7 @@ begin
     evidence, created_by, intake_fingerprint, customer_wants, source_unit_label
   ) values (
     p_report_id, v_number, 'stock_only', '', p_payload->>'reported_by',
-    p_payload->>'product_sku', p_payload->>'product_category',
+    coalesce(nullif(p_payload->>'product_sku', ''), v_unit_sku), p_payload->>'product_category',
     p_payload->>'issue_type', p_payload->>'what_happened',
     v_evidence, auth.uid(), v_fingerprint, '{}'::text[],
     case when v_unit_id is null then v_unit_label else null end
@@ -288,13 +305,26 @@ begin
   -- The selected Case is a human same-incident assertion. Verify its exact
   -- Units where already known; never let a same-SKU claim repoint them.
   if exists (select 1 from public.service_case_units where case_id = p_case_id)
-    and not exists (
-      select 1 from public.service_case_units u
-      join public.ops_stock_items i on i.id = u.stock_item_id
-      where u.case_id = p_case_id and i.hold_claim_id = p_claim_id
-    ) then
+    and (not exists (select 1 from public.ops_stock_items where hold_claim_id = p_claim_id)
+      or exists (
+        select 1 from public.ops_stock_items i where i.hold_claim_id = p_claim_id
+          and not exists (select 1 from public.service_case_units u
+            where u.case_id = p_case_id and u.stock_item_id = i.id)
+      )) then
     raise exception 'The Case and Claim refer to different Units' using errcode = '22023';
   end if;
+  -- Snapshot the verified physical scope before holds can be released. A
+  -- source-free report gains identity here; a known Case cannot gain foreign Units.
+  insert into public.service_case_units
+    (case_id, stock_item_id, unit_code, claim_id, receiving_unit_result_id, issue_type, added_by)
+  select p_case_id, i.id, i.unit_code, p_claim_id, r.id, v_claim.claim_type, v_actor
+    from public.ops_stock_items i
+    left join public.receiving_unit_results r on r.stock_item_id = i.id
+      and r.receipt_id = v_claim.warehouse_receipt_id
+    where i.hold_claim_id = p_claim_id
+  on conflict (case_id, stock_item_id) do update
+    set claim_id = coalesce(service_case_units.claim_id, excluded.claim_id),
+        receiving_unit_result_id = coalesce(service_case_units.receiving_unit_result_id, excluded.receiving_unit_result_id);
   update public.supplier_claims set case_id = p_case_id,
     case_link_evidence = jsonb_build_object('at', now(), 'actor', v_actor, 'duty', v_duty)
     where id = p_claim_id;
@@ -355,7 +385,13 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object(
              'slot', 'receiving_photo', 'path', p->>'path',
              'kind', case when lower(p->>'path') ~ '\.(mp4|mov)$' then 'video' else 'photo' end,
-             'at', p->>'at', 'by', p->>'by', 'bucket', 'delivery-orders')), '[]'::jsonb)
+             'at', p->>'at', 'by', p->>'by',
+             -- Current Receiving photos are stamped in this same transaction.
+             -- Preserve a recorded role, or stamp the known current actor only;
+             -- never guess the historical role of another uploader.
+             'by_role', coalesce(p->>'by_role', case when p->>'by' = auth.uid()::text
+               then auth.jwt()->'app_metadata'->>'role' end, 'not_recorded'),
+             'bucket', 'delivery-orders')), '[]'::jsonb)
       into v_evidence
       from jsonb_array_elements(coalesce(v_claim.photos, '[]'::jsonb)) p;
 

@@ -2129,7 +2129,7 @@ full-width object and return. Workflow success and the authenticated checks in t
 the production evidence; a local fixture is never production proof.
 
 The Case-linked intake/Receiving scope is being prepared in `codex/claims-case-delivery`.
-It is **BUILD / NOT DEPLOYED** and depends on the unnumbered reviewed SQL proposal
+It is **BUILD / NOT DEPLOYED** and depends on the unnumbered SQL draft awaiting review
 `docs/cards/supplier-claims-case-intake.sql`. Matching now requires the actual Receiving
 occurrence, exact Unit and problem; a Unit label without occurrence proof does not merge
 later faults into an open Case. Receiving captures the exact Claim-held Units in the
@@ -2138,6 +2138,12 @@ work is projected by the central server Work feed, using current shared PO Duty/
 The SQL contract tests include the open-earlier/later-fault regression, foreign occurrence,
 same-SKU unrelated Unit, authenticated RPC/direct-write denial and hold-release evidence.
 A negative control restoring Unit/problem-only matching fails the later-fault assertion.
+The resumed build also tests explicit existing-Case selection, keeps New Case as the default
+for later faults, refuses partial Unit overlap during manual linking, and snapshots verified
+Units before hold release. Receiving evidence now satisfies the actual 0289 evidence
+constraint, including reporter-role metadata; absent historical role is recorded as
+`not_recorded`, never guessed. The original draft fails that real constraint in a negative
+control. The test fixture also replays the actual 0285 intake enums.
 These are isolated PostgreSQL checks, not production-schema or live-data proof. Migration
 approval, production assertions, exact-file apply, full release checks and authenticated
 production verification remain required. No schema change or Case write control has yet

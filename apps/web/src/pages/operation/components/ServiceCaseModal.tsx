@@ -376,6 +376,10 @@ export default function ServiceCaseModal({
               <Link className="text-kit-blue-11 underline" to={`/operation?tab=claims&claim=${encodeURIComponent(claim.id)}`}>{claim.claim_no}</Link>
               {` · ${claim.sku} · ${claim.qty}`}
             </p>)}
+            {claimsQ.isSuccess && claimsQ.data.claims.length === 0 && <Link
+              className="text-kit-blue-11 underline"
+              to={`/operation?tab=claims&caseToLink=${encodeURIComponent(id ?? "")}`}
+              onClick={onClose}>Open Supplier Claims</Link>}
           </div>}
 
           {/* S2 — the evidence the case was filed with, each file naming who

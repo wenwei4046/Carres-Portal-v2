@@ -28,6 +28,8 @@ import {
   type CaseWantKey,
   type ServiceCaseConfig,
 } from "@carres/shared";
+import Select from "@/components/kit/Select";
+import Button from "@/components/kit/Button";
 import CaseEvidenceChecklist from "./CaseEvidenceChecklist";
 import type { UploadedEvidence } from "@/lib/case-evidence-upload";
 
@@ -94,10 +96,11 @@ export default function ServiceCaseWizard({
   const [noOrder, setNoOrder]               = useState(false);
   const [stockOnly, setStockOnly] = useState(false);
   /** The REAL Unit label on the item, stock-only path. The server resolves it
-   *  against the Unit register: a resolved Unit joins the same open Case for
-   *  that Unit + problem; an unresolved label is saved as the reporter's fact
+   *  against the Unit register: the reporter may explicitly select an existing
+   *  incident for that Unit + problem; an unresolved label is saved as the reporter's fact
    *  and Purchasing searches for the source. Never a guessed source. */
   const [unitLabel, setUnitLabel] = useState("");
+  const [existingCaseId, setExistingCaseId] = useState("");
 
   const [note, setNote] = useState("");
 
@@ -129,6 +132,13 @@ export default function ServiceCaseWizard({
   const category: CaseProductCategory | null = line
     ? caseProductCategory(line.sku)
     : manualCategory;
+
+  const checkExisting = stockOnly && step === 6 && Boolean(unitLabel.trim()) && Boolean(issueType) && Boolean(category);
+  const existingCases = useQuery<{ cases: { id: string; caseNo: string; openedAt: string; whatHappened: string | null; statusIsClosed: boolean }[] }>({
+    queryKey: ["ops", "service-cases", "unit-problems", unitLabel.trim(), issueType, category],
+    queryFn: () => apiFetch(`/api/ops/service-cases/unit-problems?${new URLSearchParams({ unitCode: unitLabel.trim(), issueType: issueType!, productCategory: category! })}`),
+    enabled: checkExisting,
+  });
 
   const priority = casePriorityFor(usable);
 
@@ -205,6 +215,7 @@ export default function ServiceCaseWizard({
 
         // The Unit label the reporter actually read, stock-only path.
         ...(stockOnly && unitLabel.trim() ? { unitCode: unitLabel.trim() } : {}),
+        ...(stockOnly && existingCaseId ? { existingCaseId } : {}),
       };
       return apiFetch<{ id: string; caseNo?: string; matchedExisting?: boolean }>(
         "/api/ops/service-cases",
@@ -212,8 +223,7 @@ export default function ServiceCaseWizard({
       );
     },
     onSuccess: (saved) => {
-      // §9.5 duplicate matching: the same Unit with the same problem is ONE
-      // incident. Say so — the reporter must know their photos were added to
+      // §9.5: an explicitly verified existing incident receives this report. Say so — the reporter must know their photos were added to
       // the existing Case, not filed as a second one.
       if (saved?.matchedExisting && saved.caseNo) {
         toast.success(`This problem is already reported. Your photos were added to Case ${saved.caseNo}.`);
@@ -235,6 +245,7 @@ export default function ServiceCaseWizard({
     4: !!usable,
     5: wants.length > 0,
     6:
+      (!checkExisting || existingCases.isSuccess) &&
       caseIntakeComplete(answers) &&
       (stockOnly || customerName.length > 0) &&
       caseEvidenceComplete(issueType, reportedBy, evidence),
@@ -252,6 +263,7 @@ export default function ServiceCaseWizard({
     setLineId(id);
     if (cat !== undefined) setManualCategory(cat);
     setIssueType(null);
+    setExistingCaseId("");
   }
 
   return (
@@ -271,7 +283,7 @@ export default function ServiceCaseWizard({
                   <ArrowLeft size={18} />
                 </button>
               )}
-              <h2 className="text-strong text-base-900">New Case</h2>
+              <h2 className="text-strong text-base-900">{existingCaseId ? "Add evidence" : "New Case"}</h2>
             </div>
             <button type="button" onClick={onClose} className="text-base-400 hover:text-base-700" aria-label="Close">
               <X size={18} />
@@ -428,7 +440,7 @@ export default function ServiceCaseWizard({
                     <input
                       id="sc-unit-label"
                       value={unitLabel}
-                      onChange={(e) => setUnitLabel(e.target.value)}
+                      onChange={(e) => { setUnitLabel(e.target.value); setExistingCaseId(""); }}
                       placeholder="id-abc123456"
                       className="mt-1.5 w-full rounded border border-base-300 px-2.5 py-1.5 text-body"
                     />
@@ -454,7 +466,7 @@ export default function ServiceCaseWizard({
                     key={i.key}
                     label={i.label}
                     selected={issueType === i.key}
-                    onClick={() => { setIssueType(i.key); setStep(stockOnly ? 6 : 4); }}
+                    onClick={() => { setIssueType(i.key); setExistingCaseId(""); setStep(stockOnly ? 6 : 4); }}
                   />
                 ))}
               </div>
@@ -533,6 +545,18 @@ export default function ServiceCaseWizard({
           {/* ── 6 · the evidence + confirm ───────────────────────────────── */}
           {step === 6 && (
             <div className="space-y-4">
+              {checkExisting && <div className="space-y-2">
+                {existingCases.isPending ? <p>Loading Cases…</p> : existingCases.isError ? <div role="alert">
+                  <p>Cases could not be loaded.</p><Button variant="neutral" onClick={() => void existingCases.refetch()}>Try again</Button>
+                </div> : (existingCases.data?.cases?.length ?? 0) > 0 ? <>
+                  <p>Select the existing Case only if this is the same problem. For a later problem, keep New Case.</p>
+                  <Select id="sc-existing-case" label="Case" value={existingCaseId || "new"}
+                    onValueChange={(value) => setExistingCaseId(value === "new" ? "" : value)}
+                    options={[{ value: "new", label: "New Case" }, ...(existingCases.data?.cases ?? []).map((item) => ({
+                      value: item.id, label: `${item.caseNo} · ${item.openedAt} · ${item.statusIsClosed ? "Closed" : "Open"} · ${item.whatHappened || "Not recorded"}`,
+                    }))]} />
+                </> : null}
+              </div>}
               <p className="text-meta text-base-500">
                 A case cannot be opened without these. Take them now, while you have the item.
               </p>
@@ -621,7 +645,7 @@ export default function ServiceCaseWizard({
               disabled={!canAdvance[LAST_STEP] || saveMut.isPending}
               className="btn-hero py-1.5 text-body disabled:opacity-40"
             >
-              {saveMut.isPending ? "Saving…" : "Create Case"}
+              {saveMut.isPending ? "Saving…" : existingCaseId ? "Add evidence" : "Create Case"}
             </button>
           )}
         </div>

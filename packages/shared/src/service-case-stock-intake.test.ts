@@ -35,6 +35,13 @@ describe("product-only Case intake", () => {
   it("does not let a generic edit change customer impact", () => {
     expect(updateServiceCaseInputSchema.parse({ customerImpact: "stock_only" })).not.toHaveProperty("customerImpact");
   });
+  it("requires a Unit and stock-only intake for explicit incident selection", () => {
+    const selected = { ...report, existingCaseId: report.draftId };
+    expect(createServiceCaseInputSchema.safeParse(selected).success).toBe(false);
+    expect(createServiceCaseInputSchema.safeParse({ ...selected, unitCode: "id-aaa000001" }).success).toBe(true);
+    expect(createServiceCaseInputSchema.safeParse({ ...selected, unitCode: "id-aaa000001", customerImpact: "customer", customerName: "Lee" }).success).toBe(false);
+    expect(updateServiceCaseInputSchema.parse(selected)).not.toHaveProperty("existingCaseId");
+  });
   it("does not invent a customer deadline for an old stock report", () => {
     const result = computeCaseNumbers({ todayIso: "2026-09-06", period: null, cases: [{
       id: report.draftId, caseNo: "SC2608-01", customerImpact: "stock_only",

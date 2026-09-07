@@ -8,9 +8,12 @@ Authority: Purchasing MASTER §9.5 and its first READY scope; UI MASTER; Workspa
 
 One stock-only Case intake without fake customer answers; retry-stable report identity;
 Receiving links exact Claim-held Units and permanent receiving result identities atomically.
-Only a verified occurrence + Unit + problem matches an existing Case. A new fault without
-that source proof stays distinct even while an older Case remains open. Hold release does
-not delete incident history. Photos reference original storage and attribution.
+Only a verified occurrence + Unit + problem automatically matches an existing Case. Staff
+may explicitly select a matching existing Case to add evidence. New Case remains the default
+for a later fault, which stays distinct even while an older Case remains open. Hold release does
+not delete incident history. Photos reference original storage and attribution, including
+the real evidence format constraint. Manual links reject partial overlap across multiple
+Units and retain the verified Unit identities after holds end.
 
 The Case/Claim doors use shared components and preserve the deployed factual Register.
 Current source-search Work is projected on the server through the one shared Work feed;
