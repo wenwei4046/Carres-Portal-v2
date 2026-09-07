@@ -52,9 +52,9 @@ function row(over: Partial<InvoiceRegisterRow> & {
     void_reason: over.void_reason ?? null,
     replaces_invoice_id: null,
     created_at: "2026-09-06T00:00:00Z",
-    order_id: "o1",
+    order_id: over.order_id ?? "o1",
     orders: {
-      id: "o1", so: 1300, customer_name: "LIM KUAN YANG",
+      id: over.order_id ?? "o1", so: over.order_id === "o2" ? 1301 : 1300, customer_name: "LIM KUAN YANG",
       status: "proceed_order", paid: over.paid ?? 0,
       delivery_date: over.delivery_date ?? null, delivery_date_tbd: false, delivered_at: null,
       ops_assigned_logistic: null,
@@ -77,8 +77,9 @@ beforeEach(() => {
   state.data = [
     // Goods not ready, no arrival — the wait rule holds even with a date.
     row({ id: "i1", paid: 400, delivery_date: iso(14) }),
-    // Issued and ready with a future delivery — a due deadline.
-    row({ id: "i2", invoice_no: "INV-060926-0001", status: "issued", issued_at: "2026-09-06",
+    // Issued and ready with a future delivery — a due deadline. Its OWN SO,
+    // so the footer proves the per-SO sum, not a per-row double count.
+    row({ id: "i2", order_id: "o2", invoice_no: "INV-060926-0001", status: "issued", issued_at: "2026-09-06",
       delivery_date: iso(14), control: { line_stock_status: { A: "ready" } } }),
     // Voided keeps its number and mark.
     row({ id: "i3", invoice_no: "INV-050926-0002", status: "voided", issued_at: "2026-09-05",
@@ -120,7 +121,8 @@ describe("Invoices Register", () => {
   });
   it("sums only live invoices in the footer", () => {
     show();
-    // i1 owes 600 (1000−400), i2 owes 1000, the voided row is excluded.
+    // SO-1300 owes 600 (1000−400), SO-1301 owes 1000; the voided row shares
+    // SO-1300 and must not add it AGAIN — each SO counts exactly once.
     expect(screen.getByTestId("invoice-register-summary"))
       .toHaveTextContent("3 invoices · RM 1,600.00 still needed");
   });

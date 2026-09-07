@@ -1945,19 +1945,30 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 50px destination header, governed toolbar, 240px factual rail, 36/38/32 table grammar and tokens.
 These values reuse the shared authority; this Blueprint reuses existing kit components.
 
-**APPROVED — register defaults:** Claim No. (or Not issued), Reported, Supplier, Source, Product,
-Affected Qty, Problem, Supplier Response and Claim status. Product uses human description with
-SKU as supporting evidence; source links Case/PO/GRN. One row is one supplier workstream, never one
-row per photo or Work action. Freeze identity/supplier when horizontal scroll is needed. Wider
-detail/reference fields are optional Columns: Units, Requested Result, Customer Resolution,
-Carres Execution, Item Outcome, Reply expected, Collection date, Expected back, Credit expected,
-Claim Version and Sent to Supplier. Only relevant date facts appear; no generic workflow field.
-Unknown optional facts are not promoted to permanent empty columns; measure before final layout.
+**APPROVED — register defaults (owner correction 2026-09-07):** Opening Supplier Claims
+shows all permitted new and historical claims, including closed claims, newest report first.
+There is no View selector and no setup step before records appear. Search and factual filters
+are optional, start clear on normal entry, and clearing them restores the whole permitted set.
+The useful default columns are Supplier Claim No.,
+Reported, Supplier, PO No, GRN No., Product, Variant, Qty, Problem, Supplier Response and Claim
+status. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
+reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
+product name. SKU and Supplier DO each have their own optional column; when a record has no
+Catalog product name, SKU is visible by default so its recorded identity is not hidden behind
+Columns. A source SKU is never relabelled as a product name or used to invent a Catalog record. Preserve existing SC document numbers and explain
+them through the full Supplier Claim No. header; do not rename historical documents or invent
+another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
+identity column covering adjacent content. One row is one supplier workstream, never one row
+per photo or Work action. An unissued claim shows Not issued. Wider detail/reference fields
+remain optional Columns: Units, Requested Result, Customer Resolution, Carres Execution,
+Item Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version
+and Sent to Supplier. Only relevant date facts appear; no generic workflow field. Unknown
+optional facts are not promoted to permanent empty columns; measure before final layout.
 
 ```text
 Supplier Claims                                      Jump to · Alerts · Help · Settings
                                                      Search · Export · Columns
-SUPPLIER               Claim No. | Reported | Supplier | Source | Product | Qty | Problem ...
+SUPPLIER               Supplier Claim No. | Reported | Supplier | PO No | GRN No. | Product | Variant | Qty ...
   actual suppliers     one row per supplier workstream; facts and evidence only
 PROBLEM
   observed types       footer: matching claims · affected Units/quantity with clear scope
@@ -1976,8 +1987,10 @@ source Case/PO/GRN, Unit, supplier, supplier reference and item; no privileged c
 into supplier views. Clearing filters returns the full permitted set. Empty result, no access and
 load failure are different states. A failed source is never shown as zero claims.
 
-Read-only row expansion is a short inspector: problem/source, affected Units, reply/result facts,
-evidence and Open Claim. It has no decision or Stock form. Opening the object preserves register
+Read-only row expansion is a short problem/evidence inspector: problem type and note, photo
+count, affected held Units and Open Claim. It does not repeat product, source or reply columns.
+Selection remains useful for exporting the selected records; it introduces no batch mutation.
+The inspector has no decision or Stock form. Opening the object preserves register
 filters, scroll and record position. Keyboard access, visible labels and narrow-screen wrapping
 reuse the kit; no meaning depends on hover alone.
 
@@ -2099,7 +2112,8 @@ change is included in these acceptance boundaries.
 
 The independently released slice is the governed factual Register, full-width read-only
 SC object and paginated source/Catalog/held-Unit reads. The shared FilterRail replaces
-the retired queue/card chrome; View, Search, Export and Columns use one Register toolbar.
+the retired queue/card chrome; Search, Export and Columns use one Register toolbar, without
+a redundant View selector.
 Hide/Show filters preserves the active predicates, filtered totals name the complete set,
 and opening/returning from a Claim preserves the Register state. The object reads the
 independent supplier/customer/execution/stock layers and explicitly identifies unavailable
@@ -2110,7 +2124,7 @@ records the release, scoped validation and authenticated production verification
 [the release workflow](https://github.com/wenwei4046/Carres-Portal-v2/actions/runs/34081474775)
 records deployment of main `90a8f3ef`. The PR's complete CI passed, including 9,685 tests,
 type checks, production build and bundle-secret checks. The Catalog-field negative control
-fails as required; desktop and 768px fixture checks cover search, View, rail collapse,
+fails as required; desktop and 768px fixture checks cover search, rail collapse,
 full-width object and return. Workflow success and the authenticated checks in the PR are
 the production evidence; a local fixture is never production proof.
 
@@ -2287,11 +2301,10 @@ Settings lives under the global header gear and requires authorised roles. It in
 - document number format/version and locked Unit ID family;
 - a read-only door to `Workspace → Staff & Duties` for PO Duty / GRN Duty and Buddy-cover settings; Purchasing Settings
   stores no roster and performs no Duty calculation;
-- `/api/operation/po-duty` is a one-release response-shape adapter only. It reads and writes the
-  shared Workspace Duty resolver and must be deleted when `PurchaseOrdersPage`,
-  `SalesOrderWorkspace`, `OperationOrdersControl`, and the Quick Rail `TeamPanel` consume the
-  Workspace Duty contract directly; no caller may restore a direct
-  `ops_po_duty` or cover-table read behind it.
+- The legacy `/api/operation/po-duty` response-shape adapter is retired. `PurchaseOrdersPage`,
+  `SalesOrderWorkspace` and `OperationOrdersControl` consume the shared Workspace Duty resolver;
+  the Quick Rail reads the shared Work response. No caller may restore a direct `ops_po_duty`,
+  cover-table read, page-local rota or compatibility response.
 - PO Days remain scheduling facts. They do not create reminders or `ops_tasks`; every order that
   requires issue is already one structured `issue_po` Work projection, resolved to current PO Duty
   and closed only by the owning order/purchase facts.

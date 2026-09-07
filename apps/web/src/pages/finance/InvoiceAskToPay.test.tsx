@@ -39,7 +39,7 @@ function show(tone: "reminder" | "chase" = "reminder") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <InvoiceAskToPay invoice={INVOICE} tone={tone} onClose={vi.fn()} />
+      <InvoiceAskToPay invoice={INVOICE} rows={[INVOICE]} tone={tone} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }

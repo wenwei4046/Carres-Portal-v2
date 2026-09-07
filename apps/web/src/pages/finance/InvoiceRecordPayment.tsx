@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
-import { invoiceNeeded } from "@carres/shared/payment-invoice-register";
+import { soRemaining } from "@carres/shared/payment-invoice-register";
 import type { OrderPaymentMethod } from "@carres/shared";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,11 +48,14 @@ const inputCls =
  *  and the customer receipt preview beside it (stacked first at narrow
  *  widths). One idempotency key per opening: a double press cannot post the
  *  money twice. A failed post retains everything typed. */
-export default function InvoiceRecordPayment({ invoice, onClose }: {
+export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   invoice: InvoiceRegisterRow;
+  /** The SO's sibling register rows — the prefilled amount is the SO across
+   *  every live invoice kind, storage included. */
+  rows: InvoiceRegisterRow[];
   onClose: () => void;
 }) {
-  const money = invoiceNeeded(invoice);
+  const money = soRemaining(rows, invoice.order_id);
   const orderId = invoice.order_id;
   const qc = useQueryClient();
   const [amount, setAmount] = useState(

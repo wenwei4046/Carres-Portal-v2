@@ -1357,28 +1357,14 @@ export {
 } from "./delivery-board";
 
 export {
-  monthKeyMYT,
-  grnDutyMonth,
   isPoDayMYT,
   poUrgentBypass,
-  opsPoDutySchema,
-  opsPoDutyResponseSchema,
-  opsPoDutyRosterEntrySchema,
   nextPoDayMYT,
-  type OpsPoDutyRosterEntry,
-  updateOpsPoDutyInput,
-  pickNextDutyHolder,
-  canRaisePo,
-  isPoDutyEditor,
-  type OpsPoDuty,
-  type OpsPoDutyResponse,
-  type UpdateOpsPoDutyInput,
 } from "./schemas/ops-po-duty";
 
 // HR-P2 (0260) — permissions that follow the position, not the person.
-// `isOpsManager` / `isPoDutyEditor` are re-exported above from their original
-// modules so no existing importer had to change; everything genuinely new to
-// duty keys is exported here.
+// Duty keys and their authorization helpers are exported from their one
+// shared authority.
 export {
   DUTY_KEYS,
   isDutyKey,

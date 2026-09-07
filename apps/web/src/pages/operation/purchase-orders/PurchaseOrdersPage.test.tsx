@@ -185,8 +185,28 @@ vi.mock("@/lib/queries", () => ({
     isError: false,
     refetch,
   }),
-  useOperationPoDuty: () => ({
-    data: { month: "2026-08", holder: { userId: "user-duty", name: "Yee Jean", email: "yj@carres.com", assignedBy: null } },
+  useWorkspaceDuties: () => ({
+    data: {
+      can_assign: false,
+      duties: [{
+        key: "po_duty",
+        label: "PO Duty",
+        resolution: {
+          duty_key: "po_duty",
+          normal_user_id: "user-duty",
+          normal_user_name: "Yee Jean",
+          acting_user_id: null,
+          acting_user_name: null,
+          actor_user_id: "user-duty",
+          is_cover: false,
+          is_superuser: false,
+          allowed: false,
+          source: "assignment",
+        },
+        assignments: [],
+        covers: [],
+      }],
+    },
     isLoading: false,
     isError: false,
     refetch,

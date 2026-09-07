@@ -133,9 +133,35 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
           onClick={() => mint.mutate()}>Create Storage Invoice</button>}
       {canAct && c.status === "open" && c.rule_extra_free_allowed && !extending &&
         <button className="btn-secondary" onClick={onExtend}>Request more free days</button>}
+      {canAct && c.status === "open" &&
+        <EndStorage caseId={c.id} onDone={onDone} />}
     </div>
     {extending && <ExtraFreeForm caseId={c.id} onDone={onDone} onBack={onDone} />}
   </div>;
+}
+
+/** 0439 — the closing door: storage ended (the goods went out, or the case
+ *  is otherwise finished). The reason is said; a closed case refuses the
+ *  charge and extra-free doors and never reopens. */
+function EndStorage({ caseId, onDone }: { caseId: string; onDone: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const close = useMutation({
+    mutationFn: () => apiFetch("/api/finance/payment-storage/close", {
+      method: "POST", body: JSON.stringify({ caseId, reason: reason.trim() }),
+    }),
+    onSuccess: () => { toast.success("Storage ended"); onDone(); },
+    onError: (e: Error) => toast.error(`Storage was not ended — ${e.message}`),
+  });
+  if (!asking) return <button className="btn-secondary" onClick={() => setAsking(true)}>End storage</button>;
+  return <span className="flex items-center gap-2" data-testid="storage-end-form">
+    <input value={reason} onChange={(e) => setReason(e.target.value)}
+      aria-label="Why the storage ended" placeholder="Goods delivered"
+      className="rounded-md border border-base-200 px-2 py-1.5 text-body" />
+    <button className="btn-primary" disabled={!reason.trim() || close.isPending}
+      onClick={() => close.mutate()}>End storage</button>
+    <button className="btn-secondary" onClick={() => setAsking(false)}>Back</button>
+  </span>;
 }
 
 function StartForm({ orderId, onDone, onBack }: {

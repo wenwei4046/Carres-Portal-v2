@@ -179,16 +179,22 @@ supplierClaimsRouter.get("/", async (c) => {
   }
 
   const descriptions = new Map<string, string>();
+  const variants = new Map<string, string>();
   const skuKeys = [...new Set(claims.map((row) => String(row.sku)).filter(Boolean))];
   if (skuKeys.length) {
     const result = await readEveryClaimRelation<Record<string, unknown>>(
-      skuKeys, (keys) => sb.from("product_skus").select("sku, variant").in("sku", keys),
+      skuKeys, (keys) => sb.from("product_skus").select("sku, variant, product_models(name)").in("sku", keys),
     );
     if (result.error) {
       const mapped = mapPgError(result.error);
       return c.json(mapped.body, mapped.status);
     }
-    for (const row of result.data) if (row.variant) descriptions.set(String(row.sku), String(row.variant));
+    for (const row of result.data) {
+      const relation = row.product_models;
+      const model = (Array.isArray(relation) ? relation[0] : relation) as { name?: string | null } | null;
+      if (model?.name) descriptions.set(String(row.sku), model.name);
+      if (row.variant) variants.set(String(row.sku), String(row.variant));
+    }
   }
 
   const supplierNames = new Map<string, string>();
@@ -299,6 +305,7 @@ supplierClaimsRouter.get("/", async (c) => {
         ...r,
         supplier_name,
         product_description: descriptions.get(String(r.sku)) ?? null,
+        product_variant: variants.get(String(r.sku)) ?? null,
         grn_no: grnNumbers.get(String(r.warehouse_receipt_id)) ?? null,
         reported_by_name: r.reported_by
           ? (reporterNames.get(r.reported_by as string) ?? null)

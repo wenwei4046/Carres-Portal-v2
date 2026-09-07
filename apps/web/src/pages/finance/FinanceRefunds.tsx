@@ -1,9 +1,6 @@
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useMemo } from "react";
 import {
   useFinanceRefunds,
-  useCreateRefund,
-  useFinanceArAging,
   type FinanceRefundRow,
 } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
@@ -23,9 +20,10 @@ interface RefundDisplayRow extends FinanceRefundRow {
  *
  * Visual reference: `reference/proto/finance-refunds.jsx`. Wires:
  *   - useFinanceRefunds: GET /api/finance/refunds
- *   - useCreateRefund:  POST /api/finance/refunds/create — kind=credit
- *     auto-generates CN-{seq} via next_credit_note_no RPC; kind=refund
- *     with amount > RM 1000 fires an approval row (Q5=A locked).
+ *   - The create door LEFT with payment/MASTER.md §13 (no routine Refund
+ *     queue/page/action; no automatic Customer Credit). History reads on;
+ *     the API create route stays mounted but nothing here calls it, and
+ *     retiring the surface itself remains approved target work.
  *
  * Status derivation per migration 0065 docstring:
  *   credit_note_no IS NULL  + status='approved' -> "RF approved" (refund)
@@ -37,7 +35,6 @@ export default function FinanceRefunds() {
   const refundsQ = useFinanceRefunds();
   const rows = refundsQ.data ?? [];
 
-  const [showForm, setShowForm] = useState(false);
 
   const enriched = useMemo<RefundDisplayRow[]>(() => {
     return rows.map((r) => {
@@ -99,14 +96,19 @@ export default function FinanceRefunds() {
             Money going back to customers · credits applied against future orders
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-meta font-semibold"
-        >
-          + Issue credit note
-        </button>
       </header>
+
+      {/* payment/MASTER.md §13 — Carres has a no-refund policy. There is no
+          routine Refund queue, action or automatic Customer Credit; the one
+          exceptional path runs Service Case → Management decision → Finance
+          external transfer. This page is READ-ONLY history; the create door
+          left with the ruling. Retirement of the surface itself stays
+          approved target work and is never done destructively. */}
+      <div className="mb-6 px-4 py-3 rounded-md border border-border bg-muted/30 text-meta text-muted-foreground">
+        Carres has a no-refund policy. An exceptional refund runs through a Service Case and
+        a Management decision; Finance transfers externally. This page is history only —
+        nothing new is created here.
+      </div>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
         <FinanceKpi label="Issued" value={rm(totals.issued)} hint="Credit notes outstanding" tone="warn" />
@@ -132,7 +134,7 @@ export default function FinanceRefunds() {
           <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
         ) : enriched.length === 0 ? (
           <div className="p-12 text-center text-meta text-muted-foreground">
-            No refunds or credit notes yet. Click + Issue credit note to start.
+            No refunds or credit notes on record.
           </div>
         ) : (
           enriched.map((r) => <RefundRow key={r.id} r={r} />)
@@ -143,10 +145,6 @@ export default function FinanceRefunds() {
         <b>Credit note</b> reduces what a customer owes (applied to balance on next order).{" "}
         <b>Refund</b> moves cash back to customer's bank.
       </div>
-
-      {showForm && (
-        <IssueRefundModal onClose={() => setShowForm(false)} />
-      )}
 
       {refundsQ.error && (
         <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
@@ -198,143 +196,6 @@ function RefundRow({ r }: { r: RefundDisplayRow }) {
         </span>
       </span>
       <span className="text-right text-label text-muted-foreground">{date}</span>
-    </div>
-  );
-}
-
-function IssueRefundModal({ onClose }: { onClose: () => void }) {
-  const aging = useFinanceArAging();
-  const orders = aging.data?.rows ?? [];
-
-  const [kind, setKind]       = useState<RefundKind>("credit");
-  const [orderId, setOrderId] = useState("");
-  const [amount, setAmount]   = useState("");
-  const [reason, setReason]   = useState("");
-
-  const create = useCreateRefund({
-    onSuccess: (resp) => {
-      const r = resp as { needsApproval: boolean };
-      if (r.needsApproval) {
-        toast.success(`Refund queued · awaiting Principal approval (> RM 1,000)`);
-      } else {
-        toast.success(`${kind === "credit" ? "Credit note issued" : "Refund approved"}`);
-      }
-      onClose();
-    },
-    onError: (e) => toast.error(`Issue failed: ${e.message}`),
-  });
-
-  function submit() {
-    const amt = parseFloat(amount);
-    if (!orderId) {
-      toast.error("Pick an order");
-      return;
-    }
-    if (!amt || amt <= 0) {
-      toast.error("Amount must be positive");
-      return;
-    }
-    if (!reason.trim()) {
-      toast.error("Reason required");
-      return;
-    }
-    create.mutate({
-      orderId,
-      amount: amt,
-      reason: reason.trim(),
-      kind,
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center">
-      <div onClick={onClose} className="absolute inset-0 bg-black/40" aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-label={`Issue ${kind === "credit" ? "credit note" : "refund"}`}
-        className="relative w-[480px] max-w-[92vw] p-6 rounded-md bg-card shadow-2xl"
-      >
-        <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Finance · New note</div>
-        <div className="font-display text-title mt-1 mb-4">
-          Issue {kind === "credit" ? "credit note" : "refund"}
-        </div>
-
-        <div className="flex gap-px bg-muted rounded p-0.5 mb-4 w-fit">
-          {(["credit", "refund"] as RefundKind[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              className={`px-3 py-1 rounded text-label font-semibold transition-colors ${
-                kind === k
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {k === "credit" ? "Credit note" : "Refund"}
-            </button>
-          ))}
-        </div>
-
-        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Source order</div>
-        <select
-          aria-label="Source order"
-          value={orderId}
-          onChange={(e) => setOrderId(e.target.value)}
-          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
-        >
-          <option value="">Select order…</option>
-          {orders.map((o) => (
-            <option key={o.order_id} value={o.order_id}>
-              SO-{o.so} · {o.customer_name} · {rm(o.total)}
-            </option>
-          ))}
-        </select>
-
-        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Amount (RM)</div>
-        <input
-          aria-label="Amount"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="e.g. 480"
-          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background"
-        />
-
-        <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground mb-1">Reason</div>
-        <textarea
-          aria-label="Reason"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Damaged on delivery, dealer goodwill, etc."
-          rows={3}
-          className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-3 bg-background resize-none"
-        />
-
-        {kind === "refund" && parseFloat(amount) > 1000 && (
-          <div className="px-3 py-2 mb-3 rounded bg-primary/10 text-label text-primary">
-            Refunds &gt; RM 1,000 require principal approval before payout (Q5=A locked).
-          </div>
-        )}
-
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-2 rounded-md border border-border text-meta"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={create.isPending}
-            className="px-3 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta disabled:opacity-60"
-          >
-            {create.isPending ? "Issuing…" : `Issue ${kind === "credit" ? "credit" : "refund"}`}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
