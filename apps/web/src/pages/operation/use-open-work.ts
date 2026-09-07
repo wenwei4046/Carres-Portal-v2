@@ -52,7 +52,8 @@ function toWorkRow(item: OperationWorkItem): WorkRow {
         : item.module === "orders" ||
             item.module === "purchasing" ||
             item.module === "receiving" ||
-            item.module === "delivery"
+            item.module === "delivery" ||
+            item.module === "payment"
           ? item.module
           : "orders",
     soRef: item.object.label,

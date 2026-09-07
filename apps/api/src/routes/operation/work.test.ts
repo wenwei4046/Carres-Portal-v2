@@ -7,6 +7,7 @@ import {
   manualPurchaseWorkInputsFromRegister,
   receivingWorkSourceFromModuleFacts,
   projectManualPurchaseWork,
+  projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
   projectReceivingWork,
   projectSalesOrderWork,
@@ -448,5 +449,70 @@ describe("operation Work response composition", () => {
     });
     expect(item?.action).not.toContain("Yu Jun");
     expect(item?.completionFact).toContain("exact current PO version");
+  });
+
+  it("admits due invoice collection under Payment Duty and closes only on money truth", () => {
+    const person = { userId: "payment-duty", name: "Shasha" };
+    const [item] = projectPaymentCollectionWork({
+      invoices: [{
+        id: "invoice-1",
+        invoice_no: "INV-2041",
+        status: "issued",
+        kind: "sales",
+        amount: 1000,
+        tax_amount: 0,
+        issued_at: "2026-09-01T00:00:00Z",
+        voided_at: null,
+        void_reason: null,
+        replaces_invoice_id: null,
+        created_at: "2026-09-01T00:00:00Z",
+        order_id: "order-2041",
+        orders: {
+          id: "order-2041",
+          so: 2041,
+          customer_name: "Tan Qu Qu",
+          status: "proceed_order",
+          paid: 200,
+          delivery_date: "2026-09-09",
+          delivery_date_tbd: false,
+          delivered_at: null,
+          order_payments: [],
+          payment_communications: [],
+          order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+          order_addons: [],
+          ops_order_control: [{
+            balance: null,
+            confirmed_date: "2026-09-09",
+            line_etas: null,
+            line_stock_status: { "SOFA-1": "ready" },
+          }],
+        },
+      }],
+      paymentDuty: {
+        dutyKey: "payment_duty",
+        onDate: "2026-09-08",
+        normalOwner: person,
+        buddy: null,
+        activeCover: null,
+        actingPerson: person,
+        state: "primary",
+        assignmentId: "assignment-payment",
+      },
+      today: "2026-09-08",
+    });
+
+    expect(item).toMatchObject({
+      id: "payment:invoice-1:payment.collect_customer_balance",
+      module: "payment",
+      object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
+      problem: "Customer payment should have been received",
+      action: "Ask the customer to pay",
+      recipient: "Tan Qu Qu",
+      owner: { dutyKey: "payment_duty", normal: person, acting: person },
+      timing: { dueOn: "2026-09-07", bucket: "overdue" },
+      destination: "/finance/invoices?invoice=invoice-1",
+    });
+    expect(item?.completionFact).toContain("outstanding balance is RM 0");
+    expect(item?.action).not.toContain("Shasha");
   });
 });

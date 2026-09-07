@@ -192,6 +192,12 @@ honest Work for admitted modules.
   is the Delivery scope until a Delivery Order exists, then the exact DO where the result/proof act
   belongs; the server supplies the Delivery editor/DO door. The source Sales Order remains linked
   context and is no longer presented as the universal owner of those actions.
+- Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
+  balance calculation. The shared readiness and collection clock admit only due/late balances whose
+  goods are ready or have a real arrival date; Payment Duty/cover owns the action, the exact Invoice
+  is the object/door, and only an atomic allocated payment reducing outstanding to RM 0 completes it.
+  A sent message remains evidence and bank matching remains later evidence; neither is a second
+  settlement step nor closes Work.
 - Several module MASTERs are approved while target implementation remains incomplete.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 

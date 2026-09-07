@@ -74,7 +74,7 @@ export type WorkOwnerRule =
 
 export interface WorkRule {
   key: string;
-  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery";
+  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery" | "payment";
   /** ① when the item exists — the owning engine's trigger, in words. */
   trigger: string;
   /** ② who — the rule in words, never a stored owner field (§2.2). */
@@ -290,6 +290,16 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     action: "Confirm ready date",
     dueRule: "customer date − buffer (OFFICE week) − production (FACTORY week)",
     completionFact: "a standing promise row (po_supplier_promises)",
+  },
+  {
+    key: "payment.collect_customer_balance",
+    module: "payment",
+    trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
+    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "payment_duty",
+    action: "Ask the customer to pay",
+    dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
+    completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
   },
   {
     key: "purchasing.supplier_reply",

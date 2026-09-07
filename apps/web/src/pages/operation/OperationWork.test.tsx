@@ -151,6 +151,21 @@ describe("Operation Work — one server feed", () => {
     expect(navigate).toHaveBeenCalledWith("/operation/delivery-orders/DO-2041");
   });
 
+  it("keeps Payment collection on its exact Invoice door", () => {
+    workState.data!.items = [item({
+      id: "payment:invoice-1:payment.collect_customer_balance",
+      module: "payment",
+      ruleKey: "payment.collect_customer_balance",
+      object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
+      problem: "Customer balance due",
+      action: "Ask the customer to pay",
+      destination: "/finance/invoices?invoice=invoice-1",
+    })];
+    show();
+    fireEvent.click(screen.getByTestId("work-row-INV-2041-payment.collect_customer_balance"));
+    expect(navigate).toHaveBeenCalledWith("/finance/invoices?invoice=invoice-1");
+  });
+
   it("shows server failure as an error rather than a clear desk", () => {
     workState = { data: undefined, isLoading: false, isError: true };
     show();
