@@ -284,11 +284,12 @@ honest Work for admitted modules.
 - Order and Manual Purchase Work now carry structured owner rule, Duty key, normal owner, active
   cover and acting person. My Work routes to the acting person; Team Work retains the normal owner.
   Payment and PO work no longer borrow the order PIC when their Duty is unresolved.
-- `/api/operation/po-duty` remains only as the response-shape adapter listed in the Purchasing
-  MASTER. Remaining Purchasing screens must move to the Workspace contract before that adapter is
-  deleted. The legacy PO-day `ops_tasks` reminder is retired: each Sales Order that needs a PO is
-  already an authoritative `issue_po` Work projection owned by current PO Duty. PO Days remain
-  Purchasing scheduling facts and never create a second free-text task.
+- The legacy `/api/operation/po-duty` response-shape adapter and its client hooks are retired.
+  Purchase Orders, the Sales Order Route and Orders Control now read today's acting PO / GRN person
+  from the shared Workspace Duty resolver; dated cover changes the acting person without rewriting
+  the normal holder. The legacy PO-day `ops_tasks` reminder is also retired: each Sales Order that
+  needs a PO is already an authoritative `issue_po` Work projection owned by current PO Duty. PO
+  Days remain Purchasing scheduling facts and never create a second free-text task.
 - `GET /api/operation/work` is now the one server-composed feed for admitted Sales Orders,
   Manual Purchase, Purchase Order supplier-reply and Receiving actions. Purchase Order reply work
   reads the exact current-version send and evidenced supplier-answer facts, resolves PO Duty and

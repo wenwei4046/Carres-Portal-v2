@@ -9,7 +9,7 @@ import {
   useDeliveryPartners,
   useOperationStaff,
   usePurchasingSettings,
-  useOperationPoDuty,
+  useWorkspaceDuties,
   useUpdateStaffSetting,
   useAssignOrderStaff,
   assignOrderStaffRequest,
@@ -17,6 +17,7 @@ import {
   useOperationSuppliers,
   type operationOrderListRow,
 } from "@/lib/queries";
+import { workspaceDutyActor } from "./workspace-duty-owner";
 import { useActiveOrder } from "@/lib/active-order";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
@@ -2282,12 +2283,9 @@ export default function OperationOrdersControl({ onImport }: Props) {
      handed to the ladder. `null` until the settings land, which keeps the
      ready-date call amber rather than escalating it on a guess. */
   const safetyDays = purchasingSettings?.orderByBufferDays ?? null;
-  // PO duty (0236, Jess 人分单货合买): this month's PO controller — gates the
-  // bulk-bar Raise PO (holder + management only), badges the TEAM row, and
-  // powers the Mon/Thu PO-day banner. Fails soft: old Worker / pre-0236 DB →
-  // holder null → no gate, no badge, no banner.
-  const dutyQ = useOperationPoDuty();
-  const poDutyHolder = dutyQ.data?.holder ?? null;
+  // PO Duty is resolved by Workspace. A dated cover changes who acts today
+  // without rewriting the normal holder or creating a page-local rota.
+  const dutyQ = useWorkspaceDuties();
   const [chaseOrders, setChaseOrders] = useState<operationOrderListRow[] | null>(null);
   // Logistics ⋮ → Remind/Call over the selection (company-grouped review).
   const [chasePartnerOrders, setChasePartnerOrders] = useState<
@@ -2314,6 +2312,13 @@ export default function OperationOrdersControl({ onImport }: Props) {
     () => new Map(staffList.map((s) => [s.user_id, s])),
     [staffList],
   );
+  const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
+  const poDutyHolder = poDutyActor
+    ? {
+        ...poDutyActor,
+        email: staffById.get(poDutyActor.userId)?.email ?? "",
+      }
+    : null;
   const poolStaff = useMemo(() => staffList.filter((s) => s.pooled), [staffList]);
   // Not-yet-onboarded staff (Jess 2026-07-19: "show Chow first, like LC") —
   // account created but not pooled yet. Shown greyed in TEAM so the roster

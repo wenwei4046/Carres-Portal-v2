@@ -102,7 +102,7 @@ import {
   useCustomerTypeProbe,
   useOperationDealersRef,
   useOperationOrder,
-  useOperationPoDuty,
+  useWorkspaceDuties,
   useOrderEntryConfig,
   useOrderCorrectionWork,
   useOrderServiceCases,
@@ -117,6 +117,7 @@ import {
   type SalesOrderSnapshot,
   type AmendmentProposal,
 } from "@/lib/queries";
+import { workspaceDutyActor } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
@@ -1770,11 +1771,11 @@ export default function SalesOrderWorkspace() {
 
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
-  const dutyQ = useOperationPoDuty();
+  const dutyQ = useWorkspaceDuties();
   const routeOwners = useMemo(
     () => ({
-      purchasing: dutyQ.data?.holder ?? null,
-      receiving: dutyQ.data?.grnHolder ?? null,
+      purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
+      receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
     }),
     [dutyQ.data],
   );
