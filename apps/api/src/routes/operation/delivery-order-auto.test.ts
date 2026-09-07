@@ -178,6 +178,8 @@ function tables(over?: {
     order_addons: tableMock({ data: [], error: null }),
     ops_order_control: tableMock({ data: control, error: null }),
     ops_stock_items: tableMock({ data: [], error: null }),
+    // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+    invoices: tableMock({ data: [], error: null }),
     // The carrier check is fail-soft; giving it a partner with no rules keeps
     // the response's `partnerWarnings` quiet without faking any rule.
     delivery_partners: tableMock({

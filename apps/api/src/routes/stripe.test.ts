@@ -215,8 +215,9 @@ describe("POST /:id/stripe/checkout", () => {
   });
 
   it("the cap is the SO across kinds: a live storage paper raises it, a voided one does not", async () => {
-    // total 2100 · paid 500 · storage issued 150+8 tax + draft REPLACEMENT 100
-    // − voided 40 (dead) → cap 2100 + 258 − 500 = 1858.
+    // total 2100 · paid 500 · storage issued 150+8 tax; the draft REPLACEMENT
+    // and the voided paper ask nothing (§2 exactly — no draft-debt rule)
+    // → cap 2100 + 158 − 500 = 1758.
     const orderWithStorage = { ...ORDER, invoices: [
       { kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null, replaces_invoice_id: null },
       { kind: "additional_storage", status: "draft", amount: 100, tax_amount: 0, voided_at: null, replaces_invoice_id: "old-1" },
@@ -229,12 +230,12 @@ describe("POST /:id/stripe/checkout", () => {
     vi.mocked(adminClient).mockReturnValue(
       makeSb({ stripe_checkout_sessions: { single: { data: SESSION_ROW, error: null } } }) as never);
     vi.mocked(stripeClient).mockReturnValue(makeStripe());
-    // 1858 exactly is allowed…
+    // 1758 exactly is allowed…
     let res = await app.fetch(
       new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1858 }),
+        body: JSON.stringify({ amount: 1758 }),
       }), env);
     expect(res.status).toBe(201);
     // …one ringgit above the combined obligation is refused with the cap named.
@@ -242,12 +243,12 @@ describe("POST /:id/stripe/checkout", () => {
       new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1859 }),
+        body: JSON.stringify({ amount: 1759 }),
       }), env);
     expect(res.status).toBe(422);
     const body = await res.json() as { code: string; maxAmount: number };
     expect(body.code).toBe("amount_exceeds_outstanding");
-    expect(body.maxAmount).toBe(1858);
+    expect(body.maxAmount).toBe(1758);
   });
   it("201 mints a session (sen amount, dashboard-controlled methods) and tracks it", async () => {
     const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });

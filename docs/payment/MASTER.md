@@ -617,23 +617,38 @@ correction lineage exists precisely so an obligation survives its void, and the 
 not lose the money between void and reissue (test-pinned); a fresh draft asks nothing and a
 voided paper is dead.
 
-**REAL GAP / CONTRADICTION — two storage money sources.** The shared Work engine and the
-Delivery money gate read the LEGACY C9 storage figure (`storageHold` over
-`ops_order_control.storage_from / storage_fee_override / imported fees /
-storage_waiver_status` — the shipped release-and-waiver ruling), NOT the 0436/0438 case-and-
-invoice model. Until they converge: an SO whose storage exists only as a 0438 Storage
-Invoice does not hold its DO through the gate, and a fee keyed only in the legacy columns
-never reaches Payment's invoice arithmetic. The goods side of the gate reads the same
-`orderMoney` stores and stays consistent. Converging the gate is its OWN slice and must
-carry the C9 semantics across (a manager's release lifts the HOLD and never forgives the
-money) — the gate is the money-in-full law's enforcement point and is not changed casually
-in a reader audit. Work's inline combined formula
-(`sales-order-work-source`) and `soRemaining` are the same subtract-once law with the two
-different storage sources above; they unify when the gate does.
+**RESOLVED — the gate convergence (2026-09-07 slice).** The shared Work engine, the TS
+booking gate's one feeder (`booking-context`), the completion reader and the DATABASE door
+now consume the canonical §2 storage obligation through ONE precedence law
+(`storageObligation`, shared): when the SO carries ANY live ISSUED storage paper, the
+papers ARE the storage figure (the same shape as priced-lines-beat-keyed — never both,
+never a double count), netted so `orders.paid` subtracts exactly once (a payment past the
+goods value spills into storage; a fully paid SO leaves NO stale hold); with no paper the
+LEGACY C9 answer passes through byte-identical (`collected_at` clears it, the override
+ladder holds, existing C9 cases unchanged). Migration `0441` teaches the 0362 database door
+— the one place the money law binds every DO mint — the same papers: an unpaid Storage /
+Additional Storage Invoice now blocks a DO whatever path mints it. What deliberately does
+NOT change: the legacy accrual stays TS-side (Law D division as 0362 recorded); a C9
+`release` still lifts only the TS gate's HOLD and never this door (money in full is
+ABSOLUTE per the 2026-09-01 delivery ruling; §12 — a waiver changes the receivable by
+VOIDING the paper, it is not an unpaid-delivery release); the historical 0362 approval rows
+stay honoured. Proven both directions by the rolled-back production probe on the real DO
+door (unpaid paper blocks naming the RM; partial blocks with the remainder; combined-paid
+opens; waiver-by-void opens; a draft asks nothing; the historical approval opens; a
+fully-paid-goods baseline passes) and by Work-engine tests (an unpaid paper keeps the
+collect work open on a goods-paid SO; combined payment closes it; no paper invents
+nothing).
 
 Closure: PR #1145 merged as `94acc54f` and the ERP page and Worker converged that exact
-SHA. The production DOM verification of the fixed readers is owed with the standing
-visual-pass blocker below.
+SHA. CORRECTED in the gate-convergence slice: the draft-REPLACEMENT clause #1145 added was
+a new debt rule the approved lifecycle does not contain, and it is REVERTED — §2 reads
+`issued live invoice obligations` exactly, so a correction in flight (void → reissue) asks
+nothing until the replacement is ISSUED. Continuity is the lifecycle's own: the voided
+paper is dead and never double-counted, `billed_through_period` never rolls back (0439),
+the replacement exists to be issued, and the Storage section says `A Storage Invoice
+correction is in progress` so nothing is silently lost from the operator's view. The
+production DOM verification of the fixed readers is owed with the standing visual-pass
+blocker below.
 
 ### Deployed — the storage facts are immutable, and a case can close, 2026-09-07
 
@@ -688,6 +703,24 @@ complete provider lifecycle. Provider end-to-end testing is PENDING authorised t
 access (a Stripe test-mode key set); where the governed acceptance requires the full
 provider lifecycle, that access is a requirement, not an option. No live payable link is
 ever created for testing.
+
+### BUILD — the gate consumes the canonical obligations, 2026-09-07
+
+The convergence slice itself (the RESOLVED entry above records the model): shared
+`storageObligation` + `invoiceStorageSumOf`; feeders wired in `booking-context` (the one
+TS-gate feeder), the Work projector (per-order sums off the same invoices read the
+collection work already makes) and the completion reader; migration `0441` teaches the
+0362 database door the storage papers with the same subtract-once arithmetic (priced:
+`greatest(0, priced + storage − paid)`; keyed: `greatest(0, keyed) + storage`; unknown
+goods still never block, but a storage PAPER is known money and does). The §13
+convergence also completes within approved scope: the RECON WORKSPACE — inspected and
+serving NO other authorised owner (its only consumers were its own page and routes) — loses
+its navigation row and its page; the route lands on Payments; the reconciliation DATA and
+its API routes remain untouched, and git is the history. Refunds stays as read-only
+history. Verified by the 0441 rolled-back production probe (seven controls, both
+directions), 9 composer tests, the Work both-directions test (26 work tests), 234
+finance+portal page tests, design guard and typecheck; convergence and walk facts land in
+the closure when they exist.
 
 ### Verification evidence — the four categories, stated separately
 

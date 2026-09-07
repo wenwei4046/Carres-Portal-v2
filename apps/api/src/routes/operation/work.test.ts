@@ -405,6 +405,55 @@ describe("operation Work response composition", () => {
       .toBe("Shasha");
   });
 
+  it("gate convergence: an unpaid storage PAPER keeps the money work open on a goods-paid SO, and full payment closes it", () => {
+    const base = {
+      id: "order-10",
+      so: 1310,
+      status: "proceed_order",
+      operation_stage: "ready_to_dispatch",
+      customer_name: "Storage Customer",
+      delivery_date: "2026-09-10",
+      delivery_date_tbd: false,
+      placed_at: "2026-09-01",
+      do_number: null,
+      paid: 1000, // goods fully paid
+      ops_assigned_logistic: "NETS",
+      delivery_partner_id: "partner-1",
+      salesperson_id: null,
+      salespersons: null,
+      po_skus: [],
+      order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }],
+      order_addons: [],
+      order_supplier_threads: [],
+      order_finance_exceptions: [],
+      ops_sofa_loans: [],
+      ops_order_control: {
+        assigned_staff: null, booking_stage: null, confirmed_date: null,
+        delivery_photos: [], line_etas: null,
+        line_stock_status: { "SOFA-1": "ready" },
+      },
+    };
+    const project = (paid: number, storageSum: number) =>
+      projectSalesOrdersFromModuleFacts({
+        orders: [{ ...base, paid }],
+        stock: [{ sku: "SOFA-1", available: 1 }],
+        staff: [],
+        dutyResolutions: {},
+        today: "2026-09-06",
+        safetyDays: 3,
+        invoiceStorageByOrder: new Map([["order-10", storageSum]]),
+      });
+    // Unpaid RM150 storage paper → the collection work stays OPEN.
+    const owing = project(1000, 150);
+    expect(owing.some((i) => i.ruleKey === "collect")).toBe(true);
+    // Paid covering the COMBINED obligation → no stale money work.
+    const settled = project(1150, 150);
+    expect(settled.some((i) => i.ruleKey === "collect")).toBe(false);
+    // No paper at all → nothing invented.
+    const clean = project(1000, 0);
+    expect(clean.some((i) => i.ruleKey === "collect")).toBe(false);
+  });
+
   it("admits supplier reply work from the owning PO facts with PO Duty and the exact PO door", () => {
     const person = { userId: "po-duty", name: "Yu Jun" };
     const [item] = projectPurchaseOrderReplyWork({

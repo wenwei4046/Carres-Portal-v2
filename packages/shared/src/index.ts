@@ -3007,6 +3007,7 @@ export * from "./workspace-duty";
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
 export * from "./sales-order-work-source";
+export * from "./storage-obligation";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
 

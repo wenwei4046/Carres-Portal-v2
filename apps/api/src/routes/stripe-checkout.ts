@@ -139,15 +139,14 @@ function orderTotal(order: { order_lines: Array<{ unit_price: number | string; q
 }
 
 /** The SO's live storage obligations (0438 papers) — the same rule the shared
- *  `soRemaining` prints: an ISSUED storage-kind invoice with its tax, plus a
- *  DRAFT that replaces a voided one (the correction keeps the money owed). A
- *  storage fee is money the customer owes (payment/MASTER.md §2), so the link
- *  cap includes it; the invariant is unchanged — a payment may never exceed
- *  what is owed, and `paid` is subtracted ONCE from the combined obligation. */
+ *  `soRemaining` prints: ISSUED storage-kind invoices with their tax, §2
+ *  exactly (a draft asks nothing yet, a voided one is dead). A storage fee is
+ *  money the customer owes (payment/MASTER.md §2), so the link cap includes
+ *  it; the invariant is unchanged — a payment may never exceed what is owed,
+ *  and `paid` is subtracted ONCE from the combined obligation. */
 function storageObligations(order: { invoices?: Array<{ kind: string; status: string; amount: number | string; tax_amount: number | string; voided_at: string | null; replaces_invoice_id: string | null }> }): number {
   return (order.invoices ?? [])
-    .filter((i) => i.kind !== "sales" && !i.voided_at
-      && (i.status === "issued" || (i.status === "draft" && i.replaces_invoice_id != null)))
+    .filter((i) => i.kind !== "sales" && i.status === "issued" && !i.voided_at)
     .reduce((s, i) => s + Number(i.amount) + Number(i.tax_amount), 0);
 }
 

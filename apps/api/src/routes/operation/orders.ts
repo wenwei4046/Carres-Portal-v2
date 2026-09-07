@@ -24,7 +24,9 @@ import {
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
+  invoiceStorageSumOf,
   storageHold,
+  storageObligation,
   transferReadyInputSchema,
   warehousePickInput,
   type AllocationUnit,
@@ -1164,7 +1166,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   if (!ord) return c.json({ error: "Order not found" }, 404);
   const soRef = `SO-${ord.so}`;
 
-  const [unitsRes, refundsRes, loansRes] = await Promise.all([
+  const [unitsRes, refundsRes, loansRes, invoicesRes] = await Promise.all([
     sb
       .from("ops_stock_items")
       .select("id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at")
@@ -1176,8 +1178,13 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
       .from("ops_sofa_loans")
       .select("status, source, returned_to_supplier_at")
       .eq("order_id", id),
+    // Gate convergence (2026-09-07): the completion reader must see the SAME
+    // §2 storage obligation the gate and Payment print.
+    sb.from("invoices")
+      .select("kind, status, amount, tax_amount, voided_at")
+      .eq("order_id", id),
   ]);
-  for (const r of [unitsRes, refundsRes, loansRes]) {
+  for (const r of [unitsRes, refundsRes, loansRes, invoicesRes]) {
     if (r.error) {
       const m = mapPgError(r.error);
       return c.json(m.body, m.status);
@@ -1237,19 +1244,28 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });
+  // Gate convergence (2026-09-07): invoice-backed storage beats legacy C9
+  // when papers exist, netted so `paid` subtracts once (`storageObligation`,
+  // the ONE precedence law) — `owing`, never `fee`, survives on the legacy
+  // path exactly as before (collectedAt clears it; Law D readers agree).
+  const lineSum = lines.reduce((s, l) => s + price(l), 0);
+  const addonSum = addons.reduce((s, a) => s + price(a), 0);
+  const storage = storageObligation({
+    invoiceStorageSum: invoiceStorageSumOf(
+      (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0],
+    ),
+    goodsTotal: lineSum + addonSum,
+    paid: ord.paid,
+    legacyOwing: hold.owing,
+    legacyReleased: hold.released,
+  });
   const money = orderMoney({
-    lineSum: lines.reduce((s, l) => s + price(l), 0),
-    addonSum: addons.reduce((s, a) => s + price(a), 0),
+    lineSum,
+    addonSum,
     paid: ord.paid,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    // `owing`, never `fee`. `storageHold` defines `owing = collectedAt ? 0 : fee`
-    // (storage-hold.ts), so once the fee has been COLLECTED the two part company
-    // and `fee` bills money already banked — an order that ever carried a storage
-    // fee could then never read as complete. `order-control.ts` and
-    // `OperationOrdersControl.tsx` both pass `owing`; this is the third reader of
-    // one derived fact and it agrees with them (Law D).
-    storageOwing: hold.owing,
-    storageReleased: hold.released,
+    storageOwing: storage.owing,
+    storageReleased: storage.released,
   });
 
   const completion = resolveOrderCompletion({

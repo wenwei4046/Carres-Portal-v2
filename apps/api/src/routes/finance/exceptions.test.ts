@@ -332,6 +332,8 @@ describe("Slice 2 — a clear that completes the gate issues the delivery order"
         error: null,
       }),
       ops_stock_items: issueTableMock({ data: [], error: null }),
+      // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+      invoices: issueTableMock({ data: [], error: null }),
       order_finance_exceptions: issueTableMock({ data: [CLEARED_ROW], error: null }),
       // 0362 — the approval record. Empty: nothing asked.
       order_delivery_payment_approvals: issueTableMock({ data: [], error: null }),

@@ -313,7 +313,9 @@ function InvoiceObject({ invoice, rows, today, opts, onAsk, canStorage = false }
       </Facts>
       {/* §6/§7 — the storage case lives between the goods facts and the
           money action: it is a goods-side fact that becomes money. */}
-      <InvoiceStorage orderId={invoice.order_id} canAct={canStorage} />
+      <InvoiceStorage orderId={invoice.order_id} canAct={canStorage}
+        correctionInFlight={rows.some((r) => r.order_id === invoice.order_id
+          && r.kind !== "sales" && r.status === "draft" && r.replaces_invoice_id != null)} />
       <Facts title="What to do">
         {f.timing.kind === "paid" ? <p>The money is in. Nothing to do.</p>
         : f.timing.kind === "wait" ? <>
