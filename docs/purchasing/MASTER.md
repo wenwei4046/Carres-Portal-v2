@@ -2244,6 +2244,15 @@ an instruction to the supplier or transport team. Supporting-information entry m
 this boundary by overwriting an existing committed goods/location/date fact. The Display Request
 retains the request and review evidence; it never silently rewrites another module's instruction.
 
+**Cancellation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Before submission the requester
+may discard the draft. After submission, Request cancellation requires a reason. Operations
+checks existing supplier, transport and installation commitments before confirming the outcome.
+The requester can see whether cancellation is requested, confirmed or cannot fully proceed, with
+the explanation. A cancellation request never silently stops an instruction already sent;
+affected commitments are changed/cancelled through their owning module. Completed movements and
+any charges remain in History and their authoritative records. This rules cancellation behaviour,
+not physical deletion of records or approval of the complete Showroom Blueprint.
+
 **Contact and receiving person — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester
 must supply who the team should contact and who will receive the goods. Capture contact name and
 phone number and receiving person's name and phone number; allow the same person to serve both
