@@ -568,7 +568,7 @@ a forged JWT role claim changes nothing). Charging (commenced cycles → Storage
 the operator journey UI (the delivery-window form, the case surfaces, §16 composition
 extension) are the named next slices — this one records the facts they derive from.
 
-### BUILD — a commenced period becomes a Storage Invoice, 2026-09-07
+### Deployed — a commenced period becomes a Storage Invoice, 2026-09-07
 
 Migration `0438` closes the charge side of the storage case: `payment_storage_invoice` turns
 commenced, UNBILLED §7 periods into a real invoice through the EXISTING 0429 lifecycle —
@@ -584,7 +584,12 @@ principal (§12 — Finance reads and exports). The case card says
 shared `storageChargeOf` are both pinned to the §7 worked examples (the rolled-back
 production probe asserted 1-period Aug-start RM150 · 7-period sofa RM1,400 ·
 additional-storage RM200 top-up · double-charge refused · unknown caller refused).
-Production convergence and this slice's walk are recorded when they exist.
+Closure: migration `0438` is APPLIED (tracker tail confirmed) and PR #1140 merged as
+`96ac6197`; the ERP page, POS page and Worker all converged on `90a8f3ef` carrying it, and
+the served bundle prints `Create Storage Invoice`. The section's production DOM walk shares
+the storage-foundation blocker above (the signed-in browser's frozen renderer); the DB
+behaviour — including the real INV number minted inside the rolled-back probe — is
+production-proven.
 
 ### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
 
