@@ -62,7 +62,7 @@ describe("the Storage section", () => {
       .toHaveTextContent("today is day 21"));
     const card = screen.getByTestId("storage-case-mattress_bedframe");
     expect(card).toHaveTextContent("Mattress / Bedframe");
-    expect(card).toHaveTextContent("1 charge period started · RM 150.00 — not on a Storage Invoice yet.");
+    expect(card).toHaveTextContent("1 charge period started · RM 150.00 — 1 not on a Storage Invoice yet.");
   });
   it("Record storage start sends both witnessed facts and the note to the door", async () => {
     show();
@@ -92,6 +92,25 @@ describe("the Storage section", () => {
     expect(screen.getByTestId("storage-extra-free-form"))
       .toHaveTextContent("No written request means no free storage.");
     expect(screen.getByRole("button", { name: "Approve free storage" })).toBeDisabled();
+  });
+  it("unbilled commenced periods offer Create Storage Invoice, and the door fires the charge", async () => {
+    state.cases = [CASE];
+    show();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create Storage Invoice" })).toBeInTheDocument());
+    // Day 21: one period commenced, none billed — the card says so.
+    expect(screen.getByTestId("storage-case-mattress_bedframe"))
+      .toHaveTextContent("1 not on a Storage Invoice yet.");
+    fireEvent.click(screen.getByRole("button", { name: "Create Storage Invoice" }));
+    await waitFor(() => expect(state.posts).toHaveLength(1));
+    expect(state.posts[0]).toMatchObject({
+      url: "/api/finance/payment-storage/charge", body: { caseId: "c1" } });
+  });
+  it("a fully billed case says so and offers no charge door", async () => {
+    state.cases = [{ ...CASE, billed_through_period: 1 }];
+    show();
+    await waitFor(() => expect(screen.getByTestId("storage-case-mattress_bedframe"))
+      .toHaveTextContent("all on a Storage Invoice."));
+    expect(screen.queryByRole("button", { name: "Create Storage Invoice" })).not.toBeInTheDocument();
   });
   it("a sofa case offers no extra-free door", async () => {
     state.cases = [{ ...CASE, id: "c2", product_group: "sofa", rule_extra_free_allowed: false,

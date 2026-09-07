@@ -122,6 +122,22 @@ describe("POST /api/finance/payment-storage/start", () => {
   });
 });
 
+describe("POST /api/finance/payment-storage/charge", () => {
+  it("passes the case to the ONE charge door", async () => {
+    const rpc = vi.fn(async () => ({ data: { new_periods: 1, billed_through_period: 1,
+      invoice: { invoice_no: "INV-070926-0001", kind: "storage", amount: 150 } }, error: null }));
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request(
+      "http://t/api/finance/payment-storage/charge", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId: CASE.id }),
+      }), env);
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("payment_storage_invoice", { p_case_id: CASE.id });
+  });
+});
+
 describe("POST /api/finance/payment-storage/extra-free", () => {
   it("requires the written evidence in the request shape itself", async () => {
     const rpc = vi.fn();

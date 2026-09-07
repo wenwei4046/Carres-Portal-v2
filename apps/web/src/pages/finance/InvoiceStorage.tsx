@@ -38,6 +38,8 @@ export interface StorageCaseRow {
   rule_extra_free_allowed: boolean;
   approved_free_until: string | null;
   approval_reason: string | null;
+  /** 0438 — how many commenced §7 periods are already on paper. */
+  billed_through_period?: number;
   status: "open" | "closed";
 }
 
@@ -91,6 +93,7 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
   storageCase: StorageCaseRow; canAct: boolean; extending: boolean;
   onExtend: () => void; onDone: () => void;
 }) {
+  const qc = useQueryClient();
   const charge = storageChargeOf({
     storageStart: c.storage_start,
     ruleFreeDays: c.rule_free_days,
@@ -98,6 +101,21 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
     ruleCycleDays: c.rule_cycle_days,
     approvedFreeUntil: c.approved_free_until,
   }, todayIso());
+  const billed = c.billed_through_period ?? 0;
+  const unbilled = Math.max(0, charge.commencedPeriods - billed);
+  // 0438 — the charge door: commenced unbilled periods become the paper.
+  const mint = useMutation({
+    mutationFn: () => apiFetch("/api/finance/payment-storage/charge", {
+      method: "POST", body: JSON.stringify({ caseId: c.id }),
+    }),
+    onSuccess: () => {
+      toast.success("Storage Invoice created");
+      void qc.invalidateQueries({ queryKey: ["finance", "storage-cases", c.order_id] });
+      void qc.invalidateQueries({ queryKey: ["finance", "invoice-register"], exact: false });
+      onDone();
+    },
+    onError: (e: Error) => toast.error(`The Storage Invoice was not created — ${e.message}`),
+  });
   return <div className="rounded-card border border-base-200 p-3" data-testid={`storage-case-${c.product_group}`}>
     <p className="font-semibold">{GROUP_WORD[c.product_group]}{c.status === "closed" ? " · Closed" : ""}</p>
     <p>Storage started {fmtDate(c.storage_start)} · today is day {charge.dayOfStorage}</p>
@@ -106,9 +124,16 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
         ? ` · approved${c.approval_reason ? ` — ${c.approval_reason}` : ""}` : ""}</p>
     <p>{charge.commencedPeriods === 0
       ? "No storage charge yet."
-      : `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)} — not on a Storage Invoice yet.`}</p>
-    {canAct && c.status === "open" && c.rule_extra_free_allowed && !extending &&
-      <button className="btn-secondary mt-2" onClick={onExtend}>Request more free days</button>}
+      : billed >= charge.commencedPeriods
+        ? `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)} — all on a Storage Invoice.`
+        : `${charge.commencedPeriods} charge period${charge.commencedPeriods === 1 ? "" : "s"} started · ${rm(charge.amountOwed)} — ${unbilled} not on a Storage Invoice yet.`}</p>
+    <div className="flex flex-wrap gap-2 mt-2">
+      {canAct && c.status === "open" && unbilled > 0 &&
+        <button className="btn-secondary" disabled={mint.isPending}
+          onClick={() => mint.mutate()}>Create Storage Invoice</button>}
+      {canAct && c.status === "open" && c.rule_extra_free_allowed && !extending &&
+        <button className="btn-secondary" onClick={onExtend}>Request more free days</button>}
+    </div>
     {extending && <ExtraFreeForm caseId={c.id} onDone={onDone} onBack={onDone} />}
   </div>;
 }
