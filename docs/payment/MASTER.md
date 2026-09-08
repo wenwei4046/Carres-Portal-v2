@@ -818,30 +818,91 @@ Reports→Payment door card and the §13 no-refund wording, and carries NO `Reco
 string; the live `ops_delivery_orders_money_gate` function body contains the 0441 storage
 block, reads the storage kinds and performs the subtract-once arithmetic.
 
-### Outstanding governed acceptance — why the status stays PARTIALLY DELIVERED
+### The three external dependencies, stated exactly (2026-09-08)
 
-**The Work/Delivery money-gate convergence is the outstanding BUSINESS-CRITICAL
-integration** — the gate and shared Work still read the legacy C9 storage columns, not the
-canonical §2 obligations (the named gap above); until it ships, a Storage Invoice does not
-hold a DO and a legacy-keyed fee never reaches Payment's arithmetic. Beyond it: message
-assembly with bank routing and Partner contact stays blocked on its owner inputs; the
-payment-link customer wording awaits its owner-approved template; provider end-to-end
-Stripe testing awaits authorised test-mode access; and the destructive retirement of the
-rejected Refund/Bank Matching surfaces awaits its own authorization. The complete approved customer
-Important Notes wording has not been located in the repository and has been requested from its
-owner; it must not be invented or shortened during implementation — the manager can also paste
-it into a `Standard bank transfer` template once approved. The Calendar correction's
-production DOM-interaction walk is done (above); the production VISUAL pass (blocked on a
-visible signed-in owner window), a native-zoom 200% pass, an owner walk of the whole Payment
-surface and the remaining target work keep the overall status PARTIALLY DELIVERED.
+**1 · Browser — what connecting it does and does NOT unlock.** Verified against the tool
+contracts before promising anything: BOTH browser surfaces state that page-zoom shortcuts
+(`cmd+=` / `ctrl+-` / `cmd+0`) are **not supported and return an error** — only a
+magnify-a-region screenshot exists. So native browser zoom is **not drivable by automation
+at all**, and connecting the browser does NOT unlock the native-200% check. What it does
+unlock: the production VISUAL inspection at real sizes, the Storage journey's authenticated
+interaction walk, and the production check of the converged Work/gate readers. The
+native-200% pass needs a HUMAN keypress (⌘ + twice on the signed-in page) — or it stays what
+it is today: layout-equivalent viewport evidence, never called acceptance.
 
-### Approved target / not claimed built by this scope
+**2 · Stripe — the approved test environment and its credential setup.** The Worker reads
+`STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from Cloudflare Worker secrets
+(`apps/api/wrangler.toml`), and today's production values are LIVE mode (`cs_live_` sessions
+on record). Provider end-to-end verification therefore requires, and must not be faked:
+a Stripe **test-mode** key pair (`sk_test_…` plus the test webhook endpoint's `whsec_…`), set
+as secrets on a **separate non-production Worker environment** — `wrangler secret put
+STRIPE_SECRET_KEY --env <non-production>` and the same for the webhook secret, entered by the
+owner straight into Wrangler. Secrets are never pasted into a chat, never read back, and the
+production live pair is never replaced for testing. Until that environment exists, the
+provider lifecycle stays PENDING and the database posting contract stands on its probes.
 
-Payments + Invoices Registers and full-width object UI; structured collection outcomes and promise-to-pay; immutable
-invoice/receipt snapshots beyond the present receipt identity; overpayment/reallocation review;
-Payment-owned storage rules, requests, invoices and settings; global Duty/cover; complete reports;
-and retirement of the rejected routine Refund/Bank Matching/Negative Payment surfaces remain
-approved target work. Their absence does not reopen this production-verified posting contract.
+**3 · The business content owed, consolidated into one request.** Two owner-supplied facts,
+and nothing may be invented or shortened in their place:
+   · the approved customer **Important Notes** wording — the bottom rules of the payment
+     message (may be pasted straight into `Settings → Payment → WhatsApp templates` as the
+     `Standard bank transfer` template);
+   · the **receiving bank account numbers** for the two seeded, approved banks — PJ
+     own-showroom → Hong Leong Bank, Dealer → RHB (both rows exist with the account number
+     empty; a manager enters them in `Settings → Payment`, never through this chat).
+Both block only the dependent customer messages (#20 in the list below); no other delivery
+waits on them.
+
+### THE ONE FACTUAL GAP LIST — audited 2026-09-08, whole approved mission
+
+Audit method: every approved capability in §2–§17 was searched for in the repository and,
+where it is data-bearing, counted in production. `BUILT` means shipped code plus at least
+deployment evidence; `PARTIAL` names exactly what is missing; `NOT BUILT` means no
+implementation exists. **Production data facts, measured 2026-09-08:** 1 invoice row (0 with
+a snapshot — the pre-0429 row), 0 live payments, 0 receipts, 0 allocations, 0 recorded
+messages, 2 seeded templates, 2 bank-account rows with NO account numbers, 0 storage cases,
+0 storage papers, 0 legacy storage signals. The posting chain has therefore never been
+exercised on live rows — its verification is probe/test based, as recorded in §14.
+
+| # | Approved capability | § | State | The precise gap |
+|---|---|---|---|---|
+| 1 | Canonical posting, allocation, receipt identity, idempotency | 2 | **BUILT** | Production-verified 0351; no live rows exist yet |
+| 2 | Payments + Invoices Registers, one-scroll objects, Inspect | 3·16 | **BUILT** | — |
+| 3 | Record payment (6 methods, evidence, review sentences) | 3·16 | **BUILT** | — |
+| 4 | Invoice lifecycle: draft → issue → void + replacement lineage | 4 | **BUILT** | — |
+| 5 | Invoice document from its immutable snapshot | 4·16 | **BUILT** | — |
+| 6 | **Receipt reprint from an immutable snapshot** | 4 | **PARTIAL** | A receipt PDF template and `Print receipt` exist, but the receipt renders from a LIVE read; there is no receipt snapshot column and no receipt document route. §4 asks reprint to use "the same number/snapshot" |
+| 7 | **Structured collection outcomes** (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **NOT BUILT** | No such control exists anywhere; staff cannot record a result, so the system never creates the next action from one |
+| 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **NOT BUILT** | Depends on #7; the §3 risk sort therefore cannot rank "missed promise" |
+| 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
+| 10 | **Likely-duplicate inspection before privileged continuation** | 5 | **NOT BUILT** | Posting is idempotent per key, but nothing compares customer/amount/date/reference or forces inspection |
+| 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |
+| 12 | Void payment with reason + approver duty | 5 | **BUILT** | — |
+| 13 | Storage case: witnesses, derived permanent start, rule snapshot | 6·7 | **BUILT** | 0436/0439 with probes |
+| 14 | Storage charging → Storage / Additional Storage Invoice | 4·7 | **BUILT** | 0438 with probe |
+| 15 | Storage waiver ladder (Operation → Waiver Approver → nobody) | 7 | **BUILT** | 0436 with probe |
+| 16 | **`Request a later delivery date` customer form** | 6 | **NOT BUILT** | §6's DEFAULT storage evidence. Today a case can only be opened from a typed witness note; the structured customer submission (new date, reason, terms acknowledgement, free-storage request) does not exist |
+| 17 | **`Check the stored furniture` inspection work every 30 days** | 6 | **NOT BUILT** | The interval is configured in Settings (0431) and nothing raises the work |
+| 18 | Storage obligations reconciled across every reader + the DB gate | 2·14 | **BUILT** | Five-surface reconciliation test; 0441/0445 probes |
+| 19 | Ask the customer to pay + immutable message ledger | 16 | **BUILT** | — |
+| 20 | **Complete §16 customer message assembly** (bank routing, Partner contact, Important Notes) | 16 | **BLOCKED — owner content** | Wording and bank account numbers are owner inputs; 2 bank rows exist with NO account numbers. Never invented |
+| 21 | Template library, versions, defaults, manager gate | 16 | **BUILT** | 0435 with probe |
+| 22 | Online payment link journey + provider posting | 16 | **PARTIAL** | Journey and DB posting proven by probe; **provider end-to-end pending authorised Stripe test-mode access** — production keys are live mode |
+| 23 | Send receipt (template-driven) | 16 | **BUILT** | — |
+| 24 | Reports → Payment, six listings + Excel export | 11·16 | **BUILT** | — |
+| 25 | **One read-only customer statement** | 11 | **NOT BUILT** | §11 asks for a statement deriving invoices, allocations, payments, voids and amount needed; no such surface exists |
+| 26 | Payment history filterable by date/customer/SO/amount/method/actor/exception | 11 | **PARTIAL** | Register filters and the communications ledger exist; there is no single history surface over the §11 axes |
+| 27 | Settings → Payment (banks, methods, templates, numbering, storage) | 12 | **BUILT** | 0431/0435; bank account NUMBERS are the manager's to enter and are empty |
+| 28 | Permissions: §12 role door, duties via the Shared Duty Resolver | 12 | **BUILT** | — |
+| 29 | Intentional rejects: no Refund queue, no Bank Matching workspace | 13 | **BUILT** | Refunds read-only history; Recon page and navigation retired; data and API kept |
+| 30 | Production VISUAL pass · native 200% zoom · Storage interaction walk | 14 | **BLOCKED — external** | Browser unavailable; both observed failure modes are recorded above |
+
+**Owner decisions open (not engineering choices):**
+- Does an unreconciled legacy storage fee HOLD the delivery, or stay work? (Today: work.)
+- The §16 Important Notes wording and the receiving bank account numbers (#20).
+
+**Overall status: PARTIALLY DELIVERED** — nine gaps above are unbuilt or partial approved
+capability, two are blocked on owner content, one on external access. The §14 build entries
+record what IS shipped; this table is the single list of what is not.
 
 ## 15 · Migration and module done-when
 
