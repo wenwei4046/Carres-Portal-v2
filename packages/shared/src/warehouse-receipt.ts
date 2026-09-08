@@ -363,6 +363,9 @@ export interface WarehouseIncomingLine {
   damaged_qty: number;
   wrong_item_qty: number;
   category: CaseProductCategory;
+  /** 0444 — the mode snapshotted at issue: `exact_unit` lines count one
+   *  result per Unit ID; `quantity` lines count pieces. */
+  identity_mode?: "exact_unit" | "quantity" | null;
 }
 
 export interface WarehouseIncomingPo {
@@ -378,6 +381,8 @@ export interface WarehouseIncomingPo {
     unit_code: string;
     sku: string;
     status: string;
+    /** 0442 — the immutable line this Unit was born for. */
+    po_line_id?: string | null;
   }>;
   /** Non-null when a count is already waiting for Carres — the PO must not
    *  offer a second form. */

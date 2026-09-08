@@ -1046,7 +1046,7 @@ function WorkCard({ row, owner }: { row: RegisterRow; owner: { userId: string; n
 function DocumentView({ row, owner, units, receiving, claims, destinations, unitLoading, receivingLoading, claimsLoading, unitError, receivingError, claimsError, onRetryUnits, onRetryReceiving, onRetryClaims, onSupplierDateSaved }: {
   row: RegisterRow;
   owner: { userId: string; name: string | null } | null;
-  units: Array<{ unit_code: string; sku: string; status: string }>;
+  units: Array<{ unit_code: string; sku: string; status: string; po_line_id?: string | null }>;
   receiving: Array<{ id: string; do_number: string | null; status: string; goods_received_at: string; return_reason: string | null }>;
   claims: Array<{ id: string; claim_no: string; status: string; requested_action: string | null }>;
   destinations: Array<{ id: string; name: string }>;
@@ -1062,8 +1062,18 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
   onSupplierDateSaved: () => void;
 }) {
   const po = row.po;
-  const unitsBySku = new Map<string, typeof units>();
-  for (const unit of units) unitsBySku.set(unit.sku, [...(unitsBySku.get(unit.sku) ?? []), unit]);
+  /* 0442 — a Unit belongs to the LINE it was born for (`po_line_id`); a Unit
+     born before the binding, on a PO with one line of its SKU, falls back to
+     the SKU match, which is exact for that case. Retired (voided) Units of a
+     reduced revision are not current IDs. */
+  const unitsByLine = new Map<string, typeof units>();
+  for (const unit of units) {
+    if (unit.status === "voided") continue;
+    const key = unit.po_line_id ?? `sku:${unit.sku}`;
+    unitsByLine.set(key, [...(unitsByLine.get(key) ?? []), unit]);
+  }
+  const unitsOf = (line: { id: string; sku: string }) =>
+    unitsByLine.get(line.id) ?? unitsByLine.get(`sku:${line.sku}`) ?? [];
   const returnRows = receiving.filter((receipt) => receipt.return_reason);
   /* Card 08 §3.5 — how many DISTINCT Manual Purchases feed this document.
      One: the bare label suffices everywhere. Several: each detailed source
@@ -1113,22 +1123,29 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
         <div className="-mx-4 -mb-3 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse text-body">
             <thead className="h-9 border-y border-kit-slate-5 bg-kit-slate-3 text-left text-label uppercase tracking-wide text-kit-slate-9">
-              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Unit IDs</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Order Qty</th><th className="px-3 text-right">Received Qty</th><th className="px-3 text-right">Pending Delivery Qty</th></tr>
+              <tr><th className="px-3">SKU</th><th className="px-3">Item</th><th className="px-3">Unit ID</th><th className="px-3">Source</th><th className="px-3">Deliver To</th><th className="px-3 text-right">Order Qty</th><th className="px-3 text-right">Received Qty</th><th className="px-3 text-right">Pending Delivery Qty</th></tr>
             </thead>
             <tbody>
               {po.purchase_order_lines.map((line) => (
                 <tr key={line.id} className="h-[38px] border-b border-kit-slate-4">
                   <td className="px-3 font-mono">{line.sku}</td>
                   <td className="px-3">{[line.model_name, line.size].filter(Boolean).join(" · ") || line.sku}</td>
-                  {/* The units are the line's own rows: one code per physical
-                      piece, keyed back to the line by SKU (0153). They used to
-                      sit in a card of their own at the bottom of the page,
-                      cut off from the line they belong to (YH, 2026-09-04). */}
+                  {/* The Units are the line's own rows: one permanent Unit ID
+                      per physical piece, born with the official PO and bound
+                      to this line (0442/0443). A quantity line has none by
+                      law and prints `—`; an exact-unit line with none is an
+                      integrity failure, never an ordinary empty state. They
+                      used to sit in a card of their own at the bottom of the
+                      page, cut off from the line (YH, 2026-09-04). */}
                   <td className="px-3 py-1.5 align-top" data-testid={`po-line-units-${line.id}`}>{
                     unitLoading ? <span className="text-kit-slate-9">Loading…</span>
                     : unitError ? <button type="button" className="text-kit-blue-11 hover:underline" onClick={onRetryUnits}>Unit IDs could not be loaded. Try again</button>
-                    : unitsBySku.get(line.sku)?.length
-                      ? <ul className="m-0 list-none p-0">{unitsBySku.get(line.sku)!.map((unit) => <li key={unit.unit_code} className="whitespace-nowrap"><span className="font-mono">{unit.unit_code}</span> <span className="text-meta text-kit-slate-9">{unit.status}</span></li>)}</ul>
+                    : line.identity_mode === "quantity"
+                      ? <Absence>—</Absence>
+                    : unitsOf(line).length
+                      ? <ul className="m-0 list-none p-0">{unitsOf(line).map((unit) => <li key={unit.unit_code} className="whitespace-nowrap font-mono">{unit.unit_code}</li>)}</ul>
+                    : line.identity_mode === "exact_unit" && po.status !== "cancelled"
+                      ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
                   }</td>
                   <td className="px-3">{line.governed_sources?.length ? line.governed_sources.map((source) => {

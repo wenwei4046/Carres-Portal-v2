@@ -82,6 +82,7 @@ const queryData = {
           sku: "MAT-K-001",
           qty: 3,
           received_qty: 1,
+          identity_mode: null as "exact_unit" | "quantity" | null,
           model_name: "Cody",
           size: "King",
           destination_id: "destination-1" as string | null,
@@ -257,6 +258,7 @@ beforeEach(() => {
     { id: "destination-2", name: "Carres Penang", is_default: false },
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
+  queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = null;
   queryData.pos[0]!.eta_date = "2026-09-10";
   queryData.pos[0]!.official_delivery_date = "2026-09-10";
   queryData.pos[0]!.sends[0]!.po_version = 1;
@@ -548,6 +550,37 @@ describe("Purchase Order object", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.getAllByText("Loading…")).toHaveLength(3);
     expect(screen.queryByText("No Unit ID")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ UNIT ID BORN WITH OFFICIAL PO (owner ruling 2026-09-07, Card 10). */
+  it("heads the goods-line column `Unit ID` and lists the line's own IDs, without a database status word", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(screen.getByText("Unit ID")).toBeInTheDocument();
+    expect(screen.queryByText("Unit IDs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Item ID")).not.toBeInTheDocument();
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByText("U1-000-001")).toBeInTheDocument();
+    expect(cell.queryByText("incoming")).not.toBeInTheDocument();
+  });
+
+  it("prints `—` for a quantity-scoped line — intentional, never `Not allocated`", () => {
+    queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
+    connectionEmpty = true;
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByText("—")).toBeInTheDocument();
+    expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
+    expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
+    expect(cell.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("names an exact-unit line with no Unit IDs as an integrity failure, not an empty state", () => {
+    queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "exact_unit";
+    connectionEmpty = true;
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+    expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 
   it("states successful empty connections instead of leaving blank panels", () => {

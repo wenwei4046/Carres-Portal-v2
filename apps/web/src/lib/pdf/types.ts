@@ -186,8 +186,12 @@ export type PoTemplateData = {
      * payloads may omit it, in which case the PO-level destination applies. */
     destination?: { name: string; address: string } | null;
     attrs?: Record<string, unknown> | null;
-    /** ops_stock_items.unit_code — minted at PO-open under the locked
-     *  `U1-000-001` identity (0381); the Item ID column is fed by this. */
+    /** 0442 — the line's snapshotted stock identity mode. A `quantity` line
+     *  legitimately prints `—` in the UNIT ID column. */
+    identity_mode?: "exact_unit" | "quantity" | null;
+    /** ops_stock_items.unit_code — born at official PO issue under the locked
+     *  `U1-000-001` identity (0381/0443), bound to THIS line; the UNIT ID
+     *  column is fed by this. */
     unit_codes?: string[] | null;
     /**
      * ⭐ WHICH CUSTOMER ORDER EACH UNIT ON THIS LINE IS FOR (`po_line_sources`,

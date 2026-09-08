@@ -73,6 +73,10 @@ export async function syncCompartmentSku(
      * from the quotation. Like `supplierId` since 2026-08-26: an explicit
      * value always wins. */
     supplierCode?: string | null;
+    /** 0442 — the stock identity mode the SKU is minted with. Absent leaves
+     *  the row as it is (NULL on a new row: PO issue refuses until Catalog
+     *  sets it). Never derived here from the category. */
+    stockIdentityMode?: "exact_unit" | "quantity";
   },
 ): Promise<CompartmentSkuResult> {
   // 1. The model gives the sku prefix (model_key), the category (supplier +
@@ -205,6 +209,7 @@ export async function syncCompartmentSku(
       ...(args.supplierCode === undefined
         ? {}
         : { supplier_code: args.supplierCode?.trim() || null }),
+      ...(args.stockIdentityMode ? { stock_identity_mode: args.stockIdentityMode } : {}),
       // "Sofa {Model} {code}" (Loo 2026-07-06) — the SKU Master row names the
       // model+compartment pair, NOT the pool compartment's own description
       // (e.g. "Sofa Angsa 1A(LHF)", not "Left hand facing"). Format lives in

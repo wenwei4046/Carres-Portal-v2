@@ -2690,9 +2690,12 @@ PO placed → Unit ID born → supplier can label it → Receiving confirms arri
 → reserve to SO or keep purchasing demand → out for delivery → delivered / returned
 ```
 
-Unit ID is born when the PO is placed, before receiving, and the same identity follows the
-physical item through supplier labelling, Receiving, Warehouse, reservation, Delivery, return,
-inspection and reuse. The register answers which real Unit exists, where it is, its condition,
+Unit ID is born when the official PO is issued — in the PO's own transaction, one per ordered
+piece of a Catalog-traced (exact-unit) SKU, bound to the PO line — before receiving, and the same
+identity follows the physical item through supplier labelling, Receiving, Warehouse, reservation,
+Delivery, return, inspection and reuse. Catalog quantity goods (interchangeable accessories) are
+born with no Unit ID and are reconciled by count; Receiving verifies IDs and never creates one
+(owner ruling 2026-09-07, Purchasing §6.2). The register answers which real Unit exists, where it is, its condition,
 which SO it is reserved for and the PO it came from.
 
 **Ready Stock law:** the system may offer compatible existing warehouse stock; a human decides
@@ -4710,7 +4713,7 @@ Nobody else may create, edit or delete a decision; deletion is refused by trigge
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
 itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
 an owing order with no approved approval, whichever path writes it — including the legacy 0098
-dispatch backstop. Since `0441` (2026-09-07, payment/MASTER.md §2 convergence) the trigger's
+dispatch backstop. Since `0442` (2026-09-07, payment/MASTER.md §2 convergence) the trigger's
 outstanding also counts the SO's live ISSUED Storage / Additional Storage Invoices, with `paid`
 subtracted exactly once from the combined obligation — an unpaid storage paper blocks the mint;
 a voided one (the waiver path) does not; the LEGACY C9 storage columns stay asserted by the TS

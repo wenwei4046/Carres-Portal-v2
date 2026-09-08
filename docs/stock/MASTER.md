@@ -81,11 +81,17 @@ Every physical sofa Carres controls has one permanent Carres Unit ID, including 
 supplier-consignment display goods, sold display goods awaiting delivery, and goods awaiting repair,
 change, return or supplier collection.
 
-The ID is created when a PO or Consignment Order is confirmed and supplied to the supplier. The
-locked human format is `U1-000-001`: six system-controlled digits grouped 3 + 3. After
-`U1-999-999`, allocation continues at `U2-000-001`. Allocation is company-wide, never reset,
-manually created or reused. Search/scan may normalise punctuation, but the visible identity never
-changes.
+The ID is born when the official PO or Consignment Order is issued — in the same transaction as
+the document number, bound to its document line, for every destination (owner ruling 2026-09-07;
+Purchasing §6.2). The locked human format is `U1-000-001`: six system-controlled digits grouped
+3 + 3. After `U1-999-999`, allocation continues at `U2-000-001`. Allocation is company-wide, never
+reset, manually created or reused. Search/scan may normalise punctuation, but the visible identity
+never changes. **Which goods carry a Unit ID is Catalog's stored answer** (`stock_identity_mode`):
+traceable furniture and independently saleable or replaceable modules are exact Units; governed
+interchangeable accessories and bulk goods are **quantity goods** — counted, never given a Unit ID.
+A quantity good lives in the register as a bulk row (`qty` > 1 pieces, `identity_scope =
+quantity`, 0218) whose technical register key is never shown, printed or scanned as a Unit ID.
+Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
 The supplier currently adds `CARRES UNIT ID: U1-000-001` only to its own package label. A supplier
 physical-Unit label, QR, barcode and Carres template are not required now. Carres Operations attaches

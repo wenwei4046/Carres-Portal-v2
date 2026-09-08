@@ -1606,6 +1606,8 @@ export {
 // types live in the schemas/catalog export block; the adapters are reached via
 // Adapters.* like fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
+/** 0442 — the Catalog-owned stock identity mode of a SKU. */
+export type { StockIdentityMode } from "./domain";
 
 // 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
 // the canonical seat-height axis. `sofaComboFromRow` is also reachable via
