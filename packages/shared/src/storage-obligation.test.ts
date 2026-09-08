@@ -3,18 +3,20 @@ import { orderMoney } from "./order-money";
 import { invoiceStorageSumOf, storageObligation } from "./storage-obligation";
 
 describe("storageObligation — one precedence law, subtract once", () => {
-  it("invoice-backed storage DECIDES the money; a keyed legacy fee is carried, not merged", () => {
+  it("both models count, each exactly once — nothing is erased and nothing is merged", () => {
     const r = storageObligation({
-      invoiceStorageSum: 158, storagePaperHistory: true, goodsTotal: 1000, paid: 0,
+      invoiceStorageSum: 158, goodsTotal: 1000, paid: 0,
       legacyOwing: 300, legacyReleased: false,
     });
-    expect(r).toMatchObject({ owing: 158, gross: 158, source: "mixed" });
+    // A C9 fee is cleared only by collection or an override of 0 — never by a
+    // paper existing beside it. 158 + 300, each under its own rule.
+    expect(r).toMatchObject({ owing: 458, gross: 458, source: "mixed" });
     expect(r.unreconciledLegacy).toBe(300);
   });
   it("paid past the goods value spills into storage instead of leaving a stale hold", () => {
     // goods 1000 · storage 158 · paid 1100 → total out 58, goods out 0.
     const r = storageObligation({
-      invoiceStorageSum: 158, storagePaperHistory: true, goodsTotal: 1000, paid: 1100,
+      invoiceStorageSum: 158, goodsTotal: 1000, paid: 1100,
       legacyOwing: 0, legacyReleased: false,
     });
     expect(r.owing).toBe(58);
@@ -25,7 +27,7 @@ describe("storageObligation — one precedence law, subtract once", () => {
   });
   it("a fully paid SO leaves NO stale storage hold in the gate", () => {
     const r = storageObligation({
-      invoiceStorageSum: 158, storagePaperHistory: true, goodsTotal: 1000, paid: 1158,
+      invoiceStorageSum: 158, goodsTotal: 1000, paid: 1158,
       legacyOwing: 0, legacyReleased: false,
     });
     expect(r.owing).toBe(0);
@@ -35,7 +37,7 @@ describe("storageObligation — one precedence law, subtract once", () => {
   });
   it("partial payment holds the remainder — both goods and storage", () => {
     const r = storageObligation({
-      invoiceStorageSum: 150, storagePaperHistory: true, goodsTotal: 1000, paid: 400,
+      invoiceStorageSum: 150, goodsTotal: 1000, paid: 400,
       legacyOwing: 0, legacyReleased: false,
     });
     expect(r.owing).toBe(150);
@@ -45,7 +47,7 @@ describe("storageObligation — one precedence law, subtract once", () => {
   });
   it("with NO storage paper the legacy C9 answer passes through byte-identical", () => {
     const r = storageObligation({
-      invoiceStorageSum: 0, storagePaperHistory: false, goodsTotal: 1000, paid: 5000,
+      invoiceStorageSum: 0, goodsTotal: 1000, paid: 5000,
       legacyOwing: 200, legacyReleased: false,
     });
     // NOT netted against paid — C9's clearing fact is collected_at, not paid.
@@ -53,7 +55,7 @@ describe("storageObligation — one precedence law, subtract once", () => {
   });
   it("the C9 release flag passes through on both sources and clears nothing", () => {
     const inv = storageObligation({
-      invoiceStorageSum: 150, storagePaperHistory: true, goodsTotal: 1000, paid: 1000,
+      invoiceStorageSum: 150, goodsTotal: 1000, paid: 1000,
       legacyOwing: 0, legacyReleased: true,
     });
     expect(inv).toMatchObject({ owing: 150, released: true });
@@ -66,7 +68,7 @@ describe("storageObligation — one precedence law, subtract once", () => {
   });
   it("no paper and no legacy fee is honestly nothing", () => {
     expect(storageObligation({
-      invoiceStorageSum: 0, storagePaperHistory: false, goodsTotal: 1000, paid: 0,
+      invoiceStorageSum: 0, goodsTotal: 1000, paid: 0,
       legacyOwing: 0, legacyReleased: false,
     })).toMatchObject({ owing: 0, source: "none" });
   });
@@ -94,20 +96,21 @@ describe("BOUNDARY 1 — the last live Storage Invoice is voided", () => {
     // then VOIDED — the §12 waiver path. The old C9 charge must NOT come back.
     const afterVoid = storageObligation({
       invoiceStorageSum: 0,          // every paper voided
-      storagePaperHistory: true,     // …but this order IS under the invoice model
+          // …but this order IS under the invoice model
       goodsTotal: 1000, paid: 1000,
       legacyOwing: 300, legacyReleased: false,
     });
-    // THE POINT: owing is 0 — the waived paper did not bring the old charge
-    // back. The legacy figure is still NAMED (source `mixed`) so it is not
-    // lost either; it is work to resolve, not a resurrected debt.
-    expect(afterVoid.owing).toBe(0);
-    expect(afterVoid.source).toBe("mixed");
-    expect(afterVoid.unreconciledLegacy).toBe(300);
+    // THE CORRECTED POINT: voiding a paper is the §4 CORRECTION path, not a
+    // waiver — so it forgives nothing, and the still-valid C9 fee (cleared
+    // only by collection or an override of 0) stays owed. The papers ask
+    // nothing until a replacement is issued; the legacy 300 still stands.
+    expect(afterVoid.owing).toBe(300);
+    expect(afterVoid.source).toBe("legacy");
+    expect(afterVoid.unreconciledLegacy).toBe(0);
   });
-  it("an order that was NEVER under the invoice model keeps its C9 answer", () => {
+  it("an order with no paper keeps its C9 answer, unchanged", () => {
     expect(storageObligation({
-      invoiceStorageSum: 0, storagePaperHistory: false,
+      invoiceStorageSum: 0,
       goodsTotal: 1000, paid: 1000,
       legacyOwing: 300, legacyReleased: false,
     })).toMatchObject({ owing: 300, source: "legacy" });
@@ -119,30 +122,30 @@ describe("BOUNDARY 2 — mixed obligations (one group invoiced, one still legacy
     // Mattress group invoiced RM 150; the sofa group's fee still sits in the
     // legacy columns as RM 200. Goods RM 1,000 fully paid.
     const mixed = storageObligation({
-      invoiceStorageSum: 150, storagePaperHistory: true,
+      invoiceStorageSum: 150,
       goodsTotal: 1000, paid: 1000,
       legacyOwing: 200, legacyReleased: false,
     });
-    // The invoice model decides the money (150, netted once); the legacy 200
-    // is neither merged into it nor dropped — it comes out named.
-    expect(mixed.owing).toBe(150);
+    // 150 (papers, netted once) + 200 (C9, its own rule) — neither erased,
+    // neither merged, neither counted twice.
+    expect(mixed.owing).toBe(350);
     expect(mixed.source).toBe("mixed");
     expect(mixed.unreconciledLegacy).toBe(200);
   });
-  it("a paid-up invoiced order owes nothing on the papers, and still NAMES the legacy fee", () => {
+  it("a paid-up invoiced order owes nothing on the papers and still OWES the legacy fee", () => {
     const mixed = storageObligation({
-      invoiceStorageSum: 150, storagePaperHistory: true,
+      invoiceStorageSum: 150,
       goodsTotal: 1000, paid: 1150,   // goods + the paper are settled
       legacyOwing: 200, legacyReleased: false,
     });
-    // Nothing is invented as a hold; nothing is lost either — the operator
-    // sees the unreconciled fee and resolves it (collect it, or void/clear).
-    expect(mixed.owing).toBe(0);
+    // The papers are settled; the C9 fee is not, and only collection or an
+    // override of 0 clears it. The operator sees it named and collapses it.
+    expect(mixed.owing).toBe(200);
     expect(mixed.unreconciledLegacy).toBe(200);
   });
   it("no legacy figure means no mixed state and no flag", () => {
     const clean = storageObligation({
-      invoiceStorageSum: 150, storagePaperHistory: true,
+      invoiceStorageSum: 150,
       goodsTotal: 1000, paid: 1000,
       legacyOwing: 0, legacyReleased: false,
     });

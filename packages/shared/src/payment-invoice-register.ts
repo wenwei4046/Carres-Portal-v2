@@ -75,6 +75,10 @@ export interface InvoiceRegisterRow {
       id: string; kind: string; message_text: string; template_key: string | null;
       sent_screenshot_url: string; recorded_at: string;
     }>;
+    /** The legacy C9 storage figure for this order, derived server-side
+     *  through the shared `storageHold` (the 2026-09-08 correction) so the
+     *  Payment screens, Work and the gate cannot disagree on a legacy order. */
+    legacy_storage_owing?: number;
     order_lines: Array<{ sku?: string; qty: number; unit_price: number | string | null }>;
     order_addons: Array<{ qty: number; unit_price: number | string | null }>;
     ops_order_control: Array<{
@@ -204,17 +208,23 @@ export function soRemaining(
   // lineage (0429) plus billed_through_period (0438) keep the obligation from
   // being lost — the replacement is there to ISSUE, and the case card says a
   // correction is in progress.
-  const storageOwing = mine
+  const papers = mine
     .filter((r) => r.kind !== "sales" && r.status === "issued" && !r.voided_at)
     .reduce((sum, r) => sum + Number(r.amount) + Number(r.tax_amount), 0);
+  // The 2026-09-08 correction: a LEGACY C9 fee is owed under its own rule
+  // (cleared only by collection or an override of 0), so the Payment screens
+  // carry it exactly as Work and the gate do — never netted against `paid`,
+  // because C9 never read `paid`.
+  const legacy = Math.max(0, Number(door.orders?.legacy_storage_owing ?? 0));
   const goods = invoiceNeeded(door);
+  const storageOwing = papers + legacy;
   if (!goods.known) return { known: false, outstanding: 0, storageOwing, overpaid: 0 };
   const total = goods.total ?? 0;
   return {
     known: true,
-    outstanding: Math.max(0, total + storageOwing - goods.paid),
+    outstanding: Math.max(0, total + papers - goods.paid) + legacy,
     storageOwing,
-    overpaid: Math.max(0, goods.paid - (total + storageOwing)),
+    overpaid: Math.max(0, goods.paid - (total + papers)),
   };
 }
 

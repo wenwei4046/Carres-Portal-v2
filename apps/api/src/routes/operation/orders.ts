@@ -24,7 +24,6 @@ import {
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
-  hasStoragePaperHistory,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -1254,7 +1253,6 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
   const storage = storageObligation({
     invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-    storagePaperHistory: hasStoragePaperHistory(invoiceRows),
     goodsTotal: lineSum + addonSum,
     paid: ord.paid,
     legacyOwing: hold.owing,
