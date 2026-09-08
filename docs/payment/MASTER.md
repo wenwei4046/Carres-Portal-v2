@@ -922,6 +922,32 @@ promise that cannot be read must not quietly turn back into an ordinary balance.
 
 Six projection tests pin it, including the two negative controls above.
 
+### BUILD — the one read-only customer statement, 2026-09-08
+
+§11 asks for a statement that DERIVES invoices, allocations, payments, voids and the amount
+needed. Derives is the operative word: nothing on it is stored or summed a second time. The
+invoices and payments are the canonical rows, and the amount still needed comes from the same
+shared `soRemaining` the Calendar, the Reports and the Invoice object read. A statement that
+computed its own total would be a second arithmetic — and the first thing to disagree with the
+delivery gate.
+
+It spans the CUSTOMER, not the invoice you arrived from. One customer holding several Sales
+Orders is normal here, and a statement showing one of them is not a statement. The customer is
+matched the way §5's duplicate check matches one: the same phone digits when both orders carry
+a usable one, else the same name — and the page says WHICH rule answered, so nobody mistakes a
+name match for a complete picture.
+
+An order whose price nobody recorded says so. It never prints a confident RM 0, because "we do
+not know" and "nothing is owed" are different answers and only one of them is safe to show a
+customer.
+
+The legacy C9 storage attachment the register performs was extracted into one helper both
+readers call, so the register and the statement cannot disagree about an order's storage.
+
+Read-only, by §11's own word: there is no action on the page. Ten route and composition tests
+pin it, including the customer span, the name fallback, the unknown-price answer, and that the
+voids and allocations are carried.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -1079,7 +1105,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 22 | Online payment link journey + provider posting | 16 | **PARTIAL** | Journey and DB posting proven by probe; **provider end-to-end pending authorised Stripe test-mode access** — production keys are live mode |
 | 23 | Send receipt (template-driven) | 16 | **BUILT** | — |
 | 24 | Reports → Payment, six listings + Excel export | 11·16 | **BUILT** | — |
-| 25 | **One read-only customer statement** | 11 | **NOT BUILT** | §11 asks for a statement deriving invoices, allocations, payments, voids and amount needed; no such surface exists |
+| 25 | One read-only customer statement | 11 | **BUILT** | `GET /invoices/statement/:orderId` derives it across the CUSTOMER's Sales Orders through the same shared `soRemaining`; `Statement` opens it from the invoice object. Read-only, with no action on it |
 | 26 | Payment history filterable by date/customer/SO/amount/method/actor/exception | 11 | **PARTIAL** | Register filters and the communications ledger exist; there is no single history surface over the §11 axes |
 | 27 | Settings → Payment (banks, methods, templates, numbering, storage) | 12 | **BUILT** | 0431/0435; bank account NUMBERS are the manager's to enter and are empty |
 | 28 | Permissions: §12 role door, duties via the Shared Duty Resolver | 12 | **BUILT** | — |
@@ -1099,8 +1125,8 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   perform either. The engineering is right; the assignment is missing. Naming the holder is
   the owner's, exactly as the PO/GRN rotation was.
 
-**Overall status: PARTIALLY DELIVERED** — eight gaps above are unbuilt or partial approved
-capability, two are blocked on owner content, one on external access. The §14 build entries
+**Overall status: PARTIALLY DELIVERED** — seven gaps above are unbuilt or partial approved
+capability, one is blocked on owner content, one on external access. The §14 build entries
 record what IS shipped; this table is the single list of what is not.
 
 ## 15 · Migration and module done-when

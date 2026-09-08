@@ -15,6 +15,8 @@ import {
   invoiceRegisterQuery,
   invoiceVoidReplaceInput,
   recordMessageInput,
+  soRemaining,
+  type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
 import { orderMoney } from "@carres/shared/order-money";
 import { requireFinance } from "../../lib/auth-guards";
@@ -99,12 +101,22 @@ financeInvoicesRouter.get("/register", async (c) => {
   if (error || count == null || data == null) {
     throw new HTTPException(500, { message: "Invoices could not be loaded. Try again." });
   }
-  // The legacy C9 storage figure, derived server-side through the SAME shared
-  // `storageHold` the Work engine and the booking gate use (Law D), once per
-  // order for the whole page — the catalog read is batched over every SKU on
-  // it. Attached as a source fact so `soRemaining` can add it without a
-  // second arithmetic anywhere.
   const rows = data as unknown as Array<Record<string, unknown>>;
+  await attachLegacyStorage(sb, rows);
+  return c.json({ rows, total: count });
+});
+
+/**
+ * The legacy C9 storage figure, derived server-side through the SAME shared
+ * `storageHold` the Work engine and the booking gate use (Law D), once per
+ * order — the catalog read is batched over every SKU in the set. Attached as a
+ * source fact so `soRemaining` can add it without a second arithmetic anywhere.
+ *
+ * Every reader of these rows goes through here, so the register and the
+ * customer statement can never disagree about one order's storage.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachLegacyStorage(sb: any, rows: Array<Record<string, unknown>>) {
   const allSkus = new Set<string>();
   for (const r of rows) {
     const o = r.orders as { order_lines?: Array<{ sku?: string }> } | null;
@@ -139,7 +151,122 @@ financeInvoicesRouter.get("/register", async (c) => {
     const o = r.orders as { id?: string; legacy_storage_owing?: number } | null;
     if (o?.id) o.legacy_storage_owing = legacyByOrder.get(o.id) ?? 0;
   }
-  return c.json({ rows, total: count });
+}
+
+/**
+ * GET /statement/:orderId — the ONE read-only customer statement (§11).
+ *
+ * §11, verbatim: "One read-only customer statement derives invoices,
+ * allocations, payments, voids and amount needed."
+ *
+ * DERIVES is the operative word. Nothing here is stored or summed a second
+ * time: the invoices and payments are the canonical rows, and the amount still
+ * needed comes from the SAME shared `soRemaining` the Calendar, the Reports and
+ * the Invoice object read (Law D). A statement that computed its own total
+ * would be a second arithmetic, and the first thing to disagree with the gate.
+ *
+ * It spans the CUSTOMER, not the order in front of you — one customer holding
+ * several SOs is normal here, and a statement that showed one of them is not a
+ * statement. The customer is matched the way §5's duplicate check matches one:
+ * the same phone digits when both orders carry a usable one, else the same
+ * name.
+ *
+ * Read-only. There is no action on it, by §11's own word.
+ */
+financeInvoicesRouter.get("/statement/:orderId", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view customer statements." });
+  }
+  const anchorId = c.req.param("orderId");
+  if (!UUID_RE.test(anchorId)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "order id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data: anchor, error: anchorErr } = await sb
+    .from("orders")
+    .select("id,so,customer_name,customer_phone")
+    .eq("id", anchorId)
+    .maybeSingle();
+  if (anchorErr) {
+    const m = mapPgError(anchorErr);
+    return c.json(m.body, m.status);
+  }
+  if (!anchor) {
+    return c.json({ error: "not_found", code: "not_found", message: "Order not found." }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const who: any = anchor;
+  const digits = String(who.customer_phone ?? "").replace(/[^0-9]/g, "");
+  const name = String(who.customer_name ?? "").trim().toUpperCase();
+
+  let siblings = sb.from("orders").select("id");
+  if (digits.length >= 7) siblings = siblings.eq("customer_phone", who.customer_phone);
+  else if (name !== "") siblings = siblings.eq("customer_name", who.customer_name);
+  else siblings = siblings.eq("id", anchorId);
+  const { data: sibRows, error: sibErr } = await siblings;
+  if (sibErr) {
+    const m = mapPgError(sibErr);
+    return c.json(m.body, m.status);
+  }
+  const orderIds = [...new Set([anchorId, ...(sibRows ?? []).map((r: { id: string }) => r.id)])];
+
+  const { data: invData, error: invErr } = await sb
+    .from("invoices")
+    .select(INVOICE_REGISTER_SELECT)
+    .in("order_id", orderIds)
+    .order("created_at", { ascending: false });
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  const rows = (invData ?? []) as unknown as Array<Record<string, unknown>>;
+  await attachLegacyStorage(sb, rows);
+  const registerRows = rows as unknown as InvoiceRegisterRow[];
+
+  const { data: allocData, error: allocErr } = await sb
+    .from("payment_allocations")
+    .select("id,payment_id,order_id,invoice_id,amount,allocated_at,voided_at,void_reason")
+    .in("order_id", orderIds)
+    .order("allocated_at", { ascending: false });
+  if (allocErr) {
+    const m = mapPgError(allocErr);
+    return c.json(m.body, m.status);
+  }
+
+  // One block per Sales Order this customer holds, each with the money the ONE
+  // arithmetic says is still needed on it. An order whose price nobody recorded
+  // says so — it never prints a confident RM 0.
+  const bySo = orderIds.map((id) => {
+    const mine = registerRows.filter((r) => r.order_id === id);
+    const money = soRemaining(registerRows, id);
+    const order = mine[0]?.orders ?? null;
+    return {
+      order_id: id,
+      so: order?.so ?? null,
+      known: money.known,
+      still_needed: money.known ? money.outstanding : null,
+      storage_owing: money.storageOwing,
+      overpaid: money.overpaid,
+      invoices: mine.map((r) => ({
+        id: r.id, invoice_no: r.invoice_no, kind: r.kind, status: r.status,
+        amount: r.amount, tax_amount: r.tax_amount, issued_at: r.issued_at,
+        voided_at: r.voided_at, void_reason: r.void_reason,
+        replaces_invoice_id: r.replaces_invoice_id,
+      })),
+      payments: (order?.order_payments ?? []).map((p) => ({
+        id: p.id, receipt_no: p.receipt_no, amount: p.amount, paid_on: p.paid_on,
+        method: p.method ?? null, reference: p.reference ?? null, voided_at: p.voided_at,
+      })),
+    };
+  }).filter((block) => block.invoices.length > 0 || block.payments.length > 0);
+
+  return c.json({
+    customer: { name: who.customer_name ?? null, phone: who.customer_phone ?? null },
+    matched_on: digits.length >= 7 ? "phone" : name !== "" ? "name" : "order",
+    orders: bySo,
+    allocations: allocData ?? [],
+  });
 });
 
 /** The draft door. The invoice asks for the order's money, so the amount is

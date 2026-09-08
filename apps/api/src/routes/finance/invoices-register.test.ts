@@ -262,3 +262,161 @@ describe("POST /api/finance/invoices/:id/void-replace", () => {
     expect((await request("operation", { reason: "Wrong amount" })).status).toBe(403);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/finance/invoices/statement/:orderId — §11's one read-only statement
+// ─────────────────────────────────────────────────────────────────────────────
+describe("GET /api/finance/invoices/statement/:orderId", () => {
+  const OTHER_ORDER = "00000000-0000-0000-0000-000000b99009";
+
+  function statementSource(over: {
+    anchor?: Record<string, unknown> | null;
+    siblings?: Array<{ id: string }>;
+    invoices?: unknown[];
+    allocations?: unknown[];
+  } = {}) {
+    const anchor = over.anchor === undefined
+      ? { id: ORDER_ID, so: 1300, customer_name: "LIM KUAN YANG", customer_phone: "012-345 6789" }
+      : over.anchor;
+    const calls: string[] = [];
+    const sb = {
+      from: vi.fn((table: string) => {
+        calls.push(table);
+        if (table === "orders") {
+          // The FIRST orders read is the anchor (maybeSingle); the second is
+          // the sibling sweep (awaited directly).
+          const first = calls.filter((t) => t === "orders").length === 1;
+          const chain: Record<string, unknown> = {};
+          chain.select = vi.fn().mockReturnValue(chain);
+          chain.eq = vi.fn().mockReturnValue(
+            first ? chain
+              : Promise.resolve({ data: over.siblings ?? [{ id: ORDER_ID }, { id: OTHER_ORDER }], error: null }),
+          );
+          chain.maybeSingle = vi.fn().mockResolvedValue({ data: anchor, error: null });
+          return chain;
+        }
+        if (table === "invoices") {
+          const chain: Record<string, unknown> = {};
+          chain.select = vi.fn().mockReturnValue(chain);
+          chain.in = vi.fn().mockReturnValue(chain);
+          chain.order = vi.fn().mockResolvedValue({ data: over.invoices ?? [], error: null });
+          return chain;
+        }
+        if (table === "payment_allocations") {
+          const chain: Record<string, unknown> = {};
+          chain.select = vi.fn().mockReturnValue(chain);
+          chain.in = vi.fn().mockReturnValue(chain);
+          chain.order = vi.fn().mockResolvedValue({ data: over.allocations ?? [], error: null });
+          return chain;
+        }
+        const chain: Record<string, unknown> = {};
+        chain.select = vi.fn().mockReturnValue(chain);
+        chain.in = vi.fn().mockResolvedValue({ data: [], error: null });
+        return chain;
+      }),
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+
+  async function request(role: string, id = ORDER_ID) {
+    return app.fetch(new Request(`http://t/api/finance/invoices/statement/${id}`, {
+      headers: { Authorization: `Bearer ${await makeJwt(role)}` },
+    }), env);
+  }
+
+  function invoiceRow(orderId: string, so: number, over: Record<string, unknown> = {}) {
+    return {
+      id: `inv-${so}`, invoice_no: `INV-${so}`, status: "issued", kind: "sales",
+      amount: 1000, tax_amount: 0, issued_at: "2026-09-01", voided_at: null,
+      void_reason: null, replaces_invoice_id: null, created_at: "2026-09-01T00:00:00Z",
+      order_id: orderId,
+      orders: {
+        id: orderId, so, customer_name: "LIM KUAN YANG", status: "proceed_order",
+        paid: 400, delivery_date: null, delivery_date_tbd: false, delivered_at: null,
+        order_payments: [{ id: `p-${so}`, receipt_no: `RC-${so}`, amount: 400,
+          paid_on: "2026-09-02", voided_at: null, reference: "TRF", method: "bank" }],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }], order_addons: [],
+        ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null,
+          line_stock_status: null }],
+      },
+      ...over,
+    };
+  }
+
+  it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading", async (role) => {
+    const res = await request(role);
+    expect(res.status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+
+  it("422 when the order id is not a uuid", async () => {
+    expect((await request("finance", "not-a-uuid")).status).toBe(422);
+  });
+
+  it("404 when the order is not there", async () => {
+    statementSource({ anchor: null });
+    expect((await request("finance")).status).toBe(404);
+  });
+
+  /** §11's point: the statement is the CUSTOMER's, not the order you came
+   *  from. One customer with several SOs is normal here. */
+  it("spans every Sales Order with the same phone number", async () => {
+    statementSource({
+      invoices: [invoiceRow(ORDER_ID, 1300), invoiceRow(OTHER_ORDER, 1301)],
+    });
+    const res = await request("finance");
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      matched_on: string; orders: Array<{ so: number; still_needed: number }>;
+    };
+    expect(body.matched_on).toBe("phone");
+    expect(body.orders.map((o) => o.so).sort()).toEqual([1300, 1301]);
+    // Derived through the ONE arithmetic: 1000 priced, 400 paid.
+    expect(body.orders.every((o) => o.still_needed === 600)).toBe(true);
+  });
+
+  /** "We do not know" and "nothing is owed" are different answers, and only
+   *  one of them is safe to show a customer. */
+  it("says the amount is not known rather than printing a confident RM 0", async () => {
+    const unpriced = invoiceRow(ORDER_ID, 1300);
+    unpriced.orders.order_lines = [];
+    statementSource({ siblings: [{ id: ORDER_ID }], invoices: [unpriced] });
+    const body = await (await request("finance")).json() as {
+      orders: Array<{ known: boolean; still_needed: number | null }>;
+    };
+    expect(body.orders[0].known).toBe(false);
+    expect(body.orders[0].still_needed).toBeNull();
+  });
+
+  it("falls back to the name when no usable phone number is recorded", async () => {
+    statementSource({
+      anchor: { id: ORDER_ID, so: 1300, customer_name: "LIM KUAN YANG", customer_phone: null },
+      siblings: [{ id: ORDER_ID }],
+      invoices: [invoiceRow(ORDER_ID, 1300)],
+    });
+    const body = await (await request("finance")).json() as { matched_on: string };
+    expect(body.matched_on).toBe("name");
+  });
+
+  it("carries the voids and the allocations, which is what a statement is for", async () => {
+    const voided = invoiceRow(ORDER_ID, 1300, {
+      id: "inv-void", status: "voided", voided_at: "2026-09-05", void_reason: "wrong amount",
+    });
+    statementSource({
+      siblings: [{ id: ORDER_ID }],
+      invoices: [voided],
+      allocations: [{ id: "a1", payment_id: "p-1300", order_id: ORDER_ID, invoice_id: null,
+        amount: 400, allocated_at: "2026-09-02T00:00:00Z", voided_at: null }],
+    });
+    const body = await (await request("finance")).json() as {
+      orders: Array<{ invoices: Array<{ voided_at: string | null; void_reason: string | null }> }>;
+      allocations: unknown[];
+    };
+    expect(body.orders[0].invoices[0]).toMatchObject({
+      voided_at: "2026-09-05", void_reason: "wrong amount",
+    });
+    expect(body.allocations).toHaveLength(1);
+  });
+});
+

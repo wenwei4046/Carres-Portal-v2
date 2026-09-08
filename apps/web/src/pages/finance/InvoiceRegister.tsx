@@ -15,6 +15,7 @@ import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
+import CustomerStatement from "./CustomerStatement";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
@@ -180,6 +181,8 @@ export default function InvoiceRegister() {
   // §16 — Print is a DIRECT output action: an issued invoice prints from its
   // immutable snapshot; a voided one keeps its paper and says VOIDED.
   const [printing, setPrinting] = useState(false);
+  // §11 — the ONE read-only statement, reached from the invoice you are on.
+  const [statement, setStatement] = useState(false);
   const printInvoice = async (row: InvoiceRegisterRow) => {
     if (printing) return;
     setPrinting(true);
@@ -201,23 +204,28 @@ export default function InvoiceRegister() {
   return <div className="flex h-full min-h-0 flex-col">
     {invoice ? <SalesOrderTabs identity={identityOf(invoice)}
       customer={invoice.orders?.customer_name} backLabel="Invoices" backTo="?"
-      onBack={(event) => { event.preventDefault(); setRecording(false); setLinking(false); close(); }}
+      onBack={(event) => { event.preventDefault(); setRecording(false); setLinking(false); setStatement(false); close(); }}
       status={STATUS_MARK[invoice.status] ? <span>{STATUS_MARK[invoice.status]}</span> : undefined}
       navigation={<span className="text-body">{invoice.orders ? `SO-${invoice.orders.so}` : "SO not available"}</span>}
       right={<span className="flex items-center gap-2">
-        {invoice.invoice_no && !recording && !asking && !linking && !resulting &&
+        {invoice.orders && !recording && !asking && !linking && !resulting && !statement &&
+          <button className="btn-secondary"
+            onClick={() => setStatement(true)}>Statement</button>}
+        {invoice.invoice_no && !recording && !asking && !linking && !resulting && !statement &&
           <button className="btn-secondary" disabled={printing}
             onClick={() => void printInvoice(invoice)}>Print</button>}
-        {canRecord && !recording && !asking && !linking && !resulting &&
+        {canRecord && !recording && !asking && !linking && !resulting && !statement &&
           <button className="btn-secondary" onClick={() => setLinking(true)}>Create payment link</button>}
-        {canRecord && !recording && !asking && !linking && !resulting &&
+        {canRecord && !recording && !asking && !linking && !resulting && !statement &&
           <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
       </span>}
     /> : <ModuleHeader destinationHeader testId="invoices-destination-header" word="Invoices" docTitle="Invoices — Carres" />}
     {query.isError ? <div role="alert" className="p-6 text-body">
       <p>Invoices could not be loaded. Try again.</p>
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
-    </div> : selected ? invoice ? recording && canRecord
+    </div> : selected ? invoice ? statement
+      ? <CustomerStatement orderId={invoice.order_id} onClose={() => setStatement(false)} />
+      : recording && canRecord
       ? <InvoiceRecordPayment invoice={invoice} rows={rows} onClose={() => setRecording(false)} />
       : linking && canRecord
         ? <InvoicePaymentLink invoice={invoice} rows={rows} onClose={() => setLinking(false)} />
