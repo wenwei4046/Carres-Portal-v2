@@ -210,6 +210,7 @@ export function caseWantLabel(key: string): string {
 // ── The composed record ──────────────────────────────────────────────────────
 
 export interface CaseIntakeAnswers {
+  customerImpact?: "customer" | "stock_only" | null;
   reportedBy: CaseReporterKey | null;
   productCategory: CaseProductCategory | null;
   productSku: string | null;
@@ -245,8 +246,9 @@ export function composeCaseSummary(a: CaseIntakeAnswers): string {
     const r = CASE_REPORTERS.find((x) => x.key === a.reportedBy);
     parts.push(`Found by ${r?.label ?? a.reportedBy}.`);
   }
-  if (a.usable) parts.push(`Still usable: ${caseUsableLabel(a.usable)}.`);
-  if (a.customerWants.length) {
+  if (a.customerImpact === "stock_only") parts.push("Unsold stock. No customer affected.");
+  if (a.customerImpact !== "stock_only" && a.usable) parts.push(`Still usable: ${caseUsableLabel(a.usable)}.`);
+  if (a.customerImpact !== "stock_only" && a.customerWants.length) {
     parts.push(`Customer wants: ${a.customerWants.map(caseWantLabel).join(", ")}.`);
   }
 
@@ -264,7 +266,6 @@ export function caseIntakeComplete(a: CaseIntakeAnswers): boolean {
     !!a.reportedBy &&
     !!a.productCategory &&
     !!a.issueType &&
-    !!a.usable &&
-    a.customerWants.length > 0
+    (a.customerImpact === "stock_only" || (!!a.usable && a.customerWants.length > 0))
   );
 }

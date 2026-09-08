@@ -88,9 +88,11 @@ function buildSb(rows: unknown[]) {
    *  worth anything if they land in their own columns; a route that quietly
    *  dropped them would still return 201 and still show the composed sentence. */
   const inserts: Record<string, unknown>[] = [];
+  let page: [number, number] | null = null;
   const chain: Record<string, unknown> = {
     then: (res: (v: { data: unknown[]; error: null }) => unknown) =>
-      Promise.resolve({ data: rows, error: null }).then(res),
+      Promise.resolve({ data: page ? rows.slice(page[0], page[1] + 1) : rows, error: null }).then(res),
+    range: (from: number, to: number) => { page = [from, to]; return chain; },
     eq: (col: string, val: unknown) => {
       eqCalls.push([col, val]);
       return chain;
@@ -337,6 +339,67 @@ describe("GET /api/ops/service-cases", () => {
     const { sb } = buildSb([CASE_ROW]);
     const res = await get("/ops/service-cases?orderId=ord-1", sb, "dealer");
     expect(res.status).toBe(403);
+  });
+});
+
+describe("stock-only Case intake", () => {
+  it("restricts incident candidates to the exact Unit and problem", async () => {
+    const { sb, eqCalls } = buildSb([{ case_id: DRAFT_ID, service_cases: { case_no: "SC2609-01", opened_at: "2026-09-07", what_happened: "Damaged", service_case_statuses: { is_closed: true } } }]);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.request("/api/ops/service-cases/unit-problems?unitCode=id-aaa000001&issueType=damaged&productCategory=sofa", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }, env);
+    expect(res.status).toBe(200);
+    expect(eqCalls).toEqual(expect.arrayContaining([["unit_code", "id-aaa000001"], ["issue_type", "damaged"], ["service_cases.product_category", "sofa"]]));
+    expect(await res.json()).toEqual({ cases: [{ id: DRAFT_ID, caseNo: "SC2609-01", openedAt: "2026-09-07", whatHappened: "Damaged", statusIsClosed: true }] });
+  });
+  it("includes incident candidates beyond the first database page", async () => {
+    const { sb } = buildSb(Array.from({ length: 201 }, (_, i) => ({ case_id: `case-${i}`, service_cases: { case_no: `SC-${i}`, opened_at: "2026-09-07", what_happened: "Damaged", service_case_statuses: { is_closed: false } } })));
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.request("/api/ops/service-cases/unit-problems?unitCode=id-aaa000001&issueType=damaged&productCategory=sofa", { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } }, env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { cases: { id: string }[] };
+    expect(body.cases).toHaveLength(201);
+    expect(body.cases[200].id).toBe("case-200");
+  });
+  it("passes an explicit incident selection to the atomic writer", async () => {
+    const { sb } = buildInsertSb();
+    sb.rpc.mockResolvedValue({ data: { id: DRAFT_ID, matchedExisting: true }, error: null });
+    const res = await post({ customerImpact: "stock_only", reportedBy: "warehouse", productCategory: "sofa", issueType: "damaged", draftId: DRAFT_ID, unitCode: "id-aaa000001", existingCaseId: DRAFT_ID, evidence: FULL_EVIDENCE }, sb);
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("service_case_create_stock_report", expect.objectContaining({ p_payload: expect.objectContaining({ existing_case_id: DRAFT_ID, unit_code: "id-aaa000001" }) }));
+  });
+
+  it.each([["42501", 403], ["23505", 409], ["22023", 422]])("preserves a refused source link (%s)", async (code, status) => {
+    const { sb } = buildInsertSb();
+    sb.rpc.mockResolvedValue({ data: null, error: { code, message: "Source link refused" } });
+    vi.mocked(userClient).mockReturnValue(sb);
+    const res = await app.request(`/api/ops/service-cases/${DRAFT_ID}/supplier-claims`, {
+      method: "POST", headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "content-type": "application/json" },
+      body: JSON.stringify({ claimId: DRAFT_ID }),
+    }, env);
+    expect(res.status).toBe(status);
+    expect(sb.rpc).toHaveBeenCalledWith("service_case_link_supplier_claim", { p_case_id: DRAFT_ID, p_claim_id: DRAFT_ID });
+  });
+  it("sends the permanent report ID to the atomic writer without deriving a supplier", async () => {
+    const { sb, inserts } = buildInsertSb();
+    sb.rpc.mockResolvedValue({ data: { id: DRAFT_ID, caseNo: "SC2609-01" }, error: null });
+    const res = await post({
+      customerImpact: "stock_only", reportedBy: "warehouse", productCategory: "sofa",
+      issueType: "damaged", draftId: DRAFT_ID, evidence: FULL_EVIDENCE,
+    }, sb);
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ id: DRAFT_ID, caseNo: "SC2609-01" });
+    expect(sb.rpc).toHaveBeenCalledWith("service_case_create_stock_report", expect.objectContaining({ p_report_id: DRAFT_ID }));
+    expect(sb.from).not.toHaveBeenCalled();
+    expect(inserts).toEqual([]);
+  });
+
+  it("still refuses missing evidence before the stock writer", async () => {
+    const { sb } = buildInsertSb();
+    const res = await post({ customerImpact: "stock_only", reportedBy: "warehouse", productCategory: "sofa", issueType: "damaged", draftId: DRAFT_ID }, sb);
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
 
@@ -701,6 +764,20 @@ describe("S3 — the case drives the follow-ups", () => {
 
     expect(res.status).toBe(201);
     expect(inserts[0].supplier_id).toBe("sup-ohana");
+  });
+
+  it("does not close stock-only Cases through the customer completion gate", async () => {
+    const { sb, updates } = buildCaseSb({ ...CASE_ROW, customer_impact: "stock_only", customer_name: "", progress: [] });
+    const res = await patch("c1", { statusId: DRAFT_ID }, sb);
+    expect(res.status).toBe(422);
+    expect(updates).toEqual([]);
+  });
+
+  it("refuses a fabricated customer confirmation for stock", async () => {
+    const { sb, updates } = buildCaseSb({ ...CASE_ROW, customer_impact: "stock_only", customer_name: "", progress: [] });
+    const res = await record("c1", { step: "customer_confirmed", on: "2026-07-27" }, sb);
+    expect(res.status).toBe(422);
+    expect(updates).toEqual([]);
   });
 
   it("still files the case when the SKU traces to no factory", async () => {

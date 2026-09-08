@@ -104,7 +104,7 @@ supplierClaimsRouter.get("/", async (c) => {
     let q = sb
       .from("supplier_claims")
       .select(
-        "id, claim_no, po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
+        "id, claim_no, case_id, service_case_units(stock_item_id, unit_code, receiving_unit_result_id), po_id, po_line_id, warehouse_receipt_id, supplier_id, sku, product_category, claim_type, qty, status, do_number, photos, note, reported_by, reported_at, requested_action, requested_at, supplier_response, supplier_response_note, responded_at, closed_at, close_note, customer_resolution, customer_resolution_note, customer_resolution_at, carres_execution, carres_execution_note, carres_execution_at",
       )
       .order("reported_at", { ascending: false })
       .order("id", { ascending: false });

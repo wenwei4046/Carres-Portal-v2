@@ -59,6 +59,7 @@ let uploadSeq = 0;
 beforeEach(() => {
   apiFetchMock.mockReset();
   apiFetchMock.mockImplementation((path: string) => {
+    if (path.startsWith("/api/ops/service-cases/unit-problems")) return Promise.resolve({ cases: [] });
     if (path.startsWith("/api/ops/service-cases/config")) return Promise.resolve(CONFIG);
     if (path.startsWith("/api/ops/service-cases/lookup")) {
       return Promise.resolve({ order: ORDER, matches: 1 });
@@ -251,6 +252,59 @@ describe("ServiceCaseWizard — a new hire files a case without writing a senten
     // Un-pick the only thing the customer wanted.
     await click(screen.getByRole("button", { name: "Repair" }));
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it("files unsold stock without a customer or customer confirmation", async () => {
+    const onSaved = vi.fn();
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={onSaved} />));
+    await click(screen.getByRole("button", { name: "Warehouse" }));
+    await click(screen.getByRole("button", { name: /No sales order/ }));
+    await click(screen.getByRole("button", { name: "Unsold stock" }));
+    expect(screen.queryByLabelText("Customer name")).toBeNull();
+    await click(screen.getByRole("button", { name: "Bed frame" }));
+    await click(screen.getByRole("button", { name: "Next" }));
+    await click(screen.getByRole("button", { name: "Missing parts" }));
+    expect(screen.queryByText("What does the customer want?")).toBeNull();
+    expect(screen.getByText(/Unsold stock. No customer affected./)).toBeInTheDocument();
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem");
+    await click(screen.getByRole("button", { name: "Create Case" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const post = apiFetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")!;
+    const body = JSON.parse((post[1] as RequestInit).body as string);
+    expect(body).toMatchObject({ customerImpact: "stock_only", customerName: "", customerWants: [] });
+    expect(body.usable).toBeUndefined();
+    expect(body.orderId).toBeUndefined();
+  });
+
+  it.each([false, true])("keeps later faults separate unless staff explicitly select the existing Case (%s)", async (selectExisting) => {
+    const existingId = "11111111-1111-4111-8111-111111111111";
+    const originalFetch = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string, ...rest: unknown[]) => path.startsWith("/api/ops/service-cases/unit-problems")
+      ? Promise.resolve({ cases: [{ id: existingId, caseNo: "SC2609-01", openedAt: "2026-09-01", whatHappened: "Missing parts", statusIsClosed: false }] }) : originalFetch(path, ...rest));
+    const onSaved = vi.fn();
+    render(wrap(<ServiceCaseWizard onClose={() => {}} onSaved={onSaved} />));
+    await click(screen.getByRole("button", { name: "Warehouse" }));
+    await click(screen.getByRole("button", { name: /No sales order/ }));
+    await click(screen.getByRole("button", { name: "Unsold stock" }));
+    await click(screen.getByRole("button", { name: "Bed frame" }));
+    await typeInto(screen.getByLabelText("Unit ID on the item (optional)"), "id-aaa000001");
+    await click(screen.getByRole("button", { name: "Next" }));
+    await click(screen.getByRole("button", { name: "Missing parts" }));
+    const choose = await screen.findByRole("combobox", { name: "Case" });
+    expect(choose).toHaveTextContent("New Case");
+    if (selectExisting) {
+      fireEvent.keyDown(choose, { key: "ArrowDown" });
+      await click(await screen.findByRole("option", { name: /SC2609-01/ }));
+    }
+    await upload("Photo of the whole item");
+    await upload("Close-up of the problem");
+    await click(screen.getByRole("button", { name: selectExisting ? "Add evidence" : "Create Case" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const post = apiFetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")!;
+    const body = JSON.parse((post[1] as RequestInit).body as string);
+    expect(body.existingCaseId).toBe(selectExisting ? existingId : undefined);
+    expect(body.unitCode).toBe("id-aaa000001");
   });
 
   it("still lets a case be filed when there is no sales order", async () => {

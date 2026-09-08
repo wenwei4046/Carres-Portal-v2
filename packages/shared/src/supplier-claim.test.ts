@@ -792,3 +792,70 @@ describe("Carres Execution — in what ORDER do the goods move?", () => {
     expect(claimNextMove(base).key).toBe("close");
   });
 });
+
+// ── §9.5 · the source-search continuation ────────────────────────────────────
+import {
+  CLAIM_SOURCE_SEARCH_WORDS,
+  stockCaseSourceSearchWorkItems,
+  type StockCaseSourceSearchInput,
+} from "./supplier-claim";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
+
+describe("stockCaseSourceSearchWorkItems (§9.5 source-gap rule)", () => {
+  const holder = "11111111-1111-4111-8111-111111111111";
+  const cover = "22222222-2222-4222-8222-222222222222";
+  const duty: WorkspaceDutyResolution = {
+    dutyKey: "po_duty",
+    onDate: "2026-09-07",
+    normalOwner: { userId: holder, name: "YJ" },
+    buddy: null,
+    activeCover: { userId: cover, name: "Li Ching" },
+    actingPerson: { userId: cover, name: "Li Ching" },
+    state: "covered",
+    assignmentId: "33333333-3333-4333-8333-333333333333",
+  };
+  const base: StockCaseSourceSearchInput = {
+    id: "case-1",
+    caseNo: "SC2609-07",
+    openedAt: "2026-09-04", // Friday
+    customerImpact: "stock_only",
+    hasVerifiedSource: false,
+  };
+  const holidays = new Set<string>();
+
+  it("projects the MASTER's own dictionary row for a source-free stock Case, owned by the CURRENT duty/cover", () => {
+    const [item, ...rest] = stockCaseSourceSearchWorkItems([base], duty, "2026-09-07", holidays);
+    expect(rest).toEqual([]);
+    expect(item.ruleKey).toBe("claims.link_source");
+    expect(item.module).toBe("claims");
+    expect(item.action).toBe(CLAIM_SOURCE_SEARCH_WORDS.action);
+    // Cover acts today; the normal owner survives beside them (never overwritten).
+    expect(item.actingPerson?.userId).toBe(cover);
+    expect(item.normalOwner?.userId).toBe(holder);
+    expect(item.ownerState).toBe("covered");
+    // Friday intake → the next Office working day is Monday.
+    expect(item.dueIso).toBe("2026-09-07");
+    expect(item.workingDaysLate).toBe(0);
+  });
+
+  it("counts working days late over a due date that never moves", () => {
+    const [item] = stockCaseSourceSearchWorkItems([base], duty, "2026-09-09", holidays);
+    expect(item.dueIso).toBe("2026-09-07");
+    expect(item.workingDaysLate).toBeGreaterThan(0);
+  });
+
+  it("projects nothing for customer Cases or Cases whose source is verified", () => {
+    expect(stockCaseSourceSearchWorkItems(
+      [{ ...base, customerImpact: "customer" }], duty, "2026-09-07", holidays)).toEqual([]);
+    expect(stockCaseSourceSearchWorkItems(
+      [{ ...base, hasVerifiedSource: true }], duty, "2026-09-07", holidays)).toEqual([]);
+  });
+
+  it("stands on the duty word — never an invented owner — when nobody is assigned", () => {
+    const [item] = stockCaseSourceSearchWorkItems([base], null, "2026-09-07", holidays);
+    expect(item.ownerUserId).toBeNull();
+    expect(item.ownerName).toBeNull();
+    expect(item.ownerDuty).toBe("PO Duty");
+    expect(item.ownerState).toBe("not_assigned");
+  });
+});

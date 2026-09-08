@@ -220,6 +220,7 @@ export const serviceCaseSchema = z.object({
   orderId:             z.string().uuid().nullable(),
   refNo:               z.string().nullable(),
   customerName:        z.string(),
+  customerImpact:      z.enum(["customer", "stock_only"]).nullable().optional(),
   customerPhone:       z.string().nullable(),
   customerAddress:     z.string().nullable(),
   caseTypeId:          z.string().uuid().nullable(),
@@ -315,10 +316,11 @@ export type ServiceCaseListResponse = z.infer<typeof serviceCaseListResponseSche
 
 // ── Create / update inputs (one schema, two consumers) ───────────────────────
 
-export const createServiceCaseInputSchema = z.object({
+const serviceCaseInputFields = z.object({
   orderId:         z.string().uuid().optional(),
   refNo:           z.string().trim().optional(),
-  customerName:    z.string().min(1),
+  customerName:    z.string().trim().default(""),
+  customerImpact:  z.enum(["customer", "stock_only"]).optional(),
   customerPhone:   z.string().trim().optional(),
   customerAddress: z.string().trim().optional(),
   caseTypeId:      z.string().uuid().nullable().optional(),
@@ -347,6 +349,33 @@ export const createServiceCaseInputSchema = z.object({
    */
   draftId:         z.string().uuid().optional(),
   evidence:        z.array(caseEvidenceUploadedSchema).optional(),
+
+  /**
+   * The reporter's REAL Unit label, stock-only intake. The database resolves
+   * it against the Unit register: a resolved Unit joins the §9.5 duplicate
+   * matching (verified source occurrence + Unit + problem); an unresolved
+   * label is preserved as the reporter's fact and the Case stays source-free
+   * for the governed Purchasing source search. Never a guessed source.
+   */
+  unitCode:        z.string().trim().optional(),
+  receivingUnitResultId: z.string().uuid().optional(),
+  existingCaseId: z.string().uuid().optional(),
+});
+export const createServiceCaseInputSchema = serviceCaseInputFields.superRefine((value, ctx) => {
+  if (value.customerImpact !== "stock_only" && !value.customerName) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customerName"], message: "Customer name is required." });
+  }
+  if (value.existingCaseId && (value.customerImpact !== "stock_only" || !value.unitCode)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["existingCaseId"], message: "Select the Unit before selecting its Case." });
+  }
+  if (value.customerImpact === "stock_only") {
+    if (value.orderId || value.orderLineId || value.customerName || value.customerPhone || value.customerAddress || value.customerWants?.length || value.usable || value.reportedBy === "customer") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["customerImpact"], message: "Unsold stock cannot carry customer answers or a sales order." });
+    }
+    if (!value.productCategory || !value.issueType || !value.reportedBy || !value.draftId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["productCategory"], message: "Record the product, problem, reporter and report identity." });
+    }
+  }
 });
 export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema>;
 
@@ -356,8 +385,9 @@ export type CreateServiceCaseInput = z.infer<typeof createServiceCaseInputSchema
  * quietly delete it. (`.omit` before `.partial()` — a partial of a schema that
  * still has the field would let it through as optional.)
  */
-export const updateServiceCaseInputSchema = createServiceCaseInputSchema
-  .omit({ evidence: true, draftId: true })
+export const updateServiceCaseInputSchema = serviceCaseInputFields
+  .extend({ customerName: z.string().trim().min(1) })
+  .omit({ evidence: true, draftId: true, customerImpact: true, unitCode: true, receivingUnitResultId: true, existingCaseId: true })
   .partial();
 export type UpdateServiceCaseInput = z.infer<typeof updateServiceCaseInputSchema>;
 

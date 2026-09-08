@@ -113,6 +113,7 @@ function has(wants: readonly CaseWantKey[], keys: readonly CaseWantKey[]): boole
 // ── The parties ──────────────────────────────────────────────────────────────
 
 export interface CaseFollowUpInput {
+  customerImpact?: "customer" | "stock_only" | null;
   /** Question 5 of the intake. An empty list is legal — a case filed before the
    *  wizard, or through the edit modal, has none. */
   customerWants?: readonly CaseWantKey[] | null;
@@ -155,6 +156,8 @@ function supplierAsk(wants: readonly CaseWantKey[]): string {
  * confirmed, and that does not depend on which boxes were ticked at intake.
  */
 export function caseFollowUpPlan(input: CaseFollowUpInput): CaseStep[] {
+  // A product-only problem cannot manufacture customer calls or confirmation.
+  if (input.customerImpact === "stock_only") return [];
   const wants = input.customerWants ?? [];
   const customer = customerOf(input);
   const supplier = supplierOf(input);

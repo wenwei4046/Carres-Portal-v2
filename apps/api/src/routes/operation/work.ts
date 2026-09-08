@@ -1,6 +1,8 @@
 import { Hono, type Context } from "hono";
 import {
   countWorkingDays,
+  stockCaseSourceSearchWorkItems,
+  type StockCaseSourceSearchInput,
   myHolidaySet,
   operationWorkItemFromProjection,
   operationWorkResponseSchema,
@@ -39,6 +41,7 @@ import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+import serviceCasesRouter from "../ops/service-cases";
 import operationOrdersRouter from "./orders";
 import operationStockRouter from "./stock";
 import manualPurchaseRouter from "./manual-purchase";
@@ -328,6 +331,21 @@ export function projectPurchaseOrderReplyWork(input: {
       today: input.today,
     }));
   });
+}
+
+export function projectClaimSourceSearchWork(input: {
+  cases: StockCaseSourceSearchInput[];
+  poDuty: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  return stockCaseSourceSearchWorkItems(input.cases, input.poDuty, input.today).map((item) =>
+    operationWorkItemFromProjection(item, {
+      object: { kind: "service_case", id: item.orderId, label: item.soRef },
+      problem: "The purchase source is not recorded", recipient: null,
+      requiredResult: "Verified purchase source linked to the Case",
+      destination: `/operation?tab=service-notes&case=${encodeURIComponent(item.orderId)}`,
+      today: input.today,
+    }));
 }
 
 export function projectPaymentCollectionWork(input: {
@@ -770,6 +788,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     child.set("auth", c.var.auth);
     await next();
   });
+  internal.route("/service-cases", serviceCasesRouter);
   internal.route("/orders", operationOrdersRouter);
   internal.route("/stock", operationStockRouter);
   internal.route("/manual-purchase", manualPurchaseRouter);
@@ -780,7 +799,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices, sourceCases] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -811,6 +830,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ),
       loadPurchasingSettings(userClient(c.env, c.var.auth.jwt)),
       readAllInvoices(internal, c),
+      readInternal<{ items: StockCaseSourceSearchInput[] }>(internal, "/service-cases/source-search", c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -870,7 +890,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today });
   return composeOperationWorkResponse(
-    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems],
+    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems, projectClaimSourceSearchWork({ cases: sourceCases.items, poDuty, today })],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,
