@@ -53,6 +53,11 @@ import {
   type InvoiceRegisterPage,
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
+import {
+  latestOutcomeOf,
+  missedPromise,
+  type CollectionOutcomeRow,
+} from "@carres/shared/payment-collection-outcome";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -328,17 +333,29 @@ export function projectPaymentCollectionWork(input: {
   invoices: readonly InvoiceRegisterRow[];
   paymentDuty: WorkspaceDutyResolution | null;
   today: string;
+  /** §10 row 2 (0446): the recorded conversations. A promise the customer has
+   *  already broken outranks the delivery window — the item then hangs off the
+   *  day the CUSTOMER chose, not the day the clock would have chosen. */
+  outcomes?: readonly CollectionOutcomeRow[];
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
     const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays });
-    if (timing.kind !== "due" && timing.kind !== "late") return [];
     const money = invoiceNeeded(invoice);
-    if (!money.known || money.outstanding <= 0) return [];
+    const owing = money.known && money.outstanding > 0;
+    const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
+    const broken = missedPromise(latest, input.today, owing);
+    // A broken promise raises the work even outside the collection window, and
+    // REPLACES the window item for that invoice — one act, one row.
+    if (!broken && timing.kind !== "due" && timing.kind !== "late") return [];
+    if (!owing) return [];
+    const promisedIso = broken ? latest!.promised_date! : null;
+    const dueIso = promisedIso ?? clock.dueIso;
+    const late = broken || timing.kind === "late";
     const owner = input.paymentDuty;
     const workItem: WorkItem = {
-      ruleKey: "payment.collect_customer_balance",
+      ruleKey: broken ? "payment.missed_promise" : "payment.collect_customer_balance",
       module: "payment",
       soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
       orderId: invoice.id,
@@ -352,12 +369,12 @@ export function projectPaymentCollectionWork(input: {
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
       ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Duty" }),
-      tone: timing.kind === "late" ? "danger" : "warning",
+      tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
-      dueIso: clock.dueIso,
-      workingDaysLate: timing.kind === "late" && clock.dueIso
-        ? countWorkingDays(clock.dueIso, input.today, { holidays })
+      dueIso,
+      workingDaysLate: late && dueIso
+        ? countWorkingDays(dueIso, input.today, { holidays })
         : 0,
     };
     return [operationWorkItemFromProjection(workItem, {
@@ -366,7 +383,9 @@ export function projectPaymentCollectionWork(input: {
         id: invoice.id,
         label: invoice.invoice_no ?? `SO-${invoice.orders.so} invoice`,
       },
-      problem: timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
+      problem: broken
+        ? "Customer promise was missed"
+        : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
       destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
@@ -756,6 +775,26 @@ async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<I
   return rows;
 }
 
+/**
+ * The recorded collection conversations (0446), newest last. Read straight
+ * from the append-only ledger under the caller's own RLS — there is no
+ * whole-ledger route, and inventing one for Work would be a second door onto
+ * a table that already has an owner. Only the fields the §10 promise rule
+ * needs are selected, and a read failure yields NOTHING rather than a
+ * fabricated empty answer: a missed promise that cannot be read must not
+ * quietly turn back into an ordinary balance.
+ */
+async function readCollectionOutcomes(c: Context<AppEnv>): Promise<CollectionOutcomeRow[]> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("payment_collection_outcomes")
+    .select("id, order_id, invoice_id, outcome, promised_date, note, recorded_at")
+    .eq("outcome", "will_pay_on_date")
+    .order("recorded_at", { ascending: true });
+  if (error) throw new Error("Workspace collection-outcome source could not be read");
+  return (data ?? []) as CollectionOutcomeRow[];
+}
+
 /** Reuse the existing module read routes inside the Worker. This avoids a
  * second set of table queries while keeping Work a single browser request. */
 export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWorkResponse> {
@@ -774,7 +813,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices, outcomes] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -805,6 +844,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       ),
       loadPurchasingSettings(userClient(c.env, c.var.auth.jwt)),
       readAllInvoices(internal, c),
+      readCollectionOutcomes(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -861,7 +901,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today });
+  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems],
     staff.staff.map((row) => ({

@@ -897,6 +897,30 @@ matches the row's · a LATER rename cannot rewrite the receipt · voiding keeps 
 an unknown method prints as the governed word, never the raw input · a storage collection
 carries its own receipt · an idempotent retry mints no second receipt. Eleven route and
 composition tests pin the document and the button.
+### BUILD — a promise the customer broke is its own work, 2026-09-08
+
+§10 lists two payment triggers, `Balance in window` and `Missed promise`, sharing one action
+and one completion fact. Only the first was fed. The promise was recorded (0446) and
+`missedPromise` derived the fact, but nothing consumed it, so a customer who named a day and
+let it pass looked exactly like a customer who had said nothing.
+
+It is a rule in the Workspace-owned registry, not a special case bolted onto the feed:
+`payment.missed_promise` names its own five parts, and the two differ in the two ways that
+matter — its TRIGGER is the broken promise, and its CLOCK is the day the customer chose, so
+`late` counts from that day and not from the delivery window. One invoice raises this OR the
+window item, never both: the promise replaces the window once it is broken, because the act
+and the completion fact are the same one.
+
+It also reaches Work where the window cannot. With no delivery date the collection clock has
+no anchor and raises nothing at all; a broken promise still raises, on its own date. The
+ledger is read append-only and the LATEST answer decides — a newer, later promise cancels a
+broken one, and `Customer paid` (which is not money, §3) leaves the ordinary window item
+standing rather than inventing a broken promise. A settled balance closes both.
+
+A read failure on the outcome ledger throws rather than yielding an empty list: a missed
+promise that cannot be read must not quietly turn back into an ordinary balance.
+
+Six projection tests pin it, including the two negative controls above.
 
 ### Verification evidence — the four categories, stated separately
 
@@ -1038,7 +1062,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 5 | Invoice document from its immutable snapshot | 4·16 | **BUILT** | — |
 | 6 | Receipt reprint from an immutable snapshot | 4 | **BUILT** | 0449: the ONE writer freezes the receipt's content at posting; `GET /payments/:id/receipt-document` reads it, `Print receipt` stands on the payment object, and a voided payment reprints saying VOIDED. Payments recorded before 0449 read live and say so |
 | 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
-| 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **PARTIAL** | The promise is recorded with its date and `missedPromise` derives the fact from the ledger; the shared Work FEED's risk sort does not consume it yet — that ranking lives in the Workspace-owned rule registry and is its own slice |
+| 8 | Promise-to-pay and the missed-promise Work sort | 3·10 | **BUILT** | `payment.missed_promise` is a registry rule with its own five parts; the feed raises it on the day the CUSTOMER chose, replaces the window item rather than doubling it, and it reaches Work even when the collection clock has no anchor |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
 | 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | 0448 moved the rule into the database: the CUSTOMER's live payments are compared, the order is locked first so concurrent submissions serialise, and continuation needs the Payment Approver duty or principal. The page still draws the warning; it no longer decides |
 | 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |

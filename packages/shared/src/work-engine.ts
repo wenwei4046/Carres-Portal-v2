@@ -302,6 +302,22 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
   },
   {
+    /* §10 row 2 — the SAME act with a should-have-been-done state. It is its
+     * own registry entry because its TRIGGER and its CLOCK are different: the
+     * customer named a day, that day passed, and the money is still owed. The
+     * due date is the promise, not the delivery window, so "late" counts from
+     * the day the customer chose. One invoice raises this OR the window item,
+     * never both — the promise replaces the window once it is broken. */
+    key: "payment.missed_promise",
+    module: "payment",
+    trigger: "the customer promised to pay on a named day, that day has passed and the balance is still outstanding",
+    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "payment_duty",
+    action: "Ask the customer to pay",
+    dueRule: "the day the customer promised, on the OFFICE calendar",
+    completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
     key: "purchasing.supplier_reply",
     module: "purchasing",
     trigger: "the current PO version was sent and the supplier has not confirmed its delivery date",
