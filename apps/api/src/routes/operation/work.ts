@@ -50,6 +50,7 @@ import financeInvoicesRouter from "../finance/invoices";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
+  soRemaining,
   type InvoiceRegisterPage,
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
@@ -388,6 +389,76 @@ export function projectPaymentCollectionWork(input: {
         : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
+      destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
+      today: input.today,
+    })];
+  });
+}
+
+/**
+ * §10 — `Overpaid/unallocated money | Payment Approver | Review RM {amount}`.
+ *
+ * The overpaid figure is the ONE shared `soRemaining` answer, per Sales Order
+ * and across every live invoice kind, so this raises the same number the
+ * Invoice object, the Reports listing and the statement show.
+ *
+ * It closes the way §10 says: ALLOCATED — the excess is moved onto a valid
+ * obligation and the figure reaches RM 0 — or CLASSIFIED, which is the
+ * exceptional refund §13 already allows. Neither ending invents a word, and no
+ * Customer Credit is implied: none exists anywhere in the system.
+ */
+export function projectOverpaymentReviewWork(input: {
+  invoices: readonly InvoiceRegisterRow[];
+  /** Live refund records for these orders — an approved or paid one covering
+   *  the excess is the CLASSIFIED ending, and closes the item. */
+  refunds: readonly { order_id: string; amount: number; status: string }[];
+  approver: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  const seen = new Set<string>();
+  const coveredByRefund = new Map<string, number>();
+  for (const r of input.refunds) {
+    if (r.status !== "approved" && r.status !== "paid") continue;
+    coveredByRefund.set(r.order_id, (coveredByRefund.get(r.order_id) ?? 0) + Number(r.amount));
+  }
+  return input.invoices.flatMap((invoice) => {
+    const orderId = invoice.order_id;
+    if (seen.has(orderId) || !invoice.orders) return [];
+    seen.add(orderId);
+    const money = soRemaining(input.invoices as InvoiceRegisterRow[], orderId);
+    const excess = money.overpaid;
+    if (excess <= 0) return [];
+    if ((coveredByRefund.get(orderId) ?? 0) >= excess) return [];
+    const owner = input.approver;
+    const amount = `RM ${excess.toFixed(2)}`;
+    const workItem: WorkItem = {
+      ruleKey: "payment.review_overpayment",
+      module: "payment",
+      soRef: `SO-${invoice.orders.so}`,
+      orderId,
+      action: `Review ${amount}`,
+      ownerRule: "payment_approver_duty",
+      ownerDutyKey: "payment_approver",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Approver" }),
+      tone: "warning",
+      locked: false,
+      broken: false,
+      // §10 gives this row no clock: it opens with the overpayment and is due
+      // the day it is seen. Inventing a deadline would invent a rule.
+      dueIso: input.today,
+      workingDaysLate: 0,
+    };
+    return [operationWorkItemFromProjection(workItem, {
+      object: { kind: "invoice", id: invoice.id, label: `SO-${invoice.orders.so}` },
+      problem: "The order holds more money than it asks for",
+      recipient: invoice.orders.customer_name,
+      requiredResult: `${amount} allocated to a valid obligation, or an approved refund`,
       destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
       today: input.today,
     })];
@@ -795,6 +866,25 @@ async function readCollectionOutcomes(c: Context<AppEnv>): Promise<CollectionOut
   return (data ?? []) as CollectionOutcomeRow[];
 }
 
+/**
+ * Live refund records (0345). An APPROVED or PAID refund covering an
+ * overpayment is §10's "classified" ending; without this read the review item
+ * would stay open forever after the decision that settled it. A read failure
+ * throws rather than yielding an empty list — an unreadable refund must not
+ * silently reopen a settled review.
+ */
+async function readRefunds(c: Context<AppEnv>): Promise<Array<{
+  order_id: string; amount: number; status: string;
+}>> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("order_refunds")
+    .select("order_id,amount,status")
+    .in("status", ["approved", "paid"]);
+  if (error) throw new Error("Workspace refund source could not be read");
+  return (data ?? []) as Array<{ order_id: string; amount: number; status: string }>;
+}
+
 /** Reuse the existing module read routes inside the Worker. This avoids a
  * second set of table queries while keeping Work a single browser request. */
 export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWorkResponse> {
@@ -813,7 +903,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices, outcomes] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices, outcomes, refunds] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -845,11 +935,15 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       loadPurchasingSettings(userClient(c.env, c.var.auth.jwt)),
       readAllInvoices(internal, c),
       readCollectionOutcomes(c),
+      readRefunds(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
   const paymentDuty = dutyResolution(duties, "payment_duty", today);
+  // §12 gives overpayment review to the Payment Approver, never to Payment
+  // Duty — an unassigned approver leaves the item honestly ownerless.
+  const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
     ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
@@ -902,8 +996,11 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
   });
   const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes });
+  const overpaymentItems = projectOverpaymentReviewWork({
+    invoices, refunds, approver: paymentApprover, today,
+  });
   return composeOperationWorkResponse(
-    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems],
+    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems, overpaymentItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

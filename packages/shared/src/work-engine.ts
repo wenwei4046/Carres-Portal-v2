@@ -52,6 +52,9 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *                  by a party with no login is one nobody can see or close)
  *   payment_duty   the effective Payment Duty resolution from Workspace;
  *                  unresolved fails closed and never borrows the order PIC
+ *   payment_approver  the effective Payment Approver resolution from Workspace
+ *                  — §12 gives void, reallocation and overpayment review to
+ *                  this duty and to nobody else; unresolved fails closed
  *   delivery_duty  governed Delivery ownership — no delivery-staff roster
  *                  fact exists; the duty word stands (measured-boundary rule)
  *   finance_duty   only Finance clears it — no roster fact; the word stands
@@ -62,6 +65,7 @@ export type WorkOwnerRule =
   | "salesperson"
   | "order_pic"
   | "payment_duty"
+  | "payment_approver_duty"
   | "delivery_duty"
   | "finance_duty"
   | "system"
@@ -300,6 +304,23 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     action: "Ask the customer to pay",
     dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
+    /* §10 row: `Overpaid/unallocated money | Payment Approver | Review RM
+     * {amount} | allocated/classified`. Both endings are authority's own and
+     * neither invents a word: ALLOCATED is §5's "allocate valid obligation"
+     * (the 0450 correction door), CLASSIFIED is the exceptional refund §13
+     * already allows — "never AUTO-create Customer Credit or Refund" forbids
+     * the automatic kind, not the decided one. No Customer Credit exists
+     * anywhere, so none is implied here. */
+    key: "payment.review_overpayment",
+    module: "payment",
+    trigger: "an order holds more money than its live obligations ask for, and no approved refund covers the excess",
+    owner: "the effective Payment Approver duty holder from Workspace (§12: void, reallocation, overpayment review)",
+    ownerRule: "payment_approver_duty",
+    action: "Review RM {amount}",
+    dueRule: "opens with the overpayment; §10 gives this row no clock",
+    completionFact: "the order's overpaid figure is RM 0 after allocation, or an approved refund covers it (order_refunds)",
   },
   {
     /* §10 row 2 — the SAME act with a should-have-been-done state. It is its

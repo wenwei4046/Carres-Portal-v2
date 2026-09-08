@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import {
+  projectOverpaymentReviewWork,
   composeOperationWorkResponse,
   createOperationWorkRouter,
   manualPurchaseWorkInputsFromRegister,
@@ -688,3 +689,114 @@ describe("payment.missed_promise — the promise outranks the window", () => {
     expect(items).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §10 — `Overpaid/unallocated money | Payment Approver | Review RM {amount}`
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.review_overpayment", () => {
+  const approver = { userId: "payment-approver", name: "Jess" };
+  const duty = {
+    dutyKey: "payment_approver" as const,
+    onDate: "2026-09-08",
+    normalOwner: approver,
+    buddy: null,
+    activeCover: null,
+    actingPerson: approver,
+    state: "primary" as const,
+    assignmentId: "assignment-approver",
+  };
+  function invoice(paid: number) {
+    return {
+      id: "inv-9", invoice_no: "INV-9", status: "issued" as const, kind: "sales" as const,
+      amount: 1000, tax_amount: 0, issued_at: "2026-09-01", voided_at: null,
+      void_reason: null, replaces_invoice_id: null, created_at: "2026-09-01T00:00:00Z",
+      order_id: "order-9",
+      orders: {
+        id: "order-9", so: 3001, customer_name: "Tan Qu Qu", status: "proceed_order",
+        paid, delivery_date: null, delivery_date_tbd: false, delivered_at: null,
+        order_payments: [], payment_communications: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }], order_addons: [],
+        ops_order_control: [{ balance: null, confirmed_date: null, line_etas: null,
+          line_stock_status: null }],
+      },
+    };
+  }
+
+  it("raises the review naming the exact extra money, owned by the Payment Approver", () => {
+    const [item] = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(item).toMatchObject({
+      id: "payment:inv-9:payment.review_overpayment",
+      module: "payment",
+      problem: "The order holds more money than it asks for",
+      action: "Review RM 200.00",
+    });
+    expect(item?.owner.dutyKey).toBe("payment_approver");
+    expect(item?.owner.acting).toEqual(approver);
+    expect(item?.requiredResult).toContain("RM 200.00 allocated");
+  });
+
+  it("an order that owes money is not an overpayment", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(400)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("an exactly settled order raises nothing", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1000)], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** §10's "classified" ending: the exceptional refund §13 allows. Without
+   *  this the item would stay open forever after the decision settled it. */
+  it("an approved refund covering the excess closes it", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 200, status: "approved" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("a refund still only REQUESTED settles nothing", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 200, status: "requested" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  it("a refund smaller than the excess leaves the review open", () => {
+    const items = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)],
+      refunds: [{ order_id: "order-9", amount: 50, status: "paid" }],
+      approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  it("raises ONE row per Sales Order, however many invoices it has", () => {
+    const a = invoice(1200);
+    const b = { ...invoice(1200), id: "inv-10", invoice_no: "INV-10" };
+    const items = projectOverpaymentReviewWork({
+      invoices: [a, b], refunds: [], approver: duty, today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+  });
+
+  /** §12 gives this to the Payment Approver and nobody else, so an unassigned
+   *  duty leaves it honestly ownerless rather than borrowing Payment Duty. */
+  it("an unassigned approver leaves it ownerless, never reassigned", () => {
+    const [item] = projectOverpaymentReviewWork({
+      invoices: [invoice(1200)], refunds: [], approver: null, today: "2026-09-08",
+    });
+    expect(item?.owner.state).toBe("not_assigned");
+    expect(item?.owner.acting).toBeNull();
+  });
+});
+
