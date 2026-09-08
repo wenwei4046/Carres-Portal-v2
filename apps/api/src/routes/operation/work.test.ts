@@ -442,6 +442,9 @@ describe("operation Work response composition", () => {
         today: "2026-09-06",
         safetyDays: 3,
         invoiceStorageByOrder: new Map([["order-10", storageSum]]),
+        // 2026-09-08: the model switch is paper HISTORY, so the fixture must
+        // say the order is under the invoice model when it carries a paper.
+        storagePaperHistoryOrders: new Set(storageSum > 0 ? ["order-10"] : []),
       });
     // Unpaid RM150 storage paper → the collection work stays OPEN.
     const owing = project(1000, 150);

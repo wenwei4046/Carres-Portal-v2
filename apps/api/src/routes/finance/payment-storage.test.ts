@@ -54,10 +54,14 @@ const CASE = {
 };
 
 function sbWithList(rows: unknown[]) {
+  // The cases read is a thenable chain; the unreconciled-legacy read (2026-09-08)
+  // adds a control/order `maybeSingle` and an invoices list on the same shape.
   const chain: Record<string, unknown> = {};
   chain.select = vi.fn(() => chain);
   chain.order = vi.fn(() => chain);
   chain.eq = vi.fn(() => chain);
+  chain.maybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  chain.in = vi.fn(() => chain);
   chain.then = (resolve: (v: unknown) => void) => resolve({ data: rows, error: null });
   return { from: vi.fn(() => chain), rpc: vi.fn() };
 }

@@ -726,6 +726,62 @@ Worker all reported that exact SHA. The DB-door behaviour is production-proven b
 rolled-back probe; the authenticated interaction and visual passes share the standing
 blocker recorded under the verification categories.
 
+### BUILD — the two storage-model boundary cases, 2026-09-08
+
+The 2026-09-07 precedence law asked `a live paper exists`, and the boundary review found
+two defects in it. Both are fixed; both are pinned by tests that use REAL C9 history, not
+invoice-only fixtures.
+
+**(a) Voiding the last paper resurrected the old C9 charge.** A void is the §12
+waiver/correction path, so falling back to the legacy figure brought a waived obligation
+back from the dead. FIXED: precedence is now keyed on storage-paper HISTORY (any
+storage-kind invoice ever, voided ones included). An order with history is under the
+invoice model permanently — zero live papers means ZERO storage owing, never a fallback.
+
+**(b) A mixed order hid money.** One product group invoiced while another still sat in the
+legacy columns meant the papers silently spoke for the whole order. The two models cannot be
+reconciled by arithmetic — the legacy columns are ONE per-order figure with no group
+breakdown, so nothing in the data can say whether a keyed fee is the same debt as a paper or
+a different group's. RESOLVED without guessing: the invoice model DECIDES the money (which
+also forces the zero-paper and one-paper answers in (a) to agree), and the legacy figure is
+carried out as `unreconciledLegacy` — never merged into a paper figure, never silently
+dropped. `GET /api/finance/payment-storage?orderId=` returns it through the same shared
+composition the gate and Work use, and the Storage section says: *This order also carries
+RM x of storage fee from the old records, which no Storage Invoice covers. Collect it, or
+set the storage fee to 0 in the order, so the two do not disagree.*
+
+**The state is also made unbirthable.** Migration `0445` refuses to open a storage case while
+the order carries an uncollected KEYED legacy fee (override, else the imported pair), naming
+the amount and the fix. It changes no row, migrates nothing and forgives no money. Measured
+before writing (production, 2026-09-08): ZERO orders carry any legacy storage signal, ZERO
+cases, ZERO papers — the refusal is a guard for the future, not a cleanup, and the go-live
+database starts clean (CLAUDE.md §6). Rolled-back production probe, five controls: no-legacy
+baseline opens · an imported RM 300 refuses naming RM 300.00 · an override RM 150 beats the
+imported pair and refuses naming RM 150.00 · override 0 (the operator's "no storage") opens ·
+a COLLECTED legacy fee opens.
+
+**ONE EXPECTED AMOUNT, RECONCILED ACROSS FIVE SURFACES** (`storage-reconciliation.test.ts`):
+for an invoice-only order and for a mixed order, Calendar · Reports · Invoice details
+(`soRemaining`), shared Work and the TS booking gate (`orderMoney` ← `storageObligation`),
+and the DATABASE gate (0441's arithmetic mirrored) all produce the SAME figure; the legacy
+fee is named apart. With every paper voided, all five say zero and nothing resurrects. A
+correction in flight changes nothing anywhere — no draft debt, no invented hold.
+
+**THE ONE KNOWN DIVERGENCE, stated rather than papered over.** On a LEGACY-ONLY order (no
+paper history) shared Work and the TS gate carry the C9 fee, while the Payment screens and
+the 0441 database door do not — Payment's screens read the invoice model only, and 0362's
+Law D split left the date-walked accrual TS-side. It is bounded: production carries zero
+legacy storage signals, go-live starts clean, and 0445 keeps an order in exactly one model,
+so the divergence has no live instance. Closing it would mean either teaching the Payment
+register read the C9 columns or retiring the legacy columns outright — recorded in the gap
+list below, not done silently.
+
+**⛔ OPEN OWNER DECISION — does an unreconciled legacy fee HOLD the delivery?** Today it does
+not: it is a named fact and work to resolve, because the alternative (holding on both) would
+double-hold whenever the keyed fee and the paper are the same debt, and inventing a hold was
+explicitly out of scope. The recommendation is to keep it as work, since 0445 prevents the
+state and no live order can reach it. It is listed in the gap list as an owner decision.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified

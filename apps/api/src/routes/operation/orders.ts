@@ -24,6 +24,7 @@ import {
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
+  hasStoragePaperHistory,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -1250,10 +1251,10 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   // path exactly as before (collectedAt clears it; Law D readers agree).
   const lineSum = lines.reduce((s, l) => s + price(l), 0);
   const addonSum = addons.reduce((s, a) => s + price(a), 0);
+  const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
   const storage = storageObligation({
-    invoiceStorageSum: invoiceStorageSumOf(
-      (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0],
-    ),
+    invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
+    storagePaperHistory: hasStoragePaperHistory(invoiceRows),
     goodsTotal: lineSum + addonSum,
     paid: ord.paid,
     legacyOwing: hold.owing,
