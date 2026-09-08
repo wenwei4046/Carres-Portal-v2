@@ -73,6 +73,7 @@ export default function SoBatchIssueWorkspace({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
   const [pos, setPos] = useState<IssuedPo[]>([]);
+  const [coveringPo, setCoveringPo] = useState<string | null>(null);
   /** Which documents THIS visit has confirmed — the journey's own progress, not
    *  the evidence. The evidence is read from the server (closure §8). */
   const [, setConfirmed] = useState<Set<string>>(new Set());
@@ -210,6 +211,10 @@ export default function SoBatchIssueWorkspace({
     setCreating(true);
     setError(null);
     try {
+      if (coveringPo) {
+        await openCoveringPo(coveringPo);
+        return;
+      }
       const res = await apiFetch<{ pos: IssuedPo[] }>(
         "/api/operation/purchase/to-order/issue-batch",
         {
@@ -230,11 +235,17 @@ export default function SoBatchIssueWorkspace({
           message?: string;
           action?: string;
           code?: string;
+          po?: string;
           sku?: string;
           supplier?: string;
           destination?: string;
         };
       }).body;
+      if (body?.code === "already_on_po" && body.po) {
+        setCoveringPo(body.po);
+        await openCoveringPo(body.po);
+        return;
+      }
       /* Every fact the server sent, not just the SKU. `refuse()` echoes its
          facts alongside `message`, so a refusal that names a supplier or a
          destination keeps them here — and the fallback stops degrading to
@@ -243,6 +254,7 @@ export default function SoBatchIssueWorkspace({
         sku: body?.sku ?? null,
         supplier: body?.supplier ?? null,
         destination: body?.destination ?? null,
+        po: body?.po ?? null,
       });
       setError({
         wrong: body?.message ?? fallback.wrong,
@@ -250,6 +262,21 @@ export default function SoBatchIssueWorkspace({
       });
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function openCoveringPo(poId: string) {
+    try {
+      const po = await apiFetch<IssuedPo>(
+        `/api/operation/pos/${encodeURIComponent(poId)}/issue-context`,
+      );
+      setPos([po]);
+      setConfirmed(new Set());
+      setAt(0);
+      setError(null);
+      setMode("evidence");
+    } catch {
+      setError({ wrong: `Could not open ${poId}.`, todo: "Try again." });
     }
   }
 
@@ -476,7 +503,7 @@ export default function SoBatchIssueWorkspace({
                   type="button"
                   data-testid="so-batch-issue-create"
                   className="h-8 rounded-control bg-kit-blue-9 px-3 text-meta font-medium text-white disabled:bg-kit-slate-6"
-                  disabled={creating || documents.length === 0 || blocker !== null}
+                  disabled={creating || (!coveringPo && (documents.length === 0 || blocker !== null))}
                   onClick={() => void issue()}
                 >
                   {W.issuePo}

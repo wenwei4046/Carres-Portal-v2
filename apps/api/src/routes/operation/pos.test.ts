@@ -54,6 +54,30 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
+describe("GET /api/operation/pos/:id/issue-context", () => {
+  it.each(["open", "cancelled", "missing"])("reads the saved PO and handles %s", async (status) => {
+    const from = vi.fn((table: string) => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(async () => ({ error: null, data: table === "purchase_orders"
+        ? status === "missing" ? null : { id: "PO-existing", supplier_id: "supplier", destination_id: "destination", status }
+        : table === "suppliers"
+          ? { name: "Hooka", whatsapp_group_url: "https://chat.whatsapp.com/saved", contact_email: "supplier@example.com", contact: "123" }
+          : { name: "Carres Klang" } })),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const res = await app.fetch(new Request("http://localhost/api/operation/pos/PO-existing/issue-context", {
+      headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+    }), env);
+    expect(res.status).toBe(status === "missing" ? 404 : status === "cancelled" ? 422 : 200);
+    if (status === "open") expect(await res.json()).toMatchObject({
+      id: "PO-existing", supplierName: "Hooka", destination: "Carres Klang",
+      whatsappGroupUrl: "https://chat.whatsapp.com/saved", contactEmail: "supplier@example.com",
+    });
+    else expect(from).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("GET /api/operation/pos", () => {
   const PO_ROW = {
     id: "PO-2030",

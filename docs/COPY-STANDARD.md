@@ -736,6 +736,11 @@ A demand an open purchase order already fully covers refuses issue with
 `An open purchase order ({PO No}) already covers this line.` /
 `Nothing to buy here. Check the covering purchase order instead.`
 
+In SO Batch review, `Issue PO` automatically reads the covering PO and resumes its
+PDF/send evidence step without issuing another document or showing the coverage refusal.
+Keep the label `Issue PO`; no second recovery click is needed. If that read fails,
+use `Could not open {PO No}.` / `Try again.`; the same button retries opening that PO.
+
 **Sent documents — correction card 2026-09-06.** Revisions lists each version the supplier
 actually received as `Sent document · PO V{n}` · `Recorded at the confirmed send`, with
 `Download PDF`. A version sent before document keeping began answers
