@@ -565,3 +565,126 @@ describe("operation Work response composition", () => {
     expect(item?.action).not.toContain("Shasha");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §10 row 2 (0446 + the registry entry) — a promise the customer broke
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.missed_promise — the promise outranks the window", () => {
+  const person = { userId: "payment-duty", name: "Shasha" };
+  const duty = {
+    dutyKey: "payment_duty" as const,
+    onDate: "2026-09-08",
+    normalOwner: person,
+    buddy: null,
+    activeCover: null,
+    actingPerson: person,
+    state: "primary" as const,
+    assignmentId: "assignment-payment",
+  };
+  /** With no delivery date at all the collection CLOCK has no anchor and
+   *  raises nothing — which is exactly the case the promise must reach on its
+   *  own. Pass a date to get the ordinary window item back. */
+  function invoice(deliveryDate: string | null) {
+    return {
+      id: "invoice-9", invoice_no: "INV-2099", status: "issued" as const, kind: "sales" as const,
+      amount: 1000, tax_amount: 0, issued_at: "2026-09-01T00:00:00Z",
+      voided_at: null, void_reason: null, replaces_invoice_id: null,
+      created_at: "2026-09-01T00:00:00Z", order_id: "order-2099",
+      orders: {
+        id: "order-2099", so: 2099, customer_name: "Tan Qu Qu",
+        status: "proceed_order", paid: 200, delivery_date: deliveryDate,
+        delivery_date_tbd: false, delivered_at: null,
+        order_payments: [], payment_communications: [],
+        order_lines: [{ sku: "SOFA-1", qty: 1, unit_price: 1000 }], order_addons: [],
+        ops_order_control: [{ balance: null, confirmed_date: deliveryDate,
+          line_etas: null, line_stock_status: { "SOFA-1": "ready" } }],
+      },
+    };
+  }
+  function outcome(over: Partial<{ outcome: string; promised_date: string | null; recorded_at: string }>) {
+    return {
+      id: "oc-1", order_id: "order-2099", invoice_id: "invoice-9",
+      outcome: (over.outcome ?? "will_pay_on_date") as "will_pay_on_date",
+      promised_date: over.promised_date ?? "2026-09-05",
+      note: null, recorded_at: over.recorded_at ?? "2026-09-02T02:00:00Z",
+    };
+  }
+
+  it("raises the work on the day the CUSTOMER chose, even when the clock has no anchor", () => {
+    const [item] = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(item).toMatchObject({
+      id: "payment:invoice-9:payment.missed_promise",
+      module: "payment",
+      problem: "Customer promise was missed",
+      action: "Ask the customer to pay",
+      // Due on the promised day — not the delivery window's day.
+      timing: { dueOn: "2026-09-05", bucket: "overdue" },
+    });
+    expect(item?.timing.workingDaysLate).toBeGreaterThan(0);
+    expect(item?.completionFact).toContain("outstanding balance is RM 0");
+  });
+
+  it("raises ONE row, never the window item beside it", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice("2026-09-09")],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toContain("payment.missed_promise");
+  });
+
+  it("a promise still in the future is not missed", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [outcome({ promised_date: "2026-09-20" })],
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("the LATEST promise decides — a newer, later promise cancels the broken one", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice(null)],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [
+        outcome({ promised_date: "2026-09-05", recorded_at: "2026-09-02T02:00:00Z" }),
+        outcome({ promised_date: "2026-09-20", recorded_at: "2026-09-06T02:00:00Z" }),
+      ],
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** §3: `Customer paid` is NOT money. The balance stands, so does the work —
+   *  but it is the ordinary window item, not a broken promise. */
+  it("a said-paid order with money still owed is not a missed promise", () => {
+    const items = projectPaymentCollectionWork({
+      invoices: [invoice("2026-09-09")],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [outcome({ outcome: "customer_paid", promised_date: null })],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toContain("payment.collect_customer_balance");
+  });
+
+  it("a settled balance closes it — a broken promise never outlives the money truth", () => {
+    const paid = invoice(null);
+    paid.orders.paid = 1000;
+    const items = projectPaymentCollectionWork({
+      invoices: [paid],
+      paymentDuty: duty,
+      today: "2026-09-08",
+      outcomes: [outcome({})],
+    });
+    expect(items).toHaveLength(0);
+  });
+});
