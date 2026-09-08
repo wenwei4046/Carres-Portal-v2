@@ -1000,6 +1000,31 @@ Setting the DEPLOYED Worker's secrets is a separate matter and is not attempted 
 environment holds no `CLOUDFLARE_API_TOKEN`, so `wrangler secret list` and `secret put` both
 refuse, and the live key's mode cannot be read from outside without an authenticated session.
 That is stated as a limit, not assumed away.
+### BUILD — the extra money becomes somebody's work, 2026-09-08
+
+§5 asks that overpaid money be shown as `RM {amount} needs review`, and §10 gives the row an
+owner and a completion: `Overpaid/unallocated money | Payment Approver | Review RM {amount} |
+allocated/classified`. The figure existed — the shared `overpaid` answer, on the Invoice object
+and in the Reports listing — but nothing turned it into work, so it was a number somebody had
+to notice.
+
+`payment.review_overpayment` is now a registry rule. It reads the ONE shared `soRemaining`
+answer per Sales Order across every live invoice kind, so the Work item names the same figure
+the Invoice object, the Reports listing and the statement show — one row per SO however many
+invoices it holds. Its owner is the **Payment Approver** (§12: "void, reallocation, overpayment
+review"), never Payment Duty; an unassigned approver leaves it honestly ownerless rather than
+borrowing somebody else's name. §10 gives the row no clock, so it opens with the overpayment
+and none is invented.
+
+**Both endings are authority's own, and neither invents a word.** ALLOCATED is §5's "allocate
+valid obligation" — 0450's correction door — and the item closes when the figure reaches RM 0.
+CLASSIFIED is the exceptional refund §13 already allows: "never AUTO-create Customer Credit or
+Refund" forbids the automatic kind, not the decided one, so an APPROVED or PAID refund covering
+the excess closes it. A refund still merely REQUESTED settles nothing, and one smaller than the
+excess leaves the review open. **No Customer Credit is implied anywhere — none exists in the
+system, and inventing one would have been inventing a capability, not building an approved one.**
+
+Eight projection tests pin it, including every one of those negative controls.
 
 ### Verification evidence — the four categories, stated separately
 
@@ -1154,7 +1179,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 8 | Promise-to-pay and the missed-promise Work sort | 3·10 | **BUILT** | `payment.missed_promise` is a registry rule with its own five parts; the feed raises it on the day the CUSTOMER chose, replaces the window item rather than doubling it, and it reaches Work even when the collection clock has no anchor |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
 | 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | 0448 moved the rule into the database: the CUSTOMER's live payments are compared, the order is locked first so concurrent submissions serialise, and continuation needs the Payment Approver duty or principal. The page still draws the warning; it no longer decides |
-| 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |
+| 11 | Overpayment surfaced and reviewed | 5·11 | **BUILT** | `payment.review_overpayment` is a registry rule owned by the Payment Approver; it closes the two ways §10 names — allocated (0450's correction) or classified (the exceptional refund §13 allows). No Customer Credit is implied; none exists |
 | 12 | Void payment with reason + approver duty | 5 | **BUILT** | — |
 | 13 | Storage case: witnesses, derived permanent start, rule snapshot | 6·7 | **BUILT** | 0436/0439 with probes |
 | 14 | Storage charging → Storage / Additional Storage Invoice | 4·7 | **BUILT** | 0438 with probe |
@@ -1195,7 +1220,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   perform either. The engineering is right; the assignment is missing. Naming the holder is
   the owner's, exactly as the PO/GRN rotation was.
 
-**Overall status: PARTIALLY DELIVERED** — seven gaps above are unbuilt or partial approved
+**Overall status: PARTIALLY DELIVERED** — four gaps above are unbuilt or partial approved
 capability, one is blocked on owner content, one on external access. The §14 build entries
 record what IS shipped; this table is the single list of what is not.
 
