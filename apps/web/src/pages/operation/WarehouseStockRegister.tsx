@@ -405,7 +405,7 @@ export default function WarehouseStockRegister() {
   const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <ModuleHeader
         testId="stock-register-destination-header"
         word="Inventory"
