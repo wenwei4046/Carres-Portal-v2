@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { storageChargeOf } from "@carres/shared/payment-storage";
+import { DELIVERY_REASONS } from "@carres/shared/delivery-reasons";
 import { SectionCard } from "@/components/SectionPanel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -68,6 +69,14 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
   const cases = casesQ.data?.cases ?? [];
   const [starting, setStarting] = useState(false);
   const [extending, setExtending] = useState<string | null>(null);
+  // §6 — the customer's written request to delay. It is the DEFAULT storage
+  // evidence, and the fact a free-storage decision rests on.
+  const [requesting, setRequesting] = useState(false);
+  const requestsQ = useQuery<{ requests: LaterDateRequest[] }>({
+    queryKey: ["finance", "later-delivery-requests", orderId],
+    queryFn: () => apiFetch(`/api/finance/payment-storage/later-delivery-requests?orderId=${orderId}`),
+  });
+  const requests = requestsQ.data?.requests ?? [];
 
   return <SectionCard><div className="p-4" data-testid="invoice-storage">
     <h2 className="text-strong mb-2">Storage</h2>
@@ -92,7 +101,24 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
           <p className="text-label font-normal text-base-400">
             No storage case. Storage begins only when the goods are ready AND the customer
             delays the delivery.</p>}
-        {canAct && !starting &&
+        {requests.length > 0 && <div data-testid="later-delivery-requests">
+          <p className="font-semibold">What the customer asked for</p>
+          {requests.map((r) => <p key={r.id} className="text-label font-normal">
+            {fmtDate(r.requested_date)} · {REASON_WORD[r.reason_key] ?? r.reason_key}
+            {r.reason_detail ? ` — ${r.reason_detail}` : ""}
+            {r.free_storage_requested ? " · asked for free storage" : ""}
+            {" · storage terms acknowledged"}
+          </p>)}
+        </div>}
+
+        {canAct && !starting && !requesting &&
+          <button className="btn-secondary"
+            onClick={() => setRequesting(true)}>Record the customer's later date</button>}
+        {canAct && requesting &&
+          <LaterDateForm orderId={orderId} onDone={() => { setRequesting(false);
+            void qc.invalidateQueries({ queryKey: ["finance", "later-delivery-requests", orderId] }); }}
+            onBack={() => setRequesting(false)} />}
+        {canAct && !starting && !requesting &&
           <button className="btn-secondary" onClick={() => setStarting(true)}>Record storage start</button>}
         {canAct && starting &&
           <StartForm orderId={orderId} onDone={() => { setStarting(false);
@@ -271,3 +297,108 @@ function ExtraFreeForm({ caseId, onDone, onBack }: {
     </div>
   </div>;
 }
+
+export interface LaterDateRequest {
+  id: string;
+  order_id: string;
+  requested_date: string;
+  reason_key: string;
+  reason_detail: string | null;
+  terms_acknowledged: boolean;
+  free_storage_requested: boolean;
+  evidence_url: string;
+  recorded_at: string;
+}
+
+/** §6 charges storage for CUSTOMER delay only, so only customer-side reasons
+ *  belong on this form. The words come from the one governed Delivery Reason
+ *  Library — a second list here would be a second responsibility rule. */
+const CUSTOMER_REASONS = DELIVERY_REASONS.filter((r) => r.responsibility === "customer");
+const REASON_WORD: Record<string, string> =
+  Object.fromEntries(DELIVERY_REASONS.map((r) => [r.key, r.label]));
+
+/**
+ * `Request a later delivery date` — the §6 submission, recorded by Operation
+ * from what the customer actually sent.
+ *
+ * ⛔ IT DOES NOT MOVE THE DELIVERY DATE. §6: "Original delivery date remains
+ * until written confirmation", and the date belongs to Orders/Delivery. This
+ * records what the customer ASKED for, with the evidence that makes it a
+ * written request — and the page says so, so nobody expects the calendar to
+ * change underneath them.
+ */
+function LaterDateForm({ orderId, onDone, onBack }: {
+  orderId: string; onDone: () => void; onBack: () => void;
+}) {
+  const [date, setDate] = useState("");
+  const [reasonKey, setReasonKey] = useState(CUSTOMER_REASONS[0].key as string);
+  const [detail, setDetail] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [freeRequested, setFreeRequested] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const record = useMutation({
+    mutationFn: (evidenceUrl: string) => apiFetch("/api/finance/payment-storage/later-delivery-request", {
+      method: "POST",
+      body: JSON.stringify({
+        orderId, requestedDate: date, reasonKey,
+        reasonDetail: detail.trim() || null,
+        termsAcknowledged: acknowledged, freeStorageRequested: freeRequested, evidenceUrl,
+      }),
+    }),
+    onSuccess: () => { toast.success("The customer's request is recorded"); onDone(); },
+    onError: (e: Error) => toast.error(`The request was not recorded — ${e.message}`),
+  });
+  async function submit() {
+    if (!file || saving || record.isPending) return;
+    setSaving(true);
+    const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60);
+    const path = `orders/${orderId}/later-date/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+    setSaving(false);
+    if (error) { toast.error(`The upload failed — ${error.message}`); return; }
+    record.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
+  }
+  return <div className="mt-2 rounded-card border border-base-200 p-3 space-y-2"
+    data-testid="storage-later-date-form">
+    <p className="font-semibold">This records what the customer asked for. It does not change the delivery date.</p>
+    <label className="block"><span className="text-label">The date the customer asked for</span>
+      <input type="date" value={date} min={todayIso()} onChange={(e) => setDate(e.target.value)}
+        aria-label="The date the customer asked for"
+        className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+    <label className="block"><span className="text-label">Reason</span>
+      <select value={reasonKey} onChange={(e) => setReasonKey(e.target.value)}
+        aria-label="Reason"
+        className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body">
+        {CUSTOMER_REASONS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+      </select></label>
+    <label className="block"><span className="text-label">Anything to add (optional)</span>
+      <input value={detail} onChange={(e) => setDetail(e.target.value)}
+        aria-label="Anything to add"
+        className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+    <label className="flex items-start gap-2 text-label font-normal">
+      <input type="checkbox" checked={acknowledged}
+        onChange={(e) => setAcknowledged(e.target.checked)}
+        aria-label="The customer acknowledged the storage terms" />
+      <span>The customer acknowledged the storage terms.</span></label>
+    <label className="flex items-start gap-2 text-label font-normal">
+      <input type="checkbox" checked={freeRequested}
+        onChange={(e) => setFreeRequested(e.target.checked)}
+        aria-label="The customer asked for free storage" />
+      <span>The customer asked for free storage.</span></label>
+    <label className="block"><span className="text-label">What the customer sent</span>
+      <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        aria-label="What the customer sent" className="mt-0.5 block w-full text-meta" />
+      <span className="text-label font-normal">
+        {file ? file.name : "A telephone call cannot change the date or obtain free storage."}</span></label>
+    <div className="flex gap-2">
+      <button className="btn-primary"
+        disabled={!date || !acknowledged || !file || saving || record.isPending}
+        onClick={() => void submit()}>Record the request</button>
+      <button className="btn-secondary" onClick={onBack}>Back</button>
+    </div>
+  </div>;
+}
+

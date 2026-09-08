@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
+  DELIVERY_REASONS,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -99,6 +100,79 @@ paymentStorageRouter.get("/", async (c) => {
     }
   }
   return c.json({ cases: data ?? [], unreconciledLegacy });
+});
+
+/**
+ * The §6 `Request a later delivery date` submission (0451).
+ *
+ * The SQL door owns every refusal — no evidence, no acknowledgement, a past
+ * date, no reason. This route adds the ONE thing SQL cannot know: that the
+ * reason is a key from the governed Delivery Reason Library, and a
+ * CUSTOMER-side one. §6 charges storage only for customer delay, so a request
+ * blamed on a Carres-side cause is not a §6 request at all — it is a Carres
+ * delay, and it never starts a clock. Accepting the key anyway would let a
+ * second word list, and a second responsibility rule, grow here.
+ */
+const CUSTOMER_REASON_KEYS: readonly string[] = DELIVERY_REASONS
+  .filter((r) => r.responsibility === "customer")
+  .map((r) => r.key);
+
+const laterDateInput = z.object({
+  orderId: z.string().uuid(),
+  requestedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reasonKey: z.string().trim().min(1),
+  reasonDetail: z.string().trim().max(1000).nullish(),
+  termsAcknowledged: z.boolean(),
+  freeStorageRequested: z.boolean().default(false),
+  evidenceUrl: z.string().trim().min(1, "Attach what the customer sent.").max(300),
+});
+
+paymentStorageRouter.get("/later-delivery-requests", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot view storage records." });
+  }
+  const orderId = c.req.query("orderId");
+  if (!orderId || !z.string().uuid().safeParse(orderId).success) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "order id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("payment_delivery_date_requests")
+    .select("id,order_id,requested_date,reason_key,reason_detail,terms_acknowledged,free_storage_requested,evidence_url,recorded_by,recorded_at")
+    .eq("order_id", orderId)
+    .order("recorded_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ requests: data ?? [] });
+});
+
+paymentStorageRouter.post("/later-delivery-request", async (c) => {
+  const parsed = await parseJsonBody(c, laterDateInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  if (!CUSTOMER_REASON_KEYS.includes(parsed.data.reasonKey)) {
+    return c.json({
+      error: "invalid_param", code: "reason_not_customer_side",
+      message: "Choose a customer reason. A Carres-side delay never starts the storage clock.",
+    }, 422);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("payment_record_delivery_date_request", {
+    p_order_id: parsed.data.orderId,
+    p_requested_date: parsed.data.requestedDate,
+    p_reason_key: parsed.data.reasonKey,
+    p_reason_detail: parsed.data.reasonDetail ?? null,
+    p_terms_acknowledged: parsed.data.termsAcknowledged,
+    p_free_storage_requested: parsed.data.freeStorageRequested,
+    p_evidence_url: parsed.data.evidenceUrl,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ request: data }, 201);
 });
 
 const startInput = z.object({

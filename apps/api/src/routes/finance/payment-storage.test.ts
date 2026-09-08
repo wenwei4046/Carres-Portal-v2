@@ -176,3 +176,77 @@ describe("POST /api/finance/payment-storage/extra-free", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6 (0451) — the customer's written request to delay
+// ─────────────────────────────────────────────────────────────────────────────
+describe("POST /api/finance/payment-storage/later-delivery-request", () => {
+  function door(result: unknown = { id: "r1" }, error: unknown = null) {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: result, error }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function post(role: string, body: unknown) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request("http://t/api/finance/payment-storage/later-delivery-request", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+  const GOOD = {
+    orderId: ORDER_ID, requestedDate: "2026-12-01", reasonKey: "customer_renovation",
+    reasonDetail: "kitchen not finished", termsAcknowledged: true,
+    freeStorageRequested: true, evidenceUrl: "orders-attachments/x/whatsapp.jpg",
+  };
+
+  it("hands the door every §6 fact the customer supplied", async () => {
+    const sb = door();
+    const res = await post("operation", GOOD);
+    expect(res.status).toBe(201);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_record_delivery_date_request", {
+      p_order_id: ORDER_ID,
+      p_requested_date: "2026-12-01",
+      p_reason_key: "customer_renovation",
+      p_reason_detail: "kitchen not finished",
+      p_terms_acknowledged: true,
+      p_free_storage_requested: true,
+      p_evidence_url: "orders-attachments/x/whatsapp.jpg",
+    });
+  });
+
+  /** §6 charges storage for CUSTOMER delay only. A Carres-side reason is not a
+   *  §6 request at all, and accepting one would grow a second responsibility
+   *  rule beside the governed Delivery Reason Library. */
+  it("refuses a Carres-side reason before the door is even called", async () => {
+    const sb = door();
+    const res = await post("operation", { ...GOOD, reasonKey: "stock_not_ready" });
+    expect(res.status).toBe(422);
+    expect((await res.json() as { code: string }).code).toBe("reason_not_customer_side");
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a reason that is in no library at all", async () => {
+    const sb = door();
+    expect((await post("operation", { ...GOOD, reasonKey: "because" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a request with no evidence — a telephone call is not written", async () => {
+    const sb = door();
+    expect((await post("operation", { ...GOOD, evidenceUrl: "" })).status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("carries the door's own refusals back with their status", async () => {
+    door(null, { code: "22023", details: "terms_not_acknowledged",
+      message: "The customer must acknowledge the storage terms." });
+    const res = await post("operation", { ...GOOD, termsAcknowledged: false });
+    expect(res.status).toBe(422);
+    expect((await res.json() as { message: string }).message).toContain("acknowledge");
+  });
+});
+
