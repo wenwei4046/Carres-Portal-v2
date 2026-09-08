@@ -981,6 +981,26 @@ free-storage request · the record never moves the delivery date · a second req
 beside the first · the fact reaches the order history. Eight route and composition tests pin
 the wire and the form, including that only customer-side reasons are offerable.
 
+### The isolated Stripe test environment — prepared, and what it still needs
+
+Stripe test mode is not a separate account; it is the same account with `sk_test_` keys. This
+Worker has ONE deployed environment, so putting a test key into its secrets would REPLACE the
+live one — which is exactly what must not happen. The isolated environment is therefore the
+LOCAL one: `wrangler dev` reads `apps/api/.dev.vars`, a gitignored file that never leaves the
+machine, so the whole §16 journey can be walked against Stripe test mode with nothing in
+production touched.
+
+`apps/api/.dev.vars.example` now carries both keys with the exact dashboard path to each, so
+the credential entry is a file on the owner's own machine — never a chat message, a commit or
+a screenshot. Nothing else is waiting on engineering: both keys unset is already the correct
+degrade (the routes answer 503 `stripe_not_configured` and the page says it is not set up
+yet), and that is what production does today.
+
+Setting the DEPLOYED Worker's secrets is a separate matter and is not attempted here: this
+environment holds no `CLOUDFLARE_API_TOKEN`, so `wrangler secret list` and `secret put` both
+refuse, and the live key's mode cannot be read from outside without an authenticated session.
+That is stated as a limit, not assumed away.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -1006,11 +1026,21 @@ failures, precisely and in the order they happened — two DIFFERENT modes, not 
    `Claude in Chrome is not connected` — the extension is unreachable, a different failure
    from (1) and not a page-state problem at all.
 
-Neither mode is a product defect and neither is evidence about the pages. ONE owner action
-should clear both: with the Claude in Chrome extension connected and signed in, bring the
-signed-in `erp.carresofficial.com` window to a normal visible size and leave it open; the
-visual pass, the native-zoom pass, the Storage interaction walk and the production check of
-the converged Work/gate readers all run from there. **Deployment evidence measured
+Neither mode is a product defect and neither is evidence about the pages.
+
+**CORRECTED 2026-09-08 — one action does NOT unlock all of it, and the earlier claim that it
+would was wrong.** The browser tooling's own contract states that page-zoom shortcuts are
+unsupported and error, so automation cannot drive Chrome's zoom control at all. The three
+outstanding checks therefore need two different things:
+
+* **The authenticated interaction walks** (the Storage journey, the converged Work/gate
+  readers) need the Claude in Chrome extension connected and signed in, with the
+  `erp.carresofficial.com` window at a normal visible size and left open.
+* **The native 200% zoom pass** needs a person to set it: Chrome's ⋮ menu → the Zoom row →
+  press + until the row reads **200%**, and confirm that displayed value. Two presses of ⌘+
+  do not reliably mean 200% — the step sequence depends on the starting level — so the number
+  shown in the menu is the evidence, not the keystrokes.
+* **The visual pass** can then be captured from that same window. **Deployment evidence measured
 meanwhile (2026-09-07), which is NOT visual or interaction acceptance:** the served ERP
 bundle carries `A Storage Invoice correction is in progress`, `Create Storage Invoice`, the
 Reports→Payment door card and the §13 no-refund wording, and carries NO `Reconciliation`
@@ -1135,7 +1165,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 19 | Ask the customer to pay + immutable message ledger | 16 | **BUILT** | — |
 | 20 | **Complete §16 customer message assembly** (bank routing, Partner contact, Important Notes) | 16 | **BLOCKED — owner content** | Wording and bank account numbers are owner inputs; 2 bank rows exist with NO account numbers. Never invented |
 | 21 | Template library, versions, defaults, manager gate | 16 | **BUILT** | 0435 with probe |
-| 22 | Online payment link journey + provider posting | 16 | **PARTIAL** | Journey and DB posting proven by probe; **provider end-to-end pending authorised Stripe test-mode access** — production keys are live mode |
+| 22 | Online payment link journey + provider posting | 16 | **PARTIAL** | Journey and DB posting proven by probe; the provider end-to-end walk needs Stripe TEST-mode keys in `apps/api/.dev.vars` (the route is documented there) — the deployed Worker has one environment, so a test key there would replace the live one |
 | 23 | Send receipt (template-driven) | 16 | **BUILT** | — |
 | 24 | Reports → Payment, six listings + Excel export | 11·16 | **BUILT** | — |
 | 25 | One read-only customer statement | 11 | **BUILT** | `GET /invoices/statement/:orderId` derives it across the CUSTOMER's Sales Orders through the same shared `soRemaining`; `Statement` opens it from the invoice object. Read-only, with no action on it |
@@ -1150,7 +1180,14 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   it was never an owner question. Existing authority settles it: a legacy fee is cleared
   only by collection or an override of 0 (C9), and money in full before delivery is
   ABSOLUTE (delivery/MASTER.md 2026-09-01). It holds, like any other owed money.
-- The §16 Important Notes wording and the receiving bank account numbers (#20).
+- **The two pieces of business content, consolidated into one request (#20).** Both are the
+  owner's words and neither may be invented, so §16's customer message is incomplete until
+  they exist. They are: (a) the approved **Important Notes** wording that goes on the payment
+  message — the sentences Carres wants every customer to read before paying; and (b) the
+  **receiving bank account numbers** for the two bank rows already configured, which today
+  hold a bank name and NO account number. They can be entered directly in
+  `Settings → Payment` (the manager-permission surface, 0431) — no engineering step waits on
+  anything else.
 - **Who holds the Payment Approver duty.** Measured 2026-09-08: `workspace_duty_assignments`
   carries `po_duty` and `grn_duty` rotations and **no `payment_approver` row at all**. The
   duty resolver refuses an unassigned duty (correctly), so today `Void payment` (0430) and
