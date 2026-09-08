@@ -8,10 +8,18 @@ vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () =>
 vi.mock("@/lib/queries", () => ({
   usePaymentRegister: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn(), error: null }),
   useInvoiceRegister: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn(), error: null }),
+  // The Payments object offers `Correct allocation` only to the Payment
+  // Approver, so the register asks who holds that duty (0450).
+  useWorkspaceDuties: () => ({ data: { duties: [] } }),
+  qk: { finance: {
+    paymentRegister: () => ["finance", "payment-register"],
+    invoiceRegister: () => ["finance", "invoice-register"],
+  } },
 }));
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
-  useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
+  useAuth: (selector: (s: { role: string; user: { id: string } | null }) => unknown) =>
+    selector({ role: auth.role, user: null }),
 }));
 
 function show(path: string) {

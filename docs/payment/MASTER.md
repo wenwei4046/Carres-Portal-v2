@@ -1061,6 +1061,41 @@ excess leaves the review open. **No Customer Credit is implied anywhere — none
 system, and inventing one would have been inventing a capability, not building an approved one.**
 
 Eight projection tests pin it, including every one of those negative controls.
+### BUILD — a wrong allocation is corrected, not erased, 2026-09-08
+
+The money was allocated once, at posting, and after that nothing could move it. An operator
+who put a payment against the wrong SO — one customer with several SOs is normal here — had
+exactly one remedy: void the payment and record it again. That destroys the receipt the
+customer is holding in order to fix a bookkeeping mistake, and §5 asks for the opposite: the
+payment STANDS, its allocation is corrected, and the correction is evidence.
+
+`payment_correct_allocation` is the door. It refuses without a reason, refuses anyone but the
+Payment Approver (§12: "void, reallocation, overpayment review") or principal, voids the old
+allocation rows rather than deleting them, inserts the new set, and moves every affected
+order's `paid` by exactly its share — old orders and new ones locked in id order so two
+corrections cannot deadlock. `payment_allocation_corrections` keeps before, after, actor,
+time and the reason, append-only, with the definer door as its only writer.
+
+**THE ARITHMETIC IS CONSERVED**, and the door enforces it: the corrected set must sum to
+exactly the payment's amount, and the refusal names both figures. A correction moves money
+between orders; it never creates or forgives any. That is what separates it from a void
+(which reverses) and from a discount (which nobody may key here).
+
+**A consequence found while building it, and fixed in the same migration.** `payment_void`
+reversed `orders.paid` on the PAYMENT's own order. That was right while a payment could only
+be allocated where it was recorded — and wrong the moment a correction can move it. Voiding
+would have credited back an order that no longer held the money and left the one that does
+overstated. The reversal now walks the LIVE ALLOCATIONS, which is what `paid` was built from;
+a payment with no allocation row keeps the 0430 behaviour exactly.
+
+**Proven against the ACTUAL doors** (rolled-back production probe, twelve controls): an
+operator is refused · a reason is required · a short set is refused naming both figures · one
+SO can appear only once · a split moves each order by its share · before, after, actor, time
+and reason are recorded · the old allocation survives, voided · **a void follows the corrected
+allocation to BOTH orders** · a voided payment has no money to allocate · a storage collection
+has no allocation to correct · an unknown Sales Order is refused · the assigned Payment
+Approver corrects. Eleven route and composition tests pin the wire and the form, including
+that the control is not offered to staff who do not hold the duty.
 
 ### Verification evidence — the four categories, stated separately
 
@@ -1213,7 +1248,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 6 | Receipt reprint from an immutable snapshot | 4 | **BUILT** | 0449: the ONE writer freezes the receipt's content at posting; `GET /payments/:id/receipt-document` reads it, `Print receipt` stands on the payment object, and a voided payment reprints saying VOIDED. Payments recorded before 0449 read live and say so |
 | 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
 | 8 | Promise-to-pay and the missed-promise Work sort | 3·10 | **BUILT** | `payment.missed_promise` is a registry rule with its own five parts; the feed raises it on the day the CUSTOMER chose, replaces the window item rather than doubling it, and it reaches Work even when the collection clock has no anchor |
-| 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
+| 9 | `Correct allocation` (before/after, actor, time, reason) | 5 | **BUILT** | 0450: the payment stands and its allocation moves; the corrected set must sum to what was received; old rows are voided, never deleted; the Payment Approver is the authority and `payment_void` now follows the live allocations |
 | 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | 0448 moved the rule into the database: the CUSTOMER's live payments are compared, the order is locked first so concurrent submissions serialise, and continuation needs the Payment Approver duty or principal. The page still draws the warning; it no longer decides |
 | 11 | Overpayment surfaced and reviewed | 5·11 | **BUILT** | `payment.review_overpayment` is a registry rule owned by the Payment Approver; it closes the two ways §10 names — allocated (0450's correction) or classified (the exceptional refund §13 allows). No Customer Credit is implied; none exists |
 | 12 | Void payment with reason + approver duty | 5 | **BUILT** | — |

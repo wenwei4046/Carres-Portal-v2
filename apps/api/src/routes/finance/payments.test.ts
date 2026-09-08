@@ -717,3 +717,77 @@ describe("GET /api/finance/payments/:id/receipt-document", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/finance/payments/:id/correct-allocation — §5's remedy (0450)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("POST /api/finance/payments/:id/correct-allocation", () => {
+  const PAY = "00000000-0000-0000-0000-000000a99020";
+  const SO_A = "00000000-0000-0000-0000-000000a99021";
+  const SO_B = "00000000-0000-0000-0000-000000a99022";
+  function door(result: unknown, error: unknown = null) {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: result, error }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function post(role: string, body: unknown, id = PAY) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/finance/payments/${id}/correct-allocation`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+  const GOOD = { reason: "wrong SO", allocations: [{ orderId: SO_A, amount: 200 }] };
+
+  it("403 for a role with no payment sight", async () => {
+    door(null);
+    expect((await post("dealer", GOOD)).status).toBe(403);
+  });
+
+  it("422 without a reason — the rule is never optional", async () => {
+    door(null);
+    expect((await post("finance", { ...GOOD, reason: "  " })).status).toBe(422);
+  });
+
+  it("422 with no lines at all", async () => {
+    door(null);
+    expect((await post("finance", { ...GOOD, allocations: [] })).status).toBe(422);
+  });
+
+  it("hands the door snake_case lines and the reason, unchanged", async () => {
+    const sb = door({ payment_id: PAY, before: [], after: [] });
+    const res = await post("finance", {
+      reason: "the customer paid for both SOs",
+      allocations: [{ orderId: SO_A, amount: 120 }, { orderId: SO_B, amount: 80 }],
+    });
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledWith("payment_correct_allocation", {
+      p_payment_id: PAY,
+      p_allocations: [
+        { order_id: SO_A, invoice_id: null, amount: 120 },
+        { order_id: SO_B, invoice_id: null, amount: 80 },
+      ],
+      p_reason: "the customer paid for both SOs",
+    });
+  });
+
+  /** Every rule lives in the door. The route only carries its answer back with
+   *  the right status, so the operator is told WHY, not just "no". */
+  it("carries the door's conserved-arithmetic refusal back as 422 with its figures", async () => {
+    door(null, { code: "22023", details: "sum_mismatch",
+      message: "The correction must add up to RM 200.00 — it adds up to RM 150.00." });
+    const res = await post("finance", GOOD);
+    expect(res.status).toBe(422);
+    expect((await res.json() as { message: string }).message).toContain("RM 200.00");
+  });
+
+  it("carries the door's authority refusal back as 403", async () => {
+    door(null, { code: "42501", details: "not_payment_approver",
+      message: "Only the Payment Approver can correct an allocation." });
+    expect((await post("finance", GOOD)).status).toBe(403);
+  });
+});
+
