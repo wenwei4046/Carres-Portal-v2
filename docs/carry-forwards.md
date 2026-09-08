@@ -46,6 +46,28 @@
 - `mail-cannot-leave-the-building-and-the-recovery-path-is-dead` — **found 2026-08-12 mapping email infrastructure before the Resend build; three separate faults, one theme.** ① ~~**Password reset goes nowhere.**~~ **CLOSED 2026-08-17 by `70398581` (YH, "recovery gets its step 02, and the reset link finally lands")** — `UpdatePassword.tsx` exists, `App.tsx:98` routes `/update-password` to it, and `UpdatePassword.test.tsx:57` is a live regression test asserting the path resolves to that page and NOT to the catch-all. ⚠️ **② and ③ below are still OPEN**, so this entry does not close. *(Caught stale on 2026-08-20 — this fault had been fixed for three days while the entry still described it as live.)* The original diagnosis, for the record: `Login.tsx:8` sends the recovery link to `${origin}/update-password`. That string appeared **once in the entire source tree — in that line.** No route in `App.tsx`, no component, and zero `PASSWORD_RECOVERY` listeners. Because `detectSessionInUrl: true` (`lib/supabase.ts:24`), clicking the emailed link **silently signs the user in** and the catch-all route drops them on the home page with no password field. It is the ONLY email this portal sends, and two HIGH entries above depend on it for rotating the `111` passwords. ② **`carres.com.my` is not a registered domain** — `nslookup` returns `Non-existent domain`. The login page's *"Contact admin → admin@carres.com.my"* writes into the void, which is the other path a locked-out user takes. ③ **`carresofficial.com` has Google Workspace (MX `smtp.google.com`) and DKIM published, but NO SPF and NO DMARC record.** So company mail already sends unauthenticated. **This matters before the Resend work, not after:** a domain may hold exactly ONE SPF record, so the value must cover Google and the new sender together — two records make both invalid and break company email. Verifying a subdomain (`send.carresofficial.com`) is the option that cannot break Workspace. **Fix ① first and separately** — it is a live user-facing defect, it needs no DNS, and the mail system will want that route anyway.
 
 **MEDIUM**:
+- `accessory-production-days-are-missing-so-no-quantity-good-can-be-bought` — **opened 2026-09-08
+  by the Purchasing CARD 10 production walk.** `purchasing_production_days` holds exactly four
+  rows — Hookka/bedframe, Nice Future/mattress, Ohana/bedframe, Ohana/sofa — and none for the
+  accessory category. Every SKU the 0442 classification marked `quantity` is an accessory, so
+  Manual Purchase refuses an accessory line by name (*Production days are not set · Add production
+  days for {supplier} · Accessory in Settings*) before the Catalog identity mode is ever read.
+  Consequence: **no purchase order can currently carry a quantity line at all**, so the PO object's
+  `—` Unit ID state and a quantity receive cannot be walked in production; both rest on
+  `PurchaseOrdersPage.test.tsx` and the rolled-back probe's PASS 4. **This is configuration, not
+  code.** The fix is Jess entering production days for each supplier's accessory category in
+  Purchasing Settings; the number is a real supplier lead time and no chat may invent one. Closes
+  when an accessory PO issues and its quantity line prints `—`.
+  **And a challenge worth answering while the number is being decided (Law 4, not part of CARD 10,
+  no code changed):** the gate asks every purchase for a *production* lead time, but a protector or
+  a pillow is picked off a shelf, not produced — the honest number for such a SKU is often zero,
+  and today zero has to be typed in as if it were a manufacturing estimate. **Recommendation:**
+  Purchasing Settings should let a supplier/category be marked *stocked, no production time*
+  explicitly, so a real zero reads as a decision instead of an unfilled field, and the refusal
+  keeps its force for goods that genuinely are built to order. **Trade-off:** one more Settings
+  concept for the operator to understand. **Falsifier:** if Jess says accessories do carry real
+  factory lead times at Carres, the current gate is already right and only the four missing rows
+  need filling.
 - `two-month-calendars-shipped-the-same-day-and-must-converge` — **opened 2026-09-07 by the
   Receiving CARD 01 second correction (PR #1117), which collided mid-flight with Delivery's
   #1119.** Two implementations of the rail month calendar now exist: the governed kit

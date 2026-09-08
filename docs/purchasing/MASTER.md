@@ -546,7 +546,7 @@ category (category decided ONCE, in the audited 0442 classification). A purchasa
 stored mode **blocks official PO issue by name** — `Set the stock identity (Unit ID or Quantity)
 for {sku} in Catalog before issuing a PO` — and nothing chooses for it.
 
-**UNIT ID BIRTH — BUILT, migrations 0442 / 0443 / 0444.** When an official PO is issued, the PO
+**UNIT ID BIRTH — PRODUCTION-VERIFIED 2026-09-08, migrations 0442 / 0443 / 0444.** When an official PO is issued, the PO
 number, its lines (each snapshotting the Catalog mode as `purchase_order_lines.identity_mode`) and
 every exact-unit line's Unit IDs are born **in the same transaction**: exactly one permanent
 `U1-000-001` per ordered piece, bound to the line's immutable id (`ops_stock_items.po_line_id`),
@@ -583,6 +583,24 @@ No supplier physical-Unit label, QR, barcode or Carres label template is require
 Operations attaches the same text Unit ID to the physical sofa at the showroom. Future suppliers
 may attach the physical label and future QR/barcode may encode the same permanent machine value;
 neither upgrade may renumber the Unit.
+
+**MEASURED IN PRODUCTION, 2026-09-08.** `PO-20260908-2503` was issued through the real Manual
+Purchase screens and its Unit `U1-000-082` was written in the same transaction — both rows carry
+`2026-09-08 06:45:31.737518+00` — bound to the line, `identity_scope unit`, `source_ref po_mint`.
+The PO object printed the ID under a `UNIT ID` heading, the register stayed one row per PO, and
+the PO's receiving page listed the same ID under `EXPECTED UNITS` with an outcome to record
+rather than an identity to invent. The 0442 apply classified 225 SKUs `exact_unit` and 4
+`quantity`; the seven left NULL are service and guarantee SKUs, which are not physical goods.
+0443's preflight restored exactly the 39 `po_mint` Units the retired 0366 destination trigger had
+voided — identities already printed on supplier paper — and invented none.
+
+🟡 **THE QUANTITY MODE IS UNREACHABLE UNTIL SETTINGS CARRY ACCESSORY PRODUCTION DAYS.** Every
+`quantity` SKU is an accessory, and `purchasing_production_days` holds only Hookka/bedframe,
+Nice Future/mattress, Ohana/bedframe and Ohana/sofa. Manual Purchase therefore refuses an
+accessory line by name before the Catalog mode is ever consulted, so no PO can carry a quantity
+line and neither the `—` column state nor a quantity receive can be walked. The law is built and
+probed; the block is configuration. **Fix:** Purchasing Settings gains production days for each
+supplier's accessory category. The number is a real supplier lead time and belongs to Jess.
 
 Legacy showroom stock receives a Unit ID during opening count with supplier, ownership, model,
 location, existing serial/label and photo evidence. Until the physical label is attached, the Unit

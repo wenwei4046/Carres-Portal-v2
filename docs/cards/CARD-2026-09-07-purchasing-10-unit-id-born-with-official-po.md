@@ -2,7 +2,7 @@
 
 Module: Purchasing (× Catalog × Stock × Receiving) · Sequence: 10
 Pages: Catalog (SKU Master · New SKU) · SO Batch Purchase · Manual Purchase · Purchase Orders object · official PO PDF · Receiving · Warehouse count
-Status: BUILT / PROBED — awaiting the governed production migration-apply approval
+Status: SHIPPED — owner approved the apply 2026-09-08; 0442 · 0443 · 0444 applied in order and verified; PR #1161 merged `11dac716`
 Lane: BUILD / DELIVERY
 Start from: `origin/main` `a5b39b25` in a fresh dedicated worktree
 Production at start: `72779db7` (an ancestor of `a5b39b25`; three newer merges were mid-deploy)
@@ -189,11 +189,82 @@ the multi-variant case (0076) — exactly the case `(PO, SKU)` could not tell ap
 `purchase_orders.destination_id` is NOT NULL, so the helper names the missing Deliver To rule
 instead of letting a raw constraint speak.
 
-**Owed after apply** — authenticated production walks: SO Batch issue · Manual Purchase issue ·
-the PO object's Unit ID column · the rendered PDF heading · an exact-unit receive · a quantity
-receive · the register still one row per PO.
+**The walks these owed are settled in §8.2** — what passed, and what could not be
+walked without inventing a business fact.
 
 ---
+
+## 8.1 · What the apply actually did (production, 2026-09-08)
+
+Applied in order through the governed path, each verified before the next.
+
+| Applied | Measured immediately after |
+|---|---|
+| `0442` | 225 SKUs `exact_unit`, 4 `quantity`, 7 NULL — and every NULL is a service or guarantee SKU, which is not physical goods. Every classification carries its basis in the ledger. Both allocators owner-only. |
+| `0443` | The preflight restored **exactly the 39** `po_mint` Units the old destination trigger had voided — the identities already printed on supplier paper — and invented none. Ledger: 216 Unit IDs, 216 distinct codes. The destination trigger no longer voids or mints. |
+| `0444` | No receiving door contains a bulk mint. The validator enforces both modes and finds a Unit by its line binding. No open exact-unit line is short. |
+
+Two honest observations, neither repaired because neither should be:
+
+- **Four `PO-SMOKE-*` lines carry no mode.** Their SKUs (`SMOKE King Mattress`, `SMOKE Sofa`,
+  `SMOKE Queen Bedframe`) are not in the Catalog at all, so they were never receivable through the
+  governed path. Receiving now refuses them by name, which is the correct answer for a line whose
+  SKU Catalog does not know. Constitution §6: these are smoke rows, not a backfill target.
+- **`PO-2050` / `S1601F-K` has one pending piece and two incoming Units** — an excess left by the
+  old trigger's mint/void churn, not a shortage. The preflight only restores shortages, and 0444's
+  guard only blocks shortages, so it does not block anything. It is recorded here rather than
+  silently adjusted.
+
+## 8.2 · The authenticated production walk (2026-09-08, `principal@carres.com`)
+
+Deployed SHA at the time of the walk: `322639e9`, which carries `11dac716` as an ancestor —
+convergence proven by ancestry, not by equality, because a sibling merge deployed on top.
+
+**A real PO was issued through the real Manual Purchase screens.** Request raised (`ALL-AASNDA-K`,
+qty 1, Nice Future → Carres Klang), approved, then issued from the register's one issuance
+placement. Production result:
+
+```
+PO-20260908-2503   created_at 2026-09-08 06:45:31.737518+00
+line ALL-AASNDA-K  qty 1   identity_mode exact_unit
+unit U1-000-082    created_at 2026-09-08 06:45:31.737518+00
+                   po_line_id = the line   identity_scope unit   source_ref po_mint   status incoming
+```
+
+The PO row and the Unit row share the same transaction timestamp to the microsecond. That is the
+ruling, measured: the number and the identity are born together or not at all.
+
+| Walk | Result |
+|---|---|
+| Catalog SKU Master shows the stored mode | **PASS** — the 236-SKU list prints 225 `Unit ID`, 4 `Quantity`, 7 `Not set`, exactly the counts `0442` wrote |
+| Manual Purchase issue | **PASS** — `PO-20260908-2503`, Unit born in the same transaction |
+| PO object Unit ID column | **PASS** — header reads `UNIT ID`; the line prints `U1-000-082`, no status word, no missing-ID alert |
+| Register still one row per PO | **PASS** — 62 POs, one row each, no Unit ID column |
+| Receiving reads the identity Purchasing made | **PASS** — the PO's receiving page lists `EXPECTED UNITS U1-000-082`, and the receiving form offers that Unit an outcome instead of a blank to fill |
+| PDF `Unit ID` heading | **PASS** — the deployed bundle renders `Unit ID` as the goods-table heading; `Item ID` occurs zero times in the served JavaScript |
+
+**Three walks could not be completed, and none of them was skipped for convenience.**
+
+- **A quantity line cannot be purchased at all today.** Every `quantity` SKU in the Catalog is an
+  accessory, and `purchasing_production_days` holds only four rows — Hookka/bedframe,
+  Nice Future/mattress, Ohana/bedframe, Ohana/sofa. With no accessory production days, Manual
+  Purchase refuses the line by name: *Production days are not set · Add production days for
+  Nice Future · Accessory in Settings*. So neither the `—` state nor a quantity receive is
+  reachable. **This is Settings configuration, and the number is a real supplier lead time —
+  inventing one would be inventing a business fact.** 🟡 **Fix, for Jess:** set production days
+  for each supplier's accessory category in Purchasing Settings; the walk then completes with no
+  code change. Until then the `—` state rests on `PurchaseOrdersPage.test.tsx` and the probe's
+  PASS 4.
+- **The SO Batch Purchase entrance has nothing left to issue.** All 26 proceeded sales orders are
+  already covered by POs; selecting the one apparently-open line routed to its existing
+  `PO-20260904-4665` rather than creating a second. Both entrances call the same
+  `purchasing_issue_pos_batch` → `_operation_create_po_inner`, which the Manual Purchase walk
+  exercised end to end. Creating a sales order purely to walk this would be inventing customer data.
+- **The receive could not be saved.** The form requires an uploaded signed supplier DO photo
+  (`Save — upload signed DO` stays disabled without one). There is no genuine signed DO for this
+  smoke PO, and manufacturing supplier paperwork is not acceptable evidence. The receiving draft
+  was cancelled; no receiving activity was recorded. What the walk *did* prove is the part this
+  card owns: Receiving names `U1-000-082` as an expected identity and never offers to create one.
 
 ## 9 · Migration dependency and apply order
 
