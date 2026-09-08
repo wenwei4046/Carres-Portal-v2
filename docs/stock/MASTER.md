@@ -1774,7 +1774,7 @@ rows, 221 Site names, 1 holder name, caller security and SELECT-only grants.
 Authenticated Inventory now loads 181 current records and 40 history records.
 See [WAREHOUSE — INVENTORY](../cards/CARD-2026-09-07-warehouse-inventory-production-defect.md)
 for the full evidence. The expanded 240px Register with saved views and source
-facts is in PR #1149; final CI/deployment verification remains required.
+facts is in PR #1149, which records final CI and production deployment evidence.
 
 `CARD-2026-09-03-warehouse-02-inventory` supplied fixes for three measured P0s. **The register API had
 answered 500 since birth**: the route selected `site_name`/`holder_name` from

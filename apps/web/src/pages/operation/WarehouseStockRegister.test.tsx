@@ -269,6 +269,13 @@ describe("Stock exposes no second door onto the register (Card §2, Stock MASTER
 
 
 describe("Inventory saved views", () => {
+  it("keeps the footer honest when a table column narrows the visible stock", async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: "Filter Stock use" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Available$/ }));
+    expect(screen.queryByText("id-ccc333333")).not.toBeInTheDocument();
+    expect(screen.getByText("2 of 4 Units · 1 you can promise · 555 pieces you cannot")).toBeInTheDocument();
+  });
   it("Service Case uses purchase purpose, independently of product category", async () => {
     apiFetchMock.mockResolvedValue({ units: [
       unit({ id: "service", unitCode: "id-service", purchasePurpose: "service_case", category: "sofa" }),

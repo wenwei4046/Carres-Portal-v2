@@ -2,7 +2,7 @@
 
 **Status:** owner confirmed BUILD and production repair. Existing migration applied
 and production Inventory loads real stock. The expanded page is in PR #1149;
-its final CI and deployment proof are still required.
+its final CI and production deployment evidence are recorded on that PR.
 
 ## Scope and authority
 
@@ -114,8 +114,8 @@ source is `656fa52c9d0683471faa44062fdf8409a700e0d77a83b17503671a12cc268379`,
 matching the immutable repository file. No Unit row was changed.
 
 Authenticated production Inventory now loads: 181 current records and 40 history
-records, with real Site names. The expanded page still needs the normal final
-PR/CI merge, deployment, and authenticated UI verification.
+records, with real Site names. The expanded page follows the normal PR/CI merge and deployment path.
+PR #1149 records the final SHA and authenticated UI verification after delivery.
 
 Counts/Differences/Adjustments remain the separately documented unbuilt business
 transaction in Stock MASTER §14.1 G6. This page does not claim that transaction
@@ -136,4 +136,6 @@ is attached to a Unit.
   must pass the complete gate before merge.
 - Final web tests, full-suite, type checks, production build and bundle-secret
   verification are recorded on [PR #1149](https://github.com/wenwei4046/Carres-Portal-v2/pull/1149).
-  The previous PR head passed all CI gates. Final page CI and deployment proof remain required.
+  Page head `eff04445` passed every CI gate in run `34117320505`. The final
+  footer regression additionally proves table-column filters change the Unit and
+  quantity summary. Final-head CI and deployment evidence are recorded on PR #1149.

@@ -402,7 +402,6 @@ export default function WarehouseStockRegister() {
     [navigate],
   );
 
-  const totals = summariseRegister(rows);
   const filtered = isRailFiltered({ ...sel, query: search }) || !!holder || view !== "all";
 
   return (
@@ -482,10 +481,10 @@ export default function WarehouseStockRegister() {
                   ? "No Units yet — a Unit is created when a purchase order or consignment order is confirmed, and Receiving checks it in against the ID the supplier put on the label."
                   : "No Units match these filters."
               }
-              statusSummary={() => {
+              statusSummary={(visibleRows) => {
                 /* UI MASTER §6.7: the 32px footer carries the summary. No KPI
                    strip above the table — a Register is truth, not a dashboard. */
-                const line = registerSummaryLine(totals, currentUnits.length);
+                const line = registerSummaryLine(summariseRegister(visibleRows), currentUnits.length);
                 return (
                   <span className="block truncate" title={line}>
                     {line}
