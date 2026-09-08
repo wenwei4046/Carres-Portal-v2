@@ -236,6 +236,7 @@ ruling, measured: the number and the identity are born together or not at all.
 
 | Walk | Result |
 |---|---|
+| Catalog SKU Master shows the stored mode | **PASS** — the 236-SKU list prints 225 `Unit ID`, 4 `Quantity`, 7 `Not set`, exactly the counts `0442` wrote |
 | Manual Purchase issue | **PASS** — `PO-20260908-2503`, Unit born in the same transaction |
 | PO object Unit ID column | **PASS** — header reads `UNIT ID`; the line prints `U1-000-082`, no status word, no missing-ID alert |
 | Register still one row per PO | **PASS** — 62 POs, one row each, no Unit ID column |
