@@ -146,6 +146,10 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
         reference: reference.trim() || null,
         receiptUrl,
         idempotencyKey: idempotencyKey.current,
+        // §5 (0448) — the tick ASKS to continue; the server decides. It only
+        // continues for the Payment Approver duty or principal, and it looks
+        // across the CUSTOMER, not only this order.
+        duplicateAck: duplicateChecked || undefined,
       },
       {
         onSuccess: (out) => {
@@ -202,10 +206,18 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   // order's LIVE payments. A warning, never a refusal: the posting key
   // already stops an accidental double-submit, and a customer may genuinely
   // pay the same amount twice — but nobody records one by hand unlooked.
+  const earlier = invoice.orders?.order_payments;
   const duplicates = likelyDuplicatePayments(
-    invoice.orders?.order_payments,
+    earlier,
     { amount: amtOk ? amt : 0, paidOn, reference: reference.trim() || null },
   );
+  // NOT LOADED IS NOT "NONE FOUND". When the register row carried no payment
+  // list, this page compared against nothing and found nothing — which looks
+  // exactly like a clean order. It now says so and asks for the same look.
+  // The server checks again either way (0448), so this is honesty, not the
+  // guard: the guard is in the database.
+  const earlierUnknown = earlier == null;
+  const needsLook = duplicates.length > 0 || earlierUnknown;
 
   return <div className="flex-1 overflow-auto p-4" data-testid="invoice-record-payment">
     <div className="grid gap-4 md:grid-cols-2">
@@ -260,9 +272,11 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
           <p>{file ? `${spec.evidence} attached.` : `No ${spec.evidence.toLowerCase()}.`}</p>
           <p className="font-semibold">This records customer money.</p>
           <p className="font-semibold">This does not confirm the bank account.</p>
-          {duplicates.length > 0 && <div className="rounded-card border border-base-200 p-2"
+          {needsLook && <div className="rounded-card border border-base-200 p-2"
             data-testid="likely-duplicate-warning">
-            <p className="font-semibold">This order already has a payment that looks the same.</p>
+            <p className="font-semibold">{earlierUnknown
+              ? "The earlier payments could not be read."
+              : "This customer already has a payment that looks the same."}</p>
             {duplicates.map((d) => <p key={d.id} className="text-label font-normal">
               {d.receipt_no ?? "Receipt number missing"} · {rm(Number(d.amount))} · {fmtDate(d.paid_on)}
               {d.reference ? ` · ${d.reference}` : ""}
@@ -271,12 +285,16 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
               <input type="checkbox" checked={duplicateChecked}
                 onChange={(e) => setDuplicateChecked(e.target.checked)}
                 aria-label="I checked the earlier payment" />
-              <span>I opened the earlier payment and this is a different one.</span>
+              <span>{earlierUnknown
+                ? "I opened this order's payments and this one is not there yet."
+                : "I opened the earlier payment and this is a different one."}</span>
             </label>
+            <p className="mt-1 text-label font-normal">
+              Only a Payment Approver can record it after this.</p>
           </div>}
           <div className="flex gap-2 pt-1">
             <button className="btn-primary"
-              disabled={saving || record.isPending || (duplicates.length > 0 && !duplicateChecked)}
+              disabled={saving || record.isPending || (needsLook && !duplicateChecked)}
               onClick={() => void post()}>Record payment</button>
             <button className="btn-secondary" disabled={saving || record.isPending}
               onClick={() => setStep("edit")}>Back</button>
