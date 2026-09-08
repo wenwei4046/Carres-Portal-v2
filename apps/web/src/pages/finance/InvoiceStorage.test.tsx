@@ -5,6 +5,7 @@ import InvoiceStorage, { type StorageCaseRow } from "./InvoiceStorage";
 
 const state = vi.hoisted(() => ({
   cases: [] as unknown[],
+  requests: [] as unknown[],
   posts: [] as Array<{ url: string; body: unknown }>,
 }));
 vi.mock("@/lib/api", () => ({
@@ -13,6 +14,7 @@ vi.mock("@/lib/api", () => ({
       state.posts.push({ url, body: JSON.parse(init.body ?? "{}") });
       return { case: {} };
     }
+    if (url.includes("/later-delivery-requests")) return { requests: state.requests };
     if (url.includes("/payment-storage")) return { cases: state.cases };
     throw new Error(`unexpected ${url}`);
   }),
@@ -43,7 +45,7 @@ function show(canAct = true) {
   </QueryClientProvider>);
 }
 
-beforeEach(() => { state.cases = []; state.posts = []; });
+beforeEach(() => { state.cases = []; state.requests = []; state.posts = []; });
 
 describe("the Storage section", () => {
   it("no case says the §6 rule honestly, and finance sees no doors", async () => {
@@ -142,3 +144,60 @@ describe("the Storage section", () => {
     expect(screen.queryByRole("button", { name: "Request more free days" })).not.toBeInTheDocument();
   });
 });
+
+// §6 (0451) — the customer's written request to delay.
+describe("Request a later delivery date", () => {
+  it("records what the customer asked for, and says it does not move the date", async () => {
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Record the customer's later date" }));
+    const form = screen.getByTestId("storage-later-date-form");
+    expect(form).toHaveTextContent("This records what the customer asked for. It does not change the delivery date.");
+    // A telephone call is not enough — the button stays shut with no file.
+    fireEvent.change(screen.getByLabelText("The date the customer asked for"),
+      { target: { value: todayPlus(21) } });
+    fireEvent.click(screen.getByLabelText("The customer acknowledged the storage terms"));
+    expect(screen.getByRole("button", { name: "Record the request" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("What the customer sent"),
+      { target: { files: [new File(["x"], "whatsapp.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByLabelText("The customer asked for free storage"));
+    expect(screen.getByRole("button", { name: "Record the request" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Record the request" }));
+    await waitFor(() => expect(state.posts.length).toBeGreaterThan(0));
+    const post = state.posts.at(-1)!;
+    expect(post.url).toBe("/api/finance/payment-storage/later-delivery-request");
+    expect(post.body).toMatchObject({
+      requestedDate: todayPlus(21),
+      termsAcknowledged: true,
+      freeStorageRequested: true,
+      reasonKey: "customer_reschedule",
+    });
+  });
+
+  /** §6 charges storage for CUSTOMER delay only, so a Carres-side reason must
+   *  not even be offerable — otherwise the form grows a second rule. */
+  it("offers only customer-side reasons", async () => {
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Record the customer's later date" }));
+    const options = within(screen.getByLabelText("Reason"))
+      .getAllByRole("option").map((o) => (o as HTMLOptionElement).value);
+    expect(options).toContain("customer_renovation");
+    expect(options).not.toContain("stock_not_ready");
+    expect(options).not.toContain("driver_unavailable");
+  });
+
+  it("shows what the customer already asked for, with the acknowledgement", async () => {
+    state.requests = [{
+      id: "r1", order_id: "o1", requested_date: todayPlus(30),
+      reason_key: "customer_renovation", reason_detail: "kitchen not finished",
+      terms_acknowledged: true, free_storage_requested: true,
+      evidence_url: "a/b.jpg", recorded_at: "2026-09-08T00:00:00Z",
+    }];
+    show();
+    const panel = await screen.findByTestId("later-delivery-requests");
+    expect(panel).toHaveTextContent("Customer renovation");
+    expect(panel).toHaveTextContent("kitchen not finished");
+    expect(panel).toHaveTextContent("asked for free storage");
+    expect(panel).toHaveTextContent("storage terms acknowledged");
+  });
+});
+

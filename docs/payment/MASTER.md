@@ -948,6 +948,39 @@ Read-only, by §11's own word: there is no action on the page. Ten route and com
 pin it, including the customer span, the name fallback, the unknown-price answer, and that the
 voids and allocations are carried.
 
+### BUILD — the customer's written request to delay is a record, not a note, 2026-09-08
+
+A storage case could only be opened from a TYPED witness note — prose, unfilterable, and
+silent about the three facts §6 actually asks the customer for. So "the customer acknowledged
+the storage terms" and "the customer asked for free storage" were things an operator
+remembered, not things the system held.
+
+0451 records the §6 submission: the date the customer asked for, a structured reason, the
+storage-terms acknowledgement, an optional free-storage request, and the evidence. It is
+append-only, and its door refuses exactly what §6 refuses:
+
+* **no evidence** — *"Telephone alone cannot formally change the date or obtain free storage."*
+  A request nobody can show is not a written request, so the file is required, not optional.
+* **terms not acknowledged** — §6 names the acknowledgement as part of what the customer
+  supplies. Without it the form is incomplete, not merely thin.
+* **a date already past** — a request to deliver yesterday is not a request.
+* **no reason** — and the API adds the one check SQL cannot make: the reason must be a key
+  from the one governed Delivery Reason Library, and a CUSTOMER-side one. §6 charges storage
+  for customer delay only, so a request blamed on a Carres-side cause is not a §6 request at
+  all. The form offers only those keys and the door refuses the rest, so no second word list —
+  and no second responsibility rule — can grow here.
+
+⛔ **It does not move the delivery date.** §6 is explicit that the original date stands until
+written confirmation, and the date belongs to Orders/Delivery, never to Payment. The form says
+so on its face, so nobody expects the calendar to change underneath them.
+
+**Proven against the ACTUAL door** (rolled-back production probe, nine controls): an unknown
+caller is refused · telephone alone is refused · the storage terms must be acknowledged · a
+past date is refused · a reason is required · a complete submission records with its
+free-storage request · the record never moves the delivery date · a second request stands
+beside the first · the fact reaches the order history. Eight route and composition tests pin
+the wire and the form, including that only customer-side reasons are offerable.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -1096,7 +1129,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 13 | Storage case: witnesses, derived permanent start, rule snapshot | 6·7 | **BUILT** | 0436/0439 with probes |
 | 14 | Storage charging → Storage / Additional Storage Invoice | 4·7 | **BUILT** | 0438 with probe |
 | 15 | Storage waiver ladder (Operation → Waiver Approver → nobody) | 7 | **BUILT** | 0436 with probe |
-| 16 | **`Request a later delivery date` customer form** | 6 | **NOT BUILT** | §6's DEFAULT storage evidence. Today a case can only be opened from a typed witness note; the structured customer submission (new date, reason, terms acknowledgement, free-storage request) does not exist |
+| 16 | `Request a later delivery date` | 6 | **BUILT** | 0451 records the submission — new date, governed customer-side reason, storage-terms acknowledgement, optional free-storage request and the written evidence without which there is no request. It never moves the delivery date, which Orders/Delivery owns |
 | 17 | **`Check the stored furniture` inspection work every 30 days** | 6 | **NOT BUILT** | The interval is configured in Settings (0431) and nothing raises the work |
 | 18 | Storage obligations reconciled across every reader + the DB gate | 2·14 | **BUILT** | Five-surface reconciliation test; 0441/0445 probes |
 | 19 | Ask the customer to pay + immutable message ledger | 16 | **BUILT** | — |
