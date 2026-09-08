@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { collectionOutcomeInput } from "@carres/shared/payment-collection-outcome";
 import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
@@ -367,6 +368,82 @@ financeInvoicesRouter.post("/:id/record-message", async (c) => {
     return c.json(m.body, m.status);
   }
   return c.json(data);
+});
+
+/**
+ * §3 (0446) — the customer's ANSWER, recorded as one of the five approved
+ * results. `Customer will pay on a date` carries its date and no other result
+ * may; the SQL door enforces both, appends the order history fact and stamps
+ * the shared chase clock. It never writes money: a said-paid order keeps its
+ * balance until the canonical posting service records the money.
+ */
+financeInvoicesRouter.post("/:id/collection-outcome", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot record collection results." });
+  }
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" }, 422);
+  }
+  const body = await parseJsonBody(c, collectionOutcomeInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data: invoice, error: invErr } = await sb
+    .from("invoices").select("id,order_id").eq("id", id).maybeSingle();
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  if (!invoice) {
+    return c.json({ error: "not_found", code: "not_found", message: "Invoice not found." }, 404);
+  }
+  const { data, error } = await sb.rpc("payment_record_collection_outcome", {
+    p_order_id: (invoice as { order_id: string }).order_id,
+    p_outcome: body.data.outcome,
+    p_promised_date: body.data.promisedDate ?? null,
+    p_note: body.data.note ?? null,
+    p_invoice_id: id,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ outcome: data }, 201);
+});
+
+/** The order's recorded conversations, newest first — the append-only ledger
+ *  the object reads back (§3). */
+financeInvoicesRouter.get("/:id/collection-outcomes", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view collection results." });
+  }
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "invoice id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data: invoice, error: invErr } = await sb
+    .from("invoices").select("id,order_id").eq("id", id).maybeSingle();
+  if (invErr) {
+    const m = mapPgError(invErr);
+    return c.json(m.body, m.status);
+  }
+  if (!invoice) {
+    return c.json({ error: "not_found", code: "not_found", message: "Invoice not found." }, 404);
+  }
+  const { data, error } = await sb
+    .from("payment_collection_outcomes")
+    // A stored id never reaches the screen untranslated (COPY-STANDARD).
+    .select("*, recorded_by_user:app_users!payment_collection_outcomes_recorded_by_fkey(name)")
+    .eq("order_id", (invoice as { order_id: string }).order_id)
+    .order("recorded_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ outcomes: data ?? [] });
 });
 
 /** The correction door — Payment Approver duty (or principal); SQL gates it. */
