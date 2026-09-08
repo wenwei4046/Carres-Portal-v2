@@ -151,6 +151,42 @@ beforeEach(() => {
 });
 
 describe("50% work + 50% the actual document", () => {
+  it("resumes a covering PO with its saved supplier doors without issuing twice", async () => {
+    stubReads((path) => {
+      if (path.includes("issue-batch")) throw { body: { code: "already_on_po", po: "PO-existing" } };
+      if (path.endsWith("/issue-context")) return {
+        id: "PO-existing", supplierId: "s-hooka", supplierName: "Hooka",
+        destinationId: KLANG.id, destination: "Carres Klang",
+        whatsappGroupUrl: "https://chat.whatsapp.com/saved-group",
+      };
+      return undefined;
+    });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTitle("PO-existing purchase order");
+    expect(screen.queryByTestId("so-batch-issue-error")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open existing PO")).not.toBeInTheDocument();
+    expect(await screen.findByText("Open WhatsApp group")).toHaveAttribute("href", "https://chat.whatsapp.com/saved-group");
+    expect(apiFetch.mock.calls.filter(([p]) => String(p).includes("issue-batch"))).toHaveLength(1);
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/pos/PO-existing/sends");
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing PO action available when opening fails", async () => {
+    stubReads((path) => {
+      if (path.includes("issue-batch")) throw { body: { code: "already_on_po", po: "PO-existing" } };
+      if (path.endsWith("/issue-context")) throw new Error("offline");
+      return undefined;
+    });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByText("Could not open PO-existing.");
+    expect(screen.getByRole("button", { name: "Issue PO" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Issue PO" }));
+    await waitFor(() => expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue-context"))).toHaveLength(2));
+    expect(apiFetch.mock.calls.filter(([p]) => String(p).includes("issue-batch"))).toHaveLength(1);
+  });
+
   it("renders a money-free draft on entry, changes with navigation, and creates nothing", async () => {
     const { renderPoPdf } = await import("@/lib/pdf/render");
     vi.mocked(renderPoPdf).mockClear();

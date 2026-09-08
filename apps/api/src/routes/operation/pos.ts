@@ -1367,6 +1367,35 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 // its answer is a second truth about the same paper.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
+// Resume the existing document's send step without issuing another PO.
+operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: po, error } = await sb.from("purchase_orders")
+    .select("id, supplier_id, destination_id, status")
+    .eq("id", c.req.param("id")).maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!po) return c.json({ message: "PO not found" }, 404);
+  if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
+  const [supplier, destination] = await Promise.all([
+    sb.from("suppliers").select("name, whatsapp_group_url, contact_email, contact")
+      .eq("id", po.supplier_id).maybeSingle(),
+    sb.from("purchasing_destinations").select("name")
+      .eq("id", po.destination_id).maybeSingle(),
+  ]);
+  const lookupError = supplier.error ?? destination.error;
+  if (lookupError) { const m = mapPgError(lookupError); return c.json(m.body, m.status); }
+  return c.json({
+    id: po.id,
+    supplierId: po.supplier_id,
+    supplierName: supplier.data?.name ?? null,
+    destinationId: po.destination_id,
+    destination: destination.data?.name ?? null,
+    whatsappGroupUrl: supplier.data?.whatsapp_group_url ?? null,
+    contactEmail: supplier.data?.contact_email ?? null,
+    contact: supplier.data?.contact ?? null,
+  });
+});
+
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
