@@ -57,6 +57,10 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *                  this duty and to nobody else; unresolved fails closed
  *   delivery_duty  governed Delivery ownership — no delivery-staff roster
  *                  fact exists; the duty word stands (measured-boundary rule)
+ *   warehouse_duty §6 gives the storage check to Warehouse and names no duty;
+ *                  no warehouse roster fact exists, so the word stands — the
+ *                  same measured-boundary rule delivery_duty and finance_duty
+ *                  already follow
  *   finance_duty   only Finance clears it — no roster fact; the word stands
  *   system         never a person's work
  */
@@ -67,6 +71,7 @@ export type WorkOwnerRule =
   | "payment_duty"
   | "payment_approver_duty"
   | "delivery_duty"
+  | "warehouse_duty"
   | "finance_duty"
   | "system"
   /* The cross-module rules' own precise keys — recorded now so the later
@@ -377,6 +382,21 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     action: "Confirm balance delivery date",
     dueRule: "opens with the short receipt; the calls calendar files it",
     completionFact: "a balance promise for the line (po_supplier_promises)",
+  },
+  {
+    /* §6 — "Every configured inspection interval (currently 30 days) raises
+     * `Check the stored furniture`." It could not enter the registry before
+     * 0452, because there was no authoritative completion fact: nothing
+     * recorded that anyone had ever looked. Now the look is a record, so the
+     * rule closes on that record and not on anybody's word. */
+    key: "payment.check_stored_furniture",
+    module: "payment",
+    trigger: "an open storage case has not been checked within the configured inspection interval",
+    owner: "Warehouse — §6 gives the check to the warehouse floor; no warehouse duty roster exists, so the word stands",
+    ownerRule: "warehouse_duty",
+    action: "Check the stored furniture",
+    dueRule: "the last check, or the storage start when there is none, plus the configured inspection days",
+    completionFact: "a storage inspection recorded on or after the due day (payment_storage_inspections, 0452)",
   },
   {
     key: "receiving.check_in",

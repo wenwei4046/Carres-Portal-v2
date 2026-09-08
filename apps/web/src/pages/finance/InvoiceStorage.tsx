@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { storageChargeOf } from "@carres/shared/payment-storage";
+import { storageChargeOf, storageCheckDue } from "@carres/shared/payment-storage";
 import { DELIVERY_REASONS } from "@carres/shared/delivery-reasons";
 import { SectionCard } from "@/components/SectionPanel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,6 +37,8 @@ export interface StorageCaseRow {
   rule_charge_amount: number;
   rule_cycle_days: number;
   rule_extra_free_allowed: boolean;
+  /** 0431's configured inspection interval for this group (§6). */
+  rule_inspection_days?: number;
   approved_free_until: string | null;
   approval_reason: string | null;
   /** 0438 — how many commenced §7 periods are already on paper. */
@@ -176,7 +178,128 @@ function CaseCard({ storageCase: c, canAct, extending, onExtend, onDone }: {
         <EndStorage caseId={c.id} onDone={onDone} />}
     </div>
     {extending && <ExtraFreeForm caseId={c.id} onDone={onDone} onBack={onDone} />}
+    {c.status === "open" && <StorageChecks storageCase={c} canAct={canAct} />}
   </div>;
+}
+
+/**
+ * §6 — `Check the stored furniture`, every configured interval.
+ *
+ * The section says when the next look is due through the ONE shared
+ * `storageCheckDue`, so the page and the Work item cannot disagree about the
+ * day. A recorded look restarts the clock; nothing accumulates a backlog.
+ *
+ * ⛔ Damage is a Service Case, not a field here (§6), and the form says so
+ * rather than pretending the condition note is an escalation.
+ */
+function StorageChecks({ storageCase: c, canAct }: {
+  storageCase: StorageCaseRow; canAct: boolean;
+}) {
+  const qc = useQueryClient();
+  const [checking, setChecking] = useState(false);
+  const [on, setOn] = useState(todayIso());
+  const [location, setLocation] = useState("");
+  const [packaging, setPackaging] = useState("");
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const listQ = useQuery<{ inspections: StorageInspectionRow[] }>({
+    queryKey: ["finance", "storage-inspections", c.id],
+    queryFn: () => apiFetch(`/api/finance/payment-storage/inspections?caseId=${c.id}`),
+  });
+  const checks = listQ.data?.inspections ?? [];
+  const last = checks[0]?.inspected_on ?? null;
+  const due = storageCheckDue({
+    storageStart: c.storage_start,
+    lastCheckedOn: last,
+    inspectionDays: c.rule_inspection_days ?? 30,
+  }, todayIso());
+  const record = useMutation({
+    mutationFn: (photoUrl: string) => apiFetch("/api/finance/payment-storage/inspection", {
+      method: "POST",
+      body: JSON.stringify({
+        caseId: c.id, inspectedOn: on, location: location.trim(),
+        packaging: packaging.trim(), conditionNote: note.trim(), photoUrl,
+      }),
+    }),
+    onSuccess: () => {
+      toast.success("Storage check recorded");
+      setChecking(false); setLocation(""); setPackaging(""); setNote(""); setFile(null);
+      void qc.invalidateQueries({ queryKey: ["finance", "storage-inspections", c.id] });
+    },
+    onError: (e: Error) => toast.error(`The check was not recorded — ${e.message}`),
+  });
+  async function submit() {
+    if (!file || saving || record.isPending) return;
+    setSaving(true);
+    const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60);
+    const path = `storage-cases/${c.id}/checks/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+    setSaving(false);
+    if (error) { toast.error(`The photo upload failed — ${error.message}`); return; }
+    record.mutate(`${ATTACHMENTS_BUCKET}/${path}`);
+  }
+  return <div className="mt-2" data-testid={`storage-checks-${c.product_group}`}>
+    <p className="text-label font-normal">
+      {last ? `Last checked ${fmtDate(last)}. ` : "Never checked. "}
+      {due.due
+        ? `A check was due ${fmtDate(due.dueIso)}.`
+        : `Next check due ${fmtDate(due.dueIso)}.`}
+    </p>
+    {canAct && !checking &&
+      <button className="btn-secondary mt-1"
+        onClick={() => setChecking(true)}>Check the stored furniture</button>}
+    {checking && <div className="mt-2 space-y-2" data-testid="storage-check-form">
+      <label className="block"><span className="text-label">Day it was checked</span>
+        <input type="date" value={on} max={todayIso()} onChange={(e) => setOn(e.target.value)}
+          aria-label="Day it was checked"
+          className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+      <label className="block"><span className="text-label">Where it is stored</span>
+        <input value={location} onChange={(e) => setLocation(e.target.value)}
+          aria-label="Where it is stored"
+          className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+      <label className="block"><span className="text-label">How it is packed</span>
+        <input value={packaging} onChange={(e) => setPackaging(e.target.value)}
+          aria-label="How it is packed"
+          className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+      <label className="block"><span className="text-label">What condition it is in</span>
+        <input value={note} onChange={(e) => setNote(e.target.value)}
+          aria-label="What condition it is in"
+          className="mt-0.5 w-full rounded-md border border-base-200 px-2 py-1.5 text-body" /></label>
+      <label className="block"><span className="text-label">Photo</span>
+        <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          aria-label="Photo" className="mt-0.5 block w-full text-meta" />
+        <span className="text-label font-normal">
+          {file ? file.name : "A check nobody can see is not a check."}</span></label>
+      <p className="text-label font-normal">
+        If anything is damaged, open a Service Case. This record is not one.</p>
+      <div className="flex gap-2">
+        <button className="btn-primary"
+          disabled={!location.trim() || !packaging.trim() || !note.trim() || !file
+            || saving || record.isPending}
+          onClick={() => void submit()}>Record the check</button>
+        <button className="btn-secondary" onClick={() => setChecking(false)}>Back</button>
+      </div>
+    </div>}
+    {checks.length > 0 && <div className="mt-1">
+      {checks.map((k) => <p key={k.id} className="text-label font-normal">
+        {fmtDate(k.inspected_on)} · {k.location} · {k.condition_note}
+      </p>)}
+    </div>}
+  </div>;
+}
+
+export interface StorageInspectionRow {
+  id: string;
+  case_id: string;
+  inspected_on: string;
+  location: string;
+  packaging: string;
+  condition_note: string;
+  photo_url: string;
+  recorded_at: string;
 }
 
 /** 0439 — the closing door: storage ended (the goods went out, or the case

@@ -980,6 +980,42 @@ past date is refused · a reason is required · a complete submission records wi
 free-storage request · the record never moves the delivery date · a second request stands
 beside the first · the fact reaches the order history. Eight route and composition tests pin
 the wire and the form, including that only customer-side reasons are offerable.
+### BUILD — stored furniture is looked at, and the look is recorded, 2026-09-08
+
+§6 asks for a `Check the stored furniture` every configured interval, and the interval was
+configured (0431's `inspection_days`) — but nothing raised the work, because nothing COULD.
+The Work engine admits a rule only when it can name an authoritative completion fact, and
+there was no record that anyone had ever looked. A tick-box would not have been one.
+
+0452 makes the look a record: location, packaging, condition, photo, actor and date, exactly
+the six §6 names. It is append-only, and its door refuses a closed case, a future date, a date
+before the storage started, a missing fact and — the one that matters most — a missing photo.
+A check nobody can see is not a check. The same shape serves both halves of §6: the record
+Warehouse makes AT Storage Start is simply the first inspection.
+
+With the fact in place, `payment.check_stored_furniture` enters the registry with its own five
+parts. Its clock restarts at each recorded check, so a case checked on time never accumulates
+a backlog of missed intervals — one open item at a time, which is what an operator can act on.
+The due date comes from one shared `storageCheckDue`, so the Work item and the Storage section
+cannot disagree about the day. The interval is read as a SETTING, not a case snapshot: changing
+it changes the cadence of every open case from now on, which is what an operational cadence
+should do (unlike §7's commercial values, which stay snapshotted forever).
+
+Its owner is **Warehouse**, and honestly unassigned: §6 gives the check to the warehouse floor
+and names no duty, no warehouse duty roster exists, so the word stands — the same
+measured-boundary rule `delivery_duty` and `finance_duty` already follow.
+
+⛔ **Damage is not recorded here.** §6 sends damage to a Service Case or an Issue, not to a
+Payment note, so the door has no damage field and the form says so rather than pretending a
+condition note is an escalation.
+
+**Proven against the ACTUAL door** (rolled-back production probe, eight controls): an unknown
+caller is refused · a photo is required · location, packaging and condition are all required ·
+a future date is refused · a date before the storage start is refused · a complete check
+records and reaches the order history · a second check stands beside the first · a closed case
+has nothing to check. Four projection tests and four composition tests pin the rule and the
+form, including that a recent check closes the item and that the configured interval — not a
+fixed thirty days — decides.
 
 ### The isolated Stripe test environment — prepared, and what it still needs
 
@@ -1185,7 +1221,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 14 | Storage charging → Storage / Additional Storage Invoice | 4·7 | **BUILT** | 0438 with probe |
 | 15 | Storage waiver ladder (Operation → Waiver Approver → nobody) | 7 | **BUILT** | 0436 with probe |
 | 16 | `Request a later delivery date` | 6 | **BUILT** | 0451 records the submission — new date, governed customer-side reason, storage-terms acknowledgement, optional free-storage request and the written evidence without which there is no request. It never moves the delivery date, which Orders/Delivery owns |
-| 17 | **`Check the stored furniture` inspection work every 30 days** | 6 | **NOT BUILT** | The interval is configured in Settings (0431) and nothing raises the work |
+| 17 | `Check the stored furniture` every configured interval | 6 | **BUILT** | 0452 makes the look a RECORD — the completion fact the engine needed — and `payment.check_stored_furniture` is a registry rule fed from the open cases, the last check and the configured interval |
 | 18 | Storage obligations reconciled across every reader + the DB gate | 2·14 | **BUILT** | Five-surface reconciliation test; 0441/0445 probes |
 | 19 | Ask the customer to pay + immutable message ledger | 16 | **BUILT** | — |
 | 20 | **Complete §16 customer message assembly** (bank routing, Partner contact, Important Notes) | 16 | **BLOCKED — owner content** | Wording and bank account numbers are owner inputs; 2 bank rows exist with NO account numbers. Never invented |
@@ -1220,7 +1256,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   perform either. The engineering is right; the assignment is missing. Naming the holder is
   the owner's, exactly as the PO/GRN rotation was.
 
-**Overall status: PARTIALLY DELIVERED** — four gaps above are unbuilt or partial approved
+**Overall status: PARTIALLY DELIVERED** — three gaps above are unbuilt or partial approved
 capability, one is blocked on owner content, one on external access. The §14 build entries
 record what IS shipped; this table is the single list of what is not.
 

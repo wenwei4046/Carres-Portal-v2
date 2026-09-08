@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { OperationWorkItem } from "@carres/shared";
 import {
   projectOverpaymentReviewWork,
+  projectStorageCheckWork,
   composeOperationWorkResponse,
   createOperationWorkRouter,
   manualPurchaseWorkInputsFromRegister,
@@ -797,6 +798,63 @@ describe("payment.review_overpayment", () => {
     });
     expect(item?.owner.state).toBe("not_assigned");
     expect(item?.owner.acting).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6 (0452) — `Check the stored furniture`, every configured interval
+// ─────────────────────────────────────────────────────────────────────────────
+describe("payment.check_stored_furniture", () => {
+  const CASE = {
+    caseId: "case-1", orderId: "order-1", so: 2099,
+    productGroup: "mattress_bedframe", storageStart: "2026-07-01",
+    lastCheckedOn: null as string | null, inspectionDays: 30,
+  };
+
+  it("raises the check on the interval, naming the day and how late it is", () => {
+    const [item] = projectStorageCheckWork({ cases: [CASE], today: "2026-09-08" });
+    expect(item).toMatchObject({
+      id: "payment:case-1:payment.check_stored_furniture",
+      module: "payment",
+      problem: "Stored furniture has not been checked",
+      action: "Check the stored furniture",
+      timing: { dueOn: "2026-07-31", bucket: "overdue" },
+    });
+    expect(item?.completionFact).toContain("storage inspection recorded");
+    // §6 names no warehouse duty roster, so there is no duty KEY to resolve —
+    // the rule stands and the owner is honestly unassigned.
+    expect(item?.owner.rule).toBe("warehouse_duty");
+    expect(item?.owner.dutyKey).toBeNull();
+    expect(item?.owner.state).toBe("not_assigned");
+  });
+
+  /** A case checked on time never builds a backlog — the clock restarts at the
+   *  check, so one look closes the item until the next interval. */
+  it("a recent check closes it until the next interval", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, lastCheckedOn: "2026-09-05" }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  it("raises nothing before the first interval has passed", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, storageStart: "2026-09-01" }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(0);
+  });
+
+  /** The interval is a SETTING, not a case snapshot: a shorter one makes the
+   *  same case due sooner, from now on. */
+  it("follows the configured interval, not a fixed thirty days", () => {
+    const items = projectStorageCheckWork({
+      cases: [{ ...CASE, storageStart: "2026-09-01", inspectionDays: 5 }],
+      today: "2026-09-08",
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.timing.dueOn).toBe("2026-09-06");
   });
 });
 

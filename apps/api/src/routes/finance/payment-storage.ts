@@ -99,7 +99,81 @@ paymentStorageRouter.get("/", async (c) => {
       }).unreconciledLegacy;
     }
   }
-  return c.json({ cases: data ?? [], unreconciledLegacy });
+  // §6's inspection interval is a SETTING, not a case snapshot (0431): the
+  // newest effective row for the group rules the cadence from now on. Attached
+  // here so the Storage section and the Work feed read the same number.
+  const cases = (data ?? []) as Array<Record<string, unknown>>;
+  if (cases.length > 0) {
+    const rules = await sb
+      .from("payment_storage_rules")
+      .select("product_group,inspection_days,effective_from")
+      .order("effective_from", { ascending: false });
+    if (rules.error) {
+      const m = mapPgError(rules.error);
+      return c.json(m.body, m.status);
+    }
+    const daysByGroup = new Map<string, number>();
+    for (const r of (rules.data ?? []) as Array<{ product_group: string; inspection_days: number }>) {
+      if (!daysByGroup.has(r.product_group)) daysByGroup.set(r.product_group, r.inspection_days);
+    }
+    for (const row of cases) {
+      row.rule_inspection_days = daysByGroup.get(String(row.product_group)) ?? 30;
+    }
+  }
+  return c.json({ cases, unreconciledLegacy });
+});
+
+/** The §6 storage inspection (0452). Warehouse looks; the record is what
+ *  closes the interval's Work item, so the door owns every rule and this only
+ *  shapes the request. */
+const inspectionInput = z.object({
+  caseId: z.string().uuid(),
+  inspectedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  location: z.string().trim().min(1, "Where it is stored is required.").max(200),
+  packaging: z.string().trim().min(1, "How it is packed is required.").max(200),
+  conditionNote: z.string().trim().min(1, "What condition it is in is required.").max(1000),
+  photoUrl: z.string().trim().min(1, "A photo is required.").max(300),
+});
+
+paymentStorageRouter.get("/inspections", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot view storage records." });
+  }
+  const caseId = c.req.query("caseId");
+  if (!caseId || !z.string().uuid().safeParse(caseId).success) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "case id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("payment_storage_inspections")
+    .select("id,case_id,inspected_on,location,packaging,condition_note,photo_url,recorded_by,recorded_at")
+    .eq("case_id", caseId)
+    .order("inspected_on", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ inspections: data ?? [] });
+});
+
+paymentStorageRouter.post("/inspection", async (c) => {
+  const parsed = await parseJsonBody(c, inspectionInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.rpc("payment_record_storage_inspection", {
+    p_case_id: parsed.data.caseId,
+    p_inspected_on: parsed.data.inspectedOn,
+    p_location: parsed.data.location,
+    p_packaging: parsed.data.packaging,
+    p_condition_note: parsed.data.conditionNote,
+    p_photo_url: parsed.data.photoUrl,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ inspection: data }, 201);
 });
 
 /**

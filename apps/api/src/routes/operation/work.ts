@@ -59,6 +59,7 @@ import {
   missedPromise,
   type CollectionOutcomeRow,
 } from "@carres/shared/payment-collection-outcome";
+import { storageCheckDue } from "@carres/shared/payment-storage";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -885,6 +886,131 @@ async function readRefunds(c: Context<AppEnv>): Promise<Array<{
   return (data ?? []) as Array<{ order_id: string; amount: number; status: string }>;
 }
 
+/**
+ * The §6 storage-check facts (0452): every OPEN case with its start, the day it
+ * was last looked at, and the interval configured for its product group. Read
+ * under the caller's own RLS. A read failure throws — a case nobody can read is
+ * not a case that needs no check, and silently dropping the work would hide
+ * furniture nobody has looked at for a month.
+ */
+export interface StorageCheckSource {
+  caseId: string;
+  orderId: string;
+  so: number | null;
+  productGroup: string;
+  storageStart: string;
+  lastCheckedOn: string | null;
+  inspectionDays: number;
+}
+
+async function readStorageChecks(c: Context<AppEnv>): Promise<StorageCheckSource[]> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const cases = await sb
+    .from("payment_storage_cases")
+    .select("id,order_id,product_group,storage_start,status,orders(so)")
+    .eq("status", "open");
+  if (cases.error) throw new Error("Workspace storage-case source could not be read");
+  const rows = (cases.data ?? []) as unknown as Array<{
+    id: string; order_id: string; product_group: string; storage_start: string;
+    orders?: { so?: number } | Array<{ so?: number }> | null;
+  }>;
+  if (rows.length === 0) return [];
+
+  const checks = await sb
+    .from("payment_storage_inspections")
+    .select("case_id,inspected_on")
+    .in("case_id", rows.map((r) => r.id));
+  if (checks.error) throw new Error("Workspace storage-check source could not be read");
+  const lastByCase = new Map<string, string>();
+  for (const k of (checks.data ?? []) as Array<{ case_id: string; inspected_on: string }>) {
+    const seen = lastByCase.get(k.case_id);
+    if (!seen || k.inspected_on > seen) lastByCase.set(k.case_id, k.inspected_on);
+  }
+
+  // The interval is a SETTING, not a case snapshot (0431): changing it changes
+  // the cadence of every open case from now on, which is what an operational
+  // cadence should do.
+  const rules = await sb
+    .from("payment_storage_rules")
+    .select("product_group,inspection_days,effective_from")
+    .order("effective_from", { ascending: false });
+  if (rules.error) throw new Error("Workspace storage-rule source could not be read");
+  const daysByGroup = new Map<string, number>();
+  for (const r of (rules.data ?? []) as Array<{ product_group: string; inspection_days: number }>) {
+    if (!daysByGroup.has(r.product_group)) daysByGroup.set(r.product_group, r.inspection_days);
+  }
+
+  return rows.map((r) => {
+    const o = Array.isArray(r.orders) ? r.orders[0] : r.orders;
+    return {
+      caseId: r.id,
+      orderId: r.order_id,
+      so: o?.so ?? null,
+      productGroup: r.product_group,
+      storageStart: r.storage_start,
+      lastCheckedOn: lastByCase.get(r.id) ?? null,
+      inspectionDays: daysByGroup.get(r.product_group) ?? 30,
+    };
+  });
+}
+
+/**
+ * §6 — `Check the stored furniture`, every configured interval.
+ *
+ * The clock restarts at each recorded check, so a case checked on time never
+ * builds a backlog of missed intervals: one open item at a time, which is what
+ * an operator can act on. The due date and the lateness come from the ONE
+ * shared `storageCheckDue`, so the Work item and the Storage section cannot
+ * disagree about the day.
+ */
+export function projectStorageCheckWork(input: {
+  cases: readonly StorageCheckSource[];
+  today: string;
+}): OperationWorkItem[] {
+  return input.cases.flatMap((s) => {
+    const due = storageCheckDue({
+      storageStart: s.storageStart,
+      lastCheckedOn: s.lastCheckedOn,
+      inspectionDays: s.inspectionDays,
+    }, input.today);
+    if (!due.due) return [];
+    const soRef = s.so != null ? `SO-${s.so}` : s.orderId;
+    const workItem: WorkItem = {
+      ruleKey: "payment.check_stored_furniture",
+      module: "payment",
+      soRef,
+      orderId: s.caseId,
+      action: "Check the stored furniture",
+      ownerRule: "warehouse_duty",
+      // No warehouse duty roster exists (§6 names none), so there is no duty
+      // KEY to resolve — the word stands, exactly as delivery_duty does.
+      ownerDutyKey: null,
+      normalOwner: null,
+      activeCover: null,
+      actingPerson: null,
+      ownerState: "not_assigned",
+      ownerName: null,
+      ownerUserId: null,
+      ownerDuty: "Warehouse",
+      tone: due.daysLate > 0 ? "danger" : "warning",
+      locked: false,
+      broken: false,
+      dueIso: due.dueIso,
+      workingDaysLate: due.daysLate,
+    };
+    return [operationWorkItemFromProjection(workItem, {
+      // The CASE is the object: one order can hold a mattress case and a sofa
+      // case, and they are two different lots of furniture to look at.
+      object: { kind: "storage_case", id: s.caseId, label: soRef },
+      problem: "Stored furniture has not been checked",
+      recipient: null,
+      requiredResult: "A storage check recorded with its photo",
+      destination: `/finance/invoices?order=${encodeURIComponent(s.orderId)}`,
+      today: input.today,
+    })];
+  });
+}
+
 /** Reuse the existing module read routes inside the Worker. This avoids a
  * second set of table queries while keeping Work a single browser request. */
 export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWorkResponse> {
@@ -903,7 +1029,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
 
-  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings, invoices, outcomes, refunds] =
+  const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
+         invoices, outcomes, refunds, storageChecks] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -936,6 +1063,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readAllInvoices(internal, c),
       readCollectionOutcomes(c),
       readRefunds(c),
+      readStorageChecks(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -999,8 +1127,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
+  const storageCheckItems = projectStorageCheckWork({ cases: storageChecks, today });
   return composeOperationWorkResponse(
-    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems, receivingItems, paymentItems, overpaymentItems],
+    [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
+     receivingItems, paymentItems, overpaymentItems, storageCheckItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,
