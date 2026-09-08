@@ -5,7 +5,9 @@ import type { PaymentRegisterRow } from "@carres/shared/payment-register";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
-import { usePaymentRegister } from "@/lib/queries";
+import { usePaymentRegister, useWorkspaceDuties } from "@/lib/queries";
+import { useAuth } from "@/lib/auth";
+import PaymentCorrectAllocation from "./PaymentCorrectAllocation";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
@@ -36,6 +38,15 @@ export default function PaymentRegister() {
   // live order data, so the paper in the customer's hand can never be rewritten
   // by a later rename or correction. A voided payment still prints, saying so.
   const [printing, setPrinting] = useState(false);
+  // §5 · §12 — reallocation is the Payment Approver's. The SERVER decides it;
+  // this only stops the form being offered to someone who cannot use it, which
+  // is what "unauthorised staff never see them" asks for.
+  const [correcting, setCorrecting] = useState(false);
+  const me = useAuth((s) => s.user?.id ?? null);
+  const myRole = useAuth((s) => s.role);
+  const duties = useWorkspaceDuties();
+  const mayCorrect = myRole === "principal" || (me != null && (duties.data?.duties ?? [])
+    .some((d) => d.key === "payment_approver" && d.resolution?.actor_user_id === me));
   const printReceipt = async (row: PaymentRegisterRow) => {
     if (printing) return;
     setPrinting(true);
@@ -82,13 +93,18 @@ export default function PaymentRegister() {
     {query.isError ? <div role="alert" className="p-6 text-body">
       <p>Payments could not be loaded. Try again.</p>
       <button className="btn-secondary mt-3" onClick={() => void query.refetch()}>Try again</button>
-    </div> : selected ? payment ? <div className="flex-1 overflow-auto p-4" data-testid="payment-object-scroll">
+    </div> : selected ? payment ? correcting
+      ? <PaymentCorrectAllocation payment={payment} onClose={() => setCorrecting(false)} />
+      : <div className="flex-1 overflow-auto p-4" data-testid="payment-object-scroll">
       <div className="flex flex-col gap-4">
         <Facts title="Payment facts"><p>{rm(payment.amount)} · {METHODS[payment.method] ?? payment.method} · {fmtDate(payment.paid_on)}</p>
           <p>{payment.orders ? `SO-${payment.orders.so}` : "SO not available"}</p>
           {!isLivePayment(payment) && <p>VOIDED · {payment.void_reason ?? "Reason not available"}</p>}
         </Facts>
-        <Facts title="Allocated to"><Allocation payment={payment} /></Facts>
+        <Facts title="Allocated to"><Allocation payment={payment} />
+          {mayCorrect && isLivePayment(payment) && payment.kind !== "storage"
+            && <button className="btn-secondary mt-2"
+                 onClick={() => setCorrecting(true)}>Correct allocation</button>}</Facts>
         <Facts title="Evidence"><p>{payment.receipt_url ? "Payment proof is on file." : "No payment proof on file."}</p>
           {payment.reference && <p>Reference: {payment.reference}</p>}</Facts>
         <Facts title="Receipt"><p>{payment.receipt_no ?? "Receipt number missing"}</p>

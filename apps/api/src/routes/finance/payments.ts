@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 import { paymentRegisterQuery } from "@carres/shared/payment-register";
 import { APP_USERS, ORDER_PAYMENTS } from "@carres/shared/tables";
@@ -157,6 +158,73 @@ financePaymentsRouter.get("/:id/receipt-document", async (c) => {
       currency: String(source.currency ?? "MYR"),
     },
   });
+});
+
+/**
+ * POST /:id/correct-allocation — §5's `Correct allocation` (0450).
+ *
+ * The SQL door owns every rule: the Payment Approver authority, the required
+ * reason, the conserved arithmetic and the before/after evidence. This route
+ * only shapes the request, so there is exactly one place the rule lives.
+ */
+const correctAllocationInput = z.object({
+  reason: z.string().trim().min(1, "A reason is required to correct an allocation.").max(500),
+  allocations: z.array(z.object({
+    orderId: z.string().uuid(),
+    invoiceId: z.string().uuid().nullish(),
+    amount: z.number().positive(),
+  })).min(1, "Say which Sales Orders the money belongs to."),
+});
+
+financePaymentsRouter.post("/:id/correct-allocation", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot correct an allocation." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const parsed = await parseJsonBody(c, correctAllocationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_correct_allocation", {
+    p_payment_id: id,
+    p_allocations: parsed.data.allocations.map((a) => ({
+      order_id: a.orderId,
+      invoice_id: a.invoiceId ?? null,
+      amount: a.amount,
+    })),
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/** GET /:id/allocation-corrections — the §5 evidence, newest first. */
+financePaymentsRouter.get("/:id/allocation-corrections", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view allocation corrections." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("payment_allocation_corrections")
+    .select("id,payment_id,before,after,reason,corrected_by,corrected_at")
+    .eq("payment_id", id)
+    .order("corrected_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ corrections: data ?? [] });
 });
 
 financePaymentsRouter.get("/", requireFinance, async (c) => {
