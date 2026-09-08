@@ -1097,6 +1097,36 @@ has no allocation to correct · an unknown Sales Order is refused · the assigne
 Approver corrects. Eleven route and composition tests pin the wire and the form, including
 that the control is not offered to staff who do not hold the duty.
 
+### BUILD — the Payments Register becomes the §11 history, 2026-09-08
+
+§11 asks for history "append-only/filterable by date, customer, SO, amount, method, invoice,
+receipt, actor and exception", linking "immutable documents/source SO". Six of those nine axes
+were already filterable columns; three were not there at all, and the audit called it PARTIAL
+with "no single history surface".
+
+The right answer was NOT a second surface — §13 rejects duplicate workspaces, and a second
+history would be a second truth. The Payments Register already reads the canonical ledger,
+is read-only by construction, and (since 0449) links the immutable receipt. It needed the
+three missing axes:
+
+* **Invoice** — from the payment's LIVE allocations, deduped and in order. One payment may
+  cover several invoices (§4), so the cell is a list; a payment allocated to no invoice says
+  `Not allocated to an invoice` rather than showing a blank that reads as "none owed". A
+  VOIDED allocation is skipped: after a 0450 correction the old row survives, and it is not
+  where the money sits, so it is not where the history points.
+* **Recorded by** — the actor, already resolved to a name by the register read.
+* **Exception** — the two a payment row can actually carry: `Voided`, and `Duplicate checked`
+  (0448's acknowledged continuation). A payment that is both reads as `Voided` — the void is
+  the state that matters to anyone reading history.
+
+⛔ **The duplicate acknowledgement is DERIVED server-side to a boolean.** `source_metadata`
+also holds whatever a payment provider sent, and that never needs to reach a browser, so the
+raw field is dropped from the wire and a test asserts its absence.
+
+Both derivations live in the shared module, so the register, any export and any later reader
+answer identically. Six shared and composition tests pin them, including the voided-allocation
+control and the no-invoice honesty.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -1110,7 +1140,19 @@ interaction walks exist for the Calendar, Reports and the payment-link door; DB-
 business verification exists for every migration (probes) and the §7 arithmetic; **visual
 inspection and native-200%-zoom acceptance exist for NO slice** — they need a visible
 signed-in browser window, and automation cannot drive the browser-chrome zoom control; the
-Storage journey's authenticated interaction walk is also still owed. The observed tool
+Storage journey's authenticated interaction walk is also still owed.
+
+**A PROBE THAT CANNOT SEE IS NOT A PROBE THAT FOUND NOTHING (measured 2026-09-08).** Searching
+the served ERP bundle for Work-registry rule keys returns nothing for
+`payment.review_overpayment` and `payment.check_stored_furniture` — AND for
+`payment.collect_customer_balance`, which shipped weeks earlier. That third one is the control:
+the Work registry is code-split into a chunk the entry bundle does not reference, so a
+served-bundle grep is blind to every Work rule, old or new. Work-rule slices therefore carry
+deployment evidence from the merge/ancestry check and from their tests, and their production
+behaviour needs an authenticated walk. Reporting them as "absent from the bundle" would have
+been a false negative.
+
+The observed tool
 failures, precisely and in the order they happened — two DIFFERENT modes, not one:
 
 1. **Renderer unresponsive (while the signed-in window was minimised).** Screenshot
@@ -1265,7 +1307,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 23 | Send receipt (template-driven) | 16 | **BUILT** | — |
 | 24 | Reports → Payment, six listings + Excel export | 11·16 | **BUILT** | — |
 | 25 | One read-only customer statement | 11 | **BUILT** | `GET /invoices/statement/:orderId` derives it across the CUSTOMER's Sales Orders through the same shared `soRemaining`; `Statement` opens it from the invoice object. Read-only, with no action on it |
-| 26 | Payment history filterable by date/customer/SO/amount/method/actor/exception | 11 | **PARTIAL** | Register filters and the communications ledger exist; there is no single history surface over the §11 axes |
+| 26 | Payment history filterable by date/customer/SO/amount/method/invoice/receipt/actor/exception | 11 | **BUILT** | The Payments Register IS the history surface: all nine §11 axes are filterable columns, it links the immutable receipt (`Print receipt`) and the source SO, and it is read-only by construction |
 | 27 | Settings → Payment (banks, methods, templates, numbering, storage) | 12 | **BUILT** | 0431/0435; bank account NUMBERS are the manager's to enter and are empty |
 | 28 | Permissions: §12 role door, duties via the Shared Duty Resolver | 12 | **BUILT** | — |
 | 29 | Intentional rejects: no Refund queue, no Bank Matching workspace | 13 | **BUILT** | Refunds read-only history; Recon page and navigation retired; data and API kept |
@@ -1291,9 +1333,22 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   perform either. The engineering is right; the assignment is missing. Naming the holder is
   the owner's, exactly as the PO/GRN rotation was.
 
-**Overall status: PARTIALLY DELIVERED** — three gaps above are unbuilt or partial approved
-capability, one is blocked on owner content, one on external access. The §14 build entries
-record what IS shipped; this table is the single list of what is not.
+**Overall status: PARTIALLY DELIVERED.** Every approved CAPABILITY in the table above is now
+built. What keeps the module short of DELIVERED is not engineering:
+
+1. **#20 — owner content.** The approved Important Notes wording and the receiving bank account
+   numbers. Entered in `Settings → Payment`; never invented here.
+2. **#22 — Stripe test-mode keys**, so the provider end-to-end walk can run against the isolated
+   local environment documented in `apps/api/.dev.vars.example`.
+3. **#30 — the acceptance that needs a person**: the production visual pass, the native 200%
+   zoom pass (automation cannot drive Chrome's zoom control) and the Storage authenticated
+   interaction walk.
+4. **The `payment_approver` duty has no assignment row in production** (measured 2026-09-08), so
+   `Void payment`, the §5 duplicate continuation and `Correct allocation` work for principal
+   only. The engineering is right; the assignment is missing.
+
+Until 1–3 are closed, several slices carry deployment and DB-layer evidence but no visual or
+authenticated-interaction acceptance — stated per slice in §14 rather than averaged away.
 
 ## 15 · Migration and module done-when
 

@@ -63,7 +63,7 @@ financePaymentsRouter.get("/register", async (c) => {
   const sb = userClient(c.env, auth.jwt);
   const { data, error, count } = await sb
     .from(ORDER_PAYMENTS)
-    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,orders(id,so,customer_name),payment_allocations(id,order_id,amount,allocated_at,voided_at)", { count: "exact" })
+    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
     .order("paid_on", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -78,8 +78,24 @@ financePaymentsRouter.get("/register", async (c) => {
     if (actors.error) throw new HTTPException(500, { message: "Payment history could not be loaded. Try again." });
     for (const actor of actors.data ?? []) names.set(actor.id, actor.name);
   }
-  return c.json({ rows: data.map((row) => row.recorded_by
-    ? { ...row, recorded_by_name: names.get(row.recorded_by) ?? null } : row), total: count });
+  // §11 asks history to be filterable by EXCEPTION. The two a payment row can
+  // carry are the void and the acknowledged duplicate (0448). The
+  // acknowledgement is derived to a boolean here: `source_metadata` also holds
+  // whatever a payment provider sent, and that never needs to reach a browser.
+  return c.json({
+    rows: data.map((row) => {
+      const meta = (row as { source_metadata?: Record<string, unknown> | null }).source_metadata;
+      const { source_metadata: _dropped, ...rest } = row as Record<string, unknown> & {
+        source_metadata?: unknown;
+      };
+      return {
+        ...rest,
+        duplicate_acknowledged: meta?.duplicate_ack === true,
+        ...(row.recorded_by ? { recorded_by_name: names.get(row.recorded_by) ?? null } : {}),
+      };
+    }),
+    total: count,
+  });
 });
 
 /**
