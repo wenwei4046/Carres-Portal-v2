@@ -77,6 +77,10 @@ export type ReceiptTemplateData = {
   reference: string | null;
   note: string | null;
   currency: string;
+  /** §4: "Voided Payment keeps a visible VOIDED receipt." The receipt is not
+   *  withdrawn when a payment is voided — it is reprinted saying so. */
+  voided?: boolean;
+  void_reason?: string | null;
 };
 
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-

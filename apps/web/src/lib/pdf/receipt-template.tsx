@@ -84,15 +84,20 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export function ReceiptTemplate(data: ReceiptTemplateData) {
-  const { receipt_no, issue_date, order_code, customer, amount, method, kind, reference, note, currency } = data;
+  const { receipt_no, issue_date, order_code, customer, amount, method, kind, reference, note, currency,
+    voided, void_reason } = data;
   const kindLabel = KIND_LABEL[kind] ?? kind;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <DocHeader
-          docTitle="PAYMENT RECEIPT"
+          docTitle={voided ? "PAYMENT RECEIPT · VOIDED" : "PAYMENT RECEIPT"}
           docMetaRows={[receipt_no, `Date: ${issue_date}`, `Order: ${order_code}`]}
         />
+
+        {voided ? <Text style={styles.note}>
+          VOIDED · {void_reason ?? "Reason not recorded"}
+        </Text> : null}
 
         <View style={styles.party}>
           <Text style={styles.partyLabel}>Received From</Text>

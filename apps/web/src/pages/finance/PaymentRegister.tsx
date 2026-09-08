@@ -10,6 +10,10 @@ import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
+import { apiFetch } from "@/lib/api";
+import { renderReceiptPdf } from "@/lib/pdf/render";
+import type { ReceiptTemplateData } from "@/lib/pdf/types";
+import { toast } from "sonner";
 
 const METHODS: Record<string, string> = {
   bank: "Bank transfer", bank_transfer: "Bank transfer", cash: "Cash", card: "Card",
@@ -28,6 +32,27 @@ export default function PaymentRegister() {
   const close = () => setParams((before) => {
     const next = new URLSearchParams(before); next.delete("payment"); return next;
   });
+  // §4 — the reprint reads the receipt's own immutable snapshot (0449), never
+  // live order data, so the paper in the customer's hand can never be rewritten
+  // by a later rename or correction. A voided payment still prints, saying so.
+  const [printing, setPrinting] = useState(false);
+  const printReceipt = async (row: PaymentRegisterRow) => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      const res = await apiFetch<{
+        document: ReceiptTemplateData; voided: boolean; void_reason: string | null;
+      }>(`/api/finance/payments/${row.id}/receipt-document`);
+      const blob = await renderReceiptPdf({
+        ...res.document, voided: res.voided, void_reason: res.void_reason,
+      });
+      window.open(URL.createObjectURL(blob), "_blank", "noopener");
+    } catch (e) {
+      toast.error(`The receipt could not be opened — ${(e as Error).message}`);
+    } finally {
+      setPrinting(false);
+    }
+  };
   const columns = useMemo<DataGridColumn<PaymentRegisterRow>[]>(() => [
     { key: "receipt", label: "Receipt No", width: 200, accessor: (r) => <span>
       {r.receipt_no ?? "Receipt number missing"}
@@ -68,7 +93,10 @@ export default function PaymentRegister() {
           {payment.reference && <p>Reference: {payment.reference}</p>}</Facts>
         <Facts title="Receipt"><p>{payment.receipt_no ?? "Receipt number missing"}</p>
           {!isLivePayment(payment) && <p>VOIDED · {payment.void_reason ?? "Reason not available"}</p>}
-          <p>Receipt document is not available.</p></Facts>
+          {payment.receipt_no
+            ? <button className="btn-secondary mt-2" disabled={printing}
+                onClick={() => void printReceipt(payment)}>Print receipt</button>
+            : <p>This payment has no receipt number, so it has no receipt.</p>}</Facts>
         <Facts title="History"><p>Payment recorded · {fmtDate(payment.created_at, { time: true })}</p>
           <p>{payment.recorded_by_name ?? "Recorder name not available."}</p>
           {payment.voided_at && <p>Payment voided · {fmtDate(payment.voided_at)} · {payment.void_reason}</p>}</Facts>
