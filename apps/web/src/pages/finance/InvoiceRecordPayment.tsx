@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { soRemaining } from "@carres/shared/payment-invoice-register";
+import { likelyDuplicatePayments } from "@carres/shared/payment-duplicate";
 import type { OrderPaymentMethod } from "@carres/shared";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -65,6 +66,8 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<"edit" | "review" | "done">("edit");
+  // §5 — a likely duplicate must be INSPECTED before the money is recorded.
+  const [duplicateChecked, setDuplicateChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ receiptNo: string | null; stillNeeded: number } | null>(null);
   const [sendingReceipt, setSendingReceipt] = useState(false);
@@ -195,6 +198,15 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
     </div>;
   }
 
+  // §5 — compare the amount, the paid date and the reference against the
+  // order's LIVE payments. A warning, never a refusal: the posting key
+  // already stops an accidental double-submit, and a customer may genuinely
+  // pay the same amount twice — but nobody records one by hand unlooked.
+  const duplicates = likelyDuplicatePayments(
+    invoice.orders?.order_payments,
+    { amount: amtOk ? amt : 0, paidOn, reference: reference.trim() || null },
+  );
+
   return <div className="flex-1 overflow-auto p-4" data-testid="invoice-record-payment">
     <div className="grid gap-4 md:grid-cols-2">
       <SectionCard><div className="p-4">
@@ -248,8 +260,23 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
           <p>{file ? `${spec.evidence} attached.` : `No ${spec.evidence.toLowerCase()}.`}</p>
           <p className="font-semibold">This records customer money.</p>
           <p className="font-semibold">This does not confirm the bank account.</p>
+          {duplicates.length > 0 && <div className="rounded-card border border-base-200 p-2"
+            data-testid="likely-duplicate-warning">
+            <p className="font-semibold">This order already has a payment that looks the same.</p>
+            {duplicates.map((d) => <p key={d.id} className="text-label font-normal">
+              {d.receipt_no ?? "Receipt number missing"} · {rm(Number(d.amount))} · {fmtDate(d.paid_on)}
+              {d.reference ? ` · ${d.reference}` : ""}
+            </p>)}
+            <label className="mt-1 flex items-start gap-2 text-label font-normal">
+              <input type="checkbox" checked={duplicateChecked}
+                onChange={(e) => setDuplicateChecked(e.target.checked)}
+                aria-label="I checked the earlier payment" />
+              <span>I opened the earlier payment and this is a different one.</span>
+            </label>
+          </div>}
           <div className="flex gap-2 pt-1">
-            <button className="btn-primary" disabled={saving || record.isPending}
+            <button className="btn-primary"
+              disabled={saving || record.isPending || (duplicates.length > 0 && !duplicateChecked)}
               onClick={() => void post()}>Record payment</button>
             <button className="btn-secondary" disabled={saving || record.isPending}
               onClick={() => setStep("edit")}>Back</button>
