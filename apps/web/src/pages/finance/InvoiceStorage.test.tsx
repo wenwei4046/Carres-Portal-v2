@@ -6,6 +6,7 @@ import InvoiceStorage, { type StorageCaseRow } from "./InvoiceStorage";
 const state = vi.hoisted(() => ({
   cases: [] as unknown[],
   requests: [] as unknown[],
+  checks: [] as unknown[],
   posts: [] as Array<{ url: string; body: unknown }>,
 }));
 vi.mock("@/lib/api", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/lib/api", () => ({
       return { case: {} };
     }
     if (url.includes("/later-delivery-requests")) return { requests: state.requests };
+    if (url.includes("/inspections")) return { inspections: state.checks };
     if (url.includes("/payment-storage")) return { cases: state.cases };
     throw new Error(`unexpected ${url}`);
   }),
@@ -45,7 +47,9 @@ function show(canAct = true) {
   </QueryClientProvider>);
 }
 
-beforeEach(() => { state.cases = []; state.requests = []; state.posts = []; });
+beforeEach(() => {
+  state.cases = []; state.requests = []; state.checks = []; state.posts = [];
+});
 
 describe("the Storage section", () => {
   it("no case says the §6 rule honestly, and finance sees no doors", async () => {
@@ -198,6 +202,65 @@ describe("Request a later delivery date", () => {
     expect(panel).toHaveTextContent("kitchen not finished");
     expect(panel).toHaveTextContent("asked for free storage");
     expect(panel).toHaveTextContent("storage terms acknowledged");
+  });
+});
+
+// §6 (0452) — `Check the stored furniture`, every configured interval.
+describe("Check the stored furniture", () => {
+  const OPEN = { ...CASE, rule_inspection_days: 30 };
+
+  it("says a check is overdue when nothing has been recorded since the start", async () => {
+    state.cases = [OPEN];   // started 20 days ago, interval 30 — not due yet
+    show();
+    const panel = await screen.findByTestId("storage-checks-mattress_bedframe");
+    expect(panel).toHaveTextContent("Never checked.");
+    expect(panel).toHaveTextContent("Next check due");
+  });
+
+  it("a recorded check restarts the clock and is listed", async () => {
+    state.cases = [OPEN];
+    state.checks = [{
+      id: "k1", case_id: "c1", inspected_on: todayPlus(-1), location: "Bay 3",
+      packaging: "Wrapped", condition_note: "Dry, no marks", photo_url: "a/b.jpg",
+      recorded_at: "2026-09-08T00:00:00Z",
+    }];
+    show();
+    const panel = await screen.findByTestId("storage-checks-mattress_bedframe");
+    await waitFor(() => expect(panel).toHaveTextContent("Last checked"));
+    expect(panel).toHaveTextContent("Bay 3");
+    expect(panel).toHaveTextContent("Dry, no marks");
+  });
+
+  /** §6's four facts and the photo are all required, and damage is a Service
+   *  Case — the form says so instead of pretending the note escalates. */
+  it("records the four facts with a photo, and sends damage to a Service Case", async () => {
+    state.cases = [OPEN];
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Check the stored furniture" }));
+    const form = screen.getByTestId("storage-check-form");
+    expect(form).toHaveTextContent("If anything is damaged, open a Service Case. This record is not one.");
+    expect(screen.getByRole("button", { name: "Record the check" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Where it is stored"), { target: { value: "Bay 3" } });
+    fireEvent.change(screen.getByLabelText("How it is packed"), { target: { value: "Wrapped" } });
+    fireEvent.change(screen.getByLabelText("What condition it is in"), { target: { value: "Dry" } });
+    expect(screen.getByRole("button", { name: "Record the check" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Photo"),
+      { target: { files: [new File(["x"], "check.jpg", { type: "image/jpeg" })] } });
+    expect(screen.getByRole("button", { name: "Record the check" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Record the check" }));
+    await waitFor(() => expect(state.posts.length).toBeGreaterThan(0));
+    const post = state.posts.at(-1)!;
+    expect(post.url).toBe("/api/finance/payment-storage/inspection");
+    expect(post.body).toMatchObject({
+      caseId: "c1", location: "Bay 3", packaging: "Wrapped", conditionNote: "Dry",
+    });
+  });
+
+  it("a closed case has nothing to check", async () => {
+    state.cases = [{ ...OPEN, status: "closed" }];
+    show();
+    await screen.findByTestId("storage-case-mattress_bedframe");
+    expect(screen.queryByTestId("storage-checks-mattress_bedframe")).not.toBeInTheDocument();
   });
 });
 

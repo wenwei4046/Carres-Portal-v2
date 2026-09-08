@@ -69,3 +69,44 @@ export function storageChargeOf(facts: StorageCaseFacts, todayIso: string): Stor
     dayOfStorage,
   };
 }
+
+/**
+ * When the stored furniture is next due a look (payment/MASTER.md §6).
+ *
+ * §6: "Every configured inspection interval (currently 30 days) raises `Check
+ * the stored furniture`." The clock starts at the storage start and restarts
+ * at every recorded check, so a case checked on time never accumulates a
+ * backlog of missed intervals — one open item at a time, which is what an
+ * operator can actually act on.
+ *
+ * ONE arithmetic: the Work feed and the Storage section both read this, so the
+ * date on the work item and the date on the page cannot disagree.
+ */
+export interface StorageCheckDue {
+  /** The day the next check is due (yyyy-mm-dd). */
+  dueIso: string;
+  /** Due today or earlier, with the case still open. */
+  due: boolean;
+  /** Calendar days past the due day; 0 when it is not yet late. */
+  daysLate: number;
+}
+
+export function storageCheckDue(
+  facts: {
+    storageStart: string;
+    /** The most recent recorded check, or null when none has happened yet. */
+    lastCheckedOn: string | null;
+    inspectionDays: number;
+  },
+  todayIso: string,
+): StorageCheckDue {
+  const days = Math.max(1, Math.floor(facts.inspectionDays));
+  const from = facts.lastCheckedOn ?? facts.storageStart;
+  const due = new Date(`${from}T00:00:00Z`);
+  due.setUTCDate(due.getUTCDate() + days);
+  const dueIso = due.toISOString().slice(0, 10);
+  const today = Date.parse(`${todayIso}T00:00:00Z`);
+  const late = Math.floor((today - due.getTime()) / 86_400_000);
+  return { dueIso, due: late >= 0, daysLate: Math.max(0, late) };
+}
+

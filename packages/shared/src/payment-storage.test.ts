@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { storageChargeOf } from "./payment-storage";
+import { storageCheckDue, storageChargeOf } from "./payment-storage";
 
 /** The §7 worked examples, verbatim — start 2026-09-07 makes day N easy:
  *  day N = 2026-09-(6+N) while September lasts. */
@@ -51,5 +51,51 @@ describe("storageChargeOf — the §7 worked examples", () => {
   it("says which storage day today is", () => {
     expect(storageChargeOf(MATTRESS, day(1)).dayOfStorage).toBe(1);
     expect(storageChargeOf(MATTRESS, day(21)).dayOfStorage).toBe(21);
+  });
+});
+
+describe("storageCheckDue — §6's inspection interval, one arithmetic", () => {
+  it("counts from the storage start when nothing has been checked yet", () => {
+    const d = storageCheckDue(
+      { storageStart: "2026-09-01", lastCheckedOn: null, inspectionDays: 30 },
+      "2026-09-08",
+    );
+    expect(d.dueIso).toBe("2026-10-01");
+    expect(d.due).toBe(false);
+    expect(d.daysLate).toBe(0);
+  });
+
+  /** A case checked on time never accumulates a backlog of missed intervals —
+   *  the clock restarts at the check, so there is one open item at a time. */
+  it("restarts at the last recorded check", () => {
+    const d = storageCheckDue(
+      { storageStart: "2026-07-01", lastCheckedOn: "2026-09-05", inspectionDays: 30 },
+      "2026-09-08",
+    );
+    expect(d.dueIso).toBe("2026-10-05");
+    expect(d.due).toBe(false);
+  });
+
+  it("is due on the day itself, and counts the days after it", () => {
+    const onDay = storageCheckDue(
+      { storageStart: "2026-08-09", lastCheckedOn: null, inspectionDays: 30 },
+      "2026-09-08",
+    );
+    expect(onDay.due).toBe(true);
+    expect(onDay.daysLate).toBe(0);
+    const late = storageCheckDue(
+      { storageStart: "2026-07-01", lastCheckedOn: null, inspectionDays: 30 },
+      "2026-09-08",
+    );
+    expect(late.due).toBe(true);
+    expect(late.daysLate).toBe(39);   // due 2026-07-31, today 2026-09-08
+  });
+
+  it("never divides by a zero or negative interval", () => {
+    const d = storageCheckDue(
+      { storageStart: "2026-09-01", lastCheckedOn: null, inspectionDays: 0 },
+      "2026-09-08",
+    );
+    expect(d.dueIso).toBe("2026-09-02");
   });
 });
