@@ -50,6 +50,12 @@ export const recordPaymentInputSchema = z.object({
    *  payments still record, only the slip link waits for the deploy. */
   receiptUrl: z.string().trim().max(300).nullish(),
   idempotencyKey: z.string().uuid().optional(),
+  /** §5 (0448): the operator opened the earlier payment this one resembles and
+   *  says it is a different one. The SERVER decides whether that continuation
+   *  is allowed — a match only continues for the Payment Approver duty or
+   *  principal — so this flag ASKS, it never grants. Distinct from
+   *  `idempotencyKey`, which answers whether this is the same submission. */
+  duplicateAck: z.boolean().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 

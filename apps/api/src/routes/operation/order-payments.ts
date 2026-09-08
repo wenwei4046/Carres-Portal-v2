@@ -102,6 +102,7 @@ orderPaymentsRouter.post("/:id/payments", async (c) => {
     note: parsed.data.note,
     receiptUrl: parsed.data.receiptUrl,
     idempotencyKey: parsed.data.idempotencyKey,
+    duplicateAck: parsed.data.duplicateAck,
   });
   if (error) {
     const m = mapPgError(error);
@@ -277,6 +278,8 @@ orderPaymentsRouter.post("/:id/storage/collect", async (c) => {
     reference: parsed.data.reference,
     note: parsed.data.note,
     receiptUrl: parsed.data.receiptUrl,
+    idempotencyKey: parsed.data.idempotencyKey,
+    duplicateAck: parsed.data.duplicateAck,
   });
   if (payErr) {
     const m = mapPgError(payErr);
@@ -629,6 +632,7 @@ async function recordPayment(
     note?: string | null;
     receiptUrl?: string | null;
     idempotencyKey?: string;
+    duplicateAck?: boolean;
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ data: any; error: any }> {
@@ -648,6 +652,7 @@ async function recordPayment(
       p_receipt_no: receiptNo,
       p_counts_toward_paid: true,
       p_idempotency_key: args.idempotencyKey ?? receiptNo,
+      p_duplicate_ack: args.duplicateAck ?? false,
     });
     // 23505 = the receipt number is taken. Anything else is the caller's answer.
     if (!last.error || last.error.code !== "23505") return last;

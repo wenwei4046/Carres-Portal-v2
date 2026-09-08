@@ -824,6 +824,55 @@ register wire gained `reference` and `method` on the payments read so the compar
 the right earlier payment instead of guessing from a figure. Six shared tests and two
 composition tests pin it.
 
+### BUILD — the §5 duplicate rule moves out of the browser, 2026-09-08
+
+The guard shipped earlier that day computed the match in the page and shut the button
+behind a tickbox. Re-read against §5 word by word, three things were still missing, and
+each one is a way the same money gets recorded twice:
+
+* **"privileged continuation"** was not enforced anywhere. A tickbox in a page is not a
+  permission — any caller could post the same payment through the API and never see it.
+  §5's own owner table names the authority (`Suspected wrong/duplicate | Payment
+  Approver`), so continuation is now the approver's act, gated exactly as `payment_void`
+  is (0430): the Payment Approver duty through the Shared Duty Resolver, or principal.
+* **"compare CUSTOMER"** was read as "compare this order". The duplicate §5 most fears is
+  the transfer keyed onto the customer's OTHER SO — one customer holding several SOs is
+  normal here — and nothing looked for it. The SQL comparison walks the customer: the same
+  phone digits when both orders carry a usable one, else the same name.
+* **the browser cannot see a payment recorded one second ago**, and a page whose register
+  row carried no payment list found nothing and looked exactly like a clean order.
+
+`payment_record` now takes the order lock BEFORE it looks, so two submissions of one
+transfer serialise and the second sees the first. The page still draws the warning and
+still asks for the look; it sends the acknowledgement as a REQUEST, and the door decides.
+When the earlier payments could not be read at all it says so rather than staying silent.
+
+⛔ **This is not idempotency and the two are kept apart.** The posting key answers "is this
+the same submission arriving twice?" and returns the original row; this answers "is this a
+different submission of money already recorded?" An exact idempotent retry is explicitly
+exempt — it is the same act, not a second one.
+
+**A separate defect found while probing and fixed in the same migration:** `payment_record`
+guarded with `if app_role() not in ('operation','principal')`. `app_role()` answers NULL for
+a JWT whose subject has no `app_users` row, `NULL not in (…)` is NULL, and `if` treats that
+as false — so the guard never fired for an unknown caller. Only the `recorded_by` foreign
+key stopped the money, by accident. It is coalesced now.
+
+**Proven against the ACTUAL door** (rolled-back production probe, twelve controls):
+baseline posts · a same-order duplicate is refused naming the receipt · an acknowledgement
+WITHOUT the approver duty is refused (the duty is unassigned in production, and an
+unassigned duty refuses) · the same customer's OTHER order is refused, naming that SO ·
+a different customer with the same amount and date posts · an exact retry returns the
+original and is never gated · an identical reference matches on its own · three days apart
+is not a duplicate · a voided earlier payment never matches · principal continues and the
+acknowledgement lands on the row and in the activity log · an assigned Payment Approver
+continues · an unknown caller is refused by the coalesced guard.
+
+**Limitation, stated:** true two-session concurrency was not executed — the probe runs in
+one session. Serialisation rests on the `for update` lock taken before the comparison, and
+the probe proves the comparison sees a payment committed earlier in the same transaction
+ordering.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -966,7 +1015,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
 | 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **PARTIAL** | The promise is recorded with its date and `missedPromise` derives the fact from the ledger; the shared Work FEED's risk sort does not consume it yet — that ranking lives in the Workspace-owned rule registry and is its own slice |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
-| 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | Shared `likelyDuplicatePayments`; the Review step names the earlier payment and the door stays shut until it is acknowledged |
+| 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | 0448 moved the rule into the database: the CUSTOMER's live payments are compared, the order is locked first so concurrent submissions serialise, and continuation needs the Payment Approver duty or principal. The page still draws the warning; it no longer decides |
 | 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |
 | 12 | Void payment with reason + approver duty | 5 | **BUILT** | — |
 | 13 | Storage case: witnesses, derived permanent start, rule snapshot | 6·7 | **BUILT** | 0436/0439 with probes |
@@ -994,6 +1043,12 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   only by collection or an override of 0 (C9), and money in full before delivery is
   ABSOLUTE (delivery/MASTER.md 2026-09-01). It holds, like any other owed money.
 - The §16 Important Notes wording and the receiving bank account numbers (#20).
+- **Who holds the Payment Approver duty.** Measured 2026-09-08: `workspace_duty_assignments`
+  carries `po_duty` and `grn_duty` rotations and **no `payment_approver` row at all**. The
+  duty resolver refuses an unassigned duty (correctly), so today `Void payment` (0430) and
+  the §5 duplicate continuation (0448) work for **principal only** — nobody in Operation can
+  perform either. The engineering is right; the assignment is missing. Naming the holder is
+  the owner's, exactly as the PO/GRN rotation was.
 
 **Overall status: PARTIALLY DELIVERED** — nine gaps above are unbuilt or partial approved
 capability, two are blocked on owner content, one on external access. The §14 build entries

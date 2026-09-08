@@ -231,6 +231,8 @@ describe("POST /:id/payments", () => {
       p_kind: "deposit",
       p_counts_toward_paid: true,
       p_idempotency_key: "00000000-0000-4000-8000-000000000052",
+      // 0448 — an ordinary payment asks for no continuation past a duplicate.
+      p_duplicate_ack: false,
     });
     // The receipt is the LOCKED document scheme: RC-DDMMYY-NNNN, seeded on
     // {orderId}:{seq} (seq = 3 here) — deterministic, so a reprint matches.
@@ -773,5 +775,78 @@ describe("assign-partner storage gate", () => {
     );
     expect(res.status).toBe(200);
     expect(sb.calls.rpc).toHaveLength(1); // operation_assign_partner reached
+  });
+});
+
+// =====================================================================
+// §5 (0448) — the duplicate acknowledgement reaches the door that decides
+// =====================================================================
+describe("POST /:id/payments — the §5 acknowledgement is the SERVER's to judge", () => {
+  it("passes duplicateAck through to payment_record", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: { payment: { id: PAY_ID }, orders_paid: 500 }, error: null },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: 500, paidOn: "2026-09-08", method: "bank", kind: "payment",
+          duplicateAck: true, idempotencyKey: "00000000-0000-4000-8000-000000000099",
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const rpc = sb.calls.rpc[0] as { name: string; args: Record<string, unknown> };
+    expect(rpc.args).toMatchObject({ p_duplicate_ack: true });
+  });
+
+  /** The door refuses with P0001 + detail `possible_duplicate_payment`, which
+   *  mapPgError turns into 422 carrying that code — so the page can tell a
+   *  duplicate refusal apart from every other rejection. */
+  it("surfaces the door's duplicate refusal as its own code, not a 500", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: null, error: { code: "P0001", details: "possible_duplicate_payment",
+                             message: "This looks like a payment already recorded (RC-080926-0001 · RM 500.00 · 2026-09-08)." } },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 500, paidOn: "2026-09-08", method: "bank", kind: "payment" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe("possible_duplicate_payment");
+    expect(body.message).toContain("RC-080926-0001");
+  });
+
+  it("surfaces a non-approver continuation as 403, not a silent success", async () => {
+    const sb = makeSb(
+      { order_payments: { list: { data: null, error: null, count: 0 } } },
+      { data: null, error: { code: "42501", details: "not_payment_approver",
+                             message: "Only the Payment Approver can record this" } },
+    );
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 500, paidOn: "2026-09-08", method: "bank",
+                               kind: "payment", duplicateAck: true }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(403);
   });
 });
