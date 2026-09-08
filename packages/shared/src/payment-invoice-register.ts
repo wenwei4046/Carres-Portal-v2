@@ -69,6 +69,7 @@ export interface InvoiceRegisterRow {
     order_payments?: Array<{
       id: string; receipt_no: string | null; amount: number;
       paid_on: string; voided_at: string | null;
+      reference?: string | null; method?: string | null;
     }>;
     payment_communications?: Array<{
       id: string; kind: string; message_text: string; template_key: string | null;

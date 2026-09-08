@@ -65,7 +65,10 @@ const INVOICE_REGISTER_SELECT =
   "replaces_invoice_id,created_at,order_id," +
   "orders(id,so,customer_name,customer_phone,source_ref,status,paid,delivery_date,delivery_date_tbd,delivered_at," +
   "ops_assigned_logistic,delivery_partners!orders_delivery_partner_id_fkey(name,contact)," +
-  "order_payments(id,receipt_no,amount,paid_on,voided_at)," +
+  // §5 likely-duplicate: the comparison needs the reference and the method
+  // beside the amount and the paid date, so the operator inspects the RIGHT
+  // earlier payment instead of guessing from a figure alone.
+  "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
   "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
   "ops_order_control(balance,confirmed_date,line_etas,line_stock_status))";

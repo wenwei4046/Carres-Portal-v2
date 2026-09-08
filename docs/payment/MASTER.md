@@ -808,6 +808,22 @@ invoice from another order refused · an unknown caller refused.
 The remaining half of #8 — the shared Work feed RANKING a missed promise — belongs to the
 Workspace-owned rule registry and stays listed as PARTIAL rather than reached into from here.
 
+### BUILD — a likely duplicate is inspected before the money is recorded, 2026-09-08
+
+§5 asks that a likely duplicate be compared on customer, amount, paid date and reference,
+and that staff INSPECT the earlier payment before continuing. The audit found only the
+posting key's idempotency, which stops an accidental double-submit but says nothing about a
+human keying the same transfer twice. Shared `likelyDuplicatePayments` compares the order's
+LIVE payments (a voided one is not money and never matches): equal amount within a two-day
+window either side — a Friday slip keyed on Monday is the same payment — or an identical
+reference, which matches on its own and ranks first. The Review step names each match with
+its receipt number, amount, date and reference, and `Record payment` stays SHUT until the
+operator ticks *I opened the earlier payment and this is a different one.* It is a warning
+with a gate, never a refusal: a customer may genuinely pay the same amount twice. The
+register wire gained `reference` and `method` on the payments read so the comparison names
+the right earlier payment instead of guessing from a figure. Six shared tests and two
+composition tests pin it.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -900,7 +916,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
 | 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **PARTIAL** | The promise is recorded with its date and `missedPromise` derives the fact from the ledger; the shared Work FEED's risk sort does not consume it yet — that ranking lives in the Workspace-owned rule registry and is its own slice |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
-| 10 | **Likely-duplicate inspection before privileged continuation** | 5 | **NOT BUILT** | Posting is idempotent per key, but nothing compares customer/amount/date/reference or forces inspection |
+| 10 | Likely-duplicate inspection before privileged continuation | 5 | **BUILT** | Shared `likelyDuplicatePayments`; the Review step names the earlier payment and the door stays shut until it is acknowledged |
 | 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |
 | 12 | Void payment with reason + approver duty | 5 | **BUILT** | — |
 | 13 | Storage case: witnesses, derived permanent start, rule snapshot | 6·7 | **BUILT** | 0436/0439 with probes |

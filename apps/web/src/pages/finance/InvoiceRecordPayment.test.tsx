@@ -106,3 +106,53 @@ describe("Record payment (§16)", () => {
     expect(options).toEqual(["bank", "duitnow_qr", "cheque", "cash", "credit_card", "debit_card"]);
   });
 });
+
+describe("§5 — a likely duplicate must be inspected before the money is recorded", () => {
+  const withEarlier = {
+    ...INVOICE,
+    orders: {
+      ...INVOICE.orders!,
+      order_payments: [{
+        id: "p-old", receipt_no: "RC-080926-0001", amount: 500,
+        paid_on: "2026-09-08", voided_at: null, reference: "MBB-1", method: "bank",
+      }],
+    },
+  } as typeof INVOICE;
+
+  function showWith(inv: typeof INVOICE) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <InvoiceRecordPayment invoice={inv} rows={[inv]} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("names the earlier payment and keeps the door shut until it is inspected", async () => {
+    showWith(withEarlier);
+    fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "500" } });
+    fireEvent.change(screen.getByLabelText("Paid date"), { target: { value: "2026-09-08" } });
+    // The evidence is what opens Review (the §16 upload-first rule).
+    fireEvent.change(screen.getByLabelText("Transfer slip"),
+      { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    const warn = await screen.findByTestId("likely-duplicate-warning");
+    expect(warn).toHaveTextContent("RC-080926-0001");
+    expect(warn).toHaveTextContent("This order already has a payment that looks the same.");
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("I checked the earlier payment"));
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeEnabled();
+  });
+
+  it("an ordinary payment sees no warning and no extra step", async () => {
+    showWith(withEarlier);
+    fireEvent.change(screen.getByLabelText("Payment amount"), { target: { value: "123" } });
+    fireEvent.change(screen.getByLabelText("Paid date"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Transfer slip"),
+      { target: { files: [new File(["slip"], "slip.jpg", { type: "image/jpeg" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    await screen.findByTestId("invoice-record-review");
+    expect(screen.queryByTestId("likely-duplicate-warning")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record payment" })).toBeEnabled();
+  });
+});
