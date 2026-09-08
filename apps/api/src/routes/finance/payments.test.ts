@@ -48,7 +48,9 @@ const PO_ID       = "PO-2046";
 describe("GET /api/finance/payments/register", () => {
   function ledger(error: unknown = null) {
     const rows = [{ id: "p1", receipt_no: "RC-060926-0001", amount: 200,
-      voided_at: "2026-09-06", orders: { id: ORDER_ID, so: 100, customer_name: "Customer" } }];
+      voided_at: "2026-09-06", recorded_by: null,
+      source_metadata: { duplicate_ack: true, provider_blob: "never reaches a browser" },
+      orders: { id: ORDER_ID, so: 100, customer_name: "Customer" } }];
     const chain = { select: vi.fn(), order: vi.fn(), range: vi.fn() };
     chain.select.mockReturnValue(chain);
     chain.order.mockReturnValue(chain);
@@ -63,11 +65,16 @@ describe("GET /api/finance/payments/register", () => {
     }), env);
   }
   it.each(["operation", "finance", "principal"])("reads canonical receipts for %s, including void history", async (role) => {
-    const { sb, rows } = ledger();
+    const { sb } = ledger();
     const res = await request(role);
     expect(res.status).toBe(200);
     expect(sb.from).toHaveBeenCalledWith("order_payments");
-    expect(await res.json()).toEqual({ rows, total: 1 });
+    const body = await res.json() as { rows: Array<Record<string, unknown>>; total: number };
+    expect(body.total).toBe(1);
+    // §11 (0453): the acknowledgement is DERIVED to a boolean, and the raw
+    // metadata — which can hold a payment provider's payload — is dropped.
+    expect(body.rows[0]).toMatchObject({ id: "p1", duplicate_acknowledged: true });
+    expect(body.rows[0]).not.toHaveProperty("source_metadata");
   });
   it.each(["dealer", "supplier", "partner", "warehouse"])("refuses %s before reading money", async (role) => {
     const res = await request(role);

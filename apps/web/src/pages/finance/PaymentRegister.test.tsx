@@ -30,9 +30,11 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const payment = {
   id: "p1", order_id: "o1", receipt_no: "RC-060926-0001", paid_on: "2026-09-06",
   amount: 200, method: "bank", kind: "payment", reference: "BANK-123",
-  created_at: "2026-09-06T01:00:00Z", recorded_by: null, receipt_url: null,
+  created_at: "2026-09-06T01:00:00Z", recorded_by: "u1", recorded_by_name: "Shasha",
+  receipt_url: null,
   orders: { id: "o1", so: 123, customer_name: "Customer One" },
-  payment_allocations: [{ id: "a1", order_id: "o1", amount: 200, voided_at: null }],
+  payment_allocations: [{ id: "a1", order_id: "o1", invoice_id: "i1", amount: 200,
+    voided_at: null, invoices: { invoice_no: "INV-060926-0001" } }],
 };
 beforeEach(() => {
   state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-060926-0002", amount: 100,
@@ -213,6 +215,28 @@ describe("Correct allocation", () => {
       reason: "the customer paid for both SOs",
       allocations: [{ orderId: "o1", amount: 120 }, { orderId: "o2", amount: 80 }],
     });
+  });
+});
+
+// §11 (0453) — history filterable by invoice, actor and exception.
+describe("the §11 history axes", () => {
+  it("shows the invoice, the recorder and the exception as their own columns", () => {
+    show();
+    const table = screen.getByRole("table");
+    for (const label of ["Invoice", "Recorded by", "Exception"]) {
+      expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
+    }
+    expect(screen.getAllByText("INV-060926-0001").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Shasha").length).toBeGreaterThan(0);
+    // p1 is live and unacknowledged; p2 is the voided one.
+    expect(screen.getAllByText("None").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Voided").length).toBeGreaterThan(0);
+  });
+
+  it("says so honestly when a payment sits on no invoice", () => {
+    state.data = [{ ...payment, payment_allocations: [] }];
+    show();
+    expect(screen.getByText("Not allocated to an invoice")).toBeInTheDocument();
   });
 });
 

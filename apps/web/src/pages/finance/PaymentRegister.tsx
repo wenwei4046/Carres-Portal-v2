@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isLivePayment } from "@carres/shared";
 import type { PaymentRegisterRow } from "@carres/shared/payment-register";
+import { paymentExceptionWord, paymentInvoiceNumbers } from "@carres/shared/payment-register";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -79,7 +80,19 @@ export default function PaymentRegister() {
     { key: "amount", label: "Amount", width: 140, align: "right", accessor: (r) => rm(r.amount),
       numberValue: (r) => r.amount, filterType: "number", exportValue: (r) => r.amount },
     { key: "method", label: "Method", width: 160, accessor: (r) => METHODS[r.method] ?? r.method,
-      searchValue: (r) => METHODS[r.method] ?? r.method },
+      searchValue: (r) => METHODS[r.method] ?? r.method, filterType: "enum" },
+    // §11 — history is filterable by INVOICE, ACTOR and EXCEPTION too. One
+    // payment may cover several invoices (§4), so the invoice cell is a list
+    // and says so honestly when there is none.
+    { key: "invoice", label: "Invoice", width: 200,
+      accessor: (r) => paymentInvoiceNumbers(r).join(", ") || "Not allocated to an invoice",
+      searchValue: (r) => paymentInvoiceNumbers(r).join(" ") },
+    { key: "actor", label: "Recorded by", width: 160,
+      accessor: (r) => r.recorded_by_name ?? "Recorder name not available",
+      searchValue: (r) => r.recorded_by_name ?? "", filterType: "enum" },
+    { key: "exception", label: "Exception", width: 160,
+      accessor: (r) => paymentExceptionWord(r),
+      searchValue: (r) => paymentExceptionWord(r), filterType: "enum" },
   ], []);
   const selected = params.get("payment");
   const payment = query.data?.find((r) => r.id === selected);
