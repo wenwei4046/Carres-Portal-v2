@@ -58,6 +58,16 @@
   code.** The fix is Jess entering production days for each supplier's accessory category in
   Purchasing Settings; the number is a real supplier lead time and no chat may invent one. Closes
   when an accessory PO issues and its quantity line prints `—`.
+  **And a challenge worth answering while the number is being decided (Law 4, not part of CARD 10,
+  no code changed):** the gate asks every purchase for a *production* lead time, but a protector or
+  a pillow is picked off a shelf, not produced — the honest number for such a SKU is often zero,
+  and today zero has to be typed in as if it were a manufacturing estimate. **Recommendation:**
+  Purchasing Settings should let a supplier/category be marked *stocked, no production time*
+  explicitly, so a real zero reads as a decision instead of an unfilled field, and the refusal
+  keeps its force for goods that genuinely are built to order. **Trade-off:** one more Settings
+  concept for the operator to understand. **Falsifier:** if Jess says accessories do carry real
+  factory lead times at Carres, the current gate is already right and only the four missing rows
+  need filling.
 - `two-month-calendars-shipped-the-same-day-and-must-converge` — **opened 2026-09-07 by the
   Receiving CARD 01 second correction (PR #1117), which collided mid-flight with Delivery's
   #1119.** Two implementations of the rail month calendar now exist: the governed kit
