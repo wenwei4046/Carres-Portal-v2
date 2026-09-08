@@ -872,6 +872,31 @@ continues · an unknown caller is refused by the coalesced guard.
 one session. Serialisation rests on the `for update` lock taken before the comparison, and
 the probe proves the comparison sees a payment committed earlier in the same transaction
 ordering.
+### BUILD — a receipt reprints from the moment the money was recorded, 2026-09-08
+
+`invoices` learned this in 0429: issuing captures an immutable `snapshot`, and every reprint
+reads it rather than live order data. The receipt never got the same treatment. Its NUMBER
+was minted and stored, but nothing captured what the receipt SAID — so the customer name, the
+SO and the method were re-read at reprint time, and a customer renamed or an order corrected
+six months later would silently reprint a DIFFERENT receipt under the same number. A receipt
+that changes is not a receipt.
+
+The capture belongs in the one writer, not in a route: every channel — the desk, the POS
+top-up, the payment link — mints its receipt there, so every channel captures the same way.
+0449 replaces `_customer_payment_post` with the identical body plus the snapshot and changes
+nothing else about it. `payment_void` is untouched, which is exactly why a voided payment
+still reprints its receipt marked VOIDED — §4's own sentence.
+
+**No backfill.** Payments recorded before 0449 have no snapshot and never will; their document
+reads live and says `from_snapshot: false`, the same honest fallback the pre-0429 invoices
+carry. Inventing a snapshot for a receipt nobody captured would be a forgery, not a repair.
+
+**Proven against the ACTUAL writer** (rolled-back production probe, six controls): the
+snapshot is captured with the number, customer, amount, method and reference, and its number
+matches the row's · a LATER rename cannot rewrite the receipt · voiding keeps the snapshot ·
+an unknown method prints as the governed word, never the raw input · a storage collection
+carries its own receipt · an idempotent retry mints no second receipt. Eleven route and
+composition tests pin the document and the button.
 
 ### Verification evidence — the four categories, stated separately
 
@@ -1011,7 +1036,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 3 | Record payment (6 methods, evidence, review sentences) | 3·16 | **BUILT** | — |
 | 4 | Invoice lifecycle: draft → issue → void + replacement lineage | 4 | **BUILT** | — |
 | 5 | Invoice document from its immutable snapshot | 4·16 | **BUILT** | — |
-| 6 | **Receipt reprint from an immutable snapshot** | 4 | **PARTIAL** | A receipt PDF template and `Print receipt` exist, but the receipt renders from a LIVE read; there is no receipt snapshot column and no receipt document route. §4 asks reprint to use "the same number/snapshot" |
+| 6 | Receipt reprint from an immutable snapshot | 4 | **BUILT** | 0449: the ONE writer freezes the receipt's content at posting; `GET /payments/:id/receipt-document` reads it, `Print receipt` stands on the payment object, and a voided payment reprints saying VOIDED. Payments recorded before 0449 read live and say so |
 | 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
 | 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **PARTIAL** | The promise is recorded with its date and `missedPromise` derives the fact from the ledger; the shared Work FEED's risk sort does not consume it yet — that ranking lives in the Workspace-owned rule registry and is its own slice |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
@@ -1050,7 +1075,7 @@ exercised on live rows — its verification is probe/test based, as recorded in 
   perform either. The engineering is right; the assignment is missing. Naming the holder is
   the owner's, exactly as the PO/GRN rotation was.
 
-**Overall status: PARTIALLY DELIVERED** — nine gaps above are unbuilt or partial approved
+**Overall status: PARTIALLY DELIVERED** — eight gaps above are unbuilt or partial approved
 capability, two are blocked on owner content, one on external access. The §14 build entries
 record what IS shipped; this table is the single list of what is not.
 

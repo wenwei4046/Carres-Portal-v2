@@ -81,6 +81,84 @@ financePaymentsRouter.get("/register", async (c) => {
     ? { ...row, recorded_by_name: names.get(row.recorded_by) ?? null } : row), total: count });
 });
 
+/**
+ * GET /:id/receipt-document — what the receipt SAYS (payment/MASTER.md §4).
+ *
+ * §4: "Reprint uses the same number/snapshot." So this reads the immutable
+ * snapshot 0449 froze at posting time and never re-derives the customer, the
+ * SO or the method from live data. A payment recorded before 0449 has no
+ * snapshot: it reads live and says `from_snapshot: false`, exactly as the
+ * pre-0429 invoices do — the document must never pretend to be a reprint of
+ * something nobody captured.
+ *
+ * A VOIDED payment still has its receipt, marked VOIDED with its reason. That
+ * is §4's own sentence, and it is why voiding never touches the snapshot.
+ */
+const RECEIPT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+financePaymentsRouter.get("/:id/receipt-document", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view receipts." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from(ORDER_PAYMENTS)
+    .select("id,order_id,amount,paid_on,method,kind,reference,note,receipt_no,voided_at,void_reason,snapshot,orders(so,customer_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "Payment not found." }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row: any = data;
+  if (!row.receipt_no) {
+    return c.json({
+      error: "rule_violation", code: "no_receipt_number",
+      message: "This payment has no receipt number, so it has no receipt.",
+    }, 422);
+  }
+  const voided = row.voided_at != null;
+  const snap = row.snapshot && typeof row.snapshot === "object" ? row.snapshot : null;
+  const source = snap ?? {
+    receipt_no: row.receipt_no,
+    paid_on: row.paid_on,
+    so: row.orders?.so ?? null,
+    customer: { name: row.orders?.customer_name ?? "" },
+    amount: row.amount,
+    method: row.method,
+    kind: row.kind,
+    reference: row.reference,
+    note: row.note,
+    currency: "MYR",
+  };
+  return c.json({
+    voided,
+    void_reason: row.void_reason ?? null,
+    from_snapshot: snap != null,
+    document: {
+      receipt_no: String(source.receipt_no),
+      issue_date: String(source.paid_on).slice(0, 10),
+      order_code: source.so != null ? `SO-${source.so}` : "SO not available",
+      customer: { name: String(source.customer?.name ?? "") },
+      amount: Number(source.amount),
+      method: String(source.method),
+      kind: String(source.kind),
+      reference: source.reference ?? null,
+      note: source.note ?? null,
+      currency: String(source.currency ?? "MYR"),
+    },
+  });
+});
+
 financePaymentsRouter.get("/", requireFinance, async (c) => {
   const auth = c.var.auth;
   const parsed = paymentsListQuery.safeParse(

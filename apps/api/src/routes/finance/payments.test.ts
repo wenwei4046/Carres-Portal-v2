@@ -608,3 +608,112 @@ describe("POST /api/finance/payments/po-schedule", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/finance/payments/:id/receipt-document — §4's reprint (0449)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("GET /api/finance/payments/:id/receipt-document", () => {
+  const PAY = "00000000-0000-0000-0000-000000a99010";
+  function ledger(row: unknown, error: unknown = null) {
+    const chain = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.maybeSingle.mockResolvedValue({ data: row, error });
+    const sb = { from: vi.fn().mockReturnValue(chain) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    return sb;
+  }
+  async function request(role: string, id = PAY) {
+    const jwt = await makeJwt(role);
+    return app.fetch(
+      new Request(`http://t/api/finance/payments/${id}/receipt-document`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+  }
+
+  const SNAPSHOT = {
+    receipt_no: "RC-080926-0001", paid_on: "2026-09-08", so: 2099,
+    customer: { name: "LIM KUAN YANG" }, amount: 250, method: "duitnow_qr",
+    kind: "payment", reference: "REF-1", note: "thanks", currency: "MYR",
+  };
+
+  it("403 for a role with no payment sight", async () => {
+    ledger(null);
+    expect((await request("dealer")).status).toBe(403);
+  });
+
+  it("422 when the id is not a uuid", async () => {
+    ledger(null);
+    expect((await request("finance", "not-a-uuid")).status).toBe(422);
+  });
+
+  it("404 when the payment is not there", async () => {
+    ledger(null);
+    expect((await request("finance")).status).toBe(404);
+  });
+
+  /** The whole point of §4: the document is the SNAPSHOT, and a customer
+   *  renamed afterwards must not appear on a receipt already printed. */
+  it("reprints from the snapshot, not from the live order", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001", voided_at: null,
+      void_reason: null, amount: 999, paid_on: "2026-11-30", method: "cash",
+      kind: "payment", reference: null, note: null, snapshot: SNAPSHOT,
+      orders: { so: 4242, customer_name: "RENAMED LATER" },
+    });
+    const res = await request("finance");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { from_snapshot: boolean; document: Record<string, unknown> };
+    expect(body.from_snapshot).toBe(true);
+    expect(body.document).toMatchObject({
+      receipt_no: "RC-080926-0001", issue_date: "2026-09-08",
+      order_code: "SO-2099", customer: { name: "LIM KUAN YANG" },
+      amount: 250, method: "duitnow_qr", reference: "REF-1",
+    });
+  });
+
+  /** A payment recorded before 0449 has no snapshot. It reads live and SAYS
+   *  so — it must never pretend to be a reprint of something nobody captured. */
+  it("falls back to the live read and says so when no snapshot exists", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-010826-0009", voided_at: null,
+      void_reason: null, amount: 100, paid_on: "2026-08-01", method: "bank",
+      kind: "deposit", reference: null, note: null, snapshot: null,
+      orders: { so: 1234, customer_name: "Old Customer" },
+    });
+    const body = await (await request("finance")).json() as {
+      from_snapshot: boolean; document: Record<string, unknown>;
+    };
+    expect(body.from_snapshot).toBe(false);
+    expect(body.document).toMatchObject({ order_code: "SO-1234", amount: 100 });
+  });
+
+  it("a voided payment still has its receipt, carrying the reason", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: "RC-080926-0001",
+      voided_at: "2026-09-08T02:00:00Z", void_reason: "keyed twice",
+      amount: 250, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: SNAPSHOT, orders: { so: 2099, customer_name: "x" },
+    });
+    const body = await (await request("finance")).json() as {
+      voided: boolean; void_reason: string; document: Record<string, unknown>;
+    };
+    expect(body.voided).toBe(true);
+    expect(body.void_reason).toBe("keyed twice");
+    expect(body.document).toMatchObject({ receipt_no: "RC-080926-0001" });
+  });
+
+  it("a payment with no receipt number has no receipt", async () => {
+    ledger({
+      id: PAY, order_id: "o1", receipt_no: null, voided_at: null, void_reason: null,
+      amount: 10, paid_on: "2026-09-08", method: "cash", kind: "payment",
+      reference: null, note: null, snapshot: null, orders: { so: 1, customer_name: "x" },
+    });
+    const res = await request("finance");
+    expect(res.status).toBe(422);
+    expect((await res.json() as { code: string }).code).toBe("no_receipt_number");
+  });
+});
+

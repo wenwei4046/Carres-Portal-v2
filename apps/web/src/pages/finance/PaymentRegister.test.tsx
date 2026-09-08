@@ -9,6 +9,10 @@ vi.mock("xlsx", () => ({ utils: { json_to_sheet: state.sheet, book_new: () => ({
   book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 vi.mock("@/lib/queries", () => ({ usePaymentRegister: () => state }));
 vi.mock("@/pages/operation/components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
+const doc = vi.hoisted(() => ({ fetch: vi.fn(), render: vi.fn() }));
+vi.mock("@/lib/api", () => ({ apiFetch: doc.fetch }));
+vi.mock("@/lib/pdf/render", () => ({ renderReceiptPdf: doc.render }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 const payment = {
   id: "p1", order_id: "o1", receipt_no: "RC-060926-0001", paid_on: "2026-09-06",
   amount: 200, method: "bank", kind: "payment", reference: "BANK-123",
@@ -77,5 +81,54 @@ describe("Payments Register", () => {
     expect(state.sheet.mock.calls[0][0]).toEqual([
       expect.objectContaining({ "Receipt No": "RC-060926-0002 · VOIDED", Amount: "100" }),
     ]);
+  });
+});
+
+// §4 (0449) — the reprint reads the receipt's own snapshot.
+describe("Print receipt", () => {
+  beforeEach(() => {
+    doc.fetch.mockReset();
+    doc.render.mockReset().mockResolvedValue(new Blob(["pdf"]));
+    Object.defineProperty(URL, "createObjectURL", { value: () => "blob:x", writable: true });
+    Object.defineProperty(window, "open", { value: vi.fn(), writable: true });
+  });
+
+  function openFirstPayment() {
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect payment")[0]);
+    fireEvent.click(screen.getByText("Open payment"));
+  }
+
+  it("asks the receipt-document door, never the live register row", async () => {
+    doc.fetch.mockResolvedValue({
+      voided: false, void_reason: null, from_snapshot: true,
+      document: { receipt_no: "RC-060926-0001", issue_date: "2026-09-06",
+        order_code: "SO-123", customer: { name: "Customer One" }, amount: 200,
+        method: "bank", kind: "payment", reference: "BANK-123", note: null, currency: "MYR" },
+    });
+    openFirstPayment();
+    fireEvent.click(screen.getByRole("button", { name: "Print receipt" }));
+    await waitFor(() => expect(doc.render).toHaveBeenCalled());
+    expect(doc.fetch).toHaveBeenCalledWith("/api/finance/payments/p1/receipt-document");
+    expect(doc.render.mock.calls[0][0]).toMatchObject({
+      receipt_no: "RC-060926-0001", voided: false,
+    });
+  });
+
+  it("carries the VOIDED state into the paper, with its reason", async () => {
+    doc.fetch.mockResolvedValue({
+      voided: true, void_reason: "Duplicate", from_snapshot: true,
+      document: { receipt_no: "RC-060926-0002", issue_date: "2026-09-06",
+        order_code: "SO-123", customer: { name: "Customer One" }, amount: 100,
+        method: "bank", kind: "payment", reference: null, note: null, currency: "MYR" },
+    });
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect payment")[1]);
+    fireEvent.click(screen.getByText("Open payment"));
+    fireEvent.click(screen.getByRole("button", { name: "Print receipt" }));
+    await waitFor(() => expect(doc.render).toHaveBeenCalled());
+    expect(doc.render.mock.calls[0][0]).toMatchObject({
+      voided: true, void_reason: "Duplicate",
+    });
   });
 });
