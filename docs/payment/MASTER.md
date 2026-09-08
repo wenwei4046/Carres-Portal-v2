@@ -782,6 +782,32 @@ double-hold whenever the keyed fee and the paper are the same debt, and inventin
 explicitly out of scope. The recommendation is to keep it as work, since 0445 prevents the
 state and no live order can reach it. It is listed in the gap list as an owner decision.
 
+### BUILD — the customer's answer is a recorded result, 2026-09-08
+
+§3 asked for a structured collection result and the 2026-09-08 audit found it NOT BUILT:
+0434 recorded the message we SENT, but nothing recorded what the customer ANSWERED, so no
+next action could be derived from a result and the risk sort could never rank a missed
+promise. Migration `0446` adds the missing half: `payment_collection_outcomes`, append-only,
+one row per recorded conversation, and `payment_record_collection_outcome`, its one door.
+The five approved §3 words are the only vocabulary; `Customer will pay on a date` REQUIRES
+its date and may not be in the past, and no other result may carry one. The door appends the
+order history fact and stamps the shared chase clock exactly as the message ledger does.
+
+**An outcome is never money.** `Customer paid` records what the customer SAID: it does not
+write `orders.paid`, mint a receipt or close a balance — the canonical posting service stays
+the only money writer (§2), and the composition says so on screen. That is §3's "`Done`
+never replaces authoritative completion", enforced rather than described.
+
+The Invoice object gains `Record the result` beside `Ask the customer to pay`, with one
+obvious button per result and the next step named under each. Rolled-back production probe,
+eight controls: an unknown outcome word refused · a dateless promise refused · a promise in
+the past refused · a stray date on another result refused · a promise stored with history and
+the chase stamp · `Customer paid` moving neither `orders.paid` nor any payment row · an
+invoice from another order refused · an unknown caller refused.
+
+The remaining half of #8 — the shared Work feed RANKING a missed promise — belongs to the
+Workspace-owned rule registry and stays listed as PARTIAL rather than reached into from here.
+
 ### Verification evidence — the four categories, stated separately
 
 Each §14 slice's evidence is one or more of: **DEPLOYMENT** (exact-SHA or ancestry-verified
@@ -871,8 +897,8 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 4 | Invoice lifecycle: draft → issue → void + replacement lineage | 4 | **BUILT** | — |
 | 5 | Invoice document from its immutable snapshot | 4·16 | **BUILT** | — |
 | 6 | **Receipt reprint from an immutable snapshot** | 4 | **PARTIAL** | A receipt PDF template and `Print receipt` exist, but the receipt renders from a LIVE read; there is no receipt snapshot column and no receipt document route. §4 asks reprint to use "the same number/snapshot" |
-| 7 | **Structured collection outcomes** (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **NOT BUILT** | No such control exists anywhere; staff cannot record a result, so the system never creates the next action from one |
-| 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **NOT BUILT** | Depends on #7; the §3 risk sort therefore cannot rank "missed promise" |
+| 7 | Structured collection outcomes (`Customer paid` · `will pay on a date` · `needs help` · `disputes the amount` · `did not answer`) | 3 | **BUILT** | 0446 with probe; `Record the result` on the Invoice object |
+| 8 | **Promise-to-pay and the missed-promise Work sort** | 3 | **PARTIAL** | The promise is recorded with its date and `missedPromise` derives the fact from the ledger; the shared Work FEED's risk sort does not consume it yet — that ranking lives in the Workspace-owned rule registry and is its own slice |
 | 9 | **`Correct allocation`** (before/after, actor, time, reason) | 5 | **NOT BUILT** | No door and no audit shape; a wrong allocation can only be voided |
 | 10 | **Likely-duplicate inspection before privileged continuation** | 5 | **NOT BUILT** | Posting is idempotent per key, but nothing compares customer/amount/date/reference or forces inspection |
 | 11 | Overpayment surfaced as `RM x needs review` | 5·11 | **PARTIAL** | The Reports row and the shared `overpaid` figure exist; the REVIEW action (reallocate/decide) does not |

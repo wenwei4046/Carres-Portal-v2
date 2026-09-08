@@ -14,6 +14,7 @@ import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
+import InvoiceCollectionResult from "./InvoiceCollectionResult";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
@@ -167,6 +168,8 @@ export default function InvoiceRegister() {
   const [asking, setAsking] = useState(false);
   // §16 Online link — the Stripe journey shares the posting door's staff.
   const [linking, setLinking] = useState(false);
+  // §3 (0446) — recording what the customer answered.
+  const [resulting, setResulting] = useState(false);
   // §17 — the Calendar view's business filter; the month always stays visible.
   const [calendarFilter, setCalendarFilter] = useState<"all" | CalendarEntryKind>("all");
   const canRecord = (role === "operation" || role === "principal")
@@ -202,12 +205,12 @@ export default function InvoiceRegister() {
       status={STATUS_MARK[invoice.status] ? <span>{STATUS_MARK[invoice.status]}</span> : undefined}
       navigation={<span className="text-body">{invoice.orders ? `SO-${invoice.orders.so}` : "SO not available"}</span>}
       right={<span className="flex items-center gap-2">
-        {invoice.invoice_no && !recording && !asking && !linking &&
+        {invoice.invoice_no && !recording && !asking && !linking && !resulting &&
           <button className="btn-secondary" disabled={printing}
             onClick={() => void printInvoice(invoice)}>Print</button>}
-        {canRecord && !recording && !asking && !linking &&
+        {canRecord && !recording && !asking && !linking && !resulting &&
           <button className="btn-secondary" onClick={() => setLinking(true)}>Create payment link</button>}
-        {canRecord && !recording && !asking && !linking &&
+        {canRecord && !recording && !asking && !linking && !resulting &&
           <button className="btn-primary" onClick={() => setRecording(true)}>Record payment</button>}
       </span>}
     /> : <ModuleHeader destinationHeader testId="invoices-destination-header" word="Invoices" docTitle="Invoices — Carres" />}
@@ -218,12 +221,15 @@ export default function InvoiceRegister() {
       ? <InvoiceRecordPayment invoice={invoice} rows={rows} onClose={() => setRecording(false)} />
       : linking && canRecord
         ? <InvoicePaymentLink invoice={invoice} rows={rows} onClose={() => setLinking(false)} />
+      : resulting && canAsk
+        ? <InvoiceCollectionResult invoice={invoice} onClose={() => setResulting(false)} />
       : asking && canAsk
         ? <InvoiceAskToPay invoice={invoice} rows={rows}
             tone={invoiceTiming?.kind === "late" ? "chase" : "reminder"}
             onClose={() => setAsking(false)} />
         : <InvoiceObject invoice={invoice} rows={rows} today={today} opts={opts}
             onAsk={canAsk ? () => setAsking(true) : undefined}
+            onResult={canAsk ? () => setResulting(true) : undefined}
             canStorage={role === "operation" || role === "principal"} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
@@ -287,9 +293,11 @@ function Inspect({ row, rows, today, opts, onOpen }: {
 /** One continuous scroll — Money → Goods and Delivery → Storage → What to do
  *  → Invoice → Related Payments → Communication History (payment/MASTER.md
  *  §16; Storage joined with 0436 — a goods-side fact that becomes money). */
-function InvoiceObject({ invoice, rows, today, opts, onAsk, canStorage = false }: {
+function InvoiceObject({ invoice, rows, today, opts, onAsk, onResult, canStorage = false }: {
   invoice: InvoiceRegisterRow; rows: InvoiceRegisterRow[]; today: string; opts: { holidays?: Set<string> };
   onAsk?: () => void;
+  /** §3 — record what the customer answered (0446). */
+  onResult?: () => void;
   /** The posting door's staff may open the §6 storage doors. */
   canStorage?: boolean;
 }) {
@@ -327,11 +335,17 @@ function InvoiceObject({ invoice, rows, today, opts, onAsk, canStorage = false }
         </> : f.timing.kind === "late" ? <>
           <p>{rm(f.money.outstanding)} should have been paid</p>
           <p className="text-label font-normal">Ask the customer to pay · Record the result.</p>
-          {onAsk && <button className="btn-primary mt-2" onClick={onAsk}>Ask the customer to pay</button>}
+          <span className="mt-2 flex flex-wrap gap-2">
+            {onAsk && <button className="btn-primary" onClick={onAsk}>Ask the customer to pay</button>}
+            {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
+          </span>
         </> : <>
           <p>{rm(f.money.outstanding)} needed by {fmtDate(f.timing.dueIso)}</p>
           <p className="text-label font-normal">Ask the customer to pay · Record the result.</p>
-          {onAsk && <button className="btn-primary mt-2" onClick={onAsk}>Ask the customer to pay</button>}
+          <span className="mt-2 flex flex-wrap gap-2">
+            {onAsk && <button className="btn-primary" onClick={onAsk}>Ask the customer to pay</button>}
+            {onResult && <button className="btn-secondary" onClick={onResult}>Record the result</button>}
+          </span>
         </>}
       </Facts>
       <Facts title="Invoice">

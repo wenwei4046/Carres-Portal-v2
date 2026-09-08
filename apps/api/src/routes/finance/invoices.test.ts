@@ -87,6 +87,47 @@ describe("GET /api/finance/invoices", () => {
   });
 });
 
+describe("POST /:id/collection-outcome (§3, 0446)", () => {
+  it("passes the result to the ONE SQL door, invoice scoped to its order", async () => {
+    const rpc = vi.fn(async () => ({ data: { id: "out-1" }, error: null }));
+    const sb = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ maybeSingle: async () => ({ data: { id: INVOICE_ID, order_id: ORDER_ID }, error: null }) })),
+        })),
+      })),
+      rpc,
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(new Request(
+      `http://t/api/finance/invoices/${INVOICE_ID}/collection-outcome`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome: "will_pay_on_date", promisedDate: "2026-09-20", note: "salary" }),
+      }), env);
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("payment_record_collection_outcome", {
+      p_order_id: ORDER_ID,
+      p_outcome: "will_pay_on_date",
+      p_promised_date: "2026-09-20",
+      p_note: "salary",
+      p_invoice_id: INVOICE_ID,
+    });
+  });
+  it("422 refuses an outcome word that is not one of the five, before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request(
+      `http://t/api/finance/invoices/${INVOICE_ID}/collection-outcome`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome: "customer_shouted" }),
+      }), env);
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/finance/invoices/issue", () => {
   function mockOrderLookup(status: string) {
     return {
