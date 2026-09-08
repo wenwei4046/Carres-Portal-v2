@@ -2,30 +2,27 @@ import { describe, expect, it } from "vitest";
 import { orderMoney } from "./order-money";
 import type { InvoiceRegisterRow } from "./payment-invoice-register";
 import { soRemaining } from "./payment-invoice-register";
-import {
-  hasStoragePaperHistory,
-  invoiceStorageSumOf,
-  storageObligation,
-} from "./storage-obligation";
+import { invoiceStorageSumOf, storageObligation } from "./storage-obligation";
 
 /**
- * ONE EXPECTED AMOUNT, FIVE SURFACES (the 2026-09-08 boundary review).
- *
- * The surfaces and the arithmetic each one actually runs:
+ * ONE EXPECTED AMOUNT, FIVE SURFACES (2026-09-08, corrected).
  *
  *   Calendar · Reports · Invoice details   `soRemaining` (goods stores + live
- *                                          ISSUED papers − paid, once)
- *   shared Work · the TS booking gate      `orderMoney` fed by
- *                                          `storageObligation`
- *   the DATABASE Delivery gate (0441)      priced + Σ live issued papers − paid
+ *                                          ISSUED papers + the legacy C9 fee)
+ *   shared Work · the TS booking gate      `orderMoney` ← `storageObligation`
+ *   the DATABASE Delivery gate (0447)      priced + Σ live issued papers
+ *                                          + the KEYED legacy ladder − paid
  *
- * This file pins them against each other on the three shapes that exist, so a
- * later edit to any one of them fails here instead of on a customer's order.
+ * The pure-legacy divergence the review refused to accept is CLOSED here: a
+ * legacy-only order now reads the same on every surface. The one remaining,
+ * deliberate split is 0362's own: the legacy ACCRUAL (a `storage_from` walk
+ * with no keyed figure) stays TS-side, because its date walk and catalog
+ * lookup do not belong in a trigger — pinned by its own case below.
  */
 
 const GOODS = 1000;
 
-function invoice(over: Partial<InvoiceRegisterRow> & { paid: number }): InvoiceRegisterRow {
+function invoice(over: Partial<InvoiceRegisterRow> & { paid: number; legacy?: number }): InvoiceRegisterRow {
   return {
     id: over.id ?? "i1", invoice_no: "INV-1", status: over.status ?? "issued",
     kind: over.kind ?? "sales",
@@ -37,6 +34,7 @@ function invoice(over: Partial<InvoiceRegisterRow> & { paid: number }): InvoiceR
       id: "o1", so: 1319, customer_name: "LIM KUAN YANG",
       status: "proceed_order", paid: over.paid,
       delivery_date: null, delivery_date_tbd: false, delivered_at: null,
+      legacy_storage_owing: over.legacy ?? 0,
       order_lines: [{ qty: 1, unit_price: GOODS }], order_addons: [],
       ops_order_control: [{ balance: null, confirmed_date: null,
         line_etas: null, line_stock_status: null }],
@@ -44,18 +42,16 @@ function invoice(over: Partial<InvoiceRegisterRow> & { paid: number }): InvoiceR
   };
 }
 
-/** The 0441 trigger's arithmetic, mirrored in TS so this file can compare it
- *  with the others. Kept byte-for-byte in shape with the migration:
- *  `greatest(0, priced + storage − paid)`. */
-function databaseGateOwing(paid: number, liveStorageSum: number): number {
-  return Math.max(0, GOODS + liveStorageSum - paid);
+/** The 0447 trigger's arithmetic mirrored in TS so this file can compare it.
+ *  SQL behaviour itself is proven by the rolled-back production probe on the
+ *  real `ops_delivery_orders` door — a TS mirror is never that proof. */
+function databaseGateOwing(paid: number, liveStorageSum: number, keyedLegacy = 0): number {
+  return Math.max(0, GOODS + liveStorageSum - paid) + keyedLegacy;
 }
 
-/** What shared Work and the TS booking gate arrive at. */
 function workAndGate(rows: InvoiceRegisterRow[], paid: number, legacyOwing: number) {
   const storage = storageObligation({
     invoiceStorageSum: invoiceStorageSumOf(rows as never),
-    storagePaperHistory: hasStoragePaperHistory(rows),
     goodsTotal: GOODS,
     paid,
     legacyOwing,
@@ -72,59 +68,67 @@ describe("one expected amount across every surface", () => {
       invoice({ id: "i-sales", kind: "sales", paid }),
       invoice({ id: "i-storage", kind: "storage", amount: 150, tax_amount: 8, paid }),
     ];
-    // goods 1000 + storage 158 − paid 400 = 758
-    const expected = 758;
-    expect(soRemaining(rows, "o1").outstanding).toBe(expected);          // Calendar · Reports · details
-    expect(workAndGate(rows, paid, 0).outstanding).toBe(expected);       // Work · TS gate
-    expect(databaseGateOwing(paid, 158)).toBe(expected);                 // DB gate (0441)
+    const expected = 758;                                   // 1000 + 158 − 400
+    expect(soRemaining(rows, "o1").outstanding).toBe(expected);
+    expect(workAndGate(rows, paid, 0).outstanding).toBe(expected);
+    expect(databaseGateOwing(paid, 158)).toBe(expected);
     expect(workAndGate(rows, paid, 0).storage.unreconciledLegacy).toBe(0);
   });
 
-  it("B · MIXED order: the money figure still agrees everywhere, and the legacy fee is named apart", () => {
+  it("B · MIXED order: both obligations count, each once, on every surface", () => {
     const paid = 1000;                 // goods settled
-    const legacy = 200;                // an un-cased group's fee, old model
+    const legacy = 200;
     const rows = [
-      invoice({ id: "i-sales", kind: "sales", paid }),
-      invoice({ id: "i-storage", kind: "storage", amount: 150, paid }),
+      invoice({ id: "i-sales", kind: "sales", paid, legacy }),
+      invoice({ id: "i-storage", kind: "storage", amount: 150, paid, legacy }),
     ];
-    // The papers say 150 and every surface says 150 — the legacy 200 is not
-    // merged into any of them, and not silently dropped either.
-    expect(soRemaining(rows, "o1").outstanding).toBe(150);
+    const expected = 350;                                   // 150 papers + 200 C9
+    expect(soRemaining(rows, "o1").outstanding).toBe(expected);
     const wg = workAndGate(rows, paid, legacy);
-    expect(wg.outstanding).toBe(150);
-    expect(databaseGateOwing(paid, 150)).toBe(150);
+    expect(wg.outstanding).toBe(expected);
+    expect(databaseGateOwing(paid, 150, legacy)).toBe(expected);
     expect(wg.storage.source).toBe("mixed");
-    expect(wg.storage.unreconciledLegacy).toBe(legacy);                  // said on the Storage section
+    expect(wg.storage.unreconciledLegacy).toBe(legacy);     // named, and INCLUDED
   });
 
-  it("B2 · MIXED order, papers all VOIDED: no surface resurrects the old charge", () => {
+  it("B2 · papers all VOIDED: a correction forgives nothing, and the C9 fee still stands", () => {
     const paid = 1000;
+    const legacy = 200;
     const rows = [
-      invoice({ id: "i-sales", kind: "sales", paid }),
+      invoice({ id: "i-sales", kind: "sales", paid, legacy }),
       invoice({ id: "i-void", kind: "storage", amount: 150, status: "voided",
-        voided_at: "2026-09-08", paid }),
+        voided_at: "2026-09-08", paid, legacy }),
     ];
-    expect(soRemaining(rows, "o1").outstanding).toBe(0);
-    const wg = workAndGate(rows, paid, 200);
-    expect(wg.outstanding).toBe(0);
-    expect(wg.holds).toBe(false);
-    expect(databaseGateOwing(paid, 0)).toBe(0);
-    // Nothing lost: the legacy fee is still named.
-    expect(wg.storage.unreconciledLegacy).toBe(200);
+    // §4: a void is the CORRECTION path. It waives nothing, so the papers ask
+    // nothing until a replacement is ISSUED — and the C9 fee, cleared only by
+    // collection or an override of 0, is still owed on every surface.
+    expect(soRemaining(rows, "o1").outstanding).toBe(legacy);
+    expect(workAndGate(rows, paid, legacy).outstanding).toBe(legacy);
+    expect(databaseGateOwing(paid, 0, legacy)).toBe(legacy);
   });
 
-  it("C · legacy-only order: Work and the TS gate carry C9; the Payment screens and the DB gate do not — the ONE known divergence", () => {
+  it("C · PURE LEGACY order: every surface now agrees — the divergence is closed", () => {
     const paid = 1000;
-    const rows = [invoice({ id: "i-sales", kind: "sales", paid })];  // no storage paper ever
-    const wg = workAndGate(rows, paid, 300);
+    const legacy = 300;
+    const rows = [invoice({ id: "i-sales", kind: "sales", paid, legacy })];
+    expect(soRemaining(rows, "o1").outstanding).toBe(legacy);   // Payment screens
+    const wg = workAndGate(rows, paid, legacy);
+    expect(wg.outstanding).toBe(legacy);                        // Work · TS gate
+    expect(wg.holds).toBe(true);
+    expect(databaseGateOwing(paid, 0, legacy)).toBe(legacy);    // DB gate (0447)
     expect(wg.storage.source).toBe("legacy");
-    expect(wg.outstanding).toBe(300);            // C9 still holds, as shipped
-    expect(soRemaining(rows, "o1").outstanding).toBe(0);   // Payment screens: invoice model only
-    expect(databaseGateOwing(paid, 0)).toBe(0);           // 0441: legacy stays TS-side (0362's Law D split)
-    // Recorded, bounded and measured: production carries ZERO legacy storage
-    // signals (2026-09-08), the go-live database starts clean, and 0445 stops
-    // a case being opened beside an uncollected legacy fee — so an order can
-    // be in exactly one model, and this divergence has no live instance.
+  });
+
+  it("C2 · the ONE deliberate split: a legacy ACCRUAL with no keyed figure stays TS-side", () => {
+    const paid = 1000;
+    const accrual = 150;   // storage_from walked; no override, no imported pair
+    const rows = [invoice({ id: "i-sales", kind: "sales", paid, legacy: accrual })];
+    // Payment screens and Work carry it (both read the shared storageHold)…
+    expect(soRemaining(rows, "o1").outstanding).toBe(accrual);
+    expect(workAndGate(rows, paid, accrual).outstanding).toBe(accrual);
+    // …and the trigger does not, because 0362 deliberately left the date walk
+    // and its catalog lookup out of SQL. That split is recorded law, not drift.
+    expect(databaseGateOwing(paid, 0, 0)).toBe(0);
   });
 
   it("D · a correction in flight changes nothing anywhere — no draft debt", () => {
@@ -138,7 +142,20 @@ describe("one expected amount across every surface", () => {
     ];
     expect(soRemaining(rows, "o1").outstanding).toBe(0);
     expect(workAndGate(rows, paid, 0).outstanding).toBe(0);
-    expect(workAndGate(rows, paid, 0).holds).toBe(false);   // no invented hold
+    expect(workAndGate(rows, paid, 0).holds).toBe(false);
     expect(databaseGateOwing(paid, 0)).toBe(0);
+  });
+
+  it("E · a NEVER-ISSUED draft erases nothing — the legacy fee still stands", () => {
+    const paid = 1000;
+    const legacy = 200;
+    const rows = [
+      invoice({ id: "i-sales", kind: "sales", paid, legacy }),
+      invoice({ id: "i-fresh-draft", kind: "storage", amount: 150, status: "draft",
+        paid, legacy }),
+    ];
+    expect(soRemaining(rows, "o1").outstanding).toBe(legacy);
+    expect(workAndGate(rows, paid, legacy).outstanding).toBe(legacy);
+    expect(databaseGateOwing(paid, 0, legacy)).toBe(legacy);
   });
 });

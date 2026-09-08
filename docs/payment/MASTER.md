@@ -894,6 +894,56 @@ and nothing may be invented or shortened in their place:
 Both block only the dependent customer messages (#20 in the list below); no other delivery
 waits on them.
 
+### CORRECTION — a void is not a waiver, and neither model erases the other, 2026-09-08
+
+The 2026-09-07/08 storage precedence rules were wrong twice, both times in the same
+direction: they let a valid obligation vanish.
+
+1. `a live paper exists` — voiding the last paper fell back to the legacy charge, and a
+   partly-invoiced order hid the un-invoiced group's fee.
+2. `paper history owns the order` — the invoice model then stopped counting the legacy fee
+   at all, and a NEVER-ISSUED draft could take ownership and erase a live obligation.
+
+**Rule (2) rested on something nobody approved: that voiding a paper is a WAIVER.** It is
+not. §4 makes a void the CORRECTION path (void + linked replacement). The approved storage
+waiver is the §7 extra-free decision, which changes the FREE PERIOD before anything is
+charged. And C9's shipped semantics are explicit: `storage_waiver_status = 'approved'`
+RELEASES the hold and leaves the money owed, while the write-off is
+`storage_fee_override = 0` — *"an override must never quietly forgive money"* (Jess,
+2026-07-27). A legacy fee is therefore owed until it is COLLECTED or written off, and
+nothing else clears it.
+
+**THE CORRECTED RULE, inventing nothing.** Each model's obligation stands under its own
+approved rule and they are ADDED, each counted exactly once: live ISSUED papers (netted so
+`orders.paid` subtracts once across goods and storage) PLUS the legacy C9 figure (never
+netted — C9 never read `paid`; its clearing fact is collection). Model ownership is gone, so
+a draft cannot take it and a void cannot forfeit it. `unreconciledLegacy` now names the
+legacy PART OF the figure — it is included in the money, not carried beside it — so an
+operator collapses the state with the approved instruments: collect the fee, or override it
+to 0.
+
+**The pure-legacy divergence is CLOSED, not documented.** The Payment screens carry the
+legacy figure too: the register wire now returns `legacy_storage_owing`, derived server-side
+through the SAME shared `storageHold` the gate and Work use, batched once per page. And the
+database door counts the KEYED legacy ladder (`0447`). One deliberate split remains and it
+is 0362's own recorded law, not drift: the legacy ACCRUAL (a `storage_from` walk with no
+keyed figure) stays TS-side because its day walk and catalog lookup do not belong in a
+trigger — pinned by its own reconciliation case.
+
+**The mixed state is unbirthable from BOTH directions, by any writer.** `0445` refuses a
+case beside an uncollected keyed fee; `0447` adds a BEFORE INSERT OR UPDATE trigger on
+`ops_order_control` refusing to RAISE a storage fee on a case-managed order — a trigger, not
+a route check, so the legacy writers that exist today (the order-control PATCH) and any
+future one are covered. Lowering, clearing to 0 and collecting stay open: they are exactly
+how an operator collapses an unreconciled state.
+
+**Proven against the ACTUAL database gate** (rolled-back production probe, eight controls —
+a TypeScript mirror is never proof of SQL): baseline opens · PURE LEGACY blocks naming
+RM 300.00 · the override-0 write-off opens · a collected fee opens · MIXED blocks naming
+RM 350.00 (each obligation once) · papers VOIDED still block on the RM 200.00 legacy fee
+(a correction forgives nothing) · a never-issued draft erases nothing · the model guard
+refuses raising a legacy fee on a case-managed order while lowering stays open.
+
 ### THE ONE FACTUAL GAP LIST — audited 2026-09-08, whole approved mission
 
 Audit method: every approved capability in §2–§17 was searched for in the repository and,
@@ -939,7 +989,10 @@ exercised on live rows — its verification is probe/test based, as recorded in 
 | 30 | Production VISUAL pass · native 200% zoom · Storage interaction walk | 14 | **BLOCKED — external** | Browser unavailable; both observed failure modes are recorded above |
 
 **Owner decisions open (not engineering choices):**
-- Does an unreconciled legacy storage fee HOLD the delivery, or stay work? (Today: work.)
+- ~~Does an unreconciled legacy storage fee HOLD the delivery?~~ **WITHDRAWN 2026-09-08** —
+  it was never an owner question. Existing authority settles it: a legacy fee is cleared
+  only by collection or an override of 0 (C9), and money in full before delivery is
+  ABSOLUTE (delivery/MASTER.md 2026-09-01). It holds, like any other owed money.
 - The §16 Important Notes wording and the receiving bank account numbers (#20).
 
 **Overall status: PARTIALLY DELIVERED** — nine gaps above are unbuilt or partial approved

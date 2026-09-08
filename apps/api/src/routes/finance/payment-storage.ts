@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
-  hasStoragePaperHistory,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -90,7 +89,6 @@ paymentStorageRouter.get("/", async (c) => {
       const invoiceRows = (invRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
       unreconciledLegacy = storageObligation({
         invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-        storagePaperHistory: hasStoragePaperHistory(invoiceRows),
         goodsTotal:
           (ord.order_lines ?? []).reduce((t, l) => t + price(l), 0) +
           (ord.order_addons ?? []).reduce((t, a) => t + price(a), 0),

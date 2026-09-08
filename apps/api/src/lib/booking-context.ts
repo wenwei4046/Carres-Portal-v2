@@ -1,7 +1,6 @@
 import { HTTPException } from "hono/http-exception";
 import {
   bookingConfirmGate,
-  hasStoragePaperHistory,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -141,9 +140,6 @@ export async function loadBookingContext(
   const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
   const storage = storageObligation({
     invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
-    // 2026-09-08 boundary review: the model switch is paper HISTORY, so a
-    // voided (waived) paper never falls back to the legacy charge.
-    storagePaperHistory: hasStoragePaperHistory(invoiceRows),
     goodsTotal: lineSum + addonSum,
     paid,
     legacyOwing: hold.owing,

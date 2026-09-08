@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { collectionOutcomeInput } from "@carres/shared/payment-collection-outcome";
+import { storageHold } from "@carres/shared";
+import { storageSkuCategories } from "../../lib/sku-categories";
 import {
   GUARANTEE_ENTITLEMENTS,
   GUARANTEE_TERMS,
@@ -71,7 +73,13 @@ const INVOICE_REGISTER_SELECT =
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
   "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
-  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status))";
+  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status,"
+  // The 2026-09-08 correction: the Payment screens must see the LEGACY
+  // C9 storage fee too, or they disagree with Work and the gate on a
+  // pure-legacy order. The columns ride the wire; the shared
+  // `storageHold` turns them into the one figure, server-side below.
+  "storage_from,storage_fee_override,storage_fee_msbf,storage_fee_sof,"
+  "storage_collected_at,storage_waiver_status))";
 
 financeInvoicesRouter.get("/register", async (c) => {
   const auth = c.var.auth;
@@ -91,7 +99,47 @@ financeInvoicesRouter.get("/register", async (c) => {
   if (error || count == null || data == null) {
     throw new HTTPException(500, { message: "Invoices could not be loaded. Try again." });
   }
-  return c.json({ rows: data, total: count });
+  // The legacy C9 storage figure, derived server-side through the SAME shared
+  // `storageHold` the Work engine and the booking gate use (Law D), once per
+  // order for the whole page — the catalog read is batched over every SKU on
+  // it. Attached as a source fact so `soRemaining` can add it without a
+  // second arithmetic anywhere.
+  const rows = data as unknown as Array<Record<string, unknown>>;
+  const allSkus = new Set<string>();
+  for (const r of rows) {
+    const o = r.orders as { order_lines?: Array<{ sku?: string }> } | null;
+    for (const l of o?.order_lines ?? []) if (l.sku) allSkus.add(String(l.sku));
+  }
+  const categories = await storageSkuCategories(sb, [...allSkus]);
+  const today = new Date().toISOString().slice(0, 10);
+  const legacyByOrder = new Map<string, number>();
+  for (const r of rows) {
+    const o = r.orders as {
+      id?: string;
+      order_lines?: Array<{ sku?: string }>;
+      ops_order_control?: Array<Record<string, unknown>> | Record<string, unknown> | null;
+    } | null;
+    if (!o?.id || legacyByOrder.has(o.id)) continue;
+    const raw = o.ops_order_control;
+    const ctrl = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null;
+    if (!ctrl) { legacyByOrder.set(o.id, 0); continue; }
+    legacyByOrder.set(o.id, storageHold({
+      storageFrom: (ctrl.storage_from as string | null) ?? null,
+      override: (ctrl.storage_fee_override as number | string | null) ?? null,
+      importedMsbf: (ctrl.storage_fee_msbf as number | string | null) ?? null,
+      importedSof: (ctrl.storage_fee_sof as number | string | null) ?? null,
+      skus: (o.order_lines ?? []).map((l) => String(l.sku ?? "")),
+      categories,
+      asOf: today,
+      collectedAt: (ctrl.storage_collected_at as string | null) ?? null,
+      waiverStatus: (ctrl.storage_waiver_status as string | null) ?? null,
+    }).owing);
+  }
+  for (const r of rows) {
+    const o = r.orders as { id?: string; legacy_storage_owing?: number } | null;
+    if (o?.id) o.legacy_storage_owing = legacyByOrder.get(o.id) ?? 0;
+  }
+  return c.json({ rows, total: count });
 });
 
 /** The draft door. The invoice asks for the order's money, so the amount is
