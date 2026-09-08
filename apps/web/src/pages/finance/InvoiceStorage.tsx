@@ -61,7 +61,7 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
   correctionInFlight?: boolean;
 }) {
   const qc = useQueryClient();
-  const casesQ = useQuery<{ cases: StorageCaseRow[] }>({
+  const casesQ = useQuery<{ cases: StorageCaseRow[]; unreconciledLegacy?: number }>({
     queryKey: ["finance", "storage-cases", orderId],
     queryFn: () => apiFetch(`/api/finance/payment-storage?orderId=${orderId}`),
   });
@@ -78,6 +78,12 @@ export default function InvoiceStorage({ orderId, canAct, correctionInFlight = f
           onExtend={() => setExtending(c.id)}
           onDone={() => { setExtending(null);
             void qc.invalidateQueries({ queryKey: ["finance", "storage-cases", orderId] }); }} />)}
+        {(casesQ.data?.unreconciledLegacy ?? 0) > 0 &&
+          <p className="text-label font-normal text-base-500"
+            data-testid="storage-unreconciled-legacy">
+            This order also carries {rm(casesQ.data!.unreconciledLegacy!)} of storage fee from
+            the old records, which no Storage Invoice covers. Collect it, or set the storage
+            fee to 0 in the order, so the two do not disagree.</p>}
         {correctionInFlight && <p className="text-label font-normal text-base-500"
           data-testid="storage-correction-note">
           A Storage Invoice correction is in progress — the replacement is a draft and asks

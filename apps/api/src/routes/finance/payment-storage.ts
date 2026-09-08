@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
+import {
+  hasStoragePaperHistory,
+  invoiceStorageSumOf,
+  storageHold,
+  storageObligation,
+} from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
+import { storageSkuCategories } from "../../lib/sku-categories";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -41,7 +48,59 @@ paymentStorageRouter.get("/", async (c) => {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
   }
-  return c.json({ cases: data ?? [] });
+  // 2026-09-08 boundary review — an order under the invoice model may still
+  // carry a LEGACY C9 storage fee that no paper represents. The readers never
+  // merge it into the paper figure and never let a voided paper fall back to
+  // it, so it would otherwise be invisible on every screen: this endpoint
+  // reports it, through the SAME shared composition the gate and Work use, so
+  // the Storage section can say the honest sentence. Asked only for a single
+  // order (the Storage section's own read).
+  let unreconciledLegacy = 0;
+  if (orderId) {
+    const [ctrlRes, orderRes, invRes] = await Promise.all([
+      sb.from("ops_order_control")
+        .select("storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_collected_at, storage_waiver_status")
+        .eq("order_id", orderId).maybeSingle(),
+      sb.from("orders").select("paid, order_lines(sku, qty, unit_price), order_addons(qty, unit_price)")
+        .eq("id", orderId).maybeSingle(),
+      sb.from("invoices").select("kind, status, amount, tax_amount, voided_at")
+        .eq("order_id", orderId),
+    ]);
+    const ctrl = (ctrlRes.data ?? null) as Record<string, unknown> | null;
+    const ord = (orderRes.data ?? null) as {
+      paid?: number | string | null;
+      order_lines?: Array<{ sku: string; qty: number; unit_price: number | string | null }>;
+      order_addons?: Array<{ qty: number; unit_price: number | string | null }>;
+    } | null;
+    if (ctrl && ord) {
+      const skus = (ord.order_lines ?? []).map((l) => String(l.sku));
+      const hold = storageHold({
+        storageFrom: (ctrl.storage_from as string | null) ?? null,
+        override: (ctrl.storage_fee_override as number | string | null) ?? null,
+        importedMsbf: (ctrl.storage_fee_msbf as number | string | null) ?? null,
+        importedSof: (ctrl.storage_fee_sof as number | string | null) ?? null,
+        skus,
+        categories: await storageSkuCategories(sb, skus),
+        asOf: new Date().toISOString().slice(0, 10),
+        collectedAt: (ctrl.storage_collected_at as string | null) ?? null,
+        waiverStatus: (ctrl.storage_waiver_status as string | null) ?? null,
+      });
+      const price = (x: { qty: number; unit_price?: number | string | null }) =>
+        Number(x.unit_price ?? 0) * Number(x.qty ?? 0);
+      const invoiceRows = (invRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
+      unreconciledLegacy = storageObligation({
+        invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
+        storagePaperHistory: hasStoragePaperHistory(invoiceRows),
+        goodsTotal:
+          (ord.order_lines ?? []).reduce((t, l) => t + price(l), 0) +
+          (ord.order_addons ?? []).reduce((t, a) => t + price(a), 0),
+        paid: ord.paid ?? null,
+        legacyOwing: hold.owing,
+        legacyReleased: hold.released,
+      }).unreconciledLegacy;
+    }
+  }
+  return c.json({ cases: data ?? [], unreconciledLegacy });
 });
 
 const startInput = z.object({

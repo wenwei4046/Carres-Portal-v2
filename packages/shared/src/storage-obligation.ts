@@ -3,14 +3,44 @@
  * money gate (payment/MASTER.md §2 · §7 · the 2026-09-07 gate-convergence
  * slice), so the gate and Payment's own readers cannot disagree.
  *
- * TWO SOURCES EXIST TODAY, and this composer is their one precedence law:
+ * TWO SOURCES EXIST TODAY, and this composer is their one precedence law.
  *
- *   INVOICE-BACKED (0436/0438) — the SO's live ISSUED storage-kind papers.
- *     When ANY exist, they ARE the storage obligation: the §2 model
- *     (`issued live invoice obligations − allocated money`) wins over the
- *     keyed legacy figure, the same shape as priced-lines-beat-keyed-balance
- *     in `orderMoney`. An SO carrying BOTH a keyed legacy fee and storage
- *     papers speaks the papers — never both, never a double count.
+ * ⛔ PRECEDENCE IS KEYED ON THE ORDER BEING UNDER THE INVOICE MODEL, NOT ON A
+ * LIVE PAPER EXISTING RIGHT NOW (2026-09-08 boundary review). The first shape
+ * of this rule asked `invoiceStorageSum > 0`, and it had two defects the
+ * review named and these tests now pin:
+ *
+ *   (a) VOIDING THE LAST PAPER RESURRECTED THE OLD C9 CHARGE. A void is the
+ *       §12 waiver/correction path; falling back to the legacy figure made a
+ *       waived obligation come back from the dead.
+ *   (b) A MIXED ORDER HID MONEY. One product group invoiced while another
+ *       still sat in the legacy columns meant the papers silently spoke for
+ *       the whole order and the un-cased group's fee vanished.
+ *
+ *   INVOICE-BACKED (0436/0438) — the SO has storage-paper HISTORY (any
+ *     storage-kind invoice ever, voided ones included). That order is under
+ *     the invoice model: its storage obligation is the LIVE ISSUED papers,
+ *     and zero live papers means ZERO — never a fallback to C9.
+ *
+ *   LEGACY C9 (`storageHold` over ops_order_control) — an order with NO
+ *     storage-paper history keeps the shipped 2026-07-27 ruling, byte for
+ *     byte: `collected_at` clears it, the override ladder holds, the
+ *     date-walked accrual is untouched.
+ *
+ *   MIXED (both) — the two models cannot be reconciled by arithmetic: the
+ *     legacy columns are ONE per-order figure with no group breakdown, so
+ *     nothing can say whether a keyed fee is the same debt as a paper or a
+ *     different group's. This composer therefore does NOT guess. The invoice
+ *     model DECIDES the money — the waiver ruling is explicit, and (a) forces
+ *     the zero-paper and one-paper answers to agree — while the legacy figure
+ *     is carried out as `unreconciledLegacy`: said on screen, raised as work
+ *     to resolve, never merged into a paper figure and never silently
+ *     dropped. It does not invent a second delivery hold. The state is also
+ *     made unbirthable going forward: `payment_storage_start` refuses to open
+ *     a case while an uncollected legacy fee stands (0442). ⛔ WHETHER AN
+ *     UNRECONCILED LEGACY FEE SHOULD ALSO HOLD THE DELIVERY IS AN OWNER
+ *     DECISION, recorded as open in payment/MASTER.md — today it is work, not
+ *     a hold.
  *
  *   LEGACY C9 (`storageHold` over ops_order_control) — the shipped 2026-07-27
  *     ruling's columns. It remains the fallback for an SO with NO storage
@@ -42,6 +72,10 @@
 export interface StorageObligationInput {
   /** Σ live ISSUED storage-kind invoices (amount + tax) — §2 exactly. */
   invoiceStorageSum: number;
+  /** The SO has storage-paper HISTORY — any storage-kind invoice ever, a
+   *  voided one included. THIS, not a live sum, decides the model: a waived
+   *  (voided) paper must never fall back to the legacy charge. */
+  storagePaperHistory: boolean;
   /** The order's goods value (lines + addons), when priced. */
   goodsTotal: number | null;
   /** `orders.paid`. */
@@ -60,7 +94,11 @@ export interface StorageObligationResult {
    *  legacy fee) — the figure a message quotes before payments. */
   gross: number;
   released: boolean;
-  source: "invoices" | "legacy" | "none";
+  source: "invoices" | "legacy" | "mixed" | "none";
+  /** A legacy C9 fee standing on an order that is ALSO under the invoice
+   *  model — carried, never dropped, never merged into the paper figure.
+   *  Zero on every ordinary order. A screen showing this says so. */
+  unreconciledLegacy: number;
 }
 
 function n(v: number | string | null | undefined): number {
@@ -71,31 +109,65 @@ function n(v: number | string | null | undefined): number {
 
 export function storageObligation({
   invoiceStorageSum,
+  storagePaperHistory,
   goodsTotal,
   paid,
   legacyOwing,
   legacyReleased,
 }: StorageObligationInput): StorageObligationResult {
   const storage = Math.max(0, n(invoiceStorageSum));
-  if (storage > 0) {
-    const goods = Math.max(0, n(goodsTotal));
-    const paidNum = Math.max(0, n(paid));
-    const totalOut = Math.max(0, goods + storage - paidNum);
-    const goodsOut = Math.max(0, goods - paidNum);
+  const legacy = Math.max(0, n(legacyOwing));
+
+  if (!storagePaperHistory) {
+    // Never brought into the invoice model — the shipped C9 answer, untouched.
     return {
-      owing: totalOut - goodsOut,
+      owing: legacy,
+      gross: legacy,
+      released: legacyReleased,
+      source: legacy > 0 ? "legacy" : "none",
+      unreconciledLegacy: 0,
+    };
+  }
+
+  // Under the invoice model. The papers net against `orders.paid` ONCE: goods
+  // are covered first, the remainder of the payment falls on storage.
+  const goods = Math.max(0, n(goodsTotal));
+  const paidNum = Math.max(0, n(paid));
+  const nettedStorage =
+    Math.max(0, goods + storage - paidNum) - Math.max(0, goods - paidNum);
+
+  if (legacy === 0) {
+    return {
+      owing: nettedStorage,
       gross: storage,
       released: legacyReleased,
       source: "invoices",
+      unreconciledLegacy: 0,
     };
   }
-  const legacy = Math.max(0, n(legacyOwing));
+  // MIXED — the invoice model DECIDES the money (the waiver ruling is
+  // explicit: a voided paper must not resurrect an old charge, and that must
+  // read the same whether zero or one paper survives). The legacy figure is
+  // neither merged nor dropped: it is carried out as `unreconciledLegacy`,
+  // said on screen, and raised as WORK to resolve. It does not invent a
+  // second delivery hold.
   return {
-    owing: legacy,
-    gross: legacy,
+    owing: nettedStorage,
+    gross: storage,
     released: legacyReleased,
-    source: legacy > 0 ? "legacy" : "none",
+    source: "mixed",
+    unreconciledLegacy: legacy,
   };
+}
+
+/** Does this order have storage-paper HISTORY — any storage-kind invoice
+ *  ever, voided ones included? The model switch, spelled once for every
+ *  feeder: an order with history is under the invoice model forever, so a
+ *  waived (voided) paper can never fall back to the legacy charge. */
+export function hasStoragePaperHistory(
+  invoices: Array<{ kind: string }> | null | undefined,
+): boolean {
+  return (invoices ?? []).some((i) => i.kind !== "sales");
 }
 
 /** Σ live ISSUED storage-kind invoices (amount + tax) from a raw invoices

@@ -17,6 +17,7 @@ import {
   orderActionsInDisplayOrder,
   receivingWorkItems,
   salesOrderActionSignalsFromFacts,
+  hasStoragePaperHistory,
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
@@ -119,6 +120,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** Gate convergence (2026-09-07): Σ live ISSUED storage papers per order —
    *  the canonical §2 storage obligation. Absent ⇒ legacy C9 only. */
   invoiceStorageByOrder?: ReadonlyMap<string, number>;
+  /** 2026-09-08 boundary review: the orders under the invoice model (any
+   *  storage paper EVER, voided included) — so a waived paper never falls
+   *  back to the legacy charge. */
+  storagePaperHistoryOrders?: ReadonlySet<string>;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -153,6 +158,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
     // `storageObligation` precedence law the Delivery gate reads too.
     const storage = storageObligation({
       invoiceStorageSum: input.invoiceStorageByOrder?.get(row.id) ?? 0,
+      storagePaperHistory: input.storagePaperHistoryOrders?.has(row.id) ?? false,
       goodsTotal: lineTotal == null || addonTotal == null ? null : lineTotal + addonTotal,
       paid: row.paid ?? null,
       legacyOwing: hold.owing,
@@ -817,12 +823,12 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   // Gate convergence (2026-09-07): the same invoices read that feeds the
   // collection work also answers the §2 storage obligation per order.
   const invoiceStorageByOrder = new Map<string, number>();
+  const storagePaperHistoryOrders = new Set<string>();
   for (const inv of invoices) {
     if (!invoiceStorageByOrder.has(inv.order_id)) {
-      invoiceStorageByOrder.set(
-        inv.order_id,
-        invoiceStorageSumOf(invoices.filter((i) => i.order_id === inv.order_id)),
-      );
+      const mine = invoices.filter((i) => i.order_id === inv.order_id);
+      invoiceStorageByOrder.set(inv.order_id, invoiceStorageSumOf(mine));
+      if (hasStoragePaperHistory(mine)) storagePaperHistoryOrders.add(inv.order_id);
     }
   }
   const orderItems = projectSalesOrdersFromModuleFacts({
@@ -833,6 +839,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
+    storagePaperHistoryOrders,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),
