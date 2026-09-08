@@ -194,10 +194,11 @@ describe("rail sections combine; one selection applies within a section (Card §
 });
 
 describe("search finds a Unit the way an operator looks for one (Card §4)", () => {
-  const u = unit({ unitCode: "id-hgt591896", sku: "Essential Memory Pillow(L)", poNo: "PO/2508-116", reservedRef: "SO-1319", supplier: "Ohana" });
+  const u = unit({ unitCode: "id-hgt591896", productName: "Dream · King", sku: "Essential Memory Pillow(L)", poNo: "PO/2508-116", reservedRef: "SO-1319", supplier: "Ohana" });
   it.each([
     ["unit id", "id-hgt591896"],
     ["product", "memory pillow"],
+    ["product name", "dream"],
     ["source PO", "2508-116"],
     ["sales order", "SO-1319"],
     ["supplier", "ohana"],

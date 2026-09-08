@@ -1813,9 +1813,20 @@ relocate — replenishment to Purchasing/Settings under this Blueprint, the hist
 History/Inventory. Those relocations join the `OperationStockOnHand` debt above as the named
 next scopes. Production proof rides the PR's deploy record.
 
-### 13.6 · BUILT — Inventory works and tells the truth (CARD 02, PR #TBD)
+### 13.6 · Inventory source restored; expanded Register in PR #1149
 
-`CARD-2026-09-03-warehouse-02-inventory` closed three measured P0s. **The register API had
+**Production correction, 2026-09-07:** the missing-name defect was confirmed against
+the live 0373 view. After owner BUILD/apply approval, the exact committed
+`0417_the_register_names_the_site_and_the_holder` passed a rollback rehearsal and
+was applied transactionally with tracker version `20260907112136`. Stored source
+SHA-256 matches the repository. Post-apply assertions preserve all 221 authority
+rows, 221 Site names, 1 holder name, caller security and SELECT-only grants.
+Authenticated Inventory now loads 181 current records and 40 history records.
+See [WAREHOUSE — INVENTORY](../cards/CARD-2026-09-07-warehouse-inventory-production-defect.md)
+for the full evidence. The expanded 240px Register with saved views and source
+facts is in PR #1149, which records final CI and production deployment evidence.
+
+`CARD-2026-09-03-warehouse-02-inventory` supplied fixes for three measured P0s. **The register API had
 answered 500 since birth**: the route selected `site_name`/`holder_name` from
 `stock_unit_register_v` and no migration ever gave the view either column — the route merged
 2026-08-21, its migration never landed (the inverse of red line 7). **0417** adds the two
@@ -1825,8 +1836,8 @@ route-gate test that only mounting the app can provide. **Every Warehouse surfac
 rows**: the register, both de-navigated legacy pages and Unit Detail draw their own Destination
 Header and none suppressed the slim global bar; all four do now, with a dashboard control test.
 The rail group and column that said `Attention` say **`Needs checking`** (§2's rejected-word
-list, applied). Column/rail re-architecture to §12.1's defaults remains the next Inventory
-slice, deliberately.
+list, applied). PR #1149 implements the current Inventory rail and source-column
+slice. Counts/Adjustments and unsourced Work are not claimed as built by this page.
 
 ### 13.7 · BUILT — Dashboard Calendar → exact-Unit Outbound handover (CARD 03, 0424)
 
