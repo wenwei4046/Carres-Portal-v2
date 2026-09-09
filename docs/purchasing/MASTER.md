@@ -1069,8 +1069,15 @@ keeps feeding the rail and Work Engine; structured actions keep feeding central 
   `Not recorded` — the same word the Purchase Orders register already uses for the same fact, so
   one PO can never be described differently by two columns. An unknown original is never
   back-filled from today's planning date. **A BLANK cell keeps its own separate meaning: nothing
-  has been ordered.** Live at the time of the change: 62 non-cancelled POs, 41 with an original on
-  file, 21 unknown.
+  has been ordered.**
+
+  **Measured on the production walk, 2026-09-09:** 62 non-cancelled POs — 41 carry an original,
+  21 do not. **None of those 21 has `po_line_sources` lineage to a Sales Order**, so none of them
+  can reach this Register at all: the SO Batch column showed 26 rows of real dates and no
+  `Not recorded`. The word is live and correct on **Purchase Orders**, which does list them. The
+  guard is kept because it is the only thing standing between a future unevidenced original and a
+  cell that would silently read as *nothing ordered* — but it is currently unreachable here, and
+  this MASTER does not claim otherwise.
 - **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
   `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
 - **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
