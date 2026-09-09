@@ -2795,6 +2795,40 @@ describe("GET /api/operation/orders/:id/commitment", () => {
 });
 
 describe("GET /api/operation/orders/:id/expansion", () => {
+  it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const from = vi.fn((table: string) => ({
+      select: vi.fn((columns: string) => {
+        let data: unknown = [];
+        if (table === "orders") data = { so: 1340 };
+        if (table === "order_lines") data = [
+          { id: "line-1", sku: "H1401F-K", qty: 1 },
+          { id: "line-2", sku: "H1401F-K", qty: 1 },
+        ];
+        if (table === "po_line_sources") data = columns.includes("order_id") && shared
+          ? [source, { ...source, order_id: "other-order", order_line_id: "other-line" }] : [source];
+        if (table === "ops_stock_items" && columns.includes("po_line_id")) data = [{ unit_code: "U1-000-070", po_line_id: "pol-1" }];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        return chain;
+      }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[] }>; place: unknown[] };
+    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070"]);
+    expect(body.lines[1].unitIds).toEqual([]);
+    // Incoming goods are not reported as physical allocated stock for Delivery.
+    expect(body.place).toEqual([]);
+  });
+
   it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
     const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
     const rows: Record<string, unknown> = {

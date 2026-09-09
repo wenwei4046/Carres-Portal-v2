@@ -424,8 +424,18 @@ describe("one permanent row per proceeded Sales Order", () => {
   });
 
   it("many POs, suppliers, destinations and dates summarise deterministically", () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { width: this.tagName === "SPAN" ? (this.textContent?.length ?? 0) * 8 : 200,
+        height: 24, top: 0, left: 0, right: 200, bottom: 24, x: 0, y: 0, toJSON() {} };
+    });
     renderRegister();
-    expect(screen.getByTestId("so-batch-po-many-o5").textContent).toBe("2 POs");
+    bounds.mockRestore();
+    expect(screen.getByTestId("so-batch-po-many-o5")).toHaveTextContent("PO-20260820-1111");
+    const more = screen.getByRole("button", { name: "+1 more" });
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("2 suppliers");
     expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe("Multiple");
     expect(screen.getByTestId("so-batch-po-date-o5").textContent).toBe("Multiple");
@@ -1121,6 +1131,27 @@ describe("the expansion — the ONE shared child table", () => {
     const src = source();
     expect(src).toContain('from "../components/GoodsMiniTable"');
     expect(src).not.toContain("<table");
+  });
+
+  it("does not call pending Unit IDs unallocated", async () => {
+    apiFetch.mockImplementationOnce(() => new Promise(() => {}));
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
+    const box = await screen.findByTestId("so-batch-inspector-o6");
+    expect(within(box).getByText("Loading…")).toBeInTheDocument();
+    expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
+  });
+
+  it("offers retry when Unit IDs fail to load", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("Unavailable"));
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
+    const retry = await screen.findByRole("button", { name: "Unit IDs could not be loaded. Try again" });
+    apiFetch.mockResolvedValueOnce({ defaultDeliverTo: null, place: [], lines: [
+      { lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-070"], deliverTo: [] },
+    ] });
+    fireEvent.click(retry);
+    expect(await screen.findByText("U1-000-070")).toBeInTheDocument();
   });
 });
 
