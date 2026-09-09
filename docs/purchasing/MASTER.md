@@ -558,11 +558,16 @@ no demand movement, no orphan Unit. Both governed entrances — SO Batch Purchas
 Purchase — reach the one authority (`purchasing_issue_pos_batch` → `_operation_create_po_inner`).
 `unit_id_series` is ONE row, locked `FOR UPDATE` while allocating, so two issues cannot mint one
 Unit ID; it is a table rather than a sequence because a sequence cannot roll `U1-999-999` into
-`U2-000-001`. **`allocate_unit_id()` and `gen_unit_code()` are revoked from every client role**;
-only the SECURITY DEFINER PO authority allocates. `normalise_unit_id()` makes `U1-000-001`,
-`U1-000001` and `U1000001` the same Unit for search and scan. The destination never voids or
-mints a Unit (0443 replaced the 0366 trigger that did). **Existing Unit IDs are never recoded,
-deleted, reused or renumbered.** A revision that grows an exact-unit line allocates only the
+`U2-000-001`. **`allocate_unit_id()` is revoked from every client role** and only the SECURITY
+DEFINER PO authority allocates. **`gen_unit_code()`, which minted the legacy `id-abc123456` shape,
+is DROPPED (0453)** — that shape has no producer left anywhere in the database, and a BEFORE INSERT
+trigger holds every new row to the shape its scope earns: an exact unit wears `U1-000-001`, counted
+goods wear the `QTY-000000001` technical key `gen_quantity_key()` mints. Search and scan normalise
+case and every separator, so `U1-000-001`, `U1-000001` and `u1000001` are the same Unit; **display
+and printing never normalise and never rewrite — the stored identity is what reaches paper.** The
+destination never voids or mints a Unit (0443 replaced the 0366 trigger that did). **Existing Unit
+IDs are never recoded, deleted, reused or renumbered** — including the 140 grandfathered `id-`
+codes, which remain valid, readable and fully movable because they are on real labels. A revision that grows an exact-unit line allocates only the
 additional Units; a reduction retires the surplus not-yet-received Units (`voided`, newest first)
 and a cancellation retires them all — retired IDs stay in the ledger forever.
 

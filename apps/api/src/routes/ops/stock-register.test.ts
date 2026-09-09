@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { authMiddleware, _setJwksForTesting } from "../../middleware/auth";
 import stockRouter from "./stock";
 import type { AppEnv } from "../../types";
-import { migration, stockRegisterDatabase, verifyInventorySql } from "../../test/stock-register-database";
+import { migration, statementOf, stockRegisterDatabase, verifyInventorySql } from "../../test/stock-register-database";
 
 /**
  * GET /api/ops/stock/register — the Stock Register's read surface.
@@ -140,6 +140,13 @@ function buildSb(opts: SbOpts = {}) {
       eqs.push({ col, val });
       return c;
     };
+    // 0453 — the Unit lookup is case/punctuation tolerant on INPUT, so it
+    // matches with ilike. Recorded the same way, so the assertions still see
+    // exactly which column was interrogated with what.
+    c.ilike = (col: string, val: unknown) => {
+      eqs.push({ col, val });
+      return c;
+    };
     c.order = (col: string, o?: { ascending?: boolean }) => {
       orders.push({ col, asc: o?.ascending !== false });
       return c;
@@ -178,7 +185,7 @@ describe("GET /register — the one current listing", () => {
       from(table: string) {
         tables.push(table);
         let projection = "*";
-        let filter: { column: string; value: unknown } | undefined;
+        let filter: { column: string; value: unknown; op?: "ilike" } | undefined;
         let order = "";
         let values: unknown[] = [];
         let inColumn = "";
@@ -188,7 +195,9 @@ describe("GET /register — the one current listing", () => {
               ? "sku, variant, (select json_build_object('name',name) from product_models where id=product_skus.model_id) as product_models"
               : projection;
             if (table === "product_skus") expect(projection).toBe("sku, variant, product_models(name)");
-            const where = filter ? ` where ${filter.column} = $1` : values.length ? ` where ${inColumn} = any($1)` : "";
+            const where = filter
+              ? ` where ${filter.column} ${filter.op === "ilike" ? "ilike" : "="} $1`
+              : values.length ? ` where ${inColumn} = any($1)` : "";
             const result = await db.query(`select ${columns} from public.${table}${where}${order}`, filter ? [filter.value] : values.length ? [values] : []);
             return { data: single ? result.rows[0] ?? null : result.rows, error: null };
           } catch (error) {
@@ -199,6 +208,9 @@ describe("GET /register — the one current listing", () => {
           select(columns: string) { projection = columns; return chain; },
           in(column: string, list: unknown[]) { expect(["sku", "id"]).toContain(column); inColumn = column; values = list; return chain; },
           eq(column: string, value: unknown) { filter = { column, value }; return chain; },
+          // 0453 — the Unit lookup matches case-insensitively, so the contract
+          // test must execute the real `ilike` against real PostgreSQL.
+          ilike(column: string, value: unknown) { filter = { column, value, op: "ilike" }; return chain; },
           order(column: string, options?: { ascending?: boolean }) { order = ` order by ${column} ${options?.ascending === false ? "desc" : "asc"}`; return chain; },
           limit() { return chain; },
           maybeSingle() { return execute(true); },
@@ -218,6 +230,11 @@ describe("GET /register — the one current listing", () => {
         expect(await broken.json()).toMatchObject({ message: expect.stringContaining('site_name') });
       }
       await db.exec(migration("0417_the_register_names_the_site_and_the_holder"));
+      // 0453 · the register must expose identity_scope, or no surface can tell
+      // an identity from a counted row's technical key. Real committed SQL.
+      const correction = migration("0453_a_quantity_row_is_keyed_not_identified");
+      await db.exec(statementOf(correction, "create or replace view public.stock_unit_availability_v", "FROM ops_stock_items i;"));
+      await db.exec(statementOf(correction, "create or replace view public.stock_unit_register_v", "LIMIT 1) e ON true;"));
       await db.exec(verifyInventorySql);
       const response = await app.request("/api/ops/stock/register", { headers }, env);
       expect(response.status).toBe(200);
@@ -360,5 +377,68 @@ describe("GET /register/:unitCode — one exact Unit", () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+
+  // ── 0453 · the Unit ID correction ────────────────────────────────────────
+
+  it("finds the Unit when the scanner dropped the hyphens", async () => {
+    const { sb, eqs } = buildSb({ single: viewRow({ unit_code: "U1-000-082" }) });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/u1000082",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(200);
+    // it tried what was typed, and then the canonical spelling of it
+    expect(eqs.some((e) => e.col === "unit_code" && e.val === "u1000082")).toBe(true);
+    // and what comes BACK is the stored identity, untouched by the search
+    const body = (await res.json()) as { unit: { unitCode: string } };
+    expect(body.unit.unitCode).toBe("U1-000-082");
+  });
+
+  it("refuses to resolve COUNTED GOODS — a technical key is not a Unit", async () => {
+    const { sb } = buildSb({
+      single: viewRow({ unit_code: "QTY-000000001", identity_scope: "quantity" }),
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/QTY-000000001",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    // Nothing was ever printed, so nothing can be scanned.
+    expect(res.status).toBe(404);
+  });
+
+  it("does not let a wildcard in the URL become a match-everything read", async () => {
+    const { sb, eqs } = buildSb({ single: null });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/%25",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    expect(res.status).toBe(404);
+    // the `%` reached the driver escaped, not as a wildcard
+    const asked = eqs.filter((e) => e.col === "unit_code").map((e) => e.val);
+    expect(asked).toContain("\\%");
+    expect(asked).not.toContain("%");
+  });
+
+  it("reports the scope, so no screen has to guess what the row is", async () => {
+    const { sb } = buildSb({ single: viewRow({ identity_scope: "unit" }) });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+
+    const res = await app.request(
+      "/api/ops/stock/register/id-aaa111111",
+      { headers: { Authorization: `Bearer ${await makeJwt("operation")}` } },
+      env,
+    );
+    const body = (await res.json()) as { unit: { identityScope: string } };
+    expect(body.unit.identityScope).toBe("unit");
   });
 });

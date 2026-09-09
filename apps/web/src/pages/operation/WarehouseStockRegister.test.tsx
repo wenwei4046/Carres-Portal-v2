@@ -22,6 +22,7 @@ vi.mock("@/lib/api", async () => {
 
 function unit(p: Partial<StockRegisterUnit> & { id: string; unitCode: string }): StockRegisterUnit {
   return {
+    identityScope: "unit",
     sku: "BF03-Jager-K",
     category: "bedframe",
     warehouseId: "wh-klang",

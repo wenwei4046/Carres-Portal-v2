@@ -289,3 +289,119 @@ Forward-only. No committed migration was altered. Apply **in this order, one at 
 
 0444's own preflight is the guard: if 0443 has not run, or did not make every open exact-unit
 line whole, 0444 stops rather than remove the fallback something still depends on.
+
+---
+
+# 【PURCHASING】 — CARD 【10】 · SECOND PASS · THE UNIT ID CORRECTION
+
+Reported 2026-09-09: operators still see lowercase Unit IDs — `id-aam135002`, twelve characters,
+nine of them after the `id-` — where the approved identity is `U1-000-001`.
+
+Status: BUILT · tests green · rolled-back production probe PASSED · **the apply awaits the Owner**
+Migration: `0453_a_quantity_row_is_keyed_not_identified.sql` (one file, forward-only)
+Lane: BUILD / DELIVERY · continues this Card rather than opening a second one
+
+**The first pass was not wrong, it was incomplete.** It closed the PURCHASE ORDER birth, which is
+what it set out to do. It did not close the other four doors into the same column, and this pass
+is measured against production rather than against that intent.
+
+---
+
+## 10 · What is actually in production, measured 2026-09-09
+
+```
+222 register codes   ·   82 approved U…   ·   140 legacy id-…
+```
+
+The 140 break down as **84** opening-stock imports (2026-07-11), **51** PO mints from before 0443
+sitting on 41 lines, and **5** counted bulk rows.
+
+**No identity was substituted, and the evidence is arithmetic.** `unit_id_series.last_number` is
+**82** and exactly **82** `U…` codes exist, each bound to a live row, with **zero** orphans in
+`stock_unit_ids`. Not one `U…` was ever allocated and lost. 0443's preflight had already restored
+the 39 the destination trigger voided. So there is no original identity to restore, nothing to
+renumber, and no identity chain to repair — the 140 are goods that never had a `U…` at all.
+
+## 11 · The four doors, and the fifth defect they caused
+
+| # | 🔴 Door | Evidence | Closed by |
+|---|---|---|---|
+| 1 | `ops_stock_items.unit_code` **DEFAULT `gen_unit_code()`** — any insert omitting the column silently minted a lowercase code | `pg_attrdef` on the live column | the DEFAULT is dropped; omission now fails loudly |
+| 2 | **`ops_stock_book_in_units` named no `unit_code` at all** and let that DEFAULT name it. The governed stock-import door, reachable at `POST /api/ops/stock/import` — **this is the door still producing `id-…` for EXACT units** | the live function body | it allocates a real `U…` for one piece, a `QTY-` key for many |
+| 3 | **Receiving still minted for counted rows** — three sites in `operation_receive_po_with_do`, one in `receiving_amend`. 0444 removed the shortfall mint that invented an *identity*; it left the bulk-row mints | the live function bodies | all four move to `gen_quantity_key()` |
+| 4 | **The CHECK still blessed the legacy shape** for any row, forever (0416) | `ops_stock_items_unit_code_format` | a BEFORE INSERT trigger holds new rows to their scope's shape |
+| 5 | **Nothing downstream could tell an identity from a key.** `stock_unit_register_v` never exposed `identity_scope`, so every screen printed `unit_code` under a `Unit ID` heading — including **5 counted rows covering 893 pieces** | the live view definition | both views expose it, and one shared resolver decides |
+
+**The rule, stated once:** a quantity row is **KEYED**, an exact unit is **IDENTIFIED**. They stop
+sharing a shape, so nothing can print one as the other. `gen_unit_code()` is **dropped** — the
+`id-` shape has no producer left anywhere in the database.
+
+## 12 · One resolver, and every surface asks it
+
+`packages/shared/src/unit-identity.ts` — `unitIdOf()` returns the stored identity or **`null`**.
+Counted goods get `null` every time, on every surface, and `null` prints `—`.
+
+- **Display and printing preserve the stored value exactly.** `U1-000-001` prints `U1-000-001`; a
+  grandfathered `id-abc123456` prints `id-abc123456`, because that is what the label says.
+- **Search accepts variation on INPUT only** — case and every separator are stripped for
+  comparison, so `u1000001`, `U1 000 001` and `U1-000-001` all find the same Unit. The `/register/:unitCode`
+  door also tries the canonical spelling, and **refuses to resolve a counted row**: nothing was
+  ever printed, so nothing can be scanned.
+- 🔴 **`DeliveryResultAction` was rendering `unit.unitCode ?? unit.id` — a raw UUID** beside the
+  operator's tick box whenever a line had no Unit ID. Counted goods are now named by their product.
+
+Corrected surfaces: Stock Register (display · search · **export** · row-open) · Stock On-Hand
+search · Ops Stock list · Warehouse Unit detail door · Delivery Order projections and the DO PDF ·
+Delivery Result.
+
+## 13 · Historical IDs — the recommendation, and why nothing is rewritten
+
+**RECOMMENDATION: keep all 140 exactly as they are. Do not uppercase, renumber, delete or
+replace one.** They are printed on labels in the warehouse and on supplier PDFs already sent;
+rewriting them destroys the only link between the paper and the record, and buys nothing —
+Constitution §6 says every one of these rows is test data that go-live discards.
+
+`0453` therefore contains **no `UPDATE`, no `DELETE`, no `TRUNCATE`** at migration time, the
+CHECK keeps grandfathering the `id-` shape, and the trigger fires **on INSERT only** so those rows
+stay fully movable, reservable and deliverable. A test asserts each of these.
+
+**Falsifier:** if a legacy `id-` code is found on a Unit whose PO document prints a *different*
+`U…` code, that Unit was substituted and this recommendation is wrong for it. Measured today, no
+such Unit exists — the series arithmetic in §10 rules it out.
+
+## 14 · Proof
+
+**Tests — 9,976 pass across the monorepo, typecheck clean in all three packages.**
+`unit-identity.test.ts` (24) holds the resolver, the display/search split and the preservation of
+historical codes; `unit-id-correction.test.ts` (20) holds the migration's contract, including
+*rewrites no row* and *asserts no production row count*; `stock-register.test.ts` executes the
+route's real SQL against the committed migrations in PGlite.
+
+🔴 **That contract test caught a real regression before it shipped.** `create or replace view`
+silently resets `security_invoker`, which would have made both register views run as the definer
+and stopped RLS applying to the reader. Both views now restate `with (security_invoker = true)`.
+
+**The rolled-back production probe** — `scripts/probe-unit-id-correction.sql`, one transaction on
+production, rolled back, nothing survived. Its verbatim result is recorded in that file. PASS 6 is
+the one that closes the report: the insert that used to yield `id-aam135002` now fails loudly.
+Production was re-measured immediately afterwards and is **untouched** — `gen_unit_code` present,
+DEFAULT present, series still 82, 222 rows.
+
+## 15 · 🟡 Found in passing, not fixed here
+
+**Fourteen migrations in the `0400+` range are applied in production but missing from the
+`supabase_migrations.schema_migrations` ledger** — `0405 · 0406 · 0409 · 0410 · 0413 · 0414 ·
+0415 · 0416 · 0418 · 0419 · 0420 · 0421 · 0422 · 0423`. Verified applied, not merely assumed:
+0416's constraint carries its own comment and 0423's column exists. **Fix:** record the missing
+rows so a future `supabase db push` cannot try to re-run them. Left out of this Card deliberately —
+writing to the migration ledger changes deployment behaviour repo-wide and deserves its own scope.
+
+## 16 · Apply order
+
+```
+0453_a_quantity_row_is_keyed_not_identified.sql   (needs 0442 · 0443 · 0444, all applied 2026-09-08)
+```
+
+One file, one transaction, with its own four-assertion sanity block. It refuses to commit if the
+legacy generator survives, if the DEFAULT survives, if any function still calls the generator, or
+if the register did not gain `identity_scope`.

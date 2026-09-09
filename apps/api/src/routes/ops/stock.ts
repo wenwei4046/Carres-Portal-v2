@@ -40,6 +40,7 @@ import {
   type PoolUseReason,
   unitAvailability,
   unitLifecycleOutcome,
+  canonicalUnitIdFrom,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { stockRegisterContext } from "../../lib/stock-register-context";
@@ -199,7 +200,7 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
       "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
         "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
         "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
-        "availability, lifecycle_outcome, last_event_at, last_event",
+        "availability, lifecycle_outcome, last_event_at, last_event, identity_scope",
     )
     .order("unit_code", { ascending: true });
   if (error) throw mapErr(error);
@@ -209,6 +210,10 @@ opsStockRouter.get("/register", requireOperationOrPrincipal, async (c) => {
     return {
       id: row.id as string,
       unitCode: row.unit_code as string,
+      // 0453 — the register finally says WHICH KIND of row this is, so no
+      // surface can print a counted row's technical key as a Unit ID.
+      identityScope: ((row.identity_scope as string | null) ??
+        "unit") as StockRegisterUnit["identityScope"],
       sku: row.sku as string,
       category: (row.category as string | null) ?? null,
       warehouseId: (row.warehouse_id as string | null) ?? null,
@@ -259,23 +264,54 @@ opsStockRouter.get("/register/:unitCode", requireOperationOrPrincipal, async (c)
   const unitCode = c.req.param("unitCode");
   const sb = userClient(c.env, c.var.auth.jwt);
 
-  const { data, error } = await sb
-    .from("stock_unit_register_v")
-    .select(
-      "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
-        "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
-        "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
-        "availability, lifecycle_outcome, last_event_at, last_event",
-    )
-    .eq("unit_code", unitCode)
-    .maybeSingle();
-  if (error) throw mapErr(error);
+  // SEARCH IS TOLERANT, THE STORED IDENTITY IS NOT TOUCHED. A scanner may drop
+  // the hyphens and a keyboard may be left on caps; both name the same Unit. We
+  // look up the spelling as typed, then its canonical `U1-000-001` form.
+  const SELECT =
+    "id, unit_code, sku, category, warehouse_id, site_name, holder_party_id, " +
+    "holder_name, ownership, supplier, po_no, status, condition, needs_repair, " +
+    "hold_reason, reserved_ref, sold_order_id, qty, date_in, last_verified_at, " +
+    "availability, lifecycle_outcome, last_event_at, last_event, identity_scope";
+
+  // `ilike` reads `%` and `_` as wildcards, and this value comes straight off
+  // the URL. Escape them, or `…/register/%` matches every row and the
+  // single-row read fails with a 500 where the honest answer is "no such Unit".
+  const forIlike = (v: string) => v.replace(/([\\%_])/g, "\\$1");
+  const candidates = Array.from(
+    new Set(
+      [unitCode, canonicalUnitIdFrom(unitCode)].filter(
+        (v): v is string => typeof v === "string" && v.trim() !== "",
+      ),
+    ),
+  );
+
+  let data: unknown = null;
+  for (const candidate of candidates) {
+    const { data: hit, error } = await sb
+      .from("stock_unit_register_v")
+      .select(SELECT)
+      .ilike("unit_code", forIlike(candidate))
+      .maybeSingle();
+    if (error) throw mapErr(error);
+    if (hit) {
+      data = hit;
+      break;
+    }
+  }
   if (!data) throw new HTTPException(404, { message: "No Unit with that ID" });
+
+  // 0453 — a counted row's key is a database fact, not an identity. Nobody may
+  // reach a bulk row by "scanning" it, because nothing was ever printed.
+  if ((data as Record<string, unknown>).identity_scope === "quantity") {
+    throw new HTTPException(404, { message: "No Unit with that ID" });
+  }
 
   const row = data as unknown as Record<string, unknown>;
   const unit = {
     id: row.id as string,
     unitCode: row.unit_code as string,
+    identityScope: ((row.identity_scope as string | null) ??
+      "unit") as StockRegisterUnit["identityScope"],
     sku: row.sku as string,
     category: (row.category as string | null) ?? null,
     warehouseId: (row.warehouse_id as string | null) ?? null,

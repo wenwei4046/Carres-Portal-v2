@@ -20,6 +20,7 @@ function unit(over: Partial<StockRegisterUnit> = {}): StockRegisterUnit {
   return {
     id: "u1",
     unitCode: "id-abc123456",
+    identityScope: "unit",
     sku: "BF03-Jager-K",
     category: "bedframe",
     warehouseId: "wh1",

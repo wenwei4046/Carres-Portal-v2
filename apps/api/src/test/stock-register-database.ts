@@ -1,6 +1,10 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 
+export function statementOf(sql: string, start: string, end: string) {
+  return statement(sql, start, end);
+}
+
 export function migration(name: string) {
   return readFileSync(new URL(`../../../../supabase/migrations/${name}.sql`, import.meta.url), "utf8");
 }
@@ -33,7 +37,8 @@ export async function stockRegisterDatabase() {
       holder_party_id text, ownership text, supplier text, po_no text,
       status text, condition text, needs_repair boolean, hold_reason text,
       reserved_ref text, sold_order_id text, qty integer, date_in date,
-      sold_at timestamptz, last_verified_at timestamptz
+      sold_at timestamptz, last_verified_at timestamptz,
+      identity_scope text not null default 'unit'
     );
     create table public.stock_unit_events (unit_id text, event text, event_at timestamptz, seq bigint, id text, from_value text, to_value text, note text);
     insert into warehouses values ('site-1', 'Fixture site');

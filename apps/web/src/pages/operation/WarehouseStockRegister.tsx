@@ -21,6 +21,8 @@ import {
   type StockRailSelection,
   type StockRegisterUnit,
   type UnitAvailability,
+  displayUnitId,
+  unitIdOf,
 } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { useStockRegister } from "@/lib/queries";
@@ -200,11 +202,14 @@ export default function WarehouseStockRegister() {
         label: "Unit ID",
         width: 148,
         sortable: true,
-        searchValue: (u) => u.unitCode,
-        exportValue: (u) => u.unitCode,
+        // Display, search and EXPORT all read the one resolver. Counted goods
+        // have no identity, so the column prints `—` rather than the technical
+        // key that keys their row (0453).
+        searchValue: (u) => unitIdOf(u) ?? "",
+        exportValue: (u) => displayUnitId(u),
         chooserGroup: "Unit",
         accessor: (u) => (
-          <span className="font-mono text-meta text-base-900">{u.unitCode}</span>
+          <span className="font-mono text-meta text-base-900">{displayUnitId(u)}</span>
         ),
       },
       {
@@ -476,7 +481,11 @@ export default function WarehouseStockRegister() {
               stickyIdentity
               groupBanner={false}
               chooserGroupOrder={["Unit", "Place", "Source", "Dates"]}
-              onRowDoubleClick={(u) => navigate(`/operation/stock/unit/${u.unitCode}`)}
+              onRowDoubleClick={(u) => {
+                // A counted row has no Unit page to open — it is not a Unit.
+                const id = unitIdOf(u);
+                if (id) navigate(`/operation/stock/unit/${encodeURIComponent(id)}`);
+              }}
               emptyMessage={
                 allUnits.length === 0
                   ? "No Units yet — a Unit is created when a purchase order or consignment order is confirmed, and Receiving checks it in against the ID the supplier put on the label."

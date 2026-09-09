@@ -1212,6 +1212,25 @@ export {
   type SkuAvailability,
 } from "./unit-availability";
 
+// CARD-2026-09-07-purchasing-10 · THE ONE UNIT IDENTITY. Every surface asks
+// THIS file what a row's Unit ID is, so a counted row can never print its
+// technical key as an identity (0442 · 0443 · 0453).
+export {
+  unitIdOf,
+  isExactUnit,
+  displayUnitId,
+  normaliseUnitIdQuery,
+  matchesUnitId,
+  looksLikeUnitId,
+  canonicalUnitIdFrom,
+  UNIT_ID_PATTERN,
+  QUANTITY_KEY_PATTERN,
+  LEGACY_UNIT_ID_PATTERN,
+  NO_UNIT_ID,
+  type IdentityScope,
+  type UnitIdentityRow,
+} from "./unit-identity";
+
 // CARD-2026-08-20-stock-register · THE STOCK REGISTER — the one current listing
 // of controlled Units. Pure: it READS 0366's availability and never re-derives
 // it. The `Changed` scopes read the append-only physical lineage (0373's

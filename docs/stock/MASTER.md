@@ -91,6 +91,11 @@ traceable furniture and independently saleable or replaceable modules are exact 
 interchangeable accessories and bulk goods are **quantity goods** — counted, never given a Unit ID.
 A quantity good lives in the register as a bulk row (`qty` > 1 pieces, `identity_scope =
 quantity`, 0218) whose technical register key is never shown, printed or scanned as a Unit ID.
+That key is `QTY-000000001` (0453) — deliberately not the shape of a Unit ID — and both register
+views expose `identity_scope` so no surface has to guess. **Every screen, PDF, export and scan
+resolves identity through the one shared resolver** (`unitIdOf()`), which answers `null` for
+counted goods; `null` prints `—`. A counted row cannot be reached by scanning, because nothing was
+ever printed for it.
 Receiving verifies the identities Purchasing issued and never creates, replaces or renumbers one.
 
 The supplier currently adds `CARRES UNIT ID: U1-000-001` only to its own package label. A supplier
