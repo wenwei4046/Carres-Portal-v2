@@ -1270,9 +1270,19 @@ Deliver To · Requested By.
   `Order by {date}` second line; it is not another parent column or stored date.
 - Manual Purchase does not subtract SO Safety days; Delivery Date is already goods arrival at
   Carres. Missing production/transit Settings produce no default or Order By.
-- `Approval Status` is the approval FACT (`Need approval` · `Approved` · `Refused` ·
-  `No approval needed`); while approval is needed a quiet second line names the real
-  configured approver — `{name} approves` (Card 03 §3's arithmetic).
+- `Approval Status` shows the approval badge (`Need approval`, `Approved`, `Refused`,
+  `No approval needed`). The register omits the redundant `{name} approves` and `Ordered.`
+  second lines (owner correction, 2026-09-09); approval ownership, selection eligibility and
+  object-page approval details remain unchanged. Other disabled-row explanations remain.
+- Manual Purchase and Purchase Orders share the approved SO Batch register theme: muted blue-grey parent header,
+  lighter child header, white data rows, connected expansion surfaces, readable neutral text
+  and the existing blue links and selected-filter treatment. Columns and behavior are unchanged.
+  Purchase Orders uses the same 240px FilterRail, groups and rows as Manual Purchase, flush
+  below the page header with a right divider and padding only around the main grid. No outer
+  card borders or floating margins surround the register. The shared Hide filters button
+  collapses the rail and Show filters restores it from the toolbar, on desktop and mobile;
+  browser storage remembers visibility. Filter counts and supporting action text remain
+  available (owner correction, 2026-09-09).
 - There is NO number column (Card 08). The row and its deep-link run on the invisible
   request UUID; `req_no` is legacy database data no operator surface consumes.
 - `PO No` reads ONLY the lines' real lineage (`purchase_order_lines.demand_id`, the

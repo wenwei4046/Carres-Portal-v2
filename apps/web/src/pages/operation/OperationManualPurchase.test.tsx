@@ -391,8 +391,8 @@ describe("the register — one request per row (card §7)", () => {
     // REQ-0001's switch was ON and nobody decided; REQ-0002/3 never asked.
     expect(within(grid).getByText("Need approval")).toBeInTheDocument();
     expect(within(grid).getAllByText("No approval needed").length).toBe(2);
-    // The second line names the REAL approver, only while approval is needed.
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    // The register shows only the badge; owner details remain in the object.
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
   });
 
   it("no money renders anywhere — purchasing has no money", async () => {
@@ -576,9 +576,9 @@ describe("Card 03 · the left filter rail", () => {
     expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
     expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
-    // Clicking the filter grants nothing: the filtered row still names the
-    // REAL owner and this operator still has no Approve control anywhere.
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    // Clicking the filter grants nothing: this operator still has no
+    // Approve control, and the register omits the approver subtitle.
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
     expect(screen.queryByTestId("mp-approve")).toBeNull();
   });
 
@@ -1613,9 +1613,9 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
  * `ops_manager` holder's name prints as the governed sentence.
  */
 describe("Card 03 §3 · the approval owner's name", () => {
-  it("the waiting row prints `Jess approves`; decided rows print nothing", async () => {
+  it("waiting and decided rows omit the approver subtitle", async () => {
     await loaded();
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
     expect(screen.queryByTestId(`mp-approver-${REQ2}`)).toBeNull();
   });
 
@@ -1837,12 +1837,12 @@ describe("Card 04 · selection and PO Duty", () => {
     expect(screen.getByTestId(`mp-select-${REQ3}`)).toBeDisabled();
   });
 
-  it("a dead tick says why, in the row, beside the status word", async () => {
+  it("omits the redundant Ordered line beside the approval badge", async () => {
     await loaded();
-    const reasons = screen.getAllByTestId("mp-row-dead-reason").map((el) => el.textContent);
+    const reasons = screen.queryAllByTestId("mp-row-dead-reason").map((el) => el.textContent);
     // REQ-0003 is ordered. REQ-0002 may be ticked, so no sentence. REQ-0001
     // waits, and its cell already says `Need approval`: no second line.
-    expect(reasons).toEqual(["Ordered."]);
+    expect(reasons).toEqual([]);
     expect(
       screen.getByTestId(`mp-select-${REQ1}`).closest("tr")!.textContent,
     ).not.toContain("Waiting for approval.");
