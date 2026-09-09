@@ -40,6 +40,7 @@ import { useSalesOrderExpansion } from "@/lib/queries";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
+import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import { DestinationSummarySelect, ResponsiveValues } from "./ResponsiveValues";
 import GoodsMiniTable, {
@@ -824,7 +825,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   /* ── The page ─────────────────────────────────────────────────────────── */
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-1 flex-col bg-kit-canvas"
+      className={`${styles.page} flex h-full min-h-0 w-full flex-1 flex-col`}
       data-testid="so-batch-page"
     >
       <PurchasingTabs />

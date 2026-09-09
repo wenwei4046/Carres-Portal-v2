@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./manual-purchase-create.css";
+import registerStyles from "./PurchasingRegister.module.css";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -393,12 +394,6 @@ export default function OperationManualPurchase() {
     [q.data],
   );
 
-  /** Card 03 §3 — the real action owner's name beside `Need approval`. */
-  const approverLine = useMemo(
-    () => manualPurchaseApproverLine((q.data?.approvers ?? []).map((a) => a.name)),
-    [q.data?.approvers],
-  );
-
   /**
    * THE RAIL FILTER (Card 03 — unchanged by Card 04) — one slot per section;
    * sections combine with AND; the empty filter is the permanent Register,
@@ -600,23 +595,13 @@ export default function OperationManualPurchase() {
             <StatusPill tone={APPROVAL_TONE[r.approval.kind]}>
               {r.approval.label}
             </StatusPill>
-            {/* Card 03 §3 — while approval is needed the row names the REAL
-                action owner. Nothing resolved prints nothing. */}
-            {r.approval.kind === "need_approval" && approverLine ? (
-              <span
-                className="block truncate text-label font-normal text-base-600"
-                data-testid={`mp-approver-${r.id}`}
-              >
-                {approverLine}
-              </span>
-            ) : null}
             {/* A DEAD TICK SAYS WHY (MPR-20260904-8935, 2026-09-04). The row
                 read `Approved`, Approved Qty 0, Still To Order 0, and its
                 checkbox was greyed with nothing on screen naming the cause —
                 the SO Batch Deliver To cell's defect (#1056), met again here.
                 The sentence comes from the same two facts the tick reads, so
                 it can never disagree with the checkbox. */}
-            {deadReason(r) ? (
+            {r.status.kind !== "ordered" && deadReason(r) ? (
               <span
                 className="block text-label font-normal text-kit-amber-11"
                 data-testid="mp-row-dead-reason"
@@ -795,7 +780,7 @@ export default function OperationManualPurchase() {
         filterValue: (r) => r.requestedBy,
       },
     ],
-    [approverLine, navigate],
+    [navigate],
   );
 
   if (mode === "create") {
@@ -827,7 +812,7 @@ export default function OperationManualPurchase() {
   const gridIndex = detailId != null ? gridRows.findIndex((r) => r.id === detailId) : -1;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={`${detailId == null ? registerStyles.page : ""} flex h-full min-h-0 flex-col`}>
       {detailId == null && <PurchasingTabs />}
       <div className="relative min-h-0 flex-1">
       <div

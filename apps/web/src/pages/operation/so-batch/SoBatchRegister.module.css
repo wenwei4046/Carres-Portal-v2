@@ -1,0 +1,4 @@
+/* Compatibility entry point for the shared purchasing register theme. */
+.page {
+  composes: page from "../PurchasingRegister.module.css";
+}

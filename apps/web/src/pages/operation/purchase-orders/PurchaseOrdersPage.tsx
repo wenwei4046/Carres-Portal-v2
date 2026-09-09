@@ -4,7 +4,9 @@
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useState } from "react";
 import "./purchase-order-detail.css";
-import { ArrowLeft, Download, FileCheck2, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import registerStyles from "../PurchasingRegister.module.css";
+import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
+import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
 import {
   demandPurposeLabelOf,
   manualPurchaseSourceLine,
@@ -212,7 +214,21 @@ export default function PurchaseOrdersPage() {
   const poDutyActor = workspaceDutyActor(dutyQ.data, "po_duty");
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<PurchaseOrderRegisterFilter | null>(null);
-  const [railOpen, setRailOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState(() => {
+    try {
+      return localStorage.getItem("carres.purchaseOrders.filterRail") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setRailVisible = (open: boolean) => {
+    setRailOpen(open);
+    try {
+      localStorage.setItem("carres.purchaseOrders.filterRail", open ? "1" : "0");
+    } catch {
+      // The toggle still works when browser storage is unavailable.
+    }
+  };
   const [pdfProblem, setPdfProblem] = useState<string | null>(null);
   const today = todayMYT();
 
@@ -591,68 +607,43 @@ export default function PurchaseOrdersPage() {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-kit-canvas" data-testid="purchase-orders-register">
+    <div className={`${registerStyles.page} flex h-full min-h-0 flex-col`} data-testid="purchase-orders-register">
       <PurchasingTabs />
-      <div className="relative flex min-h-0 flex-1 p-2">
-        <aside
-          className={[
-            "w-[240px] shrink-0 overflow-y-auto border border-r-0 border-kit-slate-5 bg-white p-3",
-            "max-md:absolute max-md:inset-y-2 max-md:left-2 max-md:z-30 max-md:shadow-lg",
-            railOpen ? "max-md:block" : "max-md:hidden",
-          ].join(" ")}
-          aria-label="Purchase order filters"
-          data-testid="po-filter-rail"
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {railOpen && (
+        <FilterRail
+          className="max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
+          onHide={() => setRailVisible(false)}
+          ariaLabel="Purchase order filters"
+          testId="po-filter-rail"
         >
-          <div className="mb-2 flex items-center justify-end md:hidden">
-            <button type="button" aria-label="Close filters" onClick={() => setRailOpen(false)}>
-              <X size={16} />
-            </button>
-          </div>
-          <div className="flex flex-col gap-5">
-            <div>
-              <div className="px-1.5 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-                PURCHASE ORDERS
-              </div>
-              <div className="mt-2 flex flex-col gap-0.5">
-                <button
-                  type="button"
-                  className={`flex h-8 w-full items-center justify-between rounded-control px-2 text-left text-body ${filter == null ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
-                  onClick={() => setFilter(null)}
-                >
-                  <span>All purchase orders</span><span className="tabular-nums">{allRows.length}</span>
-                </button>
-              </div>
-            </div>
-            {RAIL_GROUPS.map((group) => (
-              <div key={group.heading}>
-                <div className="px-1.5 text-label font-semibold uppercase tracking-wide text-kit-slate-9">
-                  {group.heading}
-                </div>
-                <div className="mt-2 flex flex-col gap-0.5">
-                  {group.rows.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={`flex min-h-8 w-full items-start justify-between gap-2 rounded-control px-2 py-1.5 text-left text-body ${filter === item.key ? "bg-kit-blue-3 font-semibold text-kit-blue-11" : "hover:bg-kit-slate-3"}`}
-                      onClick={() => setFilter(filter === item.key ? null : item.key)}
-                    >
-                      {item.action ? (
-                        <span className="flex min-w-0 flex-col">
-                          <span className={filter === item.key ? "" : "font-medium"}>{item.label}</span>
-                          <span className="text-[11px] font-normal leading-4 text-kit-slate-9">{item.action}</span>
-                        </span>
-                      ) : (
-                        <span className="min-w-0 break-words">{item.label}</span>
-                      )}
-                      <span className="shrink-0 tabular-nums">{counts.get(item.key) ?? 0}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </aside>
-        <div className="flex min-w-0 flex-1 flex-col border border-kit-slate-5 bg-white">
+          <FilterRailGroup title="PURCHASE ORDERS">
+            <FilterRailRow
+              label="All purchase orders"
+              count={allRows.length}
+              active={filter == null}
+              onClick={() => setFilter(null)}
+              testId="po-filter-all"
+            />
+          </FilterRailGroup>
+          {RAIL_GROUPS.map((group) => (
+            <FilterRailGroup key={group.heading} title={group.heading}>
+              {group.rows.map((item) => (
+                <FilterRailRow
+                  key={item.key}
+                  label={item.label}
+                  supportingText={item.action}
+                  count={counts.get(item.key) ?? 0}
+                  active={filter === item.key}
+                  onClick={() => setFilter(filter === item.key ? null : item.key)}
+                  testId={`po-filter-${item.key}`}
+                />
+              ))}
+            </FilterRailGroup>
+          ))}
+        </FilterRail>
+        )}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-2" data-testid="po-register-content">
           {pdfProblem ? (
             <ReadProblem
               problem={pdfProblem}
@@ -678,13 +669,16 @@ export default function PurchaseOrdersPage() {
               chooserGroupOrder={["Document", "Supplier", "Goods", "Receiving"]}
               onRowDoubleClick={openObject}
               contextMenu={contextMenu}
-              toolbarStart={(
+              toolbarStart={!railOpen && (
                 <button
                   type="button"
-                  className="inline-flex h-7 items-center gap-1.5 rounded-control border border-kit-slate-5 px-2 text-meta md:hidden"
-                  onClick={() => setRailOpen(true)}
+                  aria-label="Show filters"
+                  title="Show filters"
+                  data-testid="purchase-orders-show-filters"
+                  className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+                  onClick={() => setRailVisible(true)}
                 >
-                  <SlidersHorizontal size={14} /> Filters
+                  <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
                 </button>
               )}
               statusSummary={(filtered) => {
