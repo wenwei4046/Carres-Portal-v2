@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { operationOrderListRow } from "@/lib/queries";
+import { fmtDate } from "@/lib/fmt-date";
 import {
   buildRegisterRow,
   DEFAULT_COLUMNS,
@@ -17,6 +18,8 @@ import {
   NO_DATE_YET,
   NOT_RECORDED,
   REGISTER_FIELDS,
+  requestedDeliveryOf,
+  requestedDeliveryText,
 } from "./sales-order-columns";
 
 const order = (over: Partial<operationOrderListRow> = {}): operationOrderListRow =>
@@ -320,5 +323,45 @@ describe("Billing address reads the same-as-delivery flag", () => {
     // as `true` and silently swap in a delivery address nobody asked for.
     expect(bill({ customer_billing: null, customer_address: "12 Jalan Ampang" }))
       .toBe("Not recorded");
+  });
+});
+
+describe("Requested Delivery Date — ONE arithmetic, ONE spelling", () => {
+  it("a named day is the day", () => {
+    expect(requestedDeliveryOf({ delivery_date: "2026-09-10", delivery_date_tbd: false })).toEqual({
+      iso: "2026-09-10",
+      tbd: false,
+    });
+  });
+
+  it("`to be confirmed` hides the stored day — the customer has not settled one", () => {
+    expect(requestedDeliveryOf({ delivery_date: "2026-09-10", delivery_date_tbd: true })).toEqual({
+      iso: null,
+      tbd: true,
+    });
+  });
+
+  it("nothing asked for is neither a date nor `to be confirmed`", () => {
+    expect(requestedDeliveryOf({ delivery_date: null, delivery_date_tbd: false })).toEqual({
+      iso: null,
+      tbd: false,
+    });
+  });
+
+  it("⭐ the three states print three different words, and never share one", () => {
+    const day = requestedDeliveryText({ iso: "2026-09-10", tbd: false });
+    const tbd = requestedDeliveryText({ iso: null, tbd: true });
+    const none = requestedDeliveryText({ iso: null, tbd: false });
+    expect(day).toBe(fmtDate("2026-09-10"));
+    expect(tbd).toBe("To be confirmed");
+    expect(none).toBe("No delivery date");
+    expect(new Set([day, tbd, none]).size).toBe(3);
+  });
+
+  it("uses no banned absence word", () => {
+    for (const banned of ["TBD", "Not available", "N/A", "-", "Pending"]) {
+      expect(requestedDeliveryText({ iso: null, tbd: true })).not.toBe(banned);
+      expect(requestedDeliveryText({ iso: null, tbd: false })).not.toBe(banned);
+    }
   });
 });

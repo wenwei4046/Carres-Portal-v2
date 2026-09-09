@@ -478,6 +478,21 @@ remains an operational status and appears only under **`DELIVERY STATUS`** on Mo
 delivery is arranged but Warehouse has not recorded `Ready for handover`; it does not claim missing
 stock or an active delivery.
 
+**Monitor's `Actions` column — owner correction 2026-09-09.** The work list's last visible column is
+headed **`Actions`** (the ROW's open-action list, the same word `Order Route`'s control column
+already carries) and prints ONE next act, from recorded facts:
+**`Assign logistics`** when nobody carries the delivery · **`Call {Logistics Partner} — confirm
+delivery date`** followed by **`Edit Delivery`** when a partner carries it but no day is agreed ·
+**`Edit Delivery`** once both are true. The call line is the queue-word table's own row line above,
+with the partner's real name from the data — **never a hard-coded carrier, and never an employee's
+name**. Nothing new is spelled here: `Chase`, `Follow up`, `Contact partner`, `Set date` and
+`Unscheduled` remain banned, and the sheet's export prints the same words the cell shows.
+The customer's date keeps its governed word **`Requested Delivery Date`** beside Delivery's own
+**`Confirmed Delivery`** / **`Confirmed Time`**; **`DO date`** names the day the document issued and
+is never either of them. Its three absences are `To be confirmed` (the customer has asked, the day
+is not settled) and `No delivery date` (none asked for) for the request, and `No confirmed date` for
+the answer — one spelling each, on screen and in the export alike.
+
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
 What may travel apart, and what may never. There are exactly TWO groups, and a

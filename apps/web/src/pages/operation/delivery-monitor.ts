@@ -77,6 +77,10 @@ export const MONITOR_COPY = {
    *  names the exact missing file (`DOR_COPY.uploadPhoto` / `uploadSignedDo`). */
   uploadProof: "Upload delivery proof",
   noDeliveryOrder: "No delivery order yet",
+  /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
+  editDelivery: "Edit Delivery",
+  /** The first carrier on a scope — the governed word, never `Set partner`. */
+  assignLogistics: "Assign logistics",
   hideFilters: "Hide filters",
   showFilters: "Show filters",
   previousDays: "Previous days",
@@ -93,6 +97,29 @@ export const MONITOR_COPY = {
    *  the count) so the operator reads what the rail already taught. */
   cellDeliveries: "Deliveries",
   cellExceptions: "Exceptions",
+} as const;
+
+/**
+ * ⭐ THE WORK LIST'S COLUMN WORDS, IN ONE PLACE — the sheet and the phone's
+ * card print the same label for the same fact. Two spellings of one column
+ * heading is how `Customer Delivery` and `Deliver By` were born.
+ */
+export const MONITOR_COLUMN = {
+  so: "SO No",
+  customer: "Customer",
+  state: "State",
+  requestedDelivery: "Requested Delivery Date",
+  logisticsPartner: "Logistics Partner",
+  confirmedDelivery: "Confirmed Delivery",
+  confirmedTime: "Confirmed Time",
+  doNumber: "DO No",
+  location: "Delivery Location",
+  goods: "Goods",
+  deliveryStatus: "Delivery Status",
+  /** The ROW's open-action list — the governed word (COPY-STANDARD). */
+  actions: "Actions",
+  building: "Building",
+  phone: "Phone",
 } as const;
 
 /** Desktop shows six operating days; Sunday is never one of them. */
@@ -413,6 +440,64 @@ export function monitorCardHref(card: DeliveryMonitorCard): string {
   }`;
 }
 
+/* ── THE CHASE — who must be called, and what the operator does next ────── */
+
+/**
+ * `Call NETS — confirm delivery date` — the governed row line for the
+ * `Confirm delivery date` queue (COPY-STANDARD, "The delivery queue words":
+ * `Call {logistics} — confirm delivery date`). The partner NAME comes from
+ * the row; no company is ever hard-coded, and a row with no partner never
+ * reaches this sentence — it is asked to `Assign logistics` first.
+ */
+export function callToConfirmDeliveryDate(partnerName: string): string {
+  return `Call ${partnerName} — confirm delivery date`;
+}
+
+/**
+ * ⭐ ONE ROW, ONE NEXT ACT (the chase workflow, Delivery MASTER §8).
+ *
+ * The operator's question on a row with no confirmed date is *who do I
+ * contact?* and it has exactly two answers:
+ *
+ * ```
+ * nobody carries this row yet   Assign logistics
+ * a partner carries it          Call {partner} — confirm delivery date,
+ *                               then Edit Delivery to record what they said
+ * ```
+ *
+ * Every other row already has both a carrier and an agreed day, so its one
+ * door is the Delivery-owned editor. The act is derived from RECORDED facts
+ * — a partner and a confirmed date — never from the clock.
+ */
+export type MonitorRowAction =
+  | { kind: "assign_logistics"; label: string }
+  | { kind: "confirm_date"; call: string; label: string }
+  | { kind: "edit_delivery"; label: string };
+
+export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
+  if (card.logisticsPartnerId === null) {
+    return { kind: "assign_logistics", label: MONITOR_COPY.assignLogistics };
+  }
+  if (card.confirmedDate === null) {
+    return {
+      kind: "confirm_date",
+      /* The partner's own name, from the row — never a hard-coded company.
+         A partner id whose name has not resolved would print an id at the
+         operator, so the governed absence word stands in for it. */
+      call: callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics),
+      label: MONITOR_COPY.editDelivery,
+    };
+  }
+  return { kind: "edit_delivery", label: MONITOR_COPY.editDelivery };
+}
+
+/** The action cell's words as ONE string — what the Excel export prints, so
+ *  the sheet and the screen never say two different things. */
+export function monitorRowActionText(card: DeliveryMonitorCard): string {
+  const action = monitorRowAction(card);
+  return action.kind === "confirm_date" ? `${action.call} · ${action.label}` : action.label;
+}
+
 /* ── The filters — each one answers, and they COMBINE ──────────────────── */
 
 function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso: string): boolean {
@@ -466,6 +551,16 @@ function matchesStatus(card: DeliveryMonitorCard, picked: MonitorDeliveryStatus 
   return picked === null || card.statusKey === picked;
 }
 
+/**
+ * The module's ONE search — the customer, the SO, the DO, the place, the goods
+ * and the partner. Exported because the phone's work list has its own visible
+ * box (the sheet's box is the DataGrid's, and a phone has no sheet), and two
+ * search rules over one workspace would be two answers to one question.
+ */
+export function matchesMonitorSearch(card: DeliveryMonitorCard, search: string): boolean {
+  return matchesSearch(card, search);
+}
+
 function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
   const q = search.trim().toLowerCase();
   if (!q) return true;
@@ -508,7 +603,7 @@ export function filterMonitorListRows(
   cards: readonly DeliveryMonitorCard[],
   filters: DeliveryMonitorFilters,
 ): DeliveryMonitorCard[] {
-  return cards.filter(
+  const rows = cards.filter(
     (c) =>
       (filters.view === null ? true : matchesView(c, filters.view, filters.todayIso)) &&
       matchesRegion(c, filters.region) &&
@@ -516,6 +611,48 @@ export function filterMonitorListRows(
       matchesStatus(c, filters.status) &&
       matchesSearch(c, filters.search),
   );
+  return filters.view === "no_confirmed_date" ? sortByRequestedDeliveryDate(rows) : rows;
+}
+
+/** The stable tie-break every Delivery listing uses: the customer name
+ *  (locale-aware), then the row's own id — so equal dates never reshuffle. */
+function tieBreak(a: DeliveryMonitorCard, b: DeliveryMonitorCard): number {
+  return (
+    a.customerName.localeCompare(b.customerName, undefined, { sensitivity: "base" }) ||
+    a.scopeId.localeCompare(b.scopeId)
+  );
+}
+
+/**
+ * ⭐ THE CHASE ORDER — earliest `Requested Delivery Date` first.
+ *
+ * `No confirmed date` is a queue of customers waiting for an answer, and the
+ * customer who asked for the earliest day is the one whose answer is most
+ * expensive to be late with. A row carrying NO requested date sorts LAST: it
+ * is real work, but nothing about it is due before a dated one, and putting
+ * an absence at the top would push every dated chase off the first screen.
+ *
+ * `To be confirmed` and "never named a day" both sort last — they are two
+ * spellings of *no date to be early for*. The tie-break is the customer name
+ * then the stable row id, so the list never reshuffles between renders.
+ */
+export function sortByRequestedDeliveryDate(
+  rows: readonly DeliveryMonitorCard[],
+): DeliveryMonitorCard[] {
+  return [...rows].sort((a, b) => {
+    const x = a.scope.customerDeliveryIso;
+    const y = b.scope.customerDeliveryIso;
+    /* The absence is ranked EXPLICITLY rather than by a sentinel string: an
+       ICU collation does not promise where a padding character lands against
+       a digit, and "missing dates sort last" is a business rule, not a
+       coincidence of the collator. ISO dates then compare as plain strings,
+       which is exactly chronological. */
+    if (x === null || y === null) {
+      if (x === y) return tieBreak(a, b);
+      return x === null ? 1 : -1;
+    }
+    return x < y ? -1 : x > y ? 1 : tieBreak(a, b);
+  });
 }
 
 /**

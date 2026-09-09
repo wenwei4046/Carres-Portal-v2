@@ -53,7 +53,7 @@ vi.mock("@/lib/pdf/render", () => ({
   renderDoPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" })),
 }));
 
-import EditDelivery from "./EditDelivery";
+import EditDelivery, { returnPathOf } from "./EditDelivery";
 
 const ORDER = {
   id: "order-a",
@@ -73,11 +73,11 @@ const ORDER = {
   order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1 }],
 };
 
-function wrap() {
+function wrap(entry = "/operation/delivery/edit/order-a") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/delivery/edit/order-a"]}>
+      <MemoryRouter initialEntries={[entry]}>
         <EditDelivery />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -322,5 +322,38 @@ describe("condominium registration (Delivery Card 06, 0412)", () => {
     };
     wrap();
     expect(screen.queryByTestId("edit-delivery-condo-registration")).toBeNull();
+  });
+});
+
+describe("the chase returns to the queue it came from", () => {
+  const QUEUE = "/operation?tab=delivery&view=no_confirmed_date&region=Selangor";
+
+  it("saving the confirmed date lands back on the SAME work list", () => {
+    wrap(`/operation/delivery/edit/order-a?from=${encodeURIComponent(QUEUE)}`);
+    fireEvent.click(screen.getByRole("button", { name: "Save Delivery" }));
+    const onSuccess = saveMutate.mock.calls[0]![1]!.onSuccess as () => void;
+    onSuccess();
+    expect(navigateSpy).toHaveBeenCalledWith(QUEUE);
+  });
+
+  it("with no queue behind it, the editor still lands on Monitor", () => {
+    wrap();
+    fireEvent.click(screen.getByRole("button", { name: "Save Delivery" }));
+    const onSuccess = saveMutate.mock.calls[0]![1]!.onSuccess as () => void;
+    onSuccess();
+    expect(navigateSpy).toHaveBeenCalledWith("/operation?tab=delivery");
+  });
+
+  it("only a portal path is honoured — a pasted external URL never is", () => {
+    expect(returnPathOf(QUEUE)).toBe(QUEUE);
+    expect(returnPathOf(null)).toBe("/operation?tab=delivery");
+    for (const hostile of [
+      "https://example.com",
+      "//example.com",
+      "/dealer/orders",
+      "javascript:alert(1)",
+    ]) {
+      expect(returnPathOf(hostile)).toBe("/operation?tab=delivery");
+    }
   });
 });

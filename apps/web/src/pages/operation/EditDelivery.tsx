@@ -200,10 +200,34 @@ function Field({
 const INPUT =
   "h-8 rounded-control border border-kit-slate-6 bg-white px-2 text-body text-kit-slate-12";
 
+/** Where the operator was when they opened this editor. */
+const DEFAULT_RETURN = "/operation?tab=delivery";
+
+/**
+ * ⭐ THE CHASE RETURNS TO ITS QUEUE.
+ *
+ * `Edit Delivery` is opened from a work list — usually `No confirmed date`,
+ * often already narrowed by a state or a partner — and recording the date the
+ * partner just gave is the act that takes the row OUT of that queue. Landing
+ * the operator on the default Week calendar instead made them rebuild the
+ * narrowing by hand and never showed them the row leaving. `?from=` carries
+ * the workspace back.
+ *
+ * It is accepted ONLY as a same-origin portal path (`/operation…`), so a
+ * hand-made or pasted link can never turn this editor into an open redirect.
+ */
+export function returnPathOf(from: string | null): string {
+  /* One allow-list, and it is a PREFIX of this portal's own path — which also
+     rejects `//host` and `https://host`, because neither starts with the
+     literal `/operation`. */
+  return from?.startsWith("/operation") ? from : DEFAULT_RETURN;
+}
+
 export default function EditDelivery() {
   const { orderId } = useParams<{ orderId: string }>();
   const [searchParams] = useSearchParams();
   const leg = Number(searchParams.get("leg") ?? "0") || 0;
+  const returnPath = returnPathOf(searchParams.get("from"));
   const navigate = useNavigate();
 
   const detailQ = useDeliveryArrangement(orderId, leg);
@@ -436,14 +460,17 @@ export default function EditDelivery() {
       {
         onSuccess: () => {
           toast.success(ED.saved);
-          navigate("/operation?tab=delivery");
+          /* Back to the work list that sent us — the saved date has just
+             taken this row out of `No confirmed date`, and the operator sees
+             it leave rather than being told it did. */
+          navigate(returnPath);
         },
         onError: (e: Error) => toast.error(e.message),
       },
     );
   };
 
-  const backToWork = () => navigate("/operation?tab=delivery");
+  const backToWork = () => navigate(returnPath);
 
   if (detailQ.isError) {
     return (

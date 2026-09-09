@@ -424,10 +424,10 @@ Calendar (DEFAULT)           ·  Day / Week / Month in the page toolbar; Week is
                                 and its six Mon–Sat columns fit without horizontal date scrolling
 Operational queue selected  ·  the standard selectable Register work list (shared DataGrid):
                                 selection ☐ · ▸ expansion · SO No · Customer · State ·
-                                Delivery Location · Requested Delivery Date ·
-                                Confirmed Delivery · Confirmed Time · Goods · DO No ·
-                                Logistics Partner · Delivery Status — sticky identity,
-                                real horizontal scrolling
+                                Requested Delivery Date · Logistics Partner ·
+                                Confirmed Delivery · Confirmed Time · DO No ·
+                                Delivery Location · Goods · Delivery Status ·
+                                Actions — sticky identity, real horizontal scrolling
 ```
 
 **Calendar is a VIEW, never a `WORK TO DO` row.** `Day · Week · Month` stays in the page toolbar
@@ -462,6 +462,45 @@ correction 2026-09-07): the footer counts `{n} deliveries` / `{n} of {m} deliver
 list says `No deliveries` / `No matching deliveries.`, the assignment door counts `{n} deliveries`,
 and a Journey row prints its own route (`Klang WH → JB transit`) with no `Leg` prefix — the leg
 number rides only the Edit Delivery URL.
+
+**THE CHASE — `Requested Delivery Date` vs `Confirmed Delivery` (owner correction 2026-09-09),
+overwriting the column order above's earlier `Delivery Location`-first spelling and the Delivery
+Orders register's `Requested Delivery Date` chooser default.** A delivery with no confirmed date is
+a customer waiting for an answer, and the operator's four questions have four answers ON THE ROW:
+
+```
+What date did the customer request?   Requested Delivery Date — Sales Orders' fact, READ-ONLY here
+Has anyone confirmed a date?          Confirmed Delivery + Confirmed Time — Delivery's own facts
+Who must be contacted?                Logistics Partner, and the Actions cell's call line
+Where is the confirmed date recorded? Edit Delivery, the one Delivery-owned editor
+```
+
+- The two dates are **never the same column and never two names for one fact**. `DO date` is the
+  day the document issued and is neither of them.
+- **`No confirmed date` lists earliest `Requested Delivery Date` first**; a row with no requested
+  date — including `To be confirmed` — sorts LAST and prints the governed absence, never a
+  substitute date. Every other queue keeps the canonical row order: re-ranking work that is not a
+  chase by a Sales date would move rows for a reason the queue does not mean.
+- **`Actions` is the row's one next act**, derived from recorded facts only:
+  `no Logistics Partner → Assign logistics` (the same governed door as the bulk journey, for ONE
+  delivery) · `partner but no confirmed date → Call {Logistics Partner} — confirm delivery date`
+  (the COPY-STANDARD row line, the name always from the data) then `Edit Delivery` · `everything
+  agreed → Edit Delivery`. **No carrier and no employee name is ever hard-coded**; staff identity,
+  where a Delivery surface needs one, comes from the shared Staff & Duties resolver.
+- **`Edit Delivery` carries the workspace back.** The editor opens with the queue and every active
+  narrowing on its URL and returns to exactly that list after `Save Delivery`, so the operator
+  watches the row leave `No confirmed date` and reappear on the Calendar day the partner agreed —
+  it is not merely told that it did. Only a portal path is honoured.
+- **The phone's work list is a LIST, not the sheet squeezed.** Below the phone breakpoint a work
+  queue renders one card per delivery carrying `SO No · Customer · Requested Delivery Date ·
+  Confirmed Delivery · Logistics Partner` and the same Actions act, with its own visible search
+  box and the sheet's `{n} of {m} deliveries` footer — **none of those three facts may require a
+  Columns chooser to see**. Bulk selection stays a desk act: a phone assigns one delivery at a
+  time, through the same governed door.
+- **The Calendar boundary is unchanged.** An unconfirmed delivery never enters a Day, Week or
+  Month date cell, cards stay read-only, and the chase happens in `No confirmed date`. The empty
+  week keeps its real `{n} deliveries need a confirmed date.` count and its `Open No confirmed
+  date` door.
 
 `Upload delivery proof` contains recorded delivered results whose required evidence is incomplete
 — the Delivery Orders register's OWN missing-evidence arithmetic (`missingDeliveryProofOf`: the
@@ -580,12 +619,26 @@ header select-all over the visible filtered rows · the in-place same-height sel
 page and the print path already run) · sticky `DO No` identity with real horizontal scrolling ·
 search · governed per-column filters · Export · Columns · the fixed 32px result footer.
 
-- **Default columns, in order:** `DO No` · `DO date` · `SO No` · `Customer` ·
-  `Delivery Location` · `Logistics Partner` · `Confirmed Delivery` · `Delivery Result` ·
-  `Proof Status` · `Status`. In the chooser, off by default: `Requested Delivery Date` ·
-  `Confirmed Time` · `Goods` · `Created`. The ambiguous `Delivery date` label is retired for
+- **Default columns, in order (owner correction 2026-09-09, overwriting the 2026-09-06 order and
+  its `Requested Delivery Date` chooser default):** `DO No` · `SO No` · `Customer` ·
+  **`Requested Delivery Date`** · **`Confirmed Delivery`** · **`Confirmed Time`** ·
+  `Logistics Partner` · `Delivery Location` · `Delivery Result` · `Proof Status` · `Status` ·
+  `DO date`. In the chooser, off by default: `Goods` · `Created`.
+  **`Requested Delivery Date` and `Confirmed Delivery` are ADJACENT** — the register answers *what
+  did the customer ask for, and has anyone agreed a day?* in one glance, and a column hidden in the
+  chooser answers nobody. **`DO date` falls to the end**: it is the day the paper issued and is
+  neither delivery date; it stays available because a document register must be able to say when
+  its documents were made. The ambiguous `Delivery date` label stays retired for
   **`Confirmed Delivery`**, `Confirmed Time` is its own column, and the customer date keeps its
-  governed word `Requested Delivery Date`.
+  governed word `Requested Delivery Date`. `Requested Delivery Date` opens no editor here —
+  Sales Orders owns it; `SO No` opens the Sales Order and `DO No` the formal Delivery Order, and
+  **`Assign logistics` still never appears on this register**.
+- **The cell, the search, the per-column filter and the Excel export print ONE spelling** of the
+  requested date (`requestedDeliveryText`): the day · `To be confirmed` · `No delivery date`. The
+  export used to flatten the middle into the last, telling a sheet's reader that a customer had
+  named no day when the customer had asked for one still being settled. The governed **DO document
+  PDF is unchanged** — it prints the trip's own confirmed delivery date and has never carried the
+  customer's request.
 - **The `SO No` cell is identity only** — the inline `Order Route` second-line action is
   retired; the route stays one right-click away in the governed context menu.
 - **Its page-owned 240px FilterRail** carries `WORK TO DO` — the queues canonical data can
@@ -616,6 +669,12 @@ words.
 > Condo driver/vehicle are **Delivery's writes**. **Sales Orders remains
 > the owner of the commercial customer promise** — the customer, the address, the building facts and
 > the customer-requested `Requested Delivery Date` — and Delivery may never write one of them.
+
+**ONE ARITHMETIC FOR THE REQUESTED DATE (Architecture Law D, 2026-09-09).** `orders.delivery_date`
+under its `delivery_date_tbd` guard is resolved in exactly one place (`requestedDeliveryOf`) and
+spelled in exactly one place (`requestedDeliveryText`). The Sales Orders register, Delivery Monitor
+and the Delivery Orders register all read those two; none of them derives the date or spells its
+absence again.
 
 What changed is WHERE the writes are made: the arrangement lives on **Edit Delivery** (and the
 governed partner door). **The bulk `Assign logistics` gap is CLOSED (owner correction

@@ -51,7 +51,7 @@ import type {
   DeliveryHandoverKindRow,
   operationOrderListRow,
 } from "@/lib/queries";
-import { conciseLocality } from "./sales-order-columns";
+import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
 import { itemsSummary } from "./sales-order-facts";
 
 /**
@@ -461,8 +461,10 @@ export function buildDeliveryScopeRows({
       so: o.so,
       refs: (o.source_ref ?? []).filter(Boolean),
       customer: displayCustomerName(o.customer_name),
-      customerDeliveryIso: o.delivery_date_tbd ? null : o.delivery_date ?? null,
-      customerDateTbd: Boolean(o.delivery_date_tbd),
+      /* Sales Orders owns this date; Delivery only reads it, through the ONE
+         arithmetic every surface reads it with (Architecture Law D). */
+      customerDeliveryIso: requestedDeliveryOf(o).iso,
+      customerDateTbd: requestedDeliveryOf(o).tbd,
       location: conciseLocality(o.customer_address_city, o.customer_address_state),
       building: o.building_type?.trim() || DW.notGiven,
       goods: itemsSummary(o) || DW.noGoods,
