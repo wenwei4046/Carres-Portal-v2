@@ -436,9 +436,16 @@ describe("one permanent row per proceeded Sales Order", () => {
     expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(more);
     expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("2 suppliers");
-    expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe("Multiple");
-    expect(screen.getByTestId("so-batch-po-date-o5").textContent).toBe("Multiple");
+    /* The actual, deduplicated values print directly — never a bare count or
+       `Multiple` — and the summary reveals as many as the rendered width
+       allows before falling back to `+N more` (owner spec 2026-09-09). */
+    expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("Hooka, Ohana");
+    expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe(
+      "AL Sungai Buloh +1 more",
+    );
+    const poDateO5 = screen.getByTestId("so-batch-po-date-o5").textContent ?? "";
+    expect(poDateO5).toContain("10 Sep");
+    expect(poDateO5).toContain("12 Sep");
     /* One document prints its own facts, not a count. */
     expect(screen.getByTestId("so-batch-supplier-o3").textContent).toBe("Hooka");
     expect(screen.getByTestId("so-batch-po-date-o3").textContent).toContain("18 Sep");
@@ -1213,6 +1220,48 @@ describe("the arrangement on the parent row", () => {
       { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
       { demandId: "build::o8::b", allocations: [{ destinationId: BULOH, qty: 1 }] },
     ]);
+  });
+
+  /* ⭐ THE `+N MORE` SHORTCUT IS ITS OWN CLICK TARGET, NOT THE DROPDOWN
+     (owner correction 2026-09-09). The whole-order select overlays its real
+     text with the deduplicated summary through a `pointer-events-none`
+     wrapper, so a plain click anywhere in that wrapper falls through to open
+     the select. `+N more` must be the one part of that wrapper that captures
+     its own click instead of falling through — it expands the row and
+     leaves the arrangement exactly as it was. */
+  it("Deliver To's `+N more` expands the row instead of falling through to the dropdown", () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { width: this.tagName === "SPAN" ? (this.textContent?.length ?? 0) * 8 : 200,
+        height: 24, top: 0, left: 0, right: 200, bottom: 24, x: 0, y: 0, toJSON() {} };
+    });
+    renderRegister({
+      rows: [
+        LEAF_O1,
+        LEAF_O3,
+        LEAF_O8A,
+        {
+          ...LEAF_O8B,
+          supplierCollection: {
+            procurementPartnerId: "p-eu",
+            procurementPartnerName: "EU",
+            fixedDestinationId: BULOH,
+          },
+        },
+        LEAF_O4,
+      ],
+    });
+    bounds.mockRestore();
+    const cell = screen.getByTestId("so-batch-deliver-to-o8");
+    const more = within(cell).getByRole("button", { name: "+1 more" });
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "true");
+    /* Nothing ticked and nothing arranged — the click never reached the
+       select underneath. */
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
+    /* Clicking it again keeps the row open rather than toggling it shut. */
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("a split arrangement becomes two documents in the selection bar — the leaf contract is unchanged", async () => {
