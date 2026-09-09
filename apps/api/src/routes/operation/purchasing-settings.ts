@@ -5,6 +5,7 @@ import {
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
+  purchasingSetTransitDaysInput,
   purchasingSetSupplierCollectionInput,
   purchasingSetWorkWeekInput,
   purchasingSettingsResponseSchema,
@@ -112,6 +113,31 @@ purchasingSettingsRouter.put("/production-days", requireOperationOrPrincipal, as
   const { error } = await sb.rpc("purchasing_set_production_days", {
     p_supplier_id: parsed.data.supplierId,
     p_category: parsed.data.category,
+    p_days: parsed.data.days,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return respondWithSettings(c);
+});
+
+/**
+ * PUT /transit-days — the lorry leg, one supplier at a time.
+ *
+ * `purchasing_set_supplier_transit_days` shipped with migration 0318 and, until
+ * 2026-09-09, NOTHING called it: the number decided every PO's `eta_date` and
+ * could only be changed with raw SQL. It is the twin of `/production-days`
+ * above — same gate (the RPC's own `purchasing_settings_gate()`), same audited
+ * `purchasing_setting_changes` row (`supplier_transit_days`), same
+ * respond-with-settings so the page cannot drift from the stored truth.
+ */
+purchasingSettingsRouter.put("/transit-days", requireOperationOrPrincipal, async (c) => {
+  const parsed = await parseJsonBody(c, purchasingSetTransitDaysInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("purchasing_set_supplier_transit_days", {
+    p_supplier_id: parsed.data.supplierId,
     p_days: parsed.data.days,
   });
   if (error) {

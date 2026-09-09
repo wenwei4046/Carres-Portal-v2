@@ -898,6 +898,24 @@ auditable Workspace, never inside the launcher. Module tabs, portal navigation, 
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
+**THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The
+Workspace's section rail is the governed Carres rail, not a fifth visual language. It drew a 280px
+floating rounded card with a shadow and a page margin, and marked the active section with a
+near-black `base-900` pill. It now draws the same shell and `NavRow` treatment as every other
+Carres rail (LOCAL FILTER RAIL / LOCAL RAIL ACTIVE ROW below): **240px, flush left, one straight
+right divider, no card, no radius and no shadow on the container; `blue-3` wash with a straight 2px
+`blue-9` line inset left on the active row; slate hover on the rest.**
+
+It hides under the same law as a local filter rail: `Hide settings` removes the WHOLE rail and
+gives its width to the settings page — never a second 60px icon strip beside the Portal sidebar —
+the content then carries `Show settings`, and the choice is remembered for that staff browser
+(`ops-settings-rail`). The icons are the Portal sidebar's governed panel-left pair. This is
+navigation between module Settings sections, so the rail carries no filters and no checkboxes.
+
+Every Settings section draws the same page header: a `kicker` naming the module above an
+`h1.text-page font-display` naming the page. Purchasing Settings had neither and opened straight
+onto a paragraph; it was corrected in the same change.
+
 **REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
 behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,
 stacking additional messages upward. A toast never occupies document flow and never moves, resizes

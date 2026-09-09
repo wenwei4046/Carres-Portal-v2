@@ -72,7 +72,8 @@ const purchaseDemandsRouter = new Hono<AppEnv>();
  *                       `purchase_orders.so`, never `so_refs`, never a global
  *                       SKU/supplier/customer match.
  *   `purchase_orders`   status (a cancelled PO never counts), the CURRENT
- *                       version, the official `eta_date`, the issued
+ *                       version, the immutable `official_delivery_date`
+ *                       (never the live planning `eta_date`), the issued
  *                       supplier and `Deliver To`.
  *   `po_sends`          confirmed-sent evidence AT the current version
  *                       (0377/0378). `external_open` never counts; supplier
@@ -135,7 +136,7 @@ async function loadRegisterRows(
     id: string;
     status: string;
     version: number | null;
-    eta_date: string | null;
+    official_delivery_date: string | null;
     supplier_id: string | null;
     destination_id: string | null;
   };
@@ -146,7 +147,7 @@ async function loadRegisterRows(
     const [pos, sends] = await Promise.all([
       sb
         .from("purchase_orders")
-        .select("id, status, version, eta_date, supplier_id, destination_id")
+        .select("id, status, version, official_delivery_date, supplier_id, destination_id")
         .in("id", batch),
       sb.from("po_sends").select("po_id, po_version, kind").eq("kind", "confirmed_sent").in("po_id", batch),
     ]);
@@ -246,7 +247,7 @@ async function loadRegisterRows(
             ? (supplierNames.get(po.supplier_id) ?? null)
             : null,
           destinationId: po.destination_id,
-          etaDate: po.eta_date?.slice(0, 10) ?? null,
+          officialDeliveryDate: po.official_delivery_date?.slice(0, 10) ?? null,
           sentCurrentVersion: sentCurrent(po),
         };
       });

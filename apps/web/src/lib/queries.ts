@@ -234,6 +234,7 @@ import {
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
+  type PurchasingSetTransitDaysInput,
   type PurchasingSetWorkWeekInput,
   type PurchasingUpdateDestinationInput,
   type PurchasingSetSupplierCollectionInput,
@@ -5439,6 +5440,10 @@ export function useSetProductionDays() {
 }
 export function useSetSupplierWorkWeek() {
   return usePurchasingSettingsMutation<PurchasingSetWorkWeekInput>("/work-week");
+}
+/** The lorry leg — 0318's write door, finally given a screen (2026-09-09). */
+export function useSetSupplierTransitDays() {
+  return usePurchasingSettingsMutation<PurchasingSetTransitDaysInput>("/transit-days");
 }
 
 export function useCreatePurchasingDestination() {

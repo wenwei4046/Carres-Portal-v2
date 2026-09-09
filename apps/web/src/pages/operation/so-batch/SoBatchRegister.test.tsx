@@ -152,7 +152,7 @@ const ORDER_O3 = orderRow({
   requestedDeliveryDate: "2026-09-20",
   pos: [
     { poId: "PO-20260820-4827", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-18",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-18",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -172,10 +172,10 @@ const ORDER_O5 = orderRow({
   status: "ordered",
   pos: [
     { poId: "PO-20260820-1111", status: "received", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-10",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-10",
       sentCurrentVersion: true },
     { poId: "PO-20260821-2222", status: "open", supplierId: "s-ohana",
-      supplierName: "Ohana", destinationId: BULOH, etaDate: "2026-09-12",
+      supplierName: "Ohana", destinationId: BULOH, officialDeliveryDate: "2026-09-12",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -210,7 +210,7 @@ const ORDER_O7 = orderRow({
   status: "blank",
   pos: [
     { poId: "PO-20260822-3333", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: null,
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: null,
       sentCurrentVersion: false },
   ],
   lines: [
@@ -433,8 +433,10 @@ describe("one permanent row per proceeded Sales Order", () => {
     expect(screen.getByTestId("so-batch-supplier-o3").textContent).toBe("Hooka");
     expect(screen.getByTestId("so-batch-po-date-o3").textContent).toContain("18 Sep");
     expect(screen.getByTestId("so-batch-deliver-to-o7").textContent).toBe("Carres Klang");
-    /* A PO without a date prints the grid's own absence. */
-    expect(screen.getByTestId("so-batch-po-date-o7").textContent).toBe("");
+    /* A PO whose ORIGINAL date is not on file says so (owner correction
+       2026-09-09). It read "" until then, which is what a row with NO purchase
+       order prints — one cell, two different answers. */
+    expect(screen.getByTestId("so-batch-po-date-o7").textContent).toBe("Not recorded");
   });
 });
 
@@ -1259,5 +1261,24 @@ describe("what this page refuses to be", () => {
       "PO duty could not be checked.",
     );
     expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();
+  });
+});
+
+/* PO Delivery Date reads the ORIGINAL (owner correction, 2026-09-09). */
+describe("SO Batch Register — PO Delivery Date", () => {
+  it("prints the original supplier-facing date, not the live planning date", () => {
+    renderRegister();
+    // o3 carries one PO whose original is on file.
+    expect(screen.getByTestId("so-batch-po-date-o3")).toHaveTextContent("18 Sep");
+  });
+
+  it("an unknown original says so — it never looks like nothing was ordered", () => {
+    renderRegister();
+    // o7 HAS a purchase order; its original date is not on file (the 0428
+    // recovery recorded it as unknown rather than back-filling a planning date).
+    expect(screen.getByTestId("so-batch-po-date-o7")).toHaveTextContent("Not recorded");
+    // o1 has no purchase order at all — a different answer, and it stays blank.
+    expect(screen.getByTestId("so-batch-po-date-o1")).toHaveTextContent("");
+    expect(screen.getByTestId("so-batch-po-date-o1")).not.toHaveTextContent("Not recorded");
   });
 });

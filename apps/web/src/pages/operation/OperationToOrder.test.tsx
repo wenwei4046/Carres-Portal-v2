@@ -243,7 +243,7 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
                     pos: [
                       { poId: "PO-2041", status: "open", supplierId: "s-hooka",
                         supplierName: "Hooka", destinationId: KLANG,
-                        etaDate: "2026-09-18", sentCurrentVersion: true },
+                        officialDeliveryDate: "2026-09-18", sentCurrentVersion: true },
                     ],
                     lines: [
                       { orderLineId: "l1", sku: "B1201S-K", qty: 2, stockTaken: 0,

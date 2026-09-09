@@ -274,7 +274,7 @@ const po = (poId: string, supplierName: string | null): SoBatchOrderRow["pos"][n
   supplierId: supplierName,
   supplierName,
   destinationId: null,
-  etaDate: null,
+  officialDeliveryDate: null,
   sentCurrentVersion: true,
 });
 
@@ -759,7 +759,7 @@ describe("documents are grouped by supplier × Deliver To", () => {
     // Still no price, no number and no arrival date on the GROUPING itself —
     // the catalog cost rides on the LINE, where the operator prices it.
     expect(doc).not.toHaveProperty("unitCost");
-    expect(doc).not.toHaveProperty("etaDate");
+    expect(doc).not.toHaveProperty("officialDeliveryDate");
   });
 });
 

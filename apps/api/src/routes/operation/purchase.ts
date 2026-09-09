@@ -6,6 +6,7 @@ import {
   nextPoDayMYT,
   productionWorkingDaysFor,
   purchaseTodayResponseSchema,
+  transitDaysFor,
   PURCHASING_CATEGORIES,
   workWeekOffDaysFor,
   type DemandLine,
@@ -355,6 +356,9 @@ purchaseRouter.get("/today", requireOperation, async (c) => {
       deadline: deadline ? deadline.slice(0, 10) : null,
       leadDays,
       offDays: workWeekOffDaysFor(settings, supplierId),
+      /* The lorry leg — the same governed number `expectedArrivalOf` adds
+         forward when a PO is born (Law D). */
+      transitDays: transitDaysFor(settings, supplierId),
       placedAt: placedAt.slice(0, 10),
       committed: order.status === "proceed_order",
     });

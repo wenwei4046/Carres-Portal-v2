@@ -695,22 +695,44 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         },
       },
       {
-        /* `purchase_orders.eta_date` — the OFFICIAL supplier-facing date.
-           Never `Goods Must Arrive`, never an "if ordered today" estimate. */
+        /* `purchase_orders.official_delivery_date` — the ORIGINAL
+           supplier-facing date, stamped at birth and never changed
+           (0428/0430, MASTER §5.7). It read `eta_date` until 2026-09-09,
+           which is the LIVE planning arrival: recording a factory ready date
+           moved it, so this column silently disagreed with the same column on
+           Purchase Orders and with the paper the supplier holds. Never
+           `Goods Must Arrive`, never an "if ordered today" estimate. */
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
         width: 126,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
-          const s = soBatchCellSummary(o.pos.map((p) => p.etaDate));
-          const text = s.kind === "none" ? null : s.kind === "one" ? fmtDate(s.value) : W.multiple;
+          const s = soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate));
+          /* A blank cell means NO PURCHASE ORDER. A purchase order whose
+             original date the 0428 recovery could not evidence is a different
+             answer and owes a sentence, so it says so in the same word the
+             Purchase Orders register uses for it (21 of 62 live POs). Merging
+             the two would make an unknown original look like nothing ordered. */
+          const text =
+            s.kind === "one"
+              ? fmtDate(s.value)
+              : s.kind === "many"
+                ? W.multiple
+                : o.pos.length > 0
+                  ? W.poDeliveryDateUnknown
+                  : null;
           return <span data-testid={`so-batch-po-date-${o.orderId}`}>{text}</span>;
         },
         sortFn: (a, b) =>
-          (a.pos[0]?.etaDate ?? "").localeCompare(b.pos[0]?.etaDate ?? ""),
-        exportValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => p.etaDate)), () => W.multiple) ?? "",
+          (a.pos[0]?.officialDeliveryDate ?? "").localeCompare(b.pos[0]?.officialDeliveryDate ?? ""),
+        exportValue: (o) => {
+          const s = soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate));
+          return (
+            summaryText(s, () => W.multiple) ??
+            (o.pos.length > 0 ? W.poDeliveryDateUnknown : "")
+          );
+        },
       },
     ],
     [
@@ -1119,7 +1141,7 @@ function SoBatchOrderExpansion({
       ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
-    const poDate = soBatchCellSummary(linePos.map((p) => p!.etaDate));
+    const poDate = soBatchCellSummary(linePos.map((p) => p!.officialDeliveryDate));
     return {
       key: l.orderLineId,
       testId: `so-batch-part-${l.sku}`,

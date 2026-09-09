@@ -207,3 +207,53 @@ describe("Purchasing Settings — the earliest Delivery Date a Manual Purchase m
     ).toBe(0);
   });
 });
+
+describe("Purchasing Settings — Transit days (0318's write door, finally on a screen)", () => {
+  it("PUT /transit-days reaches purchasing_set_supplier_transit_days", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+
+    const res = await testApp().request("/settings/transit-days", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 2 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("purchasing_set_supplier_transit_days", {
+      p_supplier_id: SUPPLIER_ID,
+      p_days: 2,
+    });
+    // The answer is the whole settings object, so the screen can never drift
+    // from the stored truth after a save.
+    expect(await res.json()).toMatchObject({ poDays: [1, 3, 5] });
+  });
+
+  it("refuses a number outside 0..60 before any database call", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+
+    const res = await testApp().request("/settings/transit-days", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: 61 }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a null day count — an unknown lorry leg stays unknown, never 0", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+
+    const res = await testApp().request("/settings/transit-days", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ supplierId: SUPPLIER_ID, days: null }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
