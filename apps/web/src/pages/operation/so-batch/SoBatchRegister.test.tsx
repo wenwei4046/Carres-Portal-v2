@@ -152,7 +152,7 @@ const ORDER_O3 = orderRow({
   requestedDeliveryDate: "2026-09-20",
   pos: [
     { poId: "PO-20260820-4827", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-18",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-18",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -172,10 +172,10 @@ const ORDER_O5 = orderRow({
   status: "ordered",
   pos: [
     { poId: "PO-20260820-1111", status: "received", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-10",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-10",
       sentCurrentVersion: true },
     { poId: "PO-20260821-2222", status: "open", supplierId: "s-ohana",
-      supplierName: "Ohana", destinationId: BULOH, etaDate: "2026-09-12",
+      supplierName: "Ohana", destinationId: BULOH, officialDeliveryDate: "2026-09-12",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -210,7 +210,7 @@ const ORDER_O7 = orderRow({
   status: "blank",
   pos: [
     { poId: "PO-20260822-3333", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: null,
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: null,
       sentCurrentVersion: false },
   ],
   lines: [

@@ -695,22 +695,27 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         },
       },
       {
-        /* `purchase_orders.eta_date` — the OFFICIAL supplier-facing date.
-           Never `Goods Must Arrive`, never an "if ordered today" estimate. */
+        /* `purchase_orders.official_delivery_date` — the ORIGINAL
+           supplier-facing date, stamped at birth and never changed
+           (0428/0430, MASTER §5.7). It read `eta_date` until 2026-09-09,
+           which is the LIVE planning arrival: recording a factory ready date
+           moved it, so this column silently disagreed with the same column on
+           Purchase Orders and with the paper the supplier holds. Never
+           `Goods Must Arrive`, never an "if ordered today" estimate. */
         key: "poDeliveryDate",
         label: W.colPoDeliveryDate,
         width: 126,
         sortable: true,
         chooserGroup: "Documents",
         accessor: (o) => {
-          const s = soBatchCellSummary(o.pos.map((p) => p.etaDate));
+          const s = soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate));
           const text = s.kind === "none" ? null : s.kind === "one" ? fmtDate(s.value) : W.multiple;
           return <span data-testid={`so-batch-po-date-${o.orderId}`}>{text}</span>;
         },
         sortFn: (a, b) =>
-          (a.pos[0]?.etaDate ?? "").localeCompare(b.pos[0]?.etaDate ?? ""),
+          (a.pos[0]?.officialDeliveryDate ?? "").localeCompare(b.pos[0]?.officialDeliveryDate ?? ""),
         exportValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => p.etaDate)), () => W.multiple) ?? "",
+          summaryText(soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate)), () => W.multiple) ?? "",
       },
     ],
     [
@@ -1119,7 +1124,7 @@ function SoBatchOrderExpansion({
       ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
-    const poDate = soBatchCellSummary(linePos.map((p) => p!.etaDate));
+    const poDate = soBatchCellSummary(linePos.map((p) => p!.officialDeliveryDate));
     return {
       key: l.orderLineId,
       testId: `so-batch-part-${l.sku}`,

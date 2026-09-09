@@ -449,8 +449,18 @@ export interface SoBatchOrderPoFact {
   supplierName: string | null;
   /** The destination the ISSUED document actually carries. */
   destinationId: string | null;
-  /** `purchase_orders.eta_date` — the official supplier-facing date. */
-  etaDate: IsoDate | null;
+  /**
+   * `purchase_orders.official_delivery_date` — the ORIGINAL supplier-facing
+   * date, stamped at birth and never changed (0428/0430, MASTER §5.7).
+   *
+   * It is deliberately NOT `eta_date`: that is the LIVE planning arrival and
+   * the ready-date door recomputes it, so a register drawing it would show a
+   * "PO Delivery Date" that silently MOVED after the supplier was sent the
+   * paper. `null` is a real answer — a PO whose original the 0428 recovery
+   * could not evidence is recorded as unknown, and is printed as an absence
+   * rather than back-filled from today's planning date.
+   */
+  officialDeliveryDate: IsoDate | null;
   /** TRUE = the current PDF version has confirmed-sent evidence. */
   sentCurrentVersion: boolean;
 }
@@ -510,7 +520,7 @@ export const soBatchOrderRowSchema = z.object({
       supplierId: z.string().nullable(),
       supplierName: z.string().nullable(),
       destinationId: z.string().nullable(),
-      etaDate: z.string().nullable(),
+      officialDeliveryDate: z.string().nullable(),
       sentCurrentVersion: z.boolean(),
     }),
   ),

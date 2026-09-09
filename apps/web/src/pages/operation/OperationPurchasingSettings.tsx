@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   PURCHASING_NUMBER_RANGE,
   PRODUCTION_WORKING_DAYS_RANGE,
+  TRANSIT_DAYS_RANGE,
   SUNDAY,
   WEEKDAYS,
   lastChangeFor,
@@ -21,6 +22,7 @@ import {
   usePurchasingSettings,
   useCreatePurchasingDestination,
   useSetProductionDays,
+  useSetSupplierTransitDays,
   useSetPurchasingNumber,
   useSetPurchasingPoDays,
   useSetSupplierWorkWeek,
@@ -272,6 +274,7 @@ export default function OperationPurchasingSettings({
   const setNumber = useSetPurchasingNumber();
   const setPoDays = useSetPurchasingPoDays();
   const setProduction = useSetProductionDays();
+  const setTransit = useSetSupplierTransitDays();
   const setWorkWeek = useSetSupplierWorkWeek();
   const createDestination = useCreatePurchasingDestination();
   const updateDestination = useUpdatePurchasingDestination();
@@ -280,6 +283,7 @@ export default function OperationPurchasingSettings({
   const [poDraft, setPoDraft] = useState<number[] | null>(null);
   const [weekDraft, setWeekDraft] = useState<Record<string, number[]>>({});
   const [prodDraft, setProdDraft] = useState<Record<string, string>>({});
+  const [transitDraft, setTransitDraft] = useState<Record<string, string>>({});
   const [destinationDraft, setDestinationDraft] = useState<DestinationDraft | null>(null);
   const [collectionDrafts, setCollectionDrafts] = useState<Record<string, CollectionDraft>>({});
 
@@ -342,6 +346,14 @@ export default function OperationPurchasingSettings({
     <div className="h-full flex flex-col">
       {!embedded && <PurchasingTabs />}
       <div className="px-9 py-8 pb-14 overflow-auto" data-testid="purchasing-settings">
+        {/* The governed Settings page header — kicker + page title, the same
+            size, spacing and typography Sales Order Settings has drawn since it
+            shipped. This page opened straight onto a paragraph until 2026-09-09
+            and was the only Settings section with no title at all. */}
+        <div className="mb-5">
+          <div className="kicker">Purchasing</div>
+          <h1 className="text-page font-display mt-1.5 text-base-900">Purchasing Settings</h1>
+        </div>
         <div className="text-body text-base-600 mb-[18px] max-w-[720px]">
           The settings the ordering engine reads. Change one here and SO Batch Purchase uses it
           the same day.
@@ -723,6 +735,110 @@ export default function OperationPurchasingSettings({
           <p className="text-label text-base-500 mt-2">
             One factory at a time — a PO already sent keeps the date it was sent
             with.
+          </p>
+        </section>
+
+        {/* ── Transit days, per supplier ───────────────────────────────────
+            THE SECOND LEG OF THE LEAD TIME (owner correction, 2026-09-09).
+            `purchasing_supplier_settings.transit_days` and its audited write
+            door have existed since migration 0318, and NOTHING in the portal
+            has ever shown or set them — while Manual Purchase told the operator
+            "Add transit days for {supplier} in Settings". This is that field.
+            The stored values are read as they are; nothing is defaulted, and a
+            supplier nobody has set reads `Set a number`. */}
+        <section className="mb-8 max-w-[860px]" data-testid="transit-days-settings">
+          <h2 className="text-strong font-semibold text-base-900 mb-1">
+            Transit days
+          </h2>
+          <p className="text-meta text-base-500 mb-3">
+            Working days between the factory finishing and the goods reaching
+            Carres. Counted on the Carres work week, not the factory&rsquo;s.
+          </p>
+          <div className="bg-white border border-base-200 rounded-[10px] px-4">
+            {data.suppliers.length === 0 && (
+              <div className="py-4 text-body text-base-600">
+                No factory has SKUs yet. Add SKUs in Operation Catalog and the
+                factory appears here.
+              </div>
+            )}
+            {data.suppliers.map((s) => {
+              const draft =
+                transitDraft[s.id] ?? (s.transitDays == null ? "" : String(s.transitDays));
+              const n = Number(draft);
+              const valid =
+                draft !== "" &&
+                Number.isInteger(n) &&
+                n >= TRANSIT_DAYS_RANGE.min &&
+                n <= TRANSIT_DAYS_RANGE.max;
+              const dirty = valid && n !== s.transitDays;
+              return (
+                <div
+                  key={s.id}
+                  className="py-3 border-b border-base-100 last:border-b-0 flex items-start justify-between gap-4 flex-wrap"
+                  data-testid={`transit-row-${s.id}`}
+                >
+                  <div className="min-w-[240px]">
+                    <div className="text-body text-base-900">{s.name}</div>
+                    {s.transitDays == null && (
+                      <div
+                        className="text-meta text-warning mt-0.5"
+                        data-testid={`transit-set-a-number-${s.id}`}
+                      >
+                        Set a number
+                      </div>
+                    )}
+                    <ChangeLine
+                      settings={data}
+                      settingKey="supplier_transit_days"
+                      supplierId={s.id}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={TRANSIT_DAYS_RANGE.min}
+                      max={TRANSIT_DAYS_RANGE.max}
+                      step={1}
+                      value={draft}
+                      disabled={!canEdit}
+                      onChange={(e) =>
+                        setTransitDraft((d) => ({ ...d, [s.id]: e.target.value }))
+                      }
+                      className={`${INPUT_CLS} w-24 disabled:opacity-60`}
+                      data-testid={`transit-days-${s.id}`}
+                    />
+                    <span className="text-meta text-base-500 w-[86px]">working days</span>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        disabled={!dirty || setTransit.isPending}
+                        onClick={() =>
+                          setTransit
+                            .mutateAsync({ supplierId: s.id, days: n })
+                            .then(() => {
+                              setTransitDraft((d) => {
+                                const next = { ...d };
+                                delete next[s.id];
+                                return next;
+                              });
+                              toast.success("Saved");
+                            })
+                            .catch(fail)
+                        }
+                        className="btn-primary text-meta disabled:opacity-40"
+                        data-testid={`transit-save-${s.id}`}
+                      >
+                        Save
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-label text-base-500 mt-2">
+            Order By allows for this time as well as production time, so the
+            Safety days stay whole.
           </p>
         </section>
 

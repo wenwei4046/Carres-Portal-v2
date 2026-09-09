@@ -617,6 +617,7 @@ Sales Order line
 → Stock reads available/reserved/incoming quantity
 → uncovered quantity becomes purchase_demand
 → Delivery-derived latest arrival date becomes Purchasing required date
+→ Settings resolve production + transit days; Order By walks both legs backwards
 → SO Batch Purchase groups ready lines by supplier
 → operator checks/splits Deliver To
 → an authorised issuer uses the one PO door; normal PO Duty remains the work owner
@@ -949,8 +950,34 @@ no working-day arithmetic, and Safety days are subtracted exactly once:
 
 ```text
 Requested Delivery Date − 14 Safety days                         = Goods Must Arrive
-Goods Must Arrive − Supplier × Category production working days  = Order By
+Goods Must Arrive − Supplier transit working days                = Goods Must Be Ready
+Goods Must Be Ready − Supplier × Category production working days = Order By
 ```
+
+**THE TRANSIT LEG — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The backward walk
+subtracted production days only, while the forward arithmetic that stamps a PO's `eta_date`
+(`expectedArrivalOf`) has always been `production + transit`. One derived fact therefore had two
+arithmetics (Architecture Law D), and the gap was paid out of the Safety period: a PO issued
+exactly ON `Order By` arrived one working day AFTER `Goods Must Arrive`. Measured on live data
+(every configured supplier carries `transit_days = 1`): a Mon 2 Nov 2026 customer date gave
+`Goods Must Arrive` Tue 13 Oct and `Order By` Sat 26 Sep, and the PO born that day promised
+Wed 14 Oct — **13 of 14 safety days, not 14.**
+
+`Order By` is now Fri 25 Sep for the same order, and the two walks are exact inverses of each
+other. The rules that do not change: **Safety days are subtracted exactly once**, at
+`Goods Must Arrive`; each leg counts on its own named calendar (Law 2A) — the transit leg on the
+OFFICE week because Carres arranges the movement, the production leg on the factory's own week;
+`Goods Must Be Ready` is engine-internal and is **not** a screen word, a column or a stored date;
+and `Order By` remains a planned date, never an unlock date. `transit_days` is the SAME governed
+`purchasing_supplier_settings` number the PO already used — nothing was added, renamed or
+defaulted. A supplier with no number set keeps the pre-correction behaviour (the leg is omitted,
+never guessed); this is currently unreachable, because every supplier that has production days
+also has transit days.
+
+**PO DAYS DO NOT MOVE `Order By`.** `po_days` (live: `Mon · Wed · Fri`) is a scheduling fact, not
+an input to this arithmetic — the SO Batch surface passes no review days to the planner at all, so
+`Order By` is calendar arithmetic alone and may legitimately land on a day POs are not sent (in the
+worked example above, a Saturday). It never becomes an unlock date and never delays a late line.
 
 Timing classification, derived by the same engine:
 
@@ -1028,8 +1055,13 @@ keeps feeding the rail and Work Engine; structured actions keep feeding central 
   visible, blank and unselectable.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
-  `purchase_orders.eta_date`, the official supplier-facing date — never `expected_ready_date`,
-  never the internal `Goods Must Arrive`, never an "if ordered today" estimate.
+  `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
+  never changed (§5.7) — never `eta_date`, which is the LIVE planning arrival the ready-date door
+  recomputes; never `expected_ready_date`; never the internal `Goods Must Arrive`; never an
+  "if ordered today" estimate. **Corrected 2026-09-09:** this section named `eta_date` and the
+  Register read it, so the same column disagreed with Purchase Orders and with the paper the
+  supplier holds. A PO whose original the 0428 recovery could not evidence stays NULL and prints
+  as an absence — an unknown original is never back-filled from today's planning date.
 - **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
   `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
 - **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
@@ -2371,7 +2403,12 @@ Settings lives under the global header gear and requires authorised roles. It in
 - default `Deliver To` (`Carres Klang`) and permitted destinations, including add, address,
   availability, default, receiving station/party, arrival calendar, linked Warehouse/no-Stock
   consequence, Unit-scan requirement and signed-DO evidence controls;
-- supplier channels, contacts, `Supplier work week` and Supplier × Product Category Production Days;
+- supplier channels, contacts, `Supplier work week`, Supplier × Product Category Production Days
+  and `Transit days` — the last of these reached a screen on 2026-09-09. Its column and its audited
+  write door (`purchasing_set_supplier_transit_days`) shipped with migration 0318 and nothing had
+  ever called them, while Manual Purchase told the operator to *"Add transit days for {supplier} in
+  Settings"*. Stored values are shown as they are; a supplier nobody has set reads `Set a number`,
+  and the door refuses a null so an unknown lorry leg stays unknown rather than becoming `0`;
 - PO grouping rules and source-preservation law;
 - purchased vs supplier-consignment agreements and settlement terms;
 - supplier Unit-label capability (package, physical Unit, future machine-readable support);

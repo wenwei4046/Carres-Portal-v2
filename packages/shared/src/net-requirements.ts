@@ -60,6 +60,21 @@ export interface DemandLine {
    * different work weeks (each leg counts its own; the bundle takes the earliest).
    */
   offDays?: readonly number[];
+  /**
+   * WORKING days between the factory FINISHING and the goods reaching Carres,
+   * counted on the OFFICE week (`options.offDays`) — moving the goods is
+   * arranged by us, not by the factory (Law 2A). This is the same
+   * `purchasing_supplier_settings.transit_days` the forward arithmetic
+   * (`expectedArrivalOf`) already adds, so the backward walk here and the
+   * `eta_date` a PO is born with are finally ONE arithmetic (Law D).
+   *
+   * `undefined` / `null` = nobody has set a number for this supplier. The leg
+   * is then OMITTED, never guessed — a transit number nobody chose would be a
+   * date the register would paint as a measurement (P1). Omitting it is
+   * exactly the pre-2026-09-09 behaviour, so a caller that does not supply
+   * this field is unchanged, byte for byte.
+   */
+  transitDays?: number | null;
 }
 
 export interface NetRequirementsSupply {
@@ -149,8 +164,9 @@ export interface BundleRequirement {
   /**
    * **Stock Ready** — `deadline − arrivalBufferDays` (delivery-side working
    * days): the day the goods must be in for the delivery to be arranged in
-   * time. It is what `raiseBy` is measured back FROM, so the two can never
-   * disagree, and it is the ONE source To Order reads (Loo, 2026-07-30 — the
+   * time. `raiseBy` is measured back from it through the transit leg and then
+   * the production leg, so the two can never disagree, and it is the ONE
+   * source To Order reads (Loo, 2026-07-30 — the
    * naming freeze: Stock Ready is Carres' own requirement, never a supplier's
    * promise, which is `purchase_orders.expected_ready_date`).
    *
@@ -158,9 +174,12 @@ export interface BundleRequirement {
    * was thrown away, which is why nothing downstream could show it.
    */
   arriveBy: IsoDate | null;
-  /** arriveBy − maxLead (working days). `null` when deadline is TBD. */
+  /**
+   * arriveBy − transit − production (each on its own calendar). `null` when
+   * the deadline is TBD. A planned date, never an unlock date.
+   */
   raiseBy: IsoDate | null;
-  /** One-trip ready date if the PO is cut today = today + maxLead. */
+  /** One-trip ARRIVAL if the PO is cut today = today + production + transit. */
   promiseIfOrderedToday: IsoDate;
   /** Sum of member `toOrder` — 0 means fully covered. */
   toOrder: number;
@@ -356,10 +375,25 @@ export function computeNetRequirements(
     const maxLeadDays = members.reduce((mx, m) => Math.max(mx, m.leadDays), 0);
     // Arrival buffer: stock must land `arrivalBufferDays` working days BEFORE the
     // deadline (Carres/delivery-side week = wdOpts), leaving time to arrange
-    // delivery. Then each member backs off its OWN lead using its OWN supplier
-    // work week (m.offDays); the bundle is ordered by the EARLIEST member
+    // delivery. Then each member walks TWO legs backwards, each on its own
+    // named calendar (Law 2A), and the bundle is ordered by the EARLIEST member
     // raise-by (a bed-set spanning Nice Future 5-day + Ohana 6-day gates on the
     // earlier leg — both must be ready by arriveBy).
+    //
+    //   arriveBy  = deadline − Safety days              OFFICE week (wdOpts)
+    //   readyBy   = arriveBy − transit days             OFFICE week (wdOpts)
+    //   raiseBy   = readyBy  − production days          FACTORY week (memberWd)
+    //
+    // THE TRANSIT LEG WAS MISSING HERE UNTIL 2026-09-09 (owner correction).
+    // The forward arithmetic a PO is born with — `expectedArrivalOf`, which
+    // stamps `eta_date` — has always been `production + transit`, so a PO
+    // issued exactly ON raise-by arrived one working day AFTER the goods were
+    // due and quietly ate a day of the Safety period. Measured on live data
+    // (every configured supplier carries `transit_days = 1`): a 2 Nov customer
+    // date gave Goods Must Arrive Tue 13 Oct and Order By Sat 26 Sep, and the
+    // PO born that day promised Wed 14 Oct — 13 of 14 safety days, not 14.
+    // Backward and forward are now exact inverses of one another (Law D), and
+    // Safety days are still subtracted EXACTLY ONCE, here at `arriveBy`.
     const buffer = options.arrivalBufferDays ?? 0;
     const arriveBy =
       deadline == null ? null : subtractWorkingDays(deadline, buffer, wdOpts);
@@ -370,11 +404,17 @@ export function computeNetRequirements(
         holidays: options.holidays,
         offDays: m.offDays ?? options.offDays,
       };
+      // No number set → the leg is omitted, never guessed (`transitDaysFor`
+      // is documented NEVER DEFAULTED). A caller that supplies nothing keeps
+      // the exact dates it got before this change.
+      const transit = m.transitDays ?? 0;
       if (arriveBy != null) {
-        const rb = subtractWorkingDays(arriveBy, m.leadDays, memberWd);
+        const readyBy = subtractWorkingDays(arriveBy, transit, wdOpts);
+        const rb = subtractWorkingDays(readyBy, m.leadDays, memberWd);
         if (raiseBy == null || rb < raiseBy) raiseBy = rb;
       }
-      const arrival = addWorkingDays(today, m.leadDays, memberWd);
+      const ready = addWorkingDays(today, m.leadDays, memberWd);
+      const arrival = addWorkingDays(ready, transit, wdOpts);
       if (arrival > promiseIfOrderedToday) promiseIfOrderedToday = arrival;
     }
     const toOrder = members.reduce(

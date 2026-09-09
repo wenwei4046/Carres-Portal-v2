@@ -238,7 +238,7 @@ const registerRows: SoBatchOrderRow[] = rows.map((r, i) => ({
     supplierId: r.supplierId,
     supplierName: r.supplier,
     destinationId: KLANG,
-    etaDate: "2026-09-15",
+    officialDeliveryDate: "2026-09-15",
     sentCurrentVersion: true,
   })),
   lines: r.lineIds.map((lineId, j) => ({
@@ -266,10 +266,10 @@ registerRows.push(
     pos: [
       { poId: "PO-20260818-1042", status: "received", supplierId: "s-hooka",
         supplierName: "Nice Future", destinationId: KLANG,
-        etaDate: "2026-09-18", sentCurrentVersion: true },
+        officialDeliveryDate: "2026-09-18", sentCurrentVersion: true },
       { poId: "PO-20260819-2210", status: "open", supplierId: "s-ohana",
         supplierName: "Ohana", destinationId: BULOH,
-        etaDate: "2026-09-22", sentCurrentVersion: true },
+        officialDeliveryDate: "2026-09-22", sentCurrentVersion: true },
     ],
     lines: [
       { orderLineId: "l901", sku: "B1201S-K", qty: 1, stockTaken: 0,
@@ -295,7 +295,7 @@ registerRows.push(
     pos: [
       { poId: "PO-20260902-3301", status: "open", supplierId: "s-hooka",
         supplierName: "Nice Future", destinationId: KLANG,
-        etaDate: null, sentCurrentVersion: false },
+        officialDeliveryDate: null, sentCurrentVersion: false },
     ],
     lines: [
       { orderLineId: "l911", sku: "B1201S-Q", qty: 2, stockTaken: 0,
