@@ -62,13 +62,32 @@ export default function GlobalTopBar() {
 /** Which module's settings the launcher offers first. A module appears only
  *  when it actually OWNS settings — an entry that opens an empty page is a
  *  promise about the product, which is the thing the old placeholder did. */
-function moduleSettingsFor(pathname: string): { label: string; href: string } | null {
+/** The Warehouse map is four `?tab=` destinations, not four pathnames
+ *  (`portal-nav.ts`: Monitor · Inbound · Inventory · Outbound). The launcher
+ *  reads the tab, because reading only the pathname would offer Warehouse
+ *  Settings on every Operations page or on none. */
+const WAREHOUSE_TABS = new Set([
+  "warehouse-monitor",
+  "warehouse-inbound",
+  "warehouse-outbound",
+  "warehouse-dashboard",
+  "stock-onhand",
+]);
+
+function moduleSettingsFor(
+  pathname: string,
+  search = "",
+): { label: string; href: string } | null {
   if (pathname.startsWith("/operation/issues")) return { label: "Issue Tracker Settings", href: "/operation/settings/issue-tracker" };
   if (pathname.startsWith("/operation/orders")) {
     return { label: "Sales Order Settings", href: "/operation/settings/sales-orders" };
   }
   if (pathname.startsWith("/operation/purchasing") || pathname.startsWith("/operation/to-order")) {
     return { label: "Purchasing Settings", href: "/operation/settings/purchasing" };
+  }
+  const tab = new URLSearchParams(search).get("tab") ?? "";
+  if (WAREHOUSE_TABS.has(tab)) {
+    return { label: "Warehouse Settings", href: "/operation/settings/warehouse/details" };
   }
   return null;
 }
@@ -79,7 +98,7 @@ function moduleSettingsFor(pathname: string): { label: string; href: string } | 
 export function TopBarIcons() {
   const navigate = useNavigate();
   const location = useLocation();
-  const moduleSettings = moduleSettingsFor(location.pathname);
+  const moduleSettings = moduleSettingsFor(location.pathname, location.search);
   const { data } = useOperationOrders({});
   const orders = useMemo(() => data?.orders ?? [], [data]);
   const tasksQ = useQuery<OpsTasksListResponse>({
