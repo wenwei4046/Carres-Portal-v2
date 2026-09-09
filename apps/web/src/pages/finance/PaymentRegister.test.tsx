@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PaymentRegister from "./PaymentRegister";
 
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
-  refetch: vi.fn(), error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})) }));
+  refetch: vi.fn(), isSuccess: true, error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})) }));
 vi.mock("xlsx", () => ({ utils: { json_to_sheet: state.sheet, book_new: () => ({}),
   book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 vi.mock("@/lib/queries", () => ({
@@ -40,6 +40,7 @@ beforeEach(() => {
   state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-060926-0002", amount: 100,
     voided_at: "2026-09-06", void_reason: "Duplicate" }];
   state.isError = false;
+  state.isSuccess = true;
   state.isLoading = false;
   state.error = null;
   state.sheet.mockClear();
@@ -312,5 +313,29 @@ describe("the footer counts in English", () => {
     state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-2" }];
     show();
     expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("2 payments");
+  });
+});
+
+/**
+ * ⭐ NO CONFIRMED ANSWER IS NOT AN EMPTY LIST — measured on production
+ * 2026-09-09, and the reason this module keeps re-learning it.
+ *
+ * React Query PAUSES a query rather than erroring it, and a paused query
+ * reports `status:"pending" · fetchStatus:"paused" · isError:false ·
+ * data:undefined`. `isLoading` is `isPending && isFetching`, so it is FALSE
+ * while paused — and the grid drew its definitive `No payments yet` with a
+ * `RM 0.00` total over a read that had never finished. The register must speak
+ * only from a successful read.
+ */
+describe("a read that has not succeeded never reads as zero", () => {
+  it("shows the loading grid, not the empty message, and states no total", () => {
+    state.isSuccess = false;
+    state.isError = false;
+    state.isLoading = false; // exactly what a PAUSED query reports
+    state.data = undefined as never;
+    show();
+    expect(screen.queryByText(/No payments yet/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Loading…");
+    expect(screen.queryByText(/RM 0\.00/)).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register
 import InvoiceRegister from "./InvoiceRegister";
 
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
-  refetch: vi.fn(), error: null as Error | null }));
+  refetch: vi.fn(), isSuccess: true, error: null as Error | null }));
 vi.mock("@/lib/queries", () => ({
   useInvoiceRegister: () => state,
   useRecordPayment: () => ({ mutate: vi.fn(), isPending: false }),
@@ -86,6 +86,7 @@ beforeEach(() => {
       voided_at: "2026-09-06", void_reason: "Wrong amount" }),
   ];
   state.isError = false;
+  state.isSuccess = true;
   state.isLoading = false;
   localStorage.clear();
 });
@@ -288,5 +289,29 @@ describe("the footer counts in English", () => {
   it("still says invoices for many", () => {
     show();
     expect(screen.getByTestId("invoice-register-summary")).toHaveTextContent(/^3 invoices · /);
+  });
+});
+
+/**
+ * ⭐ NO CONFIRMED ANSWER IS NOT AN EMPTY LIST — measured on production
+ * 2026-09-09, and the reason this module keeps re-learning it.
+ *
+ * React Query PAUSES a query rather than erroring it, and a paused query
+ * reports `status:"pending" · fetchStatus:"paused" · isError:false ·
+ * data:undefined`. `isLoading` is `isPending && isFetching`, so it is FALSE
+ * while paused — and the grid drew its definitive `No invoices yet` with a
+ * `RM 0.00` total over a read that had never finished. The register must speak
+ * only from a successful read.
+ */
+describe("a read that has not succeeded never reads as zero", () => {
+  it("shows the loading grid, not the empty message, and states no total", () => {
+    state.isSuccess = false;
+    state.isError = false;
+    state.isLoading = false; // exactly what a PAUSED query reports
+    state.data = undefined as never;
+    show();
+    expect(screen.queryByText(/No invoices yet/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Loading…");
+    expect(screen.queryByText(/RM 0\.00/)).not.toBeInTheDocument();
   });
 });

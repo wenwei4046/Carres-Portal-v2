@@ -150,7 +150,10 @@ export default function PaymentRegister() {
     : <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
         storageKey="carres.payment.register.v1" appearance="reference" exportName="Payments"
-        groupBanner={false} stickyIdentity isLoading={query.isLoading} searchPlaceholder="Search payments…"
+        /* No confirmed answer is not an empty list — see the note on the
+           Invoices Register. A PAUSED query leaves `isLoading` false and
+           `data` undefined, and the grid would assert `No payments yet`. */
+        groupBanner={false} stickyIdentity isLoading={!query.isSuccess} searchPlaceholder="Search payments…"
         toolbarStart={<span className="flex items-center gap-3 text-body">
           <span aria-current="page" className="font-semibold">Payments</span>
           <Link to={scopedRegisterHref("/finance/invoices", orderScope)}>Invoices</Link>

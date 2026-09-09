@@ -1,3 +1,37 @@
+## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
+
+**Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
+
+React Query PAUSES a query rather than erroring it. A paused query reports
+`status:"pending" · fetchStatus:"paused" · isError:false · data:undefined`, and because
+`isLoading` is `isPending && isFetching`, **`isLoading` is FALSE while paused.** A register that
+passes `isLoading={query.isLoading}` to `DataGrid` therefore draws its definitive empty message —
+and its footer total — over a read that never finished. Measured live: the Invoices Register
+printed `0 invoices · RM 0.00 still needed` while its read was paused. There was an invoice.
+
+**The fix, one line per register:** `isLoading={!query.isSuccess}` — the grid shows its skeleton
+and the footer says `Loading…` until the answer is real. `DataGrid` already suppresses both the
+empty message and the status summary while `isLoading` is true, so nothing else changes.
+
+**Done in Payment** (`PaymentRegister.tsx`, `InvoiceRegister.tsx`), each with a test that fails
+against `query.isLoading`.
+
+**Still open — these seven, owned by other modules:**
+
+```
+apps/web/src/pages/operation/OperationSupplierClaims.tsx
+apps/web/src/pages/operation/OperationReceiving.tsx
+apps/web/src/pages/operation/WarehouseInbound.tsx
+apps/web/src/pages/operation/OperationSupplierItems.tsx
+apps/web/src/pages/operation/OperationToOrder.tsx
+apps/web/src/pages/operation/OperationManualPurchase.tsx
+apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx
+```
+
+Each is a surface where "nothing here" and "we could not read it" currently look identical to the
+operator. Not changed here because they belong to Purchasing, Receiving, Warehouse and Suppliers;
+each owner should take the one-line change with a test.
+
 # Open carry-forwards (living doc)
 
 > **What this is**: the full text of every open carry-forward (CF), moved out of CLAUDE.md
