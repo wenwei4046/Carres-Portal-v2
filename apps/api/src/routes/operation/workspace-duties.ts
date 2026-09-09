@@ -39,6 +39,8 @@ const DUTIES = [
   { key: "payment_approver", label: "Payment Approver" },
   { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
   { key: "service_case_approver", label: "Service Case Approver" },
+  { key: "issue_triage_duty", label: "Issue Triage Duty" },
+  { key: "issue_review_approver", label: "Issue Review Approver" },
 ] as const;
 
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {

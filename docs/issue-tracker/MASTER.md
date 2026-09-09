@@ -164,6 +164,14 @@ LINE 1     FACT / PROBLEM
 LINE 2     ACTION AND OBJECT + RECIPIENT + REQUIRED RESULT
 ```
 
+The authoritative record is one versioned `issue_actions` occurrence. Exactly one may be open for
+an Issue. `Issue Triage Duty` owns evidence gathering and operational coordination;
+`Issue Review Approver` owns the governed accountability decision. A module-specific action stays
+in its owning module and is only linked here. Recording a result closes the occurrence and preserves
+normal owner, dated cover and actual actor; if the result requires another Issue action, the same
+transition replaces it with the next sequence. Workspace projects the open occurrence and never
+creates an `ops_tasks` copy.
+
 Every action must answer:
 
 - **WHO** acts — resolved from the governed Owner Rule and shown as structured avatar/metadata;

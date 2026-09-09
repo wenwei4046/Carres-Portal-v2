@@ -212,6 +212,8 @@ describe("GET /api/operation/workspace-duties", () => {
       "payment_approver",
       "stock_adjustment_approver",
       "service_case_approver",
+      "issue_triage_duty",
+      "issue_review_approver",
     ]);
     const grnDuty = body.duties.find((d) => d.key === "grn_duty")!;
     expect(grnDuty).toMatchObject({ key: "grn_duty", label: "GRN Duty" });
