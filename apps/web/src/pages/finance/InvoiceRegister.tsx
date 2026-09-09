@@ -303,7 +303,9 @@ export default function InvoiceRegister() {
           const needed = orders.reduce((sum, id) => {
             const m = soRemaining(rows, id); return sum + (m.known ? m.outstanding : 0);
           }, 0);
-          return <span data-testid="invoice-register-summary">{visible.length} invoices · {rm(needed)} still needed</span>;
+          // `1 invoices` is the tell that a count was interpolated and never
+          // read aloud. The operator reads this line every day.
+          return <span data-testid="invoice-register-summary">{visible.length} {visible.length === 1 ? "invoice" : "invoices"} · {rm(needed)} still needed</span>;
         }}
       />
     </ListPageShell>}
