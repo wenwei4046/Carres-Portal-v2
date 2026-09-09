@@ -36,7 +36,7 @@ import {
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderAttemptRow, DeliveryOrderRow } from "@/lib/queries";
-import { conciseLocality } from "./sales-order-columns";
+import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
 import { lineName } from "./sales-order-facts";
 
 /** ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section). */
@@ -233,8 +233,10 @@ export function buildDoRegisterRow(
     orderId: r.orders.id,
     so: r.orders.so,
     customer: displayCustomerName(r.orders.customer_name ?? "") || "No customer name",
-    requestedDelivery: r.orders.delivery_date_tbd ? null : (r.orders.delivery_date ?? null),
-    requestedTbd: Boolean(r.orders.delivery_date_tbd),
+    /* The SAME `Requested Delivery Date` arithmetic Monitor and the Sales
+       Orders register read — never a second copy of the tbd guard. */
+    requestedDelivery: requestedDeliveryOf(r.orders).iso,
+    requestedTbd: requestedDeliveryOf(r.orders).tbd,
     confirmedDelivery: r.delivery_date ? r.delivery_date.slice(0, 10) : null,
     confirmedTime: r.time_slot,
     location: conciseLocality(

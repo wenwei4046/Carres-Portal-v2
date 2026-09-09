@@ -118,24 +118,42 @@ describe("DeliveryOrdersRegister", () => {
     expect(useDeliveryOrdersRegisterSpy).toHaveBeenCalledWith({ orderId: "order-1" });
   });
 
-  it("renders the corrected default columns, with the SO-side dates in the chooser", () => {
+  /** The visible header labels, in the order the sheet prints them — the
+   *  selection and ▸ headers included, so a header index and a row's cell
+   *  index address the SAME column. */
+  function headerOrder(): string[] {
+    return screen.getAllByRole("columnheader").map((h) => (h.textContent ?? "").trim());
+  }
+
+  it("renders the corrected default columns in the ruled order, `Requested Delivery Date` visible", () => {
     mount([doRow()]);
-    for (const label of [
+    /* ⭐ THE OWNER'S ORDER (correction 2026-09-09): the customer's request and
+       the confirmed answer stand together near the front; `DO date` — the day
+       the paper was issued, and neither delivery date — falls to the end. */
+    const ruled = [
       "DO No",
-      "DO date",
       "SO No",
       "Customer",
-      "Delivery Location",
-      "Logistics Partner",
+      "Requested Delivery Date",
       "Confirmed Delivery",
+      "Confirmed Time",
+      "Logistics Partner",
+      "Delivery Location",
       "Delivery Result",
       "Proof Status",
       "Status",
-    ]) {
-      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
-    }
-    /* In the chooser, off by default (owner correction 2026-09-06). */
-    for (const hidden of ["Requested Delivery Date", "Confirmed Time", "Goods", "Created"]) {
+      "DO date",
+    ];
+    const headers = headerOrder();
+    expect(ruled.every((label) => headers.some((h) => h.includes(label)))).toBe(true);
+    const at = (label: string) => headers.findIndex((h) => h.includes(label));
+    expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
+    /* ADJACENT — nothing may be inserted between the request and the answer. */
+    expect(at("Confirmed Delivery") - at("Requested Delivery Date")).toBe(1);
+    /* `DO date` is LAST of the twelve: it answers when the document issued. */
+    expect(at("DO date")).toBe(Math.max(...ruled.map(at)));
+    /* Still in the chooser, off by default. */
+    for (const hidden of ["Goods", "Created"]) {
       expect(screen.queryByRole("columnheader", { name: hidden })).toBeNull();
     }
     /* The retired ambiguous label never returns. */
@@ -143,6 +161,52 @@ describe("DeliveryOrdersRegister", () => {
     for (const banned of ["Owner", "PIC", "Next action", "Assigned"]) {
       expect(screen.queryByText(banned)).toBeNull();
     }
+  });
+
+  it("`DO date` is never printed as the requested or the confirmed delivery date", () => {
+    /* Three different days, so nothing can pass by coincidence. */
+    mount([
+      doRow({
+        issued_at: "2026-08-17T00:00:00Z",
+        delivery_date: "2026-08-24",
+        orders: {
+          ...doRow().orders,
+          delivery_date: "2026-08-20",
+          delivery_date_tbd: false,
+        },
+      }),
+    ]);
+    const row = screen.getAllByRole("row").at(-1)!;
+    const cells = within(row)
+      .getAllByRole("cell")
+      .map((c) => (c.textContent ?? "").trim());
+    const headers = headerOrder();
+    const cellUnder = (label: string) =>
+      cells[headers.findIndex((h) => h.includes(label))] ?? "";
+    expect(cellUnder("Requested Delivery Date")).toContain("20 Aug");
+    expect(cellUnder("Confirmed Delivery")).toContain("24 Aug");
+    expect(cellUnder("DO date")).toContain("17 Aug");
+  });
+
+  it("a customer date still being settled reads `To be confirmed`, never `No delivery date`", () => {
+    mount([
+      doRow({
+        orders: {
+          ...doRow().orders,
+          delivery_date: "2026-08-25",
+          delivery_date_tbd: true,
+        },
+      }),
+    ]);
+    const row = screen.getAllByRole("row").at(-1)!;
+    const cells = within(row)
+      .getAllByRole("cell")
+      .map((c) => (c.textContent ?? "").trim());
+    const headers = headerOrder();
+    const cell = cells[headers.findIndex((h) => h.includes("Requested Delivery Date"))] ?? "";
+    expect(cell).toBe("To be confirmed");
+    /* The stored day is deliberately NOT printed — nobody has agreed it. */
+    expect(cell).not.toContain("25 Aug");
   });
 
   it("wears the Sales Orders grammar: checkboxes, header select-all, chevrons, and the in-place selection toolbar", () => {

@@ -46,7 +46,7 @@
  * replace the whole displayed window; the calendar never scrolls sideways.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from "lucide-react";
 import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
 import { fmtDate, fmtMonth, appTodayIso } from "@/lib/fmt-date";
@@ -69,16 +69,15 @@ import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./component
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
 import { lineName } from "./sales-order-facts";
-import {
-  DATE_TO_BE_CONFIRMED_CELL,
-  DATE_TO_BE_CONFIRMED_FULL,
-} from "./sales-order-guidance";
+import { requestedDeliveryText } from "./sales-order-columns";
+import { DATE_TO_BE_CONFIRMED_FULL } from "./sales-order-guidance";
 import { DW, type DeliveryScopeRow } from "./delivery-work";
 import Segmented from "@/components/Segmented";
 import {
   DEFAULT_CALENDAR_VIEW,
   MONITOR_CALENDAR_VIEWS,
   MONITOR_CALENDAR_VIEW_LABEL,
+  MONITOR_COLUMN,
   MONITOR_COPY,
   MONITOR_DAYS,
   MONITOR_STATUS_FILTERS,
@@ -94,8 +93,11 @@ import {
   filterMonitorListRows,
   groupCardsByDay,
   isCalendarProjection,
+  matchesMonitorSearch,
   missingProofLabels,
   monitorCardHref,
+  monitorRowAction,
+  monitorRowActionText,
   monthDayCounts,
   monthDaysOf,
   monthStepStart,
@@ -123,7 +125,11 @@ const EDIT_DELIVERY = "Edit Delivery";
 
 /** The rail-collapse memory (LOCAL FILTER RAIL COLLAPSE law). */
 const FILTER_RAIL_STORAGE_KEY = "carres.deliveryMonitor.filterRail";
-const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v2";
+/* v3 — the 2026-09-09 chase correction changed the DEFAULT column order and
+   added `Actions`. A persisted `order` array wins over the default, so a key
+   that kept its name would have shown the old sheet to every operator who had
+   ever opened this page. */
+const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v3";
 
 /**
  * The OPERATIONAL ladder's tones (owner ruling 2026-08-24): waiting is the
@@ -177,6 +183,16 @@ function useViewportMode(): ViewportMode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneQuery, tabletQuery]);
   return mode;
+}
+
+/** This workspace's row, through the portal's ONE `Requested Delivery Date`
+ *  spelling — Sales Orders owns the date, and every reader prints it the
+ *  same way. */
+function requestedText(r: DeliveryMonitorCard): string {
+  return requestedDeliveryText({
+    iso: r.scope.customerDeliveryIso,
+    tbd: r.scope.customerDateTbd,
+  });
 }
 
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
@@ -234,6 +250,90 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
         <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>
       </div>
     </Link>
+  );
+}
+
+/**
+ * ⭐ THE PHONE'S WORK LIST — a readable list, never the desktop sheet squeezed.
+ *
+ * A work queue on a phone answers the same question it answers on a desk, and
+ * the operator standing in a warehouse chasing a carrier must see, WITHOUT
+ * opening a Columns chooser: what the customer asked for, whether anyone has
+ * agreed a day, who carries it, and the one thing to do next. Those four
+ * facts are the card; everything else the sheet offers is a desk job.
+ *
+ * The words, the absences and the act are the SAME ones the DataGrid prints —
+ * `monitorRowAction` and the governed absence strings — so the two viewports
+ * can never tell an operator two different things.
+ */
+function MonitorWorkCard({
+  card,
+  onAssign,
+  onEdit,
+  onOpenOrder,
+}: {
+  card: DeliveryMonitorCard;
+  onAssign: (card: DeliveryMonitorCard) => void;
+  onEdit: (card: DeliveryMonitorCard) => void;
+  onOpenOrder: (card: DeliveryMonitorCard) => void;
+}) {
+  const action = monitorRowAction(card);
+  /* The SAME words the sheet prints — the phone never spells a date twice. */
+  const requested = requestedText(card);
+  const confirmed = card.confirmedDate ? fmtDate(card.confirmedDate) : DW.noConfirmedDate;
+  const row = (label: string, value: string, muted: boolean) => (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
+      <span
+        className={`min-w-0 truncate text-body ${muted ? "text-kit-slate-9" : "text-kit-slate-12"}`}
+        {...(muted ? { "data-absence": "true" } : {})}
+      >
+        {value}
+      </span>
+    </div>
+  );
+  return (
+    <div
+      className="rounded-control border border-kit-slate-5 bg-white shadow-sm"
+      data-testid={`delivery-monitor-work-card-${card.scopeId}`}
+    >
+      <div className="flex flex-col gap-1 px-2.5 py-2">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <button
+            type="button"
+            className="shrink-0 font-mono font-medium text-blue-700 underline-offset-2"
+            onClick={() => onOpenOrder(card)}
+          >
+            SO-{card.scope.so}
+          </button>
+          <span className="min-w-0 truncate font-medium text-kit-slate-12">
+            {card.customerName}
+          </span>
+        </div>
+        {row(MONITOR_COLUMN.requestedDelivery, requested, !card.scope.customerDeliveryIso)}
+        {row(MONITOR_COLUMN.confirmedDelivery, confirmed, card.confirmedDate === null)}
+        {row(
+          MONITOR_COLUMN.logisticsPartner,
+          card.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
+          card.logisticsPartnerName === null,
+        )}
+      </div>
+      <div className="flex flex-col gap-1 border-t border-kit-slate-4 px-2.5 py-2">
+        {action.kind === "confirm_date" ? (
+          <span className="text-body text-kit-slate-12">{action.call}</span>
+        ) : null}
+        <button
+          type="button"
+          className="min-h-11 rounded-control border border-kit-slate-6 bg-white px-3 text-body font-medium text-kit-slate-12"
+          data-testid={`delivery-monitor-action-${action.kind}-${card.scopeId}`}
+          onClick={() =>
+            action.kind === "assign_logistics" ? onAssign(card) : onEdit(card)
+          }
+        >
+          {action.label}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -297,6 +397,7 @@ function ScopeExpansion({ row }: { row: DeliveryScopeRow }) {
 
 export default function OperationDelivery() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
@@ -526,7 +627,18 @@ export default function OperationDelivery() {
     () => filterMonitorCalendarCards(cards, filters, visibleDays),
     [cards, filters, visibleDays],
   );
+  /* The PHONE work list's own search box. It is deliberately LOCAL, not the
+     URL's `?q=`: a carried-over URL search must never narrow a work list
+     invisibly (the desktop sheet applies the same rule with the grid's own
+     box), and the phone has no sheet toolbar to put one in. */
+  const [phoneSearch, setPhoneSearch] = useState("");
+
   const listRows = useMemo(() => filterMonitorListRows(cards, filters), [cards, filters]);
+  /* The phone list's visible rows — the same rows, narrowed by its own box. */
+  const phoneRows = useMemo(
+    () => listRows.filter((c) => matchesMonitorSearch(c, phoneSearch)),
+    [listRows, phoneSearch],
+  );
   const byDay = useMemo(
     () => groupCardsByDay(calendarCards, visibleDays),
     [calendarCards, visibleDays],
@@ -586,12 +698,20 @@ export default function OperationDelivery() {
     (r: DeliveryMonitorCard) => navigate(`/operation/orders/so/${r.orderId}`),
     [navigate],
   );
+  /**
+   * The Delivery-owned editor, carrying THIS workspace back with it: the
+   * operator records the confirmed date and returns to the same queue and the
+   * same narrowing, with the row now gone from it. The Journey leg still
+   * rides the URL and never reaches the screen as a word.
+   */
   const openEditDelivery = useCallback(
-    (r: DeliveryMonitorCard) =>
-      navigate(
-        `/operation/delivery/edit/${r.orderId}${r.leg != null ? `?leg=${r.leg}` : ""}`,
-      ),
-    [navigate],
+    (r: DeliveryMonitorCard) => {
+      const params = new URLSearchParams();
+      if (r.leg != null) params.set("leg", String(r.leg));
+      params.set("from", `${location.pathname}${location.search}`);
+      navigate(`/operation/delivery/edit/${r.orderId}?${params.toString()}`);
+    },
+    [navigate, location.pathname, location.search],
   );
 
   /* ── THE WORK LIST — the same shared Register engine as Sales Orders ───── */
@@ -602,7 +722,7 @@ export default function OperationDelivery() {
            own reference rides the same cell (the string a partner recognises);
            a Journey leg adds its leg number and route. */
         key: "so",
-        label: "SO No",
+        label: MONITOR_COLUMN.so,
         width: 150,
         sortable: true,
         filterType: "numbering",
@@ -643,7 +763,7 @@ export default function OperationDelivery() {
       },
       {
         key: "customer",
-        label: "Customer",
+        label: MONITOR_COLUMN.customer,
         width: 170,
         sortable: true,
         chooserGroup: "Customer",
@@ -659,7 +779,7 @@ export default function OperationDelivery() {
         /* The rail's REGION answer, on the row — the ONE address classifier
            (`regionBucketOf`), never a second derivation. */
         key: "state",
-        label: "State",
+        label: MONITOR_COLUMN.state,
         width: 110,
         sortable: true,
         filterType: "enum",
@@ -669,24 +789,10 @@ export default function OperationDelivery() {
         filterValue: (r) => r.region ?? DW.notRecorded,
       },
       {
-        key: "location",
-        label: "Delivery Location",
-        width: 170,
-        sortable: true,
-        chooserGroup: "Customer",
-        accessor: (r) => (
-          <span className="block truncate" title={r.scope.location}>
-            {r.scope.location}
-          </span>
-        ),
-        searchValue: (r) => r.scope.location,
-        filterValue: (r) => r.scope.location,
-      },
-      {
         /* Sales Orders' promise, in the governed word (`Requested Delivery
            Date`, owner ruling 2026-08-27). Delivery reads it, never writes it. */
         key: "customer_delivery",
-        label: "Requested Delivery Date",
+        label: MONITOR_COLUMN.requestedDelivery,
         width: 176,
         sortable: true,
         filterType: "date",
@@ -694,31 +800,40 @@ export default function OperationDelivery() {
         dateValue: (r) => r.scope.customerDeliveryIso,
         accessor: (r) =>
           r.scope.customerDeliveryIso ? (
-            fmtDate(r.scope.customerDeliveryIso)
-          ) : r.scope.customerDateTbd ? (
-            <span title={DATE_TO_BE_CONFIRMED_FULL}>
-              <Absent>{DATE_TO_BE_CONFIRMED_CELL}</Absent>
-            </span>
+            requestedText(r)
           ) : (
-            <Absent>{DW.noCustomerDate}</Absent>
+            <span title={r.scope.customerDateTbd ? DATE_TO_BE_CONFIRMED_FULL : undefined}>
+              <Absent>{requestedText(r)}</Absent>
+            </span>
           ),
-        searchValue: (r) =>
-          r.scope.customerDeliveryIso ? fmtDate(r.scope.customerDeliveryIso) : DW.noCustomerDate,
-        filterValue: (r) =>
-          r.scope.customerDeliveryIso
-            ? fmtDate(r.scope.customerDeliveryIso)
-            : r.scope.customerDateTbd
-              ? DATE_TO_BE_CONFIRMED_CELL
-              : DW.noCustomerDate,
+        /* ⭐ ONE SPELLING for the cell, the search, the filter and the sheet:
+           the export used to flatten `To be confirmed` into `No delivery
+           date`, telling an Excel reader the customer had named no day when
+           the customer had asked for one still being settled. */
+        searchValue: requestedText,
+        exportValue: requestedText,
+        filterValue: requestedText,
         sortFn: (a, b) =>
           (a.scope.customerDeliveryIso ?? "").localeCompare(b.scope.customerDeliveryIso ?? ""),
+      },
+      {
+        key: "logistics",
+        label: MONITOR_COLUMN.logisticsPartner,
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) =>
+          r.logisticsPartnerName ?? <Absent>{MONITOR_COPY.noLogistics}</Absent>,
+        searchValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
+        filterValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
       },
       {
         /* Delivery's OWN confirmed operational date — the document's when one
            exists, else the confirmed booking. A carrier's provisional date is
            not confirmed and is not printed here. */
         key: "confirmed_delivery",
-        label: "Confirmed Delivery",
+        label: MONITOR_COLUMN.confirmedDelivery,
         width: 150,
         sortable: true,
         filterType: "date",
@@ -732,7 +847,7 @@ export default function OperationDelivery() {
       },
       {
         key: "confirmed_time",
-        label: "Confirmed Time",
+        label: MONITOR_COLUMN.confirmedTime,
         width: 120,
         sortable: true,
         filterType: "enum",
@@ -742,22 +857,8 @@ export default function OperationDelivery() {
         filterValue: (r) => r.confirmedTime ?? DW.noTime,
       },
       {
-        key: "goods",
-        label: "Goods",
-        width: 220,
-        sortable: true,
-        chooserGroup: "Items",
-        accessor: (r) => (
-          <span className="block truncate" title={r.goodsSummary}>
-            {r.goodsSummary}
-          </span>
-        ),
-        searchValue: (r) => r.goodsSummary,
-        filterValue: (r) => r.goodsSummary,
-      },
-      {
         key: "do_number",
-        label: "DO No",
+        label: MONITOR_COLUMN.doNumber,
         width: 150,
         sortable: true,
         filterType: "numbering",
@@ -783,20 +884,36 @@ export default function OperationDelivery() {
         filterValue: (r) => r.doNumber ?? MONITOR_COPY.noDeliveryOrder,
       },
       {
-        key: "logistics",
-        label: "Logistics Partner",
-        width: 140,
+        key: "location",
+        label: MONITOR_COLUMN.location,
+        width: 170,
         sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
-        accessor: (r) =>
-          r.logisticsPartnerName ?? <Absent>{MONITOR_COPY.noLogistics}</Absent>,
-        searchValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
-        filterValue: (r) => r.logisticsPartnerName ?? MONITOR_COPY.noLogistics,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.scope.location}>
+            {r.scope.location}
+          </span>
+        ),
+        searchValue: (r) => r.scope.location,
+        filterValue: (r) => r.scope.location,
+      },
+      {
+        key: "goods",
+        label: MONITOR_COLUMN.goods,
+        width: 220,
+        sortable: true,
+        chooserGroup: "Items",
+        accessor: (r) => (
+          <span className="block truncate" title={r.goodsSummary}>
+            {r.goodsSummary}
+          </span>
+        ),
+        searchValue: (r) => r.goodsSummary,
+        filterValue: (r) => r.goodsSummary,
       },
       {
         key: "delivery_status",
-        label: "Delivery Status",
+        label: MONITOR_COLUMN.deliveryStatus,
         width: 180,
         sortable: true,
         filterType: "enum",
@@ -828,10 +945,56 @@ export default function OperationDelivery() {
         filterValue: (r) => r.statusLabel,
       },
       {
+        /* ⭐ THE CHASE COLUMN — who must be contacted, and the one door that
+           records the answer (Delivery MASTER §8, the requested-vs-confirmed
+           chase). The act comes from RECORDED facts through the module's one
+           `monitorRowAction` arithmetic:
+
+             no Logistics Partner   `Assign logistics` — the governed door
+             partner, no date       `Call {partner} — confirm delivery date`,
+                                    then `Edit Delivery` records what they said
+             everything agreed      `Edit Delivery`
+
+           The partner's NAME comes from the row; no carrier and no employee
+           is ever hard-coded here. */
+        key: "actions",
+        label: MONITOR_COLUMN.actions,
+        width: 250,
+        chooserGroup: "Delivery",
+        accessor: (r) => {
+          const action = monitorRowAction(r);
+          return (
+            <span className="flex min-w-0 flex-col items-start gap-0.5">
+              {action.kind === "confirm_date" ? (
+                <span className="block max-w-full truncate text-kit-slate-12" title={action.call}>
+                  {action.call}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="rounded-control border border-kit-slate-6 bg-white px-2 py-0.5 text-meta font-medium text-kit-slate-12 hover:bg-kit-slate-3"
+                data-testid={`delivery-monitor-action-${action.kind}-${r.scopeId}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (action.kind === "assign_logistics") setAssigning([r.scope]);
+                  else openEditDelivery(r);
+                }}
+              >
+                {action.label}
+              </button>
+            </span>
+          );
+        },
+        /* The sheet prints the same words the screen shows. */
+        searchValue: monitorRowActionText,
+        exportValue: monitorRowActionText,
+        filterValue: monitorRowActionText,
+      },
+      {
         /* Off by default: the crew facts belong one click away rather than
            permanently widening the sheet. */
         key: "building",
-        label: "Building",
+        label: MONITOR_COLUMN.building,
         width: 120,
         sortable: true,
         defaultHidden: true,
@@ -848,7 +1011,7 @@ export default function OperationDelivery() {
       },
       {
         key: "phone",
-        label: "Phone",
+        label: MONITOR_COLUMN.phone,
         width: 140,
         sortable: true,
         defaultHidden: true,
@@ -858,7 +1021,7 @@ export default function OperationDelivery() {
         filterValue: (r) => r.scope.o.customer_phone ?? DW.notGiven,
       },
     ],
-    [navigate, openOrder],
+    [navigate, openOrder, openEditDelivery],
   );
 
   const contextMenu = useCallback(
@@ -1236,6 +1399,61 @@ export default function OperationDelivery() {
             /* ── THE WORK LIST — the standard selectable Register ──────────── */
             <>
               {filterSummary}
+              {isPhone ? (
+                /* ⭐ MOBILE IS A LIST, NOT A SQUEEZED SHEET. Same rows, same
+                   order, same words — and the three facts a chase needs are
+                   on the card, never behind a Columns chooser. Bulk selection
+                   stays a desk act: a phone assigns one delivery at a time. */
+                <>
+                {/* The rail is a DRAWER on a phone, so the door back to it
+                    must stay on screen — the sheet's toolbar is not here to
+                    carry it. */}
+                <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
+                  {!railVisible ? showFiltersButton : null}
+                  <input
+                    type="search"
+                    value={phoneSearch}
+                    placeholder={MONITOR_COPY.search}
+                    className="ml-auto h-8 w-full min-w-0 rounded-control border border-kit-slate-6 bg-white px-2.5 text-body text-kit-slate-12 placeholder:text-kit-slate-9"
+                    data-testid="delivery-monitor-work-list-search"
+                    onChange={(e) => setPhoneSearch(e.target.value)}
+                  />
+                </div>
+                <div
+                  className="min-h-0 flex-1 overflow-y-auto p-2"
+                  data-testid="delivery-monitor-work-list"
+                  aria-busy={isLoading}
+                >
+                  {phoneRows.length === 0 ? (
+                    <div className="px-1 py-3 text-body text-kit-slate-9">
+                      {cards.length === 0 ? MONITOR_COPY.emptyList : MONITOR_COPY.emptySearch}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        {phoneRows.map((card) => (
+                          <MonitorWorkCard
+                            key={card.scopeId}
+                            card={card}
+                            onAssign={(r) => setAssigning([r.scope])}
+                            onEdit={openEditDelivery}
+                            onOpenOrder={openOrder}
+                          />
+                        ))}
+                      </div>
+                      <div
+                        className="px-1 py-2 text-meta text-kit-slate-11"
+                        data-testid="delivery-monitor-work-list-footer"
+                      >
+                        {/* `{n} of {m} deliveries` while a search narrows —
+                            the sheet's own footer grammar. */}
+                        {deliveriesFooter(phoneRows.length, listRows.length)}
+                      </div>
+                    </>
+                  )}
+                </div>
+                </>
+              ) : (
               <div
                 className="flex min-w-0 min-h-0 flex-1 flex-col p-2"
                 data-testid="delivery-monitor-work-list"
@@ -1330,6 +1548,7 @@ export default function OperationDelivery() {
                   }}
                 />
               </div>
+              )}
             </>
           )}
         </div>

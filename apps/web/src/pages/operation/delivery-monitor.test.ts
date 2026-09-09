@@ -50,6 +50,10 @@ import {
   monthDayCounts,
   monthDaySentence,
   missingProofLabels,
+  monitorRowAction,
+  monitorRowActionText,
+  callToConfirmDeliveryDate,
+  sortByRequestedDeliveryDate,
   needsProof,
   deliveriesFooter,
   selectedSentence,
@@ -882,5 +886,137 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
     expect(MONITOR_COPY.railState).toBe("STATE");
     expect(MONITOR_COPY.railLogistics).toBe("LOGISTICS PARTNER");
     expect(MONITOR_COPY.railStatus).toBe("DELIVERY STATUS");
+  });
+});
+
+/* ── 8 · THE CHASE — requested vs confirmed, and who must be called ────── */
+
+describe("the No confirmed date chase", () => {
+  /** Three customers asking for three different days, seeded out of order. */
+  const chaseOrders = [
+    order({ id: "late", so: 1503, delivery_date: "2026-09-30" }),
+    order({ id: "none", so: 1504, delivery_date: null }),
+    order({ id: "early", so: 1501, delivery_date: "2026-09-10" }),
+    order({ id: "mid", so: 1502, delivery_date: "2026-09-20" }),
+  ];
+  const chaseFilters: DeliveryMonitorFilters = { ...noFilters, view: "no_confirmed_date" };
+
+  it("lists the queue by Requested Delivery Date, earliest first", () => {
+    const rows = filterMonitorListRows(cards(chaseOrders), chaseFilters);
+    expect(rows.map((r) => r.scope.so)).toEqual([1501, 1502, 1503, 1504]);
+  });
+
+  it("a row with NO requested date sorts last, never first", () => {
+    const rows = filterMonitorListRows(cards(chaseOrders), chaseFilters);
+    expect(rows[rows.length - 1]!.scope.so).toBe(1504);
+  });
+
+  it("`To be confirmed` sorts with the other absences, at the end", () => {
+    const rows = filterMonitorListRows(
+      cards([
+        ...chaseOrders,
+        order({ id: "tbd", so: 1505, delivery_date: "2026-09-01", delivery_date_tbd: true }),
+      ]),
+      chaseFilters,
+    );
+    expect(rows.map((r) => r.scope.so).slice(0, 3)).toEqual([1501, 1502, 1503]);
+    expect(rows.slice(3).map((r) => r.scope.so).sort()).toEqual([1504, 1505]);
+  });
+
+  it("the chase order is applied to `No confirmed date` and to nothing else", () => {
+    /* `All delivery work` keeps the canonical row order — re-sorting every
+       queue by a Sales date would quietly re-rank work that is not a chase. */
+    const all = filterMonitorListRows(cards(chaseOrders), { ...noFilters, view: "all" });
+    expect(all.map((r) => r.scope.so)).toEqual([1503, 1504, 1501, 1502]);
+  });
+
+  it("sorting is stable and never mutates its input", () => {
+    const input = cards(chaseOrders);
+    const before = input.map((c) => c.scopeId);
+    const once = sortByRequestedDeliveryDate(input).map((c) => c.scopeId);
+    expect(sortByRequestedDeliveryDate(input).map((c) => c.scopeId)).toEqual(once);
+    expect(input.map((c) => c.scopeId)).toEqual(before);
+  });
+
+  it("a saved confirmed date takes the row OUT of the queue", () => {
+    const seeded = cards([order({ id: "early", so: 1501, delivery_date: "2026-09-10" })], {
+      arrangements: [
+        arrangement({ order_id: "early", partner_id: "p-nets", partner_name: "NETS" }),
+      ],
+    });
+    expect(filterMonitorListRows(seeded, chaseFilters).map((r) => r.scope.so)).toEqual([1501]);
+
+    const answered = cards([order({ id: "early", so: 1501, delivery_date: "2026-09-10" })], {
+      arrangements: [
+        arrangement({
+          order_id: "early",
+          partner_id: "p-nets",
+          partner_name: "NETS",
+          confirmed_date: "2026-09-11",
+          confirmed_time: "14:00–16:00",
+        }),
+      ],
+    });
+    expect(filterMonitorListRows(answered, chaseFilters)).toEqual([]);
+    /* And it is now a CALENDAR row, on the day the partner agreed. */
+    expect(
+      filterMonitorCalendarCards(answered, noFilters, ["2026-09-11"]).map((c) => c.scope.so),
+    ).toEqual([1501]);
+  });
+});
+
+describe("monitorRowAction — one row, one next act", () => {
+  const chase = (over: Partial<DeliveryArrangementRow>) =>
+    cards([order({ id: "x", so: 1601, delivery_date: "2026-09-10" })], {
+      arrangements: [arrangement({ order_id: "x", ...over })],
+    })[0]!;
+
+  it("nobody carries the row yet → the governed `Assign logistics`", () => {
+    const action = monitorRowAction(chase({}));
+    expect(action.kind).toBe("assign_logistics");
+    expect(action.label).toBe("Assign logistics");
+  });
+
+  it("a partner carries it but no date is agreed → call THAT partner, then Edit Delivery", () => {
+    const action = monitorRowAction(chase({ partner_id: "p-al", partner_name: "AL" }));
+    expect(action).toEqual({
+      kind: "confirm_date",
+      call: "Call AL — confirm delivery date",
+      label: "Edit Delivery",
+    });
+  });
+
+  it("the partner NAME comes from the row — no carrier is ever hard-coded", () => {
+    const nets = monitorRowAction(chase({ partner_id: "p-nets", partner_name: "NETS" }));
+    const teow = monitorRowAction(chase({ partner_id: "p-teow", partner_name: "TEOW" }));
+    expect(nets.kind === "confirm_date" && nets.call).toBe("Call NETS — confirm delivery date");
+    expect(teow.kind === "confirm_date" && teow.call).toBe("Call TEOW — confirm delivery date");
+    expect(callToConfirmDeliveryDate("Chan Logistics")).toBe(
+      "Call Chan Logistics — confirm delivery date",
+    );
+  });
+
+  it("a carrier AND an agreed date → the one Delivery-owned editor", () => {
+    const action = monitorRowAction(
+      chase({ partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-11" }),
+    );
+    expect(action).toEqual({ kind: "edit_delivery", label: "Edit Delivery" });
+  });
+
+  it("the exported words are the words on the screen", () => {
+    expect(monitorRowActionText(chase({}))).toBe("Assign logistics");
+    expect(monitorRowActionText(chase({ partner_id: "p-al", partner_name: "AL" }))).toBe(
+      "Call AL — confirm delivery date · Edit Delivery",
+    );
+  });
+
+  it("no banned mood word reaches the action", () => {
+    const text = [
+      monitorRowActionText(chase({})),
+      monitorRowActionText(chase({ partner_id: "p-al", partner_name: "AL" })),
+    ].join(" ");
+    for (const banned of ["Pending", "Follow up", "Chase", "Unscheduled", "Send"]) {
+      expect(text).not.toContain(banned);
+    }
   });
 });

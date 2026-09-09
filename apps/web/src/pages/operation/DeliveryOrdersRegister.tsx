@@ -54,10 +54,8 @@ import ModuleHeader from "./components/ModuleHeader";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import { lineName } from "./sales-order-facts";
-import {
-  DATE_TO_BE_CONFIRMED_CELL,
-  DATE_TO_BE_CONFIRMED_FULL,
-} from "./sales-order-guidance";
+import { DATE_TO_BE_CONFIRMED_FULL } from "./sales-order-guidance";
+import { requestedDeliveryText } from "./sales-order-columns";
 import { DW } from "./delivery-work";
 import {
   DELIVERY_RESULT_LABEL,
@@ -164,6 +162,12 @@ async function printDeliveryOrders(rows: DoRegisterRow[]): Promise<void> {
     const message = error instanceof ApiError ? error.message : String(error);
     toast.error(`Printing ${rows.length} delivery orders failed: ${message}`);
   }
+}
+
+/** This register's row, through the portal's ONE `Requested Delivery Date`
+ *  spelling — cell, search, per-column filter and Excel export alike. */
+function requestedText(r: DoRegisterRow): string {
+  return requestedDeliveryText({ iso: r.requestedDelivery, tbd: r.requestedTbd });
 }
 
 export default function DeliveryOrdersRegister() {
@@ -297,21 +301,6 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.doNumber,
       },
       {
-        /* `DO date` = the day the system issued this document (owner column
-           ruling 2026-08-18). */
-        key: "do_date",
-        label: "DO date",
-        width: 113,
-        sortable: true,
-        chooserGroup: "Dates",
-        filterType: "date",
-        dateValue: (r) => r.issuedAt,
-        accessor: (r) => fmtDate(r.issuedAt),
-        searchValue: (r) => fmtDate(r.issuedAt),
-        filterValue: (r) => fmtDate(r.issuedAt),
-        sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
-      },
-      {
         /* The fact cell stays focused on identity (owner correction
            2026-09-06): the inline `Order Route` second line is retired; the
            route stays one right-click away in the governed context menu. */
@@ -352,31 +341,41 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.customer,
       },
       {
-        key: "location",
-        label: "Delivery Location",
-        width: 180,
+        /* `Requested Delivery Date` = the date the CUSTOMER asked Carres to
+           deliver on, from the Sales Order — the governed word (owner ruling
+           2026-08-27), read through the ONE `requestedDeliveryOf` arithmetic.
+           ⭐ VISIBLE BY DEFAULT (owner correction 2026-09-09), immediately
+           beside `Confirmed Delivery`: the register's job includes answering
+           *what did the customer ask for, and has anyone agreed a day yet?* —
+           and a column hidden in the chooser answers nobody. `DO date` — the
+           day the document was issued — keeps its place at the far end; it is
+           never either delivery date. */
+        key: "customer_delivery",
+        label: "Requested Delivery Date",
+        width: 176,
         sortable: true,
-        chooserGroup: "Customer",
-        accessor: (r) => (
-          <span className="block truncate" title={r.location}>
-            {r.location}
-          </span>
-        ),
-        searchValue: (r) => r.location,
-        filterValue: (r) => r.location,
-      },
-      {
-        /* The partner named on the document — a snapshot fact of THIS trip. */
-        key: "logistics",
-        label: "Logistics Partner",
-        width: 140,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
+        chooserGroup: "Dates",
+        filterType: "date",
+        dateValue: (r) => r.requestedDelivery,
         accessor: (r) =>
-          r.logisticsPartner ?? <Absent>{DOR_COPY.noLogistics}</Absent>,
-        searchValue: (r) => r.logisticsPartner ?? DOR_COPY.noLogistics,
-        filterValue: (r) => r.logisticsPartner ?? DOR_COPY.noLogistics,
+          r.requestedDelivery ? (
+            requestedText(r)
+          ) : (
+            <span title={r.requestedTbd ? DATE_TO_BE_CONFIRMED_FULL : undefined}>
+              <Absent>{requestedText(r)}</Absent>
+            </span>
+          ),
+        /* ⭐ THE SHEET SAYS WHAT THE SCREEN SAYS. The cell prints three
+           different things — a date, `To be confirmed`, `No delivery date` —
+           and the export used to flatten the middle one into the last, so an
+           Excel reader was told a customer had named no day when the customer
+           had in fact asked for one still being settled. ONE spelling now
+           feeds the cell, the search, the filter and the export. */
+        searchValue: (r) => requestedText(r),
+        exportValue: (r) => requestedText(r),
+        filterValue: (r) => requestedText(r),
+        sortFn: (a, b) =>
+          (a.requestedDelivery ?? "").localeCompare(b.requestedDelivery ?? ""),
       },
       {
         /* `Confirmed Delivery` — the agreed operational day (COPY-STANDARD;
@@ -401,6 +400,44 @@ export default function DeliveryOrdersRegister() {
           r.confirmedDelivery ? fmtDate(r.confirmedDelivery) : DOR_COPY.noConfirmedDate,
         sortFn: (a, b) =>
           (a.confirmedDelivery ?? "").localeCompare(b.confirmedDelivery ?? ""),
+      },
+      {
+        key: "confirmed_time",
+        label: "Confirmed Time",
+        width: 120,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Dates",
+        accessor: (r) => r.confirmedTime ?? <Absent>{DOR_COPY.noTime}</Absent>,
+        searchValue: (r) => r.confirmedTime ?? DOR_COPY.noTime,
+        filterValue: (r) => r.confirmedTime ?? DOR_COPY.noTime,
+      },
+      {
+        /* The partner named on the document — a snapshot fact of THIS trip. */
+        key: "logistics",
+        label: "Logistics Partner",
+        width: 140,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Delivery",
+        accessor: (r) =>
+          r.logisticsPartner ?? <Absent>{DOR_COPY.noLogistics}</Absent>,
+        searchValue: (r) => r.logisticsPartner ?? DOR_COPY.noLogistics,
+        filterValue: (r) => r.logisticsPartner ?? DOR_COPY.noLogistics,
+      },
+      {
+        key: "location",
+        label: "Delivery Location",
+        width: 180,
+        sortable: true,
+        chooserGroup: "Customer",
+        accessor: (r) => (
+          <span className="block truncate" title={r.location}>
+            {r.location}
+          </span>
+        ),
+        searchValue: (r) => r.location,
+        filterValue: (r) => r.location,
       },
       {
         /* The LATEST recorded result — a fact somebody recorded, never a
@@ -501,50 +538,19 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.status.label,
       },
       {
-        /* `Requested Delivery Date` = the customer's promise, from the SO —
-           the governed word (owner ruling 2026-08-27). In the chooser, off by
-           default (owner correction 2026-09-06): the register's default row
-           answers the DOCUMENT's dates. */
-        key: "customer_delivery",
-        label: "Requested Delivery Date",
-        width: 176,
+        /* `DO date` = the day the system issued this document (owner column
+           ruling 2026-08-18). */
+        key: "do_date",
+        label: "DO date",
+        width: 113,
         sortable: true,
-        defaultHidden: true,
         chooserGroup: "Dates",
         filterType: "date",
-        dateValue: (r) => r.requestedDelivery,
-        accessor: (r) =>
-          r.requestedDelivery ? (
-            fmtDate(r.requestedDelivery)
-          ) : r.requestedTbd ? (
-            <span title={DATE_TO_BE_CONFIRMED_FULL}>
-              <Absent>{DATE_TO_BE_CONFIRMED_CELL}</Absent>
-            </span>
-          ) : (
-            <Absent>{DW.noCustomerDate}</Absent>
-          ),
-        searchValue: (r) =>
-          r.requestedDelivery ? fmtDate(r.requestedDelivery) : DW.noCustomerDate,
-        filterValue: (r) =>
-          r.requestedDelivery
-            ? fmtDate(r.requestedDelivery)
-            : r.requestedTbd
-              ? DATE_TO_BE_CONFIRMED_CELL
-              : DW.noCustomerDate,
-        sortFn: (a, b) =>
-          (a.requestedDelivery ?? "").localeCompare(b.requestedDelivery ?? ""),
-      },
-      {
-        key: "confirmed_time",
-        label: "Confirmed Time",
-        width: 120,
-        sortable: true,
-        defaultHidden: true,
-        filterType: "enum",
-        chooserGroup: "Dates",
-        accessor: (r) => r.confirmedTime ?? <Absent>{DOR_COPY.noTime}</Absent>,
-        searchValue: (r) => r.confirmedTime ?? DOR_COPY.noTime,
-        filterValue: (r) => r.confirmedTime ?? DOR_COPY.noTime,
+        dateValue: (r) => r.issuedAt,
+        accessor: (r) => fmtDate(r.issuedAt),
+        searchValue: (r) => fmtDate(r.issuedAt),
+        filterValue: (r) => fmtDate(r.issuedAt),
+        sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
       },
       {
         key: "goods",
@@ -679,7 +685,7 @@ export default function DeliveryOrdersRegister() {
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.deliveryOrders.register.v3"
+              storageKey="carres.deliveryOrders.register.v4"
               rowKey={(r) => r.id}
               exportName="Delivery Orders"
               searchPlaceholder={DOR_COPY.search}
