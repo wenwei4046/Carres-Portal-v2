@@ -324,6 +324,19 @@ customer money. It is deleted, not deprecated, not hidden behind a flag.
   money-rounding guards that watched the desk were moved onto the two Registers rather than
   deleted with it — a retired surface must never take a live guard with it.
 
+**NOTHING WAS SILENTLY REMOVED — checked write door by write door.** The desk held exactly ONE
+mutation: `PATCH /api/operation/orders/:id/control` writing `balance` and `storage_fee_override`
+from two free-text cells on every listing row (measured on the deleted file: 106 editable inputs
+on the live production page, 2026-09-09). That is the capability §13 already names an
+**intentional reject** — *arbitrary outstanding/storage edit*. The route is untouched and both
+fields keep their governed homes: `storage_fee_override` in the Order Detail Drawer and the
+Orders Control page, and the approved storage path remains the §7 waiver ladder on the Invoice.
+Every canonical §16 action — Record payment · Ask to pay · Send receipt · Print receipt · Payment
+link · Correct allocation · Void — already lives on the Payment and Invoice objects the Registers
+open. Historical money is untouched in the database, and the Payments Register IS the §11 history
+surface (gap item 26). Operation access is unchanged: §12's route guard already admits operation
+staff to `/finance/payments` and `/finance/invoices`.
+
 Nothing about money arithmetic, the Delivery gate, permissions or the Register/object designs
 changed here. This is the destination correction only.
 
