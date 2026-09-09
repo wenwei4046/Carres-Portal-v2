@@ -105,14 +105,20 @@ async function loadSettings(
       )
       .eq("site_id", siteId)
       .maybeSingle(),
+    /* 0458 — a WAREHOUSE is operated by a `warehouse_operator`. The live
+       table holds twelve active delivery partners and a showroom; offering
+       them here would let `Operated by` name `NETS Delivery` or an E2E
+       fixture as the organisation running Klang. Stock MASTER §3: Site,
+       operating party and role are separate facts. */
     sb
       .from("stock_operating_parties")
       .select("id, name, kind, active")
       .eq("active", true)
+      .eq("kind", "warehouse_operator")
       .order("name"),
     sb
       .from("app_users")
-      .select("id, name, email, status, role, operations_superuser")
+      .select("id, name, email, status, role, staff_code, operations_superuser")
       .order("name"),
     sb
       .from("warehouse_working_hours")
@@ -179,14 +185,21 @@ async function loadSettings(
    *     worse — label it `Carres`. When the ERP records a genuine NETS
    *     Warehouse individual, that person joins People and this list widens
    *     then. It is not widened by guessing now.
-   *   · AN INDIVIDUAL only. A shared service account is not a person, and
-   *     `stock/MASTER.md` §11 says shared company credentials are invalid —
-   *     so the generic accounts and the operations superuser are excluded.
+   *   · AN INDIVIDUAL only — and 0458's production walk is what settled how
+   *     that is decided. `role` is not enough: the live table carries
+   *     `Business Development · Carres HQ`, `Finance · Carres HQ`,
+   *     `Operations` and an E2E login, all active, all in a Carres role, none
+   *     of them a person. **A People record is the CRnnn staff code** — that
+   *     is how somebody becomes a person in this ERP (a code is minted at the
+   *     Team door), so that is the test, rather than a hand-kept email list
+   *     that rots the day `warehouse@carres.com` is created.
+   *     `stock/MASTER.md` §11: shared company credentials are invalid.
    */
   const CARRES_ROLES = new Set(["operation", "principal", "finance", "hr", "bd"]);
   const people = peopleRows
     .filter((p) => (p.status as string) === "active")
     .filter((p) => CARRES_ROLES.has((p.role as string) ?? ""))
+    .filter((p) => str(p.staff_code) != null)
     .filter((p) => p.operations_superuser !== true)
     .filter((p) => !isOpsGenericAccount(str(p.email)))
     .map((p) => ({

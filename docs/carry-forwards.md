@@ -12,7 +12,7 @@
 
 **HIGH**:
 - `warehouse-settings-capabilities-recorded-not-yet-enforced` — **OPEN, 2026-09-09** (PR #1191,
-  migrations 0456 · 0457). `Settings → Warehouse → Access` records four capabilities.
+  migrations 0456 · 0457 · 0458). `Settings → Warehouse → Access` records four capabilities.
   `Manage Warehouse Settings` is GENUINELY enforced — 0457 widened
   `warehouse_settings_gate()` additively, proved in a rolled-back probe. The other three are
   **recorded configuration only**: `Confirm inbound receipt` is still authorised by GRN Duty

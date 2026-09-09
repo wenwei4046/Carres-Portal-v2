@@ -874,9 +874,15 @@ Warehouse Details · Working Hours · Public Holidays · Special Dates · Access
 ```
 
 - **Warehouse Details** — `Warehouse site · Status · Operated by · Full address · Time zone ·
-  Key contact · Contact number`. `Operated by` is an ORGANISATION chosen from
-  `stock_operating_parties`; `Key contact` is a PERSON chosen from active People. The two are
-  separate fields and neither may be typed free-hand. Carres records no individual NETS Warehouse
+  Key contact · Contact number`. `Operated by` is an ORGANISATION and `Key contact` is a PERSON;
+  the two are separate fields and neither may be typed free-hand. **Both are narrowed at the
+  door, not only in the picker** (0458, from the production walk): the operating organisation
+  must be an active `warehouse_operator` — the twelve `delivery_operator` rows and the showroom
+  are real organisations performing a different role and are refused — and a key contact must be
+  a real individual, which this ERP defines as an active account carrying a **CRnnn staff code**.
+  The four active role mailboxes (`BD@` · `finance@` · `operation@` · the E2E login) carry none
+  and are therefore not people; §11 already forbids shared company credentials from the other
+  side. Carres records no individual NETS Warehouse
   operator, so the key contact reads `Not assigned` / `No individual recorded`, and the address and
   contact number read `Not configured` until somebody verifies them.
 - **Working Hours** — a seven-day table with SEPARATE `Receiving hours` and `Collection hours`.
@@ -895,7 +901,8 @@ Warehouse Details · Working Hours · Public Holidays · Special Dates · Access
   receiving hours · Special collection hours`, each with a REQUIRED reason, split into Upcoming and
   Past. A Special Date whose day has passed is history: the door refuses to create or change one.
 - **Access** — `Manage Warehouse Settings · Confirm inbound receipt · Confirm collection from
-  Warehouse · Perform stock count`, granted to ACTIVE People only. A grant is never deleted;
+  Warehouse · Perform stock count`, granted to ACTIVE People only — the same CRnnn person test,
+  so a shared or role account can never hold a Warehouse capability. A grant is never deleted;
   revoking stamps it, so the audit still says who held what and when. **`Manage Warehouse Settings`
   is enforced** — it widens the manager gate, additively, so nobody who could already configure
   Warehouse lost anything. The other three are recorded configuration whose acts are still
