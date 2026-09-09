@@ -318,11 +318,22 @@ database.
 **Corrected in the same pass:** both Register footers said `1 invoices` / `1 payments` — a count
 interpolated straight into a plural noun, on the line an operator reads every day.
 
-**Not fixed, and stated rather than buried:** during the failure the Invoices page did not render
-its own `query.isError` branch (`Invoices could not be loaded. Try again.`), showing the empty
-state instead. The 500 is gone so the path is no longer reachable naturally, and the cause was not
-identified from the source. Every Register in the portal shares that pattern, so if the branch is
-genuinely dead it is not an Invoices-only defect. **Open.**
+**AND THE REASON THE ERROR BRANCH NEVER FIRED — root-caused, 2026-09-09.** The branch is not
+broken; it was never reached. React Query **PAUSES** a query rather than erroring it, and a paused
+query reports `status:"pending" · fetchStatus:"paused" · isError:false · data:undefined` — read
+live off the React fiber on the deployed page, with the failure reproduced by forcing the endpoint
+to 500 in one tab. Because `isLoading` is `isPending && isFetching`, **`isLoading` is FALSE while
+paused**, so `DataGrid` suppressed neither its empty message nor its footer, and
+`rows = query.data ?? []` supplied the empty list. The screen therefore asserted
+`0 invoices · RM 0.00 still needed` from a read that had never finished.
+
+**Fixed:** both Registers pass `isLoading={!query.isSuccess}` — skeleton and `Loading…` until the
+answer is real. Each carries a test that fails against `query.isLoading`, verified by reverting.
+
+**This is a portal-wide pattern, not an Invoices bug.** Seven registers outside Payment still pass
+`isLoading={query.isLoading}` and will read a paused read as a confirmed zero — listed with the
+one-line fix in `docs/carry-forwards.md`. They belong to Purchasing, Receiving, Warehouse and
+Suppliers and are left to their owners.
 
 ### 🔴 FOUND BY THE PRODUCTION WALK — the Invoices Register was dead, 2026-09-09
 

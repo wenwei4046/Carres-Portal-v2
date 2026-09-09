@@ -275,7 +275,14 @@ export default function InvoiceRegister() {
     : <ListPageShell register>
       <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.id}
         storageKey="carres.invoice.register.v1" appearance="reference" exportName="Invoices"
-        groupBanner={false} stickyIdentity isLoading={query.isLoading} searchPlaceholder="Search invoices…"
+        /* ⭐ NO CONFIRMED ANSWER IS NOT AN EMPTY LIST (production, 2026-09-09).
+           `isLoading` is `isPending && isFetching`, so a query React Query has
+           PAUSED reads as false while `data` is still undefined — and the grid
+           then draws its definitive `No invoices yet` over a read that never
+           finished. Measured live: `status:"pending" · fetchStatus:"paused" ·
+           isError:false · data:undefined` rendering `0 invoices · RM 0.00`.
+           `!isSuccess` is the honest test: skeleton until the answer is real. */
+        groupBanner={false} stickyIdentity isLoading={!query.isSuccess} searchPlaceholder="Search invoices…"
         toolbarStart={<span className="flex items-center gap-3 text-body">
           <Link to={scopedRegisterHref("/finance/payments", orderScope)}>Payments</Link>
           <span aria-current="page" className="font-semibold">Invoices</span>
