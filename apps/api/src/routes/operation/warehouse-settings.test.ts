@@ -30,8 +30,16 @@ const TABLES: Record<string, unknown[]> = {
     { id: NETS_WAREHOUSE, name: "NETS Warehouse", kind: "warehouse_operator", active: true },
   ],
   app_users: [
-    { id: YU_JUN, name: "Yu Jun", status: "active", role: "operation", title: null },
-    { id: KHOR_YEE, name: "Khor Yee", status: "disabled", role: "operation", title: null },
+    { id: YU_JUN, name: "Yu Jun", email: "yujun@carres.com", status: "active", role: "operation", operations_superuser: false },
+    { id: KHOR_YEE, name: "Khor Yee", email: "khoryee@carres.com", status: "disabled", role: "operation", operations_superuser: false },
+    /* A shared service account is not a person — `stock/MASTER.md` §11:
+       shared company credentials are invalid. */
+    { id: "22222222-2222-2222-2222-000000000002", name: "Operations", email: "operation@carres.com", status: "active", role: "operation", operations_superuser: true },
+    /* Counterparty logins are not Carres People and must never be offered
+       here — least of all labelled `Carres`. */
+    { id: "33333333-3333-3333-3333-000000000003", name: "Ohana Supplier", email: "ohana@supplier.com", status: "active", role: "supplier", operations_superuser: false },
+    { id: "44444444-4444-4444-4444-000000000004", name: "HOUZS Partner", email: "houzs@partner.com", status: "active", role: "partner", operations_superuser: false },
+    { id: "55555555-5555-5555-5555-000000000005", name: "PJ Showroom", email: "pj@carres.com", status: "active", role: "showroom", operations_superuser: false },
   ],
   warehouse_working_hours: [],
   warehouse_special_dates: [],
@@ -130,6 +138,10 @@ describe("GET /warehouse-settings", () => {
     const people = body.people as unknown as Array<{ id: string; name: string }>;
     expect(people.map((p) => p.name)).toEqual(["Yu Jun"]);
     expect(people.some((p) => p.id === KHOR_YEE)).toBe(false);
+    /* Not the shared account, and not a counterparty login dressed as Carres. */
+    for (const name of ["Operations", "Ohana Supplier", "HOUZS Partner", "PJ Showroom"]) {
+      expect(people.some((p) => p.name === name)).toBe(false);
+    }
     const caps = body.capabilities as unknown as Array<{ holders: unknown[] }>;
     for (const cap of caps) expect(cap.holders).toEqual([]);
   });

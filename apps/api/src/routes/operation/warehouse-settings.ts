@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import {
+  isOpsGenericAccount,
   resolveWarehouseSchedule,
   warehouseCapabilityGrantInput,
   warehouseImportHolidayCalendarInput,
@@ -109,7 +110,10 @@ async function loadSettings(
       .select("id, name, kind, active")
       .eq("active", true)
       .order("name"),
-    sb.from("app_users").select("id, name, status, role, title").order("name"),
+    sb
+      .from("app_users")
+      .select("id, name, email, status, role, operations_superuser")
+      .order("name"),
     sb
       .from("warehouse_working_hours")
       .select("weekday, activity, closed, opens_at, closes_at")
@@ -164,17 +168,31 @@ async function loadSettings(
     ? personById.get(profile.key_contact_id)
     : undefined;
 
-  /* Only ACTIVE people may be newly chosen — as key contact or for access.
-     Khor Yee and Samantha are disabled and therefore simply are not here.
-     The list is not filtered to a role: the picker names real People. */
+  /*
+   * WHO MAY BE CHOSEN — as key contact, or for Access.
+   *
+   *   · ACTIVE only. Khor Yee and Samantha are disabled and are therefore
+   *     simply not here — they cannot be newly selected anywhere.
+   *   · A CARRES PERSON only. `dealer`, `showroom`, `supplier` and `partner`
+   *     accounts are counterparty logins, not Carres People; offering one
+   *     here would put a supplier's login on a Carres settings page and — far
+   *     worse — label it `Carres`. When the ERP records a genuine NETS
+   *     Warehouse individual, that person joins People and this list widens
+   *     then. It is not widened by guessing now.
+   *   · AN INDIVIDUAL only. A shared service account is not a person, and
+   *     `stock/MASTER.md` §11 says shared company credentials are invalid —
+   *     so the generic accounts and the operations superuser are excluded.
+   */
+  const CARRES_ROLES = new Set(["operation", "principal", "finance", "hr", "bd"]);
   const people = peopleRows
     .filter((p) => (p.status as string) === "active")
-    .filter((p) => (p.role as string) !== "dealer")
+    .filter((p) => CARRES_ROLES.has((p.role as string) ?? ""))
+    .filter((p) => p.operations_superuser !== true)
+    .filter((p) => !isOpsGenericAccount(str(p.email)))
     .map((p) => ({
       id: p.id as string,
       name: (p.name as string) ?? "",
-      /* An individual's organisation, where the ERP actually records one. A
-         Carres account is Carres — it is never dressed as partner personnel. */
+      /* The organisation the ERP actually records for this individual. */
       organisation: "Carres",
     }));
 

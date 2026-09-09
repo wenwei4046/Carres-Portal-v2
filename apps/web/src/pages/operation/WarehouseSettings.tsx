@@ -56,8 +56,6 @@ import {
   WEEKDAY_WORD,
   hhmm,
   isSpecialHoursKind,
-  resolveWarehouseSchedule,
-  scheduleCellWord,
   type WarehouseActivity,
   type WarehouseCapabilityKey,
   type WarehouseHolidayAvailability,
@@ -423,6 +421,8 @@ export default function WarehouseSettings() {
         {section === "access" && (
           <AccessSection data={data} draft={draft} canEdit={canEdit} onChange={(access) => set({ access })} />
         )}
+
+        <ChangeHistory data={data} section={section} />
       </div>
     </PageShell>
   );
@@ -495,18 +495,95 @@ export function firstGap(draft: Draft): string | null {
       }
     }
   }
+  /* A Special Date is only being written when the operator has started one.
+     An untouched form is not a gap — it is simply nothing to save. */
   const s = draft.special;
-  if (s.onDate || s.reason.trim() || isSpecialHoursKind(s.kind)) {
-    if (s.onDate || s.reason.trim()) {
-      if (!s.onDate) return "pick the Special Date";
-      if (!s.reason.trim()) return "say why this date is different";
-      if (isSpecialHoursKind(s.kind)) {
-        if (!s.opensAt || !s.closesAt) return "give both Special Date times";
-        if (s.closesAt <= s.opensAt) return "the Special Date must close after it opens";
-      }
+  if (s.onDate || s.reason.trim()) {
+    if (!s.onDate) return "pick the Special Date";
+    if (!s.reason.trim()) return "say why this date is different";
+    if (isSpecialHoursKind(s.kind)) {
+      if (!s.opensAt || !s.closesAt) return "give both Special Date times";
+      if (s.closesAt <= s.opensAt) return "the Special Date must close after it opens";
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// The audit trail — who changed what, when, and what it was before
+// ---------------------------------------------------------------------------
+
+/** Which recorded changes belong to the section being read. The audit is one
+ *  log; showing the whole thing under every section would make the reader
+ *  hunt, and hiding it entirely would waste the one record that answers
+ *  "who moved this?". */
+const CHANGE_PREFIX: Record<WarehouseSettingsSection, string[]> = {
+  details: ["site_details:"],
+  "working-hours": ["working_hours:"],
+  "public-holidays": ["holiday_policy:", "holiday_calendar:"],
+  "special-dates": ["special_date:"],
+  access: ["access:"],
+};
+
+/** `site_details:{uuid}` reads as nothing to an operator. */
+const CHANGE_WORD: Array<[string, string]> = [
+  ["site_details:", "Warehouse Details"],
+  ["working_hours:", "Working Hours"],
+  ["holiday_policy:", "Public-holiday policy"],
+  ["holiday_calendar:", "Holiday calendar imported"],
+  ["special_date:", "Special Date"],
+  ["access:manage_warehouse_settings", "Access · Manage Warehouse Settings"],
+  ["access:confirm_inbound_receipt", "Access · Confirm inbound receipt"],
+  ["access:confirm_collection_from_warehouse", "Access · Confirm collection from Warehouse"],
+  ["access:perform_stock_count", "Access · Perform stock count"],
+];
+
+function changeWord(what: string): string {
+  /* Longest prefix first, so `access:perform_stock_count` never resolves to
+     the bare `access:` heading. */
+  const hit = [...CHANGE_WORD]
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([prefix]) => what.startsWith(prefix));
+  return hit ? hit[1] : what;
+}
+
+function ChangeHistory({
+  data,
+  section,
+}: {
+  data: WarehouseSettingsResponse;
+  section: WarehouseSettingsSection;
+}) {
+  const prefixes = CHANGE_PREFIX[section] ?? [];
+  const rows = data.changes
+    .filter((c) => prefixes.some((p) => c.what.startsWith(p)))
+    .slice(0, 20);
+
+  return (
+    <section
+      className="rounded-card border border-kit-slate-5 bg-white p-5"
+      data-testid="warehouse-settings-history"
+    >
+      <h2 className="text-section">History</h2>
+      {rows.length === 0 ? (
+        <p className="mt-1 text-body text-kit-slate-11">
+          Nothing has been changed here yet.
+        </p>
+      ) : (
+        <ul className="mt-2 grid gap-2">
+          {rows.map((c) => (
+            <li key={c.id} className="text-body">
+              <span className="font-semibold">{changeWord(c.what)}</span>
+              <div className="text-meta text-kit-slate-11">
+                {c.actorName ?? "Not recorded"} · {fmtDate(c.changedAt)}
+                {c.reason ? ` · ${c.reason}` : ""}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1198,7 +1275,3 @@ function AccessSection({
     </section>
   );
 }
-
-/** Re-exported so the schedule ladder is reachable from one Warehouse import
- *  in tests and future Warehouse surfaces. */
-export { resolveWarehouseSchedule, scheduleCellWord };
