@@ -115,7 +115,6 @@ begin
     'assignments', coalesce((
       select jsonb_agg(jsonb_build_object(
         'deliveryOrderId', a.delivery_order_id,
-        'siteId', a.site_id,
         'userId', a.accepted_by,
         'name', coalesce(u.name, u.email),
         'acceptedAt', a.accepted_at))
