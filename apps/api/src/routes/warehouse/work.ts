@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { z } from "zod";
 import {
   operationWorkResponseSchema,
   projectWarehouseOutboundWork,
@@ -11,6 +12,17 @@ import { requireWarehouse } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import deliveryArrangementsRouter from "../operation/delivery-arrangements";
+
+const warehouseWorkSourceSchema = z.object({
+  site: z.object({ id: z.string().uuid(), label: z.string().min(1) }).strict(),
+  assignments: z.array(z.object({
+    deliveryOrderId: z.string().uuid(),
+    siteId: z.string().uuid(),
+    userId: z.string().uuid(),
+    name: z.string().nullable(),
+    acceptedAt: z.string().min(1),
+  }).strict()),
+}).strict();
 
 function malaysiaToday(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -29,13 +41,9 @@ export async function loadWarehouseWork(c: Context<AppEnv>): Promise<OperationWo
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb.rpc("warehouse_my_outbound_assignments");
   if (error) throw new Error("Warehouse owner source could not be read");
-  const source = (data ?? {}) as {
-    site?: { id: string; label: string };
-    assignments?: WarehouseOutboundAssignment[];
-  };
-  if (!source.site) throw new Error("This warehouse login has no governed Site");
+  const source = warehouseWorkSourceSchema.parse(data ?? {});
   const today = malaysiaToday();
-  const assignments = source.assignments ?? [];
+  const assignments: WarehouseOutboundAssignment[] = source.assignments;
   return operationWorkResponseSchema.parse({
     items: projectWarehouseOutboundWork({
       cards: warehouseOutboundCards(schedule.events ?? []),
