@@ -34,12 +34,30 @@ import OperationPurchasingSettings from "./OperationPurchasingSettings";
 import SalesOrderSettings from "./SalesOrderSettings";
 import IssueTrackerSettings from "./IssueTrackerSettings";
 import PaymentSettings from "./PaymentSettings";
+import WarehouseSettings, { WAREHOUSE_SETTINGS_SECTIONS } from "./WarehouseSettings";
 
+/**
+ * A GROUP MAY OWN MORE THAN ONE ROW (Warehouse, 2026-09-09).
+ *
+ * Every module before Warehouse had exactly one settings page, so the rail was
+ * written as one row per group. Warehouse Settings is five sections of ONE
+ * page — `Warehouse Details · Working Hours · Public Holidays · Special Dates
+ * · Access` — and they are sections of the module's settings, not five module
+ * settings pages. So the group carries its rows; the shell still owns nothing
+ * but the navigation between them.
+ */
 const SECTIONS = [
-  { slug: "sales-orders", group: "Sales Orders", label: "Sales Order Settings" },
-  { slug: "purchasing", group: "Purchasing", label: "Purchasing Settings" },
-  { slug: "payment", group: "Payment", label: "Payment Settings" },
-  { slug: "issue-tracker", group: "Issue Tracker", label: "Issue Tracker Settings" },
+  { group: "Sales Orders", items: [{ slug: "sales-orders", label: "Sales Order Settings" }] },
+  { group: "Purchasing", items: [{ slug: "purchasing", label: "Purchasing Settings" }] },
+  { group: "Payment", items: [{ slug: "payment", label: "Payment Settings" }] },
+  { group: "Issue Tracker", items: [{ slug: "issue-tracker", label: "Issue Tracker Settings" }] },
+  {
+    group: "Warehouse",
+    items: WAREHOUSE_SETTINGS_SECTIONS.map((s) => ({
+      slug: `warehouse/${s.slug}`,
+      label: s.label,
+    })),
+  },
 ] as const;
 
 /** One browser's own choice. Never a server preference — it is a view state. */
@@ -90,7 +108,7 @@ export default function SettingsWorkspace() {
           </div>
 
           {SECTIONS.map((s) => (
-            <div key={s.slug}>
+            <div key={s.group}>
               <div className="flex items-center px-1.5 pb-1">
                 {/* `data-settings-group` stays on the element that CARRIES the
                     text — the shipped navigation test selects on it. */}
@@ -101,30 +119,33 @@ export default function SettingsWorkspace() {
                   {s.group}
                 </span>
               </div>
-              <NavLink
-                to={`/operation/settings/${s.slug}`}
-                className={({ isActive }) =>
-                  [
-                    "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
-                    isActive
-                      ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
-                      : "text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12",
-                  ].join(" ")
-                }
-                data-testid={`settings-section-${s.slug}`}
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span
-                        aria-hidden
-                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
-                      />
-                    )}
-                    <span className="min-w-0 flex-1">{s.label}</span>
-                  </>
-                )}
-              </NavLink>
+              {s.items.map((item) => (
+                <NavLink
+                  key={item.slug}
+                  to={`/operation/settings/${item.slug}`}
+                  className={({ isActive }) =>
+                    [
+                      "relative flex min-h-[36px] w-full items-start gap-2 rounded-control px-2 py-[9px] text-left text-body",
+                      isActive
+                        ? "bg-kit-blue-3 text-kit-slate-12 font-semibold"
+                        : "text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12",
+                    ].join(" ")
+                  }
+                  data-testid={`settings-section-${item.slug.replace("/", "-")}`}
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
+                        />
+                      )}
+                      <span className="min-w-0 flex-1">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
             </div>
           ))}
         </nav>
@@ -151,6 +172,8 @@ export default function SettingsWorkspace() {
           <Route path="purchasing" element={<OperationPurchasingSettings embedded />} />
           <Route path="payment" element={<PaymentSettings />} />
           <Route path="issue-tracker" element={<IssueTrackerSettings />} />
+          <Route path="warehouse" element={<Navigate to="details" replace />} />
+          <Route path="warehouse/:section" element={<WarehouseSettings />} />
         </Routes>
       </div>
     </div>

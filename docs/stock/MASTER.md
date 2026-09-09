@@ -858,18 +858,60 @@ facts; management receives all Warehouse reports and approval evidence. Cost, se
 payment and unrelated-outlet information remain hidden where the role does not require them.
 
 The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. No Inventory rail,
-Monitor, panel or object menu may create a second Settings door. The page sections are `Sites &
-operators · Warehouse calendar · Stock Count · Month-end Stock Confirmation · Problems & evidence ·
-Unit ID · Permissions & approvals · External partners`. Settings governs rules/master data only; it
-never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
+Monitor, panel or object menu may create a second Settings door. Settings governs rules/master data
+only; it never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
 
-- **Sites & operators:** maintain governed Site name/type, active/closed dates, operating
-  organisation and permitted receiving/Count/handover acts. Every external person has individual
-  email, name/avatar, organisation, Site/role scope and active dates. Shared company credentials are
-  invalid. Carres does not configure NETS internal Zone, Rack, Bin, forklift or pick wave.
-- **Warehouse calendar:** maintain the six-day working week, weekly closure, public/partner closed
-  dates, receiving/collection cut-offs and Count-submission rule. Every module consumes its computed
-  actual weekday/date; staff do not calculate the next working day.
+**THE BUILT SURFACE — owner card 2026-09-09, migrations 0456 · 0457.** `Settings → Warehouse` is a
+live route with five rail sections and ONE `Save changes`, disabled until something changes and
+naming its gap when a value would be refused:
+
+```
+Warehouse Settings                              [Save changes]
+Carres Klang Warehouse
+Operated by NETS Warehouse · Active
+
+Warehouse Details · Working Hours · Public Holidays · Special Dates · Access
+```
+
+- **Warehouse Details** — `Warehouse site · Status · Operated by · Full address · Time zone ·
+  Key contact · Contact number`. `Operated by` is an ORGANISATION chosen from
+  `stock_operating_parties`; `Key contact` is a PERSON chosen from active People. The two are
+  separate fields and neither may be typed free-hand. Carres records no individual NETS Warehouse
+  operator, so the key contact reads `Not assigned` / `No individual recorded`, and the address and
+  contact number read `Not configured` until somebody verifies them.
+- **Working Hours** — a seven-day table with SEPARATE `Receiving hours` and `Collection hours`.
+  Either may be `Closed` while the other is open. **No day is seeded and Sunday is not assumed
+  closed**: a day with no row reads `Not configured`. A window may be cleared back to unconfigured.
+- **Public Holidays** — `Follow public holidays · Country · State · Observed/replacement holidays ·
+  Default public-holiday availability`, whose choices are `Closed · Receiving only · Collection
+  only · Normal working hours · Special hours`. Malaysia and Selangor are selectable; the policy is
+  never silently enabled and reads `Public-holiday policy    Not configured` until saved. Holiday
+  DATES live in a versioned, locally persisted calendar that names its source, its reference and
+  when it was verified. **No date ships and none is invented** — the starter list in
+  `packages/shared/src/my-holidays.ts` is deliberately not copied in, because its own header says
+  eleven of its rows are unverified. **There is no automatic official-calendar sync**, and the page
+  says so.
+- **Special Dates** — `Closed all day · Receiving unavailable · Collection unavailable · Special
+  receiving hours · Special collection hours`, each with a REQUIRED reason, split into Upcoming and
+  Past. A Special Date whose day has passed is history: the door refuses to create or change one.
+- **Access** — `Manage Warehouse Settings · Confirm inbound receipt · Confirm collection from
+  Warehouse · Perform stock count`, granted to ACTIVE People only. A grant is never deleted;
+  revoking stamps it, so the audit still says who held what and when. **`Manage Warehouse Settings`
+  is enforced** — it widens the manager gate, additively, so nobody who could already configure
+  Warehouse lost anything. The other three are recorded configuration whose acts are still
+  authorised by the doors that own them today (GRN Duty for receiving; the signed-in Site operator
+  for handover; Counts are not built), and each row states that on screen rather than implying an
+  enforcement that does not exist. No Warehouse capability reaches a Delivery date, ETA, route or
+  customer-delivery information.
+
+**SCHEDULE PRECEDENCE — one arithmetic, `packages/shared/src/warehouse-settings.ts`.**
+`Special Date override → Company closure (the Site's own Status) → applicable public-holiday policy
+→ normal weekly working hours`, and `Not configured` when nothing above answers. The resolved day
+always says WHICH rule decided it. There is deliberately no SQL copy of the ladder.
+
+**THE FOLLOWING REMAIN APPROVED TARGET / NOT BUILT.** They are the rest of the approved Settings
+surface and are not deleted by the card above:
+
 - **Stock Count:** maintain participating Sites, monthly/cycle rule, scope, blind first Count,
   Count-again and evidence requirements, physical-person assignment mechanism and `current GRN
   Duty` investigation rule. `Match all`, automatic difference Adjustment and complete-with-skipped-
@@ -886,7 +928,8 @@ never edits a Unit, reservation, Count result, Transfer/event or Month-end versi
 - **Permissions & approvals:** capability follows role/duty, never a hard-coded email. NETS
   Warehouse, NETS Delivery, Showroom, GRN Duty, PO Duty, Sales, Purchasing and Finance receive only
   the actions stated in §10. The governed approval Duties resolve approval work; a permission never overrides
-  segregation or evidence.
+  segregation or evidence. **PARTLY BUILT** — the `Access` section above holds the four Warehouse
+  capabilities; the per-organisation and per-Site scoping of them is not built.
 - **External partners:** maintain organisation, warehouse/delivery roles, governed Sites, calendar,
   allowed actions, evidence requirements and active dates. No rule hard-codes NETS, so another 3PL
   or a future Carres-operated warehouse uses the same Unit/Receiving/Inventory/Outbound model.
