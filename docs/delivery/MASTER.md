@@ -1095,6 +1095,49 @@ on-screen law *sending is not confirmation*) and the reply proof as a REAL uploa
 `POST /delivery-arrangements/:orderId/reply-proof/sign-upload?leg=` into the private proof
 bucket under `arrangement/{order}/{leg}/…`.
 
+**DEPLOYED 2026-09-09 — the requested-vs-confirmed chase, PR #1181, main SHA
+`21f992cdbcf2d6f3addcfa9e08e48da6abe1f785`, production converged (both Pages projects and the
+production Worker report that exact SHA).** §8's chase ruling is LIVE and walked on real data.
+
+`Monitor → No confirmed date` prints the ruled twelve columns in order — `SO No · Customer ·
+State · Requested Delivery Date · Logistics Partner · Confirmed Delivery · Confirmed Time ·
+DO No · Delivery Location · Goods · Delivery Status · Actions` — over 86 real deliveries,
+ordered `Mon, 20 Jul` → `Tue, 21 Jul` → … → `Sat, 31 Oct`, with the one row carrying no
+requested date printing `No delivery date` LAST. 81 rows read `Call {partner} — confirm delivery
+date` above `Edit Delivery` and 5 read `Assign logistics`; the partner names came from the data
+(NETS · AL · HOUZS · TEOW), none hard-coded. The retired words are absent from the live page
+(`Promised Delivery` · `Customer Delivery` · `Deliver By` · `scope`), and the only `Leg` on
+screen is a furniture line (`Leg 4"`), not a Journey word.
+
+`Edit Delivery` from `No confirmed date · Selangor` opened
+`/operation/delivery/edit/{order}?from=%2Foperation%3Ftab%3Ddelivery%26view%3Dno_confirmed_date%26region%3DSelangor`
+and its back door returned to exactly that list, queue still active and the narrowing intact.
+`/operation/delivery-orders` prints `DO No · SO No · Customer · Requested Delivery Date ·
+Confirmed Delivery · Confirmed Time · Logistics Partner · Delivery Location · Delivery Result ·
+Proof Status · Status · DO date`, and one live document proves the three dates are three facts:
+requested `No delivery date` · confirmed `Thu, 20 Aug` · `DO date` `Tue, 18 Aug`.
+
+Two defects were found and fixed on the way. The requested date had THREE arithmetics — one
+`requestedDeliveryOf` now — and both registers exported `To be confirmed` as `No delivery date`,
+telling an Excel reader a customer had named no day when they had asked for one still being
+settled; one `requestedDeliveryText` now feeds the cell, the search, the per-column filter and
+the export. Both layout storage keys were bumped (`workList.v2 → v3`, `register.v3 → v4`)
+because a persisted `order` array outranks the default and would have hidden the new sheet from
+every operator who had opened these pages before.
+
+Desktop, tablet and phone were walked on the seeded preview (the phone shows the card list with
+the requested date, the partner and the act, its own search box and the `{n} of {m} deliveries`
+footer). Typecheck clean, 4,057 web tests green (30 new) and 2,865 api tests green,
+design-standard lint clean, `ci:migrations` 464 filenames and 0 changes. **No migration, no RLS
+change, no new field, no new writer, no API change** — every fact on screen was already being
+read by these pages.
+
+⚠️ **The production walk ran under the signed-in `principal@carres.com` session, not an
+Operation account.** It is honest to name that: a principal read can hide an RLS gap. The gap
+risk here is nil rather than unchecked — this PR added no query, no column, no policy and no
+route, so an Operation account exercises exactly the reads it exercised before 2026-09-09. Jess
+can confirm in a minute by opening the same two URLs as `operation@`.
+
 **DEPLOYED 2026-09-07 — Monitor Day · Week · Month and rail correction, PR #1157, main SHA
 `4f35842c87acea49cd0fcc0716d6acc0a3e31ce6`, all four canonical surfaces converged (erp ·
 pos · pages.dev `/__carres_deploy.json` and the Worker `/health` each report that exact SHA;
