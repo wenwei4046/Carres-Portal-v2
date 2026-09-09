@@ -328,11 +328,13 @@ export default function WarehouseSettings() {
         }
       }
     },
-    onSuccess: () => {
-      toast.success("Warehouse Settings saved");
-      void qc.invalidateQueries({ queryKey: QUERY_KEY });
-    },
+    onSuccess: () => toast.success("Warehouse Settings saved"),
     onError: (e: Error) => toast.error(e.message),
+    /* Sections are written one door at a time, so a refusal on the third can
+       leave the first two saved. Refetching on FAILURE as well as on success
+       is what makes the screen show what actually landed, instead of leaving
+       the operator's draft on top of a different server truth. */
+    onSettled: () => void qc.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 
   if (query.isError) {
