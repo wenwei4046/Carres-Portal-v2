@@ -1091,8 +1091,10 @@ exceptional → 50/50 check grouped POs → send PDFs.
 Delivery draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24; widened with the
 optional `Covered by` · `Supplier` · `PO Delivery Date` columns 2026-08-27 — siblings that do not
 ask render byte-identically). It says only what the ROW cannot: per item line, what covers it
-(`Ready Stock` · the exact PO numbers · `Not ordered yet`), the Unit ID where one is allocated
-(read through the Sales Order expansion door), the exact supplier/`Deliver To`/`PO Delivery Date`
+(`Ready Stock` · the exact PO numbers · `Not ordered yet`), existing Unit IDs allocated to the SO
+or incoming on a PO line sourced exclusively to that SO item line (read through the Sales Order
+expansion door). Shared PO lines do not imply a physical Unit allocation to any one SO. Loading
+and read failures are shown separately from `Not allocated`. It also shows the exact supplier/`Deliver To`/`PO Delivery Date`
 mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
 duplicate demand editor and no second mini-table.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too

@@ -1058,6 +1058,38 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   if (firstError) { const m = mapPgError(firstError); return c.json(m.body, m.status); }
   if (!order) return c.json({ error: "Order not found" }, 404);
 
+  // Incoming Units already exist on the official PO. Follow the immutable
+  // PO-line/source-line link, never a SKU match across the whole PO. A shared
+  // PO line does not yet identify which physical Unit belongs to which SO.
+  const { data: sources, error: sourceErr } = await sb.from("po_line_sources")
+    .select("po_line_id, order_line_id").eq("order_id", id);
+  if (sourceErr) { const m = mapPgError(sourceErr); return c.json(m.body, m.status); }
+  const sourceRows = (sources ?? []) as Array<{ po_line_id: string | null; order_line_id: string | null }>;
+  const sourcePoLineIds = [...new Set(sourceRows.map((s) => s.po_line_id).filter((v): v is string => Boolean(v)))];
+  const incomingByLine = new Map<string, string[]>();
+  if (sourcePoLineIds.length) {
+    const { data: owners, error: ownerErr } = await sb.from("po_line_sources")
+      .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
+    if (ownerErr) { const m = mapPgError(ownerErr); return c.json(m.body, m.status); }
+    const ownerRows = (owners ?? []) as Array<{ po_line_id: string; order_id: string | null; order_line_id: string | null }>;
+    const exclusive = new Map<string, string>();
+    for (const poLineId of sourcePoLineIds) {
+      const linked = ownerRows.filter((s) => s.po_line_id === poLineId);
+      const lineId = linked[0]?.order_line_id;
+      if (lineId && linked.every((s) => s.order_id === id && s.order_line_id === lineId)) exclusive.set(poLineId, lineId);
+    }
+    if (exclusive.size) {
+      const { data: incoming, error: incomingErr } = await sb.from("ops_stock_items")
+        .select("unit_code, po_line_id").in("po_line_id", [...exclusive.keys()])
+        .eq("status", "incoming").eq("identity_scope", "unit");
+      if (incomingErr) { const m = mapPgError(incomingErr); return c.json(m.body, m.status); }
+      for (const unit of (incoming ?? []) as Array<{ unit_code: string; po_line_id: string }>) {
+        const lineId = exclusive.get(unit.po_line_id);
+        if (lineId && unit.unit_code) incomingByLine.set(lineId, [...(incomingByLine.get(lineId) ?? []), unit.unit_code]);
+      }
+    }
+  }
+
   const destinationRows = (destinations ?? []) as Array<{ id: string; name: string; is_default: boolean }>;
   const destinationName = new Map(destinationRows.map((d) => [d.id, d.name]));
   const defaultDeliverTo = destinationRows.find((d) => d.is_default)?.name ?? null;
@@ -1123,7 +1155,10 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
       return {
         lineId: line.id,
         sku: line.sku,
-        unitIds: unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? [],
+        unitIds: [...new Set([
+          ...(unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? []),
+          ...(incomingByLine.get(line.id) ?? []),
+        ])].sort(),
         deliverTo: deliverTo.length ? deliverTo : (defaultDeliverTo ? [{ name: defaultDeliverTo, qty: Number(line.qty) || 0 }] : []),
       };
     }),

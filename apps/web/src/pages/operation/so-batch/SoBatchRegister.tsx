@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PanelLeftOpen } from "lucide-react";
 import {
@@ -78,6 +78,74 @@ import GoodsMiniTable, {
    the leaf-grain Register must not override the owner-approved order. */
 const STORAGE_KEY = "carres.soBatchPurchase.register.v2";
 const FILTER_RAIL_STORAGE_KEY = "carres.soBatchPurchase.filters.open";
+
+/** Measure actual text against the cell, including space for the overflow link. */
+function PoNumbersCell({ order }: { order: SoBatchOrderRow }) {
+  const navigate = useNavigate();
+  const numbers = useMemo(() => [...new Set(order.pos.map((po) => po.poId))], [order.pos]);
+  const host = useRef<HTMLDivElement>(null);
+  const measure = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(1);
+  useLayoutEffect(() => {
+    const cell = host.current;
+    const ruler = measure.current;
+    if (!cell || !ruler) return;
+    const update = () => {
+      const parts = Array.from(ruler.children) as HTMLElement[];
+      const width = cell.getBoundingClientRect().width;
+      let count = 0;
+      for (let n = 1; n <= numbers.length; n++) {
+        const textWidth = parts.slice(0, n).reduce((sum, part) => sum + part.getBoundingClientRect().width, 0);
+        const suffix = ruler.lastElementChild as HTMLElement;
+        suffix.textContent = n < numbers.length ? ` +${numbers.length - n} more` : "";
+        if (textWidth + suffix.getBoundingClientRect().width <= width) count = n;
+      }
+      // At very narrow widths keep the first real number, ellipsised, beside the shortcut.
+      setVisible(Math.max(1, count));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(cell);
+    let disposed = false;
+    void document.fonts?.ready.then(() => { if (!disposed) update(); });
+    return () => { disposed = true; observer.disconnect(); };
+  }, [numbers]);
+  const hidden = Math.max(0, numbers.length - visible);
+  return (
+    <div ref={host} className="relative flex min-w-0 items-center overflow-hidden whitespace-nowrap"
+      data-testid={numbers.length > 1 ? `so-batch-po-many-${order.orderId}` : undefined}>
+      <span className="min-w-0 truncate">
+        {numbers.slice(0, visible).map((number, index) => (
+          <span key={number} className="font-mono">
+            {index > 0 ? ", " : ""}
+            <button type="button" className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
+              data-testid={`so-batch-po-link-${order.orderId}`}
+              onClick={(event) => { event.stopPropagation(); navigate(`/operation/procurement?po=${encodeURIComponent(number)}`); }}>
+              {number}
+            </button>
+          </span>
+        ))}
+      </span>
+      {hidden > 0 && <button type="button"
+        className="shrink-0 whitespace-pre font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+        title="View all PO details"
+        onClick={(event) => {
+          event.stopPropagation();
+          const row = event.currentTarget.closest("tr");
+          const arrow = row?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+          if (arrow?.getAttribute("aria-expanded") === "false") arrow.click();
+          requestAnimationFrame(() => {
+            row?.nextElementSibling?.querySelector('[data-testid="grid-expansion-cell"]')
+              ?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+          });
+        }}>{` +${hidden} more`}</button>}
+      <span ref={measure} aria-hidden="true" className="pointer-events-none invisible absolute whitespace-pre">
+        {numbers.map((number, index) => <span key={number} className="font-mono">{index > 0 ? ", " : ""}{number}</span>)}
+        <span className="font-medium" />
+      </span>
+    </div>
+  );
+}
 
 /** Governed absence — a muted sentence, never a bare dash. */
 function Absent({ children }: { children: string }) {
@@ -443,27 +511,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         width: 144,
         sortable: true,
         chooserGroup: "Documents",
-        accessor: (o) => {
-          const s = soBatchCellSummary(o.pos.map((p) => p.poId));
-          if (s.kind === "none") return null;
-          if (s.kind === "one") {
-            return (
-              <button
-                type="button"
-                className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
-                data-testid={`so-batch-po-link-${o.orderId}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/operation/procurement?po=${encodeURIComponent(s.value)}`);
-                }}
-              >
-                {s.value}
-              </button>
-            );
-          }
-          /* The exact numbers live in the expansion — the cell only counts. */
-          return <span data-testid={`so-batch-po-many-${o.orderId}`}>{`${s.count} POs`}</span>;
-        },
+        accessor: (o) => o.pos.length ? <PoNumbersCell order={o} /> : null,
         searchValue: (o) => o.pos.map((p) => p.poId).join(" "),
         filterValue: (o) =>
           summaryText(soBatchCellSummary(o.pos.map((p) => p.poId)), (n) => `${n} POs`) ?? "",
@@ -1076,6 +1124,8 @@ function poDutyLabel(data: SoBatchPurchaseResponse): string {
  * `PO Delivery Date` mapping when the parent cell could only summarise, and
  * the arrangement editor for the lines still being bought.
  *
+ * Unit IDs include incoming goods bound to this SO line through its PO line.
+ * Shared PO-line goods need a physical allocation before naming an SO's Units.
  * Unit IDs are read LAZILY through the Sales Order expansion endpoint — the
  * same read the Sales Orders register uses (Law D: Stock owns the fact, both
  * disclosures ask the same door), and only when a row is actually opened.
@@ -1147,7 +1197,7 @@ function SoBatchOrderExpansion({
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
-      unitAbsence: "Not allocated",
+      unitAbsence: expansion.isError ? "Unit IDs could not be loaded" : expansion.isPending ? "Loading…" : "Not allocated",
       coveredBy,
       coveredByAbsence: "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
@@ -1242,6 +1292,11 @@ function SoBatchOrderExpansion({
 
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>
+      {expansion.isError && (
+        <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void expansion.refetch()}>
+          Unit IDs could not be loaded. Try again
+        </button>
+      )}
       {blockers.length > 0 && (
         <div className="mb-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
           {blockers.map((leaf) => (
