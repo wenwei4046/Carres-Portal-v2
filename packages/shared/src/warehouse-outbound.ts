@@ -104,6 +104,7 @@ export interface WarehouseOutboundCard {
   soDate: string | null;
   eventDate: IsoDate;
   fromLocation: string;
+  warehouseSiteId?: string | null;
   toCustomer: string;
   logisticsPartner: string;
   /** The individual the Partner assigned — a separate stored fact, never
@@ -191,6 +192,7 @@ export function warehouseOutboundCards(
       soDate: first.soDate ?? null,
       eventDate: first.eventDate,
       fromLocation: first.fromLocation,
+      warehouseSiteId: first.warehouseSiteId,
       toCustomer: first.toCustomer,
       logisticsPartner: first.logisticsPartner,
       driverName: first.driverName ?? null,

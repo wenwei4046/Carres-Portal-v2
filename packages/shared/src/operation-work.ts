@@ -24,8 +24,20 @@ export const operationWorkOwnerSchema = z.object({
   normal: operationWorkPersonSchema.nullable(),
   activeCover: operationWorkPersonSchema.nullable(),
   acting: operationWorkPersonSchema.nullable(),
-  state: z.enum(["primary", "covered", "not_assigned"]),
-}).strict();
+  state: z.enum(["primary", "covered", "not_assigned", "site_queue"]),
+  queue: z.object({
+    kind: z.literal("warehouse_site"),
+    id: z.string().min(1),
+    label: z.string().min(1),
+  }).strict().nullable().optional(),
+}).strict().superRefine((owner, ctx) => {
+  if (owner.state === "site_queue" && !owner.queue) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["queue"], message: "A Site queue owner must name its Site" });
+  }
+  if (owner.state === "site_queue" && (owner.normal || owner.acting)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["state"], message: "Unaccepted Site work cannot invent a person" });
+  }
+});
 
 export const operationWorkItemSchema = z.object({
   id: z.string().min(5),
@@ -128,6 +140,7 @@ export function operationWorkItemFromProjection(
       activeCover: item.activeCover,
       acting: item.actingPerson,
       state: item.ownerState,
+      queue: null,
     },
     timing: { dueOn, workingDaysLate: item.workingDaysLate, bucket },
     destination: presentation.destination,

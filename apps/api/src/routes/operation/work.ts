@@ -21,6 +21,8 @@ import {
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
+  projectWarehouseOutboundWork,
+  warehouseOutboundCards,
   workItemsForOrder,
   type DeliveryQueueLeads,
   type ManualPurchaseWorkInput,
@@ -33,11 +35,13 @@ import {
   type WorkOwnerRule,
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
+  type DeliveryWarehouseScheduleEvent,
+  type WarehouseOutboundAssignment,
   WAREHOUSE_OFF_DAYS,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 import operationOrdersRouter from "./orders";
 import operationStockRouter from "./stock";
@@ -49,6 +53,7 @@ import workspaceDutiesRouter from "./workspace-duties";
 import opsStaffRouter from "./staff";
 import financeInvoicesRouter from "../finance/invoices";
 import issuesRouter from "../ops/issues";
+import deliveryArrangementsRouter from "./delivery-arrangements";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -1031,9 +1036,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
   internal.route("/issues", issuesRouter);
+  internal.route("/delivery-arrangements", deliveryArrangementsRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks, issueSource] =
+         invoices, outcomes, refunds, storageChecks, issueSource, outboundSource, outboundAssignments] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1068,6 +1074,12 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readRefunds(c),
       readStorageChecks(c),
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
+      readInternal<{ events: DeliveryWarehouseScheduleEvent[] }>(
+        internal, "/delivery-arrangements/warehouse-schedule", c,
+      ),
+      adminClient(c.env)
+        .from("warehouse_outbound_assignments")
+        .select("delivery_order_id,site_id,accepted_by,app_users!warehouse_outbound_assignments_accepted_by_fkey(name,email)"),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -1142,9 +1154,40 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     },
     today,
   });
+  if (outboundAssignments.error) {
+    throw new Error("Workspace Warehouse owner source could not be read");
+  }
+  const assignmentRows = (outboundAssignments.data ?? []) as unknown as Array<{
+    delivery_order_id: string;
+    site_id: string;
+    accepted_by: string;
+    app_users?: { name: string | null; email: string | null } | null;
+  }>;
+  const assignments: WarehouseOutboundAssignment[] = assignmentRows.map((row) => ({
+    deliveryOrderId: row.delivery_order_id,
+    siteId: row.site_id,
+    userId: row.accepted_by,
+    name: row.app_users?.name ?? row.app_users?.email ?? null,
+  }));
+  const outboundCards = warehouseOutboundCards(outboundSource.events);
+  const outboundItems = [...new Set(
+    outboundCards
+      .filter((card) => Boolean(card.warehouseSiteId))
+      .map((card) => card.warehouseSiteId as string),
+  )].flatMap((siteId) => {
+    const cards = outboundCards
+      .filter((card) => card.warehouseSiteId === siteId);
+    return projectWarehouseOutboundWork({
+      cards,
+      site: { id: siteId, label: cards[0]?.fromLocation ?? "Warehouse Site" },
+      assignments,
+      today,
+      destination: "operation",
+    });
+  });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     receivingItems, paymentItems, overpaymentItems, storageCheckItems, issueItems],
+     receivingItems, paymentItems, overpaymentItems, storageCheckItems, issueItems, outboundItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

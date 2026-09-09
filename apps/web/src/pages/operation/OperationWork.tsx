@@ -150,15 +150,18 @@ export default function OperationWork() {
     for (const i of allItems) {
       const key =
         i.normalOwnerId ??
+        (i.ownerQueue
+          ? `queue:${i.ownerQueue.id}`
+          :
         (i.ownerName
           ? `person:${i.ownerName}`
-          : `duty:${i.ownerDuty ?? "No owner yet"}`);
+          : `duty:${i.ownerDuty ?? "No owner yet"}`));
       const list = byOwner.get(key) ?? [];
       list.push(i);
       byOwner.set(key, list);
     }
     const groups = [...byOwner.entries()].map(([key, items]) => {
-      const staffMember = key.startsWith("duty:") || key.startsWith("person:")
+      const staffMember = key.startsWith("duty:") || key.startsWith("person:") || key.startsWith("queue:")
         ? null
         : staffById.get(key) ?? null;
       // A resolved person without an ops account still has a NAME (the
@@ -169,11 +172,14 @@ export default function OperationWork() {
           ? key.slice(7)
           : (items[0]?.ownerName ?? null);
       const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
+      const queueWord = key.startsWith("queue:")
+        ? `${items[0]?.ownerQueue?.label ?? "Warehouse Site"} queue`
+        : null;
       return {
         key,
         person: personName !== null,
         userId: staffMember ? key : null,
-        name: personName ?? dutyWord ?? "No owner yet",
+        name: personName ?? queueWord ?? dutyWord ?? "No owner yet",
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
         ),

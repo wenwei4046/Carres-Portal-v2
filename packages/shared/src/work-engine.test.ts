@@ -166,9 +166,9 @@ describe("WORK_RULES — five parts, or no entry", () => {
     }
   });
 
-  it("cross-module rules name their duty-derived owners, never a stored assignee", () => {
+  it("cross-module rules name their governed duty, holder, or Site queue, never a stored assignee", () => {
     for (const r of MODULE_WORK_RULES) {
-      expect(r.owner).toMatch(/duty|holder/i);
+      expect(r.owner).toMatch(/duty|holder|Site queue/i);
     }
   });
 });

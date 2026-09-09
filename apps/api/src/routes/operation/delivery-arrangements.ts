@@ -386,6 +386,7 @@ deliveryArrangementsRouter.get(
           fromLocation: unit.warehouse_id
             ? warehouseName.get(unit.warehouse_id) ?? "Not recorded"
             : "Not recorded",
+          warehouseSiteId: unit.warehouse_id,
           toCustomer: order.customer_address ?? "Not recorded",
           logisticsPartner: arrangement.partner_name as string,
           driverName: arrangement.driver_name,

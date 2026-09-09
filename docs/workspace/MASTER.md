@@ -306,6 +306,17 @@ honest Work for admitted modules.
   NETS Warehouse operator, falling back to an authorised Site queue until accepted, while the
   current central Work endpoint is Operation-only and has neither Site-queue routing nor personal
   acceptance facts. Naming Carres staff, `NETS` or a shared warehouse login would violate section 3.
+- **Outbound Work delivery branch, 2026-09-09 — built, not yet production-verified.** Physical
+  Outbound now projects one action per unfinished Delivery Order from the already-authoritative
+  exact-Unit schedule. Before work starts, Team Work groups it under the permission-scoped
+  Warehouse Site queue; the first personally signed-in Warehouse operator who explicitly accepts
+  or begins the governed scan becomes its resolved owner without rewriting the Site evidence.
+  `warehouse_outbound_assignments` preserves that acceptance, while completion remains only every
+  required Unit's accepted Warehouse handover with receiver and proof. Internal Work opens the
+  exact filtered internal Outbound door; the Warehouse-scoped feed opens the external Site door.
+  No Carres staff member, organisation avatar, Monitor event or manual Done control is introduced.
+  Migration, deploy and authenticated multi-account production proof remain required before this
+  paragraph may say production-verified.
 - Delivery-owned arrangement, company assignment, customer booking, delivery-day result, proof and
   loan-return actions now retain Delivery as their module in the shared engine. Their stable object
   is the Delivery scope until a Delivery Order exists, then the exact DO where the result/proof act
@@ -360,8 +371,10 @@ honest Work for admitted modules.
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
 3. Remove legacy PIC/duty fallbacks.
-4. Add permission-scoped Warehouse Site queues and personal operator acceptance/resolution, then
-   admit physical Outbound actions; never turn Monitor events into actions.
+4. Merge, apply and production-verify the built permission-scoped Warehouse Site queue and personal
+   operator acceptance/resolution: prove queue visibility, first-scan ownership, cross-Site refusal,
+   exact internal/external doors and authoritative handover closure. Never turn Monitor events into
+   actions.
 5. Define a routine Service Case owner rule/Duty (separate from approval) and decide whether its
    derived follow-ups are governed `No date` actions or receive per-step clocks; then admit only the
    qualified projections to the server feed.

@@ -2062,6 +2062,25 @@ two-person duty) was found unapplied while 0438–0440 were — with nobody reso
 `20260907120448`; the resolver now answers `po_duty` → Yu Jun and `grn_duty` → Shasha, and the
 2026-10 → 2027-09 alternating rotation exists.
 
+### 13.10 · BUILT / REQUIRES PRODUCTION PROOF — Outbound joins shared Work (2026-09-09)
+
+The delivery branch implements §8 and §12.11 without changing the production-verified Outbound
+transaction. One unfinished Delivery Order projects one `warehouse.outbound_handover` action;
+Monitor still projects none. Its object is the DO, its due date is the scheduled Warehouse
+handover date, and its completion fact is every required exact Unit carrying an accepted Warehouse
+handover event with receiver and proof.
+
+Before work starts, ownership is the governed Warehouse Site queue. The first active, personally
+signed-in `warehouse` account bound to that Site who accepts or begins an exact-Unit prep scan is
+recorded as durable ownership evidence and becomes the resolved person. This never assigns
+Yu Jun, Shasha, an organisation name or a shared `NW` avatar. Team Work keeps the Site queue visible;
+accepted work groups under the person. The same contract opens the filtered internal Outbound door
+for Carres and the Site-scoped external Outbound door for Warehouse users.
+
+Migration `0459_outbound_work_starts_in_the_site_queue.sql`, authenticated cross-Site refusal,
+first-scan concurrency, personal-account fixtures, deployment and production closure evidence are
+still required. Until those pass, this section is BUILD evidence and not production verification.
+
 ## 14 · Whole-domain completion gate
 
 ### 14.1 Challenge of the original 14 findings

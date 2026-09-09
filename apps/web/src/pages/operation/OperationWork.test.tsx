@@ -136,6 +136,26 @@ describe("Operation Work — one server feed", () => {
     expect(navigate).toHaveBeenCalledWith("/operation/orders/so/order-1");
   });
 
+  it("groups unaccepted Outbound work under its Warehouse Site queue", () => {
+    workState.data!.items = [item({
+      id: "stock:do-1:warehouse.outbound_handover",
+      module: "stock",
+      ruleKey: "warehouse.outbound_handover",
+      object: { kind: "delivery_order", id: "do-1", label: "DO-2609-019" },
+      problem: "1 Unit has not been handed over",
+      action: "Check, pack and hand over the exact Unit to Ahmad",
+      owner: {
+        rule: "warehouse_site_queue_then_operator", dutyKey: null,
+        normal: null, activeCover: null, acting: null, state: "site_queue",
+        queue: { kind: "warehouse_site", id: "site-1", label: "Carres Klang Warehouse" },
+      },
+      destination: "/warehouse/outbound?do=DO-2609-019",
+    })];
+    show("/operation?tab=work&scope=team");
+    expect(screen.getByText("Carres Klang Warehouse queue")).toBeInTheDocument();
+    expect(screen.queryByText("No owner yet")).not.toBeInTheDocument();
+  });
+
   it("keeps a Delivery item on its exact Delivery Order door", () => {
     workState.data!.items = [item({
       id: "delivery:DO-2041:deliver_today",
