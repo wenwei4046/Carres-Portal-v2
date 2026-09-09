@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   DELIVERY_REASONS,
+  unitIdOf,
   type DeliveryAttemptRecordInput,
 } from "@carres/shared";
 import { useOrderAllocation, useRecordDeliveryAttempt } from "@/lib/queries";
@@ -15,6 +16,18 @@ interface DeliveryResultOrder {
 }
 
 type IncompleteResult = "partial" | "failed";
+
+/**
+ * What the operator reads beside the tick box.
+ *
+ * NEVER the row's database id. Until 0453 this fell back to `unit.id` — a raw
+ * UUID — whenever a line had no Unit ID, which is exactly the case for counted
+ * goods. Counted goods have no identity, so they are named by their product.
+ */
+function unitLabel(unit: { unitCode: string | null; lineSku: string }): string {
+  const id = unitIdOf(unit);
+  return id ? `${id} · ${unit.lineSku}` : unit.lineSku;
+}
 
 const LOCATION_OPTIONS: Array<{
   value: DeliveryAttemptRecordInput["whereGoods"];
@@ -141,7 +154,7 @@ function DeliveryAttemptForm({
                       })
                     }
                   />
-                  {unit.unitCode ?? unit.id} · {unit.lineSku}
+                  {unitLabel(unit)}
                 </label>
               ))
             )}
@@ -185,7 +198,7 @@ function DeliveryAttemptForm({
             </legend>
             {remaining.map((unit) => (
               <label key={unit.id} className="grid gap-1 text-meta text-base-700">
-                {unit.unitCode ?? unit.id} · {unit.lineSku}
+                {unitLabel(unit)}
                 <select
                   value={returns[unit.id] ?? ""}
                   onChange={(event) =>

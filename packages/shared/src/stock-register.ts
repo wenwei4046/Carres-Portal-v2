@@ -18,11 +18,20 @@ import {
   UNIT_AVAILABILITY_LABEL,
   type UnitAvailability,
 } from "./unit-availability";
+import {
+  matchesUnitId,
+  unitIdOf,
+  type IdentityScope,
+} from "./unit-identity";
 
 /** One row of `public.stock_unit_register_v` (migration 0373), camel-cased. */
 export interface StockRegisterUnit {
   id: string;
+  /** The STORED code. Never rendered directly — ask `unitIdOf()`, because a
+   *  counted row's code is a technical key and not an identity (0453). */
   unitCode: string;
+  /** 0442/0453 — `unit` (one exact piece) or `quantity` (counted goods). */
+  identityScope: IdentityScope;
   sku: string;
   /** The CATALOG's answer, or null when the catalog holds no row for this SKU.
    *  Never derived from SKU text (D9, ERP-ARCHITECTURE §3.1). */
@@ -237,7 +246,11 @@ export function isRailFiltered(sel: StockRailSelection): boolean {
 export function matchesRegisterQuery(u: StockRegisterUnit, rawQuery: string): boolean {
   const q = rawQuery.trim().toLowerCase();
   if (q === "") return true;
-  return [u.unitCode, u.productName, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName]
+  // The Unit ID is matched through the ONE resolver: case- and
+  // punctuation-tolerant on input, and a counted row's technical key is not
+  // searchable as an identity because it is not one (0453).
+  if (matchesUnitId(u, rawQuery)) return true;
+  return [unitIdOf(u), u.productName, u.sku, u.poNo, u.reservedRef, u.supplier, u.siteName]
     .filter(Boolean)
     .some((v) => (v as string).toLowerCase().includes(q));
 }
@@ -252,7 +265,7 @@ export function applyRailSelection(
     // Ended Units leave the default view but stay findable by EXACT ID —
     // searching a delivered Unit's code must still open it (Card §6).
     if (!sel.showEnded && !isCurrentUnit(u)) {
-      if (exact === "" || u.unitCode.toLowerCase() !== exact) return false;
+      if (exact === "" || !matchesUnitId(u, sel.query)) return false;
     }
     if (sel.attention && !hasAttention(u, sel.attention)) return false;
     if (sel.availability && u.availability !== sel.availability) return false;

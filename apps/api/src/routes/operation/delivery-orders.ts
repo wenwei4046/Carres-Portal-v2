@@ -5,6 +5,7 @@ import {
   recordHandoverInput,
   recordOutboundPrepInput,
   signHandoverProofUploadInput,
+  unitIdOf,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
@@ -289,11 +290,11 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   const [scopeRes, eventUnitsRes] = await Promise.all([
     sb
       .from("delivery_order_units")
-      .select("item_id, ops_stock_items!inner(unit_code, sku)")
+      .select("item_id, ops_stock_items!inner(unit_code, sku, identity_scope)")
       .eq("delivery_order_id", (row as { id: string }).id),
     sb
       .from("delivery_handover_event_units")
-      .select("event_id, item_id, recorded_side, ops_stock_items!inner(unit_code)")
+      .select("event_id, item_id, recorded_side, ops_stock_items!inner(unit_code, identity_scope)")
       .eq("delivery_order_id", (row as { id: string }).id),
   ]);
   if (scopeRes.error) {
@@ -310,22 +311,34 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   }
   const scopeUnits = ((scopeRes.data ?? []) as unknown as Array<{
     item_id: string;
-    ops_stock_items: { unit_code: string | null; sku: string | null };
+    ops_stock_items: {
+      unit_code: string | null;
+      sku: string | null;
+      identity_scope: string | null;
+    };
   }>).map((r) => ({
     item_id: r.item_id,
-    unit_code: r.ops_stock_items?.unit_code ?? null,
+    // 0453 — the ONE resolver, so a counted row's technical key can never
+    // reach a Delivery Order or the paper the customer signs.
+    unit_code: unitIdOf({
+      unitCode: r.ops_stock_items?.unit_code ?? null,
+      identityScope: r.ops_stock_items?.identity_scope ?? null,
+    }),
     sku: r.ops_stock_items?.sku ?? null,
   }));
   const handoverEventUnits = ((eventUnitsRes.data ?? []) as unknown as Array<{
     event_id: string;
     item_id: string;
     recorded_side: string;
-    ops_stock_items: { unit_code: string | null };
+    ops_stock_items: { unit_code: string | null; identity_scope: string | null };
   }>).map((r) => ({
     event_id: r.event_id,
     item_id: r.item_id,
     recorded_side: r.recorded_side,
-    unit_code: r.ops_stock_items?.unit_code ?? null,
+    unit_code: unitIdOf({
+      unitCode: r.ops_stock_items?.unit_code ?? null,
+      identityScope: r.ops_stock_items?.identity_scope ?? null,
+    }),
   }));
 
   return c.json({
