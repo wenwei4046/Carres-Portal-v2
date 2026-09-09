@@ -75,13 +75,50 @@ const INVOICE_REGISTER_SELECT =
   "order_payments(id,receipt_no,amount,paid_on,voided_at,reference,method)," +
   "payment_communications(id,kind,message_text,template_key,sent_screenshot_url,recorded_at)," +
   "order_lines(sku,qty,unit_price),order_addons(qty,unit_price)," +
-  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status,"
+  "ops_order_control(balance,confirmed_date,line_etas,line_stock_status," +
   // The 2026-09-08 correction: the Payment screens must see the LEGACY
   // C9 storage fee too, or they disagree with Work and the gate on a
   // pure-legacy order. The columns ride the wire; the shared
   // `storageHold` turns them into the one figure, server-side below.
-  "storage_from,storage_fee_override,storage_fee_msbf,storage_fee_sof,"
+  //
+  // ⚠️ THE `+` IS LOAD-BEARING AND JAVASCRIPT WILL NOT TELL YOU. Two adjacent
+  // string literals are not concatenated — ASI ends the statement at the first
+  // one and evaluates the rest away, so dropping a `+` here silently TRUNCATES
+  // the select to `…line_stock_status,` — an unclosed `ops_order_control(`
+  // with a dangling comma. PostgREST rejects it, this route throws its 500,
+  // and the Invoices Register shows nothing. That shipped on 2026-09-08 (PR
+  // #1169) and ran in production until 2026-09-09. `selectIsWellFormed` below
+  // is the guard; never edit this string without running it.
+  "storage_from,storage_fee_override,storage_fee_msbf,storage_fee_sof," +
   "storage_collected_at,storage_waiver_status))";
+
+/**
+ * IS THIS SELECT A SELECT AT ALL? — the guard the 2026-09-08 truncation needed.
+ *
+ * A PostgREST select is a nested grammar carried in a hand-built string, and
+ * the compiler checks none of it: a dropped `+` still TYPES, still builds and
+ * still deploys — it just sends half a query. So the shape is asserted here
+ * and exercised by the route's own suite: every embedded resource closes, no
+ * dangling separator, and the columns the callers actually read are present.
+ *
+ * This does not claim the columns exist in the database — only that the string
+ * says what it was written to say. Schema drift is the migration's job.
+ */
+export function selectIsWellFormed(select: string): boolean {
+  let depth = 0;
+  for (const ch of select) {
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    if (depth < 0) return false;
+  }
+  if (depth !== 0) return false;
+  if (/,\s*$/.test(select)) return false;
+  // A separator may never sit against a group boundary — `(,` `,)` `,,` are
+  // each a symptom of a fragment that went missing.
+  return !/\(\s*,|,\s*\)|,\s*,/.test(select);
+}
+
+export const INVOICE_REGISTER_SELECT_FOR_TEST = INVOICE_REGISTER_SELECT;
 
 financeInvoicesRouter.get("/register", async (c) => {
   const auth = c.var.auth;

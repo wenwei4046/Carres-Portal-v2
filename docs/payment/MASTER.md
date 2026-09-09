@@ -287,6 +287,41 @@ entrance, idempotency mapping, role gate and void contract; focused web tests pr
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
 
+### 🔴 FOUND BY THE PRODUCTION WALK — the Invoices Register was dead, 2026-09-09
+
+**Measured, not inferred.** The authenticated walk that verified the entry point above went on
+through the Register toolbar to Invoices and found `GET /api/finance/invoices/register` returning
+**HTTP 500 on every call** — both Worker hosts, the app's own request included — while the page
+drew `No invoices yet. A prepared or issued invoice will appear here.` and
+`0 invoices · RM 0.00 still needed`, with no alert and no `Try again`.
+
+**That is the ABSENT-IS-NOT-ZERO failure stated as law elsewhere in this file: a read that failed
+was painted as an empty list and RM 0.00.** An operator would have concluded Carres has no
+invoices.
+
+**Root cause — two missing `+` operators**, `apps/api/src/routes/finance/invoices.ts`, shipped by
+PR #1169 (`e36e0f11`, 2026-09-08, the void-is-not-a-waiver storage correction). Adjacent string
+literals are not concatenated in JavaScript: ASI ended the expression at the first one and
+evaluated the rest away, so `INVOICE_REGISTER_SELECT` silently became
+
+```
+…,ops_order_control(balance,confirmed_date,line_etas,line_stock_status,
+```
+
+— seven open parentheses against five closed, a dangling comma, and all six storage columns
+absent. PostgREST rejects it, the route throws its own 500, and the destination is dead. **It
+typed, it built, it passed CI and it deployed.** The route's own 31 tests all pass against the
+truncated string, because every one of them mocks the Supabase client and none reads the select.
+
+**Fixed and guarded.** The operators are restored and `selectIsWellFormed` now asserts the real
+constant: every embedded resource closes, no dangling or doubled separator, and the storage
+columns are present. Reverting either `+` fails that test. A PostgREST select is a nested grammar
+carried in a hand-built string that no compiler reads — the guard is the only thing that can.
+
+**Consequence for the entry point above.** From 2026-09-08 to 2026-09-09 the Invoices Register and
+the §17 Calendar behind its date cells were unreachable in production. The entry-point correction
+did not cause this and did not depend on it; it is what made the walk find it.
+
 ### THE ENTRY POINT — the everyday `Payments` row opens the Register, 2026-09-09
 
 **The gap this closes, stated plainly.** Every §16/§17 surface above was built, deployed and
