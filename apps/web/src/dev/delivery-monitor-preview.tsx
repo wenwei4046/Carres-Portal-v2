@@ -103,7 +103,18 @@ const ORDERS = [
     customer_name: "farah binti azman",
     do_number: "DO-010926-0004",
   }),
-  order({ id: "f", so: 1327, customer_name: "chong kah wai" }),
+  /* THE CHASE (2026-09-09) — three deliveries with no confirmed date: one
+     nobody carries yet, one a partner carries and has not answered on, and
+     one whose customer has asked for a day still being settled. */
+  order({ id: "f", so: 1327, customer_name: "chong kah wai", delivery_date: "2026-09-18" }),
+  order({ id: "h", so: 1329, customer_name: "siti nurhaliza", delivery_date: "2026-09-11" }),
+  order({
+    id: "i",
+    so: 1330,
+    customer_name: "ravi kumar",
+    delivery_date: null,
+    delivery_date_tbd: true,
+  }),
   order({
     id: "g",
     so: 1328,
@@ -158,6 +169,9 @@ const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
         partner_name: "HOUZS",
         confirmed_date: "2026-09-01",
       }),
+      /* A partner carries these two and has not given a day back yet. */
+      arrangement({ order_id: "h", partner_id: "p-al", partner_name: "AL" }),
+      arrangement({ order_id: "i", partner_id: "p-nets", partner_name: "NETS" }),
     ],
   })],
   [(url) => url.includes("/api/operation/delivery-orders"), () => ({
