@@ -984,6 +984,15 @@ one merely to repeat status filters. Supplier Claims defaults to all permitted n
 records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
+**Supplier Claims three-layer composition — owner-approved 2026-09-09, target not built.**
+Purchasing MASTER §9.5 owns the exact arrangement; COPY-STANDARD owns the words. The Register
+shows one Claim's independent facts and generated Current Status. Expansion has exactly one job:
+project all outstanding shared Work rows (`Owner` · `Next Action` · `Due Date`) read-only, with
+owning deep links and no inline editors. The full object owns action/evidence presentation and
+complete History; module write boundaries remain intact. Neither a five-party remark grid nor a
+latest-event summary replaces evidenced current conditions. This is a scoped composition approval,
+not a change to tokens, a new component, or a portal-wide replacement of Register templates.
+
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
 permanent band. Left = truthful selected count + Clear + the primary work action and any structured
 owner context it needs. Right = outputs such as Export, followed only by secondary actions valid for

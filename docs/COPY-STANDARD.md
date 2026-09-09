@@ -1493,6 +1493,32 @@ which sends a van to the wrong address.
 > freeze was on the missing argument — lifting it does not license guessing the function. A line
 > naming one would be a guess wearing a screen's authority.
 
+### Supplier Claims presentation — OWNER-APPROVED / LOCKED, 2026-09-09
+
+Purchasing MASTER §9.5 owns the three-layer layout; this section owns its display words.
+Target approved; this entry does not claim implementation or deployment.
+
+| Surface | Exact words / meaning |
+|---|---|
+| Default Register headings, in order | `Supplier Claim No` · `Reported Date` · `Supplier` · `Product` · `Size` · `Qty` · `Problem` · `Current Status` · `Claim Status` |
+| Optional document/product references | `PO No` · `GRN No` · `SKU` · `Supplier DO No`; each separate |
+| Current Status | System-generated evidenced current situation; never a manually selected status or the last remark |
+| Claim Status | Independent `Open` / `Closed` record state; existing cancellation vocabulary/law remains unchanged |
+| Outstanding-work expansion | `Owner` · `Next Action` · `Due Date`; shared Work projection, one action per row |
+| Product / Size | Actual Catalog model name / category-appropriate Catalog size, independently; do not label Size as `Variant` on this surface |
+| Supplier conversation | Existing `Supplier Response` remains valid for the actual recorded answer in detail; it is not a default summary column or a synonym for all parties' progress |
+| Missing request | `Supplier request not recorded`; do not claim a reply is awaited before the outgoing request is evidenced |
+| Waiting on an evidenced request | `Waiting for supplier reply` |
+| Remaining physical quantity | `{n} unit still waiting for collection` / `{n} units still waiting for collection`; requires actual scoped handover evidence |
+
+`Latest Update` and five-party Remark columns are not default Claims headings. External replies
+are recorded once with structured facts and evidence; system-known acts automatically generate
+readable facts. Free text remains supplementary. History preserves who, when and proof using the
+shared record grammar. Delivery preferences and driver information keep their Delivery ownership.
+Dates use the shared Malaysia-time formatter. In expansion, the underlying obligation retains its
+specific date meaning; `Due Date` does not introduce a new business clock. Existing full action-line
+requirements and shared Duty identity rules continue to apply.
+
 ### Receiving and supplier-exception words (locked 2026-07-27)
 
 One vocabulary for every module that waits on a supplier. Never invent a synonym.

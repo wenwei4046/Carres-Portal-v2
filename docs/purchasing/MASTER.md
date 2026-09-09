@@ -2049,41 +2049,42 @@ No New Claim, module Work page, dashboard, second sidebar or duplicate editors. 
 50px destination header, governed toolbar, 240px factual rail, 36/38/32 table grammar and tokens.
 These values reuse the shared authority; this Blueprint reuses existing kit components.
 
-**APPROVED — register defaults (owner correction 2026-09-07):** Opening Supplier Claims
-shows all permitted new and historical claims, including closed claims, newest report first.
-There is no View selector and no setup step before records appear. Search and factual filters
-are optional, start clear on normal entry, and clearing them restores the whole permitted set.
-The useful default columns are Supplier Claim No.,
-Reported, Supplier, PO No, GRN No., Product, Variant, Qty, Problem, Supplier Response and Claim
-status. Each column displays one kind of fact. PO and GRN never share a Source cell. Product
-reads the actual Catalog model name; Variant reads the variant separately, never as a replacement
-product name. SKU and Supplier DO each have their own optional column; when a record has no
-Catalog product name, SKU is visible by default so its recorded identity is not hidden behind
-Columns. A source SKU is never relabelled as a product name or used to invent a Catalog record. Preserve existing SC document numbers and explain
-them through the full Supplier Claim No. header; do not rename historical documents or invent
-another UI vocabulary. Horizontal scrolling moves complete columns together without a floating
-identity column covering adjacent content. One row is one supplier workstream, never one row
-per photo or Work action. An unissued claim shows Not issued. Wider detail/reference fields
-remain optional Columns: Units, Requested Result, Customer Resolution, Carres Execution,
-Item Outcome, Reply expected, Collection date, Expected back, Credit expected, Claim Version
-and Sent to Supplier. Only relevant date facts appear; no generic workflow field. Unknown
-optional facts are not promoted to permanent empty columns; measure before final layout.
+**APPROVED / LOCKED — Claims presentation (owner approval 2026-09-09; target not built):**
+The three layers are: Register for facts and current situation; read-only expansion for all
+outstanding work; full object for action and evidence. The Excel Master is operating evidence,
+not a requirement to reproduce party remark columns.
 
-```text
-Supplier Claims                                      Jump to · Alerts · Help · Settings
-                                                     Search · Export · Columns
-SUPPLIER               Supplier Claim No. | Reported | Supplier | PO No | GRN No. | Product | Variant | Qty ...
-  actual suppliers     one row per supplier workstream; facts and evidence only
-PROBLEM
-  observed types       footer: matching claims · affected Units/quantity with clear scope
-CLAIM STATUS
-  Open / Closed / Cancelled
-SUPPLIER RESPONSE
-  Not recorded / actual recorded answer
-EVIDENCE
-  Source not linked / Reply evidence missing / Credit evidence missing
-Clear filters
-```
+Opening Supplier Claims shows all permitted new and historical claims, including closed claims,
+newest report first. No View selector or setup step. Search/factual filters start clear on normal
+entry; clearing them restores the complete permitted set. One row remains one supplier workstream,
+never one row per photo, party or Work action.
+
+Default columns, in this order:
+`Supplier Claim No` · `Reported Date` · `Supplier` · `Product` · `Size` · `Qty` · `Problem` ·
+`Current Status` · `Claim Status`.
+Each column holds one kind of fact. Product reads the actual Catalog model name; Size reads the
+Catalog size for categories with a size axis, never a service description or product name.
+PO No, GRN No, SKU and Supplier DO No remain separate optional Columns. SKU is visible by default
+when a Catalog product name is missing. Do not invent names, derive sizes from codes or rename old
+SC numbers. An unissued Claim shows `Not issued`. Preserve scope-specific missing facts rather
+than guessing values. Horizontal scrolling must not let one column cover another.
+
+`Current Status` is generated from evidenced outstanding conditions, not manually selected and
+not the latest remark/event. `Claim Status` remains the independent Open/Closed record state;
+existing cancellation law is unchanged. A recorded supplier request is required before asserting
+that a reply is awaited; a promise is never a handover; an uploaded photo does not hide overdue
+work. Old closure remarks remain attributed remarks, not proof of linked physical completion.
+Do not automatically reopen historical closed Claims because the new reader lacks evidence.
+When parallel obligations exist, the summary must not imply that only one remains; expansion
+shows every outstanding action. The shared Work rules determine the lead action and dates.
+
+No default Customer/Carres/Supplier/Warehouse/Logistic Remark columns, `Latest Update`,
+Supplier Response, Units on hold, Customer Resolution or Carres Execution columns. Their relevant
+facts remain in the owning detail and history. Customer delivery preferences and NETS driver
+information remain Delivery-owned; Claims links only facts relevant to this incident.
+
+The factual rail and Search/Export/Columns reuse the shared Register kit. The footer reports
+matching claims and affected quantity with clear scope. No empty invented category/party rows.
 
 Rail entries are factual predicates with truthful counts, not action queues. No empty invented
 supplier/category rows. Typed date filtering stays with the date column. Search covers claim,
@@ -2091,30 +2092,36 @@ source Case/PO/GRN, Unit, supplier, supplier reference and item; no privileged c
 into supplier views. Clearing filters returns the full permitted set. Empty result, no access and
 load failure are different states. A failed source is never shown as zero claims.
 
-Read-only row expansion is a short problem/evidence inspector: problem type and note, photo
-count, affected held Units and Open Claim. It does not repeat product, source or reply columns.
-Selection remains useful for exporting the selected records; it introduces no batch mutation.
-The inspector has no decision or Stock form. Opening the object preserves register
-filters, scroll and record position. Keyboard access, visible labels and narrow-screen wrapping
-reuse the kit; no meaning depends on hover alone.
+**Expansion has one job: show all outstanding work for this Claim.** Read-only columns are
+`Owner` · `Next Action` · `Due Date`. This is a projection of the same shared Work records, never
+a second task list, assignment or date calculation. Owner resolves the real current duty holder
+or cover with accessible identity; Next Action names the act, recipient and required result;
+Due Date retains the source date meaning (reply, collection, return or other governed obligation).
+The earlier ban on generic action/date columns continues for the parent Register; these three
+approved headings are scoped to its outstanding-work expansion. Missing ownership and missing
+dates remain explicit. Loading/failure must never render as no outstanding work.
 
-```text
-SC number / source problem                Supplier · Open                 previous / next · close
-Problem fact
-[owner avatar] one smaller specific action                        actual working date · action
+Each task is a separate row. Selecting it opens the owning action in the full object or the
+responsible module. No five-party notes or editing forms in expansion. Selection of Claims
+continues to support export, not batch mutation. Opening and returning preserves filters, scroll
+and record position; no meaning depends solely on hover.
 
-The Item        original PO/CO · GRN · Supplier DO · SKU · affected Units/quantity
-Problem         shared Case · observed event · photos/video · customer impact
-Supplier Response   asked / actual answer / exact scope / promises / contact proof
-Customer Resolution read-only Case decision + Open Case
-Carres Execution    approved scope and movement order + owning document doors
-Item Outcome        read-only Where / Who has it / condition / inspection / remaining result
-Supplier money      requested/agreed remedy + Finance acceptance/result links
-Documents           version · recipient · actual send · required print/sign proof
-History             observed/recorded dates · actor/duty/cover · decision/revision/results
+Full object, top to bottom:
+1. Claim identity, actual supplier and Claim Status.
+2. Current work: factual reason, resolved owner, actual date and corresponding action door;
+   parallel outstanding tasks remain accessible.
+3. Product and problem: actual product, size, affected quantity/Units, shared photos and PO/GRN.
+4. Supplier conversation: exact request, actual answer, scoped promise/date, original message
+   evidence and recorder. Purchasing owns these inputs.
+5. Actual results: linked handover, Receiving and inspection evidence, relevant Case remedy,
+   physical execution and Finance results read from their respective owners.
+6. History: complete attributed events and evidence, preserving old records and revisions.
 
-Reference tabs: Document · Revisions · History · Order Route
-```
+System-known receiving/handover/inspection operations generate the progress display automatically.
+Staff record unknown external answers once through structured choices, actual promised dates and
+reply evidence. Supplementary text is for exceptional facts the normal fields cannot express,
+not the main workflow and never the source of inferred completion. No guessed supplier reply,
+customer date, driver identity, owner or physical result.
 
 Main object is one full-width working scroll. Only claim-owned request/answer and supplier
 instruction controls edit here. The customer decision opens the one Case door; physical outcome
