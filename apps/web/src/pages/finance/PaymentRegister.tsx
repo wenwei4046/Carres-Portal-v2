@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { isLivePayment } from "@carres/shared";
 import type { PaymentRegisterRow } from "@carres/shared/payment-register";
 import { paymentExceptionWord, paymentInvoiceNumbers } from "@carres/shared/payment-register";
+import { inOrderScope, orderScopeOf, scopedRegisterHref } from "@carres/shared/payment-register-scope";
 import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
@@ -29,6 +30,14 @@ export default function PaymentRegister() {
   const query = usePaymentRegister();
   const [selectedKeys, setSelectedKeys] = useState(new Set<string>());
   const [params, setParams] = useSearchParams();
+  /* THE ORDER SCOPE (entry-point correction, 2026-09-09) — the Sales Order's
+     `Open this order in Payment` door and every old `?tab=payments&so=` link
+     arrive here asking about ONE order, so the listing answers about that
+     order and says so. Leaving the scope is one control, never a back button. */
+  const orderScope = orderScopeOf(params.get("order"));
+  const leaveScope = () => setParams((before) => {
+    const next = new URLSearchParams(before); next.delete("order"); return next;
+  });
   const open = (r: PaymentRegisterRow) => setParams((before) => {
     const next = new URLSearchParams(before); next.set("payment", r.id); return next;
   });
@@ -96,6 +105,12 @@ export default function PaymentRegister() {
   ], []);
   const selected = params.get("payment");
   const payment = query.data?.find((r) => r.id === selected);
+  // The complete set is already in hand (the hook pages until `total`), so
+  // this narrows an exact list — it never hides a row from an unfetched page.
+  const rows = useMemo(
+    () => (query.data ?? []).filter((r) => inOrderScope(r, orderScope)),
+    [query.data, orderScope],
+  );
   return <div className="flex h-full min-h-0 flex-col">
     {payment ? <SalesOrderTabs identity={payment.receipt_no ?? "Payment"}
       customer={payment.orders?.customer_name} backLabel="Payments" backTo="?"
@@ -133,16 +148,26 @@ export default function PaymentRegister() {
     </div> : <div className="p-6 text-body"><p>{query.isLoading ? "Loading payment…" : "Payment not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Payments</button></div>
     : <ListPageShell register>
-      <DataGrid rows={query.data ?? []} columns={columns} rowKey={(r) => r.id}
+      <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
         storageKey="carres.payment.register.v1" appearance="reference" exportName="Payments"
         groupBanner={false} stickyIdentity isLoading={query.isLoading} searchPlaceholder="Search payments…"
-        toolbarStart={<span className="flex gap-3 text-body"><span aria-current="page" className="font-semibold">Payments</span><Link to="/finance/invoices">Invoices</Link></span>}
+        toolbarStart={<span className="flex items-center gap-3 text-body">
+          <span aria-current="page" className="font-semibold">Payments</span>
+          <Link to={scopedRegisterHref("/finance/invoices", orderScope)}>Invoices</Link>
+          {orderScope !== null && <span className="flex items-center gap-2" data-testid="payment-register-order-scope">
+            <span>SO-{orderScope} only</span>
+            <button type="button" className="underline underline-offset-2"
+              onClick={leaveScope}>Show all payments</button>
+          </span>}
+        </span>}
         selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((before) => {
           const next = new Set(before); if (next.has(key)) next.delete(key); else next.add(key); return next;
         }), onToggleAll: (keys, all) => setSelectedKeys((before) => {
           const next = new Set(before); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next;
         }) }}
-        emptyMessage="No payments yet. Recorded customer money will appear here."
+        emptyMessage={orderScope !== null
+          ? `No payment is recorded on SO-${orderScope} yet.`
+          : "No payments yet. Recorded customer money will appear here."}
         expandTitle="Inspect payment" onRowDoubleClick={open}
         expandable={{ renderExpansion: (r) => <div className="p-4 text-body">
           <Allocation payment={r} /><p>{r.receipt_url ? "Payment proof is on file." : "No payment proof on file."}</p>

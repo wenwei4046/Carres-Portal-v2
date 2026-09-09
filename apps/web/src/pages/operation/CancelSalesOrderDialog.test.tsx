@@ -46,7 +46,7 @@ const impact = (over: Partial<SalesOrderCancelImpact> = {}): SalesOrderCancelImp
     { owner: "Receiving", kind: "receipt", count: 0, blocks: false, href: "/operation?tab=receiving" },
     { owner: "Stock", kind: "unit", count: 0, blocks: false, href: "/operation?tab=stock-onhand" },
     { owner: "Delivery", kind: "attempt", count: 0, blocks: false, href: "/operation?tab=delivery" },
-    { owner: "Money", kind: "paid", count: 0, amount: 0, blocks: false, href: "/operation?tab=payments" },
+    { owner: "Money", kind: "paid", count: 0, amount: 0, blocks: false, href: "/finance/payments" },
     { owner: "Loan", kind: "loan", count: 0, blocks: false, href: "/operation?tab=loans" },
     { owner: "Other Commitments", kind: "work", count: 0, blocks: false, href: "/operation?tab=work" },
   ],

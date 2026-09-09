@@ -24,7 +24,7 @@ vi.mock("@/lib/queries", async () => {
             commercial_delta: 500,
             findings: [
               { owner: "Purchasing", kind: "purchase_order", count: 1, blocks: false, href: "/operation?tab=purchase" },
-              { owner: "Money", kind: "commercial_delta", count: 0, amount: 500, blocks: false, href: "/operation?tab=payments" },
+              { owner: "Money", kind: "commercial_delta", count: 0, amount: 500, blocks: false, href: "/finance/payments" },
             ],
           }
         : undefined,

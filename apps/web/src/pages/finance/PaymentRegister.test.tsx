@@ -46,10 +46,10 @@ beforeEach(() => {
   duty.me = null; duty.role = "operation"; duty.actor = null;
   localStorage.clear();
 });
-function show() {
+function show(at = "/finance/payments") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>
-    <MemoryRouter><PaymentRegister /></MemoryRouter>
+    <MemoryRouter initialEntries={[at]}><PaymentRegister /></MemoryRouter>
   </QueryClientProvider>);
 }
 describe("Payments Register", () => {
@@ -240,3 +240,56 @@ describe("the §11 history axes", () => {
   });
 });
 
+/**
+ * ⭐ ONE ORDER'S MONEY (entry-point correction, 2026-09-09).
+ *
+ * The Sales Order's `Open this order in Payment` door and every bookmark of
+ * the retired `/operation?tab=payments&so=` desk arrive here asking about ONE
+ * order. Without the scope they would open a list of every payment Carres has
+ * ever taken — which is not an answer, it is the operator's search problem
+ * handed back to them.
+ */
+describe("Payments Register — the order scope", () => {
+  it("shows only the scoped order, and says which one", () => {
+    state.data = [
+      payment,
+      { ...payment, id: "p9", receipt_no: "RC-060926-0009",
+        orders: { id: "o9", so: 999, customer_name: "Another Customer" } },
+    ];
+    show("/finance/payments?order=123");
+    expect(screen.getByTestId("payment-register-order-scope")).toHaveTextContent("SO-123 only");
+    expect(screen.getByText("RC-060926-0001")).toBeInTheDocument();
+    expect(screen.queryByText("RC-060926-0009")).not.toBeInTheDocument();
+  });
+
+  it("leaves the scope on one control, and the whole list comes back", () => {
+    state.data = [
+      payment,
+      { ...payment, id: "p9", receipt_no: "RC-060926-0009",
+        orders: { id: "o9", so: 999, customer_name: "Another Customer" } },
+    ];
+    show("/finance/payments?order=123");
+    fireEvent.click(screen.getByRole("button", { name: "Show all payments" }));
+    expect(screen.getByText("RC-060926-0009")).toBeInTheDocument();
+    expect(screen.queryByTestId("payment-register-order-scope")).not.toBeInTheDocument();
+  });
+
+  it("carries the scope across the toolbar switch to Invoices", () => {
+    show("/finance/payments?order=123");
+    expect(screen.getByRole("link", { name: "Invoices" }))
+      .toHaveAttribute("href", "/finance/invoices?order=123");
+  });
+
+  it("says the order is empty rather than showing an empty portal", () => {
+    state.data = [{ ...payment, orders: { id: "o9", so: 999, customer_name: "Another" } }];
+    show("/finance/payments?order=123");
+    expect(screen.getByText("No payment is recorded on SO-123 yet.")).toBeInTheDocument();
+  });
+
+  it("is absent when nothing is scoped — the unscoped listing is unchanged", () => {
+    show();
+    expect(screen.queryByTestId("payment-register-order-scope")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Invoices" }))
+      .toHaveAttribute("href", "/finance/invoices");
+  });
+});

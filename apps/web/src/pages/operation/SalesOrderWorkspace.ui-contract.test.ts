@@ -656,7 +656,7 @@ describe("Sales Order object template contract", () => {
 
   it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
     expect(workspace).toContain("Open this order in Payment");
-    expect(workspace).toContain("tab=payments&so=");
+    expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
     const start = workspace.indexOf('<Block title="Money">');

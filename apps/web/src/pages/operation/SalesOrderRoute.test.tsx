@@ -354,7 +354,7 @@ describe("Order Route — accessibility", () => {
   it("opens the node's door on Enter and on Space", () => {
     draw();
     fireEvent.keyDown(nodeEl("money"), { key: "Enter" });
-    expect(screen.getByTestId("where")).toHaveTextContent("/operation?tab=payments&so=1319");
+    expect(screen.getByTestId("where")).toHaveTextContent("/finance/payments?order=1319");
   });
 
   it("never carries state in colour alone", () => {
