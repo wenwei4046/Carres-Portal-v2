@@ -327,16 +327,14 @@ honest Work for admitted modules.
   also have no step owner or governed per-step due law. Workspace therefore reports this as an
   admission gap and does not invent an `Operation team` owner, a global fallback or duplicate task
   rows. Their outcome dates remain the authoritative completion facts in the Service Case.
-- Issue Tracker admission was re-audited against its approved MASTER, migration 0352, shared input
-  contract, API and shipped Register on 2026-09-07. Production currently stores the action owner
-  name and action parts as mutable Issue columns, then creates a second free-text `ops_tasks` row.
-  The person id is optional, no Duty/person rule or Buddy-cover evidence is resolved, and the UI
-  repeats the owner inside the action sentence. There is also no authoritative result write that
-  completes/replaces the current action identity and no deep link that opens the exact Issue. These
-  records therefore fail sections 2, 3 and 6 and are not admitted to shared Work. Repair must make
-  the Issue's structured current-action transition the single truth, resolve its owner rule through
-  Workspace, preserve actual-actor history, expose exact Issue routing and retire the duplicate
-  generated task only after source-by-source migration proof.
+- Issue Tracker admission now uses the versioned `issue_actions` occurrence as its one action truth.
+  Intake stores an owner rule, never a person sentence; `Issue Triage Duty` and `Issue Review
+  Approver` resolve through Staff & Duties with dated cover. One atomic result door records the
+  governed result, actual actor, normal owner and cover evidence, then completes or replaces that
+  occurrence. Open actions project into shared Work with their exact Issue door. Migration 0440
+  preserves legacy Current Actions as sequence 1 and cancels only the explicitly linked generated
+  `ops_tasks` duplicate; historical actor/task evidence remains. The old mutable columns remain
+  transition-only database baggage and have no application writer or reader.
 - Notifications were re-audited against the shipped global Bell on 2026-09-07. The current Bell is
   not a notification system: it independently recomputes overdue/near-delivery Orders, reads legacy
   `ops_tasks`, labels the result `to action` and opens Orders. That is a second action queue and can
@@ -367,11 +365,11 @@ honest Work for admitted modules.
 5. Define a routine Service Case owner rule/Duty (separate from approval) and decide whether its
    derived follow-ups are governed `No date` actions or receive per-step clocks; then admit only the
    qualified projections to the server feed.
-6. Replace Issue Tracker's stored owner prose and duplicate `ops_tasks` creation with a governed
-   owner rule, versioned current-action result transition and exact Issue deep link; migrate existing
-   truth before admitting it to Work.
-7. Retire remaining duplicate generated-task paths after source-by-source proof; the PO-day task is
-   complete, while Issue Tracker and the legacy Bell remain governed gaps above.
+6. Production-verify Issue Tracker action migration, result transition, duty assignment/cover and
+   exact Work deep link; then remove its transition-only legacy Current Action columns in a later
+   schema cleanup.
+7. Retire remaining duplicate generated-task paths after source-by-source proof; PO-day and Issue
+   Tracker generation are retired, while the legacy Bell remains the governed gap above.
 8. Replace the legacy Bell queue with durable, idempotent Work-transition receipts and migrate the
    header to those receipts; read/dismiss must never alter Work.
 9. Last, complete and owner-review Dashboard against production data.
