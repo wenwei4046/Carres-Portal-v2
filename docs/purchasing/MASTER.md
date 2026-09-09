@@ -1061,7 +1061,11 @@ keeps feeding the rail and Work Engine; structured actions keep feeding central 
   "if ordered today" estimate. **Corrected 2026-09-09:** this section named `eta_date` and the
   Register read it, so the same column disagreed with Purchase Orders and with the paper the
   supplier holds. A PO whose original the 0428 recovery could not evidence stays NULL and prints
-  as an absence — an unknown original is never back-filled from today's planning date.
+  `Not recorded` — the same word the Purchase Orders register already uses for the same fact, so
+  one PO can never be described differently by two columns. An unknown original is never
+  back-filled from today's planning date. **A BLANK cell keeps its own separate meaning: nothing
+  has been ordered.** Live at the time of the change: 62 non-cancelled POs, 41 with an original on
+  file, 21 unknown.
 - **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
   `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
 - **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;

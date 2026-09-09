@@ -709,13 +709,30 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         chooserGroup: "Documents",
         accessor: (o) => {
           const s = soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate));
-          const text = s.kind === "none" ? null : s.kind === "one" ? fmtDate(s.value) : W.multiple;
+          /* A blank cell means NO PURCHASE ORDER. A purchase order whose
+             original date the 0428 recovery could not evidence is a different
+             answer and owes a sentence, so it says so in the same word the
+             Purchase Orders register uses for it (21 of 62 live POs). Merging
+             the two would make an unknown original look like nothing ordered. */
+          const text =
+            s.kind === "one"
+              ? fmtDate(s.value)
+              : s.kind === "many"
+                ? W.multiple
+                : o.pos.length > 0
+                  ? W.poDeliveryDateUnknown
+                  : null;
           return <span data-testid={`so-batch-po-date-${o.orderId}`}>{text}</span>;
         },
         sortFn: (a, b) =>
           (a.pos[0]?.officialDeliveryDate ?? "").localeCompare(b.pos[0]?.officialDeliveryDate ?? ""),
-        exportValue: (o) =>
-          summaryText(soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate)), () => W.multiple) ?? "",
+        exportValue: (o) => {
+          const s = soBatchCellSummary(o.pos.map((p) => p.officialDeliveryDate));
+          return (
+            summaryText(s, () => W.multiple) ??
+            (o.pos.length > 0 ? W.poDeliveryDateUnknown : "")
+          );
+        },
       },
     ],
     [

@@ -81,6 +81,18 @@ export const SO_BATCH_PURCHASE_WORDS = {
    */
   multiple: "Multiple",
 
+  /**
+   * A purchase order exists, but the original date it was issued with is not
+   * on file — the 0428 recovery recorded an unevidenced original as unknown
+   * rather than back-filling it from a planning date (§5.7). 21 of 62 live
+   * purchase orders are in this state.
+   *
+   * It is the SAME word the Purchase Orders register already prints for the
+   * same fact, so the two columns cannot describe one PO differently. A cell
+   * left BLANK keeps its own separate meaning: nothing has been ordered.
+   */
+  poDeliveryDateUnknown: "Not recorded",
+
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
      and that component owns its own headings. The eight labels that used to
