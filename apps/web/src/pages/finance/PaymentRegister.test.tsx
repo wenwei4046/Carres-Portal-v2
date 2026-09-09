@@ -293,3 +293,24 @@ describe("Payments Register — the order scope", () => {
       .toHaveAttribute("href", "/finance/invoices");
   });
 });
+
+/* Measured on production 2026-09-09: the Invoices Register footer read
+   `1 invoices · RM 2,499.00 still needed`. A count interpolated straight into
+   a plural noun is the tell that nobody read the line aloud, and the operator
+   reads this one every day. Both Registers now agree with themselves. */
+describe("the footer counts in English", () => {
+  it("says one payment, not one payments", () => {
+    state.data = [payment];
+    show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("1 payment · RM 200.00 received");
+  });
+  it("still says payments for none and for many", () => {
+    state.data = [];
+    const { unmount } = show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("0 payments");
+    unmount();
+    state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-2" }];
+    show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("2 payments");
+  });
+});

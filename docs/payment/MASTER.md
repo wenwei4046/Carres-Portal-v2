@@ -287,6 +287,43 @@ entrance, idempotency mapping, role gate and void contract; focused web tests pr
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
 
+### PRODUCTION-VERIFIED — the entry point and the Invoices repair, 2026-09-09
+
+Walked authenticated on the deployed ERP as `principal@carres.com`. ERP page and API Worker both
+reported `a7db9fbc` (`de30da24` entry point + `a7db9fbc` Invoices repair; verified by ANCESTRY —
+a sibling merge landed between them).
+
+| Walked | Result |
+|---|---|
+| Sidebar `Payments` row | `href="/finance/payments"` — was `/operation?tab=payments` on `5da8dab3` |
+| Clicking it | the canonical Register: `Payments · Invoices` toolbar, eight columns, read-only |
+| Summary band · Queues | **gone** (were `Balance owing RM 134,060` · `Collect/Waiting stock/Stock late/Storage running`) |
+| Editable fields on the destination | **0** — were **106**, including per-row `bal RM 0` / `storage RM 0` |
+| Toolbar → Invoices | `INV-FIX-3208 · SO-1313 · RM 2,499.00 · Arrival not confirmed · Sun, 4 Oct` |
+| Invoice date cell → Calendar | opens `?view=calendar&date=2026-10-04&so=…&from=delivery`, October month rail, the SO highlighted on its day, `Back to Invoices` |
+| `/operation?tab=payments&so=1313` | lands on `/finance/payments?order=1313`, chip `SO-1313 only` + `Show all payments`, honest `No payment is recorded on SO-1313 yet.` |
+| Toolbar switch under scope | `/finance/invoices?order=1313` — the scope survives |
+
+**THE ZERO WAS A LIE, AND THE REPAIR PROVED IT.** Before `a7db9fbc` the Invoices Register drew
+`0 invoices · RM 0.00 still needed`; after it, the same page drew `1 invoice · RM 2,499.00 still
+needed`. There was always an invoice. The 500 hid it and the screen reported the hiding as zero.
+That is the strongest available argument for the absent-is-not-zero law: the lie was not
+detectable from the screen, only from the read behind it.
+
+**The Payments Register's own zero is TRUE**, and was checked rather than assumed:
+`GET /api/finance/payments/register` answers `{"rows":[],"total":0}` at HTTP 200. No canonical
+receipt has been posted in production, which is what CLAUDE.md §6 expects of a clean-start
+database.
+
+**Corrected in the same pass:** both Register footers said `1 invoices` / `1 payments` — a count
+interpolated straight into a plural noun, on the line an operator reads every day.
+
+**Not fixed, and stated rather than buried:** during the failure the Invoices page did not render
+its own `query.isError` branch (`Invoices could not be loaded. Try again.`), showing the empty
+state instead. The 500 is gone so the path is no longer reachable naturally, and the cause was not
+identified from the source. Every Register in the portal shares that pattern, so if the branch is
+genuinely dead it is not an Invoices-only defect. **Open.**
+
 ### 🔴 FOUND BY THE PRODUCTION WALK — the Invoices Register was dead, 2026-09-09
 
 **Measured, not inferred.** The authenticated walk that verified the entry point above went on

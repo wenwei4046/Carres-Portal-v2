@@ -277,3 +277,16 @@ describe("Invoices Register — the order scope", () => {
       .toHaveAttribute("href", "/finance/payments");
   });
 });
+
+/* The production line this fixes: `1 invoices · RM 2,499.00 still needed`
+   (measured 2026-09-09, the walk that verified the Payments entry point). */
+describe("the footer counts in English", () => {
+  it("says one invoice, not one invoices", () => {
+    show("/finance/invoices?order=1301");
+    expect(screen.getByTestId("invoice-register-summary")).toHaveTextContent(/^1 invoice · /);
+  });
+  it("still says invoices for many", () => {
+    show();
+    expect(screen.getByTestId("invoice-register-summary")).toHaveTextContent(/^3 invoices · /);
+  });
+});

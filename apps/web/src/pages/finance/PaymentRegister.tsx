@@ -175,7 +175,7 @@ export default function PaymentRegister() {
           <p>{r.recorded_by_name ?? "Recorder name not available."}</p>
           <button className="btn-secondary mt-3" onClick={() => open(r)}>Open payment</button>
         </div> }}
-        statusSummary={(visible) => <span data-testid="payment-register-summary">{visible.length} payments · {rm(visible.filter(isLivePayment).reduce((sum, r) => sum + r.amount, 0))} received</span>}
+        statusSummary={(visible) => <span data-testid="payment-register-summary">{visible.length} {visible.length === 1 ? "payment" : "payments"} · {rm(visible.filter(isLivePayment).reduce((sum, r) => sum + r.amount, 0))} received</span>}
       />
     </ListPageShell>}
   </div>;
