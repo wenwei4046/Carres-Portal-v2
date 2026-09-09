@@ -1,0 +1,71 @@
+/* Sales Order detail-only palette trial. Keep geometry, shared kit tokens,
+   semantic states, interactive blue and PDF document rendering unchanged. */
+[data-so-theme="trial"] {
+  background-color: #f5f7fa;
+  color: #1f2937;
+}
+
+[data-so-theme="trial"] .bg-kit-slate-3 {
+  background-color: #f5f7fa;
+}
+
+[data-so-theme="trial"] .so-detail-style {
+  color: #1f2937;
+}
+
+[data-so-theme="trial"] .so-detail-style [data-block] {
+  background-color: #ffffff;
+  border-color: #d0d7e0;
+  border-radius: 6px;
+}
+
+[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child {
+  background-color: #d6e3f0;
+  color: #24364b;
+}
+
+[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child > h2 {
+  color: #24364b;
+}
+
+[data-so-theme="trial"] .so-detail-style :is(label, .text-base-400, .text-base-500, .text-base-600, .text-kit-slate-11),
+[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child :is(span, p) {
+  color: #667085;
+}
+
+[data-so-theme="trial"] .so-detail-style :is(.text-base-700, .text-base-900, .text-kit-slate-12) {
+  color: #1f2937;
+}
+
+[data-so-theme="trial"] .so-detail-style :is([data-kit="input"], [data-kit="textarea"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]) {
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
+/* Retain error borders and the existing blue focus treatment. */
+[data-so-theme="trial"] .so-detail-style :is([data-kit="input"], [data-kit="textarea"], [data-kit="select"], [data-kit="date-picker"], [data-kit="readonly-field"]).border-kit-slate-5:not(:focus):not(:focus-visible) {
+  border-color: #cbd5e1;
+}
+
+[data-so-theme="trial"] .so-detail-style :is(tr, .border-t, .border-b) {
+  border-color: #d0d7e0;
+}
+
+[data-so-theme="trial"] .so-detail-style thead,
+[data-so-theme="trial"] .so-detail-style thead tr {
+  background-color: #e8edf2;
+  color: #24364b;
+}
+
+[data-so-theme="trial"] .so-detail-style tbody tr {
+  background-color: #ffffff;
+}
+
+[data-so-theme="trial"] .so-detail-style tbody tr:is([aria-selected="true"], [data-state="selected"]) {
+  background-color: #eaf4ff;
+}
+
+[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child :is(a, button),
+[data-so-theme="trial"] .so-detail-style [data-block] > div:first-child :is(a, button) * {
+  @apply text-kit-blue-11;
+}

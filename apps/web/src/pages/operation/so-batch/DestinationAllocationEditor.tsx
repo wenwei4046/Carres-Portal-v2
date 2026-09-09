@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   SO_BATCH_PURCHASE_WORDS as W,
   splitAllocation,
@@ -82,19 +83,27 @@ export default function DestinationAllocationEditor({
     <span className="flex flex-col gap-0.5">
       <span className="flex items-center gap-1.5">
         {single ? (
-          <select
-            className="min-w-0 flex-1 truncate rounded-control border border-kit-slate-6 bg-white px-1.5 py-0.5 text-meta"
-            data-testid={`so-batch-deliver-to-select-${row.id}`}
-            value={single.destinationId}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onWholeRow(e.target.value)}
-          >
-            {destinations.map((d) => (
-              <option key={d.id} value={d.id} disabled={!d.active}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          <span className="relative min-w-0 flex-1">
+            {/* `appearance-none` + a drawn `ChevronDown`, same as the
+               multi-destination summary select — one dropdown chrome across
+               every editable Deliver To cell, not two that happen to sit
+               next to each other (owner correction 2026-09-09). */}
+            <select
+              className="w-full min-w-0 appearance-none truncate rounded-control border border-kit-slate-6 bg-white py-0.5 pl-1.5 pr-5 text-meta"
+              data-testid={`so-batch-deliver-to-select-${row.id}`}
+              value={single.destinationId}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onWholeRow(e.target.value)}
+            >
+              {destinations.map((d) => (
+                <option key={d.id} value={d.id} disabled={!d.active}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} strokeWidth={1.75} aria-hidden
+              className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-kit-slate-11" />
+          </span>
         ) : (
           /* Already split — the cell states the arrangement rather than
              pretending one select could describe it. */

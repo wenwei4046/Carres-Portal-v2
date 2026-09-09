@@ -41,6 +41,7 @@ import { avatarColor, personInitials } from "@/lib/staff-avatar";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
+import { DestinationSummarySelect, ResponsiveValues } from "./ResponsiveValues";
 import GoodsMiniTable, {
   categoryWord,
   type GoodsMiniLine,
@@ -616,8 +617,15 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         sortable: true,
         chooserGroup: "Buying",
         accessor: (o) => {
-          const text = summaryText(supplierSummaryOf(o), (n) => `${n} suppliers`);
-          return <span data-testid={`so-batch-supplier-${o.orderId}`}>{text}</span>;
+          const s = supplierSummaryOf(o);
+          const names = s.kind === "none" ? [] : s.kind === "one" ? [s.value] : s.values;
+          return (
+            <ResponsiveValues
+              values={names}
+              detail="Supplier"
+              testId={`so-batch-supplier-${o.orderId}`}
+            />
+          );
         },
         searchValue: (o) =>
           [...o.outstandingSuppliers, ...o.pos.map((p) => p.supplierName ?? "")].join(" "),
@@ -650,45 +658,40 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           }
           if (eligible.length > 1) {
             /* One select for the whole order — the common act. The exact
-               per-item allocation (and Split) lives in the expansion. */
-            const arranged = soBatchCellSummary(
-              eligible.flatMap((r) => leafAllocations(r).map((a) => a.destinationId)),
-            );
-            const value = arranged.kind === "one" ? arranged.value : "";
+               per-item allocation (and Split) lives in the expansion.
+               `DestinationSummarySelect` keeps the real `<select>` (and its
+               real options — `Multiple` is a summary of the current
+               assignments, never a selectable destination) and overlays the
+               actual, deduplicated location names so the collapsed control
+               says WHERE, not just THAT there are several. */
             return (
               <span data-testid={`so-batch-deliver-to-${o.orderId}`}>
-                <select
-                  className="w-full min-w-0 truncate rounded-control border border-kit-slate-6 bg-white px-1.5 py-0.5 text-meta"
-                  data-testid={`so-batch-deliver-to-select-${o.orderId}`}
-                  value={value}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    for (const r of eligible) changeWholeLeaf(r, e.target.value);
+                <DestinationSummarySelect
+                  destinations={data.destinations}
+                  ids={eligible.flatMap((r) => leafAllocations(r).map((a) => a.destinationId))}
+                  onChange={(destinationId) => {
+                    for (const r of eligible) changeWholeLeaf(r, destinationId);
                   }}
-                >
-                  {arranged.kind !== "one" ? (
-                    <option value="" disabled>
-                      {W.multiple}
-                    </option>
-                  ) : null}
-                  {data.destinations.map((d) => (
-                    <option key={d.id} value={d.id} disabled={!d.active}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                  testId={`so-batch-deliver-to-select-${o.orderId}`}
+                />
               </span>
             );
           }
           const issued = soBatchCellSummary(
             o.pos.map((p) => destinationName(p.destinationId)),
           );
-          const text =
-            issued.kind === "none"
-              ? null
-              : issued.kind === "one"
-                ? issued.value
-                : W.multiple;
+          /* Ordered/locked rows stay plain text — no dropdown, nothing left
+             to arrange — but "Multiple" named nothing. The issued document's
+             own destinations are known, so print them. */
+          if (issued.kind === "many") {
+            return (
+              <ResponsiveValues
+                values={issued.values}
+                testId={`so-batch-deliver-to-${o.orderId}`}
+              />
+            );
+          }
+          const text = issued.kind === "one" ? issued.value : null;
           /* THE EMPTY CELL SAYS WHY IT IS EMPTY (YH, 2026-09-02:
              "still cant click checkboxes, delivery to column is still empty").
              This cell draws a CONTROL on any row that can still be bought, so
@@ -762,14 +765,21 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
              answer and owes a sentence, so it says so in the same word the
              Purchase Orders register uses for it (21 of 62 live POs). Merging
              the two would make an unknown original look like nothing ordered. */
+          if (s.kind === "many") {
+            return (
+              <ResponsiveValues
+                values={s.values.map((d) => fmtDate(d))}
+                detail="PO Delivery Date"
+                testId={`so-batch-po-date-${o.orderId}`}
+              />
+            );
+          }
           const text =
             s.kind === "one"
               ? fmtDate(s.value)
-              : s.kind === "many"
-                ? W.multiple
-                : o.pos.length > 0
-                  ? W.poDeliveryDateUnknown
-                  : null;
+              : o.pos.length > 0
+                ? W.poDeliveryDateUnknown
+                : null;
           return <span data-testid={`so-batch-po-date-${o.orderId}`}>{text}</span>;
         },
         sortFn: (a, b) =>
