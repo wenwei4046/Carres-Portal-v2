@@ -861,7 +861,14 @@ The only Warehouse Settings entry is `Page Header → Settings → Warehouse`. N
 Monitor, panel or object menu may create a second Settings door. Settings governs rules/master data
 only; it never edits a Unit, reservation, Count result, Transfer/event or Month-end version.
 
-**THE BUILT SURFACE — owner card 2026-09-09, migrations 0456 · 0457.** `Settings → Warehouse` is a
+**THE BUILT SURFACE — PRODUCTION-VERIFIED, owner card 2026-09-09, migrations 0456 · 0457 · 0458.**
+Merged in PR #1191 (`05b36bd8`) and PR #1194 (`d3630bea`); both Pages projects and the Worker
+report `d3630bea`. Walked signed in at `erp.carresofficial.com/operation/settings/warehouse/*`
+with the app's own stylesheet applied: the five rail rows, the identity block
+`Carres Klang Warehouse / Operated by NETS Warehouse · Active`, a disabled `Save changes`, every
+weekday `Not configured` for both activities, `Public-holiday policy    Not configured`, no
+calendar imported, no Special Date, and every capability held by nobody. `Settings → Warehouse`
+is a
 live route with five rail sections and ONE `Save changes`, disabled until something changes and
 naming its gap when a value would be refused:
 
