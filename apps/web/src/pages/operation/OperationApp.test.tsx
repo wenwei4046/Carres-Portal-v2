@@ -420,3 +420,33 @@ describe("OperationApp — the retired Purchase Demands address", () => {
     expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ⭐ THE OLD PAYMENTS URL LEADS TO THE CANONICAL EXPERIENCE (2026-09-09).
+ *
+ * `?tab=payments` mounted the Master-Sheet "Balance" collections desk — its
+ * own Summary band, its own queue chips, its own editable balance and
+ * storage-fee fields — for the whole time the approved read-only Register was
+ * live at `/finance/payments`. Two forms for one act make two records
+ * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is deleted and the
+ * address forwards. A bookmark is not a reason to keep a duplicate; it is a
+ * reason to make the old address land.
+ */
+describe("OperationApp — the retired Payments desk", () => {
+  it("?tab=payments leads to the canonical Payments Register", () => {
+    renderApp("/operation?tab=payments");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/payments");
+  });
+
+  it("a scoped bookmark keeps its order", () => {
+    renderApp("/operation?tab=payments&so=1319");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/finance/payments?order=1319",
+    );
+  });
+
+  it("nothing of the desk is left to render", () => {
+    renderApp("/operation?tab=payments");
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+});

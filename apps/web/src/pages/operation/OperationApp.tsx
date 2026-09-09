@@ -40,7 +40,6 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
 import EditDelivery from "./EditDelivery";
-import OperationPayments from "./OperationPayments";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -225,6 +224,10 @@ export default function OperationApp() {
   // Rides along on the stale-catalog-link forward so a deep-linked tab
   // (`?section=promo`) survives the hop to the Admin door.
   const catalogSection = searchParams.get(CATALOG_TAB_PARAM);
+  /* The retired Payments desk scoped itself with `?so=<SO No>` and the order's
+     Money door still spells it that way in old links. It rides along on the
+     forward below so a scoped bookmark keeps its order. */
+  const legacyPaymentsSo = searchParams.get("so");
   useEffect(() => {
     if (
       !urlTab
@@ -523,8 +526,24 @@ export default function OperationApp() {
                 open work set (Card 9's engine). The page writes nothing; a
                 row opens the Sales Order Workspace. */}
             {tab === "work" && <OperationWork />}
-            {/* 0165 — Payments / collection (Master Sheet Balance tab) */}
-            {tab === "payments" && <OperationPayments />}
+            {/* ⭐ THE OLD PAYMENTS URL LEADS TO THE CANONICAL EXPERIENCE
+                (entry-point correction, 2026-09-09). `?tab=payments` was the
+                0165 Master-Sheet "Balance" desk — its own Summary band, its
+                own queue chips and its own editable balance / storage-fee
+                fields. Payment MASTER §16 gave that act ONE home: the
+                read-only Payments Register, its `Payments · Invoices`
+                toolbar, and the Invoice object that owns every write. The
+                desk is deleted, and every bookmark, saved link and shared URL
+                still lands — carrying its order scope, which the Register
+                reads as `?order=<SO No>`. */}
+            {tab === "payments" && (
+              <Navigate
+                to={`/finance/payments${
+                  legacyPaymentsSo ? `?order=${encodeURIComponent(legacyPaymentsSo)}` : ""
+                }`}
+                replace
+              />
+            )}
             {/* 0247-0249 — Rental base: agreements + deployed-unit registry */}
             {tab === "rental" && <OperationRental />}
             {/* Purchasing → SO Batch Purchase — the buying Register and the

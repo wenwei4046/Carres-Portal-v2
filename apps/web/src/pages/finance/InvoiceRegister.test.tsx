@@ -90,11 +90,11 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-function show() {
+function show(at = "/finance/invoices") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter><InvoiceRegister /></MemoryRouter>
+      <MemoryRouter initialEntries={[at]}><InvoiceRegister /></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -224,5 +224,56 @@ describe("Invoices Register", () => {
     expect(screen.queryByTestId("invoice-register-summary")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(state.refetch).toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⭐ ONE ORDER'S INVOICES (entry-point correction, 2026-09-09) — the same
+ * `?order=<SO No>` the Payments Register reads, so the toolbar switch keeps
+ * answering the same question.
+ *
+ * `?so=` is deliberately NOT this parameter: §17 already spends it on the
+ * Calendar's highlighted order, where it holds an `order_id` UUID.
+ */
+describe("Invoices Register — the order scope", () => {
+  it("shows only the scoped order's invoices", () => {
+    show("/finance/invoices?order=1301");
+    expect(screen.getByTestId("invoice-register-order-scope")).toHaveTextContent("SO-1301 only");
+    expect(screen.getByText("INV-060926-0001")).toBeInTheDocument();
+    expect(screen.queryByText("INV-050926-0002")).not.toBeInTheDocument();
+  });
+
+  it("leaves the scope on one control", () => {
+    show("/finance/invoices?order=1301");
+    fireEvent.click(screen.getByRole("button", { name: "Show all invoices" }));
+    expect(screen.getByText("INV-050926-0002")).toBeInTheDocument();
+    expect(screen.queryByTestId("invoice-register-order-scope")).not.toBeInTheDocument();
+  });
+
+  it("carries the scope back across the toolbar switch to Payments", () => {
+    show("/finance/invoices?order=1301");
+    expect(screen.getByRole("link", { name: "Payments" }))
+      .toHaveAttribute("href", "/finance/payments?order=1301");
+  });
+
+  it("says the order is empty rather than showing an empty portal", () => {
+    show("/finance/invoices?order=9999");
+    expect(screen.getByText("No invoice is prepared on SO-9999 yet.")).toBeInTheDocument();
+  });
+
+  /* The `?so=` UUID the Calendar spends is not an order scope, and must not
+     silently empty the listing. */
+  it("ignores the Calendar's own parameter", () => {
+    show("/finance/invoices?so=o2");
+    expect(screen.queryByTestId("invoice-register-order-scope")).not.toBeInTheDocument();
+    expect(screen.getByText("INV-060926-0001")).toBeInTheDocument();
+    expect(screen.getByText("INV-050926-0002")).toBeInTheDocument();
+  });
+
+  it("is absent when nothing is scoped", () => {
+    show();
+    expect(screen.queryByTestId("invoice-register-order-scope")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Payments" }))
+      .toHaveAttribute("href", "/finance/payments");
   });
 });

@@ -263,9 +263,10 @@ Operation informed customer. Payment may show linked read-only history; it does 
 **OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is
 production-verified and the §16/§17 registers, objects, actions, Settings and Calendar are
 deployed with exact-SHA proof and local walks, but the governed acceptance is not complete:
-the authenticated production walk, the complete §16 message assembly (blocked on the
-owner-approved Important Notes wording), Reports, Stripe convergence, the storage journeys and
-the Refund/Recon retirement remain open below.
+the complete §16 message assembly (blocked on the owner-approved Important Notes wording),
+Stripe convergence and the production VISUAL pass remain open below. **The everyday entry point
+was corrected on 2026-09-09** — until then the sidebar `Payments` row still opened the retired
+Master-Sheet desk, so none of the deployed §16 work reached the operator by its normal route.
 
 ### Production-verified — Customer payment posting convergence
 
@@ -285,6 +286,59 @@ Production evidence, reconfirmed 2026-09-03: migration
 entrance, idempotency mapping, role gate and void contract; focused web tests prove the shared money
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
+
+### THE ENTRY POINT — the everyday `Payments` row opens the Register, 2026-09-09
+
+**The gap this closes, stated plainly.** Every §16/§17 surface above was built, deployed and
+proved at `/finance/*` — and the sidebar row an operator actually clicks every day still opened
+`/operation?tab=payments`, the Master-Sheet "Balance" collections desk. So the approved Payment
+experience was, from the operator's chair, not delivered: they saw a Summary band, queue chips
+and EDITABLE balance and storage-fee fields, and never reached the Register at all. Building a
+better page at a second address is not replacing the first one.
+
+**Why it survived so long.** `PortalSidebar.test.tsx` asserted the row's SHAPE — that `Payments`
+is a plain row and not a chevron hiding one child — and never once asserted where it went. A
+rail test that never checks a destination cannot fail when the destination is wrong.
+
+**The ruling applied.** `docs/ERP-ARCHITECTURE.md` ownership Law C — *a door, never a duplicate;
+two forms for one act make two records*. The desk was the second form for recording and editing
+customer money. It is deleted, not deprecated, not hidden behind a flag.
+
+**What now happens (this change):**
+
+* The Operations rail's `Payments` row links to `/finance/payments` — the canonical read-only
+  Register — and stays lit across both of its listings. §12 already admits operation staff to
+  Payments and Invoices, and `FinanceApp` already bounces them off every finance-only page.
+* `Payments · Invoices` remains the Register toolbar's own switch (§16), so the rail keeps ONE
+  Finance row; a second rail row for Invoices would be a second control for one act.
+* The §17 Calendar keeps its approved entry: the Invoice `Expected arrival` and
+  `Customer Delivery` date cells.
+* `/operation?tab=payments` forwards to `/finance/payments`. The desk's `?so=<SO No>` scope
+  travels with it as `?order=<SO No>`, which both Registers read — the Sales Order's
+  `Open this order in Payment` door and the shared route engine's Money door now spell it that
+  way. `?so=` was NOT reused: §17 already spends it on the Calendar's highlighted order, where
+  it holds an `order_id` UUID. The scope narrows the LISTING only; the Invoice object, Inspect
+  and the record-payment composition keep the complete set, because they derive one customer's
+  money across their Sales Orders.
+* Deleted: `OperationPayments.tsx`, `payments-money-state.ts` and their tests. The word-scan and
+  money-rounding guards that watched the desk were moved onto the two Registers rather than
+  deleted with it — a retired surface must never take a live guard with it.
+
+**NOTHING WAS SILENTLY REMOVED — checked write door by write door.** The desk held exactly ONE
+mutation: `PATCH /api/operation/orders/:id/control` writing `balance` and `storage_fee_override`
+from two free-text cells on every listing row (measured on the deleted file: 106 editable inputs
+on the live production page, 2026-09-09). That is the capability §13 already names an
+**intentional reject** — *arbitrary outstanding/storage edit*. The route is untouched and both
+fields keep their governed homes: `storage_fee_override` in the Order Detail Drawer and the
+Orders Control page, and the approved storage path remains the §7 waiver ladder on the Invoice.
+Every canonical §16 action — Record payment · Ask to pay · Send receipt · Print receipt · Payment
+link · Correct allocation · Void — already lives on the Payment and Invoice objects the Registers
+open. Historical money is untouched in the database, and the Payments Register IS the §11 history
+surface (gap item 26). Operation access is unchanged: §12's route guard already admits operation
+staff to `/finance/payments` and `/finance/invoices`.
+
+Nothing about money arithmetic, the Delivery gate, permissions or the Register/object designs
+changed here. This is the destination correction only.
 
 ### Deployed — the Payments Register answers the Finance door, 2026-09-06
 

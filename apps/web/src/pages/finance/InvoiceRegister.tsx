@@ -26,6 +26,7 @@ import ListPageShell from "@/components/ListPageShell";
 import { SectionCard } from "@/components/SectionPanel";
 import { DataGrid, type DataGridColumn } from "@/components/register/DataGrid";
 import { useInvoiceRegister } from "@/lib/queries";
+import { inOrderScope, orderScopeOf, scopedRegisterHref } from "@carres/shared/payment-register-scope";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import ModuleHeader from "@/pages/operation/components/ModuleHeader";
@@ -109,6 +110,23 @@ export default function InvoiceRegister() {
     return next;
   });
   const rows = useMemo(() => query.data ?? [], [query.data]);
+  /* THE ORDER SCOPE (entry-point correction, 2026-09-09) — the same
+     `?order=<SO No>` the Payments Register reads, carried across the toolbar
+     switch. It narrows the LISTING only: `rows` above stays the complete set
+     because the Invoice object, Inspect and the record-payment composition
+     derive one customer's money ACROSS their Sales Orders (`soRemaining`), and
+     a scoped input would quietly change that arithmetic.
+
+     `?so=` is NOT this: §17 already spends it on the Calendar's highlighted
+     order, and it holds a UUID there. */
+  const orderScope = orderScopeOf(params.get("order"));
+  const leaveScope = () => setParams((before) => {
+    const next = new URLSearchParams(before); next.delete("order"); return next;
+  });
+  const listRows = useMemo(
+    () => rows.filter((r) => inOrderScope(r, orderScope)),
+    [rows, orderScope],
+  );
   const columns = useMemo<DataGridColumn<InvoiceRegisterRow>[]>(() => [
     // §17 — Customer / SO / Invoice open the collection details (never an
     // automatic switch to Calendar); the exact row keeps the exact SO.
@@ -255,16 +273,26 @@ export default function InvoiceRegister() {
         onOpenInvoice={(r) => { closeCalendar(); open(r); }}
         onBack={closeCalendar} />
     : <ListPageShell register>
-      <DataGrid rows={query.data ?? []} columns={columns} rowKey={(r) => r.id}
+      <DataGrid rows={listRows} columns={columns} rowKey={(r) => r.id}
         storageKey="carres.invoice.register.v1" appearance="reference" exportName="Invoices"
         groupBanner={false} stickyIdentity isLoading={query.isLoading} searchPlaceholder="Search invoices…"
-        toolbarStart={<span className="flex gap-3 text-body"><Link to="/finance/payments">Payments</Link><span aria-current="page" className="font-semibold">Invoices</span></span>}
+        toolbarStart={<span className="flex items-center gap-3 text-body">
+          <Link to={scopedRegisterHref("/finance/payments", orderScope)}>Payments</Link>
+          <span aria-current="page" className="font-semibold">Invoices</span>
+          {orderScope !== null && <span className="flex items-center gap-2" data-testid="invoice-register-order-scope">
+            <span>SO-{orderScope} only</span>
+            <button type="button" className="underline underline-offset-2"
+              onClick={leaveScope}>Show all invoices</button>
+          </span>}
+        </span>}
         selectable={{ selectedKeys, onToggle: (key) => setSelectedKeys((before) => {
           const next = new Set(before); if (next.has(key)) next.delete(key); else next.add(key); return next;
         }), onToggleAll: (keys, all) => setSelectedKeys((before) => {
           const next = new Set(before); keys.forEach((key) => { if (all) next.delete(key); else next.add(key); }); return next;
         }) }}
-        emptyMessage="No invoices yet. A prepared or issued invoice will appear here."
+        emptyMessage={orderScope !== null
+          ? `No invoice is prepared on SO-${orderScope} yet.`
+          : "No invoices yet. A prepared or issued invoice will appear here."}
         expandTitle="Inspect invoice" onRowDoubleClick={open}
         expandable={{ renderExpansion: (r) => <Inspect row={r} rows={rows} today={today} opts={opts} onOpen={() => open(r)} /> }}
         statusSummary={(visible) => {

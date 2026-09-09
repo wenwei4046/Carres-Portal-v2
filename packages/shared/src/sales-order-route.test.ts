@@ -735,7 +735,7 @@ describe("doors", () => {
     });
     expect(node(map, "money").door).toEqual({
       label: "Open Payments →",
-      href: "/operation?tab=payments&so=1319",
+      href: "/finance/payments?order=1319",
     });
   });
 });

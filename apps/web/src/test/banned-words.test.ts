@@ -27,14 +27,28 @@ import { BANNED, itSaysNoBannedWord, visibleStrings } from "./banned-words";
 const PAGES = join(dirname(fileURLToPath(import.meta.url)), "..", "pages");
 
 describe("no banned word reaches the screen (C12 · portal-wide)", () => {
-  describe("the collections desk", () => {
-    itSaysNoBannedWord(join(PAGES, "operation", "OperationPayments.tsx"), {
-      // Measured on the file: 219 strings. The floor is a non-vacuity guard,
-      // not a target — it is set below the real count so an unrelated edit does
-      // not trip it, and far above zero so a matcher that stopped matching
-      // cannot make every assertion below vacuously true.
-      minStrings: 150,
-      expectString: "Waiting stock",
+  /* THE COLLECTIONS DESK IS THE REGISTER PAIR NOW (2026-09-09). The scan
+     followed the CLICK, not the filename: `OperationPayments.tsx` was the page
+     the everyday `Payments` row opened, and on 2026-09-09 that row started
+     opening `/finance/payments` instead. The desk was deleted in the same
+     change, so its guard moves here rather than disappearing — a retired
+     surface must never take a live word-scan with it.
+
+     The floors are non-vacuity guards, not targets: measured 107 and 169
+     visible strings, set below the real count so an unrelated edit does not
+     trip them and far above zero so a matcher that stopped matching cannot
+     make every assertion below vacuously true. */
+  describe("the collections desk — the Payments Register", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "PaymentRegister.tsx"), {
+      minStrings: 70,
+      expectString: "Back to Payments",
+    });
+  });
+
+  describe("the collections desk — the Invoices Register", () => {
+    itSaysNoBannedWord(join(PAGES, "finance", "InvoiceRegister.tsx"), {
+      minStrings: 110,
+      expectString: "Goods ready",
     });
   });
 
