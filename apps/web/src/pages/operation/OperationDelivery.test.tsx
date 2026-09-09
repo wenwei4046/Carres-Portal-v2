@@ -1082,6 +1082,26 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(document.body.textContent).not.toMatch(/\bleg\b/i);
   });
 
+  it("the act is also one right-click away — `Actions` is the twelfth column and a sheet scrolls", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const count = (name: string) => screen.queryAllByRole("button", { name }).length;
+    const assignsOnSheet = count("Assign logistics");
+    const editsOnSheet = count("Edit Delivery");
+
+    /* A row nobody carries: the menu adds BOTH doors. */
+    fireEvent.contextMenu(screen.getByText("SO-1502"));
+    expect(count("Assign logistics")).toBe(assignsOnSheet + 1);
+    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+
+    /* A row a partner already carries: the editor only — a partner is never
+       silently swapped from a context menu (`Change logistics` is the
+       governed act, and it asks for its reason). */
+    fireEvent.contextMenu(screen.getByText("SO-1501"));
+    expect(count("Assign logistics")).toBe(assignsOnSheet);
+    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+  });
+
   it("keeps selection, the ▸ expansion and the per-column filters", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");

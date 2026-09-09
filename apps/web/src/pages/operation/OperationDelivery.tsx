@@ -1027,6 +1027,13 @@ export default function OperationDelivery() {
   const contextMenu = useCallback(
     (r: DeliveryMonitorCard): DataGridContextMenuItem[] => [
       { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
+      /* The row's act is ALSO one right-click away. `Actions` is the last of
+         twelve ruled columns and a wide sheet scrolls, so the governed door
+         must not depend on the operator reaching the right-hand edge — and
+         `Assign logistics` was the one act the menu could not reach. */
+      ...(r.logisticsPartnerId === null
+        ? [{ label: ASSIGN_LOGISTICS, onClick: () => setAssigning([r.scope]) }]
+        : []),
       { divider: true },
       { label: `Open SO-${r.scope.so}`, onClick: () => openOrder(r) },
       ...(r.doNumber
