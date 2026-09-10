@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0473_a_rental_collection_reaches_the_ledger.sql
+-- 0475_a_rental_collection_reaches_the_ledger.sql
 -- FINANCE LEDGER · BUILD D — RENT-TO-OWN MONEY REACHES THE LEDGER
 --
 -- WHAT WAS WRONG
@@ -130,7 +130,7 @@ as $fn$
 $fn$;
 
 comment on function public._rental_payment_doc_no(text, integer) is
-  'The ledger document number of one collected rental month: <agreement no>-M<seq>, e.g. RA-1003-M07 (0473).';
+  'The ledger document number of one collected rental month: <agreement no>-M<seq>, e.g. RA-1003-M07 (0475).';
 
 revoke all on function public._rental_payment_doc_no(text, integer) from public, anon, authenticated;
 
@@ -249,7 +249,7 @@ end;
 $fn$;
 
 comment on function public._rental_payment_to_ledger(uuid) is
-  'One collected rental month -> one RENTAL_PAYMENT journal entry: Dr the payment method''s money account, Cr rental income (0473). Null when paid before go-live or collected at zero. Private; called by rental_record_payment.';
+  'One collected rental month -> one RENTAL_PAYMENT journal entry: Dr the payment method''s money account, Cr rental income (0475). Null when paid before go-live or collected at zero. Private; called by rental_record_payment.';
 
 revoke all on function public._rental_payment_to_ledger(uuid) from public, anon, authenticated;
 
@@ -288,7 +288,7 @@ DECLARE
   v_commission numeric(12,2);
   v_carres     numeric(12,2);
   v_invoice    text := nullif(btrim(coalesce(p_stripe_invoice_id, '')), '');
-  v_entry      uuid;   -- 0473
+  v_entry      uuid;   -- 0475
 BEGIN
   -- Finance/principal at a desk, or the Stripe webhook's service_role JWT.
   -- Deliberately NOT is_internal(): that admits bd, and a BD sells these.
@@ -344,7 +344,7 @@ BEGIN
       'paidAmount',      v_bill.paid_amount,
       'supplierShare',   v_bill.supplier_share,
       'commissionShare', v_bill.commission_share,
-      -- 0473: the entry that already stands (null before go-live or at zero).
+      -- 0475: the entry that already stands (null before go-live or at zero).
       'glEntryId',       (SELECT e.id FROM gl_entries e
                            WHERE e.source_type = 'RENTAL_PAYMENT'
                              AND e.source_doc_no = public._rental_payment_doc_no(v_ra.agreement_no, v_bill.seq)
@@ -391,7 +391,7 @@ BEGIN
           CASE WHEN v_is_service THEN 'stripe-webhook' ELSE 'rental-collection' END,
           'rental.payment_recorded', v_ra.dealer_id, v_ra.agreement_no);
 
-  -- ── 0473 · the ledger. Dr the money account, Cr rental income. A month
+  -- ── 0475 · the ledger. Dr the money account, Cr rental income. A month
   -- paid before go-live, or at zero, returns null quietly. Anything else
   -- that goes wrong raises and rolls the whole collection back — the month
   -- stays unpaid and the caller sees why. Not caught, on purpose.
@@ -406,19 +406,19 @@ BEGIN
     'supplierShare',   v_supplier,
     'commissionShare', v_commission,
     'carresShare',     v_carres,
-    'glEntryId',       v_entry   -- 0473
+    'glEntryId',       v_entry   -- 0475
   );
 END;
 $function$;
 
 comment on function public.rental_record_payment(uuid, integer, text, numeric, timestamptz, text, text, text) is
-  'The ONE writer of rental_billings (0281): finance/principal at a desk or the Stripe webhook''s service_role. Idempotent by stripe_invoice_id / paid status. Computes the supplier/commission split server-side. 0473: every collection on or after go-live also posts one RENTAL_PAYMENT journal entry (Dr money account, Cr rental income); a refused posting rolls the collection back.';
+  'The ONE writer of rental_billings (0281): finance/principal at a desk or the Stripe webhook''s service_role. Idempotent by stripe_invoice_id / paid status. Computes the supplier/commission split server-side. 0475: every collection on or after go-live also posts one RENTAL_PAYMENT journal entry (Dr money account, Cr rental income); a refused posting rolls the collection back.';
 
 
 -- ── 4 · the read — collected after go-live, and not in the ledger ────────────
 -- For the ledger Self-check page. After this file a collection cannot commit
 -- without its entry, so this list can only hold months collected between
--- go-live and the day 0473 was applied, or a month whose entry was later
+-- go-live and the day 0475 was applied, or a month whose entry was later
 -- reversed by hand. An empty list is the healthy answer.
 create or replace function public.gl_rental_payments_unposted()
 returns table (
@@ -480,7 +480,7 @@ end;
 $fn$;
 
 comment on function public.gl_rental_payments_unposted() is
-  'Rental months collected on or after go-live with no active RENTAL_PAYMENT ledger entry (0473). finance + principal only. Empty is healthy.';
+  'Rental months collected on or after go-live with no active RENTAL_PAYMENT ledger entry (0475). finance + principal only. Empty is healthy.';
 
 revoke all on function public.gl_rental_payments_unposted() from public, anon;
 grant execute on function public.gl_rental_payments_unposted() to authenticated;
@@ -517,26 +517,26 @@ begin
   select count(*) into v_n from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname = 'public' and p.proname = 'rental_record_payment';
   if v_n <> 1 then
-    raise exception '0473 sanity: expected 1 rental_record_payment, found %', v_n;
+    raise exception '0475 sanity: expected 1 rental_record_payment, found %', v_n;
   end if;
   select oidvectortypes(p.proargtypes), p.prosrc into v_args, v_src
     from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
    where ns.nspname = 'public' and p.proname = 'rental_record_payment';
   if v_args <> 'uuid, integer, text, numeric, timestamp with time zone, text, text, text' then
-    raise exception '0473 sanity: rental_record_payment signature drifted: %', v_args;
+    raise exception '0475 sanity: rental_record_payment signature drifted: %', v_args;
   end if;
   if v_src not like '%_rental_payment_to_ledger(v_bill.id)%' then
-    raise exception '0473 sanity: rental_record_payment does not post to the ledger';
+    raise exception '0475 sanity: rental_record_payment does not post to the ledger';
   end if;
   if v_src not like '%rental_can_approve() OR v_is_service%'
      or v_src not like '%supplier_rate_pct%'
      or v_src not like '%''payment_recorded''%'
      or v_src not like '%rental.payment_recorded%'
      or v_src not like '%IF v_bill.status = ''paid'' THEN%' then
-    raise exception '0473 sanity: rental_record_payment lost part of its 0281 body';
+    raise exception '0475 sanity: rental_record_payment lost part of its 0281 body';
   end if;
   if v_src ~* 'exception\s+when' then
-    raise exception '0473 sanity: a ledger failure must roll the collection back, not be caught';
+    raise exception '0475 sanity: a ledger failure must roll the collection back, not be caught';
   end if;
 
   -- 2 · who may call what.
@@ -546,23 +546,23 @@ begin
        'public.rental_record_payment(uuid, integer, text, numeric, timestamptz, text, text, text)', 'execute')
      or not has_function_privilege('service_role',
        'public.rental_record_payment(uuid, integer, text, numeric, timestamptz, text, text, text)', 'execute') then
-    raise exception '0473 sanity: rental_record_payment grants are wrong';
+    raise exception '0475 sanity: rental_record_payment grants are wrong';
   end if;
   if has_function_privilege('authenticated', 'public._rental_payment_to_ledger(uuid)', 'execute')
      or has_function_privilege('anon', 'public._rental_payment_to_ledger(uuid)', 'execute')
      or has_function_privilege('authenticated', 'public._rental_payment_doc_no(text, integer)', 'execute') then
-    raise exception '0473 sanity: the private rental posting helpers are callable over the API';
+    raise exception '0475 sanity: the private rental posting helpers are callable over the API';
   end if;
   if has_function_privilege('anon', 'public.gl_rental_payments_unposted()', 'execute')
      or not has_function_privilege('authenticated', 'public.gl_rental_payments_unposted()', 'execute') then
-    raise exception '0473 sanity: gl_rental_payments_unposted grants are wrong';
+    raise exception '0475 sanity: gl_rental_payments_unposted grants are wrong';
   end if;
 
   -- 3 · the document number.
   if public._rental_payment_doc_no('RA-1003', 7) <> 'RA-1003-M07'
      or public._rental_payment_doc_no('RA-1003', 84) <> 'RA-1003-M84'
      or public._rental_payment_doc_no('RA-1003', 123) <> 'RA-1003-M123' then
-    raise exception '0473 sanity: the rental document number is wrong';
+    raise exception '0475 sanity: the rental document number is wrong';
   end if;
 
   -- 4 · a Stripe-style collection with NO user posts, a retry does not post
@@ -574,7 +574,7 @@ begin
   select m.account_code into v_income from public.gl_income_account_map m
    where m.component_type = 'GOODS' and m.component_key = 'rental';
   if v_go_live is null or v_money is null or v_income is null then
-    raise warning '0473 sanity: probe skipped — go-live %, Stripe money account %, rental income account %. A rental collection will REFUSE until these are configured.',
+    raise warning '0475 sanity: probe skipped — go-live %, Stripe money account %, rental income account %. A rental collection will REFUSE until these are configured.',
       coalesce(v_go_live::text, 'MISSING'), coalesce(v_money, 'UNMAPPED'), coalesce(v_income, 'UNMAPPED');
   else
     begin
@@ -582,22 +582,22 @@ begin
       perform set_config('request.jwt.claim.sub', '', true);
 
       insert into public.customers (name, phone, phone_key)
-      values ('Probe 0473', '+60 00-000 0473', 'probe-0473')
+      values ('Probe 0475', '+60 00-000 0475', 'probe-0475')
       returning id into v_cust;
       insert into public.rental_agreements
         (agreement_no, customer_id, sku, term_months, monthly_fee, start_date, status)
-      values ('RA-PROBE-0473', v_cust, 'PROBE-SKU', 2, 59, v_go_live - 40, 'active')
+      values ('RA-PROBE-0475', v_cust, 'PROBE-SKU', 2, 59, v_go_live - 40, 'active')
       returning id into v_ra;
       insert into public.rental_billings (agreement_id, seq, due_date, amount_due, status)
       values (v_ra, 1, v_go_live, 59, 'due'), (v_ra, 2, v_go_live - 30, 59, 'due');
 
       v_out := public.rental_record_payment(
-        p_agreement_id => v_ra, p_seq => 1, p_stripe_invoice_id => 'in_probe_0473',
+        p_agreement_id => v_ra, p_seq => 1, p_stripe_invoice_id => 'in_probe_0475',
         p_amount => 59, p_paid_at => (v_go_live::timestamp + interval '12 hours') at time zone 'Asia/Kuala_Lumpur',
-        p_method => 'stripe', p_reference => 'in_probe_0473');
+        p_method => 'stripe', p_reference => 'in_probe_0475');
       v_entry := nullif(v_out->>'glEntryId', '')::uuid;
       if v_entry is null then
-        raise exception '0473 sanity: a no-user Stripe collection did not post';
+        raise exception '0475 sanity: a no-user Stripe collection did not post';
       end if;
 
       select e.entry_date into v_edate from public.gl_entries e where e.id = v_entry;
@@ -607,20 +607,20 @@ begin
        where l.entry_id = v_entry and l.credit > 0;
       if v_edate <> v_go_live or v_dr_acct <> v_money or v_cr_acct <> v_income
          or v_dr <> 59 or v_cr <> 59 then
-        raise exception '0473 sanity: wrong entry — date %, Dr % %, Cr % %',
+        raise exception '0475 sanity: wrong entry — date %, Dr % %, Cr % %',
           v_edate, v_dr_acct, v_dr, v_cr_acct, v_cr;
       end if;
 
       v_again := public.rental_record_payment(
-        p_stripe_invoice_id => 'in_probe_0473', p_method => 'stripe');
+        p_stripe_invoice_id => 'in_probe_0475', p_method => 'stripe');
       if not coalesce((v_again->>'already')::boolean, false)
          or nullif(v_again->>'glEntryId', '')::uuid is distinct from v_entry then
-        raise exception '0473 sanity: a re-delivered collection did not return the entry that stands';
+        raise exception '0475 sanity: a re-delivered collection did not return the entry that stands';
       end if;
       select count(*) into v_n from public.gl_entries e
-       where e.source_type = 'RENTAL_PAYMENT' and e.source_doc_no = 'RA-PROBE-0473-M01';
+       where e.source_type = 'RENTAL_PAYMENT' and e.source_doc_no = 'RA-PROBE-0475-M01';
       if v_n <> 1 then
-        raise exception '0473 sanity: expected 1 entry for RA-PROBE-0473-M01, found %', v_n;
+        raise exception '0475 sanity: expected 1 entry for RA-PROBE-0475-M01, found %', v_n;
       end if;
 
       v_pre := public.rental_record_payment(
@@ -628,17 +628,17 @@ begin
         p_paid_at => (v_go_live::timestamp - interval '12 hours') at time zone 'Asia/Kuala_Lumpur',
         p_method => 'stripe');
       if v_pre->>'glEntryId' is not null then
-        raise exception '0473 sanity: a collection paid before go-live reached the ledger';
+        raise exception '0475 sanity: a collection paid before go-live reached the ledger';
       end if;
 
       -- Nothing is wrong. This is how the probe's rows are undone.
-      raise exception 'gl_0473_probe_rollback';
+      raise exception 'gl_0475_probe_rollback';
     exception when others then
-      if sqlerrm <> 'gl_0473_probe_rollback' then
+      if sqlerrm <> 'gl_0475_probe_rollback' then
         raise;
       end if;
     end;
   end if;
 
-  raise notice '0473 OK: a rental collection reaches the ledger';
+  raise notice '0475 OK: a rental collection reaches the ledger';
 end $sanity$;
