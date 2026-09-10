@@ -1,146 +1,107 @@
-# Cross-Module Work Feed Implementation Plan
+# Cross-module Workspace Work Feed — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status:** APPROVED for build · corrected 2026-09-06 against `CLAUDE.md`, `docs/ERP-ARCHITECTURE.md`, and `docs/workspace/MASTER.md`.
 
-**Goal:** Make My Work and Team Work answer who must do what, on which governed day, where to act, what evidence closes it, and what the completion changes across Purchasing, Receiving, Claims, and Purchase Returns.
+**Goal:** Replace the browser-composed Work dataset with one read-only server feed used by Work and the Quick Rail, without copying module truth or adding module-local work panels.
 
-**Architecture:** Module engines continue to determine whether an action is open and which module fact closes it. A typed `ModuleWorkItem` contract carries action, owner rule/context, due calendar/date, completion fact, and destination. One read-only API composes module projections. `useOpenWorkSet` combines that feed with existing Order work; Work renders and deep-links without writing module truth.
+**Architecture:** Owning modules remain authoritative for triggers and completion. Shared projectors translate authoritative facts into the structured Work contract. `GET /api/operation/work` composes the admitted module projections once. My Work, Team Work, and Quick Rail are filters or summaries over the same response. The feed writes nothing and exposes no generic Done action.
 
-**Tech Stack:** TypeScript, Hono, React Query, React, Vitest.
+**Initial admission:** Sales Orders, Manual Purchase, and Receiving only. Other modules enter in later cards after they prove trigger, owner rule, due/SLA, completion fact, and exact object door.
 
-**Spec:** `docs/superpowers/specs/2026-08-29-purchasing-receiving-work-design.md` §§2–5, 8–9.
+## Non-negotiable laws
 
-## Global Constraints
+- Action has an Owner; a Sales Order does not have one universal Owner.
+- Normal owner, active cover, and acting person remain separate structured fields.
+- Object identity is the row/card header; owner is metadata; action sentence contains only the act.
+- Completion is an authoritative owning-module fact. Workspace never stores duplicate completion state.
+- One feed supplies My Work, Team Work, and Quick Rail counts.
+- No module-local `WORK TO DO` panel is created.
+- Dashboard remains last and is not part of this build.
 
-- Module work has no manual `Done` button. It disappears only when the owning module's completion fact exists.
-- My Work is the default view for every user, including managers. Team Work is the supervision view.
-- A Purchasing chase row deep-links the exact Purchase Order. A Receiving row deep-links the exact
-  PO/Receiving Session. Other rows open Supplier Claims or Purchase Returns according to source;
-  Work never redirects every item to Sales Orders and never owns completion.
-- The module rail's first panel is `WORK TO DO`, filtered to the current module. It is not a second queue and uses the same feed/counts as Work.
-- Due dates name Office or Warehouse calendar explicitly. Late work keeps its original due date.
+## Task 1 — Lock the wire contract
 
----
+**Files**
 
-## Task 1: Define a typed module-work projection
+- Create `packages/shared/src/operation-work.ts`
+- Create `packages/shared/src/operation-work.test.ts`
+- Modify `packages/shared/src/index.ts`
 
-**Files:**
-- Create: `packages/shared/src/module-work-feed.ts`
-- Create: `packages/shared/src/module-work-feed.test.ts`
-- Modify: `packages/shared/src/work-engine.ts`
-- Modify: `packages/shared/src/work-engine.test.ts`
-- Modify: `packages/shared/src/index.ts`
+**TDD sequence**
 
-- [ ] Write failing tests for the five-part contract plus destination and evidence requirement.
-- [ ] Add:
+1. Write failing contract tests for stable identity, object header, two-line facts, owner identities, timing, completion fact, and exact destination.
+2. Add the minimal schema/types and deterministic stable-id helper.
+3. Verify malformed or incomplete work cannot be admitted.
 
-```ts
-export type WorkCalendar = "office" | "warehouse";
-export type WorkModule = "orders" | "purchasing" | "receiving" | "claims" | "purchase_returns";
+## Task 2 — Build the server composition boundary
 
-export interface ModuleWorkItem {
-  id: string;
-  module: WorkModule;
-  ruleKey: string;
-  sourceId: string;
-  ownerRule: WorkOwnerRule;
-  owner: OperationsAuthorityPerson | null;
-  action: string;
-  dueIso: string | null;
-  calendar: WorkCalendar;
-  completionFact: string;
-  evidenceRequired: boolean;
-  destination: string;
-  party: string | null;
-}
-```
+**Files**
 
-- [ ] Extend `WorkOwnerRule` with only the rules needed by approved module actions; do not add names/emails to rule keys.
-- [ ] Add validators that reject empty action, completion fact, destination, or an invalid date/calendar combination.
-- [ ] Run `pnpm --filter @carres/shared test -- src/module-work-feed.test.ts src/work-engine.test.ts`; expected result: pass.
-- [ ] Commit: `git add packages/shared && git commit -m "test(work): define cross-module action projection"`.
+- Create `apps/api/src/routes/operation/work.ts`
+- Create `apps/api/src/routes/operation/work.test.ts`
+- Modify `apps/api/src/index.ts`
 
-## Task 2: Make each module project its own open work
+**TDD sequence**
 
-**Files:**
-- Modify: `packages/shared/src/purchasing-supplier-calls.ts`
-- Modify: `packages/shared/src/purchasing-supplier-calls.test.ts`
-- Create: `packages/shared/src/receiving-work.ts`
-- Create: `packages/shared/src/receiving-work.test.ts`
-- Modify: `packages/shared/src/supplier-claim.ts`
-- Modify: `packages/shared/src/supplier-claim.test.ts`
-- Modify: `packages/shared/src/purchase-return.ts`
-- Modify: `packages/shared/src/purchase-return.test.ts`
+1. Write failing route tests proving one response includes admitted Orders, Manual Purchase, and Receiving actions.
+2. Reuse the existing module projectors; do not invent trigger arithmetic in the route.
+3. Resolve normal owner, active cover, and acting person from Workspace duty resolution.
+4. Return one authorized open set plus staff needed for Team grouping.
+5. Prove completed module facts remove items, unresolved duty does not borrow a PIC, and cover changes acting person without rewriting normal owner.
+6. Prove each item carries an exact owning-object destination.
 
-- [ ] Add failing projection tests for:
-  - Issue PO;
-  - confirm ready/arrival/balance date;
-  - receive/post GRN on Warehouse-calendar arrival date;
-  - claim request/response next action;
-  - return collection date and physical handover.
-- [ ] Keep trigger and completion decisions in their current module functions; add adapters that shape open facts into `ModuleWorkItem` rather than reimplementing triggers in Work.
-- [ ] Set destinations to canonical routes with source IDs in query/path parameters.
-- [ ] Assert `not_delivered` projects balance-date work, not a claim; Warehouse `submitted` projects GRN review/post, not a completed receipt.
-- [ ] Run the four module test files; expected result: pass.
-- [ ] Commit: `git add packages/shared && git commit -m "feat(work): project purchasing receiving and claim actions"`.
+## Task 3 — Add the one client query
 
-## Task 3: Add one read-only composed Work API
+**Files**
 
-**Files:**
-- Create: `apps/api/src/routes/operation/work.ts`
-- Create: `apps/api/src/routes/operation/work.test.ts`
-- Modify: `apps/api/src/index.ts`
+- Modify `apps/web/src/lib/queries.ts`
+- Create or modify focused query tests where the repository pattern requires them.
 
-- [ ] Write failing route tests for `GET /api/operation/work?scope=mine|team&module=...` covering ordinary user, manager, duty owner, dated cover, Operations Superuser, due dates, and deep links.
-- [ ] Query authoritative PO/promise, receipt, claim, return, roster/cover, staff, Settings/calendar facts and pass them into the shared projectors.
-- [ ] Resolve owner context by rule and relevant action date. A Superuser does not own all work; ownership remains normal duty/cover.
-- [ ] For `scope=mine`, use the active cover when one exists; otherwise use the normal owner. Keep the normal owner as accountability context, but do not duplicate one action into both people's My Work. Superuser capability does not automatically make every action My Work.
-- [ ] For `scope=team`, require manager/supervision authority and return the same item identities grouped client-side.
-- [ ] Apply optional `module` as a response filter only; do not create separate module counts.
-- [ ] Run `pnpm --filter @carres/api test -- src/routes/operation/work.test.ts`; expected result: pass.
-- [ ] Commit: `git add apps/api && git commit -m "feat(work): expose one composed module feed"`.
+**TDD sequence**
 
-## Task 4: Make Work consume the feed and deep-link correctly
+1. Add a failing test for `useOperationWork` reading `/api/operation/work` under one cache key.
+2. Implement the typed query with no client-side trigger projection.
 
-**Files:**
-- Modify: `apps/web/src/pages/operation/use-open-work.ts`
-- Modify: `apps/web/src/pages/operation/OperationWork.tsx`
-- Modify: `apps/web/src/pages/operation/OperationWork.test.tsx`
-- Modify: `apps/web/src/lib/queries.ts`
-- Modify: `apps/web/src/pages/operation/components/rail/TeamPanel.tsx`
-- Modify: `apps/web/src/pages/operation/components/rail/TeamPanel.test.tsx`
+## Task 4 — Switch Work to the server feed
 
-- [ ] Write failing tests proving managers still land on My Work, Team Work uses the same item IDs/counts, and each module item opens its own destination.
-- [ ] Add `useOperationWork(scope, module?)`; merge module items with existing order items by stable `id`, never by display sentence.
-- [ ] Replace the current `all rows open Sales Order` callback with `navigate(item.destination)`.
-- [ ] Keep Team Work as a view switch, not the default for managers.
-- [ ] Make TeamPanel counts derive from the same cached Work query rather than `useOperationOrders()`.
-- [ ] Run the Work and TeamPanel tests; expected result: pass.
-- [ ] Commit: `git add apps/web && git commit -m "feat(work): show cross-module daily actions"`.
+**Files**
 
-## Task 5: Put contextual WORK TO DO first in module rails
+- Modify `apps/web/src/pages/operation/use-open-work.ts`
+- Modify `apps/web/src/pages/operation/OperationWork.tsx`
+- Modify `apps/web/src/pages/operation/OperationWork.test.tsx`
 
-**Files:**
-- Create: `apps/web/src/pages/operation/components/rail/ModuleWorkPanel.tsx`
-- Create: `apps/web/src/pages/operation/components/rail/ModuleWorkPanel.test.tsx`
-- Modify: `apps/web/src/pages/operation/so-batch/SoBatchRegister.tsx`
-- Modify after PR #977 integration: `apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx`
-- Modify: `apps/web/src/pages/operation/OperationReceiving.tsx`
-- Modify: `apps/web/src/pages/operation/OperationSupplierClaims.tsx`
-- Modify: `apps/web/src/pages/operation/PurchaseReturnsRegister.tsx`
-- Modify corresponding page tests.
+**TDD sequence**
 
-- [ ] Write failing tests asserting `WORK TO DO` is the first contextual rail panel and contains only current-module items from the one Work query.
-- [ ] Reuse one `ModuleWorkPanel` with module prop; no page-local action computation.
-- [ ] Keep SO Batch's operational filters below it. Do not insert PO Duty as a permanent rail block.
-- [ ] Clicking an item opens its governed destination. `View all` opens My Work with the module filter.
-- [ ] Run the component and five page tests; expected result: pass.
-- [ ] Commit: `git add apps/web && git commit -m "feat(work): lead module rails with daily actions"`.
+1. Rewrite tests first so My Work filters by acting person and Team Work groups by normal owner from the server response.
+2. Preserve cover evidence, due/late copy, module filter, search, empty/error/loading states, and exact object deep links.
+3. Delete the browser-side Orders, Manual Purchase, and Receiving composition.
+4. Make My Work the default for every user, including managers.
 
-## Task 6: Work slice verification
+## Task 5 — Switch Quick Rail to the same response
 
-- [ ] Run targeted shared, API, Work, TeamPanel, and module-page tests.
-- [ ] Run `pnpm typecheck` and `pnpm lint`.
-- [ ] Search `rg -n "workItemsForOrder|useOperationOrders" apps/web/src/pages/operation/components/rail apps/web/src/pages/operation/OperationWork.tsx`; verify no second team count remains.
-- [ ] Search for module work completion buttons; expected result: no generic manual completion mutation.
-- [ ] Commit verification corrections with `git commit -m "test(work): verify one cross-module work set"`.
+**Files**
+
+- Modify `apps/web/src/pages/operation/components/rail/TeamPanel.tsx`
+- Modify `apps/web/src/pages/operation/components/rail/TeamPanel.test.tsx`
+
+**TDD sequence**
+
+1. Write failing tests that rail counts equal the shared response and covered work counts for the acting person.
+2. Keep the rail a compact count/navigation surface; do not render a second action list.
+3. Retain the governed duty coverage door and its authorization.
+
+## Task 6 — Remove duplicate paths and verify
+
+1. Search for remaining browser-side work composition and independent Team workload arithmetic.
+2. Run focused shared, API, Work, and TeamPanel tests.
+3. Run shared/API/web typechecks and lint.
+4. Run full shared, API, and web suites.
+5. Update `docs/workspace/MASTER.md` current-truth and gap sections only after the implementation is proven.
+6. Commit the verified implementation and push the build branch for review; do not deploy production from this plan.
+
+## Explicitly deferred
+
+- Dashboard composition and KPI work.
+- Payment, Delivery, Stock/Warehouse, Service Case, and Issue Tracker admission until each passes the module admission gate.
+- Notifications delivery mechanics.
+- New manual assignment or generic completion controls.
+

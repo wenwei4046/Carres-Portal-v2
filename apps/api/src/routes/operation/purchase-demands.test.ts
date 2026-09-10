@@ -61,8 +61,15 @@ async function makeJwt(role: string) {
  * Malaysian holiday — and composes every delivery date RELATIVE to it with the
  * same calendar engine the server plans on. The classification itself is not
  * computed here (that would test the engine against itself); each delivery is
- * placed a known number of working days from the expected completion, and the
+ * placed a known number of working days from the expected ARRIVAL, and the
  * test asserts the state that distance must produce.
+ *
+ * THE ANCHOR IS ARRIVAL, NOT COMPLETION (owner correction, 2026-09-09). The
+ * Safety period is the gap between the goods being HERE and the customer's
+ * date, so it is measured from `READY + transit`, not from the day the factory
+ * puts the goods down. These dates hung off `READY` until the transit leg was
+ * added to the planner; the distances below are unchanged, only what they are
+ * measured from.
  */
 const TODAY = "2026-09-02";
 const HOLIDAYS = myHolidaySet();
@@ -72,10 +79,12 @@ const NICE_WEEK = { offDays: [0] as number[], holidays: HOLIDAYS };
 const OFFICE = { offDays: [0, 6] as number[], holidays: HOLIDAYS };
 /** Expected production completion of a Nice Future mattress ordered today. */
 const READY = addWorkingDays(TODAY, 7, NICE_WEEK);
-const DELIVERY_EARLY = addWorkingDays(READY, 40, OFFICE);
-const DELIVERY_FULL = addWorkingDays(READY, 14, OFFICE);
-const DELIVERY_LOW = addWorkingDays(READY, 5, OFFICE);
-const DELIVERY_NONE = READY;
+/** …and when it reaches Carres: the fixture's Nice Future carries 1 transit day. */
+const ARRIVAL = addWorkingDays(READY, 1, OFFICE);
+const DELIVERY_EARLY = addWorkingDays(ARRIVAL, 40, OFFICE);
+const DELIVERY_FULL = addWorkingDays(ARRIVAL, 14, OFFICE);
+const DELIVERY_LOW = addWorkingDays(ARRIVAL, 5, OFFICE);
+const DELIVERY_NONE = ARRIVAL;
 const DELIVERY_SHORT = addWorkingDays(TODAY, 2, OFFICE);
 
 const NICE = "11111111-1111-1111-1111-111111111111";
@@ -422,12 +431,13 @@ beforeEach(() => {
 async function getDemands(
   tables: Record<string, { data: unknown; error: unknown }> = TABLES() as unknown as Tbl,
   role = "operation",
+  path = "/api/operation/purchase/demands",
 ) {
   const sb = makeSb(tables);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(userClient).mockReturnValue(sb as any);
   const res = await app.fetch(
-    new Request("https://api.test/api/operation/purchase/demands", {
+    new Request(`https://api.test${path}`, {
       headers: { Authorization: `Bearer ${await makeJwt(role)}` },
     }),
     env,
@@ -472,6 +482,28 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
       onPo: 0,
       readyStock: 0,
     });
+  });
+
+  it("scopes the reload read when a Sales Order opens SO Batch directly", async () => {
+    const { res } = await getDemands(
+      TABLES() as unknown as Tbl,
+      "operation",
+      "/api/operation/purchase/demands?so=1204",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as SoBatchPurchaseResponse;
+    expect(body.rows.map((row) => row.so)).toEqual([1204]);
+    expect(body.registerRows.map((row) => row.so)).toEqual([1204]);
+  });
+
+  it("refuses an invalid Sales Order scope instead of returning a misleading read", async () => {
+    const { res } = await getDemands(
+      TABLES() as unknown as Tbl,
+      "operation",
+      "/api/operation/purchase/demands?so=nope",
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ code: "invalid_param" });
   });
 });
 
@@ -538,13 +570,13 @@ describe("the derived states — blockers and order timing", () => {
 
   it("every timing band classifies from the engine's own dates", async () => {
     const { rows } = await rowsOf();
-    // Delivery 14 office working days after expected completion — Order By is today.
+    // Delivery 14 office working days after expected ARRIVAL — Order By is today.
     expect(rows.find((r) => r.so === 1212)!.state).toBe("safety_days_full");
-    // Delivery 5 office working days after expected completion.
+    // Delivery 5 office working days after expected ARRIVAL.
     expect(rows.find((r) => r.so === 1211 && r.skus.includes("PART-K"))!.state).toBe(
       "safety_days_low",
     );
-    // Delivery ON the expected completion day.
+    // Delivery ON the day the goods arrive.
     expect(rows.find((r) => r.so === 1213)!.state).toBe("safety_days_none");
     // Delivery before production can finish.
     expect(rows.find((r) => r.so === 1214)!.state).toBe("not_enough_production_time");
@@ -561,10 +593,19 @@ describe("the derived states — blockers and order timing", () => {
     }
   });
 
-  it("a fully covered build LEAVES the page; a partly covered one stays with its numbers", async () => {
+  it("a fully covered build STAYS and stays buyable; a partly covered one keeps its numbers", async () => {
     const { rows } = await rowsOf();
-    // Every COV-K unit is on PO-2051 — Buy = 0 does not remain in SO Batch Purchase.
-    expect(bySku(rows, "COV-K")).toBeUndefined();
+    /* Every COV-K unit is on PO-2051. That coverage comes from a per-SKU pool
+       with no customer attribution, so it may belong to another order and may
+       move on the next refresh — the buyer is shown both numbers and decides.
+       Before 2026-09-03 this row was dropped and the operator got a Sales
+       Order with goods lines, no tick-box and no sentence. */
+    expect(bySku(rows, "COV-K")).toMatchObject({
+      qtyNeeded: 3,
+      onPo: 3,
+      toBuy: 3,
+      poNumbers: ["PO-2051"],
+    });
     expect(bySku(rows, "PART-K")).toMatchObject({
       state: "safety_days_low",
       qtyNeeded: 3,
@@ -742,6 +783,39 @@ describe("the buying facts SO Batch Purchase needs", () => {
       procurementPartnerName: "NETS",
       fixedDestinationId: KLANG_DEST,
     });
+  });
+
+  it("names a factory-collected supplier with NO collector, instead of failing at issue", async () => {
+    /* YH, 2026-09-03. `to-order.ts` refuses this plan with
+       `pickup_partner_required` AFTER the operator has ticked and pressed
+       Issue PO — the same trap shape as `already_on_po`. The facts were on the
+       row all along, so the refusal moves to where the tick is offered. */
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    (t.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+
+    const { rows } = await rowsOf(t);
+    const row = bySku(rows, "B1201S-K")!;
+    expect(row.state).toBe("no_pickup_partner");
+    expect(row.action!.action).toContain("Purchasing Settings");
+  });
+
+  it("a factory-collected supplier WITH a collector is orderable as normal", async () => {
+    const t = TABLES() as unknown as Record<string, { data: unknown; error: unknown }>;
+    (t.suppliers.data as Record<string, unknown>[])[0]!.kind = "factory_pickup";
+    t.purchasing_supplier_settings = {
+      data: [{
+        supplier_id: NICE,
+        off_days: [0],
+        transit_days: 1,
+        fixed_destination_id: KLANG_DEST,
+        collected_by_partner_id: "p-nets",
+      }],
+      error: null,
+    };
+    t.delivery_partners = { data: [{ id: "p-nets", name: "NETS" }], error: null };
+
+    const { rows } = await rowsOf(t);
+    expect(bySku(rows, "B1201S-K")!.state).not.toBe("no_pickup_partner");
   });
 
   it("carries the arrival date off the ENGINE — the route subtracts nothing", async () => {
@@ -999,7 +1073,7 @@ describe("closure §1 · the Register offers the act to whoever may act today", 
  *
  * The fixture overlay adds the three authorities the order Register runs on:
  * `po_line_sources` (the ONLY visible PO attribution), `purchase_orders`
- * (status · version · `eta_date` · supplier · destination) and `po_sends`
+ * (status · version · `official_delivery_date` · supplier · destination) and `po_sends`
  * (confirmed-sent evidence at the current version). Five extra orders cover
  * the five Status stories: fully sent, numbered-but-unsent, cancelled,
  * stale-revision and received.
@@ -1049,21 +1123,21 @@ function registerTables() {
   t.purchase_orders = {
     data: [
       /* Received, current version confirmed sent — stays Ordered forever. */
-      { id: "PO-9001", status: "received", version: 1, eta_date: "2026-09-18",
+      { id: "PO-9001", status: "received", version: 1, official_delivery_date: "2026-09-18",
         supplier_id: NICE, destination_id: KLANG_DEST },
       /* Numbered, never sent — visible under PO No, Status stays blank. */
-      { id: "PO-9002", status: "open", version: 1, eta_date: null,
+      { id: "PO-9002", status: "open", version: 1, official_delivery_date: null,
         supplier_id: NICE, destination_id: KLANG_DEST },
       /* Cancelled — never counts, never attributed. */
-      { id: "PO-9003", status: "cancelled", version: 1, eta_date: "2026-09-10",
+      { id: "PO-9003", status: "cancelled", version: 1, official_delivery_date: "2026-09-10",
         supplier_id: NICE, destination_id: KLANG_DEST },
       /* Revised to v2; only v1 was ever sent — the old send completes nothing. */
-      { id: "PO-9004", status: "open", version: 2, eta_date: "2026-09-12",
+      { id: "PO-9004", status: "open", version: 2, official_delivery_date: "2026-09-12",
         supplier_id: NICE, destination_id: BULOH_DEST },
       /* The o4 covers, so Partial can be proven on a real engine order. */
-      { id: "PO-2051", status: "open", version: 1, eta_date: "2026-09-15",
+      { id: "PO-2051", status: "open", version: 1, official_delivery_date: "2026-09-15",
         supplier_id: NICE, destination_id: KLANG_DEST },
-      { id: "PO-2052", status: "open", version: 1, eta_date: "2026-09-15",
+      { id: "PO-2052", status: "open", version: 1, official_delivery_date: "2026-09-15",
         supplier_id: NICE, destination_id: KLANG_DEST },
     ],
     error: null,
@@ -1140,7 +1214,7 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
       status: "received",
       supplierName: "Nice Future",
       destinationId: KLANG_DEST,
-      etaDate: "2026-09-18",
+      officialDeliveryDate: "2026-09-18",
       sentCurrentVersion: true,
     });
   });
@@ -1152,7 +1226,7 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     expect(o9.pos[0]!.sentCurrentVersion).toBe(false);
     expect(o9.status).toBe("blank");
     /* A PO without a date prints nothing — never an estimate. */
-    expect(o9.pos[0]!.etaDate).toBeNull();
+    expect(o9.pos[0]!.officialDeliveryDate).toBeNull();
   });
 
   it("a cancelled PO neither counts nor attributes, even with send evidence", async () => {
@@ -1185,7 +1259,7 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     const t = registerTables();
     (t.purchase_orders.data as Record<string, unknown>[]).push({
       /* A PO that merely mentions the customer order some other way. */
-      id: "PO-9099", status: "open", version: 1, eta_date: "2026-09-01",
+      id: "PO-9099", status: "open", version: 1, official_delivery_date: "2026-09-01",
       supplier_id: NICE, destination_id: KLANG_DEST, so: 1207, so_refs: [1207],
     });
     const { body } = await rowsOf(t);
@@ -1248,12 +1322,13 @@ describe("Card 02-C · a `place` order is invisible to Purchasing", () => {
 
   it("cannot consume Open PO coverage ahead of a proceeded order", async () => {
     /* One open unit of COV2-K; the `place` order asked first (2026-06-01).
-       Under the corrected boundary the PROCEEDED order's unit is fully
-       covered — its leaf leaves the buying listing entirely. If the `place`
-       order were still allowed to drink the coverage, the proceeded order
-       would surface here with `toBuy: 1`. */
+       Under the corrected boundary the PROCEEDED order drinks that unit, so
+       its build reports `onPo: 1`. If the `place` order were still allowed to
+       take the coverage first, the proceeded order would report `onPo: 0`.
+       That number is the assertion — the row itself is present either way
+       since 2026-09-03, so its mere existence proves nothing. */
     const { rows, body } = await rowsOf();
-    expect(bySku(rows, "COV2-K")).toBeUndefined();
+    expect(bySku(rows, "COV2-K")).toMatchObject({ onPo: 1 });
     /* And the proceeded order's PERMANENT row is still on the Register. */
     expect(body.registerRows.find((r) => r.orderId === "o13")).toBeDefined();
   });

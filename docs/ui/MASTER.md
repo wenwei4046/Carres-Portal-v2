@@ -626,11 +626,21 @@ directory only and said so.*
   person (`?tab=work&scope=team&owner=…`); a link seeds the view, it never restricts it.
   **Everyone appears, including a clear desk at `0 open`** — a rail that hides the people at
   zero cannot answer *"is anyone free?"*, and a missing name reads as a missing person.
-- **Team states BOTH duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` are one
-  rota (`ops_po_duty`), auto-assigned through one rotation, resolved server-side.
-  `Not assigned` may appear ONLY when no assignable staff exists, and must then say where to
-  fix it. See `../purchasing/MASTER.md` §2.2 for the duty model itself — this file does not
-  restate it.
+- **Team states BOTH operational duties, and neither is ever blank.** `PO DUTY` and `GRN DUTY` resolve
+  through the ONE Shared Duty Resolver (`../ERP-ARCHITECTURE.md` Law F.1, owner ruling
+  2026-09-01 / 2026-09-03): **Workspace → Staff & Duties is the one Duty assignment door**,
+  People owns identity/eligibility only, and no
+  page reads a rota table or calculates a Duty for itself (the current `ops_po_duty` read is
+  legacy implementation evidence that must converge — `../purchasing/MASTER.md` §5.3).
+  `Not assigned` may appear ONLY when zero eligible staff exists, and must then say where to
+  fix it. This file does not restate the duty model.
+- **A PAGE NEVER RESOLVES DUTY — owner ruling 2026-09-01.** Every action-bearing surface renders
+  the resolved owner/avatar from the one Work Engine Action contract governed by
+  `../ERP-ARCHITECTURE.md` Law F.1. Only `Workspace → Staff & Duties` edits Duty assignments and
+  Buddy cover; People supplies
+  active/access and last-working-date facts. Dashboard, module Registers, object details, My Work,
+  Team Work and Quick Rail may change display density, but they may not query the rota, calculate
+  an offset, store local assignment or invent a fallback identity.
 - **Activity** previews recent append-only events and links to their objects; it does not replace
   an object's History or a module audit surface. **No stored value reaches the screen untranslated
   and no `—` stands in for a value** — the two rulings are in `../COPY-STANDARD.md` and bind
@@ -670,9 +680,14 @@ directory only and said so.*
   **Line 1** is the fact/problem in governed body size and medium/semibold emphasis. **Line 2**
   is the next action in the governed smaller supporting size, regular weight and quieter but
   readable colour. It is not metadata and may not fall below the accessible contrast floor.
-  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18:** registers list
-  documents; the action clause renders only where actions live (My Work · Team Work · the Order
-  Route · detail panels), never in a register cell.
+  **A REGISTER CELL carries the FACT alone — owner ruling 2026-08-18; extended 2026-09-04:**
+  registers list documents and authoritative facts; the action clause renders only where actions
+  live (My Work · Team Work · the Order Route · detail panels), never in a register cell — and
+  neither does an owner avatar, an owner name or a duty holder: a Register has no `Work` column.
+  A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
+  instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
+  avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
+  My Work, Team Work, the PO detail and Order Route.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one
@@ -883,6 +898,42 @@ auditable Workspace, never inside the launcher. Module tabs, portal navigation, 
 `…` must not repeat a Settings destination. Current-view presentation such as Columns, personal
 Saved Views and governed Register layout remains on the owning Register and is not System Settings.
 
+**THE SETTINGS WORKSPACE RAIL — APPROVED / LOCKED, owner correction 2026-09-09. BUILT.** The
+Workspace's section rail is the governed Carres rail, not a fifth visual language. It drew a 280px
+floating rounded card with a shadow and a page margin, and marked the active section with a
+near-black `base-900` pill. It now draws the same shell and `NavRow` treatment as every other
+Carres rail (LOCAL FILTER RAIL / LOCAL RAIL ACTIVE ROW below): **240px, flush left, one straight
+right divider, no card, no radius and no shadow on the container; `blue-3` wash with a straight 2px
+`blue-9` line inset left on the active row; slate hover on the rest.**
+
+It hides under the same law as a local filter rail: `Hide settings` removes the WHOLE rail and
+gives its width to the settings page — never a second 60px icon strip beside the Portal sidebar —
+the content then carries `Show settings`, and the choice is remembered for that staff browser
+(`ops-settings-rail`). The icons are the Portal sidebar's governed panel-left pair. This is
+navigation between module Settings sections, so the rail carries no filters and no checkboxes.
+
+Every Settings section draws the same page header: a `kicker` naming the module above an
+`h1.text-page font-display` naming the page. Purchasing Settings had neither and opened straight
+onto a paragraph; it was corrected in the same change.
+
+**A MODULE GROUP MAY OWN MORE THAN ONE RAIL ROW — APPROVED / LOCKED, owner card 2026-09-09. BUILT.**
+Every module before Warehouse had exactly one settings page, so the rail carried one row per group.
+`Warehouse` is five SECTIONS of one page — `Warehouse Details · Working Hours · Public Holidays ·
+Special Dates · Access` — not five module settings pages, and they sit as five rows under one
+`Warehouse` group heading. The rail treatment is unchanged: 240px, flush left, one straight right
+divider, `blue-3` wash with a 2px `blue-9` line inset left on the active row. A group may still not
+invent a second Settings home, and a section that opens nothing may not appear.
+
+**A SETTINGS PAGE MAY CARRY ONE HEADER `Save changes` — APPROVED / LOCKED, owner card 2026-09-09.
+BUILT.** This narrows, and does not repeal, the 2026-08-14 SETTINGS TEMPLATE rule that raw config
+fields and Save/Cancel controls are not the default view. That rule was written against per-field
+Save/Cancel scattered through a page of database-shaped inputs. A module settings page that edits
+one coherent configuration instead renders plain-language groups and readable rows, holds the
+operator's edits as a draft, and commits them with **one** `Save changes` in the Page Header's right
+cluster. It obeys the Receiving button law: disabled while nothing has changed, and when something
+is invalid it NAMES the gap — `Save changes — say why this date is different`. It never becomes a
+second per-field control, and it never appears on a settings page that has no draft to commit.
+
 **REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
 behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,
 stacking additional messages upward. A toast never occupies document flow and never moves, resizes
@@ -946,7 +997,9 @@ scrolls horizontally. Normal state spends the left side on the current View cont
 Register Search, and the right side on page-owned Export/display controls, frequent actions, one
 primary create action and a low-frequency overflow when needed. `View: {current view}` is explicit;
 scope capabilities such as All orders / Not delivered are saved/reusable Views, never a permanent
-row of pills. Header-column filters remain the direct per-column filter door; the Toolbar does not
+row of pills. A View control is conditional on a useful, distinct view capability; do not render
+one merely to repeat status filters. Supplier Claims defaults to all permitted new and historical
+records and has no View selector (owner correction 2026-09-07; Purchasing §9.5). Header-column filters remain the direct per-column filter door; the Toolbar does not
 add a duplicate generic Filters button. `Reset layout` remains inside Columns.
 
 Selecting rows **replaces** the normal Toolbar within the same 45px height; it never adds a third
@@ -1003,6 +1056,22 @@ against the Register; at narrower desktop widths the Register scrolls horizontal
 rail is never squeezed below 240px. The rail is navigation, not batch selection — it carries
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
+
+**LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
+Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
+block: the header stays put while the filter groups scroll independently beneath it, separated
+by a hairline (`{testId}-fixed` / `{testId}-scroll` regions). Its governed content is the rail
+month calendar, and the kit gained **`MonthCalendar`** (`components/kit/MonthCalendar.tsx`) for
+it: the same `react-day-picker` engine and token skin as `DatePicker`, rendered permanently
+instead of in a popover, acting as a FILTER (pick a day to narrow the register beside it, pick
+it again to clear, ‹ › move exactly one month). It prints the month spelled out as its caption,
+keeps Sunday visible in the muted non-working state, and marks a day by printing a COUNT under
+the date with the same fact in the day's aria sentence — colour is never the only signal.
+Delivery Monitor's same-day `MonitorMonthCalendar` (a page-level recipe on the kit's exported
+DatePicker skin and dot markers) predates the kit component by hours and migrates onto it in its
+own card — §6.1's second-occurrence rule; nobody draws a third month grid. On Monitor, the month
+calendar is the persistent date picker: choosing a date opens that date's `Day` view. The page
+toolbar owns `Day · Week · Month`; `Calendar` is never repeated as a `WORK TO DO` rail row.
 
 **LOCAL FILTER RAIL COLLAPSE — APPROVED / LOCKED, owner ruling 2026-08-27.** The open rail carries
 one neutral `Hide filters` panel-left button. Hiding removes the whole local rail and gives its width
@@ -1132,7 +1201,11 @@ breathing gap
   moving `Deliver To` next to `Unit ID`: both answer *where is this piece*, and separating them by
   three columns made the operator read across the whole table to pair them). It may use its own column
   tracks; it must retain the parent Register's seven-column structure and horizontal behaviour.
-  Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location.
+  Unit ID is Stock truth; Deliver To is read-only Purchasing truth, not Warehouse location. The
+  word is `Unit ID` everywhere (`Item ID` is retired); on the opened Purchase Order's
+  `Document → Goods lines` a quantity-scoped line prints `—` because it has no Unit ID by law,
+  and an exact-unit line with none after issue reads `Unit IDs missing on this line — do not send
+  this PO` (owner ruling 2026-09-07, Purchasing §6.2).
 - Keep the proven Search, typed filters, Columns, Export and right-click document interaction.
   Selection may scope Export; it may not introduce register-owned execution. Direct SO/PO/DO
   numbers are links to their owner. Only explicit `Edit` opens the formal edit context; View,
@@ -1173,6 +1246,13 @@ breathing gap
   config fields, Save/Cancel controls and database-like keys are not the default view. Future
   Purchasing, Warehouse and Delivery settings inherit the grammar without creating empty pages or
   duplicate top-level settings homes.
+- **ACTION OWNER TEMPLATE — OWNER-APPROVED / LOCKED (2026-09-03).** Object identity belongs to the
+  row/card header; owner belongs to structured metadata/avatar; the action sentence contains only
+  the act. Avatar initials are a separate chip and hover reveals the person. My Work omits the
+  current person's repeated avatar. Team Work groups by owner header. Cover shows normal owner and
+  today's cover without overwriting either. Counts name concrete work (`5 customer balances need
+  collection`), never abstract `open`/`late` totals. Register, My Work and Team Work render the same
+  Action contract at different density; none stores a second free-text truth.
 - **ERP SHELL + SALES ORDER UI REFERENCE — PRODUCTION-VERIFIED / LOCKED (2026-08-14).** PR #771
   merged as `5fed50d3`; the known-goods classification correction followed in PR #773 and merged
   as `4934826d`; PR #776 closed the final object-route/Settings presentation mismatches and merged
@@ -1357,6 +1437,19 @@ counters above the table; the 32px status footer carries the summary.
 
 **THIS SHAPE IS THE TEMPLATE.** Every Register inherits Rows 1–3 and the three message kinds
 unchanged. Only Row 2's page-owned controls and the columns differ.
+
+**WAREHOUSE INBOUND / OUTBOUND — OWNER-APPROVED 2026-09-06, unified 2026-09-07.** Warehouse
+navigation is `Monitor · Inbound · Inventory · Outbound`. Monitor alone is the Calendar-summary
+page. Inbound AND Outbound use the shared 240px page-specific Filter Rail + remaining-width
+Register in one row grammar (stock MASTER §7); no six-working-day strip, Calendar cards or
+35%/65% composition. A compact date/range control is a filter only. Status, document type, Site
+and search filter one shared scope — the rail counts, the rows, the footer and the export can
+never describe different ranges. Exact Monitor deep links preserve date, Site ID and document
+scope. Two engine capabilities exist for this grammar and are opt-in per column/page:
+`wrap: true` (a completeness column wraps and the row grows — Product, Exceptions) and
+`expandable.trigger` (a named data column is the ONE expansion entry — its arrow and content
+are one button; no second expand control). Every other register keeps the single-line,
+gutter-chevron contract byte-identical.
 
 **APPLIED — STOCK, 2026-08-21 (`CARD-2026-08-20-stock-register`).** The Warehouse master list is the
 fourth Register on this template, and the first with a LEFT FILTER RAIL beside it.

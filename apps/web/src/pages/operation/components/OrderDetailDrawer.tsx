@@ -143,6 +143,7 @@ import { SectionCard, SectionBand } from "@/components/SectionPanel";
 import Btn from "@/components/Btn";
 import Money from "@/components/Money";
 import { fieldCls } from "@/components/Field";
+import { waLink } from "@/lib/wa-link";
 import BookingSpine from "./BookingSpine";
 import DeliveryChain from "./DeliveryChain";
 import LoanPanel from "./LoanPanel";
@@ -4893,20 +4894,8 @@ function CustomerIdentityCard({
  * message the customer). Takes the FIRST number if the field lists several
  * ("014-… | 012-…"), strips non-digits, and normalises a local `0…` to `60…`.
  */
-export function waLink(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const first = phone.split(/[|,/]/)[0] ?? "";
-  let d = first.replace(/\D/g, "");
-  if (!d) return null;
-  if (d.startsWith("60")) {
-    /* already international */
-  } else if (d.startsWith("0")) {
-    d = `60${d.slice(1)}`;
-  } else {
-    d = `60${d}`;
-  }
-  return `https://wa.me/${d}`;
-}
+// waLink lives in @/lib/wa-link; re-exported for existing importers.
+export { waLink };
 
 /** Grounded-card KV row — the Loan-card language, STANDARD kit tokens (label
  *  base-500 uppercase 11/600 — READABLE, not the washed base-300; value base-900;
@@ -6089,6 +6078,9 @@ const PAY_METHOD_LABEL: Record<OrderPaymentMethod, string> = {
   cheque: "Cheque",
   online: "e-wallet",
   other: "Other",
+  duitnow_qr: "DuitNow QR",
+  credit_card: "Credit card",
+  debit_card: "Debit card",
 };
 
 /** Open a payment's uploaded proof: an https receipt URL directly, or a
@@ -6689,8 +6681,16 @@ function MoneyCard({
   // The INLINE Record-payment form (Balance-tab spec — no modal here; the
   // collapsed band's shortcut still wraps the same form in a Modal).
   const [addingInline, setAddingInline] = useState(false);
+  // 0430 — a void wears its reason: the Undo2 icon opens this inline ask
+  // instead of firing one-click; the SQL door refuses a blank reason anyway.
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+    onSuccess: () => {
+      setVoidingId(null);
+      setVoidReason("");
+    },
   });
 
   // CHARGES — merge same-SKU lines; per-line amounts only exist on a
@@ -6913,8 +6913,8 @@ function MoneyCard({
                 // refuse it anyway — `already_voided`).
                 const voided = !isLivePayment(p);
                 return (
+                <div key={p.id}>
                 <div
-                  key={p.id}
                   className={`flex items-center gap-2.5 py-2 ${voided ? "opacity-60" : ""}`}
                   data-testid={voided ? "payment-voided" : undefined}
                 >
@@ -6984,7 +6984,10 @@ function MoneyCard({
                   {isPrincipal && !voided && (
                     <button
                       type="button"
-                      onClick={() => voidPay.mutate(p.id)}
+                      onClick={() => {
+                        setVoidingId(voidingId === p.id ? null : p.id);
+                        setVoidReason("");
+                      }}
                       disabled={voidPay.isPending}
                       title="Void this payment (reversible — payments are never deleted)"
                       aria-label={`Void payment ${p.receipt_no ?? p.id}`}
@@ -6993,6 +6996,37 @@ function MoneyCard({
                       <Undo2 size={14} />
                     </button>
                   )}
+                </div>
+                {voidingId === p.id && !voided && (
+                  // 0430 — the reason is required; the payment and its
+                  // reversal keep it forever.
+                  <div className="flex items-center gap-2 pb-2">
+                    <input
+                      type="text"
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                      placeholder="Why is this payment wrong?"
+                      aria-label="Void reason"
+                      autoFocus
+                      className={fieldCls}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => voidPay.mutate({ paymentId: p.id, reason: voidReason.trim() })}
+                      disabled={voidPay.isPending || !voidReason.trim()}
+                      className="text-meta font-semibold text-danger shrink-0 disabled:opacity-40"
+                    >
+                      Void payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoidingId(null)}
+                      className="text-meta text-base-500 shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 </div>
                 );
               })}

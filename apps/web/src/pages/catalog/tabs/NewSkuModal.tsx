@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
+  StockIdentityMode,
   CatalogOptionPoolDto,
   ProductCategory,
   ProductModelDto,
@@ -14,6 +15,7 @@ import {
   autoBedSkuDescription,
   canonicalSize,
   supplierSlug,
+  supplierCreateInput,
   guaranteeVisitsTotal,
   type GuaranteeKind,
 } from "@carres/shared";
@@ -79,6 +81,13 @@ function deriveModelKey(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+/** 0442 — the form's DEFAULT for the stock identity mode, from the one fact
+ *  it already knows. It is a suggestion the keyer confirms and the server
+ *  stores explicitly; nothing derives the mode at runtime. */
+function defaultIdentityModeFor(category: ProductCategory | undefined): StockIdentityMode {
+  return category === "accessory" ? "quantity" : "exact_unit";
 }
 
 function variantKindFor(category: ProductCategory, model?: ProductModelDto): VariantKind {
@@ -181,7 +190,14 @@ export default function NewSkuModal({
   const [newSupplierName, setNewSupplierName] = useState("");
   const [newSupplierKind, setNewSupplierKind] =
     useState<"own_logistics" | "factory_pickup">("factory_pickup");
-  const [newSupplierCats, setNewSupplierCats] = useState<ProductCategory[]>([]);
+  const [newSupplierCats, setNewSupplierCats] = useState<Array<"mattress" | "bedframe" | "sofa">>([]);
+  const [newSupplierDays, setNewSupplierDays] = useState<Record<string, string>>({});
+  const [newSupplierOffDays, setNewSupplierOffDays] = useState<number[]>([0]);
+  const supplierSetup = supplierCreateInput.safeParse({
+    name: newSupplierName, kind: newSupplierKind, catCovered: newSupplierCats,
+    productionDays: newSupplierCats.map(category => ({ category, workingDays: Number(newSupplierDays[category]) })),
+    offDays: newSupplierOffDays,
+  });
   /* ⭐ A DUPLICATE IS CAUGHT BEFORE THE ROUND-TRIP, AND IS NOT A DEAD END
    * (2026-08-25). The server refuses a second supplier with the same derived
    * slug, correctly — but a red toast saying "already a supplier, pick it from
@@ -206,6 +222,10 @@ export default function NewSkuModal({
     : null;
   // new-product fields
   const [category, setCategory] = useState<ProductCategory>("mattress");
+  /* 0442 — Catalog states how Stock identifies the new SKU: `exact_unit`
+     (one permanent Unit ID per piece, born with the official PO) or
+     `quantity` (counted goods, no Unit IDs). Saved EXPLICITLY with the SKU. */
+  const [identityMode, setIdentityMode] = useState<StockIdentityMode>("exact_unit");
   const [name, setName] = useState("");
   // existing-model field
   const [modelId, setModelId] = useState("");
@@ -252,6 +272,23 @@ export default function NewSkuModal({
   // (`supplierId`), same control, rendered wherever a flow needs it — the value
   // means the same thing everywhere: empty = Auto (today's resolve), a pick =
   // an explicit override sent to whichever endpoint this flow calls.
+  /* 0442 — the Catalog fact official PO issue reads. Absent, the PO refuses
+     the SKU by name, so the form always sends one. */
+  const stockIdentityField = (
+    <label className="block">
+      <span className="label block mb-1">Stock identity</span>
+      <select
+        value={identityMode}
+        onChange={(e) => setIdentityMode(e.target.value as StockIdentityMode)}
+        data-testid="new-sku-stock-identity"
+        className={INPUT_CLS}
+      >
+        <option value="exact_unit">Unit ID — one permanent ID per piece</option>
+        <option value="quantity">Quantity — counted, no Unit ID</option>
+      </select>
+    </label>
+  );
+
   const supplierPickerField = (
     <div className="block">
       <label className="block">
@@ -290,12 +327,14 @@ export default function NewSkuModal({
             setNewSupplierName("");
             /* Pre-tick the category being keyed: it is the answer nine times
                out of ten, and it is the one fact this modal already knows. */
-            setNewSupplierCats(effectiveCategory ? [effectiveCategory] : []);
+            setNewSupplierCats(effectiveCategory === "mattress" || effectiveCategory === "bedframe" || effectiveCategory === "sofa" ? [effectiveCategory] : []);
+            setNewSupplierDays({});
+            setNewSupplierOffDays([0]);
           }}
           className="mt-1.5 text-meta font-medium text-kit-blue-9 underline underline-offset-2"
           data-testid="new-sku-supplier-add-open"
         >
-          + New supplier
+          Add Supplier
         </button>
       )}
       {isPrincipal && newSupplierOpen && (
@@ -304,7 +343,7 @@ export default function NewSkuModal({
           data-testid="new-sku-supplier-add"
         >
           <label className="block">
-            <span className="label block mb-1">New supplier name</span>
+            <span className="label block mb-1">Supplier Name</span>
             <input
               value={newSupplierName}
               onChange={(e) => setNewSupplierName(e.target.value)}
@@ -314,7 +353,7 @@ export default function NewSkuModal({
             />
           </label>
           <label className="block">
-            <span className="label block mb-1">How the goods leave the factory</span>
+            <span className="label block mb-1">Delivery Method</span>
             <select
               value={newSupplierKind}
               onChange={(e) =>
@@ -323,14 +362,14 @@ export default function NewSkuModal({
               data-testid="new-sku-supplier-add-kind"
               className={INPUT_CLS}
             >
-              <option value="factory_pickup">We collect from the factory</option>
-              <option value="own_logistics">They deliver to us</option>
+              <option value="own_logistics">Supplier delivers</option>
+              <option value="factory_pickup">We collect</option>
             </select>
           </label>
           <div className="block">
-            <span className="label block mb-1">What they supply</span>
+            <span className="label block mb-1">Product Categories</span>
             <div className="flex flex-wrap gap-1.5">
-              {PRODUCT_CATEGORIES.map((cat) => {
+              {(["mattress", "bedframe", "sofa"] as const).map((cat) => {
                 const on = newSupplierCats.includes(cat);
                 return (
                   <button
@@ -354,11 +393,30 @@ export default function NewSkuModal({
                 );
               })}
             </div>
-            <div className="mt-1 text-meta text-base-500">
-              Ticking a category lets Carres pick this supplier on its own. You can always choose
-              them by hand instead.
-            </div>
+
           </div>
+          {newSupplierCats.map(cat => (
+            <label className="block" key={cat}>
+              <span className="label block mb-1">{CATEGORY_LABEL[cat]} · Production Days</span>
+              <input type="number" min={1} max={180} step={1} required
+                value={newSupplierDays[cat] ?? ""}
+                onChange={e => setNewSupplierDays(prev => ({ ...prev, [cat]: e.target.value }))}
+                data-testid={`new-sku-supplier-add-days-${cat}`} className={INPUT_CLS} />
+              <span className="text-meta text-base-500">working days</span>
+            </label>
+          ))}
+          <fieldset>
+            <legend className="label block mb-1">Supplier work week</legend>
+            <div className="flex flex-wrap gap-2">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, day) => (
+                <label key={day} className="text-meta">
+                  <input type="checkbox" checked={!newSupplierOffDays.includes(day)}
+                    onChange={() => setNewSupplierOffDays(prev => prev.includes(day)
+                      ? prev.filter(value => value !== day) : [...prev, day])} /> {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           {existingSupplierMatch && (
             <div
               className="flex flex-wrap items-center gap-2 text-meta text-base-700"
@@ -386,17 +444,14 @@ export default function NewSkuModal({
             <button
               type="button"
               disabled={
-                newSupplierName.trim().length < 2 ||
+                !supplierSetup.success ||
                 createSupplier.isPending ||
                 existingSupplierMatch !== null
               }
               onClick={async () => {
                 try {
-                  const { supplier } = await createSupplier.mutateAsync({
-                    name: newSupplierName.trim(),
-                    kind: newSupplierKind,
-                    catCovered: newSupplierCats,
-                  });
+                  if (!supplierSetup.success) return;
+                  const { supplier } = await createSupplier.mutateAsync(supplierSetup.data);
                   /* Select it immediately — the keyer asked for this supplier
                      because they are keying its SKU right now. */
                   setSupplierId(supplier.id);
@@ -410,7 +465,7 @@ export default function NewSkuModal({
               className="btn-primary text-meta"
               data-testid="new-sku-supplier-add-save"
             >
-              {createSupplier.isPending ? "Adding…" : "Add supplier"}
+              {createSupplier.isPending ? "Adding…" : "Add Supplier"}
             </button>
             <button
               type="button"
@@ -479,6 +534,9 @@ export default function NewSkuModal({
   // picked model's (existing): "Add to existing model" surfaces the SAME chips
   // as "New product" (Loo 2026-07-21).
   const effectiveCategory = mode === "new" ? category : existingModel?.category;
+  useEffect(() => {
+    setIdentityMode(defaultIdentityModeFor(effectiveCategory));
+  }, [effectiveCategory]);
 
   // The picked model's LIVE SKUs (discontinued excluded — a soft-retired
   // compartment sku re-offers cleanly, so its chip stays offerable).
@@ -740,6 +798,7 @@ export default function NewSkuModal({
           /* Omitted when nobody typed a code, so a batch with no codes sends
              the byte-identical payload it sent before this field existed. */
           ...(Object.keys(codes).length > 0 ? { supplierCodes: codes } : {}),
+          stockIdentityMode: identityMode,
         });
         if (failed.length > 0) {
           // Keep the modal open with ONLY the failed compartments selected —
@@ -794,6 +853,7 @@ export default function NewSkuModal({
                one request. Only the sizes actually being generated are sent —
                a code typed against a size then unticked must not travel. */
             supplierCode: supplierCode.trim() || undefined,
+            stockIdentityMode: identityMode,
             ...(() => {
               const own = sizes.reduce<Record<string, string>>((acc, v) => {
                 const code = (supplierCodes[v] ?? "").trim();
@@ -865,6 +925,7 @@ export default function NewSkuModal({
         description: description.trim() || null,
         supplierId: supplierId || null,
         supplierCode: supplierCode.trim() || null,
+        stockIdentityMode: identityMode,
       });
       toast.success(`Added ${codePreview || variant.trim()}`);
       onClose();
@@ -1472,6 +1533,7 @@ export default function NewSkuModal({
             </label>
 
             {supplierPickerField}
+            {stockIdentityField}
 
             <label className="block">
               <span className="label block mb-1">Supplier item code (optional)</span>

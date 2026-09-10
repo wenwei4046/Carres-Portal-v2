@@ -8,6 +8,8 @@ import {
   manualPurchaseLineRemainingOf,
   orderByFromDeliveryDate,
   productionWorkingDaysFor,
+  poSupplierDeliveryDateOf,
+  type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
   railItemLabel,
@@ -57,17 +59,18 @@ const manualPurchaseRouter = new Hono<AppEnv>();
  * they must refuse in the same words — `purchasingRefusal` is the one place
  * those words live.
  */
+function refusalBody(code: string, facts?: Parameters<typeof purchasingRefusal>[1]) {
+  const r = purchasingRefusal(code, facts);
+  return { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) };
+}
+
 function refuse(
   c: Context<AppEnv>,
   status: 400 | 403 | 404 | 409 | 422 | 500,
   code: string,
   facts?: Parameters<typeof purchasingRefusal>[1],
 ) {
-  const r = purchasingRefusal(code, facts);
-  return c.json(
-    { error: code, code, message: r.wrong, action: r.todo, ...(facts ?? {}) },
-    status,
-  );
+  return c.json(refusalBody(code, facts), status);
 }
 
 /** Today in Asia/Kuala_Lumpur (UTC+8, no DST) — the Malaysia calendar date
@@ -75,6 +78,14 @@ function refuse(
  *  browser never guesses a date; this server fact travels in the payload. */
 function todayMyt(): string {
   return new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** `iso` + n CALENDAR days — the same day arithmetic `earliest_sell_days`
+ *  is counted in (0422). No working-day walk: the number is calendar days. */
+function plusCalendarDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -459,7 +470,7 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     .map((r) => r.for_service_case_id as string | null)
     .filter((v): v is string => v != null);
   const [dests, sups, users, cases] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name"),
+    sb.from("purchasing_destinations").select("id, name, is_default").order("name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email"),
     forCaseIds.length > 0
@@ -531,7 +542,19 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: sc.id as string,
       case_no: sc.case_no as string,
     })),
-    destinations: dests.data ?? [],
+    destinations: (dests.data ?? []).map((d) => ({ id: d.id, name: d.name })),
+    /* ⭐ THE TWO GOVERNED DELIVER TO FACTS (owner, 2026-09-03). Until now the
+       create form defaulted Deliver To to whichever destination came first
+       and offered every one as an equal choice, so a request for a supplier
+       Carres COLLECTS from could name Carres Klang — and the issue door then
+       refused it (`supplier_collection_destination_mismatch`) with no door
+       left to correct the request. SO Batch ships both facts
+       (`purchase-demands.ts`); this lane never did. `settings` is already in
+       hand from the date plan, so this costs no subrequest. No default
+       configured means NO default (MASTER §5.4). */
+    defaultDestinationId:
+      ((dests.data ?? []).find((d) => d.is_default === true)?.id as string | undefined) ?? null,
+    supplierCollections: settings?.supplierCollections ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
@@ -545,6 +568,11 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
        and the honest date-plan availability fact. */
     todayIso: todayMyt(),
     planUnavailable,
+    /* 0422 — Purchasing Settings' `manual_purchase_min_delivery_days`
+       (calendar days after the Proceed Date). The create form mirrors the
+       door's refusal under the date field; the door refuses regardless.
+       Settings unavailable: 0, no floor — the same answer the door gives. */
+    minDeliveryDays: settings?.manualPurchaseMinDeliveryDays ?? 0,
   });
 });
 
@@ -625,7 +653,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   }
 
   const [dests, sups, users] = await Promise.all([
-    sb.from("purchasing_destinations").select("id, name"),
+    /* `active` rides so the object's Deliver To door offers only open places;
+       a closed one still resolves to its name on a request that named it. */
+    sb.from("purchasing_destinations").select("id, name, active").order("name"),
     sb.from("suppliers").select("id, name, kind"),
     sb.from("app_users").select("id, name, email, role"),
   ]);
@@ -671,16 +701,8 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     serviceCaseNo = (sc?.case_no as string | null) ?? null;
   }
 
-  /**
-   * THE EXACT PO FACTS (Card 05 §3.6; MASTER §9.3). `PO Issued` is the
-   * actual issue timestamp (`placed_at`). `eta_date` is stamped at issue
-   * (0318) and the supplier-date doors (0306/0310) move it, appending the
-   * held date to the promise ledger — so the ORIGINAL supplier-facing
-   * `PO Delivery Date` is the earliest date-moving promise's
-   * `previous_date` when one exists, else the current `eta_date`; and a
-   * `Supplier Delivery Date` exists ONLY when that ledger proves the
-   * supplier changed it. Read from the exact linked PO, never inferred.
-   */
+  // Original PO date and supplier answer have separate authorities. Only an
+  // evidenced reply to the current version counts; legacy dates are not guessed.
   let pos: Array<{
     id: string;
     po_no: string;
@@ -692,12 +714,11 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
   if (enriched.pos.length > 0) {
     const poIds = enriched.pos.map((p) => p.id);
     const [poRes, promRes] = await Promise.all([
-      sb.from("purchase_orders").select("id, placed_at, eta_date").in("id", poIds),
+      sb.from("purchase_orders").select("id, placed_at, official_delivery_date, version").in("id", poIds),
       sb
         .from("po_supplier_promises")
-        .select("po_id, previous_date, new_date, recorded_at")
+        .select("po_id, kind, answer, about_date, previous_date, new_date, reason, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by")
         .in("po_id", poIds)
-        .not("new_date", "is", null)
         .order("recorded_at", { ascending: true }),
     ]);
     if (poRes.error) {
@@ -708,23 +729,17 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
       const m = mapPgError(promRes.error);
       return c.json(m.body, m.status);
     }
-    const firstPromiseByPo = new Map<string, { previous_date: string | null }>();
-    for (const p of promRes.data ?? []) {
-      if (!firstPromiseByPo.has(p.po_id as string)) {
-        firstPromiseByPo.set(p.po_id as string, {
-          previous_date: (p.previous_date as string | null) ?? null,
-        });
-      }
-    }
     pos = (poRes.data ?? []).map((p) => {
-      const eta = (p.eta_date as string | null) ?? null;
-      const first = firstPromiseByPo.get(p.id as string);
+      const replies = (promRes.data ?? []).filter(row => row.po_id === p.id) as unknown as PoDatePromise[];
+      const originalDate = (p.official_delivery_date as string | null) ?? null;
+      const supplierDate = poSupplierDeliveryDateOf(replies, Number(p.version ?? 1));
       return {
         id: p.id as string,
         po_no: p.id as string,
         placed_at: (p.placed_at as string | null) ?? null,
-        po_delivery_date: first ? (first.previous_date ?? eta) : eta,
-        supplier_delivery_date: first ? eta : null,
+        po_delivery_date: originalDate,
+        // This compact connected-document view adds a column only for a change.
+        supplier_delivery_date: supplierDate !== originalDate ? supplierDate : null,
         ordered_qty: enriched.orderedByPo.get(p.id as string) ?? 0,
       };
     });
@@ -809,6 +824,9 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     pos,
     history,
     destinations: dests.data ?? [],
+    /* The collection rule per collected supplier — the object's Deliver To
+       door applies the same lock the create form applies (1083). */
+    supplierCollections: settings?.supplierCollections ?? [],
     suppliers: sups.data ?? [],
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
@@ -894,6 +912,124 @@ manualPurchaseRouter.post("/:id/decide", requireOperation, async (c) => {
   return c.json(data);
 });
 
+const deliverToBody = z.object({ destinationId: z.string().uuid() }).strict();
+
+/**
+ * PUT /:id/deliver-to — THE DELIVER TO DOOR ON AN EXISTING REQUEST (0421).
+ *
+ * MPR-20260903-3381 was refused at Issue with "Set Deliver To to Ohana, then
+ * issue again", and the request had no door to do that. This is the door.
+ * The RPC moves the header and every live line together and refuses once a
+ * line is on a PO (`request_ordered`), once the request is refused or every
+ * line is cancelled (`request_refused` / `request_closed`), or when the place
+ * is unknown or closed.
+ *
+ * The collection pre-flight `/issue` runs is run here first, so a move that
+ * the issue door would refuse anyway is refused now, in the same words, and
+ * nothing is written.
+ */
+manualPurchaseRouter.put("/:id/deliver-to", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const parsed = deliverToBody.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
+  }
+  const { destinationId } = parsed.data;
+
+  const { data: lines, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select("id, supplier_id, cancelled_at")
+    .eq("request_id", id);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  const supplierIds = [
+    ...new Set(
+      (lines ?? [])
+        .filter((l) => l.cancelled_at == null)
+        .map((l) => l.supplier_id as string | null)
+        .filter((v): v is string => v != null),
+    ),
+  ];
+  if (supplierIds.length > 0) {
+    const { data: collectionRows, error: collectionErr } = await sb
+      .from("purchasing_supplier_settings")
+      .select("supplier_id, fixed_destination_id, collected_by_partner_id")
+      .in("supplier_id", supplierIds);
+    if (collectionErr) {
+      const m = mapPgError(collectionErr);
+      return c.json(m.body, m.status);
+    }
+    const governed = ((collectionRows ?? []) as Record<string, unknown>[]).find(
+      (r) =>
+        supplierIds.includes(r.supplier_id as string) &&
+        r.fixed_destination_id != null &&
+        r.fixed_destination_id !== destinationId,
+    );
+    if (governed) {
+      const { data: supRows } = await sb
+        .from("suppliers")
+        .select("id, kind, name")
+        .in("id", supplierIds);
+      const sup = (supRows ?? []).find((s) => s.id === governed.supplier_id);
+      /* Only a collected supplier is bound by its rule; the row for one that
+         delivers its own goods is stale Settings, not a refusal. */
+      if (sup?.kind === "factory_pickup") {
+        const { data: destRow } = await sb
+          .from("purchasing_destinations")
+          .select("name")
+          .eq("id", governed.fixed_destination_id as string)
+          .maybeSingle();
+        return refuse(c, 422, "supplier_collection_destination_mismatch", {
+          supplier: (sup.name as string | null) ?? null,
+          destination: (destRow?.name as string | null) ?? null,
+        });
+      }
+    }
+  }
+
+  const { data, error } = await sb.rpc("purchasing_move_request_destination", {
+    p_id: id,
+    p_destination_id: destinationId,
+  });
+  if (error) {
+    /* The door's own detail is the code; the dictionary turns it into the
+       two lines. A 42501 (the role gate, the same one `requireOperation`
+       already asked) and anything unnamed fall to `mapPgError`. */
+    const detail = String((error as { details?: string }).details ?? "").trim();
+    if (detail === "request_ordered") return refuse(c, 422, "request_ordered");
+    if (detail === "request_closed") return refuse(c, 422, "request_closed");
+    if (detail === "request_refused") return refuse(c, 409, "request_refused");
+    if (detail === "unknown_request") return refuse(c, 404, "unknown_request");
+    if (detail === "unknown_destination") return refuse(c, 422, "unknown_destination");
+    if (detail === "inactive_destination") {
+      const { data: destRow } = await sb
+        .from("purchasing_destinations")
+        .select("name")
+        .eq("id", destinationId)
+        .maybeSingle();
+      return refuse(c, 422, "inactive_destination", {
+        destination: (destRow?.name as string | null) ?? null,
+      });
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ ok: true, ...((data as Record<string, unknown> | null) ?? {}) });
+});
+
 /**
  * Card 04 — only `Other Purchase` asks (and must answer) `What is this
  * for?`; the other purposes carry their STRUCTURED For fact instead. The
@@ -911,6 +1047,27 @@ const headerBody = z
     serviceCaseId: z.string().uuid().nullish(),
     staffUserId: z.string().uuid().nullish(),
     subsidiaryName: z.string().max(200).nullish(),
+    /* ⭐ THE WHOLE REQUEST ARRIVES AT ONCE (0410, YH 2026-09-01). The form
+       used to POST the header, read back its id, then POST one line per line
+       in a loop — six transactions for one act. A failure on line 3 left a
+       committed header with two of five lines, on no screen and behind no
+       door. The lines ride the header now and `0410` writes them in ONE
+       database transaction.
+       OPTIONAL, and that is deliberate: `0410` is applied BY HAND, so a build
+       that reaches production before the migration does must still be able to
+       create a Manual Purchase. Absent, this route falls back to exactly the
+       behaviour it had — see the handler. */
+    lines: z
+      .array(
+        z.object({
+          sku: z.string().min(1),
+          qty: z.number().int().min(1),
+          requiredBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+          note: z.string().max(500).nullish(),
+        }),
+      )
+      .min(1)
+      .optional(),
   })
   .superRefine((b, ctx) => {
     if (b.purpose === "other_purchase" && !(b.why ?? "").trim()) {
@@ -952,10 +1109,39 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_body", code: "invalid_param" }, 400);
   }
-  const { purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName } =
-    parsed.data;
+  const {
+    purpose, destinationId, requiredBy, why, serviceCaseId, staffUserId, subsidiaryName, lines,
+  } = parsed.data;
 
-  const { data, error } = await sb.rpc("purchasing_create_request", {
+  /* ⭐ 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+     (YH, 2026-09-04; owner ruling: a NUMBER, not a switch). Purchasing
+     Settings holds `manual_purchase_min_delivery_days` — CALENDAR days, like
+     `earliest_sell_days`. The floor is the Proceed Date (today in Malaysia,
+     the date this request is created on — the same `todayMyt()` the `/plan`
+     preview shows as Proceed Date) + that many days. 0 means no floor.
+     The lead-time plan's `deliveryDateDefault` stays a proposal only; the
+     two are NOT combined.
+
+     Refused HERE, before any row is written, in the same words the form
+     prints under the date field. If the settings cannot be loaded there is
+     no number to measure against, so the door lets the create RPC decide
+     as before — it refuses nothing it cannot compute. */
+  {
+    let minDeliveryDays = 0;
+    try {
+      minDeliveryDays = (await loadPurchasingSettings(sb)).manualPurchaseMinDeliveryDays;
+    } catch (e) {
+      console.error("manual purchase — purchasing settings unavailable", (e as Error).message);
+    }
+    if (minDeliveryDays > 0) {
+      const earliest = plusCalendarDays(todayMyt(), minDeliveryDays);
+      if (requiredBy < earliest) {
+        return refuse(c, 422, "delivery_date_before_earliest", { date: requiredBy, earliest });
+      }
+    }
+  }
+
+  const header = {
     p_purpose: purpose,
     p_destination_id: destinationId,
     p_why: (why ?? "").trim() || null,
@@ -963,7 +1149,63 @@ manualPurchaseRouter.post("/", requireOperation, async (c) => {
     p_for_service_case_id: serviceCaseId ?? null,
     p_for_staff_user_id: staffUserId ?? null,
     p_for_subsidiary_name: (subsidiaryName ?? "").trim() || null,
-  });
+  };
+
+  /* ⭐ ONE TRANSACTION FOR ONE ACT (0410). When the caller sends its lines,
+     the whole request is written by `purchasing_create_request_with_lines`,
+     which calls the SAME two doors this route used to call one after another —
+     so every gate still runs, in its own body, and the only thing that changed
+     is that a refusal on line 3 now takes the header with it. */
+  if (lines && lines.length > 0) {
+    const { data, error } = await sb.rpc("purchasing_create_request_with_lines", {
+      ...header,
+      p_lines: lines.map((l) => ({
+        sku: l.sku,
+        qty: l.qty,
+        required_by: l.requiredBy ?? null,
+        remark: (l.note ?? "").trim() || null,
+      })),
+    });
+    if (!error) return c.json(data);
+
+    /* ⛔ MERGED IS NOT APPLIED — and DEGRADING IS NOT DROPPING (YH,
+       2026-09-01, correcting the same day's own change).
+
+       The first version of this branch fell through to the header-only door
+       when `0410` was missing, on the reasoning that a create form which 404s
+       for a day is worse than one that degrades. That reasoning was right and
+       the implementation was wrong: the header-only door cannot write lines,
+       and the browser is the only caller and ALWAYS sends them. So a missing
+       migration produced a `200`, an empty request, and a form that ticked
+       every line as created. An approver could then approve a purchase with
+       no items, and it would read `Ready to order` for ever.
+
+       "Degrade, not abort" means keep working with LESS, never claim to have
+       done something you did not do. Silence about dropped lines is the
+       worse failure of the two — a 404 is visible in a second, an empty
+       approved purchase is found weeks later by somebody wondering why
+       nothing arrived.
+
+       So a missing function is now a REFUSAL that names itself. The
+       header-only path below survives for the caller that genuinely sends no
+       lines, which is the only caller it can serve honestly. */
+    const code = String((error as { code?: string }).code ?? "");
+    if (code === "PGRST202" || code === "42883") {
+      return c.json(
+        {
+          error: "migration_not_applied",
+          code: "migration_not_applied",
+          message: "This Manual Purchase was not created.",
+          action: "Ask IT to apply migration 0410, then send it again.",
+        },
+        503,
+      );
+    }
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const { data, error } = await sb.rpc("purchasing_create_request", header);
   if (error) {
     const m = mapPgError(error);
     return c.json(m.body, m.status);
@@ -1189,14 +1431,36 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const m = mapPgError(reqErr);
     return c.json(m.body, m.status);
   }
+  /* ⭐ EVERY REFUSAL ON THIS DOOR TRAVELS WITH ITS WORDS (YH, 2026-09-01).
+     Four of the refusals below were bare `c.json({ error, code })` while their
+     neighbours ten lines away already used `refuse()`. A bare body carries no
+     `message` and no `action`, so `purchasingRefusal` fell through to its
+     honest fallback — "The Portal refused this purchase order. Tell IT the
+     message on screen." — and the TWO COMMONEST outcomes of this door, a
+     request somebody else already issued and a request nobody has approved
+     yet, both read to the operator as a system fault. Nothing was broken;
+     nothing was said.
+     `refuse()` is the same helper this file already uses for `cost_required`
+     and `pickup_partner_required`. It is not new machinery; four throw sites
+     were simply written without it. */
   if ((requests ?? []).length !== requestIds.length) {
-    return c.json({ error: "unknown_request", code: "unknown_request" }, 404);
+    return refuse(c, 404, "unknown_request");
   }
   for (const r of requests ?? []) {
-    const ready = r.refused_at === null && (!r.approval_required || r.approved_at !== null);
-    if (!ready) {
+    /* ⭐ ONE CODE CANNOT SAY TWO THINGS. `not_ready_to_order` covered BOTH
+       "nobody has approved this yet" and "somebody refused this", which are
+       opposite facts with opposite next acts — one is a wait on an approver,
+       the other is a row that must come off the list. The test is split so
+       each carries its own sentence. */
+    if (r.refused_at !== null) {
       return c.json(
-        { error: "not_ready_to_order", code: "not_ready_to_order", requestId: r.id },
+        { ...refusalBody("request_refused"), requestId: r.id },
+        409,
+      );
+    }
+    if (r.approval_required && r.approved_at === null) {
+      return c.json(
+        { ...refusalBody("not_ready_to_order"), requestId: r.id },
         409,
       );
     }
@@ -1229,7 +1493,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     }))
     .filter((l) => l.issueQty > 0);
   if (toIssue.length === 0) {
-    return c.json({ error: "nothing_to_issue", code: "nothing_to_issue" }, 409);
+    return refuse(c, 409, "nothing_to_issue");
   }
 
   // The catalog facts: supplier truth, cost, category (for the ETA).
@@ -1253,8 +1517,15 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     ]),
   );
 
-  const { data: supRows } = await sb.from("suppliers").select("id, kind");
+  /* `name` is read for the REFUSALS, not for the document. Both collection
+     refusals below used to pass no facts at all, so `purchasingRefusal`
+     degraded to its `the supplier` fallback and named nobody — on a batch
+     spanning suppliers the operator could not tell which one refused. */
+  const { data: supRows } = await sb.from("suppliers").select("id, kind, name");
   const supplierKind = new Map((supRows ?? []).map((s) => [s.id as string, s.kind as string]));
+  const supplierNameById = new Map(
+    (supRows ?? []).map((s) => [s.id as string, (s.name as string | null) ?? null]),
+  );
   const { data: collectionRows, error: collectionErr } = await sb
     .from("purchasing_supplier_settings")
     .select("supplier_id, fixed_destination_id, collected_by_partner_id");
@@ -1283,7 +1554,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   const warehouse =
     (whRows ?? []).find((w) => /klang|klg/i.test((w.name as string) ?? "")) ??
     (whRows ?? [])[0];
-  if (!warehouse) return c.json({ error: "no_warehouse", code: "no_warehouse" }, 500);
+  if (!warehouse) return refuse(c, 500, "no_warehouse");
 
   const reqById = new Map((requests ?? []).map((r) => [r.id as string, r]));
 
@@ -1300,10 +1571,7 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   for (const l of toIssue) {
     const cat = catalog.get(l.sku as string);
     if (!cat || !cat.supplierId) {
-      return c.json(
-        { error: "unresolved_supplier", code: "unresolved_supplier", sku: l.sku },
-        422,
-      );
+      return refuse(c, 422, "unresolved_supplier", { sku: l.sku as string });
     }
     if (cat.cost == null || cat.cost <= 0) {
       // The manual lane issues at catalog cost; a SKU without one is a
@@ -1332,15 +1600,31 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
     const kind = supplierKind.get(first.supplierId!) ?? null;
     const collection = collectionBySupplier.get(first.supplierId!) ?? null;
     const partnerId = kind === "factory_pickup" ? (collection?.partnerId ?? null) : null;
+    const supplierNameForRefusal = first.supplierId
+      ? (supplierNameById.get(first.supplierId) ?? null)
+      : null;
     if (kind === "factory_pickup" && !partnerId) {
-      return refuse(c, 422, "pickup_partner_required");
+      return refuse(c, 422, "pickup_partner_required", { supplier: supplierNameForRefusal });
     }
     if (
       kind === "factory_pickup" &&
       collection?.fixedDestinationId &&
       collection.fixedDestinationId !== group.destinationId
     ) {
-      return refuse(c, 422, "supplier_collection_destination_mismatch");
+      /* Read the destination NAME here and nowhere else. It is wanted only to
+         write the refusal, and this line is one statement from returning, so
+         the happy path — the one that runs every time a PO is issued — pays no
+         subrequest for it. A read that fails degrades to the unnamed sentence
+         rather than turning a 422 into a 500. */
+      const { data: destRow } = await sb
+        .from("purchasing_destinations")
+        .select("name")
+        .eq("id", collection.fixedDestinationId)
+        .maybeSingle();
+      return refuse(c, 422, "supplier_collection_destination_mismatch", {
+        supplier: supplierNameForRefusal,
+        destination: ((destRow?.name as string | null) ?? null),
+      });
     }
     governedPos.push({
       supplier_id: first.supplierId,

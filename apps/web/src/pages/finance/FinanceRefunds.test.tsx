@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import FinanceRefunds from "./FinanceRefunds";
@@ -92,52 +92,19 @@ describe("FinanceRefunds page", () => {
     expect(screen.getByText("Pending")).toBeInTheDocument();
   });
 
-  it("clicking + Issue credit note opens modal with kind toggle", async () => {
+  it("§13 — no create door: the page is read-only history with the ruling on screen", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("/refunds")) return [];
       if (url.includes("/ar-aging")) return { rows: [], buckets: {} };
       throw new Error(`unexpected fetch ${url}`);
     });
     render(wrap(<FinanceRefunds />));
-
     await waitFor(() => {
-      expect(screen.getByText(/No refunds or credit notes yet/)).toBeInTheDocument();
+      expect(screen.getByText(/No refunds or credit notes on record/)).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "+ Issue credit note" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("dialog")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Credit note" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Refund" })).toBeInTheDocument();
-    });
-  });
-
-  it("modal switches to refund kind + shows RM 1,000 approval warning when amount exceeds", async () => {
-    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
-      if (url.includes("/refunds")) return [];
-      if (url.includes("/ar-aging")) return { rows: [] };
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    render(wrap(<FinanceRefunds />));
-
-    await waitFor(() => {
-      expect(screen.getByText(/No refunds or credit notes yet/)).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "+ Issue credit note" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Refund" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Refund" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Amount" }), {
-      target: { value: "1500" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/require principal approval/i)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/Carres has a no-refund policy/)).toBeInTheDocument();
+    expect(screen.getByText(/history only/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Issue credit note/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

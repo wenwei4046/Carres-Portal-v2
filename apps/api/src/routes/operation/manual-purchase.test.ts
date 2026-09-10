@@ -7,6 +7,7 @@ import {
   type JWK,
   type KeyLike,
 } from "jose";
+import { purchasingRefusal } from "@carres/shared";
 import app from "../../index";
 import { _setJwksForTesting } from "../../middleware/auth";
 
@@ -96,7 +97,7 @@ const REQUESTS = [
     approval_required: true, approved_at: "2026-08-19T03:00:00Z", refused_at: null,
   },
   {
-    id: REQ_B, req_no: "REQ-0002", purpose: "display", destination_id: DEST,
+    id: REQ_B, req_no: null, purpose: "display", destination_id: DEST,
     approval_required: false, approved_at: null, refused_at: null,
   },
 ];
@@ -389,7 +390,7 @@ describe("Card 03 · the doors speak the approved purpose vocabulary", () => {
     purpose: string,
     extra: Record<string, unknown> = {},
     rpc = vi.fn().mockResolvedValue({
-      data: { id: REQ_A, req_no: "MPR-20260829-0009", approval_required: true },
+      data: { id: REQ_A, req_no: null, approval_required: true },
       error: null,
     }),
   ) {
@@ -1008,12 +1009,15 @@ describe("Card 05 · GET /purchasing/requests/detail/:id", () => {
             ]);
           case "purchase_orders":
             return tableStub([
-              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", eta_date: "2026-09-08" },
+              { id: PO_D, placed_at: "2026-08-29T03:05:00Z", official_delivery_date: "2026-09-01", eta_date: "2026-09-08", version: 1 },
             ]);
           case "po_supplier_promises":
             // The supplier moved the date: the ledger holds the date we HELD.
             return tableStub([
               { po_id: PO_D, previous_date: "2026-09-01", new_date: "2026-09-08",
+                kind: "tomorrow_delivery", answer: "delayed", po_version: 1, channel: "whatsapp",
+                recipient: "Factory", evidence: "reply.png", reported_by: "Factory staff",
+                reported_at: "2026-09-02T01:00:00Z", recorded_by: U_JESS,
                 recorded_at: "2026-09-02T02:00:00Z" },
             ]);
           case "purchasing_destinations":
@@ -1133,6 +1137,7 @@ const CARD06_SETTINGS = {
   earliestSellDays: 21,
   logisticsCallWorkingDays: 1,
   poDays: [1, 3, 5],
+  manualPurchaseMinDeliveryDays: 0,
   suppliers: [
     { id: SUP, name: "Hooka", categories: ["sofa"], offDays: [0], transitDays: 1 },
   ],
@@ -1442,5 +1447,508 @@ describe("Card 06 · POST /issue — Delivery Date joins the document partition"
       new Set(["2026-10-10", "2026-10-20"]),
     );
     expect((await res.json() as { documents: number }).documents).toBe(2);
+  });
+});
+
+/**
+ * EVERY REFUSAL ON THIS DOOR ARRIVES WITH WORDS (YH, 2026-09-01).
+ *
+ * Four throw sites on `POST /issue` were bare `c.json({ error, code })` while
+ * their neighbours ten lines away already used `refuse()`. A bare body carries
+ * no `message` and no `action`, so the browser fell through to the honest
+ * fallback — "The Portal refused this purchase order. Tell IT the message on
+ * screen." — for the TWO COMMONEST outcomes of this door. Nothing was broken
+ * and nothing was said.
+ *
+ * These tests assert the CONTRACT, not the spelling: every refusal carries a
+ * message and an action, and neither is the fallback. `purchasing-refusals.ts`
+ * owns the words and its own suite pins their shape, so a ruled reword changes
+ * one file and passes here untouched.
+ */
+describe("POST /purchasing/requests/issue — a refusal says what is wrong and what to do", () => {
+  const FALLBACK = purchasingRefusal("__not_a_code__");
+
+  type Over = {
+    requests?: unknown[];
+    lines?: unknown[];
+    skus?: unknown[];
+    suppliers?: unknown[];
+    collections?: unknown[];
+  };
+
+  function sbWith(over: Over, rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub(over.requests ?? REQUESTS, { filterInBy: "id" });
+          case "purchase_demands":
+            return tableStub(over.lines ?? LINES, { filterInBy: "request_id" });
+          case "product_skus":
+            return tableStub(
+              over.skus ?? [
+                { sku: "5539-2NA", supplier_id: SUP, cost: 850, product_models: { category: "sofa" } },
+                { sku: "5539-CNR", supplier_id: SUP, cost: 400, product_models: { category: "sofa" } },
+              ],
+            );
+          case "suppliers":
+            return tableStub(over.suppliers ?? [{ id: SUP, kind: "own_logistics", name: "Ohana" }]);
+          case "purchasing_supplier_settings":
+            return tableStub(over.collections ?? []);
+          case "warehouses":
+            return tableStub([
+              { id: "eeeeeeee-0000-0000-0000-000000000001", name: "Carres Klang", kind: "own" },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => {
+        if (fn === "purchasing_actor_may_issue") return Promise.resolve({ data: true, error: null });
+        return rpc(fn, args);
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function issueAgainst(over: Over, body: unknown) {
+    const rpc = vi.fn().mockResolvedValue({ data: { po_ids: [] }, error: null });
+    vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/issue", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc, body: (await res.json()) as Record<string, string> };
+  }
+
+  /** The whole contract in one place: a code, words, and NOT the fallback. */
+  function expectSpoken(payload: Record<string, string>, code: string) {
+    expect(payload.code, "the code still travels").toBe(code);
+    expect(payload.message, `${code} has a fact`).toBeTruthy();
+    expect(payload.action, `${code} has an act`).toBeTruthy();
+    expect(payload.message, `${code} is not the fallback`).not.toBe(FALLBACK.wrong);
+    expect(payload.action, `${code} is not the fallback`).not.toBe(FALLBACK.todo);
+  }
+
+  /* ⭐ THE DELIVER TO GATE (owner, 2026-09-03). A supplier Carres collects
+     from has one place its goods land, held in Purchasing Settings. A request
+     that names another Deliver To is refused BEFORE any PO exists, and the
+     refusal names the supplier and the governed place — the sentence the
+     owner met on MPR-20260903-3381. This pre-flight had no test until now. */
+  it("refuses a collected supplier's request that names another Deliver To, before creating anything", async () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+    const { res, rpc, body } = await issueAgainst(
+      {
+        suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+        collections: [
+          {
+            supplier_id: SUP,
+            fixed_destination_id: OHANA,
+            collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+          },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "supplier_collection_destination_mismatch");
+    expect(body.message).toContain("Ohana must be collected to");
+    expect(body.supplier, "the supplier travels as a fact").toBe("Ohana");
+    expect(rpc, "no PO was created").not.toHaveBeenCalled();
+  });
+
+  it("names a Manual Purchase that is no longer on the list", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      { requests: [REQUESTS[0]] },
+      { requestIds: [REQ_A, REQ_B], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(404);
+    expectSpoken(body, "unknown_request");
+    expect(rpc, "nothing was created").not.toHaveBeenCalled();
+  });
+
+  /* ⭐ ONE CODE CANNOT SAY TWO THINGS. `not_ready_to_order` used to cover BOTH
+     "nobody has approved this yet" and "somebody refused this" — opposite
+     facts with opposite next acts. The route separates them; these two tests
+     are what stop them being folded back together. */
+  it("separates a Manual Purchase nobody has approved yet", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      {
+        requests: [
+          { ...REQUESTS[0], approved_at: null, refused_at: null, approval_required: true },
+        ],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "not_ready_to_order");
+    expect(body.requestId, "the row is named so the operator can find it").toBe(REQ_A);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("separates a Manual Purchase somebody refused", async () => {
+    const { res, body } = await issueAgainst(
+      { requests: [{ ...REQUESTS[0], refused_at: "2026-08-30T02:00:00Z" }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "request_refused");
+    /* The two are genuinely different sentences, not one word reused. */
+    expect(body.message).not.toBe(purchasingRefusal("not_ready_to_order").wrong);
+  });
+
+  it("names an issue with nothing left to buy on it", async () => {
+    const { res, body } = await issueAgainst(
+      { lines: [{ ...LINES[0], approved_qty: 2, issued_qty: 2 }] },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(409);
+    expectSpoken(body, "nothing_to_issue");
+  });
+
+  it("names the SKU whose supplier the catalog does not hold", async () => {
+    const { res, body } = await issueAgainst(
+      {
+        lines: [LINES[0]],
+        skus: [{ sku: "5539-2NA", supplier_id: null, cost: 850, product_models: { category: "sofa" } }],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "unresolved_supplier");
+    /* The sentence names the SKU rather than saying "an item". */
+    expect(body.message).toContain("5539-2NA");
+  });
+
+  /* ⭐ THE DELIVER TO DOOR (0421). MPR-20260903-3381 was told "Set Deliver To
+     to Ohana, then issue again" and had no way to. PUT /:id/deliver-to is
+     that way: it runs the same collection pre-flight as /issue, then asks the
+     RPC, and every refusal leaves with its two lines. */
+  describe("PUT /purchasing/requests/:id/deliver-to", () => {
+    const OHANA = "cccccccc-0000-0000-0000-000000000002";
+
+    async function moveAgainst(over: Over, rpc: ReturnType<typeof vi.fn>, destinationId = OHANA) {
+      vi.mocked(userClient).mockReturnValue(sbWith(over, rpc));
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(
+        new Request(`https://api.test/api/operation/purchasing/requests/${REQ_A}/deliver-to`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ destinationId }),
+        }),
+        env as never,
+        { waitUntil() {}, passThroughException() {} } as never,
+      );
+      return { res, rpc, body: (await res.json()) as Record<string, unknown> };
+    }
+
+    it("asks the RPC to move the request, with the request and the place", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, req_no: "REQ-0001", destination_id: OHANA, moved: true },
+        error: null,
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledWith("purchasing_move_request_destination", {
+        p_id: REQ_A,
+        p_destination_id: OHANA,
+      });
+      expect(body.ok).toBe(true);
+      expect(body.moved).toBe(true);
+    });
+
+    it("a request already on a PO is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is already ordered", details: "request_ordered" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_ordered");
+      expect(body.message).toBe("This request is already ordered. Deliver To cannot move.");
+      expect(body.action).toBe("Revise the purchase order instead.");
+    });
+
+    it("a request with nothing going ahead is refused in the governed words", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "22023", message: "request is not going ahead", details: "request_closed" },
+      });
+      const { res, body } = await moveAgainst({}, rpc);
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "request_closed");
+    });
+
+    it("a collected supplier's request cannot move away from its governed place — refused before the RPC", async () => {
+      const rpc = vi.fn();
+      const KLANG = "cccccccc-0000-0000-0000-000000000009";
+      const { res, body } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        KLANG,
+      );
+      expect(res.status).toBe(422);
+      expectSpoken(body as Record<string, string>, "supplier_collection_destination_mismatch");
+      expect(body.message).toContain("Ohana must be collected to");
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it("a move TO the governed place passes the pre-flight", async () => {
+      const rpc = vi.fn().mockResolvedValue({
+        data: { id: REQ_A, moved: true },
+        error: null,
+      });
+      const { res } = await moveAgainst(
+        {
+          suppliers: [{ id: SUP, kind: "factory_pickup", name: "Ohana" }],
+          collections: [
+            {
+              supplier_id: SUP,
+              fixed_destination_id: OHANA,
+              collected_by_partner_id: "ffffffff-0000-0000-0000-000000000001",
+            },
+          ],
+        },
+        rpc,
+        OHANA,
+      );
+      expect(res.status).toBe(200);
+      expect(rpc).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+/**
+ * A MANUAL PURCHASE ARRIVES WHOLE, OR NOT AT ALL (0410, YH 2026-09-01).
+ *
+ * The create form used to POST the header, read back its id, then POST one
+ * line per line in a loop — six transactions for one act. A failure on line 3
+ * left a committed header holding two of five lines, on no screen and behind
+ * no door, and the Register listed it as a real request.
+ *
+ * These tests pin the ROUTE's half of the fix: lines that arrive with the
+ * header go to the one transactional door, and — because `0410` is applied by
+ * hand — a build that reaches production before the migration does must still
+ * be able to create a Manual Purchase.
+ */
+describe("POST /purchasing/requests — the whole request, or none of it", () => {
+  const HEADER = {
+    purpose: "ready_stock",
+    destinationId: DEST,
+    requiredBy: "2026-09-15",
+  };
+
+  async function post(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(makeSb(rpc));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return { res, rpc };
+  }
+
+  it("sends header and lines to the ONE transactional door", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(
+      { ...HEADER, lines: [{ sku: "5539-2NA", qty: 2 }, { sku: "5539-CNR", qty: 1 }] },
+      rpc,
+    );
+    expect(res.status).toBe(200);
+    const [fn, args] = rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(fn).toBe("purchasing_create_request_with_lines");
+    expect(args.p_lines).toEqual([
+      { sku: "5539-2NA", qty: 2, required_by: null, remark: null },
+      { sku: "5539-CNR", qty: 1, required_by: null, remark: null },
+    ]);
+    /* ONE call. The per-line loop is what this replaces. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a request with no lines before it reaches the database", async () => {
+    /* An empty Manual Purchase is the orphan `0410` exists to delete. The
+       route refuses it on the schema, so no transaction is even opened; the
+       function refuses it again in SQL, because a screen is not a rule. */
+    const rpc = vi.fn();
+    const { res } = await post({ ...HEADER, lines: [] }, rpc);
+    expect(res.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns a real refusal from the transactional door untouched", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "22023", message: "unknown sku NOPE", details: "unknown_sku" },
+    });
+    const { res } = await post({ ...HEADER, lines: [{ sku: "NOPE", qty: 1 }] }, rpc);
+    expect(res.status).toBe(422);
+    /* It must NOT be mistaken for a missing migration and silently retried on
+       the old door — that is how a refusal would become a half-written row. */
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  /* ⛔ MERGED IS NOT APPLIED — AND DEGRADING IS NOT DROPPING.
+     ⭐ RE-PINNED THE SAME DAY IT WAS WRITTEN (YH, 2026-09-01). The original
+     assertion here was that a missing `0410` falls back to the header-only
+     door and returns 200, on the reasoning that a create form which 404s for a
+     day is worse than one that degrades. The reasoning was right and what it
+     pinned was wrong: the header-only door cannot write lines, the browser is
+     the only caller and always sends them, so that 200 meant an EMPTY request
+     and a form that ticked every line as created. An approver could approve a
+     purchase with no items and it would read `Ready to order` for ever.
+     A 404 is found in one second. An empty approved purchase is found weeks
+     later by somebody wondering why nothing arrived. The test now pins the
+     refusal, and pins that NOTHING was written behind it. */
+  for (const code of ["PGRST202", "42883"]) {
+    it(`refuses in words when 0410 is not applied yet, and writes nothing (${code})`, async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code, message: "not found" } });
+      const { res } = await post({ ...HEADER, lines: [{ sku: "5539-2NA", qty: 1 }] }, rpc);
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as Record<string, string>;
+      expect(body.code).toBe("migration_not_applied");
+      /* It says what happened and who fixes it — never a bare code. */
+      expect(body.message).toBeTruthy();
+      expect(body.action).toContain("0410");
+      /* ⛔ AND IT DOES NOT QUIETLY TRY THE HEADER-ONLY DOOR. One call, one
+         refusal; a second call here would be the dropped-lines bug again. */
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+    });
+  }
+
+  it("still accepts a header with no lines at all, for a caller that sends none", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValue({ data: { id: REQ_A, req_no: "MPR-1", approval_required: true }, error: null });
+    const { res } = await post(HEADER, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request");
+  });
+});
+
+/**
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch).
+ *
+ * Purchasing Settings holds `manual_purchase_min_delivery_days` (calendar
+ * days). The floor is the Proceed Date — today, Malaysia — plus that number.
+ * When the number is above 0 and the asked-for date is earlier, the create
+ * door refuses BEFORE the create RPC. 0, or settings unavailable: the door
+ * behaves exactly as before. The lead-time plan is not consulted.
+ */
+describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purchase may ask for (0422)", () => {
+  const HEADER = { purpose: "ready_stock", destinationId: DEST };
+  const LINES = [{ sku: "5539-2NA", qty: 1 }];
+
+  function sbWith(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "product_skus":
+            return tableStub([
+              { sku: "5539-2NA", supplier_id: SUP, product_models: { category: "sofa" } },
+            ]);
+          case "suppliers":
+            return tableStub([{ id: SUP, name: "Hooka" }]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string, args: unknown) => rpc(fn, args)),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function create(body: unknown, rpc: ReturnType<typeof vi.fn>) {
+    vi.mocked(userClient).mockReturnValue(sbWith(rpc));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  const created = () =>
+    vi.fn().mockResolvedValue({
+      data: { id: REQ_A, req_no: "MPR-1", approval_required: true },
+      error: null,
+    });
+
+  /** Today in Malaysia + n calendar days — the floor, computed here by hand
+   *  so the route's arithmetic is pinned by value, not trusted. */
+  const mytPlus = (n: number) =>
+    new Date(Date.now() + 8 * 3_600_000 + n * 86_400_000).toISOString().slice(0, 10);
+
+  it("3 days + a Delivery Date before Proceed Date + 3 → 422, and the RPC is never called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const tooEarly = mytPlus(2);
+    const res = await create({ ...HEADER, requiredBy: tooEarly, lines: LINES }, rpc);
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body.code).toBe("delivery_date_before_earliest");
+    expect(body.date).toBe(tooEarly);
+    expect(body.earliest).toBe(mytPlus(3));
+    expect(body.message).toContain(tooEarly);
+    expect(body.action).toContain(mytPlus(3));
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("3 days + a Delivery Date exactly on Proceed Date + 3 → the RPC is called", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 3,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: mytPlus(3), lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc.mock.calls[0][0]).toBe("purchasing_create_request_with_lines");
+  });
+
+  it("0 days → an early Delivery Date still reaches the RPC (today's behaviour)", async () => {
+    vi.mocked(loadPurchasingSettings).mockResolvedValueOnce({
+      ...CARD06_SETTINGS,
+      manualPurchaseMinDeliveryDays: 0,
+    });
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("the settings cannot be loaded → no number, no floor, no refusal", async () => {
+    vi.mocked(loadPurchasingSettings).mockRejectedValueOnce(new Error("purchasing_settings: down"));
+    const rpc = created();
+    const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });

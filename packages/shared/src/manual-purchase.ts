@@ -13,6 +13,7 @@ import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
 import { DEMAND_PURPOSES, type DemandPurpose } from "./to-order";
 import { SO_BATCH_RAIL, type SoBatchProductCategory } from "./so-batch-purchase";
 import type { WorkItem } from "./work-engine";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 import { countWorkingDays, type WorkingDayOptions } from "./working-days";
 
 /** Every visible word on the Manual Purchase surfaces (COPY-STANDARD). */
@@ -27,11 +28,19 @@ export const MANUAL_PURCHASE_WORDS = {
    *  form's own top-to-bottom order — lead days first (Card 06). */
   sendNeedsLeadDays: "Send — lead days are not set",
   sendNeedsDate: "Send — pick a date",
+  /** 0422 — the chosen date is before the earliest Delivery Date a Manual
+   *  Purchase may ask for (Proceed Date + the Purchasing Settings number);
+   *  the sentence under the field says so. */
+  sendNeedsLaterDate: "Send — pick a later date",
   sendNeedsWhy: "Send — say what it is for",
   sendNeedsServiceCase: "Send — pick the Service Case",
   sendNeedsStaff: "Send — pick the staff member",
   sendNeedsSubsidiary: "Send — name the subsidiary",
   cancel: "Cancel",
+  /** The Deliver To door on an existing request (0421): the text button that
+   *  opens the choice, and the act that closes it. */
+  change: "Change",
+  save: "Save",
   needFor: "Need for",
   /**
    * THE TWO VISIBLE DATE MEANINGS (Card 06, owner-corrected 2026-08-29 —
@@ -60,20 +69,26 @@ export const MANUAL_PURCHASE_WORDS = {
   items: "ITEMS",
   addLine: "+ Add line",
   remove: "Remove",
+  /** COPY-STANDARD §Manual Purchase: the per-line free-text field is `Note`.
+   *  `Remark` was the retired To Order dialog's word and rode in with the
+   *  port; the state, the input id and the payload always said `note`. */
+  note: "Note",
   alreadyHave: "WHAT WE ALREADY HAVE",
   freeStock: "free stock",
   alreadyOnPo: "already on PO",
   stillNeeded: "still needed",
   /**
-   * THE PERMANENT REGISTER'S ELEVEN COLUMNS — Card 06's owner correction
-   * (2026-08-29), exactly and in this order. Purpose and Order By are NOT
-   * parent columns: Purpose lives in the rail, the expansion context and
-   * the object; Order By drives timing/work and the quiet second line only.
-   * `Requested Date` and `Needed By` are retired words.
+   * THE PERMANENT REGISTER'S TEN COLUMNS — Card 08's owner correction
+   * (2026-09-04), exactly and in this order. A Manual Purchase has NO
+   * visible document number: before `Issue PO` there is nothing to show,
+   * after it the only purchasing document identity is the actual `PO No`.
+   * `Manual Purchase No` / `MPR` are retired words. Purpose and Order By
+   * are NOT parent columns: Purpose lives in the rail, the expansion
+   * context and the object; Order By drives timing/work and the quiet
+   * second line only. `Requested Date` and `Needed By` stay retired.
    */
   colProceedDate: "Proceed Date",
   colApproval: "Approval Status",
-  colMprNo: "Manual Purchase No",
   colPoNo: "PO No",
   colDeliveryDate: "Delivery Date",
   colFor: "For",
@@ -82,8 +97,16 @@ export const MANUAL_PURCHASE_WORDS = {
   colSupplier: "Supplier",
   colDeliverTo: "Deliver To",
   colRequestedBy: "Requested By",
-  /** The PO lineage absence — the arithmetic ran and found no PO. */
+  /** The PO lineage absence — the arithmetic ran and found no PO. The
+   *  Register cell states the bare fact (Card 08 §3.2: `—` is a fact, not
+   *  a button); the object's Purchase Orders section keeps the sentence. */
+  poNone: "—",
   notOrderedYet: "Not ordered yet",
+  /** THE TWO WORK ACTION SENTENCES (Card 08 §3.4) — no number, no person's
+   *  name, no UUID. The Work row's context line distinguishes the purchase
+   *  through its business facts (`manualPurchaseWorkContext`). */
+  workApprove: "Approve purchase",
+  workIssuePo: "Issue PO",
   /** Several destinations behind one request. */
   multiple: "Multiple",
   /** The expansion's own child columns (read-only; Card 04). */
@@ -314,7 +337,11 @@ export interface ManualPurchaseStatusInput {
   lines: Array<{
     qty: number;
     issuedQty: number;
-    remainingQty: number;
+    /** ⭐ THE APPROVER'S NUMBER (YH, 2026-09-01). `null` = nobody cut it, so
+     *  the ask stands. This replaces `remainingQty`, which was the database's
+     *  generated `qty − issued_qty` column and does not know the cut exists —
+     *  see the note on `manualPurchaseStatusOf`. */
+    approvedQty?: number | null;
     cancelledAt: string | null;
     poId: string | null;
     /** Slice 3 wires this from the linked PO's posted receipt. */
@@ -363,14 +390,48 @@ export function manualPurchaseStatusOf(r: ManualPurchaseStatusInput): ManualPurc
       reasonLabel: null,
     };
   }
-  if (live.length > 0 && live.every((l) => l.received === true)) {
+  /* ⭐ THE APPROVER'S CUT IS PART OF THE ARITHMETIC (YH, 2026-09-01).
+     This read `remainingQty`, the database's generated `qty − issued_qty`
+     column, which does not know an approval cut exists. Every OTHER number on
+     the Manual Purchase page uses `manualPurchaseLineRemainingOf`, which
+     honours it. So a request for 5 that the approver cut to 2, then issued in
+     full, still reported 3 outstanding: the record read `Ready to order` after
+     its purchase order was raised, sat in the `All not ordered` worklist for
+     ever, and was untickable at the same time. The buying queue could never
+     empty and finished work was indistinguishable from outstanding work.
+     ONE arithmetic now, the same one the rest of the page reads (Law D).
+
+     ⭐ AND A LINE CUT TO ZERO IS NOT WAITING FOR ANYTHING. The issue door
+     filters a zero-remainder line out (`manual-purchase.ts` route), so it
+     never receives a `po_id` — and `every(… poId !== null)` could therefore
+     never be satisfied on a request containing one. A line the approver cut to
+     nothing is a line nobody is buying; it is excluded from what the request
+     is still PURSUING rather than blocking it for ever. If every live line was
+     cut to zero, nothing is going ahead, and the status says so. */
+  const remainingOf = (l: (typeof r.lines)[number]) =>
+    manualPurchaseLineRemainingOf({
+      qty: l.qty,
+      approvedQty: l.approvedQty ?? null,
+      issuedQty: l.issuedQty,
+    });
+  const cutToNothing = (l: (typeof r.lines)[number]) => (l.approvedQty ?? null) === 0;
+  const pursued = live.filter((l) => !cutToNothing(l));
+
+  if (live.length > 0 && pursued.length === 0) {
+    return {
+      kind: "not_going_ahead",
+      label: MANUAL_PURCHASE_STATUS_WORDS.not_going_ahead,
+      reasonLabel: null,
+    };
+  }
+  if (pursued.length > 0 && pursued.every((l) => l.received === true)) {
     return {
       kind: "arrived",
       label: MANUAL_PURCHASE_STATUS_WORDS.arrived,
       reasonLabel: null,
     };
   }
-  if (live.length > 0 && live.every((l) => l.remainingQty <= 0 && l.poId !== null)) {
+  if (pursued.length > 0 && pursued.every((l) => remainingOf(l) <= 0 && l.poId !== null)) {
     return {
       kind: "ordered",
       label: MANUAL_PURCHASE_STATUS_WORDS.ordered,
@@ -825,14 +886,17 @@ export function manualPurchaseLineRemainingOf(l: {
 }
 
 /**
- * `PO No` — ONLY real lineage (Card 04 §3.4): the distinct actual
- * `purchase_orders.po_no` values behind the request's lines. None:
- * `Not ordered yet`. One: the number itself (the caller renders it as the
- * clickable door). Several: `{n} POs`. Never a UUID, never an inference.
+ * `PO No` — ONLY real lineage (Card 04 §3.4, cell facts corrected by Card
+ * 08 §3.2): the distinct actual `purchase_orders.po_no` values behind the
+ * request's lines. None: `—` (a fact, not a button — before `Issue PO` a
+ * Manual Purchase has no document identity). One: the number itself (the
+ * caller renders it as the clickable door). Several: `{n} POs` (the caller
+ * opens the object's exact linked PO list). Never a UUID, never an
+ * inference, never an `MPR`.
  */
 export function manualPurchasePoSummary(poNos: readonly string[]): string {
   const distinct = [...new Set(poNos.filter((n) => n && n.trim() !== ""))];
-  if (distinct.length === 0) return MANUAL_PURCHASE_WORDS.notOrderedYet;
+  if (distinct.length === 0) return MANUAL_PURCHASE_WORDS.poNone;
   if (distinct.length === 1) return distinct[0];
   return `${distinct.length} POs`;
 }
@@ -906,6 +970,34 @@ export function manualPurchaseForOf(f: {
 }
 
 /**
+ * A PURCHASE ORDER'S VISIBLE MANUAL PURCHASE SOURCE WORDING (Card 08 §3.5):
+ * one source prints `Manual Purchase`, several print `{n} Manual Purchases`.
+ * The count is DISTINCT source request UUIDs — never a count of labels, and
+ * never an MPR number. Zero sources print nothing (null).
+ */
+export function manualPurchaseSourceSummary(count: number): string | null {
+  if (count <= 0) return null;
+  if (count === 1) return MANUAL_PURCHASE_WORDS.page;
+  return `${count} Manual Purchases`;
+}
+
+/**
+ * ONE detailed source line's words (Card 08 §3.5) — when a surface lists
+ * manual sources individually and the label alone cannot tell two apart,
+ * the business facts distinguish them: `Manual Purchase · {purpose} ·
+ * {Proceed Date}`. Empty facts drop out; the label never becomes a number.
+ */
+export function manualPurchaseSourceLine(f: {
+  purposeLabel: string | null;
+  proceedDateLabel: string | null;
+}): string {
+  return [MANUAL_PURCHASE_WORDS.page, f.purposeLabel, f.proceedDateLabel]
+    .map((part) => (part ?? "").trim())
+    .filter((part) => part !== "")
+    .join(" · ");
+}
+
+/**
  * WHO MAY BE TICKED (Card 04 §3, Selection): ONLY a request whose derived
  * status is `Ready to order` with live remaining quantity. Need approval,
  * refused/withdrawn, fully ordered and arrived rows refuse the tick — the
@@ -916,6 +1008,30 @@ export function manualPurchaseSelectable(
   remainingQty: number,
 ): boolean {
   return status === "ready_to_order" && remainingQty > 0;
+}
+
+/**
+ * WHY THE TICK IS DEAD — the sentence a register prints beside a row that
+ * `manualPurchaseSelectable` refuses; `null` when the row may be ticked.
+ * Same two inputs as the gate, so the two can never disagree. The one extra
+ * fact, `approvalKind`, exists for MPR-20260904-8935 (2026-09-04): an
+ * approver cut every line to 0, so the status arithmetic derives
+ * `Not going ahead` while the Approval Status column still says `Approved`.
+ * That row sat greyed with nothing on screen saying why. `Not going ahead.`
+ * beside `Approved` names the state but not the cause; `Approved at 0.` does.
+ * The other kinds print their own status word, full stop.
+ */
+export function manualPurchaseNotSelectableReason(
+  status: ManualPurchaseStatusKind,
+  remainingQty: number,
+  approvalKind?: ManualPurchaseApprovalKind,
+): string | null {
+  if (manualPurchaseSelectable(status, remainingQty)) return null;
+  const approvedAtZero =
+    status === "ready_to_order" ||
+    (status === "not_going_ahead" && approvalKind === "approved");
+  if (approvedAtZero) return "Approved at 0. Nothing to order.";
+  return `${MANUAL_PURCHASE_STATUS_WORDS[status]}.`;
 }
 
 /**
@@ -959,12 +1075,49 @@ export function manualPurchaseIssueSentence(
   return `${requests} selected · ${units} unit${units === 1 ? "" : "s"} · Issue ${pos} PO${pos === 1 ? "" : "s"}`;
 }
 
-// ─── The two Work Engine action contracts — PURCHASING CARD 06 §7 ────────────
+// ─── The two Work Engine action contracts — PURCHASING CARD 06 §7,
+//     wording corrected by CARD 08 §3.4 (no MPR, no name, no UUID) ─────────────
+
+/**
+ * THE WORK ROW'S BUSINESS CONTEXT (Card 08 §3.4) — the words that
+ * distinguish one Manual Purchase from another now that no visible number
+ * exists: `Manual Purchase · {Need for} · {For} · {supplier summary}`,
+ * empty facts dropped. ONE composition (Law D) for My Work, Team Work and
+ * the Quick Rail; the record stays distinct through its structured
+ * `orderId` (the request UUID), which is never printed.
+ */
+export function manualPurchaseWorkContext(f: {
+  purposeLabel: string | null;
+  forText: string | null;
+  supplierSummary: string | null;
+}): string {
+  return [MANUAL_PURCHASE_WORDS.page, f.purposeLabel, f.forText, f.supplierSummary]
+    .map((part) => (part ?? "").trim())
+    .filter((part) => part !== "")
+    .join(" · ");
+}
+
+/**
+ * THE OBJECT HEADER'S IDENTITY (Card 08 §3.3) — `{Need for} · {For}`; the
+ * quieter context line is `{Proceed Date} · {supplier summary}`. No MPR,
+ * no UUID, composed once for the Register hand-off and the loaded object.
+ */
+export function manualPurchaseObjectHeading(f: {
+  purposeLabel: string | null;
+  forText: string | null;
+}): string {
+  const parts = [f.purposeLabel, f.forText]
+    .map((part) => (part ?? "").trim())
+    .filter((part) => part !== "");
+  return parts.length > 0 ? parts.join(" · ") : MANUAL_PURCHASE_WORDS.page;
+}
 
 /** One request's Work-relevant facts, projected from the register read. */
 export interface ManualPurchaseWorkInput {
   requestId: string;
-  reqNo: string;
+  /** The composed business context (`manualPurchaseWorkContext`) — the
+   *  visible reference the Work row prints instead of a document number. */
+  context: string;
   status: ManualPurchaseStatusKind;
   /** Live remainder still issuable (`manualPurchaseLineRemainingOf` summed). */
   remainingQty: number;
@@ -986,8 +1139,8 @@ export interface ManualPurchaseWorkInput {
  * nothing, exposes no manual `Done`, and the local rail filters these same
  * identities.
  *
- *   Approve {MPR}                              the configured real approver
- *   Issue the purchase order for {MPR}         normal PO Duty / dated cover
+ *   Approve purchase                           the configured real approver
+ *   Issue PO                                   normal PO Duty / dated cover
  *
  * Both are due no later than the request's Order By (the Office calendar
  * counts lateness — Purchasing/Operation work runs Mon–Fri, MASTER §10).
@@ -1006,6 +1159,9 @@ export function manualPurchaseWorkItems(
     /** The month's NORMAL PO Duty holder — Team Work groups by them; a
      *  dated cover changes who acts, never the normal owner group. */
     poDuty: { userId: string; name: string | null } | null;
+    /** Shared resolver answer; when present, acting cover and normal owner
+     * remain separate. `poDuty` is the one-release compatibility input. */
+    poDutyResolution?: WorkspaceDutyResolution | null;
   },
   todayIso: string,
   opts: WorkingDayOptions = {},
@@ -1020,12 +1176,21 @@ export function manualPurchaseWorkItems(
 
   const items: WorkItem[] = [];
   if (input.status === "waiting_approval") {
+    const approver = ctx.approver
+      ? { userId: ctx.approver.userId, name: ctx.approver.name }
+      : null;
     items.push({
       ruleKey: "manual_purchase.approve",
       module: "purchasing",
-      soRef: input.reqNo,
+      soRef: input.context,
       orderId: input.requestId,
-      action: `Approve ${input.reqNo}`,
+      action: MANUAL_PURCHASE_WORDS.workApprove,
+      ownerRule: "purchasing_approver",
+      ownerDutyKey: "purchasing_approver",
+      normalOwner: approver,
+      activeCover: null,
+      actingPerson: approver,
+      ownerState: approver ? "primary" : "not_assigned",
       ownerName: ctx.approver?.name ?? null,
       ownerUserId: ctx.approver?.userId ?? null,
       ...(ctx.approver ? {} : { ownerDuty: "Purchasing" }),
@@ -1043,15 +1208,28 @@ export function manualPurchaseWorkItems(
     (input.status === "ready_to_order" && input.remainingQty > 0) ||
     (input.status === "ordered" && input.hasPos && !input.posAllSent);
   if (issueOpen) {
+    const resolution = ctx.poDutyResolution;
+    const legacy = ctx.poDuty
+      ? { userId: ctx.poDuty.userId, name: ctx.poDuty.name }
+      : null;
+    const normalOwner = resolution?.normalOwner ?? legacy;
+    const activeCover = resolution?.activeCover ?? null;
+    const actingPerson = resolution?.actingPerson ?? legacy;
     items.push({
       ruleKey: "manual_purchase.issue_po",
       module: "purchasing",
-      soRef: input.reqNo,
+      soRef: input.context,
       orderId: input.requestId,
-      action: `Issue the purchase order for ${input.reqNo}`,
-      ownerName: ctx.poDuty?.name ?? null,
-      ownerUserId: ctx.poDuty?.userId ?? null,
-      ...(ctx.poDuty ? {} : { ownerDuty: "Purchasing" }),
+      action: MANUAL_PURCHASE_WORDS.workIssuePo,
+      ownerRule: "po_duty",
+      ownerDutyKey: "po_duty",
+      normalOwner,
+      activeCover,
+      actingPerson,
+      ownerState: resolution?.state ?? (legacy ? "primary" : "not_assigned"),
+      ownerName: actingPerson?.name ?? null,
+      ownerUserId: actingPerson?.userId ?? null,
+      ...(actingPerson ? {} : { ownerDuty: "Purchasing" }),
       tone: "info",
       locked: false,
       broken: false,

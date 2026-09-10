@@ -1,13 +1,37 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import {
   deliveryGroupOf,
   recordHandoverInput,
+  recordOutboundPrepInput,
   signHandoverProofUploadInput,
+  unitIdOf,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
+
+/**
+ * Warehouse Card 03: the physical acts (prep + handover) admit the SAME
+ * governed door to a personally signed-in warehouse login. The role gate here
+ * is a doorstep courtesy — the real boundary is the RPC, which re-checks the
+ * role, the bound Site and the exact-Unit scope (0424). Warehouse holds no
+ * table policy (0302), so its ancillary READS use admin after this gate; the
+ * RPC always rides the USER's own JWT so the act is personally attributable.
+ */
+function outboundActorOf(c: Context<AppEnv>):
+  | { kind: "internal" | "warehouse" }
+  | null {
+  const auth = c.var.auth;
+  if (auth.role === "operation" || auth.role === "principal") {
+    return { kind: "internal" };
+  }
+  if (auth.role === "warehouse" && auth.warehouseId) {
+    return { kind: "warehouse" };
+  }
+  return null;
+}
 
 /**
  * The Delivery Orders REGISTER — document truth, plus the §4 handover doors
@@ -35,9 +59,12 @@ import type { AppEnv } from "../../types";
  */
 const deliveryOrdersRouter = new Hono<AppEnv>();
 
-/** The order fields the register's columns print — nothing more. */
+/** The order fields the register's columns print — nothing more. The 2026-09-06
+ *  register correction added the proof facts its WORK TO DO rail counts
+ *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
+ *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd)";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
 
 deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -186,6 +213,43 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     }
   }
   const admin = adminClient(c.env);
+  // 0440 — every evidence file of every act, signed for viewing. Until the
+  // migration lands the table may not exist; absence reads as no files,
+  // never as a failure of the whole document.
+  const evidenceByEvent = new Map<
+    string,
+    Array<{ path: string; kind: string; recorded_at: string; url: string | null }>
+  >();
+  try {
+    const evidenceRes = await sb
+      .from("delivery_handover_evidence")
+      .select("event_id, path, kind, recorded_at")
+      .eq("delivery_order_id", (row as { id: string }).id)
+      .order("recorded_at", { ascending: true });
+    if (!evidenceRes.error && (evidenceRes.data ?? []).length > 0) {
+      const files = evidenceRes.data as Array<{
+        event_id: string;
+        path: string;
+        kind: string;
+        recorded_at: string;
+      }>;
+      const { data: signedFiles } = await admin.storage
+        .from("proof-of-delivery")
+        .createSignedUrls(files.map((f) => f.path), 3600);
+      files.forEach((f, i) => {
+        const list = evidenceByEvent.get(f.event_id) ?? [];
+        list.push({
+          path: f.path,
+          kind: f.kind,
+          recorded_at: f.recorded_at,
+          url: signedFiles?.[i]?.signedUrl ?? null,
+        });
+        evidenceByEvent.set(f.event_id, list);
+      });
+    }
+  } catch {
+    /* absent ledger = no files */
+  }
   const handoverEvents = await Promise.all(
     (eventsRes.data ?? []).map(async (e) => {
       let proofUrl: string | null = null;
@@ -199,6 +263,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
         ...e,
         recorded_by_name: recorderNames[e.recorded_by as string] ?? null,
         proofUrl,
+        evidence: evidenceByEvent.get(e.id as string) ?? [],
       };
     }),
   );
@@ -219,12 +284,71 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     }
   }
 
+  // Warehouse Card 03 — the document's recorded exact-Unit scope (0424) and
+  // which Units each accepted batch physically moved. Read-only projections
+  // of the §3.5.1 tally: required = handed over + not handed over.
+  const [scopeRes, eventUnitsRes] = await Promise.all([
+    sb
+      .from("delivery_order_units")
+      .select("item_id, ops_stock_items!inner(unit_code, sku, identity_scope)")
+      .eq("delivery_order_id", (row as { id: string }).id),
+    sb
+      .from("delivery_handover_event_units")
+      .select("event_id, item_id, recorded_side, ops_stock_items!inner(unit_code, identity_scope)")
+      .eq("delivery_order_id", (row as { id: string }).id),
+  ]);
+  if (scopeRes.error) {
+    return c.json(
+      { error: "delivery_order_scope_read_failed", message: scopeRes.error.message },
+      500,
+    );
+  }
+  if (eventUnitsRes.error) {
+    return c.json(
+      { error: "handover_event_units_read_failed", message: eventUnitsRes.error.message },
+      500,
+    );
+  }
+  const scopeUnits = ((scopeRes.data ?? []) as unknown as Array<{
+    item_id: string;
+    ops_stock_items: {
+      unit_code: string | null;
+      sku: string | null;
+      identity_scope: string | null;
+    };
+  }>).map((r) => ({
+    item_id: r.item_id,
+    // 0453 — the ONE resolver, so a counted row's technical key can never
+    // reach a Delivery Order or the paper the customer signs.
+    unit_code: unitIdOf({
+      unitCode: r.ops_stock_items?.unit_code ?? null,
+      identityScope: r.ops_stock_items?.identity_scope ?? null,
+    }),
+    sku: r.ops_stock_items?.sku ?? null,
+  }));
+  const handoverEventUnits = ((eventUnitsRes.data ?? []) as unknown as Array<{
+    event_id: string;
+    item_id: string;
+    recorded_side: string;
+    ops_stock_items: { unit_code: string | null; identity_scope: string | null };
+  }>).map((r) => ({
+    event_id: r.event_id,
+    item_id: r.item_id,
+    recorded_side: r.recorded_side,
+    unit_code: unitIdOf({
+      unitCode: r.ops_stock_items?.unit_code ?? null,
+      identityScope: r.ops_stock_items?.identity_scope ?? null,
+    }),
+  }));
+
   return c.json({
     deliveryOrder: row,
     attempts: attemptsRes.data ?? [],
     loans: loansRes.data ?? [],
     lineDescriptions,
     handoverEvents,
+    scopeUnits,
+    handoverEventUnits,
   });
 });
 
@@ -252,8 +376,13 @@ function tripGoodsOf(
 // goods count from the document's own trip lines so the warehouse states
 // what the paper says unless the recorder says otherwise (a receipt with a
 // different count is a discrepancy — both facts stay).
-deliveryOrdersRouter.post("/:id/handover", requireOperationOrPrincipal, async (c) => {
+deliveryOrdersRouter.post("/:id/handover", async (c) => {
+  const actor = outboundActorOf(c);
+  if (!actor) {
+    return c.json({ error: "forbidden", message: "This act is not available to your role" }, 403);
+  }
   const sb = userClient(c.env, c.var.auth.jwt);
+  const reader = actor.kind === "warehouse" ? adminClient(c.env) : sb;
   const id = c.req.param("id");
 
   let body: unknown;
@@ -275,19 +404,25 @@ deliveryOrdersRouter.post("/:id/handover", requireOperationOrPrincipal, async (c
     );
   }
 
-  // Proof binds to the exact event it proves (§6): the path must sit under
+  // Proof binds to the exact event it proves (§6): every path must sit under
   // THIS document's own prefix — never another document's, never outside it.
-  if (parsed.data.proofPath && !parsed.data.proofPath.startsWith(`handover/${id}/`)) {
+  const evidencePaths = [
+    ...(parsed.data.proofPath ? [parsed.data.proofPath] : []),
+    ...(parsed.data.evidence ?? []).map((f) => f.path),
+  ];
+  if (evidencePaths.some((path) => !path.startsWith(`handover/${id}/`))) {
     return c.json(
       { error: "invalid_input", message: "Proof path does not belong to this delivery order" },
       422,
     );
   }
 
-  // The default goods count comes from the document's own derived lines.
+  // The default goods count comes from the document's own derived lines —
+  // a DERIVED DISPLAY for legacy readers (0424): the exact-Unit batch is
+  // the authority the RPC enforces.
   let goods = parsed.data.goods ?? null;
   if (!goods && parsed.data.kind !== "ready_for_handover") {
-    const { data: doc, error } = await sb
+    const { data: doc, error } = await reader
       .from("ops_delivery_orders")
       .select("id, trip_groups, orders!inner(order_lines(sku, qty))")
       .eq("id", id)
@@ -313,6 +448,8 @@ deliveryOrdersRouter.post("/:id/handover", requireOperationOrPrincipal, async (c
     p_goods: goods,
     p_note: parsed.data.note ?? null,
     p_proof_path: parsed.data.proofPath ?? null,
+    p_unit_codes: parsed.data.unitCodes ?? null,
+    p_evidence: parsed.data.evidence ?? null,
   });
   if (error) {
     const m = mapPgError(error);
@@ -321,15 +458,61 @@ deliveryOrdersRouter.post("/:id/handover", requireOperationOrPrincipal, async (c
   return c.json({ event: data }, 201);
 });
 
+// POST /:id/outbound-prep — record scanned / checked / packed for exact
+// Units of one DO scope through the governed door (0424). Idempotent: a
+// duplicate fact is reconciled, never doubled. Same actors as the handover.
+deliveryOrdersRouter.post("/:id/outbound-prep", async (c) => {
+  const actor = outboundActorOf(c);
+  if (!actor) {
+    return c.json({ error: "forbidden", message: "This act is not available to your role" }, 403);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+  }
+  const parsed = recordOutboundPrepInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      {
+        error: "invalid_input",
+        message: issue?.message ?? "invalid input",
+        field: issue?.path.join(".") ?? "unknown",
+      },
+      422,
+    );
+  }
+
+  const { data, error } = await sb.rpc("delivery_outbound_prep_record", {
+    p_do_id: id,
+    p_fact: parsed.data.fact,
+    p_unit_codes: parsed.data.unitCodes,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ result: data }, 201);
+});
+
 // POST /:id/handover-proof/sign-upload — short-lived signed upload URL into
 // the private proof-of-delivery bucket (the 0280 pattern). Server-generated
 // key under handover/{do_id}/; the client can neither pick nor overwrite a
 // path. Live documents only — a cancelled document has no handover.
 deliveryOrdersRouter.post(
   "/:id/handover-proof/sign-upload",
-  requireOperationOrPrincipal,
   async (c) => {
-    const sb = userClient(c.env, c.var.auth.jwt);
+    const actor = outboundActorOf(c);
+    if (!actor) {
+      return c.json({ error: "forbidden", message: "This act is not available to your role" }, 403);
+    }
+    const sb =
+      actor.kind === "warehouse" ? adminClient(c.env) : userClient(c.env, c.var.auth.jwt);
     const id = c.req.param("id");
 
     let body: unknown;
@@ -370,12 +553,36 @@ deliveryOrdersRouter.post(
       );
     }
 
+    // A warehouse login signs an upload only for a document whose recorded
+    // scope holds a Unit at its own Site (the RPC re-checks the same fact).
+    if (actor.kind === "warehouse") {
+      const { data: scoped, error: scopeErr } = await sb
+        .from("delivery_order_units")
+        .select("item_id, ops_stock_items!inner(warehouse_id)")
+        .eq("delivery_order_id", id)
+        .eq("ops_stock_items.warehouse_id", c.var.auth.warehouseId as string)
+        .limit(1);
+      if (scopeErr) {
+        const m = mapPgError(scopeErr);
+        return c.json(m.body, m.status);
+      }
+      if (!scoped || scoped.length === 0) {
+        return c.json(
+          { error: "forbidden", message: "This delivery order has no Units at your warehouse" },
+          403,
+        );
+      }
+    }
+
     const ext =
-      parsed.data.mimeType === "image/png"
-        ? "png"
-        : parsed.data.mimeType === "image/webp"
-          ? "webp"
-          : "jpg";
+      {
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/jpeg": "jpg",
+        "video/mp4": "mp4",
+        "video/quicktime": "mov",
+        "video/webm": "webm",
+      }[parsed.data.mimeType] ?? "jpg";
     const path = `handover/${id}/${crypto.randomUUID()}-handover.${ext}`;
     const admin = adminClient(c.env);
     const { data, error: signErr } = await admin.storage

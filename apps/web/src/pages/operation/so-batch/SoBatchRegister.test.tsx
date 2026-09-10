@@ -152,7 +152,7 @@ const ORDER_O3 = orderRow({
   requestedDeliveryDate: "2026-09-20",
   pos: [
     { poId: "PO-20260820-4827", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-18",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-18",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -172,10 +172,10 @@ const ORDER_O5 = orderRow({
   status: "ordered",
   pos: [
     { poId: "PO-20260820-1111", status: "received", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: "2026-09-10",
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: "2026-09-10",
       sentCurrentVersion: true },
     { poId: "PO-20260821-2222", status: "open", supplierId: "s-ohana",
-      supplierName: "Ohana", destinationId: BULOH, etaDate: "2026-09-12",
+      supplierName: "Ohana", destinationId: BULOH, officialDeliveryDate: "2026-09-12",
       sentCurrentVersion: true },
   ],
   lines: [
@@ -210,7 +210,7 @@ const ORDER_O7 = orderRow({
   status: "blank",
   pos: [
     { poId: "PO-20260822-3333", status: "open", supplierId: "s-hooka",
-      supplierName: "Hooka", destinationId: KLANG, etaDate: null,
+      supplierName: "Hooka", destinationId: KLANG, officialDeliveryDate: null,
       sentCurrentVersion: false },
   ],
   lines: [
@@ -424,17 +424,94 @@ describe("one permanent row per proceeded Sales Order", () => {
   });
 
   it("many POs, suppliers, destinations and dates summarise deterministically", () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { width: this.tagName === "SPAN" ? (this.textContent?.length ?? 0) * 8 : 200,
+        height: 24, top: 0, left: 0, right: 200, bottom: 24, x: 0, y: 0, toJSON() {} };
+    });
     renderRegister();
-    expect(screen.getByTestId("so-batch-po-many-o5").textContent).toBe("2 POs");
-    expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("2 suppliers");
-    expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe("Multiple");
-    expect(screen.getByTestId("so-batch-po-date-o5").textContent).toBe("Multiple");
+    bounds.mockRestore();
+    expect(screen.getByTestId("so-batch-po-many-o5")).toHaveTextContent("PO-20260820-1111");
+    const more = screen.getByRole("button", { name: "+1 more" });
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o5")).toHaveAttribute("aria-expanded", "true");
+    /* The actual, deduplicated values print directly — never a bare count or
+       `Multiple` — and the summary reveals as many as the rendered width
+       allows before falling back to `+N more` (owner spec 2026-09-09). */
+    expect(screen.getByTestId("so-batch-supplier-o5").textContent).toBe("Hooka, Ohana");
+    expect(screen.getByTestId("so-batch-deliver-to-o5").textContent).toBe(
+      "AL Sungai Buloh +1 more",
+    );
+    const poDateO5 = screen.getByTestId("so-batch-po-date-o5").textContent ?? "";
+    expect(poDateO5).toContain("10 Sep");
+    expect(poDateO5).toContain("12 Sep");
     /* One document prints its own facts, not a count. */
     expect(screen.getByTestId("so-batch-supplier-o3").textContent).toBe("Hooka");
     expect(screen.getByTestId("so-batch-po-date-o3").textContent).toContain("18 Sep");
     expect(screen.getByTestId("so-batch-deliver-to-o7").textContent).toBe("Carres Klang");
-    /* A PO without a date prints the grid's own absence. */
-    expect(screen.getByTestId("so-batch-po-date-o7").textContent).toBe("");
+    /* A PO whose ORIGINAL date is not on file says so (owner correction
+       2026-09-09). It read "" until then, which is what a row with NO purchase
+       order prints — one cell, two different answers. */
+    expect(screen.getByTestId("so-batch-po-date-o7").textContent).toBe("Not recorded");
+  });
+});
+
+describe("a missing DEFAULT destination does not stop the buying", () => {
+  /* YH, 2026-09-02: "is making it tickable, that is all i ask for".
+     A tick is an allocation, so it needs a destination id - but it used to
+     demand the DEFAULT one specifically, and nothing in the schema requires a
+     default row to exist (`purchasing_destinations_one_default` is a partial
+     index: at most one, never at least one). So a perfectly healthy list with
+     nobody's `is_default` set killed every checkbox on the page, while the
+     Deliver To dropdown and Split's Apply carried on ticking lines without
+     ever reading the default. Three controls, one fact, two answers. */
+
+  it("ticks a row when destinations exist but none is the default", () => {
+    renderRegister({ defaultDestinationId: null });
+
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+
+    /* The selection actually happened - the bar is the page's own proof. */
+    const bar = screen.getByTestId("selection-bar");
+    expect(within(bar).getByText("1 selected · 2 units · Issue 1 PO")).toBeVisible();
+  });
+
+  it("opens on the first ACTIVE destination and says which, without blocking", () => {
+    renderRegister({ defaultDestinationId: null });
+
+    /* Not the blocker sentence - buying works. */
+    expect(screen.queryByTestId("so-batch-no-destination")).not.toBeInTheDocument();
+    const note = screen.getByTestId("so-batch-no-default-destination");
+    expect(note).toHaveTextContent("ticks open on Carres Klang");
+  });
+
+  it("an EMPTY list still blocks, and still names the setting", () => {
+    /* The real blocker survives: with nowhere for the goods to go there is
+       nothing to allocate a tick to, and that is not a warning, it is a stop. */
+    renderRegister({ destinations: [], defaultDestinationId: null });
+
+    expect(screen.getByTestId("so-batch-no-destination")).toHaveTextContent(
+      "Purchasing → Settings",
+    );
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
+  });
+
+  it("skips an INACTIVE destination when picking the opening one", () => {
+    renderRegister({
+      destinations: [
+        { id: KLANG, name: "Carres Klang", isDefault: false, active: false },
+        { id: BULOH, name: "AL Sungai Buloh", isDefault: false, active: true },
+      ],
+      defaultDestinationId: null,
+    });
+
+    expect(screen.getByTestId("so-batch-no-default-destination")).toHaveTextContent(
+      "ticks open on AL Sungai Buloh",
+    );
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("selection-bar")).toBeVisible();
   });
 });
 
@@ -621,6 +698,127 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
     expect(all.textContent).toContain("1");
     fireEvent.click(all);
     expect(screen.getByTestId("so-batch-row-open-po-pool-mismatch")).toBeInTheDocument();
+  });
+
+  it.each([
+    "no_sku",
+    "no_supplier",
+    "no_cost",
+    "no_production_days",
+    "no_customer_date",
+    "no_pickup_partner",
+  ] as const)("a %s row SAYS why it cannot be ticked", (state) => {
+    /* Every untickable row must answer "why not?" on the page itself. The
+       amber panel is that answer, and until now nothing pinned it. */
+    const blocked = leaf({
+      id: `build::ob::${state}`,
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      lineIds: ["lb1"],
+      skus: ["B1201S-K"],
+      state,
+    });
+    const order = orderRow({
+      orderId: "ob",
+      so: 1500,
+      customer: "BLOCKED ONE",
+      status: "blank",
+      lines: [
+        { orderLineId: "lb1", sku: "B1201S-K", qty: 1, stockTaken: 0,
+          item: "Booqit", variant: "King", category: "mattress", pos: [] },
+      ],
+    });
+    renderRegister({ rows: [blocked], registerRows: [order] });
+    fireEvent.click(screen.getByTestId("so-batch-expand-ob"));
+
+    const panel = screen.getByTestId(`so-batch-blocker-build::ob::${state}`);
+    expect(panel.textContent).toBeTruthy();
+    expect(screen.getByTestId("so-batch-select-ob")).toBeDisabled();
+  });
+
+  it("an Ordered record refuses the tick even when a leaf still looks buyable", () => {
+    /* THE PINNING TEST THIS REPLACES WAS VACUOUS (YH, 2026-09-03 — "an
+       ordered's checkbox still tickable"). `ORDER_O5` is Ordered and carries
+       NO leaf, so nothing about it could ever have drawn a checkbox and the
+       suite proved nothing.
+
+       The two numbers are computed from different facts and are allowed to
+       disagree: Status counts this order's OWN `po_line_sources` lineage,
+       `toBuy` drains a per-SKU pool with no customer attribution. So a fully
+       Ordered record CAN carry a leaf whose `toBuy` is positive — and the
+       checkbox appeared beside the `Ordered` pill. Ticking it raises a second
+       purchase order for units this order already sent for. */
+    const stillBuyable = leaf({
+      id: "build::o5::b5",
+      orderId: "o5",
+      so: 1400,
+      customer: "DONE ONE",
+      lineIds: ["l51"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [stillBuyable], registerRows: [ORDER_O5] });
+
+    /* Visible and DISABLED, never absent — Card 02-B keeps the record on the
+       page; what this closes is the ability to act on it. */
+    expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-select-o5")).toBeDisabled();
+  });
+
+  it("an Ordered record shows no amber `Issue PO` sentence — it is not blocked", () => {
+    /* Failing the tick because buying is FINISHED is not a blocker. Printing
+       "Issue PO to Hooka" in an amber panel on an order whose purchase orders
+       are already sent would be an instruction to duplicate work. */
+    const stillBuyable = leaf({
+      id: "build::o5::b5",
+      orderId: "o5",
+      so: 1400,
+      customer: "DONE ONE",
+      lineIds: ["l51"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [stillBuyable], registerRows: [ORDER_O5] });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
+
+    expect(screen.queryByTestId("so-batch-blocker-build::o5::b5")).not.toBeInTheDocument();
+  });
+
+  it("a blank record with the SAME leaf shape KEEPS its tick — the gate fails open", () => {
+    /* `ordered` needs lineage, and lineage exists only from 0382 with no
+       backfill. An order whose purchase orders predate it reads `blank` and
+       must stay tickable, or this gate would hide the very demand SO-1297
+       was filed about. */
+    const uncovered = orderRow({
+      orderId: "o9",
+      so: 1297,
+      customer: "Kimi",
+      status: "blank",
+      lines: [
+        { orderLineId: "l91", sku: "H1401S-K", qty: 1, stockTaken: 0,
+          item: "Haven", variant: "King", category: "mattress", pos: [] },
+      ],
+      outstandingSuppliers: ["Hooka"],
+    });
+    const buyable = leaf({
+      id: "build::o9::b9",
+      orderId: "o9",
+      so: 1297,
+      customer: "Kimi",
+      lineIds: ["l91"],
+      skus: ["H1401S-K"],
+      item: "Haven",
+      toBuy: 1,
+      qtyNeeded: 1,
+    });
+    renderRegister({ rows: [buyable], registerRows: [uncovered] });
+
+    expect(screen.getByTestId("so-batch-select-o9")).toBeInTheDocument();
   });
 
   it("timing facets count unique Sales Orders and filter the parent rows", () => {
@@ -895,6 +1093,12 @@ describe("the expansion — the ONE shared child table", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
     expect(within(box).getByTestId("goods-mini-table")).toBeInTheDocument();
+    const expansionCell = box.closest("td")!;
+    const parentRow = expansionCell.parentElement!.previousElementSibling!;
+    expect(expansionCell.colSpan).toBe(parentRow.children.length - 2);
+    expect(expansionCell.parentElement!.children).toHaveLength(3);
+    expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__expand__");
+    expect(expansionCell).toHaveStyle({ padding: "0px" });
     /* The exact item-to-PO/supplier/destination/date mapping. */
     const first = within(box).getByTestId("so-batch-part-H1401S-K");
     expect(first).toHaveTextContent("PO-20260820-1111");
@@ -943,6 +1147,27 @@ describe("the expansion — the ONE shared child table", () => {
     expect(src).toContain('from "../components/GoodsMiniTable"');
     expect(src).not.toContain("<table");
   });
+
+  it("does not call pending Unit IDs unallocated", async () => {
+    apiFetch.mockImplementationOnce(() => new Promise(() => {}));
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
+    const box = await screen.findByTestId("so-batch-inspector-o6");
+    expect(within(box).getByText("Loading…")).toBeInTheDocument();
+    expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
+  });
+
+  it("offers retry when Unit IDs fail to load", async () => {
+    apiFetch.mockRejectedValueOnce(new Error("Unavailable"));
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
+    const retry = await screen.findByRole("button", { name: "Unit IDs could not be loaded. Try again" });
+    apiFetch.mockResolvedValueOnce({ defaultDeliverTo: null, place: [], lines: [
+      { lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-070"], deliverTo: [] },
+    ] });
+    fireEvent.click(retry);
+    expect(await screen.findByText("U1-000-070")).toBeInTheDocument();
+  });
 });
 
 describe("the arrangement on the parent row", () => {
@@ -952,6 +1177,40 @@ describe("the arrangement on the parent row", () => {
     expect(
       within(cell).getByTestId("so-batch-deliver-to-select-build::o1::b1"),
     ).toBeInTheDocument();
+  });
+
+  /* ⭐ THE ORDER-LEVEL SELECT USED TO OVERWRITE A GOVERNED LINE (YH, 2026-09-03).
+     Purchasing Settings pins where a collected supplier's goods land, and the
+     server refuses any purchase naming somewhere else. This one dropdown moved
+     EVERY line at once — so on an order spanning two governed suppliers no
+     value it offered could be issued, and Issue PO died with
+     `supplier_collection_destination_mismatch` and no way back. The governed
+     line now keeps its rule while its ungoverned neighbour still moves. */
+  it("leaves a line whose supplier has a governed destination where Settings put it", () => {
+    renderRegister({
+      rows: [
+        LEAF_O1,
+        LEAF_O3,
+        LEAF_O8A,
+        {
+          ...LEAF_O8B,
+          supplierCollection: {
+            procurementPartnerId: "p-eu",
+            procurementPartnerName: "EU",
+            fixedDestinationId: KLANG,
+          },
+        },
+        LEAF_O4,
+      ],
+    });
+    fireEvent.change(screen.getByTestId("so-batch-deliver-to-select-o8"), {
+      target: { value: BULOH },
+    });
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledWith([
+      { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
+      { demandId: "build::o8::b", allocations: [{ destinationId: KLANG, qty: 1 }] },
+    ]);
   });
 
   it("several eligible lines share one whole-order select; changing it arranges every line", () => {
@@ -967,6 +1226,48 @@ describe("the arrangement on the parent row", () => {
       { demandId: "build::o8::a", allocations: [{ destinationId: BULOH, qty: 1 }] },
       { demandId: "build::o8::b", allocations: [{ destinationId: BULOH, qty: 1 }] },
     ]);
+  });
+
+  /* ⭐ THE `+N MORE` SHORTCUT IS ITS OWN CLICK TARGET, NOT THE DROPDOWN
+     (owner correction 2026-09-09). The whole-order select overlays its real
+     text with the deduplicated summary through a `pointer-events-none`
+     wrapper, so a plain click anywhere in that wrapper falls through to open
+     the select. `+N more` must be the one part of that wrapper that captures
+     its own click instead of falling through — it expands the row and
+     leaves the arrangement exactly as it was. */
+  it("Deliver To's `+N more` expands the row instead of falling through to the dropdown", () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { width: this.tagName === "SPAN" ? (this.textContent?.length ?? 0) * 8 : 200,
+        height: 24, top: 0, left: 0, right: 200, bottom: 24, x: 0, y: 0, toJSON() {} };
+    });
+    renderRegister({
+      rows: [
+        LEAF_O1,
+        LEAF_O3,
+        LEAF_O8A,
+        {
+          ...LEAF_O8B,
+          supplierCollection: {
+            procurementPartnerId: "p-eu",
+            procurementPartnerName: "EU",
+            fixedDestinationId: BULOH,
+          },
+        },
+        LEAF_O4,
+      ],
+    });
+    bounds.mockRestore();
+    const cell = screen.getByTestId("so-batch-deliver-to-o8");
+    const more = within(cell).getByRole("button", { name: "+1 more" });
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "true");
+    /* Nothing ticked and nothing arranged — the click never reached the
+       select underneath. */
+    expect(screen.queryByTestId("selection-bar")).not.toBeInTheDocument();
+    /* Clicking it again keeps the row open rather than toggling it shut. */
+    fireEvent.click(more);
+    expect(screen.getByTestId("so-batch-expand-o8")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("a split arrangement becomes two documents in the selection bar — the leaf contract is unchanged", async () => {
@@ -1046,5 +1347,24 @@ describe("what this page refuses to be", () => {
       "PO duty could not be checked.",
     );
     expect(screen.queryByText("Nobody holds PO duty this month.")).not.toBeInTheDocument();
+  });
+});
+
+/* PO Delivery Date reads the ORIGINAL (owner correction, 2026-09-09). */
+describe("SO Batch Register — PO Delivery Date", () => {
+  it("prints the original supplier-facing date, not the live planning date", () => {
+    renderRegister();
+    // o3 carries one PO whose original is on file.
+    expect(screen.getByTestId("so-batch-po-date-o3")).toHaveTextContent("18 Sep");
+  });
+
+  it("an unknown original says so — it never looks like nothing was ordered", () => {
+    renderRegister();
+    // o7 HAS a purchase order; its original date is not on file (the 0428
+    // recovery recorded it as unknown rather than back-filling a planning date).
+    expect(screen.getByTestId("so-batch-po-date-o7")).toHaveTextContent("Not recorded");
+    // o1 has no purchase order at all — a different answer, and it stays blank.
+    expect(screen.getByTestId("so-batch-po-date-o1")).toHaveTextContent("");
+    expect(screen.getByTestId("so-batch-po-date-o1")).not.toHaveTextContent("Not recorded");
   });
 });

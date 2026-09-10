@@ -36,6 +36,18 @@ export interface StairCarryRecomputeContext {
   floor: number;
   hasLift: boolean;
   stairItems: number | null | undefined;
+  /** ⭐ THE RATE THIS ORDER WAS PRICED AT (0414), when it has one.
+   *
+   *  YH, 2026-08-28, `docs/orders/MASTER.md` §405-410, APPROVED / LOCKED: *"the
+   *  fee must be STAMPED at the order, not re-derived. A charge the customer
+   *  signed for may not move because a rate changed afterwards."*
+   *
+   *  Present = re-price with the order's OWN rate, so a later change to
+   *  `floor_config` cannot reach it. Absent = the order was stamped before
+   *  0414, or 0414 is not applied yet; the live config is then the only rate
+   *  there is, exactly as before. Both halves must be present to be used — a
+   *  rate without its free band prices a different fee. */
+  pinned?: { perFloorPerItem: number; freeUpToFloor: number } | null;
 }
 
 /** Mirrors `OrderAddonInput` — the shape `payload.addons[]` already carries. */
@@ -47,7 +59,15 @@ export interface StairCarryAddon {
 }
 
 export type StairCarryRecomputeOutcome =
-  | { status: "ok"; addons: StairCarryAddon[]; fee: number }
+  | {
+      status: "ok";
+      addons: StairCarryAddon[];
+      fee: number;
+      /** 0414 — the rate this fee was priced at, so the caller can record it on
+       *  the order the first time. Absent when no rate could apply (a lift, or
+       *  a count nobody set) and `floor_config` was therefore never read. */
+      rate?: { perFloorPerItem: number; freeUpToFloor: number };
+    }
   | { status: "server_error"; message: string };
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -75,6 +95,27 @@ export async function recomputeStairCarry(
      what it means on the POS. */
   if (ctx.hasLift || stairCarryCount(itemsTotal, ctx.stairItems) === 0) {
     return { status: "ok", addons: [], fee: 0 };
+  }
+
+  /* ⭐ THE ORDER'S OWN RATE WINS, AND THE READ IS SKIPPED ENTIRELY (0414).
+     A pinned order is priced at the rate it agreed to, so `floor_config` is
+     not consulted at all — which is the ruling expressed as code rather than
+     as a comment: there is no path here by which a rate change reaches it. */
+  if (ctx.pinned) {
+    const pinnedFee = round2(
+      stairCarryFee(
+        { floor: ctx.floor, hasLift: ctx.hasLift, stairItems: ctx.stairItems, itemsTotal },
+        ctx.pinned as Parameters<typeof stairCarryFee>[1],
+      ),
+    );
+    return pinnedFee <= 0
+      ? { status: "ok", addons: [], fee: 0, rate: ctx.pinned }
+      : {
+          status: "ok",
+          fee: pinnedFee,
+          rate: ctx.pinned,
+          addons: [{ addonKey: STAIR_CARRY_ADDON_KEY, qty: 1, unitPrice: pinnedFee, attrs: null }],
+        };
   }
 
   /* Past here a fee CAN apply, so the rate is load-bearing and this fails
@@ -111,7 +152,11 @@ export async function recomputeStairCarry(
     ),
   );
 
-  if (fee <= 0) return { status: "ok", addons: [], fee: 0 };
+  const usedRate = {
+    freeUpToFloor: Number(data.free_up_to_floor),
+    perFloorPerItem: Number(data.per_floor_per_item),
+  };
+  if (fee <= 0) return { status: "ok", addons: [], fee: 0, rate: usedRate };
 
   /* ⛔ THE KEY MUST EXIST BEFORE THE ROW CAN REFERENCE IT.
 
@@ -137,7 +182,7 @@ export async function recomputeStairCarry(
       `stair carry NOT charged (RM${fee}): the '${STAIR_CARRY_ADDON_KEY}' addon key is missing. ` +
         "Apply migration 0393, then run `pnpm backfill:stair-carry -- --apply`.",
     );
-    return { status: "ok", addons: [], fee: 0 };
+    return { status: "ok", addons: [], fee: 0, rate: usedRate };
   }
 
   /* qty 1 × the whole fee, matching the DELIVERY rows. The per-item breakdown
@@ -147,6 +192,7 @@ export async function recomputeStairCarry(
   return {
     status: "ok",
     fee,
+    rate: usedRate,
     addons: [{ addonKey: STAIR_CARRY_ADDON_KEY, qty: 1, unitPrice: fee, attrs: null }],
   };
 }

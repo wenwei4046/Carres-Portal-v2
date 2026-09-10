@@ -17,26 +17,15 @@
 import { describe, it, expect } from "vitest";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
 import {
-  buildDateRail,
   buildDeliveryScopeRows,
-  buildLogisticsRail,
   confirmedDeliveryOf,
-  dateBucketOf,
   legWorkStatusOf,
   entersDeliveryWork,
   deliveryEntryBlockers,
-  nearTermDates,
-  matchesDate,
-  matchesLogistics,
-  scopeFooter,
-  OVERDUE_KEY,
+  regionBucketOf,
+  SINGAPORE_KEY,
   DW,
-  GOVERNED_LOGISTICS,
-  NO_DATE_KEY,
-  NO_LOGISTICS_KEY,
-} from "./delivery-work";
-
-const TODAY = "2026-08-21";
+  } from "./delivery-work";
 
 function order(
   over: Partial<operationOrderListRow> & { id: string; so: number },
@@ -212,180 +201,6 @@ describe("Confirmed Delivery has one arithmetic", () => {
   });
 });
 
-describe("the DELIVERY DATE rail", () => {
-  const rows = build([
-    order({ id: "a", so: 1301 }),
-    order({
-      id: "b",
-      so: 1302,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-19" },
-    }),
-    order({
-      id: "c",
-      so: 1303,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "d",
-      so: 1304,
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-22" },
-    }),
-  ]);
-
-  it("buckets a scope by its confirmed date, and a past date is `Overdue`", () => {
-    expect(dateBucketOf(rows.find((r) => r.so === 1301)!, TODAY)).toBe(NO_DATE_KEY);
-    expect(dateBucketOf(rows.find((r) => r.so === 1302)!, TODAY)).toBe(OVERDUE_KEY);
-    // `Overdue`, never `Date passed` — the rail is a work queue (owner 2026-08-24).
-    expect(DW.overdue).toBe("Overdue");
-    expect(dateBucketOf(rows.find((r) => r.so === 1303)!, TODAY)).toBe("2026-08-25");
-  });
-
-  it("orders itself: no date, then Overdue, then real days ascending", () => {
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    expect(rail[0]!.label).toBe(DW.noConfirmedDate);
-    expect(rail[1]!.label).toBe(DW.overdue);
-    expect(rail.slice(2).map((r) => r.label)).toEqual([...rail.slice(2)].map((r) => r.label).sort());
-    expect(rail[0]!.count).toBe(1);
-    expect(rail[1]!.count).toBe(1);
-    expect(rail.find((r) => r.label === "printed:2026-08-22")?.count).toBe(1);
-    expect(rail.find((r) => r.label === "printed:2026-08-25")?.count).toBe(1);
-  });
-
-  it("⭐ shows the near-term operating dates even at ZERO — a planner needs the empty day", () => {
-    // A rail that lists only the days already holding work cannot be used to
-    // plan: the operator cannot see that Sunday is free because Sunday is not
-    // on it (owner ruling 2026-08-24).
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    for (const iso of nearTermDates(TODAY)) {
-      expect(rail.find((r) => r.label === `printed:${iso}`)).toBeDefined();
-    }
-    expect(rail.find((r) => r.label === "printed:2026-08-23")?.count).toBe(0);
-  });
-
-  it("the near-term window starts today and runs seven days", () => {
-    expect(nearTermDates(TODAY)).toEqual([
-      "2026-08-21",
-      "2026-08-22",
-      "2026-08-23",
-      "2026-08-24",
-      "2026-08-25",
-      "2026-08-26",
-      "2026-08-27",
-    ]);
-  });
-
-  it("crosses a month end without inventing a 32nd", () => {
-    expect(nearTermDates("2026-08-30", 3)).toEqual(["2026-08-30", "2026-08-31", "2026-09-01"]);
-  });
-
-  it("keeps a PICKED day on the rail after its last scope moves away", () => {
-    /* Otherwise the row vanishes while its choice is still on the URL, and the
-       operator is left with an empty listing and no control to undo it. */
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`, new Set(["2026-09-01"]));
-    const stranded = rail.find((r) => r.label === "printed:2026-09-01");
-    expect(stranded).toBeDefined();
-    expect(stranded!.count).toBe(0);
-  });
-
-  it("never prints a relative day word", () => {
-    const rail = buildDateRail(rows, TODAY, (iso) => `printed:${iso}`);
-    for (const item of rail) {
-      expect(item.label).not.toMatch(/\bToday\b|\bTomorrow\b/i);
-    }
-  });
-});
-
-describe("the LOGISTICS rail", () => {
-  it("keeps every governed partner visible at zero, in the ruled order", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), []);
-    expect(rail.slice(0, 7).map((r) => r.label)).toEqual([...GOVERNED_LOGISTICS]);
-    expect(rail.slice(0, 7).every((r) => r.count === 0)).toBe(true);
-  });
-
-  it("names the scopes nobody is carrying rather than hiding them under All", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), []);
-    const none = rail.find((r) => r.key === NO_LOGISTICS_KEY);
-    expect(none?.label).toBe(DW.noLogistics);
-    expect(none?.count).toBe(1);
-  });
-
-  it("admits an ungoverned partner only while it is carrying something", () => {
-    const partners = [
-      { id: "p-tsdd", name: "TSDD" },
-      { id: "p-quiet", name: "QUIET CO" },
-    ];
-    const rows = build([
-      order({ id: "a", so: 1301, delivery_partners: { id: "p-tsdd", name: "TSDD" } }),
-    ]);
-    const rail = buildLogisticsRail(rows, partners);
-    expect(rail.find((r) => r.label === "TSDD")?.count).toBe(1);
-    expect(rail.find((r) => r.label === "QUIET CO")).toBeUndefined();
-  });
-
-  it("keeps a PICKED ungoverned partner on the rail after its last scope moves away", () => {
-    const rail = buildLogisticsRail(build([order({ id: "a", so: 1301 })]), [], new Set(["TSDD"]));
-    const stranded = rail.find((r) => r.label === "TSDD");
-    expect(stranded).toBeDefined();
-    expect(stranded!.count).toBe(0);
-  });
-
-  it("counts the NETS scopes assigned through triage, not only the formal ones", () => {
-    const rows = buildDeliveryScopeRows({
-      orders: [order({ id: "a", so: 1301, ops_assigned_logistic: "p-nets" })],
-      deliveryOrders: [],
-      attempts: [],
-      handoverEvents: [],
-      partnerNameById: new Map([["p-nets", "NETS"]]),
-    });
-    expect(buildLogisticsRail(rows, []).find((r) => r.label === "NETS")?.count).toBe(1);
-  });
-});
-
-describe("the two filters combine", () => {
-  const rows = build([
-    order({
-      id: "a",
-      so: 1301,
-      delivery_partners: { id: "p-nets", name: "NETS" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "b",
-      so: 1302,
-      delivery_partners: { id: "p-al", name: "AL" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-25" },
-    }),
-    order({
-      id: "c",
-      so: 1303,
-      delivery_partners: { id: "p-nets", name: "NETS" },
-      ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-26" },
-    }),
-  ]);
-
-  it("asks ONE question of the date and the partner together", () => {
-    const date = new Set(["2026-08-25"]);
-    const logistics = new Set(["NETS"]);
-    const shown = rows.filter(
-      (r) => matchesDate(r, date, TODAY) && matchesLogistics(r, logistics),
-    );
-    expect(shown.map((r) => r.so)).toEqual([1301]);
-  });
-
-  it("treats an empty pick as every value, on both rails", () => {
-    const none = new Set<string>();
-    expect(rows.filter((r) => matchesDate(r, none, TODAY))).toHaveLength(3);
-    expect(rows.filter((r) => matchesLogistics(r, none))).toHaveLength(3);
-  });
-});
-
-/**
- * ⭐ THE ENTRY RULE — owner ruling 2026-08-24.
- *
- * "Do not dump every incomplete Sales Order into Delivery Work. Missing
- *  address/location remains Sales-owned Work and must not appear here as rows
- *  filled with `Not given`."
- */
 describe("the entry rule keeps Sales work out of Delivery Work", () => {
   it("admits a scope carrying a place, the building facts and goods", () => {
     expect(entersDeliveryWork(order({ id: "a", so: 1301 }))).toBe(true);
@@ -556,10 +371,48 @@ describe("the arrangement is what Delivery wrote", () => {
   });
 });
 
-describe("the footer counts scopes, never orders", () => {
-  it("says so in the plural the number earns", () => {
-    expect(scopeFooter(1, 1)).toBe("1 delivery scope");
-    expect(scopeFooter(3, 3)).toBe("3 delivery scopes");
-    expect(scopeFooter(2, 9)).toBe("2 of 9 delivery scopes");
+
+describe("REGION classification — direct state names (owner correction 2026-09-06)", () => {
+  it("classifies a whole-order scope by its address state", () => {
+    const rows = build([order({ id: "a", so: 1301 })]); // Selangor fixture
+    expect(regionBucketOf(rows[0]!)).toBe("Selangor");
   });
+
+  it("a Singapore journey: leg 1 counts under Johor, leg 2 under Singapore", () => {
+    const rows = build([
+      order({
+        id: "sg",
+        so: 1400,
+        customer_address: "1 Orchard Rd, Singapore",
+        customer_address_city: "Singapore",
+        customer_address_state: null as never,
+        delivery_stops: [
+          {
+            leg: 1,
+            partner_id: "p-teow",
+            partner_name: "TEOW",
+            from_loc: "Klang WH",
+            to_loc: "JB transit",
+            scheduled_at: "2026-08-25T04:00:00.000Z",
+            status: "pending",
+          },
+          {
+            leg: 2,
+            partner_id: "p-ssy",
+            partner_name: "SSY",
+            from_loc: "JB transit",
+            to_loc: "Singapore customer",
+            scheduled_at: "2026-08-27T04:00:00.000Z",
+            status: "pending",
+          },
+        ] as never,
+      }),
+    ]);
+    const leg1 = rows.find((r) => r.leg === 1)!;
+    const leg2 = rows.find((r) => r.leg === 2)!;
+    expect(regionBucketOf(leg1)).toBe("Johor");
+    expect(regionBucketOf(leg2)).toBe(SINGAPORE_KEY);
+  });
+
+
 });

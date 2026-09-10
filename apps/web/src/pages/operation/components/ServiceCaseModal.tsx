@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -182,6 +183,7 @@ export default function ServiceCaseModal({
         </div>
 
         <div className="space-y-5 px-6 py-5">
+          {mode === "edit" && id && <div className="flex flex-wrap gap-4 text-body"><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=customer-return&case=${id}`}>Plan Customer Return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=failed-delivery-return&case=${id}`}>Plan Failed Delivery return</Link><Link className="text-kit-blue-11" to={`/operation?tab=arrival-source&kind=repair-return&case=${id}`}>Plan Repair</Link></div>}
           {/* Lookup */}
           {mode === "create" && (
             <div className="rounded border border-base-200 bg-base-50 p-3">

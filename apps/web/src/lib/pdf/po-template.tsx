@@ -13,7 +13,8 @@
  *   RPC (0307) — no RM figure ever reaches this component.
  * - `Delivery by` is the supplier's 3-second fact — first row of PO DETAILS,
  *   bold value.
- * - Item ID = ops_stock_items.unit_code (0153), minted at PO-open — the
+ * - Unit ID = ops_stock_items.unit_code, born at official PO issue and bound
+ *   to its line (0442/0443); a quantity line prints `—` because it has none — the
  *   column the old law reserved is now LIVE: supplier labels each unit by
  *   id, the warehouse scans on receive. Prints `—` until codes arrive.
  * - Sofa plan-view layout drawing per model (direction contract).
@@ -169,7 +170,7 @@ export function PoTemplate(data: PoTemplateData) {
      number and no version cannot tell which to build from, so Version 1 prints
      too. (`Version 1 prints nothing` is the internal REVISIONS PANEL's rule —
      `docs/COPY-STANDARD.md` — and this is paper that leaves the building.) */
-  const versionLabel = `Version ${version ?? 1}`;
+  const versionLabel = data.draft ? "Not issued" : `Version ${version ?? 1}`;
 
   /**
    * ⭐ PER-LINE SO ATTRIBUTION, FROM THE LINE'S OWN LINEAGE (0382).
@@ -205,9 +206,10 @@ export function PoTemplate(data: PoTemplateData) {
   // column is the one home (owner round, 2026-08-09). `Deliver by` is the
   // frozen term's paper form: the reader IS the supplier, imperative.
   const detailRows: Array<[string, string | null, boolean?]> = [
-    ["PO No", po_number],
-    ["Version", versionLabel.replace("Version ", "")],
-    ["Issued", niceDate(issue_date)],
+    ["PO No", data.draft ? "Assigned when issued" : po_number],
+    ["Version", data.draft ? null : versionLabel.replace("Version ", "")],
+    ["Status", data.draft ? "Not issued" : null],
+    ["Issued", data.draft ? null : niceDate(issue_date)],
     ["Deliver by", niceDate(eta_date), true],
   ];
 
@@ -319,7 +321,7 @@ export function PoTemplate(data: PoTemplateData) {
         <View style={styles.tableHead} minPresenceAhead={40}>
           <Text style={[styles.th, styles.colNo]}>#</Text>
           <Text style={[styles.th, styles.colSo]}>SO No</Text>
-          <Text style={[styles.th, styles.colUnit]}>Item ID</Text>
+          <Text style={[styles.th, styles.colUnit]}>Unit ID</Text>
           <Text style={[styles.th, { flex: 1 }]}>Description</Text>
           <Text style={[styles.th, styles.colDestination]}>Deliver To</Text>
           <Text style={[styles.th, styles.colQty]}>Qty</Text>
@@ -415,7 +417,7 @@ export function PoTemplate(data: PoTemplateData) {
               {po_number}
               {issued_by ? ` · Issued by ${issued_by}` : ""}
             </Text>
-            <Text style={styles.footerCenter}>Computer-generated document · No signature required.</Text>
+            <Text style={styles.footerCenter}>{data.draft ? "DRAFT · Not issued · Do not send to supplier." : "Computer-generated document · No signature required."}</Text>
             <Text
               style={styles.footerPage}
               render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}

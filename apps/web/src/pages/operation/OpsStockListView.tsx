@@ -13,6 +13,7 @@ import {
   type OpsStockItem,
   type OpsStockListResponse,
   type PoolUseReason,
+  unitIdOf,
 } from "@carres/shared";
 import { AlertTriangle } from "lucide-react";
 
@@ -735,13 +736,12 @@ function RowItem({
   const [takeoutNote, setTakeoutNote] = useState("");
   return (
     <tr className="border-t border-base-200 hover:bg-base-50">
-      {/* Unit ID = the minted per-unit serial (id-abc123456). Falls back to "—"
-          for legacy/seed rows that never got a unit_code. Previously this cell
-          showed row.sku, which (a) was wrong and (b) left the header row one
-          column wider than the body — fixed by adding the dedicated SKU cell
-          that follows. */}
+      {/* Unit ID = the permanent Carres identity, `U1-000-001`. Counted goods
+          have none and print `—`: their row still needs a database key, but a
+          key is not an identity and never appears here (0453). Grandfathered
+          `id-…` codes print exactly as stored — they are on real labels. */}
       <td className="px-3 py-2 font-mono text-label text-base-900 whitespace-nowrap">
-        {row.unitCode ?? <span className="text-base-400">—</span>}
+        {unitIdOf(row) ?? <span className="text-base-400">—</span>}
       </td>
       <td className="px-3 py-2 font-mono text-base-700">
         {row.sku}

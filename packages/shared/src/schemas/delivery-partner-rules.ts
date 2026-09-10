@@ -37,6 +37,29 @@ export type SetPartnerDeliveryRulesInput = z.infer<
   typeof setPartnerDeliveryRulesInput
 >;
 
+/** Delivery Card 03 (0411) — one destination region as the carrier states it.
+ *  deliveryDays null = the carrier only states its pickup week; the shared
+ *  engine derives delivery = pickup + transitDays and says so. */
+export const journeyRegionRuleSchema = z.object({
+  deliveryDays: z.array(z.number().int().min(0).max(6)).max(7).nullable(),
+  transitDays: z.number().int().min(0).max(14),
+});
+
+/** PUT /api/operation/partners/:id/journey-calendar — the whole calendar every
+ *  time (the 0283 no-partial-patch law). pickupDays null = not recorded: the
+ *  backward calculation stays silent rather than guessing. */
+export const setPartnerJourneyCalendarInput = z
+  .object({
+    /** 1=Mon … 6=Sat — Sunday is never a pickup day. */
+    pickupDays: z.array(z.number().int().min(1).max(6)).min(1).max(6).nullable(),
+    regions: z.record(z.string().min(1).max(40), journeyRegionRuleSchema),
+    surchargeAreas: z.array(z.string().min(1).max(80)).max(50),
+  })
+  .strict();
+export type SetPartnerJourneyCalendarInput = z.infer<
+  typeof setPartnerJourneyCalendarInput
+>;
+
 export const partnerBookingWarningSchema = z.object({
   key: z.enum(["off_day", "blackout", "lead_time", "capacity"]),
   /** Ready to render — the server composed it from the same shared engine the

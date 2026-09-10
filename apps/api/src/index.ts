@@ -34,6 +34,8 @@ import supplierClaimsRouter from "./routes/operation/supplier-claims";
 // R6 — the ops half: review what the warehouse filed, then replay it through
 // the ONE receive engine (0302).
 import warehouseReceiptsRouter from "./routes/operation/warehouse-receipts";
+import workspaceDutiesRouter from "./routes/operation/workspace-duties";
+import operationWorkRouter from "./routes/operation/work";
 import procurementTabsRouter from "./routes/operation/procurement-tabs";
 import dispatchCustomerLegRouter from "./routes/operation/dispatch-customer-leg";
 import deliveryChainRouter from "./routes/operation/delivery-chain";
@@ -47,8 +49,9 @@ import toOrderRouter from "./routes/operation/to-order";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
+// Settings → Warehouse — the ONE Warehouse Settings surface (0456 · 0457).
+import warehouseSettingsRouter from "./routes/operation/warehouse-settings";
 import opsStaffRouter from "./routes/operation/staff";
-import poDutyRouter from "./routes/operation/po-duty";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
 import operationPaymentsRouter from "./routes/operation/payments";
@@ -58,6 +61,7 @@ import recentCostRouter from "./routes/operation/recent-cost";
 import stockAlertsRouter from "./routes/operation/stock-alerts";
 import thresholdsRouter from "./routes/operation/thresholds";
 import operationSuppliersRouter from "./routes/operation/suppliers";
+import arrivalSourcesRouter from "./routes/operation/arrival-sources";
 import operationWarehouseRouter from "./routes/operation/warehouse";
 // 0174 — Sales Order Maintenance (AutoCount-style configurable SO grid).
 import salesOrderMaintenanceRouter from "./routes/operation/sales-order-maintenance";
@@ -67,6 +71,7 @@ import bdInquiriesRouter from "./routes/bd/inquiries";
 import partnerDashboardRouter from "./routes/partner/dashboard";
 import partnerFleetRouter from "./routes/partner/fleet";
 import partnerOrdersRouter from "./routes/partner/orders";
+import partnerDeliveriesRouter from "./routes/partner/deliveries";
 import partnerPickupsRouter from "./routes/partner/pickups";
 import partnerPickupsBatchRouter from "./routes/partner/pickups-batch";
 import partnerPodRouter from "./routes/partner/pod";
@@ -74,6 +79,8 @@ import pickupEventsRouter from "./routes/pickup-events/print";
 import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
+import paymentSettingsRouter from "./routes/finance/payment-settings";
+import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
@@ -118,7 +125,6 @@ import stripeCheckoutRouter from "./routes/stripe-checkout";
 import stripeWebhookRouter from "./routes/stripe-webhook";
 import rentalRouter from "./routes/rental";
 import { runContactByCron, runFollowUpMaintenanceCron } from "./cron/contact-by";
-import { runPoDutyCron } from "./cron/po-duty";
 import { runSupplierClaimSweepCron } from "./cron/supplier-claim-sweep";
 import type { AppEnv, Bindings } from "./types";
 
@@ -217,10 +223,9 @@ api.route("/operation/purchase/demands", purchaseDemandsRouter);
 api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
+api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
-// 0236 PO duty rotation — GET current holder / PUT manager override
-api.route("/operation/po-duty", poDutyRouter);
 api.route("/operation/partners", operationPartnersRouter);
 api.route("/operation/pos", operationPosRouter);
 api.route("/operation/pos", lpInboundRouter);
@@ -235,6 +240,7 @@ api.route("/operation/suppliers-overview", operationSuppliersOverviewRouter);
 api.route("/operation", thresholdsRouter);
 api.route("/operation/suppliers", operationSuppliersRouter);
 api.route("/operation/warehouse", operationWarehouseRouter);
+api.route("/operation/arrival-sources", arrivalSourcesRouter);
 // 0174 — Sales Order Maintenance grid + shared column config.
 api.route("/operation/sales-order-maintenance", salesOrderMaintenanceRouter);
 api.route("/bd/accounts", bdAccountsRouter);
@@ -244,12 +250,15 @@ api.route("/partner/dashboard", partnerDashboardRouter);
 api.route("/partner/fleet", partnerFleetRouter);
 api.route("/partner/orders", partnerOrdersRouter);
 api.route("/partner/pickups", partnerPickupsRouter);
+api.route("/partner/deliveries", partnerDeliveriesRouter);
 api.route("/partner/pickups", partnerPickupsBatchRouter);
 api.route("/partner/pod", partnerPodRouter);
 api.route("/pickup-events", pickupEventsRouter);
 api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
+api.route("/finance/payment-settings", paymentSettingsRouter);
+api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
@@ -277,6 +286,8 @@ api.route("/ops/notes", opsNotesRouter);
 api.route("/ops/tasks", opsTasksRouter);
 api.route("/operation/supplier-claims", supplierClaimsRouter);
 api.route("/operation/warehouse-receipts", warehouseReceiptsRouter);
+api.route("/operation/workspace-duties", workspaceDutiesRouter);
+api.route("/operation/work", operationWorkRouter);
 api.route("/operation/orders", annotationsRouter);
 api.route("/operation/escalations", escalationsRouter);
 api.route("/operation/activity", activityRouter);
@@ -294,11 +305,6 @@ export default {
       (async () => {
         await runContactByCron(env);
         await runFollowUpMaintenanceCron(env);
-        // 0236 — Mon/Thu (MYT) PO-day reminder for the duty holder; no-ops on
-        // other days and on a pre-0236 DB.
-        await runPoDutyCron(env).catch((e) =>
-          console.error("po-duty cron failed:", (e as Error).message),
-        );
         // R2 (0288) — an ETA that has passed with units still owed becomes a
         // late-delivery claim. Idempotent, so a retry costs nothing.
         await runSupplierClaimSweepCron(env).catch((e) =>

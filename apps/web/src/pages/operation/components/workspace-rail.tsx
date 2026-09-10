@@ -118,15 +118,69 @@ export function FilterRail({
   children,
   testId,
   onHide,
+  header,
+  className,
+  ariaLabel,
 }: {
   children: ReactNode;
   testId?: string;
+  className?: string;
+  ariaLabel?: string;
   onHide?: () => void;
+  /**
+   * Owner correction 2026-09-06 (Delivery Monitor + Receiving — the two
+   * corrections landed the same day and share this one slot): a FIXED region
+   * above the scrolling filter groups — the rail's month calendar lives
+   * here. It never scrolls away; the groups below scroll independently.
+   * Absent = the rail renders byte-identically to before (one scroll area,
+   * nothing added). The two regions carry `{testId}-fixed` / `{testId}-scroll`
+   * so a page can assert the independence.
+   */
+  header?: ReactNode;
 }) {
+  if (header) {
+    return (
+      <aside
+        data-testid={testId}
+        aria-label={ariaLabel}
+        className={`relative flex w-[240px] min-h-0 shrink-0 flex-col border-r border-kit-slate-5 bg-white ${className ?? ""}`}
+      >
+        {onHide && (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Hide filters"
+            title="Hide filters"
+            className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+          >
+            <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden />
+          </button>
+        )}
+        <div
+          className="shrink-0 border-b border-kit-slate-5 p-3"
+          data-testid={testId ? `${testId}-fixed` : undefined}
+        >
+          {header}
+        </div>
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3"
+          data-testid={testId ? `${testId}-scroll` : undefined}
+        >
+          {children}
+        </div>
+      </aside>
+    );
+  }
   return (
     <aside
       data-testid={testId}
-      className="relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white p-3"
+      aria-label={ariaLabel}
+      /* The collapse toggle sits `top-2`, absolutely positioned over the
+         first heading — unaffected by padding, so it stays put while a
+         touch more top padding gives the first group's own row room to
+         clear it (Jess, 2026-09-09: "terlalu rapat" between the two). Only
+         when the toggle exists; without it there is nothing to clear. */
+      className={`relative flex w-[240px] min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-r border-kit-slate-5 bg-white ${onHide ? "px-3 pb-3 pt-4" : "p-3"} ${className ?? ""}`}
     >
       {onHide && (
         <button
@@ -166,6 +220,7 @@ export function FilterRailGroup({
 
 export function FilterRailRow({
   label,
+  supportingText,
   count,
   active,
   onClick,
@@ -173,6 +228,7 @@ export function FilterRailRow({
   testId,
 }: {
   label: string;
+  supportingText?: string;
   /** Omitted renders no number (the section's `All …` rows). A live count is
    *  passed as-is — the fixed rows print zero rather than hiding it. */
   count?: number;
@@ -204,7 +260,12 @@ export function FilterRailRow({
           className="absolute left-0 top-1 bottom-1 w-0.5 bg-kit-blue-9"
         />
       )}
-      <span className="min-w-0 flex-1 break-words">{label}</span>
+      <span className="min-w-0 flex-1 break-words">
+        {label}
+        {supportingText && (
+          <span className="block text-label font-normal leading-4 text-kit-slate-9">{supportingText}</span>
+        )}
+      </span>
       {count != null && (
         <span className="shrink-0 tabular-nums text-label leading-[18px] text-kit-slate-9">
           {count}

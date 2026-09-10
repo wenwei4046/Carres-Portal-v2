@@ -35,6 +35,10 @@ const read = (prefix: string): string => {
 
 const ALLOCATORS = read("0381_");
 const CREATION = read("0382_");
+/* 0442 closed the allocator to every client role; 0443 is the creation helper
+   that now does the minting. The 0381/0382 files are immutable history. */
+const CLOSURE = read("0442_");
+const BIRTH = read("0443_");
 
 /* A scan that reads its own comments fails on the sentence explaining the rule
    (the D0.5b lesson). Both directions are needed: the SOURCE for strings the
@@ -104,7 +108,15 @@ describe("the Unit ID is U1-000-001, allocated once and never reset", () => {
     /* A new Supabase table inherits every grant to `authenticated` (the 0367
        lesson). The series is revoked; the FUNCTION is the only door. */
     expect(ALLOCATORS).toMatch(/revoke all on public\.unit_id_series from authenticated/);
-    expect(ALLOCATORS).toMatch(/grant execute on function public\.allocate_unit_id\(\) to authenticated/);
+    /* 0381 granted the function itself to `authenticated`; 0442 CLOSED it —
+       only the SECURITY DEFINER PO authority may allocate (owner ruling
+       2026-09-07). The 0381 line is history, not the current grant. */
+    expect(CLOSURE).toMatch(
+      /revoke all on function public\.allocate_unit_id\(\) from public, anon, authenticated, service_role/,
+    );
+    expect(CLOSURE).toMatch(
+      /revoke all on function public\.gen_unit_code\(\) from public, anon, authenticated, service_role/,
+    );
   });
 
   it("starts ABOVE anything already minted, because existing units are not renumbered", () => {
@@ -118,10 +130,15 @@ describe("the Unit ID is U1-000-001, allocated once and never reset", () => {
     expect(ALLOCATORS).toMatch(/regexp_replace\(coalesce\(p, ''\), '\[\^A-Za-z0-9\]', '', 'g'\)/);
   });
 
-  it("mints one Unit per piece, for EVERY governed destination", () => {
+  it("mints one Unit per piece, for EVERY governed destination — but only for exact-unit lines", () => {
     expect(CREATION).toMatch(/public\.allocate_unit_id\(\)/);
     /* One row per unit, not one per line — a line of three is three pieces. */
     expect(CREATION).toMatch(/from generate_series\(1, v_qty\)/);
+    /* 0443: the birth is gated on the line's snapshotted Catalog mode and is
+       bound to the LINE, never to `(po_no, sku)`. */
+    expect(BIRTH).toMatch(/if v_mode = 'exact_unit' then/);
+    expect(BIRTH).toMatch(/v_supplier_name, v_po_id, v_line_id, 'unit', 'po_mint', current_date/);
+    expect(BIRTH).toMatch(/catalog_identity_mode_missing/);
   });
 });
 

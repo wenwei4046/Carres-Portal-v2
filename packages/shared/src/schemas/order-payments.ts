@@ -11,7 +11,10 @@ import { z } from "zod";
  * collect-before-delivery gate. See `docs/superpowers/plans/2026-06-26-balance-job.md`.
  */
 
-/** How the money came in. */
+/** How the money came in. 0430 adds the governed manual methods from
+ *  payment/MASTER.md §16 — duitnow_qr · credit_card · debit_card — matching
+ *  the widened SQL dictionary and column CHECK. `online` remains
+ *  provider-recorded (Stripe) and is never a manual selection. */
 export const PAYMENT_METHODS = [
   "cash",
   "bank",
@@ -19,6 +22,9 @@ export const PAYMENT_METHODS = [
   "cheque",
   "online",
   "other",
+  "duitnow_qr",
+  "credit_card",
+  "debit_card",
 ] as const;
 export type OrderPaymentMethod = (typeof PAYMENT_METHODS)[number];
 
@@ -44,6 +50,12 @@ export const recordPaymentInputSchema = z.object({
    *  payments still record, only the slip link waits for the deploy. */
   receiptUrl: z.string().trim().max(300).nullish(),
   idempotencyKey: z.string().uuid().optional(),
+  /** §5 (0448): the operator opened the earlier payment this one resembles and
+   *  says it is a different one. The SERVER decides whether that continuation
+   *  is allowed — a match only continues for the Payment Approver duty or
+   *  principal — so this flag ASKS, it never grants. Distinct from
+   *  `idempotencyKey`, which answers whether this is the same submission. */
+  duplicateAck: z.boolean().optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentInputSchema>;
 

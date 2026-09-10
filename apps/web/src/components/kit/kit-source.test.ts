@@ -100,9 +100,14 @@ describe("components/kit source rules", () => {
     expect(importers).toEqual(["Icon.tsx"]);
   });
 
-  it("has exactly ONE calendar — §11 pins it to react-day-picker", () => {
+  it("every calendar is react-day-picker — §11's engine, two governed skins", () => {
+    // DatePicker is the FIELD (popover); MonthCalendar is the permanent rail
+    // month view (owner correction 2026-09-06, Receiving — ui/MASTER LOCAL
+    // FILTER RAIL FIXED HEADER + MONTH CALENDAR). Both wear the same engine
+    // and token skin; a third calendar joins this list only through the kit,
+    // and a hand-rolled month grid never passes this gate.
     const importers = FILES.filter((f) => read(f).includes('from "react-day-picker"'));
-    expect(importers).toEqual(["DatePicker.tsx"]);
+    expect(importers).toEqual(["DatePicker.tsx", "MonthCalendar.tsx"]);
   });
 
   it("takes no className and no style anywhere in the kit (§6.0)", () => {

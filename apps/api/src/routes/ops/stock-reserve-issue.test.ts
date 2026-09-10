@@ -130,6 +130,8 @@ function tables() {
     order_finance_exceptions: tableMock({ data: [], error: null }),
     order_delivery_payment_approvals: tableMock({ data: [], error: null }),
     ops_delivery_orders: tableMock({ data: [], error: null }),
+    // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+    invoices: tableMock({ data: [], error: null }),
   };
 }
 

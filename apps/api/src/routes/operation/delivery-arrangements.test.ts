@@ -34,8 +34,11 @@ const ORDER_B = "00000000-0000-0000-0000-0000000a0002";
 const NETS = "00000000-0000-0000-0000-0000000b0001";
 const AL = "00000000-0000-0000-0000-0000000b0002";
 
-async function makeJwt(role: string) {
-  return new SignJWT({ email: `${role}@x`, app_metadata: { role } })
+async function makeJwt(role: string, warehouseId?: string) {
+  return new SignJWT({
+    email: `${role}@x`,
+    app_metadata: { role, ...(warehouseId ? { warehouse_id: warehouseId } : {}) },
+  })
     .setProtectedHeader({ alg: "ES256", kid: KID, typ: "JWT" })
     .setSubject("11111111-1111-1111-1111-000000000001")
     .setIssuedAt()
@@ -92,8 +95,8 @@ function mockSb(results: Array<{ data?: unknown; error?: unknown }>) {
   return { from, inserts, upserts };
 }
 
-async function call(path: string, role: string, init?: RequestInit) {
-  const jwt = await makeJwt(role);
+async function call(path: string, role: string, init?: RequestInit, warehouseId?: string) {
+  const jwt = await makeJwt(role, warehouseId);
   return app.fetch(
     new Request(`http://t/api/operation/delivery-arrangements${path}`, {
       ...init,
@@ -255,6 +258,216 @@ describe("POST /assign — one partner onto one or many scopes", () => {
   });
 });
 
+describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
+  /** The feed's fixed query order (0424): arrangements · orders ·
+   *  delivery orders · SCOPE (delivery_order_units) · units · prep ·
+   *  event units · handover events · warehouses · product names. */
+  const ARRANGEMENT_ROW = {
+    id: "arr-1",
+    order_id: ORDER_A,
+    leg: 0,
+    partner_id: NETS,
+    confirmed_date: "2026-09-05",
+    confirmed_time: "Morning (9am–12pm)",
+    expected_arrival: "11:00:00",
+    logistics_note: null,
+    reply_proof_path: "arrangements/arr-1/reply.jpg",
+    driver_name: "Ahmad",
+    vehicle: "VAN-7",
+    updated_at: "2026-09-01T00:00:00Z",
+    updated_by: "user-1",
+    delivery_partners: { id: NETS, name: "NETS" },
+  };
+  const ORDER_ROW = {
+    id: ORDER_A,
+    so: 1322,
+    customer_address: "12 Jalan Meru, Klang",
+    delivered_at: null,
+    do_file_path: null,
+    pod_signature_url: null,
+    placed_at: "2026-08-30T02:00:00Z",
+    created_at: "2026-08-29T02:00:00Z",
+  };
+  const DO_ROW = {
+    id: "do-1",
+    order_id: ORDER_A,
+    do_number: "DO-010926-1322",
+    trip_groups: null,
+    voided_at: null,
+  };
+
+  it("projects the DO's recorded exact-Unit scope onto the real Saturday pickup with Friday readiness", async () => {
+    const { inserts, upserts } = mockSb([
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
+      { data: [{ delivery_order_id: "do-1", item_id: "item-1" }] },
+      { data: [{ id: "item-1", unit_code: "CAR-000123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
+      { data: [] }, // prep
+      { data: [] }, // event units
+      { data: [] }, // handover events
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [{ sku: "SOFA-X", variant: "Sofa X (Grey)" }] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    expect(body.events).toHaveLength(2);
+    expect(body.events[0]).toMatchObject({
+      title: "Customer delivery pickup",
+      unitId: "CAR-000123",
+      eventDate: "2026-09-05",
+      operationsReadyBy: "2026-09-04",
+      fromLocation: "Carres Klang",
+      toCustomer: "12 Jalan Meru, Klang",
+      logisticsPartner: "NETS",
+      driverName: "Ahmad",
+      vehicle: "VAN-7",
+      doNumber: "DO-010926-1322",
+      actualCollectionAt: null,
+      hasEvidence: false,
+      custody: null,
+      deliveryOrderHref: "/operation/delivery-orders/DO-010926-1322",
+      soDate: "2026-08-30",
+      sku: "SOFA-X",
+      productName: "Sofa X (Grey)",
+      unitScannedAt: null,
+      unitHandedOverAt: null,
+    });
+    expect(body.events[1]).toMatchObject({
+      title: "Customer handover",
+      eventDate: "2026-09-05",
+      unitId: "CAR-000123",
+    });
+    expect(inserts).toEqual([]);
+    expect(upserts).toEqual([]);
+  });
+
+  it("a document with no recorded scope stays absent — never an invented Unit assignment", async () => {
+    mockSb([
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [{ ...DO_ROW, trip_groups: ["ROOM_1"] }] },
+      { data: [] }, // no scope rows recorded for the split document
+    ]);
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: unknown[] };
+    expect(body.events).toEqual([]);
+  });
+
+  it("projects per-Unit prep and the accepted batch's own handover time", async () => {
+    mockSb([
+      { data: [ARRANGEMENT_ROW] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1" },
+          { delivery_order_id: "do-1", item_id: "item-2" },
+        ],
+      },
+      {
+        data: [
+          { id: "item-1", unit_code: "U1-260-019", warehouse_id: "wh-1", sku: "SOFA-X" },
+          { id: "item-2", unit_code: "U1-260-020", warehouse_id: "wh-1", sku: "SOFA-X" },
+        ],
+      },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "scanned", recorded_at: "2026-09-04T10:00:00Z" },
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "checked", recorded_at: "2026-09-04T10:05:00Z" },
+          { delivery_order_id: "do-1", item_id: "item-1", fact: "packed", recorded_at: "2026-09-04T10:10:00Z" },
+        ],
+      },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-1", event_id: "ev-1", recorded_side: "warehouse" },
+        ],
+      },
+      {
+        data: [
+          { id: "ev-1", delivery_order_id: "do-1", kind: "handed_over", proof_path: "handover/do-1/p.jpg", recorded_at: "2026-09-04T11:18:00Z" },
+        ],
+      },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "operation");
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    const pickups = body.events.filter((e) => e.title === "Customer delivery pickup");
+    expect(pickups).toHaveLength(2);
+    const handed = pickups.find((e) => e.unitId === "U1-260-019");
+    const waiting = pickups.find((e) => e.unitId === "U1-260-020");
+    expect(handed).toMatchObject({
+      unitScannedAt: "2026-09-04T10:00:00Z",
+      unitCheckedAt: "2026-09-04T10:05:00Z",
+      unitPackedAt: "2026-09-04T10:10:00Z",
+      unitHandedOverAt: "2026-09-04T11:18:00Z",
+      hasEvidence: true,
+    });
+    // The Unit NOT in the batch keeps null facts — a partial handover
+    // changes only the accepted exact Units.
+    expect(waiting).toMatchObject({
+      unitScannedAt: null,
+      unitHandedOverAt: null,
+      hasEvidence: false,
+    });
+  });
+
+  it("does not expose the internal Warehouse feed to a Partner role", async () => {
+    mockSb([]);
+    const res = await call("/warehouse-schedule", "partner");
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a Warehouse login read only exact Units physically assigned to its own Warehouse", async () => {
+    mockSb([
+      { data: [{ ...ARRANGEMENT_ROW, logistics_note: "internal note must not ride the projection", reply_proof_path: null }] },
+      { data: [ORDER_ROW] },
+      { data: [DO_ROW] },
+      {
+        data: [
+          { delivery_order_id: "do-1", item_id: "item-own" },
+          { delivery_order_id: "do-1", item_id: "item-other" },
+        ],
+      },
+      {
+        data: [
+          { id: "item-own", unit_code: "CAR-OWN-001", warehouse_id: "wh-own", sku: null },
+          { id: "item-other", unit_code: "CAR-OTHER-002", warehouse_id: "wh-other", sku: null },
+        ],
+      },
+      { data: [] }, // prep
+      { data: [] }, // event units
+      { data: [] }, // handover events
+      {
+        data: [
+          { id: "wh-own", name: "Own Warehouse" },
+          { id: "wh-other", name: "Other Warehouse" },
+        ],
+      },
+      { data: [] },
+    ]);
+
+    const res = await call("/warehouse-schedule", "warehouse", undefined, "wh-own");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<Record<string, unknown>> };
+    expect(body.events).toHaveLength(2);
+    expect(new Set(body.events.map((event) => event.unitId))).toEqual(
+      new Set(["CAR-OWN-001"]),
+    );
+    for (const event of body.events) {
+      expect(event).toMatchObject({ driverName: "Ahmad", vehicle: "VAN-7" });
+      expect(event).not.toHaveProperty("logisticsNote");
+      expect(event).not.toHaveProperty("price");
+      expect(event).not.toHaveProperty("payment");
+    }
+  });
+});
+
 describe("PUT /:orderId — Save Delivery", () => {
   const save = (body: unknown, path = `/${ORDER_A}`) =>
     call(path, "operation", { method: "PUT", body: JSON.stringify(body) });
@@ -362,5 +575,113 @@ describe("PUT /:orderId — Save Delivery", () => {
     mockSb([]);
     const res = await save({ confirmedDate: "2026-08-28" }, `/${ORDER_A}?leg=99`);
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /:orderId/reply-proof/sign-upload — the reply evidence door (Card 05)", () => {
+  const sign = (
+    body: unknown,
+    path = `/${ORDER_A}/reply-proof/sign-upload?leg=0`,
+    role = "operation",
+  ) => call(path, role, { method: "POST", body: JSON.stringify(body) });
+
+  function mockStorage() {
+    const createSignedUploadUrl = vi.fn().mockImplementation((p: string) =>
+      Promise.resolve({ data: { token: "t1", path: p }, error: null }),
+    );
+    vi.mocked(adminClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUploadUrl }) },
+    } as never);
+    return createSignedUploadUrl;
+  }
+
+  it("signs an upload under the arrangement's own key", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; path: string };
+    expect(body.token).toBe("t1");
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^arrangement/${ORDER_A}/0/.+-reply\\.png$`)),
+    );
+  });
+
+  it("keys a Journey leg's proof under its own leg", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign(
+      { mimeType: "image/jpeg", sizeBytes: 1000 },
+      `/${ORDER_A}/reply-proof/sign-upload?leg=2`,
+    );
+    expect(res.status).toBe(200);
+    expect(createSignedUploadUrl).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^arrangement/${ORDER_A}/2/.+-reply\\.jpg$`)),
+    );
+  });
+
+  it("refuses a non-photo mime in words, before any storage call", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    const createSignedUploadUrl = mockStorage();
+    const res = await sign({ mimeType: "application/pdf", sizeBytes: 1000 });
+    expect(res.status).toBe(422);
+    expect(createSignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("404s a junk order id without touching the database", async () => {
+    const { from } = mockSb([]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 }, "/not-a-uuid/reply-proof/sign-upload");
+    expect(res.status).toBe(404);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("404s an order that does not exist", async () => {
+    mockSb([{ data: null }]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 });
+    expect(res.status).toBe(404);
+  });
+
+  it("403s a dealer", async () => {
+    mockSb([{ data: { id: ORDER_A } }]);
+    mockStorage();
+    const res = await sign({ mimeType: "image/png", sizeBytes: 1000 }, undefined, "dealer");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /:orderId/message-prepared — preparation is activity, never confirmation (0412)", () => {
+  const prepared = (body: unknown, path = `/${ORDER_A}/message-prepared?leg=0`, role = "operation") =>
+    call(path, role, { method: "POST", body: JSON.stringify(body) });
+
+  function mockRpc() {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    return rpc;
+  }
+
+  it("records through the one SQL door with the exact scope", async () => {
+    const rpc = mockRpc();
+    const res = await prepared({ partnerId: NETS }, `/${ORDER_A}/message-prepared?leg=2`);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("delivery_arrangement_message_prepared", {
+      p_order_id: ORDER_A,
+      p_leg: 2,
+      p_partner_id: NETS,
+    });
+  });
+
+  it("422s a junk partner id before any call", async () => {
+    const rpc = mockRpc();
+    const res = await prepared({ partnerId: "nope" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("403s a dealer", async () => {
+    mockRpc();
+    const res = await prepared({ partnerId: NETS }, undefined, "dealer");
+    expect(res.status).toBe(403);
   });
 });

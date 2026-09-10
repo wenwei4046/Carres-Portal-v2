@@ -95,6 +95,11 @@ The system derives documents from an approved outcome plus execution facts. Exam
 | Supplier owes Carres money | Supplier Claim completed with external credit/debit-note evidence |
 | Inspection, repair, packing or transport only | Work instruction; no stock/money document |
 
+Every governed Service Case decision routes to the `Service Case Approver` Duty through the one
+Shared Duty Resolver. Service Settings stores the Duty key only; it never stores a manager's name
+or another approver list. The decision evidence preserves the normal Primary holder, today's Buddy
+cover and the actual authenticated actor separately.
+
 The Case `Documents` panel is the operator's one checklist. For every derived document it states
 `Waiting for decision`, `Ready to issue`, `Print required`, `Send electronically`, `Printed`,
 `Signed/acknowledged` or `Not required`, together with who needs it and when. Staff do not have to
@@ -146,6 +151,14 @@ delivery and asset records. A related Case may explain why, but never substitute
 transactions.
 
 ### CONDITION-GATED CUSTOMER COLLECTION — OWNER-RULED 2026-08-14
+
+**Local implementation note — 2026-09-07, not deployed:** Case links now open exact-Unit return or
+repair source work with explicit Operation approval, linked dated Case evidence and a recorded
+condition-dependent classification. Applicable checklists/photo proof gate acceptance; refusal
+records no custody movement. Automated policy selection, complete surface-photo validation and
+urgent shared Work are still target gaps. Implementation/readiness evidence is in the Stock MASTER;
+the policy and two independent gates below remain authoritative.
+
 
 A 100-Day Trial or other condition-dependent return is not sent straight to Logistics. Collection
 has two independent gates:

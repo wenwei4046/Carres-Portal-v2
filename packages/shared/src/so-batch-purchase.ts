@@ -81,6 +81,18 @@ export const SO_BATCH_PURCHASE_WORDS = {
    */
   multiple: "Multiple",
 
+  /**
+   * A purchase order exists, but the original date it was issued with is not
+   * on file — the 0428 recovery recorded an unevidenced original as unknown
+   * rather than back-filling it from a planning date (§5.7). 21 of 62 live
+   * purchase orders are in this state.
+   *
+   * It is the SAME word the Purchase Orders register already prints for the
+   * same fact, so the two columns cannot describe one PO differently. A cell
+   * left BLANK keeps its own separate meaning: nothing has been ordered.
+   */
+  poDeliveryDateUnknown: "Not recorded",
+
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
      and that component owns its own headings. The eight labels that used to
@@ -449,8 +461,18 @@ export interface SoBatchOrderPoFact {
   supplierName: string | null;
   /** The destination the ISSUED document actually carries. */
   destinationId: string | null;
-  /** `purchase_orders.eta_date` — the official supplier-facing date. */
-  etaDate: IsoDate | null;
+  /**
+   * `purchase_orders.official_delivery_date` — the ORIGINAL supplier-facing
+   * date, stamped at birth and never changed (0428/0430, MASTER §5.7).
+   *
+   * It is deliberately NOT `eta_date`: that is the LIVE planning arrival and
+   * the ready-date door recomputes it, so a register drawing it would show a
+   * "PO Delivery Date" that silently MOVED after the supplier was sent the
+   * paper. `null` is a real answer — a PO whose original the 0428 recovery
+   * could not evidence is recorded as unknown, and is printed as an absence
+   * rather than back-filled from today's planning date.
+   */
+  officialDeliveryDate: IsoDate | null;
   /** TRUE = the current PDF version has confirmed-sent evidence. */
   sentCurrentVersion: boolean;
 }
@@ -510,7 +532,7 @@ export const soBatchOrderRowSchema = z.object({
       supplierId: z.string().nullable(),
       supplierName: z.string().nullable(),
       destinationId: z.string().nullable(),
-      etaDate: z.string().nullable(),
+      officialDeliveryDate: z.string().nullable(),
       sentCurrentVersion: z.boolean(),
     }),
   ),
@@ -682,6 +704,43 @@ export function isSelectableForBuying(row: PurchaseDemandRow): boolean {
     row.supplierId != null &&
     row.issueRef != null
   );
+}
+
+/**
+ * Whether this row may be ticked ON THIS ORDER.
+ *
+ * `isSelectableForBuying` judges the DEMAND. This adds the one fact the demand
+ * cannot see: whether the order it belongs to has already bought everything it
+ * needed.
+ *
+ * WHY THE ROW ARITHMETIC IS NOT ENOUGH (YH, 2026-09-03 — "an ordered's
+ * checkbox still tickable"). The two numbers are computed from different
+ * facts and are allowed to disagree:
+ *
+ *   Status   per order line, `qty - stockTaken` against the units carried by
+ *            this order's OWN `po_line_sources` lineage on confirmed-sent
+ *            purchase orders. Customer-attributed and exact.
+ *   `toBuy`  the engine's remainder, drained from a per-SKU pool with NO
+ *            customer attribution.
+ *
+ * So an order whose own documents cover every unit it required could still
+ * carry a leaf with `toBuy > 0`, and the checkbox appeared beside an `Ordered`
+ * pill. Ticking it raises a SECOND purchase order for units this order has
+ * already bought and sent — the one duplication the pooled arithmetic cannot
+ * rule out on its own, because only lineage knows whose units they are.
+ *
+ * IT FAILS OPEN, deliberately. `ordered` requires lineage, and lineage exists
+ * only from migration 0382 with no backfill. An order whose purchase orders
+ * predate it scores `sentCoveredQty` 0, reads `blank`, and stays tickable —
+ * which is right: nothing has PROVEN those units were bought for this
+ * customer. This gate can therefore never hide genuine demand; it only refuses
+ * a buy the order's own documents already account for.
+ */
+export function isSelectableForOrder(
+  row: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+): boolean {
+  return orderStatus !== "ordered" && isSelectableForBuying(row);
 }
 
 /** Everything to Carres Klang — the standing Purchasing default (MASTER §5.4). */

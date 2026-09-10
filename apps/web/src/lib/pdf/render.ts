@@ -16,6 +16,7 @@ import { Document, pdf } from "@react-pdf/renderer";
 import { SalesOrderTemplate } from "./sales-order-template";
 import { InvoiceTemplate } from "./invoice-template";
 import { DoTemplate } from "./do-template";
+import { GrnTemplate } from "./grn-template";
 import { PoTemplate } from "./po-template";
 import { PickupEventTemplate } from "./pickup-event-template";
 import { ReceiptTemplate } from "./receipt-template";
@@ -26,6 +27,7 @@ import { registerNotoSansSC } from "./fonts/noto";
 import type {
   DoTemplateData,
   ExtensionAgreementTemplateData,
+  GrnTemplateData,
   InvoiceTemplateData,
   LoanNoteTemplateData,
   PoTemplateData,
@@ -87,6 +89,31 @@ export function renderExtensionAgreementPdf(
 
 export function renderDoPdf(data: DoTemplateData): Promise<Blob> {
   return toBlob(DoTemplate(data));
+}
+
+/**
+ * MANY Delivery Orders, one file — `Print {n} delivery orders` from the
+ * register's selection (owner correction 2026-09-06). The same lift as
+ * `renderCombinedSalesOrderPdf`: each document keeps its GOVERNED single-DO
+ * page unmodified — its `<Page>` is moved out of its own `<Document>` into one
+ * shared Document, and the template's footer reads the sub-document counters,
+ * so DO 7 of 12 still prints its own `Page 1 of 1`.
+ */
+export function renderCombinedDoPdf(list: DoTemplateData[]): Promise<Blob> {
+  const pages = list.map((data, i) => {
+    const doc = DoTemplate(data) as ReactElement<{ children: ReactElement }>;
+    return createElement(
+      doc.props.children.type,
+      { ...doc.props.children.props, key: `do-${i}` },
+    );
+  });
+  return toBlob(createElement(Document, null, ...pages) as ReactElement);
+}
+
+/** The formal Goods Received Note (owner correction 2026-09-06) — the GRN
+ *  object's preview, its Print and its Download PDF share this one call. */
+export function renderGrnPdf(data: GrnTemplateData): Promise<Blob> {
+  return toBlob(GrnTemplate(data));
 }
 
 /** Migration 0242 — ON LOAN delivery-note (the customer signs on hand-over of a

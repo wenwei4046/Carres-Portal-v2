@@ -61,6 +61,7 @@ function settings(over: Partial<PurchasingSettingsResponse> = {}): PurchasingSet
     earliestSellDays: 21,
     logisticsCallWorkingDays: 1,
     poDays: [1, 3, 5],
+    manualPurchaseMinDeliveryDays: 0,
     suppliers: [
       { id: NICE, name: "Nice Future", categories: ["mattress"], offDays: [0, 6], transitDays: 1 },
       { id: OHANA, name: "Ohana", categories: ["bedframe", "sofa"], offDays: [0], transitDays: 1 },
@@ -267,6 +268,42 @@ describe("Purchasing → Settings", () => {
     fireEvent.click(screen.getByTestId("safety-days-save"));
     await waitFor(() =>
       expect(setNumber).toHaveBeenCalledWith({ key: "order_by_buffer_days", value: 10 }),
+    );
+  });
+
+  /* 0422 — the Manual Purchase number sits directly under the earliest-sell
+     number, renders from the payload, and saves through the same door. */
+  it("renders the Manual Purchase earliest-date number from the payload, under the earliest-sell number", () => {
+    settingsQuery.mockReturnValue({
+      data: settings({ manualPurchaseMinDeliveryDays: 3 }),
+      isLoading: false,
+      error: null,
+    });
+    render(wrap(<OperationPurchasingSettings />));
+    expect(
+      screen.getByText("Earliest Delivery Date a Manual Purchase may ask for"),
+    ).toBeTruthy();
+    const input = screen.getByTestId("manual-purchase-min-delivery-days") as HTMLInputElement;
+    expect(input.value).toBe("3");
+    expect(input).toHaveAttribute("min", "0");
+    expect(input).toHaveAttribute("max", "365");
+    const earliestSell = screen.getByTestId("earliest-sell-days");
+    expect(
+      earliestSell.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("saving the Manual Purchase number PUTs /purchasing/settings/number by key", async () => {
+    render(wrap(<OperationPurchasingSettings />));
+    fireEvent.change(screen.getByTestId("manual-purchase-min-delivery-days"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("manual-purchase-min-delivery-days-save"));
+    await waitFor(() =>
+      expect(setNumber).toHaveBeenCalledWith({
+        key: "manual_purchase_min_delivery_days",
+        value: 3,
+      }),
     );
   });
 

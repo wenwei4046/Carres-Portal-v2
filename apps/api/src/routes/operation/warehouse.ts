@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { DB, reservedDrilldownQuery } from "@carres/shared";
+import { DB, reservedDrilldownQuery, buildInboundRegisterView, inboundArrivals, inboundUnresolvedSources, type InboundInput } from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
+import { readOptionalRelation } from "../../lib/optional-relation";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -51,6 +52,76 @@ operationWarehouseRouter.use("*", async (c, next) => {
     throw new HTTPException(403, { message: "operation only" });
   }
   await next();
+});
+
+/** Paginated, RLS-scoped reads: a truncated table must never look like a complete tally. */
+operationWarehouseRouter.get("/inbound", async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const limit = Math.min(
+    Math.max(1, Math.floor(Number(c.req.query("limit")) || 50)),
+    200,
+  );
+  const offset = Math.max(0, Math.floor(Number(c.req.query("offset")) || 0));
+  async function read(table: string, fields: string) {
+    const rows: Record<string, unknown>[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const result = await sb.from(table).select(fields).order(table === "arrival_source_units" ? "source_id" : "id").order(table === "arrival_source_units" ? "stock_item_id" : "id").range(offset, offset + 499);
+      if (result.error) throw result.error;
+      rows.push(...(result.data ?? []) as unknown as Record<string, unknown>[]);
+      if ((result.data?.length ?? 0) < 500) return rows;
+    }
+  }
+  /* The arrival-source objects are approved Inbound truth whose tables are
+     still an unnumbered draft (docs/stock/MASTER.md §13.9). Their absence
+     means this source kind has no records — it may never mean the register
+     failed to open. A real authority failure still travels untouched. */
+  const optional = (table: string, fields: string) =>
+    readOptionalRelation(() => read(table, fields), [] as Record<string, unknown>[]);
+  try {
+    const [pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, productSkus] = await Promise.all([
+      read("purchase_orders", "id,version,supplier_id,warehouse_id,destination_id,status,official_delivery_date,eta_date,placed_at,so"),
+      read("warehouses", "id,name"),
+      read("suppliers", "id,name"),
+      read("purchasing_destinations", "id,warehouse_id"),
+      read("ops_stock_items", "id,unit_code,po_no,qty,sku"),
+      /* `arrival_source_id` arrives with those same draft tables; without it
+         every receipt is simply PO-backed, which is what production holds. */
+      readOptionalRelation(
+        () => read("warehouse_receipts", "id,po_id,arrival_source_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+        null,
+      ).then((rows) =>
+        rows ??
+        read("warehouse_receipts", "id,po_id,actual_site_id,status,posted_at,grn_no,goods_received_at"),
+      ),
+      read("receiving_unit_results", "id,receipt_id,stock_item_id,outcome,issue_kind"),
+      read("purchase_order_lines", "id,po_id,qty,destination_id,sku"),
+      read("po_supplier_promises", "id,po_id,po_version,kind,answer,new_date,about_date,previous_date,reason,channel,recipient,evidence,reported_by,reported_at,recorded_by,recorded_at"),
+      optional("arrival_sources", "id,source_no,kind,claim_id,case_id,from_site_id,to_site_id,party_id,expected_date,collection_date,reason,cancelled_at,created_at,sales_order_ref"),
+      optional("arrival_source_units", "source_id,stock_item_id,replaces_item_id"),
+      optional("stock_operating_parties", "id,name"),
+      optional("arrival_source_events", "id,source_id,kind,unit_ids"),
+      read("product_skus", "id,sku,variant"),
+    ]);
+    const skuNames = (productSkus as Array<{ sku: string; variant: string | null }>).map(
+      (row) => ({ sku: row.sku, name: row.variant ?? null }),
+    );
+    const input = { pos, sites, suppliers, destinations, units, receipts, results, lines, promises, arrivalSources, sourceUnits, parties, sourceEvents, skuNames } as unknown as InboundInput;
+    const all = inboundArrivals(input);
+    const filters = new URLSearchParams();
+    for (const key of ["status", "sourceType", "site", "source", "date", "from", "to", "q"])
+      if (c.req.query(key)) filters.set(key, c.req.query(key)!);
+    const view = buildInboundRegisterView(all, filters, offset, limit);
+    return c.json({
+      arrivals: view.rows,
+      sites,
+      unresolvedSources: inboundUnresolvedSources(input),
+      page: { offset, limit, total: view.total },
+      facets: view.facets,
+    });
+  } catch (error) {
+    const mapped = mapPgError(error as Parameters<typeof mapPgError>[0]);
+    return c.json(mapped.body, mapped.status);
+  }
 });
 
 type LowStockStatus = "out" | "low" | "ok";

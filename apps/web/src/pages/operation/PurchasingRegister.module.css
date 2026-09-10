@@ -1,0 +1,170 @@
+/* Shared approved purchasing register palette. Geometry and grid behaviour stay intact. */
+.page {
+  background: #f6f7f9;
+  color: #1f2937;
+}
+
+.page [data-testid="sales-orders-grid"] {
+  --c-paper: #ffffff;
+  --c-cream: #fafbfc;
+  --c-ink: #1f2937;
+  --line: #d2dae3;
+  --fg-muted: #667085;
+  --fg-soft: #667085;
+  --c-burnt: var(--kit-blue-11);
+  --c-orange: var(--kit-blue-9);
+  --kit-blue-3: #edf5fc;
+  color: #1f2937;
+}
+
+.page [data-testid="selection-bar"] {
+  background: #f7f9fb;
+}
+
+.page [data-testid="grid-header"],
+.page [data-testid="grid-header"] th {
+  background: #b9c9d8;
+  color: #26384a;
+  border-color: #d2dae3;
+  font-weight: 600;
+}
+
+/* Neutral content surfaces; blue is reserved for the active parent. */
+.page :is([data-testid="grid-parent-row"], [data-testid^="mp-row-"]) {
+  --purchasing-row-bg: #ffffff;
+  /* Override the shared grid's !important clicked-row fill on this page only.
+     Expansion, rather than the last clicked row, owns the blue background. */
+  background: var(--purchasing-row-bg) !important;
+}
+
+.page :is([data-testid="grid-parent-row"], [data-testid^="mp-row-"]):hover {
+  --purchasing-row-bg: #f5f8fb;
+}
+
+.page :is([data-testid="grid-parent-row"], [data-testid^="mp-row-"]):has(button[aria-expanded="true"]) {
+  --purchasing-row-bg: #edf5fc;
+  --kit-blue-3: #edf5fc;
+  border-bottom-color: #d2dae3;
+}
+
+/* Paint pinned cells too, so each row remains one continuous surface. */
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) :is([data-testid="grid-parent-row"], [data-testid^="mp-row-"]) > td {
+  background: var(--purchasing-row-bg);
+  border-color: #d2dae3;
+}
+
+.page :is([data-testid="grid-parent-row"], [data-testid^="mp-row-"]):has(button[aria-expanded="true"]) button[aria-expanded] {
+  --fg-muted: #344054;
+}
+
+.page [data-testid="grid-expansion-cell"],
+.page [data-testid^="grid-expansion-gutter-"] {
+  /* The grid's inline top border uses this local token; keep its 1px geometry. */
+  --line: #d2dae3;
+  background: #f8fafc;
+  border-bottom: 1px solid #d2dae3;
+}
+
+.page [data-testid="grid-expansion-cell"] {
+  position: relative;
+}
+
+/* Overlay the connector so the detail's width, padding and hit targets stay intact. */
+.page [data-testid="grid-expansion-cell"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--kit-blue-9);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) {
+  background: #ffffff;
+  border-color: #d2dae3;
+  border-radius: 2px;
+  box-shadow: none;
+  color: #1f2937;
+}
+
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) :is(thead, tr, th, td) {
+  border-color: #d2dae3;
+}
+
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) thead,
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) th {
+  background: #e7ecf1;
+  color: #26384a;
+  font-weight: 600;
+}
+
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) tbody {
+  background: #ffffff;
+}
+
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) :is(:global(.text-kit-slate-11), [data-absence="true"], :global(.text-base-600)) {
+  color: #667085;
+}
+
+.page :is([data-testid="goods-mini-table"], [data-testid^="mp-expansion-"]) :global(.text-base-900) {
+  color: #1f2937;
+}
+
+.page [data-testid="so-batch-grid"] :global(.text-kit-red-11) {
+  color: #344054;
+}
+
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) select {
+  color: #1f2937;
+  background-color: #ffffff;
+  border-color: #d2dae3;
+  border-radius: 4px;
+}
+
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) select:focus-visible {
+  outline: 2px solid var(--kit-blue-9);
+  outline-offset: 1px;
+}
+
+/* Text-only hierarchy, scoped to this destination. */
+.page [data-testid="purchasing-tabs-module-word"] {
+  color: #111827;
+}
+
+.page :is([data-testid="so-batch-rail"], [data-testid="manual-purchase-rail"], [data-testid="po-filter-rail"]) button[aria-pressed],
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) :global(.text-kit-slate-12),
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) select option {
+  color: #1f2937;
+}
+
+.page :is([data-testid="so-batch-rail"], [data-testid="manual-purchase-rail"], [data-testid="po-filter-rail"]) :global(.text-kit-slate-9) {
+  color: #667085;
+}
+
+.page :is([data-testid="so-batch-grid"], [data-testid="mp-register-surface"], [data-testid="po-register-content"]) select option:disabled {
+  color: #98a2b3;
+}
+
+/* The shared sidebar is outside the page. Apply text refinements only while
+   this register is mounted, and preserve its selected navigation styling. */
+:global(body):has(.page) :global(aside) :is(a[data-testid^="nav-child-"], button[data-testid^="nav-module-"]):not(:global(.bg-kit-blue-3)) {
+  color: #344054;
+}
+
+:global(body):has(.page) :global(aside) button[data-testid^="nav-group-"] {
+  color: #667085;
+}
+
+:global(body):has(.page) :global(aside) [data-soon="1"],
+:global(body):has(.page) :global(aside) [data-soon="1"] > span {
+  color: #98a2b3;
+}
+
+.page [data-testid="mp-register-surface"] :global(.text-base-400) {
+  color: #98a2b3;
+}
+
+.page [data-testid="po-register-content"] :global(.text-kit-slate-9) {
+  color: #667085;
+}

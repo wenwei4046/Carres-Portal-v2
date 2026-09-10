@@ -20,6 +20,7 @@ import {
   type PortalNavGroup,
   type PortalNavItem,
   type PortalSection,
+  WAREHOUSE_LANDING_KEY,
 } from "./portal-nav";
 import {
   purchasingChildBlocks,
@@ -35,6 +36,7 @@ import {
 } from "./purchasing-sidebar";
 
 const COLLAPSE_KEY = "ops-sidebar-collapsed";
+const NARROW_DESKTOP_QUERY = "(max-width: 1279px)";
 
 /* ⭐ THE MEASURED RAIL (CARD-2026-08-19-sidebar-expandable-modules §3).
  *
@@ -95,6 +97,7 @@ const GROUP_GEOM: ChildGeom = {
 };
 
 const PURCHASING: PortalSection = "Purchasing";
+const WAREHOUSE: PortalSection = "Warehouse";
 
 /**
  * Unified Internal Portal sidebar (2026-06-30, Loo).
@@ -161,11 +164,23 @@ export default function PortalSidebar() {
   // Collapse — self-owned, persisted. Icon rail = more room for wide tables.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(COLLAPSE_KEY) === "1";
+      return (
+        localStorage.getItem(COLLAPSE_KEY) === "1" ||
+        window.matchMedia?.(NARROW_DESKTOP_QUERY).matches === true
+      );
     } catch {
       return false;
     }
   });
+  useEffect(() => {
+    const media = window.matchMedia?.(NARROW_DESKTOP_QUERY);
+    if (!media) return;
+    const collapseAtNarrowDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setCollapsed(true);
+    };
+    media.addEventListener("change", collapseAtNarrowDesktop);
+    return () => media.removeEventListener("change", collapseAtNarrowDesktop);
+  }, []);
   const toggleCollapse = () =>
     setCollapsed((c) => {
       const next = !c;
@@ -464,6 +479,14 @@ export default function PortalSidebar() {
     if (block.module.section === PURCHASING) {
       const named = block.pages.find(
         (p) => p.key === PURCHASING_LANDING_KEY && !p.soon,
+      );
+      if (named) return named;
+    }
+    /* Warehouse names its landing too (CARD-2026-09-01-warehouse-01-sidebar):
+     * `Inventory` — the Unit Register — until Dashboard is built. */
+    if (block.module.section === WAREHOUSE) {
+      const named = block.pages.find(
+        (p) => p.key === WAREHOUSE_LANDING_KEY && !p.soon,
       );
       if (named) return named;
     }

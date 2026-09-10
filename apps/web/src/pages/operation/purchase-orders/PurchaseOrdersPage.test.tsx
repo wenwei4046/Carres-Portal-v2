@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const navigate = vi.fn();
 const refetch = vi.fn();
 const reviseMutate = vi.fn();
+const supplierDateMutate = vi.fn();
 let auditError = false;
 let connectionError = false;
 let requiredLoading = false;
@@ -12,6 +13,8 @@ let connectionLoading = false;
 let connectionEmpty = false;
 let receivingReturnReason: string | null = null;
 type TestPromise = {
+  po_version?: number; channel?: string; recipient?: string; evidence?: string;
+  reported_by?: string; reported_at?: string; recorded_by?: string;
   kind: string;
   answer: string;
   about_date: string | null;
@@ -31,6 +34,7 @@ const queryData = {
       sup_status: "pending",
       so: null,
       so_refs: null,
+      official_delivery_date: "2026-09-10",
       eta_date: "2026-09-10",
       expected_ready_date: null,
       purpose: "customer_sales",
@@ -39,7 +43,13 @@ const queryData = {
       placed_at: "2026-08-28T08:00:00Z",
       sources: [
         { kind: "sales_order" as const, reference: "SO-4001" },
-        { kind: "manual_purchase" as const, reference: "MPR-20260828-0042" },
+        {
+          kind: "manual_purchase" as const,
+          reference: "Manual Purchase",
+          request_id: "request-1",
+          purpose: "showroom_display",
+          proceed_date: "2026-08-28",
+        },
       ],
       sends: [
         {
@@ -56,7 +66,9 @@ const queryData = {
         },
       ],
       promises: [{
-        kind: "tomorrow_delivery",
+      po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+      reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
+      kind: "tomorrow_delivery",
         answer: "shipping",
         about_date: "2026-09-10",
         previous_date: null,
@@ -70,6 +82,7 @@ const queryData = {
           sku: "MAT-K-001",
           qty: 3,
           received_qty: 1,
+          identity_mode: null as "exact_unit" | "quantity" | null,
           model_name: "Cody",
           size: "King",
           destination_id: "destination-1" as string | null,
@@ -85,7 +98,14 @@ const queryData = {
           ],
           governed_sources: [
             { kind: "sales_order" as const, reference: "SO-4001", qty: 1 },
-            { kind: "manual_purchase" as const, reference: "MPR-20260828-0042", qty: 2 },
+            {
+              kind: "manual_purchase" as const,
+              reference: "Manual Purchase",
+              qty: 2,
+              request_id: "request-1",
+              purpose: "showroom_display",
+              proceed_date: "2026-08-28",
+            },
           ],
         },
       ],
@@ -166,8 +186,28 @@ vi.mock("@/lib/queries", () => ({
     isError: false,
     refetch,
   }),
-  useOperationPoDuty: () => ({
-    data: { month: "2026-08", holder: { userId: "user-duty", name: "Yee Jean", email: "yj@carres.com", assignedBy: null } },
+  useWorkspaceDuties: () => ({
+    data: {
+      can_assign: false,
+      duties: [{
+        key: "po_duty",
+        label: "PO Duty",
+        resolution: {
+          duty_key: "po_duty",
+          normal_user_id: "user-duty",
+          normal_user_name: "Yee Jean",
+          acting_user_id: null,
+          acting_user_name: null,
+          actor_user_id: "user-duty",
+          is_cover: false,
+          is_superuser: false,
+          allowed: false,
+          source: "assignment",
+        },
+        assignments: [],
+        covers: [],
+      }],
+    },
     isLoading: false,
     isError: false,
     refetch,
@@ -177,12 +217,14 @@ vi.mock("@/lib/queries", () => ({
   useOperationSupplierClaims: () => ({ isLoading: connectionLoading, isError: connectionError, refetch, data: connectionError || connectionLoading ? undefined : { claims: connectionEmpty ? [] : [{ id: "claim-1", claim_no: "SC-1001", requested_action: "return", status: "open" }], counts: { open: connectionEmpty ? 0 : 1, closed: 0, all: connectionEmpty ? 0 : 1 } } }),
   useOperationPoAudit: () => ({ isError: auditError, refetch, data: auditError ? undefined : { revisions: [{ id: "rev-1", rev_no: 1, reason: "Deliver To changed", created_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean" }], history: [{ id: "hist-1", text: "Purchase order revised", occurred_at: "2026-08-28T09:00:00Z", actor_name: "Yee Jean", by_role: "operation" }] } }),
   useRecordSend: () => ({ mutate: vi.fn() }),
+  useRecordSupplierDate: () => ({ mutate: supplierDateMutate, isPending: false }),
   useRevisePo: () => ({ mutate: reviseMutate, isPending: false }),
 }));
 
 vi.mock("../components/PoIssueEvidence", () => ({
   default: () => <div data-testid="po-issue-evidence">Issue evidence</div>,
   doorsForIssuedPo: () => ({}),
+  CHANNEL_WORD: { whatsapp: "WhatsApp", email: "Email", print: "Printed" },
 }));
 
 vi.mock("@/lib/api", () => ({ apiFetch: vi.fn().mockResolvedValue({}) }));
@@ -201,6 +243,7 @@ function renderPage(path = "/operation/procurement") {
 
 beforeEach(() => {
   navigate.mockReset();
+  supplierDateMutate.mockReset();
   auditError = false;
   connectionError = false;
   requiredLoading = false;
@@ -215,8 +258,14 @@ beforeEach(() => {
     { id: "destination-2", name: "Carres Penang", is_default: false },
   );
   queryData.pos[0]!.purchase_order_lines[0]!.destination_id = "destination-1";
+  queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = null;
   queryData.pos[0]!.eta_date = "2026-09-10";
+  queryData.pos[0]!.official_delivery_date = "2026-09-10";
+  queryData.pos[0]!.sends[0]!.po_version = 1;
+  queryData.pos[0]!.version = 2;
   queryData.pos[0]!.promises.splice(0, queryData.pos[0]!.promises.length, {
+    po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+    reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
     kind: "tomorrow_delivery",
     answer: "shipping",
     about_date: "2026-09-10",
@@ -231,15 +280,22 @@ beforeEach(() => {
 describe("Purchase Orders Register", () => {
   it("uses the governed columns and filter rail, and does not hide old or cancelled POs", () => {
     renderPage();
-    expect(screen.getByTestId("register-grid")).toHaveTextContent(
-      "PO No. | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Ordered | Received | Open Balance | Current Version | Supplier Has | Work",
+    const grid = screen.getByTestId("register-grid");
+    expect(grid).toHaveTextContent(
+      "PO No | PO Issued | Supplier | Source | Deliver To | PO Delivery Date | Supplier Delivery Date | Order Qty | Received Qty | Pending Delivery Qty | PO Version | Sent to Supplier",
     );
+    /* The retired words may not come back: ERP jargon (`Open Balance` reads as
+       money) and the Work column (a Register lists facts; actions live in
+       My Work, Team Work, the PO detail and Order Route). */
+    for (const retired of ["Ordered |", "Open Balance", "Current Version", "Supplier Has", "| Work"]) {
+      expect(grid).not.toHaveTextContent(retired);
+    }
     const rail = within(screen.getByTestId("po-filter-rail"));
     for (const word of [
       "All purchase orders",
       "PDF not sent",
-      "Supplier date missing",
-      "Supplier date passed",
+      "Supplier has not confirmed the PO date",
+      "Supplier delivery date passed",
       "Partly received",
       "Completed",
     ]) expect(rail.getByRole("button", { name: new RegExp(word) })).toBeInTheDocument();
@@ -255,7 +311,7 @@ describe("Purchase Orders Register", () => {
     expect(railEl.textContent).not.toContain("Filters");
     expect(railEl.textContent).not.toContain("—");
     expect(railEl.textContent).not.toContain("supplier update required");
-    const headings = ["PURCHASE ORDERS", "DOCUMENT", "DELIVERY DATE", "RECEIVING"];
+    const headings = ["PURCHASE ORDERS", "DOCUMENT", "SUPPLIER REPLY", "RECEIVING"];
     for (const heading of headings) expect(within(railEl).getByText(heading)).toBeInTheDocument();
     const order = headings.map((heading) => railEl.textContent!.indexOf(heading));
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -293,6 +349,8 @@ describe("Purchase Orders Register", () => {
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("Same as PO");
 
     queryData.pos[0]!.promises.push({
+      po_version: 2, channel: "whatsapp", recipient: "Factory", evidence: "PO-20260828-4827/reply.png",
+      reported_by: "Supplier staff", reported_at: "2026-09-09T09:00:00Z", recorded_by: "user-duty",
       kind: "tomorrow_delivery",
       answer: "delayed",
       about_date: "2026-09-10",
@@ -306,18 +364,54 @@ describe("Purchase Orders Register", () => {
     changed.unmount();
   });
 
-  it("shows two-line work copy with structured real-roster owner metadata", () => {
+  it("lists facts only: no action sentence and no owner avatar in any register cell", () => {
     renderPage();
     const row = screen.getByTestId("grid-row-PO-20260828-4827");
-    expect(row).toHaveTextContent("Version 2 has not been sent");
-    expect(row).toHaveTextContent("Issue Version 2 to Hooka");
-    expect(row.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
+    expect(row).not.toHaveTextContent("has not been sent");
+    expect(row).not.toHaveTextContent("Issue");
+    expect(row.querySelector("[data-owner-id]")).toBeNull();
+  });
+
+  it("shows the current official version as PO V{n} and the latest confirmed-sent version beside it", () => {
+    renderPage();
+    const row = screen.getByTestId("grid-row-PO-20260828-4827");
+    /* The official document is V2; only V1 was ever confirmed sent — the
+       mismatch is two visibly different values, `PO V2` against `PO V1`,
+       with the send evidence (channel · date) on the second line. */
+    expect(row).toHaveTextContent("PO V2");
+    expect(row).toHaveTextContent("PO V1");
+    expect(row).toHaveTextContent("WhatsApp · Thu, 27 Aug");
+    expect(row).not.toHaveTextContent("Version 2");
+  });
+
+  it("keeps missing send evidence visibly missing instead of fabricating it", () => {
+    renderPage();
+    /* PO-LEGACY has no confirmed-send record; it reads `Not sent` forever. */
+    expect(screen.getByTestId("grid-row-PO-LEGACY")).toHaveTextContent("Not sent");
+  });
+
+  it("totals the footer with the approved quantity words", () => {
+    renderPage();
+    expect(screen.getByTestId("register-grid")).toHaveTextContent(
+      "2 purchase orders · Order Qty 3 · Received Qty 1 · Pending Delivery Qty 2",
+    );
+  });
+
+  it("keeps the work copy in the PO detail, where actions live", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const work = screen.getByTestId("po-object-work");
+    expect(work).toHaveTextContent("PO V2 has not been sent");
+    expect(work).toHaveTextContent("Issue PO V2 to Hooka");
+    expect(work.querySelector('[data-owner-id="user-duty"]')).toHaveAttribute("data-owner-duty", "PO Duty");
   });
 
   it("keeps every governed source searchable while the register cell stays compact", () => {
+    /* Card 08 §3.5 — the manual source's visible token is the label, never
+       an MPR number; the SO keeps its real number. */
     renderPage();
     expect(screen.getByTestId("grid-row-PO-20260828-4827")).toHaveTextContent("SO-4001 +1");
-    expect(screen.getByTestId("register-search-index")).toHaveTextContent("MPR-20260828-0042");
+    expect(screen.getByTestId("register-search-index")).toHaveTextContent("Manual Purchase");
+    expect(screen.getByTestId("register-search-index")).not.toHaveTextContent("MPR-");
   });
 
   it("opens an object from the live register without changing the page's Hook order", () => {
@@ -335,6 +429,103 @@ describe("Purchase Orders Register", () => {
   });
 });
 
+vi.mock("@/components/ClaimPhotoUploadField", () => ({
+  default: ({ onChange }: { onChange: (paths: string[]) => void }) =>
+    <button onClick={() => onChange(["PO-20260828-4827/reply.png"])}>Upload reply evidence</button>,
+}));
+
+describe("the evidenced supplier reply door", () => {
+  function sent() { queryData.pos[0]!.sends[0]!.po_version = 2; }
+  function evidence() {
+    fireEvent.change(screen.getByLabelText("Recipient"), { target: { value: "Factory group" } });
+    fireEvent.change(screen.getByLabelText("Reported by"), { target: { value: "Factory staff" } });
+    fireEvent.change(screen.getByLabelText("Reported at"), { target: { value: "2026-08-28T10:00" } });
+    fireEvent.click(screen.getByText("Upload reply evidence"));
+  }
+  it("never offers RECORDING before this version was sent — history stays readable", () => {
+    /* 0430 — the record form still needs the current version's confirmed
+       send; but a recorded reply may never disappear behind a revision, so
+       the block itself renders as read-only history. */
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(screen.queryByTestId("po-supplier-date-input")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("po-supplier-date-save")).not.toBeInTheDocument();
+    expect(screen.getByTestId("po-supplier-reply-history")).toBeInTheDocument();
+  });
+  it("asks WHY only for a later date, pre-selects nothing, and sends one date for the server to classify", () => {
+    /* 0430 — the browser used to submit `answer: "delayed"` with a
+       pre-selected "Production Delay" the operator never chose. Now a later
+       date blocks the save until a reason is CHOSEN, and the wire carries the
+       date alone — classification is the server's. */
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    /* The input is LABELLED with whose date it is, not a bare "Date". */
+    expect(screen.getByTestId("po-supplier-date-input").closest("label")).toHaveTextContent("Supplier Delivery Date");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
+    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Later than the PO date");
+    evidence();
+    /* Evidence complete, reason NOT chosen — the save must stay closed. */
+    expect(screen.getByTestId("po-supplier-date-reason")).toHaveValue("");
+    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("po-supplier-date-reason"), { target: { value: "Material Shortage" } });
+    fireEvent.click(screen.getByTestId("po-supplier-date-save"));
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({
+      poVersion: 2, supplierDate: "2026-09-15", reason: "Material Shortage",
+      channel: "whatsapp", recipient: "Factory group", evidence: "PO-20260828-4827/reply.png",
+      reportedBy: "Factory staff",
+    });
+    expect(supplierDateMutate.mock.calls[0]![0]).not.toHaveProperty("answer");
+  });
+  it("records an EARLIER date without any delay reason", () => {
+    /* An earlier date is not a delay: the reason question never appears and
+       nothing reason-shaped reaches the wire. */
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-05" } });
+    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Earlier than the PO date");
+    expect(screen.queryByTestId("po-supplier-date-reason")).not.toBeInTheDocument();
+    evidence();
+    fireEvent.click(screen.getByTestId("po-supplier-date-save"));
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({ poVersion: 2, supplierDate: "2026-09-05" });
+    expect(supplierDateMutate.mock.calls[0]![0]).not.toHaveProperty("reason");
+  });
+  it("discards an unfinished reply when the official version changes", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    const view = renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-15" } });
+    evidence();
+    queryData.pos[0]!.version = 3;
+    queryData.pos[0]!.sends[0]!.po_version = 3;
+    view.rerender(<MemoryRouter initialEntries={["/operation/procurement?po=PO-20260828-4827"]}><PurchaseOrdersPage /></MemoryRouter>);
+    expect(screen.getByTestId("po-supplier-date-input")).toHaveValue("");
+    expect(screen.getByTestId("po-supplier-date-save")).toBeDisabled();
+  });
+  it("can confirm the original PO date without changing it", () => {
+    sent(); queryData.pos[0]!.promises = [];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    fireEvent.change(screen.getByTestId("po-supplier-date-input"), { target: { value: "2026-09-10" } });
+    expect(screen.getByTestId("po-supplier-date-compare")).toHaveTextContent("Same as PO");
+    evidence(); fireEvent.click(screen.getByTestId("po-supplier-date-save"));
+    expect(supplierDateMutate.mock.calls[0]![0]).toMatchObject({ supplierDate: "2026-09-10", poVersion: 2 });
+  });
+  it("shows a reply recorded without evidence instead of claiming a proven absence", () => {
+    /* 0430 — a pre-evidence reply linked to this version is a recorded fact.
+       It never qualifies as the governed Supplier Delivery Date, but the block
+       must say what exists rather than 'the supplier has said nothing'. */
+    sent();
+    queryData.pos[0]!.promises = [{
+      kind: "tomorrow_delivery", answer: "shipping", about_date: "2026-09-10",
+      previous_date: null, new_date: null, reason: null, po_version: 2,
+      channel: null, recipient: null, evidence: null, reported_by: null,
+      reported_at: null, recorded_by: null, recorded_at: "2026-08-27T08:00:00Z",
+    } as never];
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const block = screen.getByTestId("po-supplier-date");
+    expect(block).toHaveTextContent("Supplier reply recorded without evidence");
+    expect(screen.getByTestId("po-supplier-reply-history")).toHaveTextContent("PO V2");
+    expect(screen.getByTestId("po-supplier-reply-history")).toHaveTextContent("Confirms the PO date");
+  });
+});
+
 describe("Purchase Order object", () => {
   it("opens the governed object views and preserves document connections", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
@@ -342,7 +533,8 @@ describe("Purchase Order object", () => {
     for (const view of ["Document", "Revisions", "History", "Order Route"]) {
       expect(screen.getByRole("button", { name: view })).toBeInTheDocument();
     }
-    expect(screen.getByText("U1-000-001")).toBeInTheDocument();
+    /* The unit sits on its own Goods line, keyed by SKU, not in a card of its own. */
+    expect(within(screen.getByTestId("po-line-units-line-1")).getByText("U1-000-001")).toBeInTheDocument();
     expect(screen.getByText("DO-SUP-9")).toBeInTheDocument();
     expect(screen.getByText("SC-1001")).toBeInTheDocument();
   });
@@ -357,13 +549,44 @@ describe("Purchase Order object", () => {
     connectionLoading = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
     expect(screen.getAllByText("Loading…")).toHaveLength(3);
-    expect(screen.queryByText("No Unit ID is recorded for this PO.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No Unit ID")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ UNIT ID BORN WITH OFFICIAL PO (owner ruling 2026-09-07, Card 10). */
+  it("heads the goods-line column `Unit ID` and lists the line's own IDs, without a database status word", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    expect(screen.getByText("Unit ID")).toBeInTheDocument();
+    expect(screen.queryByText("Unit IDs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Item ID")).not.toBeInTheDocument();
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByText("U1-000-001")).toBeInTheDocument();
+    expect(cell.queryByText("incoming")).not.toBeInTheDocument();
+  });
+
+  it("prints `—` for a quantity-scoped line — intentional, never `Not allocated`", () => {
+    queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "quantity";
+    connectionEmpty = true;
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByText("—")).toBeInTheDocument();
+    expect(cell.queryByText("Not allocated")).not.toBeInTheDocument();
+    expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
+    expect(cell.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("names an exact-unit line with no Unit IDs as an integrity failure, not an empty state", () => {
+    queryData.pos[0]!.purchase_order_lines[0]!.identity_mode = "exact_unit";
+    connectionEmpty = true;
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const cell = within(screen.getByTestId("po-line-units-line-1"));
+    expect(cell.getByRole("alert")).toHaveTextContent("Unit IDs missing on this line — do not send this PO");
+    expect(cell.queryByText("No Unit ID")).not.toBeInTheDocument();
   });
 
   it("states successful empty connections instead of leaving blank panels", () => {
     connectionEmpty = true;
     renderPage("/operation/procurement?po=PO-20260828-4827");
-    expect(screen.getByText("No Unit ID is recorded for this PO.")).toBeInTheDocument();
+    expect(within(screen.getByTestId("po-line-units-line-1")).getByText("No Unit ID")).toBeInTheDocument();
     expect(screen.getByText("No receiving session is connected to this PO.")).toBeInTheDocument();
     expect(screen.getByText("No claim or return is connected to this PO.")).toBeInTheDocument();
   });
@@ -374,6 +597,59 @@ describe("Purchase Order object", () => {
     fireEvent.click(screen.getByRole("button", { name: "Order Route" }));
     expect(screen.getByText("2 connected")).toBeInTheDocument();
     expect(screen.getByText("SC-1001 · Receiving return")).toBeInTheDocument();
+  });
+
+  /* ⭐ THE FACTS AND THE DOCUMENT ARE READ TOGETHER (YH, 2026-09-03).
+     The preview used to sit BELOW every block, so checking a goods line against
+     what the supplier actually received meant scrolling the two apart. They are
+     now two panes that each scroll on their own — the Sales Order's shape —
+     and the document is paper, not a framed PDF viewer. */
+  it("shows the official document beside the facts as two self-scrolling panes", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const column = screen.getByTestId("po-document-column");
+    expect(within(column).getByLabelText("Official purchase order preview")).toBeInTheDocument();
+    expect(within(column).queryByTitle("Official purchase order preview")).toBeNull();
+    const panes = column.parentElement!;
+    expect(panes.className).toContain("lg:flex-row");
+    /* Each pane scrolls on its own, and the page does not. */
+    expect(panes.firstElementChild?.className).toContain("lg:overflow-auto");
+    expect(column.className).toContain("lg:overflow-auto");
+    /* The Goods lines table sets `min-w-[900px]`. Without `min-w-0` the flex
+       item sizes to it and the document pane collapses — the one failure this
+       layout has, and the reason the class is asserted rather than eyeballed. */
+    expect(panes.firstElementChild?.className).toContain("min-w-0");
+  });
+
+  it("shows the print-data refusal and corrective action instead of a generic PDF error", async () => {
+    vi.mocked(apiFetch).mockRejectedValue({
+      body: { code: "destination_address_missing", message: "No address on file for this PO's destination" },
+    });
+    try {
+      renderPage("/operation/procurement?po=PO-20260828-4827");
+      expect(await screen.findByText("No address on file for this PO's destination")).toBeInTheDocument();
+      expect(screen.getByText(/Ask Purchasing to add the address/)).toBeInTheDocument();
+      expect(screen.queryByText("The official PDF could not be opened")).toBeNull();
+    } finally {
+      vi.mocked(apiFetch).mockResolvedValue({});
+    }
+  });
+
+  it("wears the Sales Order's card heading and keeps the long Unit ID list last (2026-09-04)", () => {
+    renderPage("/operation/procurement?po=PO-20260828-4827");
+    const facts = screen.getByTestId("po-document-panes").firstElementChild!;
+    const heads = within(facts as HTMLElement).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    /* Same card as the Sales Order: the mono, tracked heading face. */
+    const po = within(facts as HTMLElement).getByRole("heading", { level: 2, name: "Purchase order" });
+    expect(po.className).toContain("font-mono");
+    /* Receiving, then Claims and returns, each a row of its own. No Unit IDs
+       card: a unit is a row of its Goods line. */
+    const order = ["Receiving", "Claims and returns"].map((t) => heads.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(heads).not.toContain("Unit IDs");
+    const cards = screen.getByRole("heading", { level: 2, name: "Receiving" }).closest("section")!.parentElement!;
+    expect(cards.className).toContain("flex-col");
+    expect(cards.className).not.toContain("sm:grid-cols-2");
   });
 
   it("uses the 50/50 official-document layout only for issue or revision work", () => {
@@ -413,7 +689,7 @@ describe("Purchase Order object", () => {
     fireEvent.change(screen.getByLabelText("Why"), {
       target: { value: "Send this line to Penang" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save Version 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Send this line to Penang",
@@ -437,7 +713,7 @@ describe("Purchase Order object", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revise" }));
     fireEvent.change(screen.getByLabelText("Qty for MAT-K-001"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("Why"), { target: { value: "Customer quantity changed" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save Version 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save PO V3" }));
     expect(reviseMutate).toHaveBeenCalledWith(
       {
         reason: "Customer quantity changed",

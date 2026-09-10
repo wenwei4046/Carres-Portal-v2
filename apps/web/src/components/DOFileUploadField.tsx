@@ -27,11 +27,19 @@ const MAX_SIZE = 10 * 1024 * 1024;
 
 type Props = {
   poId: string;
+  arrivalSourceId?: string;
+  imageOnly?: boolean;
   doNumber: string;
   onUploaded: (filePath: string) => void;
 };
 
-export default function DOFileUploadField({ poId, doNumber, onUploaded }: Props) {
+export default function DOFileUploadField({
+  poId,
+  doNumber,
+  onUploaded,
+  arrivalSourceId,
+  imageOnly = false,
+}: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewName, setPreviewName] = useState<string | null>(null);
@@ -41,32 +49,45 @@ export default function DOFileUploadField({ poId, doNumber, onUploaded }: Props)
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!ALLOWED_MIMES.includes(file.type)) {
-      setError(`Unsupported file type: ${file.type || "unknown"}. Use PDF, JPG, or PNG.`);
+    if (
+      !ALLOWED_MIMES.includes(file.type) ||
+      (imageOnly && file.type === "application/pdf")
+    ) {
+      setError(
+        `Unsupported file type: ${file.type || "unknown"}. Use ${imageOnly ? "JPG or PNG" : "PDF, JPG, or PNG"}.`,
+      );
       return;
     }
     if (file.size > MAX_SIZE) {
-      setError(`File too large (${Math.round(file.size / 1024 / 1024)} MB). Max 10 MB.`);
+      setError(
+        `File too large (${Math.round(file.size / 1024 / 1024)} MB). Max 10 MB.`,
+      );
       return;
     }
 
     setBusy(true);
     try {
       const sign = await apiFetch<{ token: string; path: string }>(
-        "/api/storage/dos/sign-upload",
+        arrivalSourceId
+          ? `/api/operation/arrival-sources/${arrivalSourceId}/proof`
+          : "/api/storage/dos/sign-upload",
         {
           method: "POST",
-          body: JSON.stringify({
-            po_id: poId,
-            do_number: doNumber,
-            mime_type: file.type,
-            size_bytes: file.size,
-          }),
+          body: JSON.stringify(
+            arrivalSourceId
+              ? { mime_type: file.type, size_bytes: file.size }
+              : {
+                  po_id: poId,
+                  do_number: doNumber,
+                  mime_type: file.type,
+                  size_bytes: file.size,
+                },
+          ),
         },
       );
 
       const { error: uploadErr } = await supabase.storage
-        .from("delivery-orders")
+        .from(arrivalSourceId ? "arrival-proofs" : "delivery-orders")
         .uploadToSignedUrl(sign.path, sign.token, file);
 
       if (uploadErr) throw uploadErr;
@@ -83,13 +104,45 @@ export default function DOFileUploadField({ poId, doNumber, onUploaded }: Props)
 
   return (
     <div>
+      {/* ⛔ THE GUARD ITS OWN SIBLING ALREADY HAS (YH, 2026-09-02, defect 30).
+          The upload names its files after the DO number, so attaching a photo
+          before typing one is rejected by `/api/storage/dos/sign-upload` - and
+          the rejection was printed VERBATIM under the file picker:
+          "String must contain at least 3 character(s)". A programmer's message,
+          naming nothing, sitting under the wrong control, and impossible to
+          connect to the Save button's own "Save - add a DO number".
+          Photo-first is the natural order when you are standing at the lorry
+          holding the phone and the paper, so operators met this constantly.
+          `ClaimPhotoUploadField` - the field directly beside this one - has
+          disabled its input below three characters and explained why since it
+          shipped. Two sibling fields, one guard, and only this one lacked it. */}
       <input
         type="file"
-        accept=".pdf,image/jpeg,image/png"
+        accept={
+          imageOnly ? "image/jpeg,image/png" : ".pdf,image/jpeg,image/png"
+        }
         onChange={handleChange}
-        disabled={busy}
-        aria-label="DO file"
+        disabled={busy || doNumber.trim().length < 3}
+        aria-label={
+          imageOnly
+            ? "Doorstep photos"
+            : arrivalSourceId
+              ? "Handover proof"
+              : "DO file"
+        }
       />
+      {doNumber.trim().length < 3 && (
+        <p
+          className="text-label text-base-500 mt-1 font-body"
+          data-testid="do-file-needs-number"
+        >
+          {imageOnly
+            ? "Enter the handover evidence reference first."
+            : arrivalSourceId
+              ? "Enter the handover document number first."
+              : "Enter the supplier DO number first — the file is named after it."}
+        </p>
+      )}
       {previewName && (
         <p className="text-body text-base-600 mt-1">Uploaded: {previewName}</p>
       )}

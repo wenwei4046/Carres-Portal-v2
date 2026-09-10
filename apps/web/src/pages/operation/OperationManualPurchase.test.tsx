@@ -343,7 +343,7 @@ function mount() {
 
 async function loaded() {
   mount();
-  await screen.findByText("REQ-0001");
+  await screen.findByTestId(`mp-open-${REQ1}`);
 }
 
 async function openWorkspace() {
@@ -373,10 +373,14 @@ function pickDeliveryDate(dayOfMonth = 15) {
 }
 
 describe("the register — one request per row (card §7)", () => {
-  it("lists requests with the REQ- series and the ruled columns", async () => {
+  it("lists requests with NO visible number — Card 08: business facts only", async () => {
     await loaded();
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    // The stored legacy identities exist in the payload and never render.
+    expect(document.body.textContent).not.toContain("REQ-0001");
+    expect(document.body.textContent).not.toContain("MPR");
+    expect(document.body.textContent).not.toContain("Manual Purchase No");
     // `PR-` is refused: 2990s prints it for a purchase return.
     expect(document.body.textContent).not.toMatch(/\bPR-\d/);
   });
@@ -387,8 +391,8 @@ describe("the register — one request per row (card §7)", () => {
     // REQ-0001's switch was ON and nobody decided; REQ-0002/3 never asked.
     expect(within(grid).getByText("Need approval")).toBeInTheDocument();
     expect(within(grid).getAllByText("No approval needed").length).toBe(2);
-    // The second line names the REAL approver, only while approval is needed.
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    // The register shows only the badge; owner details remain in the object.
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
   });
 
   it("no money renders anywhere — purchasing has no money", async () => {
@@ -412,7 +416,7 @@ describe("the register — one request per row (card §7)", () => {
     expect(within(grid).queryByText("Purchase Purpose")).toBeNull();
     expect(within(grid).queryByText("Need for")).toBeNull();
     // The object still prints the RETIRED row's own truthful word.
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail").textContent).toContain("Display");
     expect(screen.getByTestId("mp-detail").textContent).not.toContain("Showroom Display");
@@ -556,41 +560,41 @@ describe("Card 03 · the left filter rail", () => {
 
   it("the default Register keeps ordered history; `All not ordered` drops it", async () => {
     await loaded();
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
-    expect(screen.queryByText("REQ-0003")).toBeNull();
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
     // A second click clears the row — the permanent Register returns whole.
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("`Approve purchase` is the derived awaiting-approver truth — a filter, not a grant", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
-    // Clicking the filter grants nothing: the filtered row still names the
-    // REAL owner and this operator still has no Approve control anywhere.
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
+    // Clicking the filter grants nothing: this operator still has no
+    // Approve control, and the register omits the approver subtitle.
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
     expect(screen.queryByTestId("mp-approve")).toBeNull();
   });
 
   it("`Issue PO` filters approved remaining demand", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-work-issue_po"));
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
   });
 
   it("a timing lens sorts earliest Order By first and never blocks issuance", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
     // Early is a FACT, not a gate — nothing on the row loses selection
     // rights it otherwise has (REQ-0001 refuses the tick for approval,
     // exactly as without the filter).
@@ -600,12 +604,12 @@ describe("Card 03 · the left filter rail", () => {
   it("a purpose row narrows; `All purposes` clears only its own section", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-purpose-subsidiary_purchase"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-purpose-all"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("a retired-purpose request lives under `All purposes` and matches no approved row", async () => {
@@ -619,42 +623,42 @@ describe("Card 03 · the left filter rail", () => {
     ]) {
       fireEvent.click(screen.getByTestId(`mp-purpose-${value}`));
       // REQ-0001 (`display`, retired) never answers an approved purpose row.
-      expect(screen.queryByText("REQ-0001"), value).toBeNull();
+      expect(screen.queryByTestId(`mp-open-${REQ1}`), value).toBeNull();
       fireEvent.click(screen.getByTestId(`mp-purpose-${value}`));
     }
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
   });
 
   it("PRODUCT filters by the Catalog's category, never SKU text", async () => {
     await loaded();
     fireEvent.click(screen.getByTestId("mp-product-mattress"));
     // `MATTRESS-LOOK-9`'s request does NOT match — Catalog said nothing.
-    expect(screen.queryByText("REQ-0002")).toBeNull();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-product-sofa"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
   });
 
   it("SUPPLIER rows are actual names that filter; sections combine with AND", async () => {
     await loaded();
     // Hooka is only REQ-0003's supplier.
     fireEvent.click(screen.getByTestId("mp-supplier-Hooka"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0001")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ1}`)).toBeNull();
     // AND with WORK TO DO: Hooka + Approve purchase matches nothing — an
     // unmatched supplier row drops, but the SELECTED one survives with its
     // honest 0.
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.queryByText("REQ-0003")).toBeNull();
+    expect(screen.queryByTestId(`mp-open-${REQ3}`)).toBeNull();
     expect(screen.getByTestId("mp-supplier-Hooka").textContent).toContain("0");
     // Ohana + Approve purchase shows exactly REQ-0001 — the AND of both.
     fireEvent.click(screen.getByTestId("mp-supplier-Ohana"));
-    expect(screen.getByText("REQ-0001")).toBeInTheDocument();
-    expect(screen.queryByText("REQ-0002")).toBeNull();
+    expect(screen.getByTestId(`mp-open-${REQ1}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`mp-open-${REQ2}`)).toBeNull();
     fireEvent.click(screen.getByTestId("mp-supplier-all"));
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    expect(screen.getByText("REQ-0003")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
   it("`Hide filters` collapses the whole rail; the toolbar then shows it back", async () => {
@@ -674,13 +678,217 @@ describe("Card 03 · the left filter rail", () => {
     await loaded();
     // REQ-0002's line has no Catalog category; no `Not in catalog` row grew,
     // and the request is simply in the permanent Register.
-    expect(screen.getByText("REQ-0002")).toBeInTheDocument();
+    expect(screen.getByTestId(`mp-open-${REQ2}`)).toBeInTheDocument();
     const rail = screen.getByTestId("manual-purchase-rail");
     expect(rail.textContent).not.toContain("Not in catalog");
   });
 });
 
+/* ⭐ DELIVER TO FOLLOWS THE COLLECTION RULE (owner, 2026-09-03). The owner
+   raised MPR-20260903-3381 for Ohana to Carres Klang and was refused at issue
+   with `Ohana must be collected to Ohana.` — and the request's Deliver To has
+   no door to move it. So the form may not offer the dead end, and the Register
+   must say the same sentence BEFORE the round trip. */
+describe("Deliver To is the supplier's governed place (2026-09-03)", () => {
+  const OHANA = "2f181917-f4e1-42b2-9e25-d7ee6785424b";
+  const GOVERNED = {
+    ...REGISTER,
+    destinations: [
+      { id: KLANG, name: "Carres Klang" },
+      { id: OHANA, name: "Ohana" },
+    ],
+    supplierCollections: [
+      { supplierId: "s1", supplierName: "Ohana", destinationId: OHANA, partnerId: "p1" },
+    ],
+  };
+  function withRegister(register: unknown) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        url.includes("/purchasing/requests") &&
+        !url.includes("/plan") &&
+        !url.includes("/detail/") &&
+        !url.includes("/issue") &&
+        !url.includes("/already-have")
+      ) {
+        return Promise.resolve(register);
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("locks the create form's Deliver To to the rule once a collected item is picked, and says why", async () => {
+    withRegister(GOVERNED);
+    await openWorkspace();
+    /* Free until a governed supplier is on the form. */
+    expect(screen.queryByTestId("mp-dest-governed")).toBeNull();
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* 5539-2NA's plan names supplier s1, collected to Ohana. */
+    const why = await screen.findByTestId("mp-dest-governed");
+    expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+    const select = document.getElementById("mp-dest")!;
+    expect(select).toHaveTextContent("Ohana");
+    expect(select).toBeDisabled();
+    /* Remove the item — the choice returns. */
+    fireEvent.click(screen.getByTestId("mp-line-remove-0"));
+    await waitFor(() => expect(screen.queryByTestId("mp-dest-governed")).toBeNull());
+  });
+
+  it("starts the create form on the governed default when no rule binds", async () => {
+    withRegister({ ...GOVERNED, defaultDestinationId: OHANA });
+    await openWorkspace();
+    expect(document.getElementById("mp-dest")).toHaveTextContent("Ohana");
+    expect(document.getElementById("mp-dest")).not.toBeDisabled();
+  });
+
+  it("the Register refuses an issue that disagrees with the rule before sending it", async () => {
+    /* REQ2's line is supplier s2 to Carres Klang; govern s2 to Ohana. */
+    withRegister({
+      ...GOVERNED,
+      supplierCollections: [
+        { supplierId: "s2", supplierName: "Office Co", destinationId: OHANA, partnerId: "p1" },
+      ],
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    await screen.findByTestId("mp-selection-bar");
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    expect(err).toHaveTextContent("Office Co must be collected to Ohana.");
+    expect(err).toHaveTextContent("Set Deliver To to Ohana, then issue again.");
+    expect(
+      apiFetch.mock.calls.some(
+        ([url, init]) =>
+          String(url).endsWith("/purchasing/requests/issue") &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+      "nothing was sent",
+    ).toBe(false);
+  });
+
+  /* ⭐ THE DOOR ON AN EXISTING REQUEST (0421). The refusal above told the
+     operator to "Set Deliver To to Ohana" — and a request's Deliver To had no
+     door. `Change` beside the fact is that door, until a line is on a PO. */
+  describe("the object's Deliver To may move until a line is ordered", () => {
+    const READY = {
+      ...REGISTER.requests[0],
+      approval_required: false,
+    };
+    async function openObject(over: Record<string, unknown>) {
+      withRegister(GOVERNED);
+      seedDetail(false, {
+        destinations: GOVERNED.destinations,
+        ...over,
+      });
+      await loaded();
+      fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
+      await screen.findByTestId("mp-detail");
+    }
+
+    it("a Ready-to-order request offers Change beside Deliver To", async () => {
+      await openObject({ request: READY });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.getByTestId("mp-detail-deliver-to-change")).toHaveTextContent("Change");
+    });
+
+    it("an Ordered request offers no door", async () => {
+      await openObject({
+        request: READY,
+        lines: REGISTER.lines
+          .filter((l) => l.request_id === REQ1)
+          .map((l) => ({ ...l, po_id: "PO-2041", po_ids: ["PO-2041"], issued_qty: 1 })),
+      });
+      expect(screen.getByTestId("mp-detail-deliver-to")).toHaveTextContent("Carres Klang");
+      expect(screen.queryByTestId("mp-detail-deliver-to-change")).toBeNull();
+    });
+
+    it("Save PUTs the chosen place — locked to the supplier's governed place, with the sentence", async () => {
+      /* REQ1's line is supplier s1, collected to Ohana. */
+      await openObject({
+        request: READY,
+        supplierCollections: GOVERNED.supplierCollections,
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      const why = await screen.findByTestId("mp-detail-deliver-to-governed");
+      expect(why).toHaveTextContent("Ohana must be collected to Ohana.");
+      const select = document.getElementById("mp-detail-deliver-to-select")!;
+      expect(select).toHaveTextContent("Ohana");
+      expect(select).toBeDisabled();
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      await waitFor(() => {
+        const put = apiFetch.mock.calls.find(
+          ([url, init]) =>
+            String(url).endsWith(`/purchasing/requests/${REQ1}/deliver-to`) &&
+            (init as RequestInit | undefined)?.method === "PUT",
+        );
+        expect(put, "the move was sent").toBeTruthy();
+        expect(JSON.parse(String((put![1] as RequestInit).body))).toEqual({
+          destinationId: OHANA,
+        });
+      });
+      /* Saved: the choice closes back into the fact. */
+      await waitFor(() =>
+        expect(document.getElementById("mp-detail-deliver-to-select")).toBeNull(),
+      );
+    });
+
+    it("a refusal from the door prints the two lines and keeps the choice open", async () => {
+      await openObject({ request: READY });
+      apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/deliver-to") && init?.method === "PUT") {
+          return Promise.reject(
+            Object.assign(new Error("422"), {
+              body: {
+                code: "request_ordered",
+                message: "This request is already ordered. Deliver To cannot move.",
+                action: "Revise the purchase order instead.",
+              },
+            }),
+          );
+        }
+        if (
+          url.includes("/purchasing/requests") &&
+          !url.includes("/plan") &&
+          !url.includes("/detail/") &&
+          !url.includes("/issue") &&
+          !url.includes("/already-have")
+        ) {
+          return Promise.resolve(GOVERNED);
+        }
+        return Promise.resolve(respond(url, init));
+      });
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-change"));
+      fireEvent.click(screen.getByTestId("mp-detail-deliver-to-save"));
+      const err = await screen.findByTestId("mp-detail-deliver-to-error");
+      expect(err).toHaveTextContent("This request is already ordered. Deliver To cannot move.");
+      expect(err).toHaveTextContent("Revise the purchase order instead.");
+      expect(document.getElementById("mp-detail-deliver-to-select")).not.toBeNull();
+    });
+  });
+});
+
 describe("the create workspace — full page, never a dialog (card §3)", () => {
+  it("the ITEMS block (owner, 2026-09-03): `Note` is the caption, one grid, `+ Add line` under the lines", async () => {
+    await openWorkspace();
+    const lines = screen.getByTestId("mp-lines");
+    // The word. COPY-STANDARD rules `Note` for this form's field; `Remark` was
+    // the retired dialog's word and may not survive the port.
+    const caption = screen.getByText("Note");
+    expect(lines.contains(caption)).toBe(true);
+    expect(lines.textContent).not.toContain("Remark");
+    expect(screen.getByLabelText("Note")).toBe(document.getElementById("mp-note-0"));
+    // ONE grid: the caption row and the line share a parent, so the four
+    // tracks are resolved once and the caption sits over the note it names.
+    const line0 = screen.getByTestId("mp-line-0");
+    expect(line0.parentElement).toBe(caption.parentElement);
+    // The add control FOLLOWS the list, where the operator's eye ends.
+    const add = screen.getByTestId("mp-line-add");
+    expect(lines.contains(add)).toBe(true);
+    expect(line0.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(add);
+    expect(screen.getByTestId("mp-line-1").parentElement).toBe(caption.parentElement);
+  });
+
   it("offers exactly the approved six purposes (Cards 03/04)", () => {
     // The list a control may render IS the shared constant (0322's law); the
     // Select renders from it verbatim. Management folds under Internal Staff
@@ -797,7 +1005,16 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     expect(block.textContent).toContain("may not be needed");
   });
 
-  it("ONE act, per-row result — a failed line keeps its row, retry reuses the header", async () => {
+  /* ⭐ RE-PINNED, NOT DELETED (0410, YH 2026-09-01).
+     This test's original title was "…retry reuses the header", and it asserted
+     that a second Send posts NO new header because the first one is already a
+     record. That was an accurate pin on the six-transaction shape — and the
+     committed-header-on-failure it pinned is exactly the defect `0410` closes.
+     The INTENT survives whole: one act, a per-row result, the workspace stays
+     open, and the operator can press Send again. What is re-pinned is the
+     opposite half — a refusal must now leave NOTHING behind, so a retry sends
+     the WHOLE request rather than resuming an orphan. */
+  it("ONE act, per-row result — a refusal leaves nothing, and retry re-sends the whole request", async () => {
     await openWorkspace();
     pickDeliveryDate();
     fireEvent.focus(document.getElementById("mp-item-0")!);
@@ -806,16 +1023,9 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     fireEvent.focus(document.getElementById("mp-item-1")!);
     fireEvent.click(pickRow("5539-CNR"));
 
-    // Header lands; line 1 lands; line 2 is refused with the server's words.
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests")) {
-        return Promise.resolve({ id: REQ1, req_no: "REQ-0009", approval_required: true });
-      }
-      if (init?.method === "POST" && url.includes("/lines")) {
-        const body = JSON.parse(String(init.body)) as { sku: string };
-        return body.sku === "5539-CNR"
-          ? Promise.reject(new Error("sku 5539-CNR has no supplier"))
-          : Promise.resolve({ id: "d1", supplier_id: "s1" });
+        return Promise.reject(new Error("sku 5539-CNR has no supplier"));
       }
       return Promise.resolve(respond(url));
     });
@@ -828,20 +1038,37 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     // The workspace stayed open — something is left to answer for.
     expect(screen.getByTestId("manual-purchase-create")).toBeInTheDocument();
 
-    const headerPosts = () =>
+    const requestPosts = () =>
       apiFetch.mock.calls.filter(
         (c) =>
           (c[1] as RequestInit | undefined)?.method === "POST" &&
           String(c[0]).endsWith("/purchasing/requests"),
       );
-    const before = headerPosts().length;
+    const before = requestPosts().length;
+    expect(before).toBe(1);
 
-    // Retry posts ONLY the failed line — the header is a record now.
+    /* NOTHING was written, so there is no half-record to resume: pressing Send
+       again re-sends the whole request, header and all. Under the old shape
+       this count would NOT have moved, and that was the bug. */
     fireEvent.click(screen.getByTestId("mp-send"));
-    await waitFor(() => expect(screen.queryByTestId("mp-line-failed-1")).toBeTruthy());
-    expect(headerPosts().length).toBe(before);
+    await waitFor(() => expect(requestPosts().length).toBe(before + 1));
+
+    /* AND THE LINES RODE WITH IT — the loop of one-call-per-line is gone, so a
+       failure can no longer land some of them. */
+    const sent = JSON.parse(String((requestPosts()[0][1] as RequestInit).body)) as {
+      lines?: unknown[];
+    };
+    expect(sent.lines).toHaveLength(2);
+    expect(
+      apiFetch.mock.calls.filter((c) => String(c[0]).includes("/lines")),
+      "no per-line call is made any more",
+    ).toHaveLength(0);
   });
 
+  /* ⭐ RE-PINNED (0410). Same intent — the browser must never send a supplier,
+     because the database derives it from the catalog (Jess, 2026-08-03). Only
+     the ENVELOPE moved: the lines now ride inside the request POST instead of
+     one call each, so the assertion reads the same fact in its new place. */
   it("no supplier key rides the wire — the server derives it", async () => {
     await openWorkspace();
     pickDeliveryDate();
@@ -850,10 +1077,7 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
 
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "POST" && url.endsWith("/purchasing/requests")) {
-        return Promise.resolve({ id: REQ1, req_no: "REQ-0009", approval_required: true });
-      }
-      if (init?.method === "POST" && url.includes("/lines")) {
-        return Promise.resolve({ id: "d1", supplier_id: "s1" });
+        return Promise.resolve({ id: REQ1, req_no: null, approval_required: true });
       }
       return Promise.resolve(respond(url));
     });
@@ -861,11 +1085,21 @@ describe("the create workspace — full page, never a dialog (card §3)", () => 
     await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
     fireEvent.click(screen.getByTestId("mp-send"));
     await waitFor(() => {
-      const linePost = apiFetch.mock.calls.find((c) => String(c[0]).includes("/lines"));
-      expect(linePost).toBeTruthy();
-      const sent = JSON.parse(String((linePost![1] as RequestInit).body));
+      const post = apiFetch.mock.calls.find(
+        (c) =>
+          (c[1] as RequestInit | undefined)?.method === "POST" &&
+          String(c[0]).endsWith("/purchasing/requests"),
+      );
+      expect(post).toBeTruthy();
+      const sent = JSON.parse(String((post![1] as RequestInit).body)) as {
+        lines: Array<Record<string, unknown>>;
+      };
       expect(sent).not.toHaveProperty("supplier");
       expect(sent).not.toHaveProperty("supplierId");
+      for (const line of sent.lines) {
+        expect(line).not.toHaveProperty("supplier");
+        expect(line).not.toHaveProperty("supplierId");
+      }
     });
   });
 });
@@ -937,14 +1171,15 @@ describe("the ONE status arithmetic (Law D)", () => {
  *
  * One scroll, no tabs. Money for the APPROVER only — the server omits the
  * key for everyone else, and the same screen renders minus the money. The
- * Approve control pre-fills `still needed`, never the asked quantity, and
- * `Refuse` cannot be submitted without a reason.
+ * Approve control opens at the REQUESTED quantity (field-guide defect 23:
+ * a `Still Needed` seed raced two reads and could open at 0), and `Refuse`
+ * cannot be submitted without a reason.
  */
 describe("the object detail and the decision (slice 2)", () => {
   async function openDetail(canApprove: boolean) {
     seedDetail(canApprove);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
   }
 
@@ -969,13 +1204,48 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(screen.getByTestId("mp-approve")).toBeInTheDocument();
   });
 
-  it("the Approve control pre-fills `still needed`, not the asked quantity", async () => {
+  it("the Approve control opens at the REQUESTED quantity, never a half-read `Still Needed`", async () => {
     await openDetail(true);
-    // qty 1 · free 2 · already on PO 1 → still needed 0 — the pre-fill the
-    // card demands, because an approver who must subtract will not.
+    // qty 1 · free 2 · already on PO 1 → Still Needed 0 is PRINTED for the
+    // approver to read; the field itself opens at the ask (1), because a
+    // seed built from two reads opened at 0 and was saved as 0 (defect 23).
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
+    expect(screen.getByTestId("mp-approve")).toBeEnabled();
+    expect(screen.queryByTestId("mp-approve-zero")).toBeNull();
+  });
+
+  it("every line at 0 refuses Approve and says to refuse the request instead", async () => {
+    await openDetail(true);
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
+    );
+    fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "0" } });
+    expect(screen.getByTestId("mp-approve")).toBeDisabled();
+    const zero = screen.getByTestId("mp-approve-zero");
+    expect(zero).toHaveTextContent("Every line is approved at 0.");
+    expect(zero).toHaveTextContent("Refuse the request instead.");
+  });
+
+  it("one line at 0 among others is a partial cut — Approve stays live", async () => {
+    seedDetail(true, {
+      lines: REGISTER.lines
+        .filter((l) => l.request_id === REQ1)
+        .flatMap((l) => [
+          { ...l, unit_cost: 850 },
+          { ...l, id: "l1b", sku: "5539-CNR", item_label: "Booqit Corner", qty: 2, unit_cost: 900 },
+        ]),
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
+    await screen.findByTestId("mp-detail");
+    await waitFor(() =>
+      expect((screen.getByTestId("mp-cut-1") as HTMLInputElement).value).toBe("2"),
+    );
+    fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "0" } });
+    expect(screen.getByTestId("mp-approve")).toBeEnabled();
+    expect(screen.queryByTestId("mp-approve-zero")).toBeNull();
   });
 
   it("Refuse cannot be submitted without a reason", async () => {
@@ -991,7 +1261,7 @@ describe("the object detail and the decision (slice 2)", () => {
   it("approving posts the cuts through the one decide door", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     fireEvent.click(screen.getByTestId("mp-approve"));
     await waitFor(() => {
@@ -999,7 +1269,7 @@ describe("the object detail and the decision (slice 2)", () => {
       expect(post).toBeTruthy();
       const sent = JSON.parse(String((post![1] as RequestInit).body));
       expect(sent.decision).toBe("approve");
-      expect(sent.cuts).toEqual([{ id: "l1", qty: 0 }]);
+      expect(sent.cuts).toEqual([{ id: "l1", qty: 1 }]);
     });
   });
 
@@ -1012,7 +1282,7 @@ describe("the object detail and the decision (slice 2)", () => {
   it("a refused decide prints the approved two lines, never the raw code word", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     const base = apiFetch.getMockImplementation()!;
     apiFetch.mockImplementation((url: string, init?: RequestInit) => {
@@ -1037,12 +1307,14 @@ describe("the object detail and the decision (slice 2)", () => {
     expect(err).toHaveTextContent("Only the approver may decide this purchase.");
     expect(err).toHaveTextContent("Ask Jess to approve or refuse it.");
     expect(err.textContent).not.toContain("forbidden");
+    // Defect 23's other half: the failure does not leave Approve greyed.
+    await waitFor(() => expect(screen.getByTestId("mp-approve")).toBeEnabled());
   });
 
   it("a decision stays on the object — no throw back to the Register", async () => {
     await openDetail(true);
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     /* After the door records the decision, the refetched object carries the
        decided facts: controls gone, the actor and time on screen. */
@@ -1091,7 +1363,7 @@ describe("the object never issues (Card 05)", () => {
   it("`Arrived` cannot be set by any control — no such button exists", async () => {
     seedDetail(true);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.queryByText(/^Arrived$/, { selector: "button" })).toBeNull();
     expect(document.querySelector("[data-testid*='arrived']")).toBeNull();
@@ -1105,7 +1377,7 @@ describe("the object never issues (Card 05)", () => {
       requested_by_name: "Siti",
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0002", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ2}`));
     const detail = await screen.findByTestId("mp-detail");
     for (const gone of [
       "mp-issue",
@@ -1132,10 +1404,62 @@ describe("the object never issues (Card 05)", () => {
         refusedAt: null,
         refuseReason: null,
         lines: [
-          { qty: 1, issuedQty: 1, remainingQty: 0, cancelledAt: null, poId: "PO-1", received: true },
+          { qty: 1, issuedQty: 1, cancelledAt: null, poId: "PO-1", received: true },
         ],
       }).label,
     ).toBe("Arrived");
+  });
+
+  /* ⭐ THE APPROVER'S CUT REACHES THE STATUS (YH, 2026-09-01).
+     The status read the database's generated `qty − issued_qty`, which does
+     not know an approval cut exists, while every other number on this page
+     used the governed remainder that does. A request for 5 cut to 2 and then
+     fully issued reported 3 outstanding: `Ready to order` after its purchase
+     order was raised, stuck in `All not ordered` for ever, and untickable at
+     the same time. */
+  it("a request cut by its approver and fully issued reads Ordered, not Ready to order", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [
+          { qty: 5, approvedQty: 2, issuedQty: 2, cancelledAt: null, poId: "PO-1" },
+        ],
+      }).label,
+    ).toBe("Ordered");
+  });
+
+  /* A line cut to NOTHING never reaches the issue door, so it never gets a
+     `po_id` — and `every(… poId !== null)` could never be satisfied on a
+     request containing one. It is excluded from what the request is still
+     pursuing rather than blocking it for ever. */
+  it("a line cut to zero does not hold the whole request open", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [
+          { qty: 3, approvedQty: 3, issuedQty: 3, cancelledAt: null, poId: "PO-1" },
+          { qty: 2, approvedQty: 0, issuedQty: 0, cancelledAt: null, poId: null },
+        ],
+      }).label,
+    ).toBe("Ordered");
+  });
+
+  it("a request whose every line was cut to zero is not going ahead", () => {
+    expect(
+      manualPurchaseStatusOf({
+        approvalRequired: true,
+        approvedAt: "2026-08-30T02:00:00Z",
+        refusedAt: null,
+        refuseReason: null,
+        lines: [{ qty: 2, approvedQty: 0, issuedQty: 0, cancelledAt: null, poId: null }],
+      }).label,
+    ).toBe("Not going ahead");
   });
 });
 
@@ -1220,6 +1544,66 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
     expect(err).toHaveTextContent("You do not hold PO duty today.");
     expect(err).toHaveTextContent("Ask Shasha to issue this purchase order.");
   });
+
+  /* ⭐ TWO LINES MEANS TWO LINES (YH, 2026-09-01).
+     The two assertions above pass on a SINGLE joined sentence, which is what
+     this surface actually rendered — `${message} ${action}` with a space —
+     because `toHaveTextContent` reads the whole subtree. The object page
+     eighty lines over has used `TwoLines` since it was written; the Register
+     never did. These two pin the shape and the lifetime that the text
+     assertions cannot see. */
+  it("draws the fact and the act as two lines, not one joined sentence", async () => {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "not_ready_to_order",
+              message: "One Manual Purchase has not been approved yet.",
+              action: "Ask its approver to Approve it, then issue again.",
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respond(url));
+    });
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    const err = await screen.findByTestId("mp-issue-selected-error");
+    const lines = err.firstElementChild!;
+    expect(lines.children).toHaveLength(2);
+    expect(lines.children[0]).toHaveTextContent("One Manual Purchase has not been approved yet.");
+    expect(lines.children[1]).toHaveTextContent("Ask its approver to Approve it, then issue again.");
+  });
+
+  it("keeps the refusal on screen after the selection it names goes away", async () => {
+    /* The refusal that MOST needs reading is the one where the rows vanish —
+       somebody else issued the request, the list refetches without it, the
+       selection empties. The message used to disappear in that same tick, so
+       the operator saw a changed list and no reason for it. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.endsWith("/purchasing/requests/issue")) {
+        return Promise.reject(
+          Object.assign(new Error("refused"), {
+            body: {
+              code: "unknown_request",
+              message: "One Manual Purchase on this list is no longer there.",
+              action: "Reload the page, then tick the ones that are left and issue again.",
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respond(url));
+    });
+    await tickReady();
+    fireEvent.click(screen.getByTestId("mp-issue-selected"));
+    await screen.findByTestId("mp-issue-selected-error");
+    /* Untick — the same emptying the refetch would have caused. */
+    fireEvent.click(screen.getByTestId(`mp-select-${REQ2}`));
+    expect(screen.getByTestId("mp-issue-selected-error")).toHaveTextContent(
+      "One Manual Purchase on this list is no longer there.",
+    );
+  });
 });
 
 
@@ -1229,16 +1613,16 @@ describe("closure §2 · Catalog remains the selected issue price authority", ()
  * `ops_manager` holder's name prints as the governed sentence.
  */
 describe("Card 03 §3 · the approval owner's name", () => {
-  it("the waiting row prints `Jess approves`; decided rows print nothing", async () => {
+  it("waiting and decided rows omit the approver subtitle", async () => {
     await loaded();
-    expect(screen.getByTestId(`mp-approver-${REQ1}`)).toHaveTextContent("Jess approves");
+    expect(screen.queryByTestId(`mp-approver-${REQ1}`)).toBeNull();
     expect(screen.queryByTestId(`mp-approver-${REQ2}`)).toBeNull();
   });
 
   it("the object detail names the owner while the request waits", async () => {
     seedDetail(false);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-approver")).toHaveTextContent("Jess approves");
   });
@@ -1257,15 +1641,16 @@ describe("Card 03 §3 · the approval owner's name", () => {
 });
 
 /**
- * ⭐ PURCHASING CARD 04 — THE PERMANENT REGISTER
- * (docs/cards/CARD-2026-08-29-purchasing-04-manual-purchase-permanent-register.md).
+ * ⭐ PURCHASING CARD 04 — THE PERMANENT REGISTER — columns corrected by
+ * CARD 08 (2026-09-04): the number column is retired; ten columns remain.
  *
- * Eleven columns in the Card's exact order · newest Requested Date first ·
- * PO No from real lineage only · Items in Catalog human words · the
- * structured For · a read-only expansion · selection admitting only
+ * Ten columns in Card 08's exact order · newest Proceed Date first ·
+ * PO No from real lineage only (`—` before issue) · Items in Catalog human
+ * words · the structured For as the single-click entrance and sticky
+ * business column · a read-only expansion · selection admitting only
  * Ready-to-order remainder · PO Duty existing ONLY beside a selection.
  */
-describe("Card 04 · the eleven columns, in the Card's exact order", () => {
+describe("Card 08 · the ten columns, in the Card's exact order", () => {
   it("renders the exact heads, in order — and none of the banned columns", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
@@ -1275,7 +1660,6 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
     expect(heads).toEqual([
       "Proceed Date",
       "Approval Status",
-      "Manual Purchase No",
       "PO No",
       "Delivery Date",
       "For",
@@ -1302,6 +1686,9 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       "Needed By",
       // Order By drives timing/work; it is NOT another parent column.
       "Order By",
+      // Card 08 — the retired identity words may never return.
+      "Manual Purchase No",
+      "Request No",
     ]) {
       expect(heads, `banned column "${banned}"`).not.toContain(banned);
     }
@@ -1310,12 +1697,14 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
   it("newest Proceed Date leads by default — the actual created_at", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
-    const order = [...grid.querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    // REQ-0002 (19 Aug 03:00) · REQ-0001 (19 Aug 02:00) · REQ-0003 (18 Aug).
-    expect(order).toEqual(["REQ-0002", "REQ-0001", "REQ-0003"]);
+    const order = [...grid.querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    // REQ2 (19 Aug 03:00) · REQ1 (19 Aug 02:00) · REQ3 (18 Aug).
+    expect(order).toEqual([
+      `mp-open-${REQ2}`,
+      `mp-open-${REQ1}`,
+      `mp-open-${REQ3}`,
+    ]);
   });
 
   it("PO No is real lineage — the actual number clickable, absence named", async () => {
@@ -1329,8 +1718,41 @@ describe("Card 04 · the eleven columns, in the Card's exact order", () => {
       "/operation/procurement?po=PO-20260818-9001",
     );
     expect(document.body.textContent).not.toContain("PO-9001,");
-    // A request with no lineage says so in the governed sentence.
-    expect(screen.getAllByText("Not ordered yet").length).toBeGreaterThan(0);
+    // A request with no lineage states the bare fact — Card 08 §3.2: `—`
+    // is a fact, never a button, and never a replacement number.
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("register-column").textContent).not.toContain(
+      "Not ordered yet",
+    );
+  });
+
+  it("several POs read `{n} POs` and open the object's exact linked PO list (Card 08)", async () => {
+    /* REQ3's one line issued across TWO documents — the cell aggregates,
+       and the click opens the object whose Purchase Orders section IS the
+       exact linked list, keyed by the invisible UUID. */
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/detail/")) {
+        return Promise.resolve(DETAIL);
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({
+          ...REGISTER,
+          lines: REGISTER.lines.map((l) =>
+            l.request_id === REQ3 ? { ...l, po_ids: ["PO-9001", "PO-9002"] } : l,
+          ),
+          pos: [
+            { id: "PO-9001", po_no: "PO-20260818-9001", sent: true },
+            { id: "PO-9002", po_no: "PO-20260818-9002", sent: true },
+          ],
+        });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+    await loaded();
+    const many = screen.getByTestId(`mp-po-list-${REQ3}`);
+    expect(many).toHaveTextContent("2 POs");
+    fireEvent.click(many);
+    await screen.findByTestId("mp-detail");
   });
 
   it("Items speak the Catalog's human words; the SKU stays searchable off-screen", async () => {
@@ -1368,6 +1790,10 @@ describe("Card 04 · the read-only expansion", () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ3}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ3}`);
+    const expansionCell = box.closest("td")!;
+    expect(expansionCell).toHaveStyle({ padding: "0px" });
+    expect(expansionCell.parentElement!.children).toHaveLength(3);
+    expect(expansionCell.colSpan).toBe(expansionCell.parentElement!.previousElementSibling!.children.length - 2);
     const heads = [...box.querySelectorAll("th")].map((th) => th.textContent?.trim());
     expect(heads).toEqual([
       "SKU",
@@ -1413,6 +1839,57 @@ describe("Card 04 · selection and PO Duty", () => {
     // REQ-0001 needs approval; REQ-0003 is fully ordered — both refuse.
     expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
     expect(screen.getByTestId(`mp-select-${REQ3}`)).toBeDisabled();
+  });
+
+  it("omits the redundant Ordered line beside the approval badge", async () => {
+    await loaded();
+    const reasons = screen.queryAllByTestId("mp-row-dead-reason").map((el) => el.textContent);
+    // REQ-0003 is ordered. REQ-0002 may be ticked, so no sentence. REQ-0001
+    // waits, and its cell already says `Need approval`: no second line.
+    expect(reasons).toEqual([]);
+    expect(
+      screen.getByTestId(`mp-select-${REQ1}`).closest("tr")!.textContent,
+    ).not.toContain("Waiting for approval.");
+  });
+
+  it("MPR-20260904-8935: approved at 0 prints the cause, and no tick is live", async () => {
+    /* One request, approved, every line cut to 0: `Approved` in the column,
+       Approved Qty 0, Still To Order 0 — and a greyed checkbox that said
+       nothing. The register must name the cause on that row. */
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        String(url).includes("/purchasing/requests") &&
+        !String(url).includes("/detail/") &&
+        !String(url).includes("/plan")
+      ) {
+        return Promise.resolve({
+          ...REGISTER,
+          requests: [
+            {
+              ...REGISTER.requests[0],
+              approved_at: "2026-09-04T01:00:00Z",
+              approved_by: "u9",
+            },
+          ],
+          lines: REGISTER.lines
+            .filter((l) => l.request_id === REQ1)
+            .map((l) => ({ ...l, approved_qty: 0, remaining_qty: 1 })),
+        });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    expect(screen.getByTestId(`mp-select-${REQ1}`)).toBeDisabled();
+    expect(screen.getByTestId("mp-row-dead-reason")).toHaveTextContent(
+      "Approved at 0. Nothing to order.",
+    );
+    const grid = screen.getByTestId("register-column");
+    expect(within(grid).getByText("Approved")).toBeInTheDocument();
+    // Every ROW checkbox is dead (the header's select-all is DataGrid's own).
+    const rowBoxes = grid.querySelectorAll("input[aria-label='Select row']");
+    expect(rowBoxes.length).toBe(1);
+    for (const box of rowBoxes) expect(box).toBeDisabled();
   });
 
   it("PO Duty exists NOWHERE until a selection; then once, beside Issue PO", async () => {
@@ -1507,7 +1984,7 @@ describe("Card 05 · the object detail", () => {
   async function openObject(canApprove = false, over: Record<string, unknown> = {}) {
     seedDetail(canApprove, over);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     return await screen.findByTestId("mp-detail");
   }
 
@@ -1535,7 +2012,12 @@ describe("Card 05 · the object detail", () => {
     const detail = await openObject();
     // The shared object header (Law C) with the Register as back destination.
     expect(within(detail).getByLabelText("Manual Purchase")).toBeInTheDocument();
-    expect(within(detail).getByTestId("object-identity")).toHaveTextContent("REQ-0001");
+    /* Card 08 §3.3 — the identity is `{Need for} · {For}` (REQ1's retired
+       purpose prints its own truthful word; its For was never stored), and
+       no number or UUID appears anywhere in the header. */
+    expect(within(detail).getByTestId("object-identity")).toHaveTextContent("Display");
+    expect(within(detail).getByTestId("object-identity").textContent).not.toContain("REQ-");
+    expect(document.title).toBe("Manual Purchase — Carres");
     expect(within(detail).getByTestId("object-identity-status")).toHaveTextContent(
       "Waiting for approval",
     );
@@ -1553,7 +2035,7 @@ describe("Card 05 · the object detail", () => {
     expect(within(detail).getByTestId("mp-object-position")).toHaveTextContent("2 of 3");
     fireEvent.click(within(detail).getByLabelText("Next Manual Purchase"));
     await waitFor(() =>
-      expect(screen.getByTestId("object-identity")).toHaveTextContent("REQ-0003"),
+      expect(screen.getByTestId("object-identity")).toHaveTextContent("HOUZS Sdn Bhd"),
     );
   });
 
@@ -1617,7 +2099,7 @@ describe("Card 05 · the object detail", () => {
       expect(table).toHaveTextContent(head);
     }
     await waitFor(() =>
-      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("0"),
+      expect((screen.getByTestId("mp-cut-0") as HTMLInputElement).value).toBe("1"),
     );
     fireEvent.change(screen.getByTestId("mp-cut-0"), { target: { value: "5" } });
     expect(screen.getByTestId("mp-approve")).toBeDisabled();
@@ -1782,7 +2264,7 @@ describe("Card 05 · the object detail", () => {
       return Promise.resolve(respond(url));
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByText("This Manual Purchase could not be opened");
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
@@ -1809,21 +2291,19 @@ describe("Card 06 · the Register's date facts and lens order", () => {
     fireEvent.click(screen.getByTestId("mp-work-issue_po")); // clear again
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
     // TO ORDER alone is not a work/timing lens — default newest-first holds.
-    let order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    expect(order).toEqual(["REQ-0002", "REQ-0001"]);
+    let order = [...screen.getByTestId("register-column")
+      .querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([`mp-open-${REQ2}`, `mp-open-${REQ1}`]);
     fireEvent.click(screen.getByTestId("mp-to-order-not_ordered"));
     // The WORK lens re-orders: earliest Order By first, null-dated last.
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
     fireEvent.click(screen.getByTestId("mp-timing-can_order_early"));
     fireEvent.click(screen.getByTestId("mp-work-approve_purchase"));
-    order = [...screen.getByTestId("register-column").querySelectorAll("tbody tr")]
-      .map((tr) => tr.textContent ?? "")
-      .filter((t) => /REQ-\d{4}/.test(t))
-      .map((t) => t.match(/REQ-\d{4}/)![0]);
-    expect(order).toEqual(["REQ-0001"]);
+    order = [...screen.getByTestId("register-column")
+      .querySelectorAll('[data-testid^="mp-open-"]')]
+      .map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual([`mp-open-${REQ1}`]);
   });
 });
 
@@ -1831,7 +2311,7 @@ describe("Card 06 · the object's date facts", () => {
   it("Request reads Proceed Date · Delivery Date with the quiet `Order by {date}` fact", async () => {
     seedDetail(false);
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-proceed-date")).toHaveTextContent(
       fmtDate("2026-08-19"),
@@ -1860,7 +2340,7 @@ describe("Card 06 · the object's date facts", () => {
         .map((l) => ({ ...l, order_by: "2026-09-01" })),
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     const timing = screen.getByTestId("mp-detail-order-by");
     expect(timing).toHaveTextContent("Order date passed");
@@ -1877,28 +2357,113 @@ describe("Card 06 · the object's date facts", () => {
         .map((l) => ({ ...l, delivery_date: null, order_by: null })),
     });
     await loaded();
-    fireEvent.click(screen.getByText("REQ-0001", { selector: "button" }));
+    fireEvent.click(screen.getByTestId(`mp-open-${REQ1}`));
     await screen.findByTestId("mp-detail");
     expect(screen.getByTestId("mp-detail-delivery-date")).toHaveTextContent("Not recorded");
     expect(screen.queryByTestId("mp-detail-order-by")).toBeNull();
   });
 });
 
-describe("Card 06 §7 · the Work deep link opens the exact MPR", () => {
-  it("`?mpr={id}` lands directly on the object, and Back restores the Register", async () => {
+describe("Card 06 §7 / Card 08 · the Work deep link opens the exact request by UUID", () => {
+  function mountAt(param: string) {
     seedDetail(false);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
+    return render(
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={[`/operation?tab=manual-purchase&mpr=${REQ1}`]}>
+        <MemoryRouter initialEntries={[`/operation?tab=manual-purchase&${param}=${REQ1}`]}>
           <OperationManualPurchase />
         </MemoryRouter>
       </QueryClientProvider>,
     );
+  }
+
+  it("`?mp={id}` lands directly on the object, and Back restores the Register", async () => {
+    mountAt("mp");
     await screen.findByTestId("mp-detail");
-    expect(screen.getByTestId("mp-detail").textContent).toContain("REQ-0001");
+    // The object speaks business facts — never the stored legacy number.
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
+    expect(screen.getByTestId("mp-detail").textContent).not.toContain("REQ-0001");
     // `‹ Manual Purchase` returns to the Register — not a reopen loop.
     fireEvent.click(screen.getByText("Manual Purchase", { selector: "a *, a" }));
     await waitFor(() => expect(screen.queryByTestId("mp-detail")).toBeNull());
+  });
+
+  it("`?mpr={id}` survives as a read-only alias for pre-Card-08 bookmarks", async () => {
+    mountAt("mpr");
+    await screen.findByTestId("mp-detail");
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("Display");
+  });
+});
+
+/**
+ * 0422 — THE EARLIEST DELIVERY DATE A MANUAL PURCHASE MAY ASK FOR
+ * (YH, 2026-09-04; owner ruling: a number, not a switch). The Register
+ * carries Purchasing Settings' `minDeliveryDays` (calendar days). The form
+ * computes floor = Proceed Date (the one `/plan` shows) + that number; a
+ * chosen date before it prints the door's own refusal under Delivery Date
+ * and blocks Send. 0 days: no floor, nothing printed.
+ */
+describe("0422 · the earliest Delivery Date a Manual Purchase may ask for, on the create form", () => {
+  /** A far-future Proceed Date, so whichever day of the current month the
+   *  picker offers is EARLIER than Proceed Date + 30 — the test does not
+   *  depend on the run date. */
+  const PROCEED = "2099-01-01";
+  const FLOOR = "2099-01-31";
+  function withMinDays(minDeliveryDays: number, proceedDate = PROCEED) {
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/purchasing/requests/plan")) {
+        return Promise.resolve({ ...(planFor(init) as object), proceedDate });
+      }
+      if (url.includes("/purchasing/requests")) {
+        return Promise.resolve({ ...REGISTER, minDeliveryDays });
+      }
+      return Promise.resolve(respond(url, init));
+    });
+  }
+
+  it("30 days: a date before Proceed Date + 30 prints the refusal and blocks Send", async () => {
+    withMinDays(30);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    /* The floor is Proceed Date + 30 — the Proceed Date `/plan` answers
+       with, so wait for that answer rather than the Register's fallback. */
+    await waitFor(() =>
+      expect(screen.getByTestId("mp-date-too-early").textContent).toContain(fmtDate(FLOOR)),
+    );
+    const line = screen.getByTestId("mp-date-too-early");
+    // The door's words, with the two dates in the portal's own spelling.
+    expect(line.textContent).toContain("is earlier than the earliest date");
+    expect(line.textContent).toContain("then send again.");
+    expect(screen.getByTestId("mp-send")).toBeDisabled();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.sendNeedsLaterDate);
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/purchasing/requests"),
+      expect.objectContaining({ method: "POST", body: expect.stringContaining("requiredBy") }),
+    );
+  });
+
+  it("the floor is calendar days from the Proceed Date the form shows — not from the plan's proposal", async () => {
+    /* Proceed Date 2020-01-01 + 30 = 2020-01-31: every date the picker
+       offers is later, so a date the plan never proposed is still fine. */
+    withMinDays(30, "2020-01-01");
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+  });
+
+  it("0 days: the same early date is fine — no sentence, Send live", async () => {
+    withMinDays(0);
+    await openWorkspace();
+    pickDeliveryDate(5);
+    fireEvent.focus(document.getElementById("mp-item-0")!);
+    fireEvent.click(pickRow("5539-2NA"));
+    await waitFor(() => expect(screen.getByTestId("mp-send")).toBeEnabled());
+    expect(screen.queryByTestId("mp-date-too-early")).toBeNull();
+    expect(screen.getByTestId("mp-send")).toHaveTextContent(MW.send);
   });
 });

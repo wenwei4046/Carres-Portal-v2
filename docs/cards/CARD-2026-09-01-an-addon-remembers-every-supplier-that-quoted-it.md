@@ -5,7 +5,7 @@ Operation cost tab
 **Owner authority:** YH, 2026-09-01 — *"1 add-on can be made from different suppliers with
 different cost so that needs to be taken account"*
 **Precedent:** migration `0388` (SKU dual-sourcing) — **this Card copies it, it does not redesign it**
-**Status:** QUEUED — owner-approved capability; **owner review of §9 before build**
+**Status:** READY FOR BUILD — §9 ANSWERED by YH, 2026-09-01. See §9.1.
 **Lane:** BUILD / DELIVERY
 **Base:** `origin/main` at the tip that carries `build/supplier-offers-modal`
 
@@ -203,6 +203,41 @@ something reads it.
 
 **OPERATIONAL CONSEQUENCE:** none until a surface writes to it. Recording a quotation changes no
 price, no total and no PO.
+
+## 9.1 · The answer — YH, 2026-09-01
+
+**The question was one question and the tables are two, so the answer is two answers.**
+
+| Table | What it is | Does Carres raise a PO for it? | Therefore build |
+|---|---|---|---|
+| `special_addons` | a surcharge on a PRODUCT — its price folds into the line's own unit price | **YES.** Owner: *"if it's addons like at `?tab=catalog&section=special` then yes we buy it, like eg hydraulic bedframe is considered a product add on"* | the supplier **slot** (§3.2) **and** the offers |
+| `addons` | a SERVICE on the order — disposal, assembly | **NO.** Owner: *"if it's addons then no need cuz it's from our staff that gets it done"* | the **offers only** — no slot |
+
+**Why the split is the right shape and not a compromise.** A slot is a routing
+instruction: something reads it and raises a document against it. A hydraulic
+bedframe is bought from a factory, so a slot there is read by Purchasing and
+earns its keep. Mattress disposal is done by Carres staff with a Carres truck —
+there is nobody to send a Purchase Order to, so a supplier slot on `addons`
+would be a field nothing reads, which §9's own recommendation warned is a field
+that drifts.
+
+**What survives from the recommendation.** §9 recommended building the offers
+first and leaving the slot out, on the grounds that the offers half is useful
+either way and cannot be wrong. That still holds for `addons`, and it is now
+the WHOLE build for `addons`. For `special_addons` the slot is unblocked and
+built alongside.
+
+**What the offers half still means for a service.** `addons` may record what an
+outside company quoted without Carres ever buying from them — a disposal
+contractor's price is a margin reference and a fallback if the truck is full.
+Recording a quotation changes no price, no total and no PO, exactly as §9's
+operational-consequence line says.
+
+**⚠️ NOT ANSWERED, and it does not block this build:** whether a `special_addons`
+purchase rides an existing product PO or raises its own. Nothing here decides
+that, and nothing here should — the slot records WHO supplies it, which is the
+question that was asked. The document it rides is Purchasing's to answer when a
+surface needs it.
 
 ## 10 · Completion record
 

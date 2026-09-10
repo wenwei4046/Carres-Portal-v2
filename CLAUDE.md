@@ -76,7 +76,7 @@ still requires delivery/production proof. A proposal never becomes authority thr
 | Rental / Subscription | `docs/rental/MASTER.md` | **APPROVED / LOCKED** | Frozen agreement truth plus approved subscription service/visit target |
 | People / HR | `docs/hr/MASTER.md` | **LOCKED** | Measured current implementation and explicit gaps in that MASTER |
 | Issue Tracker | `docs/issue-tracker/MASTER.md` | **BUILD — business law APPROVED / LOCKED** | Verify/deliver the committed Issue Tracker implementation; do not re-plan the operating model |
-| Workspace — Dashboard + Work | No MASTER; `docs/workspace/BLUEPRINT.md` is review material | **PROPOSAL** | Owner review rulings in Blueprint §§15–16; no Cards or implementation before approval |
+| Workspace — Staff & Duties + Work + Dashboard | `docs/workspace/MASTER.md` | **APPROVED / LOCKED architecture; staged delivery** | Staff & Duties and Shared Duty Resolver first; module projections during module delivery; Dashboard last |
 | Shared ERP UI | `docs/ui/MASTER.md` | **PRODUCTION-VERIFIED / LOCKED** | Apply the governed templates/tokens and the latest locked owner/action presentation law |
 
 `docs/issue-tracker/MASTER.md` is the one current Issue Tracker path. The former
@@ -202,7 +202,7 @@ engineering mechanics. Clarify only when acting would risk crossing a business o
      authoritative sources conflict.
    A missing implementation is not an owner decision. A planner preference is not an owner
    decision. Example: if Blueprint/Money authority already permits planning/booking in parallel and
-   makes T−1 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
+   makes T−2 with RM0 the hard Delivery release gate, Delivery records it as **`RESOLVED FROM
    AUTHORITY`**; it may not ask Jess whether an outstanding balance should block release.
 3. **WHOLE-DOMAIN AUDIT FIRST — AUDIT IS INPUT, NOT FINAL PLAN.** Complete the target domain
    capability and lifecycle pass, including
@@ -537,19 +537,25 @@ CONFIGURATION — suppliers, SKUs, production days, rates — not transactions.
 > **When the architecture and a module MASTER disagree, the ARCHITECTURE wins** — a MASTER
 > describes one module, and every boundary defect found so far lived *between* two of them.
 
+> **GLOBAL DUTY LAW — OWNER-APPROVED 2026-09-03.** Every ERP action and approval resolves its
+> owner through the shared Staff & Duties system: duty rule → primary holder → today's buddy cover
+> → actual actor evidence. A module may name the duty it needs; it may never hard-code a person's
+> name, keep a second assignment list, or turn owner identity into action-sentence text.
+
 ## 8.1 · Modules
 
 | Module | What it owns | MASTER |
 |---|---|---|
 | **Orders** | the customer's order end to end — the list, the drawer, the action engine, delay planning, the money gate | [`docs/orders/MASTER.md`](docs/orders/MASTER.md) |
 | **Purchasing** | buy what customers ordered and what the shelf needs | [`docs/purchasing/MASTER.md`](docs/purchasing/MASTER.md) |
-| **Delivery** | the delivery WORKSPACE — a view of Orders' delivery track | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
+| **Delivery** | the delivery WORKSPACE — it owns the arrangement, the Delivery Order document, handover and proof; Sales owns the promise | [`docs/delivery/MASTER.md`](docs/delivery/MASTER.md) |
 | **Stock** | exact Unit · Where · Who has it · availability · physical history and month-end truth | [`docs/stock/MASTER.md`](docs/stock/MASTER.md) |
 | **Payment** | the collections desk | [`docs/payment/MASTER.md`](docs/payment/MASTER.md) |
 | **Service** | customer complaints after delivery | [`docs/service/MASTER.md`](docs/service/MASTER.md) |
 | **UI** | the design system, the kit, the portal shell and its right rail | [`docs/ui/MASTER.md`](docs/ui/MASTER.md) |
 | **HR** | people, commission, targets, cost | [`docs/hr/MASTER.md`](docs/hr/MASTER.md) |
 | **Rental** | rent-to-own agreements, billing and buyout | [`docs/rental/MASTER.md`](docs/rental/MASTER.md) |
+| **Workspace** | Staff & Duties, duty holders, cover and shared approval routing | [`docs/workspace/MASTER.md`](docs/workspace/MASTER.md) |
 
 **A module gets a folder only when it is a real operator surface with measured reality.**
 Never create an empty master for symmetry.

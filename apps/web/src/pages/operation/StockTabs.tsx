@@ -24,9 +24,13 @@ import ModuleHeader from "./components/ModuleHeader";
  * route and every `?tab=` value is unchanged — this moved the DOOR, not the
  * address.
  *
- * Word law (COPY-STANDARD): the page words are the SIDEBAR's own words
- * (`portal-nav.ts`) — `On hand` · `Ready stock` · `In & out`. "Inventory" and
- * "Movements" remain banned UI words; the goods pool is still `Stock`.
+ * ── DE-NAVIGATED LEGACY PAGES (CARD-2026-09-01-warehouse-01-sidebar) ────────
+ * The owner-approved 2026-09-01 Blueprint reduced the Warehouse map to
+ * `Dashboard · Inbound · Inventory · Outbound`; `Ready stock` and `In & out`
+ * left the rail. Their ROUTES stay alive so a direct URL still lands, and this
+ * header keeps drawing their words until each page's capabilities are
+ * relocated (Stock MASTER §13 names the scopes). The Inventory Register draws
+ * its own header (`WarehouseStockRegister`) and does not use this file.
  */
 
 type StockPage = "on-hand" | "ready" | "in-out";

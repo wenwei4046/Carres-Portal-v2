@@ -1,6 +1,6 @@
 import {
   LayoutDashboard,
-  ArrowLeftRight,
+  CalendarDays,
   ClipboardList,
   ShoppingBag,
   Boxes,
@@ -108,7 +108,10 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
  * (Dashboard · Work · Issue Tracker, ruled plain by the card) and `Finance`,
  * whose single `Payments` page would otherwise hide behind a chevron that
  * reveals one row of the same name. A control that opens nothing new is the
- * dead control `docs/03-page-patterns.md:149` bans.
+ * dead control `docs/03-page-patterns.md:149` bans. `Payments` stays ONE row
+ * after the 2026-09-09 entry-point correction: Payment MASTER §16 puts the
+ * `Payments · Invoices` switch in the Register's own toolbar, so a second
+ * rail row for Invoices would be a second control for one act.
  *
  * The icon is the module's ONE face — the same law the Purchasing `ShoppingBag`
  * already followed (Loo, 2026-08-02). Children carry no icon at all now, so
@@ -121,9 +124,20 @@ export interface PortalModule {
   icon: LucideIcon;
 }
 
+/** WHERE THE COLLAPSED WAREHOUSE ICON GOES — a NAMED destination, never "the
+ *  first live row" (the same law Purchasing follows; owner review 2026-08-20).
+ *  `Monitor` is the module's Calendar-summary page and the daily journey
+ *  OPENS on it (Stock MASTER §7) — by name, never derived from row order. */
+export const WAREHOUSE_LANDING_KEY = "wh-monitor";
+
 export const PORTAL_MODULES: ReadonlyArray<PortalModule> = [
   { section: "Sales", label: "Sales", icon: ClipboardList },
   { section: "Purchasing", label: "Purchasing", icon: ShoppingBag },
+  /* THE FOUR-PAGE MAP (CARD-2026-09-04-delivery-01): Monitor → Delivery
+   * Orders → Delivery Order → Edit Delivery. The first two are navigation,
+   * so Delivery is a module again; the object and the writer stay doors on
+   * cards and rows. This overwrites the 2026-08-21 one-page ruling. */
+  { section: "Delivery", label: "Delivery", icon: Route },
   { section: "Warehouse", label: "Warehouse", icon: Boxes },
   { section: "Customer Care", label: "Customer Care", icon: LifeBuoy },
   /* Suppliers left Master Data on 2026-08-21 (YH's placement ruling): it is a
@@ -242,6 +256,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // worked out*. The page writes nothing; a row opens the owning module's
       // workspace.
       { key: "work", label: "Work", icon: ListTodo, section: "Workspace" },
+      /* `Workspace → Staff & Duties` — the ONE company-wide duty assignment
+       * door (workspace/MASTER.md, LOCKED 2026-09-03; built with the
+       * Receiving & GRN card). Modules reference duties; they never keep a
+       * second person list. */
+      { key: "staff-duties", label: "Staff & Duties", icon: Users, section: "Workspace" },
       { key: "issue-tracker", label: "Issue Tracker", icon: CircleAlert, path: "/operation/issues", section: "Workspace" },
       // ⭐ THE TEMPORARY DOOR (SALES-ORDER-CUTOVER, owner 2026-08-10).
       //
@@ -281,7 +300,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        *   `Purchase Demands`       `purchase_demand` is hidden canonical truth,
        *                            not a page an operator is sent to
        *   `Consignment Overview`   the Stock Register reports supplier-owned
-       *   `Consignment Receipts`   Units, and `Goods Receipts` is the ONE
+       *   `Consignment Receipts`   Units, and `Receiving` is the ONE
        *                            physical receipt engine
        *   `Report` + its hairline  reports are central / Register exports
        *
@@ -329,7 +348,11 @@ export const PORTAL_NAV: PortalNavGroup[] = [
        * the rest of receiving (returns to warehouse, put-away) will land. It
        * receives purchased AND consignment goods — there is no second receipt
        * engine (`docs/purchasing/MASTER.md` §4). */
-      { key: "receiving", label: "Goods Receipts", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
+      /* `Receiving` is the exact destination word (owner correction 2026-08-29,
+       * ERP-ARCHITECTURE §2.1): it names the physical operation. `Goods
+       * Receipts` is retired as navigation — the GRN stays the DOCUMENT's
+       * noun, never a page name. */
+      { key: "receiving", label: "Receiving", icon: PackageCheck, section: "Purchasing", pageGroup: "purchasing-receive" },
 
       /* PROBLEMS — what you open when the goods are wrong. */
       { key: "claims", label: "Supplier Claims", icon: Scale, section: "Purchasing", pageGroup: "purchasing-problems" },
@@ -352,42 +375,93 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // reasons and photos stay behind the order drawer's server-side gates, so
       // this door shows the delivery work and hands over to the same drawer the
       // Orders list opens.
-      /* THE DELIVERY MODULE'S PAGES — TWO, and both of them open
-       * Owner ruling 2026-08-24: arrangement and formal DO truth share one
-       * Delivery listing. A one-page destination is a direct row, not a
-       * chevron that reveals one child of the same name. The historical DO
-       * object path remains a valid deep link and lights this same row. */
+      /* THE DELIVERY MODULE'S PAGES — TWO NAVIGATION DESTINATIONS
+       * (CARD-2026-09-04-delivery-01). Monitor is the calendar the operator
+       * plans the day on; Delivery Orders is the restored formal-document
+       * register. The DO object page and Edit Delivery are reached from
+       * cards and rows, never from the rail. Monitor leads: it is the
+       * module's flagship and the collapsed icon's landing (first live row). */
       {
         key: "delivery",
-        label: "Delivery",
+        label: "Monitor",
         icon: Route,
-        activeFor: ["tab:delivery", "path:/operation/delivery-orders"],
+        activeFor: ["tab:delivery"],
+        section: "Delivery",
       },
-      /* WAREHOUSE IS A HEADING, NOT A PARENT ROW (Warehouse Blueprint item 13,
-       * owner-approved; applied 2026-08-19 under the Jess 2026-08-19 SALES
-       * template — CARD-2026-08-19-warehouse-rail). K0's single merged `Stock`
-       * row becomes the module's pages in the rail. The three built pages keep
-       * their `?tab=` addresses; `Transfers` and `Counts` are blueprint pages
-       * printing `Coming soon` until their own PRs. The blueprint keeps
-       * Reports and Settings central: NO Report row, NO Settings row here.
-       * The three live rows keep K0's learned order (Stock · Ready stock ·
-       * In & out) — the rail never reshuffles under an operator; when Ready
-       * stock folds into Stock Views (blueprint item 13.7) its row dies in
-       * that card's own PR. Word law (COPY-STANDARD): "Inventory" and
-       * "Movements" stay banned UI words; the goods pool is still `Stock` on
-       * any page — `Warehouse` is the MODULE heading, not the pool word. */
-      /* `Stock`, not `On hand` — CARD-2026-08-20-stock-register §1, and
-       * Stock MASTER §2 rejects `On hand` and `Stock Units` as the master-list
-       * name by name. `On hand` described a QUANTITY on a shelf; the page now
-       * lists exact Units and answers which one, where, who has it and whether
-       * it can be used. The `?tab=` address is unchanged, so no bookmark and no
-       * learned rail position moves. */
-      { key: "stock", label: "Stock", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
-      { key: "stock-plan", label: "Ready stock", icon: ClipboardList, section: "Warehouse" },
-      { key: "movements", label: "In & out", icon: ArrowLeftRight, section: "Warehouse" },
-      { key: "transfers", label: "Transfers", icon: Truck, soon: true, section: "Warehouse" },
-      { key: "counts", label: "Counts", icon: ScrollText, soon: true, section: "Warehouse" },
-      { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
+      {
+        key: "delivery-orders",
+        label: "Delivery Orders",
+        icon: FileText,
+        path: "/operation/delivery-orders",
+        activeFor: ["path:/operation/delivery-orders"],
+        section: "Delivery",
+      },
+      /* THE WAREHOUSE MAP IS FOUR DESTINATIONS (owner replacement Card,
+       * 2026-09-06 — Stock MASTER §2, ERP-ARCHITECTURE §2.1): `Monitor ·
+       * Inbound · Inventory · Outbound`. The ERP keeps ONE global Dashboard;
+       * the Warehouse Calendar-summary page is `Monitor` (the same word
+       * Delivery's calendar page already speaks). `Inventory` is the one
+       * current Unit Register — the `?tab=stock-onhand` address is unchanged,
+       * so no bookmark moves, and `?tab=warehouse-dashboard` still lands on
+       * Monitor for the same reason.
+       * Reports and Settings stay central: NO Report row, NO Settings row.
+       *
+       * The de-navigated legacy pages keep their routes (`?tab=stock-plan` ·
+       * `?tab=movements`) until their capabilities are relocated — reorder
+       * points/urgent restock and the event history are named next scopes in
+       * Stock MASTER §13; a direct URL still lands. */
+      {
+        key: "wh-monitor",
+        label: "Monitor",
+        icon: CalendarDays,
+        tab: "warehouse-monitor",
+        section: "Warehouse",
+      },
+      {
+        key: "wh-inbound",
+        label: "Inbound",
+        icon: ArrowDownLeft,
+        tab: "warehouse-inbound",
+        section: "Warehouse",
+      },
+      { key: "stock", label: "Inventory", icon: Boxes, tab: "stock-onhand", section: "Warehouse" },
+      {
+        key: "wh-outbound",
+        label: "Outbound",
+        icon: ArrowUpRight,
+        tab: "warehouse-outbound",
+        section: "Warehouse",
+      },
+      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER — the
+       * entry-point correction, 2026-09-09.
+       *
+       * This row used to link to `/operation?tab=payments`, the Master-Sheet
+       * "Balance" collections desk: its own Summary band, its own queue chips
+       * and its own EDITABLE balance / storage-fee fields. Payment MASTER §16
+       * approved a different destination — the read-only Payments Register,
+       * its `Payments · Invoices` toolbar, the Invoice object that owns the
+       * writing, and the §17 Calendar behind the Invoice date cells — and
+       * every one of those shipped at `/finance/*` while this row still
+       * pointed at the old desk. Two forms for one act make two records
+       * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is gone and
+       * this is the one door.
+       *
+       * `path` (not `financePath`) on purpose: `navItemHref` reads `path` for
+       * every non-finance area, so the row links absolutely out of
+       * `/operation` and lights on the destination it actually opens. Both
+       * `operation` and `principal` may stand there — `/finance/*` admits
+       * operation staff to Payments and Invoices (§12), and `FinanceApp`
+       * bounces them off every finance-only page. */
+      {
+        key: "payments",
+        label: "Payments",
+        icon: Wallet,
+        path: "/finance/payments",
+        // The Invoices Register is the same destination's second listing (its
+        // toolbar switches between the two), so the row stays lit there.
+        activeFor: ["path:/finance/payments", "path:/finance/invoices"],
+        section: "Finance",
+      },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
       { key: "rental", label: "Rental", icon: Repeat, section: "Customer Care" },
@@ -440,7 +514,9 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       },
       {
         key: "payments",
-        label: "Order Payments",
+        // Payment MASTER §16 — the destination word is `Payments`; the row
+        // opens the canonical receipt Register.
+        label: "Payments",
         icon: Wallet,
         financePath: "/finance/payments",
       },
@@ -464,12 +540,6 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Rental Approver",
         icon: UserCheck,
         financePath: "/finance/rental-approver",
-      },
-      {
-        key: "recon",
-        label: "Reconciliation",
-        icon: Scale,
-        financePath: "/finance/recon",
       },
       {
         key: "reports",

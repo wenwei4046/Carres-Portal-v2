@@ -51,56 +51,67 @@ this number, may I change it). That was audited in full on 2026-08-28 —
 `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md`, 103 rows in render order. **The open
 items in it are the work; do not re-audit.**
 
-## 2 · CURRENT STATUS — measured 2026-09-01, re-measure before use
+## 2 · CURRENT STATUS — measured 2026-09-02 after #1063, re-measure before use
 
 | Fact | Value | How to re-measure |
 |---|---|---|
-| `origin/main` | `c35adc60` | `git rev-parse --short origin/main` |
-| Branch state | level with main, tree clean | `git rev-list origin/main..dev_branch_yh --count` |
-| `apps/web` tests | **GREEN — 282 files, 3634 tests** | `cd apps/web && pnpm exec vitest run` |
-| `apps/api` + `shared` | **GREEN — 130 files, 2590 tests** | `pnpm --filter @carres/api --filter @carres/shared test` |
-| Typecheck | clean | `pnpm -r typecheck` |
-| Lint | passes (Stage 1, warn-only) | `pnpm -r lint` |
-| Migration filenames | 418 validated | `node scripts/check-migrations.mjs` |
-| Migration tail, ALL branches | **0409** → next free is **0410** | the rename-safe command in §4 |
-| On `main` | `0393`–`0409`, plus `0398a` | `ls supabase/migrations` |
-| Production | **2 commits behind, deploys queued** | `EXPECTED_SHA=$(git rev-parse origin/main) node scripts/verify-production.mjs` |
+| `origin/main` | `7613bb14` | `git rev-parse --short origin/main` |
+| `apps/web` tests | **GREEN — 285 files, 3731 tests** | `cd apps/web && pnpm exec vitest run` |
+| `apps/api` tests | **GREEN — 131 files, 2649 tests** | `pnpm --filter @carres/api test` |
+| `packages/shared` tests | **GREEN — 122 files, 2836 tests** | `pnpm --filter @carres/shared test` |
+| Typecheck | clean | `pnpm -r typecheck` — **NOT** `tsc -p tsconfig.json` in `apps/web`, which checks nothing |
+| Migration filenames | 426 validated | `node scripts/check-migrations.mjs` |
+| Migration tail, ALL branches | `0416` — **now merged** (#1061), so main and the branch tail agree → **next free is `0417`** | the rename-safe command in §4 |
+| Open PRs from this lane | **one** — `fix/so-register-three` (D3 · D4 · D7). #1058–#1063 all merged 2 Sep | `gh pr list --author @me` |
 
-**On production lag:** all five surfaces agreed on `e70cac31` while `#1004`'s
-deploy had been in-progress 21 minutes and `#1006`'s was cancelled by a newer
-push. Queued deploys, not a failure. `verify-production.mjs` polls for 15
-minutes by default; set `CONVERGENCE_TIMEOUT_MS=1` for a single pass that
-reports what each surface currently serves.
+### Migrations — APPLIED means probed, not merged
 
-**The ten red `os-card-*` tests are FIXED** (`8bfa1099`, `#1002`/`#1003`). They
-were never a product bug — see §3.7. Do not go looking for them.
-
-### Shipped by this lane, merged and live
-
-| Migration | What it does |
+| Migration | Probe verdict — all probed 2026-09-02, none recited |
 |---|---|
-| `0391` | Office create requires a Proceed date; a blank one may be filled ONCE, then locks |
-| `0393`/`0394` | Stair carry is a real `STAIR_CARRY` add-on row, stamped at birth and re-stamped when floor/lift/count move |
-| `0395` | A misclicked service can be removed — same gates as the edit door, no reason demanded |
-| `0406` | A computed fee is not a pickable service — the doubling bug, closed at UI **and** database |
-| `0409` | Layer ④ Carres Execution — in what ORDER the goods move. Completes Loo's four-layer claim model; **applied by YH 2026-09-01** |
+| `0395`, `0406` | ✅ applied — closed the HIGH carry-forward that had been open four days |
+| `0405` | ✅ applied 1 Sep. **It had never run**; the PO collection guard existed only in two API routes |
+| `0410` Manual Purchase is one transaction | ✅ applied |
+| `0414` a stamped fee remembers its rate | ✅ applied |
+| `0415` the office door locks what the shop door locks | ✅ applied 2026-09-02 and **confirmed WHOLE** — `floors_fns = 2`, F-11 true, F-12 true |
+| `0413` the over-issue guard counts what was approved | ✅ applied — probed 2 Sep after the refresh found it had never been checked at all |
+| `0411` instalment months widened | **WITHDRAWN, never applied.** YH asked *"if the POS still sells 6 and 12, why widen?"* and he was right |
 
-Plus, without a migration: the office add-on door (`SalesOrderAddons.tsx`) · the
-FK guard that stops a missing migration blocking a sale · one name for the
-delivery fee · the two POS delivery-fee inputs withheld · one absence word
-(`Not recorded`) · goods-row alignment · Money card one size · `Change delivery
-date` · the building-type gate · duty work reaching Finance and Delivery ·
-`Preview PDF` retired · `Copy to a new Sales Order` retired · the stair-count
-clamp · ~20 banned words removed across Workspace, Revisions and Order Route ·
-Revisions/History loading and error guards (a 403 used to render as "No
-revisions recorded") · the Order Route asking the shared money predicates
-instead of re-deciding them.
+### Shipped 1–2 Sep, merged and live
 
-**Three owner rulings are LAW in `docs/orders/MASTER.md`** (YH, 2026-08-28):
-stair carry is money the customer owes · a date never recorded is not a date
-that is locked · the delivery-payment approver is the principal only, and that
-is explicitly marked CHANGEABLE.
+**Money defects closed.** A **live POS double-charge**: `PosOrderDetail.tsx`
+added the stored `STAIR_CARRY` add-on row *and* a live `floorSurcharge()`
+recomputation into one total, so the stair fee was charged twice and drove the
+payment prefill. Its test could not see it — the fixture had `floor: 1`,
+`hasLift: true` and no stair items, three separate ways of zeroing the live half
+while a real fee sat in the add-ons. · The **stale stair fee** (the 🔴 that
+opened this file's old §6): `restampAfterLineWrite` now re-stamps when goods
+change, and skips the write when the fee is unchanged. · **`0414`** stores the
+rate that produced a stamped fee, so an old order re-reads its own rate instead
+of today's.
 
+**Sales Order workspace.** Every non-editable fact now renders as a read-only
+textbox (`role="textbox" aria-readonly`) so filled and empty look the same
+shape · money boxed · service rows in the Goods card styled like goods ·
+`Sales ownership` split into its own card · card titles carry
+`text-signature-700`, the one hue free of a token job · `{n} of {m} Units ready`
+replaces the banned `Not allocated` · stair-carry quantity has a ceiling
+(`max={stair?.itemsTotal}`) and the floor bound is `1–3` on both doors — *office
+follows POS*, measured, not assumed · `Change salesperson` no longer owns a row ·
+the delivery-payment approval box removed on YH's ruling · `SO Date` registered
+in `COPY-STANDARD.md` · `sales-order-copy.ts` deleted (F-14) · the
+emergency-contact round trip fixed — only *trailing* empties drop, so a blank
+middle field no longer shifts every value one slot left.
+
+**Purchasing.** `0410` makes a Manual Purchase all-or-nothing — it was six
+separate browser transactions, and a failure on line 3 left a half-record that
+could still be approved and issued · `approvedQty` in `manualPurchaseStatusOf` ·
+`useAddOrderLines` now invalidates `["operation","orders"]` — React Query
+matches by **prefix**, so adding a service wrote to the database and the screen
+never refetched.
+
+**A settled doc.** `docs/orders/MASTER.md:1727` is struck as spent: its own
+condition (*"until the amendment lane lands"*) had expired, and it was the only
+text authorising a silent change to a customer's promised date.
 ## 3 · KEY DECISIONS, AND WHY
 
 Do not re-litigate these. Each was ruled by the owner or resolved from authority.
@@ -189,6 +200,33 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
     makes an operator type a false answer to record a true one. In
     `docs/purchasing/MASTER.md` §9.5 and pinned by a test.
 
+18. **Migration NUMBERING is not governed during development** (YH, 2 Sep):
+    *"no comm on numbering during dev — this is just a trivial matter, leave it
+    as it is, just ensure the SQLs are integrated/migrated."* Collisions and
+    out-of-order numbers across unmerged branches are NOT defects and no card
+    may be written for them. **What is governed is whether the SQL is APPLIED**,
+    which §2's probe table tracks. Still take the max across all branches when
+    numbering a NEW file (§4) — that is to avoid overwriting a live one, not to
+    tidy the sequence.
+
+19. **Blueprints and unruled business rules are not this lane's work** (YH,
+    2 Sep). A page blueprint with no build scope, and a rule nobody has ruled,
+    both wait on their owner. Neither is an engineering item and neither belongs
+    on this lane's open list as though it were one.
+
+20. **A saved order stores what was CHARGED, not the working-out** (YH, 2 Sep):
+    *"a saved order should save just what was charged."* This closes **R1** in
+    `PURCHASING-TODO.md` with **no code change** — the shipped behaviour already
+    matches. A saved order prints *"2 of 5 items carried to floor 4 — charged
+    RM 300"*, and the rate that produced it is not recovered for display:
+    only the product is stored, so rate and `freeUpToFloor` are one equation
+    with two unknowns, and reading either off today's config is defect D1 one
+    term smaller. `stair-carry-recompute.ts:143-147` forbids stamping the
+    breakdown — *"a second copy would be a second arithmetic for one number."*
+    Acceptance #6 of `CARD-2026-08-28-stair-carry-is-money-the-order-can-hold.md`
+    is therefore **fully met**, not half-met: what must not move after the fact
+    is the money, and the money does not move.
+
 ## 4 · CONSTRAINTS
 
 - **Migrations are applied BY HAND.** Code can reach production before its
@@ -249,73 +287,154 @@ Do not re-litigate these. Each was ruled by the owner or resolved from authority
 - **Do not write long explanations to YH.** He has said so repeatedly. Plain
   words, conclusion first, mechanism second or on request.
 
+## 5b · WHAT TO AVOID — three added 2026-09-02, each learned by doing it
+
+- **`git log --diff-filter=A` to find the next migration number.** It reports
+  additions only, and git records a renumbered file as a **rename** — so it hid
+  `0413` on another branch and the next migration was nearly numbered on top of
+  a live one. Use the rename-safe command in §4.
+- **A two-part SQL probe pasted as one file.** The Supabase SQL editor runs only
+  the **last** statement of a paste, so a two-question probe silently answers
+  half. Split them into separate files and say so when handing them over.
+- **Degrading quietly.** A `0410` fallback returned HTTP 200 while dropping
+  every line of a Manual Purchase. "Degrade, don't abort" is not "stay silent" —
+  if the safe path cannot do the whole job, refuse in words (503), never
+  half-write.
+- **A gate that never ran, read as a gate that passed.** Two ways to get this,
+  both hit on 2026-09-02. A **fresh worktree has no `node_modules`**, so
+  `pnpm -r typecheck` fails with *'tsc' is not recognized* — a missing binary,
+  not clean code. And `pnpm -r test 2>&1 | tail` reports **tail's** exit code,
+  so a red suite prints green. Run `pnpm install` in a new worktree first, and
+  redirect to a file rather than piping: `pnpm -r test > log 2>&1; echo $?`.
+  Same family as the `tsc -p tsconfig.json` warning in §2 — the failure mode is
+  always that nothing was measured, and nothing looks like success.
+
 ## 6 · OPEN WORK, in order
 
-**Closed since this file was written:** Layer ④ (Carres Execution) is BUILT —
-migration `0409`, applied by YH 2026-09-01. Loo's four-layer claim model is
-complete, and the argument Purchase Returns (§9.6) and Repair Orders (§9.7) were
-frozen on now exists. **Both are still unbuilt**; they are unfrozen, not
-delivered, and each is a register with its own numbering, PDFs, handover proof
-and custody moves. The audit's 818-line correction pass also landed, from
-another lane.
+**One PR open, and one SO defect left behind it.** Every migration the 1–2 Sep
+build shipped is probed and applied — `0410`, `0413`, `0414`, `0415`, the last
+confirmed whole rather than half — and the code that rides on them is merged.
 
-**YH ruled while building it (2026-09-01): the layers are NOT cross-validated.**
+**In review:** `fix/so-register-three` closes **D3** (the register printed the
+raw add-on key), **D4** (the `DO No` column went blind past 500 delivery
+orders) and **D7** (`Paid in full` / `No price yet` were in no dictionary),
+which YH asked for on 2 Sep.
+
+**Still open on the SO side: D5.** Cancelling a Sales Order removes it from the
+only register that lists Sales Orders, while `CancelSalesOrderDialog.tsx:83`
+promises nothing is deleted — the list read is
+`.in("status", ["place","proceed_order","delivered"])` at `operation/orders.ts:303`, so a
+cancelled order has nowhere left to be seen. **D6 is a method caution, not a
+defect** (re-measure the old-revision lock with a check that walks fieldset
+ancestors; the obvious check reports a false pass). Both live in
+`PURCHASING-TODO.md` §6.
+
+⚠️ **THAT IS NOT "NOTHING TO DO", AND DO NOT REPORT IT AS SUCH.** This file
+covers one lane. YH's two active areas each keep their own tracker, and both
+hold real work:
+
+| Tracker | Where | Holds |
+|---|---|---|
+| `PURCHASING-TODO.md` | the Carres desktop folder — **outside this repo** | **15 open defects**, ranked, plus rulings R1 and R4 |
+| `PURCHASING-FIELD-GUIDE.md` | same folder | the reference the tracker indexes — §4 is the 41 defects |
+| `docs/audits/SO-WORKSPACE-FIELD-AUDIT.md` | in-repo | 103 rows. **Its 🔴 markers are 28 Aug and NOT maintained** — several are since closed (F-2, F-3, F-4, F-8). Re-measure any row before quoting it |
+| `docs/carry-forwards.md` | in-repo | open risks, per `CLAUDE.md` §11 |
+
+The purchasing tracker is the freshest of them and names its own start point.
+Read it before concluding there is no work.
+
+**Both items below belong to somebody else**, which YH ruled on 2 Sep (§3.19).
+Neither is work an agent may pick up, and neither is waiting on him: one needs
+Jess, one needs an owner release. They are listed so the next session does not
+rediscover them, not as a queue.
+
+⛔ **CLOSED 2 Sep, do not re-open.** The *instalment-months refusal sentence* sat
+here for two revisions asking YH for "a word". Measured: there is nothing to
+rule. #1036 replaced the amendment form's free number box with a picker of the
+same two plans the POS sells, `installmentMonthsField` (`6 | 12 | null`) is the
+one union every door validates against, and `PrincipalNewOrder` coerces to 6 or
+12. **A term the database refuses can no longer be typed on any surface**, so the
+raw constraint text cannot reach the principal's Approve press. It survived two
+refreshes because it was renumbered rather than re-measured — which is what §2's
+own header warns against.
+
+1. **`building_type` — NOT THIS LANE'S. Four questions, and they are Jess's.**
+   YH ruled on 2 Sep that this is not his to answer. **Do not build any of it
+   from inference**, and do not put it back on his list.
+
+   What IS ruled and needs nothing: Jess locked the map on 2026-07-27 and
+   `COPY-STANDARD.md` §2143–2179 carries it — `Landed`/`Retail` full day,
+   `Condo`/`Apartment`/`Office` half day, `Other`/blank full day with the
+   booking refused — including the exact refusal sentence. The field is stored
+   in `entry_data.fields.building_type` and **nothing reads it**, which the
+   standard says out loud.
+
+   The four questions, each with the code fact behind it:
+
+   a. **Does a half-day take half a slot, or a whole one?**
+      `delivery-calendar.ts` does `cur.confirmed += 1` per booking, so six
+      condos and six landed houses are the same number to the calendar. Its own
+      header already admits this: *"counts as one; it is listed as what it is."*
+   b. **What are the other four building types worth?** Loo set Saturday weights
+      for `Landed = 1` and `Condo = 0.5` and stopped there. `Apartment`,
+      `Office`, `Retail` and `Other` have none.
+   c. **Does the weight apply every day, or only Saturday?** Loo ruled Saturday;
+      `dailyCapacity` applies to every day of the week.
+   d. **Is the principal's create door exempt?** `PrincipalNewOrder.tsx` never
+      asks for a building type, while the POS and the office both do — and the
+      rule refuses the booking until it is filled. So an order created there is
+      born unbookable. Related: orders with no address at all.
+
+   **For Chai, not Jess:** Delivery and warehouse scheduling is his lane and his
+   Blueprint closed on 1 Sep. Ask whether it already answers (a) — if it does,
+   the building-type map feeds it rather than becoming a second capacity rule.
+
+2. **Purchase Returns (§9.6) and Repair Orders (§9.7)** — unfrozen by `0409`,
+   still unbuilt. Each is a full register: numbering, PDF issue, handover proof,
+   custody moves, Finance credit reads. `docs/purchasing/MASTER.md` §9.6–9.7
+   gives each a purpose, a left rail, columns, a journey and its exceptions —
+   which is a page blueprint, not a build scope.
+
+   **This is NOT YH's to release** (ruled 2 Sep). It waits on whoever owns the
+   purchasing MASTER. Do not ask him to scope it, and do not start either one on
+   your own initiative.
+
+**Ruled, do not re-open:** the four claim layers are NOT cross-validated —
 `Replace First` with `No Replacement Required` is incoherent and the database
-accepts it, deliberately — a guard would collapse two layers Loo's model keeps
-apart, and would refuse a real event (the van is already collecting; the
-customer has not settled what they want). Written into
-`docs/purchasing/MASTER.md` §9.5 and pinned by a test. **Do not add the guard**
-without reopening it with Loo.
-
-1. 🔴 **The stair fee goes stale when goods change** — a live money defect in
-   shipped code. `stairCarryFee` clamps on the order's item count, but
-   `touchesStairInputs` watches only `delivery_floor`, `delivery_has_lift` and
-   `delivery_stair_items`. Add or remove goods on a clamped order and the
-   on-screen working-out recomputes live while the stored row does not. **One
-   screen, two numbers** — ownership Law D, and the exact defect the stair Card
-   was opened to close. Fix: make the line-writing paths re-stamp too.
-
-2. **`SO Date` is unregistered and contradicts the dictionary.** Commit
-   `11e11ca2` renamed `Ordered` → `SO Date` on five surfaces with no
-   COPY-STANDARD entry, and the table at `COPY-STANDARD:1756` still rules
-   `Ordered: {date}` for that exact fact. Shipped code breaks the dictionary it
-   is ruled by. Register `SO Date` against `orders.placed_at` and retire the old
-   row — or revert the rename. YH decides which.
-
-3. **The instalment-months 500.** `orders_installment_months_chk` allows
-   NULL/6/12 and nothing above the database knows. A proposal of 9 saves fine and
-   fails at the **principal's** Approve press with raw constraint text on screen.
-   The bound is verified; the refusal **sentence** needs a ruled word from YH.
-
-4. **Migrations `0395`–`0406` are probably unapplied.** YH applied through `0394`
-   by hand. `0395` is the one the office add-on door needs. Run the tracker query
-   and apply what is missing.
-
-5. **The stair-carry backfill has not been run.** `pnpm backfill:stair-carry`
-   (dry run), `-- --apply` to write. **YH's to run** — it needs the service-role
-   key and it changes money on existing orders.
-
-6. **Still open from the audit:** F-7 (`building_type` decides delivery slot
-   length, has no column and no constraint) · F-8 (floor bounds disagree across
-   UI/API/DB) · F-11 (the promised date is guarded by one layer, not two) · F-12
-   (`update_order` freezes six delivery fields after Proceed; the office door does
-   not) · F-13 (the floors evaluator is blind to seven fields) · F-14
-   (`sales-order-copy.ts` is dead code — its only importer is its own test) · the
-   emergency-contact parts-direction round-trip.
+accepts it deliberately (YH, 2026-09-01, `docs/purchasing/MASTER.md` §9.5,
+pinned by a test). Adding the guard would collapse two layers Loo's model keeps
+apart and would refuse a real event.
 
 ## 7 · EXACT NEXT STEP
 
-Ask YH which item in §6 he is releasing, and recommend **① the stale stair fee**
-— it is the only 🔴 on the list, it is a live money defect in code this lane
-shipped, and it is small. If he releases nothing, stand by. **Do not invent
-work.**
+**Get `fix/so-register-three` merged, then ask YH about D5.**
 
-Do NOT start Purchase Returns or Repair Orders on your own initiative just
-because Layer ④ unfroze them. Each is a full register — numbering, PDF issue,
-handover proof, custody moves, Finance credit reads — and §9.6/§9.7 are page
-blueprints, not build scopes. They need YH to release them.
+D3, D4 and D7 are written, gated and in review. **D5 is the last SO defect on
+this lane** and it needs a word before code: a cancelled order must be visible
+somewhere, and whether that is a status filter on the register, a separate
+cancelled view, or a different promise in the dialog is his call, not an
+inference. Build nothing else until he says.
+
+The two items in §6 belong to Jess and to the MASTER's owner, and YH ruled on
+2 Sep that neither is his — so **do not present them to him as his open work**,
+and do not treat their presence in this file as permission to start them.
+
+⛔ **Two failure modes, and they pull in opposite directions.**
+
+*Inventing work to look busy.* Three items were on this list yesterday that
+should not have been: the instalment sentence (already closed in #1036),
+migration numbering (not governed during development — §3.18), and two
+blueprints (not YH's). Each survived because it was carried forward rather than
+measured. **If §6 is empty, say it is empty** — it was, for one day, and saying
+so is what surfaced D3/D4/D7 from the tracker that actually held them.
+
+*Reporting "nothing left" from one empty list.* This file covers one lane. The
+purchasing tracker named in §6 held **15 open defects** on 2 Sep while this
+section read empty — both true at once. **Check the other trackers
+before telling YH he is done.** He is finalising Sales Order and working on
+Purchasing, and neither of those is finished.
 
 ---
 
-*Written 2026-09-01 at `origin/main` = `c35adc60`. Status lines decay within
+*Written 2026-09-02 at `origin/main` = `7613bb14`. Status lines decay within
 days in this repo — measure, do not recite.*

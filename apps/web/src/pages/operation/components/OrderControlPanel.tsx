@@ -725,8 +725,16 @@ function PaymentLedger({
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Couldn't record payment — ${e.message}`),
   });
+  // 0430 — a void wears its reason: the ✕ opens this inline ask instead of
+  // firing one-click; the SQL door refuses a blank reason anyway.
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
   const voidPay = useVoidPayment(orderId, {
     onError: (e) => toast.error(`Couldn't void — ${e.message}`),
+    onSuccess: () => {
+      setVoidingId(null);
+      setVoidReason("");
+    },
   });
   const [adding, setAdding] = useState(false);
 
@@ -759,13 +767,45 @@ function PaymentLedger({
           <div className="text-meta text-base-400">No payments recorded yet.</div>
         )}
         {payments.map((p) => (
-          <LedgerRow
-            key={p.id}
-            row={p}
-            canVoid={isPrincipal && !voidPay.isPending}
-            onVoid={() => voidPay.mutate(p.id)}
-            receiptMeta={receiptMeta}
-          />
+          <div key={p.id}>
+            <LedgerRow
+              row={p}
+              canVoid={isPrincipal && !voidPay.isPending}
+              onVoid={() => {
+                setVoidingId(voidingId === p.id ? null : p.id);
+                setVoidReason("");
+              }}
+              receiptMeta={receiptMeta}
+            />
+            {voidingId === p.id && p.voided_at == null && (
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="Why is this payment wrong?"
+                  aria-label="Void reason"
+                  autoFocus
+                  className="w-full rounded-md border border-base-200 px-2 py-1 text-meta"
+                />
+                <button
+                  type="button"
+                  onClick={() => voidPay.mutate({ paymentId: p.id, reason: voidReason.trim() })}
+                  disabled={voidPay.isPending || !voidReason.trim()}
+                  className="text-meta font-semibold text-danger shrink-0 disabled:opacity-40"
+                >
+                  Void payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVoidingId(null)}
+                  className="text-meta text-base-500 shrink-0"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
         ))}
 
         {adding ? (

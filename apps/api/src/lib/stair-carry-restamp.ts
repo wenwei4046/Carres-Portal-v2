@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { STAIR_CARRY_ADDON_KEY } from "@carres/shared";
 import { recomputeStairCarry } from "./stair-carry-recompute";
 
 /**
@@ -30,13 +31,27 @@ import { recomputeStairCarry } from "./stair-carry-recompute";
  * a lost edit.
  */
 
-/** The three inputs plus the line quantities the fee is priced from. */
+/** The three inputs, the line quantities the fee is priced from, and the fee
+ *  that is on the order right now. */
 interface OrderStairInputs {
   delivery_floor: number | null;
   delivery_has_lift: boolean | null;
   delivery_stair_items: number | null;
   order_lines: Array<{ qty: number }> | null;
+  order_addons: Array<{ addon_key: string; qty: number; unit_price: number }> | null;
+  /** 0414 — the rate this order's fee was priced at. Both null until the order
+   *  is next stamped, and absent entirely until 0414 is applied. */
+  stair_rate_per_floor_per_item?: number | null;
+  stair_rate_free_up_to_floor?: number | null;
 }
+
+/** The columns 0414 adds. Selected separately so their absence is survivable —
+ *  migrations here are applied BY HAND and this code can reach production
+ *  first. */
+const PIN_COLUMNS = "stair_rate_per_floor_per_item, stair_rate_free_up_to_floor";
+const BASE_COLUMNS =
+  "delivery_floor, delivery_has_lift, delivery_stair_items, " +
+  "order_lines(qty), order_addons(addon_key, qty, unit_price)";
 
 export async function restampStairCarry(
   sb: SupabaseClient,
@@ -58,21 +73,87 @@ async function restamp(
   sb: SupabaseClient,
   orderId: string,
 ): Promise<{ ok: true; fee: number } | { ok: false; reason: string }> {
-  const { data, error } = await sb
+  /* ⛔ MERGED IS NOT APPLIED. `0414` is applied by hand, so this build can
+     reach production before its two columns exist — and a select naming a
+     missing column fails the whole read, which would stop every re-stamp.
+     Ask for them, and on failure ask again without them: an order with no pin
+     prices from the live config, which is exactly the behaviour before 0414.
+     Degrade, never abort. The second round trip happens only while the
+     migration is outstanding. */
+  let withPin = true;
+  let read = await sb
     .from("orders")
-    .select("delivery_floor, delivery_has_lift, delivery_stair_items, order_lines(qty)")
+    .select(`${BASE_COLUMNS}, ${PIN_COLUMNS}`)
     .eq("id", orderId)
     .maybeSingle();
+  if (read.error) {
+    withPin = false;
+    read = await sb.from("orders").select(BASE_COLUMNS).eq("id", orderId).maybeSingle();
+  }
+  const { data, error } = read;
   if (error) return { ok: false, reason: `read order: ${error.message}` };
   if (!data) return { ok: false, reason: "order not found" };
 
   const row = data as unknown as OrderStairInputs;
+  /* BOTH HALVES OR NEITHER. A rate without its free band prices a different
+     fee, so a half-written pin is treated as no pin at all. */
+  const pinned =
+    row.stair_rate_per_floor_per_item != null && row.stair_rate_free_up_to_floor != null
+      ? {
+          perFloorPerItem: Number(row.stair_rate_per_floor_per_item),
+          freeUpToFloor: Number(row.stair_rate_free_up_to_floor),
+        }
+      : null;
   const recompute = await recomputeStairCarry(sb, row.order_lines ?? [], {
     floor: row.delivery_floor ?? 0,
     hasLift: row.delivery_has_lift ?? false,
     stairItems: row.delivery_stair_items,
+    pinned,
   });
   if (recompute.status !== "ok") return { ok: false, reason: recompute.message };
+
+  /* ⭐ A FEE THAT HAS NOT MOVED IS NOT RE-WRITTEN (YH, 2026-09-02).
+     `order_stamp_stair_carry` (0394) DELETES the row and re-INSERTS it, so
+     every call is a real write even when the number is identical. And the
+     callers fire far more often than the fee changes:
+       · `touchesStairInputs` tests whether the KEY is present, and the office
+         form sends all three on every save — so a phone-number correction
+         re-stamps.
+       · `restampAfterLineWrite` fires on every line write, but the count is
+         CLAMPED (`stairCarryCount`), so adding a 6th item to an order that
+         carries 2 changes nothing about the fee.
+     Comparing the computed fee with the one already on the order turns both of
+     those into no-ops. `0` is a real value here — it means "no row" — so the
+     stored side reads a missing row as 0 rather than as unknown.
+     ⛔ THIS DOES NOT FIX THE RATE. If `floor_config` moved, the recomputed fee
+     legitimately differs and this still re-stamps — at TODAY's rate, on an
+     order the customer already signed. That is the defect `0414` closes by
+     pinning the rate to the order; this only stops the pointless writes that
+     make it fire. Said plainly so nobody reads this as the whole fix. */
+  const stored = (row.order_addons ?? []).find((a) => a.addon_key === STAIR_CARRY_ADDON_KEY);
+  const storedFee = stored ? Number(stored.unit_price) * Number(stored.qty) : 0;
+  if (storedFee === recompute.fee) return { ok: true, fee: recompute.fee };
+
+  /* ⭐ THE STAMP RECORDS THE RATE THAT MADE IT (0414), once. `..._pinned`
+     writes the pin only where none exists and then delegates to `0394`'s door
+     unchanged, so a re-stamp on an already-pinned order moves the fee and
+     leaves the rate — which is the ruling.
+     Same hand-applied caveat as the read: a missing function means 0414 has
+     not run, so fall back to the original door and carry on unpinned. */
+  const rate = recompute.rate;
+  if (withPin && rate) {
+    const { error: pinnedError } = await sb.rpc("order_stamp_stair_carry_pinned", {
+      p_order_id: orderId,
+      p_fee: recompute.fee,
+      p_rate: rate.perFloorPerItem,
+      p_free_up_to: rate.freeUpToFloor,
+    });
+    if (!pinnedError) return { ok: true, fee: recompute.fee };
+    const code = String((pinnedError as { code?: string }).code ?? "");
+    if (code !== "PGRST202" && code !== "42883") {
+      return { ok: false, reason: `stamp: ${pinnedError.message}` };
+    }
+  }
 
   const { error: stampError } = await sb.rpc("order_stamp_stair_carry", {
     p_order_id: orderId,
@@ -82,8 +163,52 @@ async function restamp(
   return { ok: true, fee: recompute.fee };
 }
 
-/** The header keys whose movement changes the fee. A save that touches none of
- *  them cannot move it, so it does not pay for a read and an RPC round-trip. */
+/**
+ * ⭐ AFTER A LINE WRITE, ALWAYS (YH, 2026-09-01 — the one 🔴 on the open list,
+ * and live money in shipped code).
+ *
+ * The fee is `count × floors × rate`, and `count` is CLAMPED to the number of
+ * items on the order. So the GOODS are the fourth input, and they never arrive
+ * through a header patch — they arrive through `add_order_lines` and
+ * `replace_order_lines`.
+ *
+ * Sell 3 items to a 3rd floor with no lift and the order stamps a fee for 3.
+ * Remove one and the stored charge stays priced for 3 while every screen
+ * recomputes 2. One order, two numbers, and the stored one is what the customer
+ * is billed.
+ *
+ * ⛔ NO PREDICATE HERE, deliberately. `touchesStairInputs` reads a header patch
+ * to decide whether a round-trip is worth paying for; a line door has no header
+ * to read and a line write ALWAYS moves the count, so there is nothing to test.
+ *
+ * ⛔ AND IT NEVER FAILS THE WRITE, like every other caller. The lines are
+ * already committed and the change request already decided; throwing here would
+ * tell the operator their edit was lost when it was not. A stale fee is the
+ * state we were in before this existed — a lost edit is not.
+ *
+ * FOUR DOORS CALL THIS: the two direct place-lane writers and the two
+ * change-request APPROVE paths that write lines. It is a function rather than
+ * four pasted blocks because a fifth line door is how this bug comes back.
+ */
+export async function restampAfterLineWrite(
+  sb: SupabaseClient,
+  orderId: string,
+): Promise<void> {
+  const restamp = await restampStairCarry(sb, orderId);
+  if (!restamp.ok) {
+    console.error("stair carry re-stamp failed", { orderId, reason: restamp.reason });
+  }
+}
+
+/**
+ * The header keys whose movement changes the fee. A save that touches none of
+ * them cannot move it, so it does not pay for a read and an RPC round-trip.
+ *
+ * ⚠️ THESE ARE ONLY THREE OF THE FOUR INPUTS, and that was the bug. The item
+ * count is the fourth and it does not travel in a header patch — see
+ * `restampAfterLineWrite` above. This predicate stays exactly what its name
+ * says: the HEADER test.
+ */
 export const STAIR_INPUT_KEYS = [
   "delivery_floor",
   "delivery_has_lift",

@@ -88,6 +88,9 @@ export interface ProductModel {
   allowedOptions?: Record<string, string[] | undefined>;
 }
 
+/** 0442 — the Catalog-owned stock identity mode of a SKU. */
+export type StockIdentityMode = "exact_unit" | "quantity";
+
 export interface ProductSku {
   id: string;
   modelId: string;
@@ -106,6 +109,11 @@ export interface ProductSku {
   supplierId: string | null;
   /** 0375 — the SUPPLIER'S own item code (their quotation's code). */
   supplierCode?: string | null;
+  /** 0442 — how Stock identifies this SKU. `exact_unit` = every piece is one
+   *  permanent Carres Unit ID born at official PO issue; `quantity` = counted
+   *  interchangeable goods, never given Unit IDs; null = Catalog has not said
+   *  (official PO issue refuses the SKU by name). Stored, never derived. */
+  stockIdentityMode?: StockIdentityMode | null;
   discontinuedAt?: string | null;
   // 0170 — sell-side ON/OFF (Modular toggle, DISTINCT from discontinuedAt) +
   // editable sell-side description.

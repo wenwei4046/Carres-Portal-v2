@@ -36,8 +36,7 @@ const first = (s: OrderActionSignals) => displayOrderAction(openOrderActions(s))
 // ── LAYER 1 · nothing may be hidden ──────────────────────────────────────────
 
 describe("openOrderActions — one track never suppresses another", () => {
-  it("the card's own example: no PO + owing + no logistics → THREE open actions", () => {
-    // The old ladder showed the purchasing act alone and swallowed the other two.
+  it("no PO and no arrival keeps goods and logistics work while collection waits", () => {
     const s = sig({
       goodsReady: false,
       goodsUnordered: true,
@@ -46,7 +45,7 @@ describe("openOrderActions — one track never suppresses another", () => {
       confirmedDateIso: null,
       moneyOwing: true,
     });
-    expect(keys(s)).toEqual(["issue_po", "assign_logistics", "collect"]);
+    expect(keys(s)).toEqual(["issue_po", "assign_logistics"]);
   });
 
   it("goods still coming does not hide the delivery work", () => {
@@ -60,8 +59,8 @@ describe("openOrderActions — one track never suppresses another", () => {
     expect(keys(s)).toEqual(["confirm_ready_date", "confirm_delivery_date"]);
   });
 
-  it("money is open on its own, never folded into the goods answer", () => {
-    const s = sig({ goodsReady: false, moneyOwing: true });
+  it("money is open alongside goods work when arrival is known", () => {
+    const s = sig({ goodsReady: false, stockEtaIso: "2026-08-19", moneyOwing: true });
     expect(keys(s)).toContain("collect");
     expect(keys(s)).toContain("confirm_ready_date");
   });
@@ -460,9 +459,9 @@ describe("displayOrderAction — Law 4's priority, and only that", () => {
     expect(first(s)).toBe("confirm_ready_date");
   });
 
-  it("money shows LAST and is never lost — it is still in the list", () => {
+  it("ready collection shows last alongside delivery preparation", () => {
     const s = sig({
-      goodsReady: false,
+      goodsReady: true,
       hasLogistics: false,
       bookingConfirmed: false,
       confirmedDateIso: null,
@@ -517,7 +516,6 @@ describe("orderActionsInDisplayOrder — the drawer's list", () => {
     expect(list.map((a) => a.key)).toEqual([
       "issue_po",
       "assign_logistics",
-      "collect",
     ]);
     expect(list[0].key).toBe(first(s));
   });

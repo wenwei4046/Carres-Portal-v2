@@ -1,15 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Users, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { CalendarDays, ListTodo, ScrollText, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useActiveOrder } from "@/lib/active-order";
-import type { OpsTask } from "@carres/shared";
 import CalendarPanel from "./rail/CalendarPanel";
-import TeamPanel from "./rail/TeamPanel";
-import TasksPanel, { TASKS_KEY } from "./rail/TasksPanel";
+import TasksPanel from "./rail/TasksPanel";
 import AnnotationTimeline from "./AnnotationTimeline";
 import GlobalActivity from "./GlobalActivity";
+import { useOpenWorkSet } from "../use-open-work";
 
 /**
  * OperationRightRail — Gmail-style collapsible right rail (Jess COO ask).
@@ -18,15 +15,13 @@ import GlobalActivity from "./GlobalActivity";
  * 60-min SLA) so the team is nudged to take action within the hour. Follow-ups is
  * the same ops_tasks data the Orders list flag column drives.
  */
-type Panel = "calendar" | "team" | "tasks" | "activity";
+type Panel = "calendar" | "tasks" | "activity";
 // Calendar (blue) · Team (green — the duty board) · Follow-ups — the
 // Follow-ups rail is the SAME flag system as the Orders list flag column
 // (both ops_tasks), so it uses the Flag icon + amber (Jess 2026-06-29).
 // Team REPLACED Notes (Jess 2026-07-19): Keep notes shipped 6/12 and held
 // exactly ONE note ever — dead slot, repurposed as the DUTY & ROLES board.
 const TABS: { key: Panel; label: string; icon: LucideIcon; active: string }[] = [
-  // Team FIRST (Jess 2026-07-19: "team put at first, after only calendar").
-  { key: "team", label: "Team", icon: Users, active: "bg-success-soft text-success" },
   { key: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-info-soft text-info" },
   // My Work wears the SAME icon as the left navigation's `Work` destination
   // (`portal-nav.ts`, ListTodo) — owner ruling 2026-08-15. The rail is that
@@ -44,26 +39,15 @@ export default function OperationRightRail() {
   const [active, setActive] = useState<Panel | null>(null);
   const activeOrderId = useActiveOrder((s) => s.orderId);
 
-  // Overdue count — shares the TasksPanel cache (single fetch), drives the badge.
-  const { data: tasksData } = useQuery<{ tasks: OpsTask[] }>({
-    queryKey: TASKS_KEY,
-    queryFn: () => apiFetch("/api/ops/tasks"),
-    refetchInterval: 60_000,
-  });
+  const { items } = useOpenWorkSet();
   const myId = useAuth((s) => s.session)?.user?.id ?? null;
-  // Personal alert: the Follow-ups badge counts MY open follow-ups (red if any
-  // overdue), so each operator is nudged on their OWN queue (Jess 2026-06-29).
-  const myTasks = (tasksData?.tasks ?? []).filter(
-    (t) =>
-      (t.assignedTo === myId || t.claimedBy === myId) &&
-      (t.status === "open" || t.status === "claimed"),
-  );
-  const myOverdue = myTasks.filter((t) => t.overdue).length;
+  const myWork = myId ? items.filter((item) => item.ownerId === myId) : [];
+  const myOverdue = myWork.filter((item) => item.workingDaysLate > 0).length;
 
   // Per-tab badge: Tasks = my open follow-ups (red when any overdue).
   const badgeFor = (key: Panel): { n: number; tone: string } | null => {
-    if (key === "tasks" && myTasks.length > 0)
-      return { n: myTasks.length, tone: myOverdue > 0 ? "bg-danger" : "bg-base-700" };
+    if (key === "tasks" && myWork.length > 0)
+      return { n: myWork.length, tone: myOverdue > 0 ? "bg-danger" : "bg-base-700" };
     return null;
   };
 
@@ -91,7 +75,6 @@ export default function OperationRightRail() {
           </div>
           <div className="flex-1 overflow-auto p-3.5 min-h-0">
             {active === "calendar" && <CalendarPanel />}
-            {active === "team" && <TeamPanel />}
             {active === "tasks" && <TasksPanel />}
             {active === "activity" &&
               (activeOrderId ? (

@@ -1,5 +1,8 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
+import { paymentRegisterQuery } from "@carres/shared/payment-register";
+import { APP_USERS, ORDER_PAYMENTS } from "@carres/shared/tables";
 import {
   financePoPayInput,
   financePoScheduleInput,
@@ -46,6 +49,199 @@ import type { AppEnv } from "../../types";
  *                           0063.
  */
 const financePaymentsRouter = new Hono<AppEnv>();
+
+// A Payment Register reads the canonical ledger, never order progress or AP.
+// Keep voids and allocation evidence; an absent source is not a zero balance.
+financePaymentsRouter.get("/register", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view payments." });
+  }
+  const parsed = paymentRegisterQuery.safeParse(c.req.query());
+  if (!parsed.success) return c.json({ message: "Choose a valid payment range." }, 422);
+  const { offset, limit } = parsed.data;
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error, count } = await sb
+    .from(ORDER_PAYMENTS)
+    .select("id,order_id,amount,paid_on,method,kind,reference,receipt_no,receipt_url,note,recorded_by,created_at,voided_at,voided_by,void_reason,source_metadata,orders(id,so,customer_name),payment_allocations(id,order_id,invoice_id,amount,allocated_at,voided_at,invoices(invoice_no))", { count: "exact" })
+    .order("paid_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error || count == null || data == null) {
+    throw new HTTPException(500, { message: "Payments could not be loaded. Try again." });
+  }
+  const actorIds = [...new Set(data.map((r) => r.recorded_by).filter((id): id is string => !!id))];
+  const names = new Map<string, string>();
+  if (actorIds.length) {
+    const actors = await sb.from(APP_USERS).select("id,name").in("id", actorIds);
+    if (actors.error) throw new HTTPException(500, { message: "Payment history could not be loaded. Try again." });
+    for (const actor of actors.data ?? []) names.set(actor.id, actor.name);
+  }
+  // §11 asks history to be filterable by EXCEPTION. The two a payment row can
+  // carry are the void and the acknowledged duplicate (0448). The
+  // acknowledgement is derived to a boolean here: `source_metadata` also holds
+  // whatever a payment provider sent, and that never needs to reach a browser.
+  return c.json({
+    rows: data.map((row) => {
+      const meta = (row as { source_metadata?: Record<string, unknown> | null }).source_metadata;
+      const { source_metadata: _dropped, ...rest } = row as Record<string, unknown> & {
+        source_metadata?: unknown;
+      };
+      return {
+        ...rest,
+        duplicate_acknowledged: meta?.duplicate_ack === true,
+        ...(row.recorded_by ? { recorded_by_name: names.get(row.recorded_by) ?? null } : {}),
+      };
+    }),
+    total: count,
+  });
+});
+
+/**
+ * GET /:id/receipt-document — what the receipt SAYS (payment/MASTER.md §4).
+ *
+ * §4: "Reprint uses the same number/snapshot." So this reads the immutable
+ * snapshot 0449 froze at posting time and never re-derives the customer, the
+ * SO or the method from live data. A payment recorded before 0449 has no
+ * snapshot: it reads live and says `from_snapshot: false`, exactly as the
+ * pre-0429 invoices do — the document must never pretend to be a reprint of
+ * something nobody captured.
+ *
+ * A VOIDED payment still has its receipt, marked VOIDED with its reason. That
+ * is §4's own sentence, and it is why voiding never touches the snapshot.
+ */
+const RECEIPT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+financePaymentsRouter.get("/:id/receipt-document", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view receipts." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from(ORDER_PAYMENTS)
+    .select("id,order_id,amount,paid_on,method,kind,reference,note,receipt_no,voided_at,void_reason,snapshot,orders(so,customer_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  if (!data) {
+    return c.json({ error: "not_found", code: "not_found", message: "Payment not found." }, 404);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row: any = data;
+  if (!row.receipt_no) {
+    return c.json({
+      error: "rule_violation", code: "no_receipt_number",
+      message: "This payment has no receipt number, so it has no receipt.",
+    }, 422);
+  }
+  const voided = row.voided_at != null;
+  const snap = row.snapshot && typeof row.snapshot === "object" ? row.snapshot : null;
+  const source = snap ?? {
+    receipt_no: row.receipt_no,
+    paid_on: row.paid_on,
+    so: row.orders?.so ?? null,
+    customer: { name: row.orders?.customer_name ?? "" },
+    amount: row.amount,
+    method: row.method,
+    kind: row.kind,
+    reference: row.reference,
+    note: row.note,
+    currency: "MYR",
+  };
+  return c.json({
+    voided,
+    void_reason: row.void_reason ?? null,
+    from_snapshot: snap != null,
+    document: {
+      receipt_no: String(source.receipt_no),
+      issue_date: String(source.paid_on).slice(0, 10),
+      order_code: source.so != null ? `SO-${source.so}` : "SO not available",
+      customer: { name: String(source.customer?.name ?? "") },
+      amount: Number(source.amount),
+      method: String(source.method),
+      kind: String(source.kind),
+      reference: source.reference ?? null,
+      note: source.note ?? null,
+      currency: String(source.currency ?? "MYR"),
+    },
+  });
+});
+
+/**
+ * POST /:id/correct-allocation — §5's `Correct allocation` (0450).
+ *
+ * The SQL door owns every rule: the Payment Approver authority, the required
+ * reason, the conserved arithmetic and the before/after evidence. This route
+ * only shapes the request, so there is exactly one place the rule lives.
+ */
+const correctAllocationInput = z.object({
+  reason: z.string().trim().min(1, "A reason is required to correct an allocation.").max(500),
+  allocations: z.array(z.object({
+    orderId: z.string().uuid(),
+    invoiceId: z.string().uuid().nullish(),
+    amount: z.number().positive(),
+  })).min(1, "Say which Sales Orders the money belongs to."),
+});
+
+financePaymentsRouter.post("/:id/correct-allocation", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot correct an allocation." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const parsed = await parseJsonBody(c, correctAllocationInput);
+  if (!parsed.ok) return c.json(parsed.body, parsed.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_correct_allocation", {
+    p_payment_id: id,
+    p_allocations: parsed.data.allocations.map((a) => ({
+      order_id: a.orderId,
+      invoice_id: a.invoiceId ?? null,
+      amount: a.amount,
+    })),
+    p_reason: parsed.data.reason,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+/** GET /:id/allocation-corrections — the §5 evidence, newest first. */
+financePaymentsRouter.get("/:id/allocation-corrections", async (c) => {
+  const auth = c.var.auth;
+  if (!["operation", "finance", "principal"].includes(auth.role)) {
+    throw new HTTPException(403, { message: "You cannot view allocation corrections." });
+  }
+  const id = c.req.param("id");
+  if (!RECEIPT_UUID_RE.test(id)) {
+    return c.json({ error: "invalid_id", code: "invalid_param", message: "payment id must be a uuid" }, 422);
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("payment_allocation_corrections")
+    .select("id,payment_id,before,after,reason,corrected_by,corrected_at")
+    .eq("payment_id", id)
+    .order("corrected_at", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ corrections: data ?? [] });
+});
 
 financePaymentsRouter.get("/", requireFinance, async (c) => {
   const auth = c.var.auth;

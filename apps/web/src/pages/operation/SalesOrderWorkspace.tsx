@@ -44,6 +44,8 @@
 // design-standard: not-a-list-page — this is a DOCUMENT workspace. Its
 // tables are the order's own line block: fixed rows, no sort, no selection.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./purchase-orders/purchase-order-detail.css";
+import "./sales-order-detail-theme.css";
 import { Plus, Printer, Trash2, X } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -69,16 +71,18 @@ import {
   resolveSalesOrderRoute,
   supplierClaimStatusLabel,
   myHolidaySet,
+  unitsShortWords,
   type CustomField,
   type OrderEntryTab,
   type SalesOrderRouteMap as SalesOrderRouteModel,
 } from "@carres/shared";
 import Button from "@/components/kit/Button";
-import Textarea from "@/components/kit/Textarea";
 import Checkbox from "@/components/kit/Checkbox";
 import DatePicker from "@/components/kit/DatePicker";
 import { getCities, getPostcodes, MY_STATES } from "@/data/malaysia-postcodes";
 import EmptyState from "@/components/kit/EmptyState";
+import FieldFrame from "@/components/kit/FieldFrame";
+import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import Modal from "@/components/kit/Modal";
@@ -89,21 +93,17 @@ import { cjkClassName } from "@/lib/cjk";
 import { composeAddress } from "@/data/malaysia-postcodes";
 import { fmtDate } from "@/lib/fmt-date";
 import { floorSurchargeRaw, stairCarryCount } from "@/lib/order-totals";
-import SalesOrderAddons from "./SalesOrderAddons";
+import SalesOrderAddons, { ServiceRowActions } from "./SalesOrderAddons";
 import { displayCustomerName } from "@/lib/customer-name";
 import { renderSalesOrderPdf } from "@/lib/pdf/render";
 import type { SalesOrderTemplateData } from "@/lib/pdf/types";
-import { useAuth } from "@/lib/auth";
 import {
   useCatalog,
   useCreateSalesOrder,
   useCustomerTypeProbe,
-  useDecidePaymentApproval,
-  useDeliveryPaymentApprovals,
-  useRequestPaymentApproval,
   useOperationDealersRef,
   useOperationOrder,
-  useOperationPoDuty,
+  useWorkspaceDuties,
   useOrderEntryConfig,
   useOrderCorrectionWork,
   useOrderServiceCases,
@@ -118,12 +118,13 @@ import {
   type SalesOrderSnapshot,
   type AmendmentProposal,
 } from "@/lib/queries";
+import { workspaceDutyActor } from "./workspace-duty-owner";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import ServiceCaseWizard from "./components/ServiceCaseWizard";
 import CorrectionWorkList from "./CorrectionWorkList";
 import SalesOrderAmendDeliveryDate from "./SalesOrderAmendDeliveryDate";
 import SalesOrderAmendment from "./SalesOrderAmendment";
-import SalesOrderAttribution from "./SalesOrderAttribution";
+import SalesOrderAttribution, { useCanChangeSalesOwnership } from "./SalesOrderAttribution";
 import SalesOrderLedger from "./SalesOrderLedger";
 import SalesOrderRoute from "./SalesOrderRoute";
 import SalesOrderTabs from "./SalesOrderTabs";
@@ -466,6 +467,13 @@ function draftTemplateData(
 function snapshotTemplateData(
   snap: SalesOrderSnapshot,
   base: SalesOrderTemplateData | null,
+  /** ⭐ addon key -> the catalog's word for it (YH, 2026-09-01). See the
+   *  `addons` mapping below — without this the printed document showed the
+   *  customer a database key. A FUNCTION, not a map, so the caller decides
+   *  what to do when the catalog has not answered: today it returns the key,
+   *  which is what this printed before, so a slow catalog degrades to the old
+   *  behaviour instead of printing a blank line on a document. */
+  addonLabel: (key: string) => string = (key) => key,
 ): SalesOrderTemplateData {
   const h = snap.header ?? {};
   const baseBySku = new Map((base?.lines ?? []).map((l) => [l.sku, l]));
@@ -478,8 +486,22 @@ function snapshotTemplateData(
     attrs: (l.attrs as Record<string, unknown> | null) ?? null,
     category: baseBySku.get(l.sku)?.category ?? null,
   }));
+  /* ⭐ THE CUSTOMER'S DOCUMENT NEVER PRINTS A DATABASE KEY (YH, 2026-09-01).
+     This read `String(a.addon_key)`, so an OLD REVISION's PDF — a customer
+     document, printed and sent — carried `dispose_mattress` where the live
+     document carries `Mattress disposal`. The live path never had this bug:
+     `base.addons` arrives labelled from the server. Only the snapshot path,
+     which builds its own rows from the stored revision, spelled the key
+     straight onto paper.
+     ⛔ AND THE SNAPSHOT'S OWN WORD STILL WINS WHERE IT HAS ONE. A revision is
+     a photograph: if the stored row carried a label, that label is what the
+     customer agreed to and it prints, even if the catalog has since renamed
+     the service. The catalog is asked only where the photograph is silent. */
   const addons = (snap.addons ?? []).map((a) => ({
-    label: String(a.addon_key),
+    label:
+      (typeof (a as { label?: unknown }).label === "string"
+        ? ((a as { label?: string }).label ?? "").trim()
+        : "") || addonLabel(String(a.addon_key)),
     qty: Number(a.qty),
     unit_price: Number(a.unit_price),
     line_total: Number(a.qty) * Number(a.unit_price),
@@ -610,7 +632,17 @@ export function Block({
    *  (Jess, 2026-08-26). `note` is prose; this slot takes a rendered chip, so a
    *  fact the reader wants BEFORE reading the fields — is this a new customer or
    *  one we already have — is answered by the heading rather than by a row eight
-   *  fields down. It is a fact, never a control: nothing in here writes. */
+   *  fields down.
+   *
+   *  ⭐ AND A READ-ONLY DOOR MAY RIDE HERE TOO (YH, 2026-09-01). The original
+   *  rule read "a fact, never a control: nothing in here writes", and the
+   *  second half of that sentence is the part that matters. A door that only
+   *  NAVIGATES writes nothing — it is the Law C escape hatch, not a form — and
+   *  a whole bordered row at the bottom of a card to hold one link is the
+   *  "extra row for one control" this page has been removing all week.
+   *  ⛔ STILL NEVER A WRITER. Nothing mounted here may submit, decide, or
+   *  change a record; a control that writes belongs beside the fact it
+   *  changes, where the reader can see what it will move. */
   headerSlot?: React.ReactNode;
   /** ⭐ WHAT THIS BLOCK IS FOR, in the operator's words (2026-08-24).
    *
@@ -665,7 +697,7 @@ export function Block({
             keep the face — one class, no other change. */}
         <h2
           id={headingId}
-          className="font-mono text-strong uppercase tracking-[0.08em] text-base-900"
+          className="font-mono text-strong uppercase tracking-[0.08em] text-signature-700"
         >
           {title}
         </h2>
@@ -726,13 +758,15 @@ export function Block({
  * MASTER.md's block order names the section). So the section keeps its exact
  * word and loses only its border, its own 24px gap and its second heading rule.
  *
- * Deliberately quieter than a card title: `text-label` against the card's
- * `text-strong`, so one card still reads as one thing.
+ * Deliberately quieter than a card title: the ordinary field-group heading
+ * (`text-strong`, `01-design-tokens.md` §1) rather than the card title's own
+ * mono/uppercase treatment — one "shouting" heading per card, and this reads
+ * as a smaller instance of the same body text.
  */
 function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-label font-semibold text-base-600 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-strong text-base-900 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
@@ -745,176 +779,75 @@ function SubHead({ children, note }: { children: React.ReactNode; note?: string 
   );
 }
 
+/* ⛔ THE DELIVERY PAYMENT APPROVAL DOOR IS REMOVED — owner instruction,
+   2026-09-01, and it changes what the business does rather than how a card
+   looks. Recorded here rather than deleted in silence.
+
+   WHAT IT WAS. `0362` (Jess, 2026-08-19) made "money in full before delivery"
+   the default and allowed ONE exception: a recorded approval, decided by the
+   principal, which opened the Delivery Order as COD — the balance paid by
+   online transfer before unloading. This component was the only surface in the
+   product that could raise or decide one.
+
+   WHAT REMOVING IT MEANS, stated plainly because nobody should have to
+   rediscover it. The rule becomes ABSOLUTE: `ops_delivery_orders_money_gate`
+   (0362) still refuses to mint a Delivery Order while a Sales Order's goods
+   money is outstanding, and there is no longer any way to ask for the
+   exception. An owing order is undeliverable until it is paid. That is the
+   intended effect of this change, not a side effect of it.
+
+   ⛔ THE RECORD, THE RPCs AND THE DATABASE GATE ARE UNTOUCHED.
+   `order_delivery_payment_approvals`, `delivery_payment_approval_request`,
+   `delivery_payment_approval_decide` and the trigger all remain, and so do
+   their API routes. Nothing is dropped and no migration is written, for two
+   reasons: an approval already granted stays honoured by the gate, and
+   restoring the door is a revert of this one commit rather than a rebuild.
+
+   If the exception is wanted again, this is where it goes back. */
+
 /**
- * THE DELIVERY PAYMENT APPROVAL (0362, owner ruling 2026-08-19). Sales Order
- * OWNS this record, so its doors live here — this is not the Money summary
- * gaining a form (Law B): nothing here writes a payment or a price. Operation
- * or the salesperson RAISES the ask with a reason; the configured approver —
- * today Jess only — APPROVES or REFUSES with a reason. An APPROVED record
- * opens the DO money gate as COD: full balance by online transfer BEFORE
- * unloading, no cash. The server refuses every other role; the role check
- * here only hides doors a user cannot walk through.
+ * A RECORDED ANSWER WEARS THE BOX THE QUESTION WOULD HAVE WORN (YH,
+ * 2026-09-01 — measured on `/operation/orders/so`).
+ *
+ * Every question on this page is a box: `Full name`, `Floor (Max is 3rd
+ * Floor)`, `Lift available?`. An answer that was already recorded, or that this
+ * surface may not move, was a bare label with a line of text under it — so ONE
+ * form carried TWO grammars and the reader learnt which shapes accept typing by
+ * trying them. The frame is constant now; what differs is the CONTROL. A
+ * read-only field has no caret, no focus ring and no hover, so it still reads
+ * as an answer rather than as an invitation, and the page stops looking like
+ * two forms stapled together.
+ *
+ * ⛔ NOT an `<input readOnly>`. Several values here are rendered NODES, not
+ * strings — the amber `No delivery date` chip, and anything wearing `<Money>` —
+ * and an input can hold only a string, so boxing them through one would throw
+ * away the exact fact the chip exists to carry. This borrows the kit's own
+ * `CONTROL_BASE` + resting hairline instead, so there is still ONE control skin
+ * in the app and this shares it rather than copying it. The one deliberate
+ * departure is HEIGHT: `min-h-8` in place of the control's fixed `h-8`, because
+ * an address or a long customer name is an answer that must be readable, and a
+ * fixed-height box would clip it.
+ *
+ * `role="textbox"` + `aria-readonly` is what a screen reader is told, so the
+ * announced grammar matches the drawn one. `aria-label` carries the name
+ * because `<label for>` binds only to real form controls.
  */
-function PaymentApprovalBlock({
-  orderId,
-  outstanding,
-}: {
-  orderId: string;
-  outstanding: number;
-}) {
-  const role = useAuth((s) => s.role);
-  const approvalsQuery = useDeliveryPaymentApprovals(orderId);
-  const request = useRequestPaymentApproval(orderId);
-  const decide = useDecidePaymentApproval(orderId);
-  const [asking, setAsking] = useState(false);
-  const [reason, setReason] = useState("");
-  const [decisionReason, setDecisionReason] = useState("");
-
-  const rows = approvalsQuery.data ?? [];
-  const approved = rows.find((r) => r.status === "approved") ?? null;
-  const pending = rows.find((r) => r.status === "pending") ?? null;
-
-  // Nothing owed and nothing ever asked → the block does not exist.
-  if (rows.length === 0 && outstanding <= 0) return null;
-
-  const canRaise =
-    role === "operation" || role === "salesperson" || role === "principal";
-  /* The approver list is DATA (principal today; the delivery_payment_approver
-     duty later). The server is the boundary — showing the buttons to
-     principal only keeps the screen honest for everyone else today. */
-  const canDecide = role === "principal";
-
-  return (
-    <div
-      className="mt-3 border-t border-kit-slate-5 pt-3"
-      data-testid="payment-approval-block"
-    >
-      <div className="text-label text-base-500">Delivery payment approval</div>
-      {approved ? (
-        <div className="mt-1 text-body text-base-900" data-testid="payment-approval-approved">
-          COD approved — collect before unloading
-          {approved.decided_at ? ` · ${fmtDate(approved.decided_at)}` : ""}
-          {approved.decision_reason ? ` · ${approved.decision_reason}` : ""}
-        </div>
-      ) : pending ? (
-        <div className="mt-1" data-testid="payment-approval-pending">
-          <div className="text-body text-base-900">
-            Waiting for decision
-            {pending.requested_at ? ` · requested ${fmtDate(pending.requested_at)}` : ""}
-            {` · ${pending.request_reason}`}
-          </div>
-          {canDecide && (
-            <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
-              <Textarea
-                id="payment-approval-decision-reason"
-                label="Decision reason"
-                value={decisionReason}
-                rows={2}
-                onChange={(e) => setDecisionReason(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  data-testid="payment-approval-approve"
-                  disabled={decide.isPending || decisionReason.trim().length === 0}
-                  onClick={() =>
-                    decide.mutate(
-                      { id: pending.id, decision: "approved", reason: decisionReason.trim() },
-                      {
-                        onSuccess: () => setDecisionReason(""),
-                        onError: (e) => toast.error(e.message),
-                      },
-                    )
-                  }
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="neutral"
-                  data-testid="payment-approval-refuse"
-                  disabled={decide.isPending || decisionReason.trim().length === 0}
-                  onClick={() =>
-                    decide.mutate(
-                      { id: pending.id, decision: "refused", reason: decisionReason.trim() },
-                      {
-                        onSuccess: () => setDecisionReason(""),
-                        onError: (e) => toast.error(e.message),
-                      },
-                    )
-                  }
-                >
-                  Refuse
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : outstanding > 0 && canRaise ? (
-        asking ? (
-          <div className="mt-2 flex flex-col gap-2 sm:max-w-md">
-            <Textarea
-              id="payment-approval-reason"
-              label="Reason"
-              value={reason}
-              rows={2}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                data-testid="payment-approval-request-send"
-                disabled={request.isPending || reason.trim().length === 0}
-                onClick={() =>
-                  request.mutate(
-                    { reason: reason.trim() },
-                    {
-                      onSuccess: () => {
-                        setReason("");
-                        setAsking(false);
-                      },
-                      onError: (e) => toast.error(e.message),
-                    },
-                  )
-                }
-              >
-                Send request
-              </Button>
-              <Button size="sm" variant="neutral" onClick={() => setAsking(false)}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-1">
-            <Button
-              size="sm"
-              variant="neutral"
-              data-testid="payment-approval-request"
-              onClick={() => setAsking(true)}
-            >
-              Request payment approval
-            </Button>
-          </div>
-        )
-      ) : (
-        /* Refused history, nothing pending: state the last word. */
-        <div className="mt-1 text-body text-base-700">
-          {rows[0]?.status === "refused"
-            ? `Refused${rows[0].decided_at ? ` · ${fmtDate(rows[0].decided_at)}` : ""}${rows[0].decision_reason ? ` · ${rows[0].decision_reason}` : ""}`
-            : null}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
+  const id = `so-fact-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
-    <div className="min-w-0">
-      <div className="text-label text-base-500">{label}</div>
-      <div className="text-body text-base-900 mt-0.5 break-words">{value}</div>
-    </div>
+    <FieldFrame id={id} label={label}>
+      <div
+        id={id}
+        role="textbox"
+        aria-readonly
+        aria-label={label}
+        data-kit="readonly-field"
+        data-testid={id}
+        className={`${CONTROL_BASE} ${CONTROL_BORDER.rest} rounded-control min-h-8 min-w-0 break-words px-2 py-1`}
+      >
+        {value}
+      </div>
+    </FieldFrame>
   );
 }
 
@@ -994,6 +927,10 @@ export default function SalesOrderWorkspace() {
   /* Bumped by `More actions → Propose a change to the customer`. A counter, not
      a boolean, so the menu item still works after the modal was cancelled. */
   const [amendSignal, setAmendSignal] = useState(0);
+  /* The `Change salesperson` door lives beside the Salesperson it changes; the
+     modal behind it lives in `SalesOrderAttribution`. Bumping this opens it. */
+  const [attributionSignal, setAttributionSignal] = useState(0);
+  const canChangeSalesOwnership = useCanChangeSalesOwnership();
   const [amendDateOpen, setAmendDateOpen] = useState(false);
   const [objectView, setObjectView] = useState<ObjectView>(showRoute ? "Order Route" : "Order");
 
@@ -1051,6 +988,13 @@ export default function SalesOrderWorkspace() {
     }
     return out;
   }, [catalogQ.data]);
+  /** addon key -> what the CATALOG calls it. `SalesOrderAddons` reads the same
+   *  bundle for the same purpose, so the Goods table and the Services list
+   *  under it can never print two different names for one row (Law D). */
+  const addonNameByKey = useMemo(
+    () => new Map((catalogQ.data?.addons ?? []).map((a) => [a.key, a.name])),
+    [catalogQ.data],
+  );
   const revisionsQ = useSalesOrderRevisions(isNew ? null : (orderId ?? null));
   const goodsTruthQ = useSalesOrderExpansion(isNew ? "" : (orderId ?? ""));
   const amendmentQ = useSalesOrderAmendment(isNew ? null : (orderId ?? null));
@@ -1293,6 +1237,84 @@ export default function SalesOrderWorkspace() {
     detailQ.data?.lines,
   ]);
 
+  /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
+   *
+   * The `stair` memo above prices from `catalogQ.data.floorConfig` — the live
+   * `floor_config` singleton a principal can PATCH — and the sentence below it
+   * was rendered in EVERY mode. So stamping an order at RM 50/floor/item and
+   * later moving the rate to RM 60 made one page print two numbers: the
+   * working-out narrated `× RM 60 = RM 360` while MONEY, the PDF,
+   * `stripe-checkout` and every payment cap stayed at the RM 300 that was
+   * actually charged. The Card's own trap — STAMP THE FEE, DO NOT RE-DERIVE IT
+   * — was closed in the database and left open on screen.
+   *
+   * An old revision was worse again: `stair` reads the CURRENT order's lines
+   * for `itemsTotal` while the floor and the count come from the snapshot, so a
+   * photograph of Rev 3 mixed two revisions and today's rate in one sentence.
+   *
+   * ⭐ SO THE SENTENCE CHANGES SHAPE WITH THE MODE, because what is KNOWN
+   * changes with the mode:
+   *
+   *   · CREATE — nothing is stamped yet, so the live rate IS the quote and the
+   *     whole multiplication is exactly what the operator needs. Unchanged.
+   *
+   *   · OBJECT / OLDREV — the fee is the stamped `STAIR_CARRY` row, the same
+   *     one MONEY reads, and the counts are the ones that produced it: the
+   *     snapshot's for a revision, the order's own otherwise.
+   *
+   * ⛔ IT STOPS SHORT OF THE MULTIPLICATION ON A SAVED ORDER, and that is the
+   * point rather than a shortcut. Recovering `× RM rate above NF` from a
+   * stamped fee needs BOTH the rate and `freeUpToFloor`, and only their product
+   * is stored — one equation, two unknowns. Reading either back off today's
+   * config is the very defect this closes, one term smaller. So a saved order
+   * states what it holds: how many items were carried, to which floor, and what
+   * it was charged. `stair-carry-recompute.ts` rules that the breakdown is NOT
+   * re-stated on the addon row ("a second copy of it would be a second
+   * arithmetic for one number"), so there is nowhere honest to read it from.
+   */
+  const stairWorking = useMemo(() => {
+    if (mode === "create") {
+      if (!stair || stair.fee <= 0) return null;
+      return {
+        quoted: true as const,
+        items: stair.items,
+        itemsTotal: stair.itemsTotal,
+        floors: stair.floors,
+        freeUpToFloor: stair.cfg.freeUpToFloor,
+        perFloorPerItem: stair.cfg.perFloorPerItem,
+        fee: stair.fee,
+      };
+    }
+    /* A REVISION IS A PHOTOGRAPH — its own lines and its own addons, never the
+       order's current ones. MONEY already reads it this way; this is the same
+       source, so the two cannot disagree on one page. */
+    const snapshot = mode === "oldrev" ? (viewedRevision?.snapshot ?? null) : null;
+    const lines = snapshot ? (snapshot.lines ?? []) : (detailQ.data?.lines ?? []);
+    const addons = snapshot ? (snapshot.addons ?? []) : (detailQ.data?.addons ?? []);
+    const fee = addons
+      .filter((a) => a.addon_key === STAIR_CARRY_ADDON_KEY)
+      .reduce((sum, a) => sum + Number(a.unit_price ?? 0) * Number(a.qty ?? 0), 0);
+    /* No stamped row means no charge to explain — an order placed before 0393,
+       or one where the addon key was missing and the recompute degraded loudly
+       rather than failing the sale. The zero is not narrated either way. */
+    if (fee <= 0) return null;
+    const itemsTotal = lines.reduce((n, l) => n + Number(l.qty ?? 0), 0);
+    return {
+      quoted: false as const,
+      items: stairCarryCount(itemsTotal, draft.delivery_stair_items),
+      itemsTotal,
+      floor: draft.delivery_floor,
+      fee,
+    };
+  }, [
+    mode,
+    stair,
+    viewedRevision,
+    detailQ.data,
+    draft.delivery_stair_items,
+    draft.delivery_floor,
+  ]);
+
   /* ── ONE template-data value per mode; the draft path debounces 300ms. ── */
   const base = baseQ.data ?? null;
   const liveDraftData = useMemo(
@@ -1301,9 +1323,12 @@ export default function SalesOrderWorkspace() {
   );
   const debouncedDraftData = useDebounced(liveDraftData, 300);
   const templateData: SalesOrderTemplateData | null = useMemo(() => {
-    if (mode === "oldrev" && viewedRevision) return snapshotTemplateData(viewedRevision.snapshot, base);
+    if (mode === "oldrev" && viewedRevision)
+      return snapshotTemplateData(viewedRevision.snapshot, base, (key) =>
+        addonNameByKey.get(key) ?? key,
+      );
     return debouncedDraftData;
-  }, [mode, viewedRevision, base, debouncedDraftData]);
+  }, [mode, viewedRevision, base, debouncedDraftData, addonNameByKey]);
 
   const { setPane } = usePdfCanvases(templateData);
 
@@ -1735,11 +1760,11 @@ export default function SalesOrderWorkspace() {
 
   /* The Route hands out the action-engine line; the ROSTER names the person.
      One duty read, the same one the Team board and the PO chips use. */
-  const dutyQ = useOperationPoDuty();
+  const dutyQ = useWorkspaceDuties();
   const routeOwners = useMemo(
     () => ({
-      purchasing: dutyQ.data?.holder ?? null,
-      receiving: dutyQ.data?.grnHolder ?? null,
+      purchasing: workspaceDutyActor(dutyQ.data, "po_duty"),
+      receiving: workspaceDutyActor(dutyQ.data, "grn_duty"),
     }),
     [dutyQ.data],
   );
@@ -1892,7 +1917,7 @@ export default function SalesOrderWorkspace() {
        keeps it out of the layout. */
     <fieldset
       disabled={mode === "oldrev"}
-      className="contents"
+      className="so-detail-style contents"
       data-testid="sales-order-workspace"
       id="sales-order-workspace"
     >
@@ -1923,16 +1948,12 @@ export default function SalesOrderWorkspace() {
         title="Customer"
         headerSlot={
           customerBuiltins["customerType"]?.enabled !== false ? (
-            <span data-pos-field="customerType">
-              {/* NEUTRAL, not the accent. `01-design-tokens.md` §2.2 spends blue
-                  once per screen and the tab underline already holds it — and a
-                  new customer is news, not a warning, so amber is wrong too. */}
-              <span
-                className="inline-flex rounded-full bg-kit-slate-3 px-2 py-0.5 text-label font-semibold text-base-700"
-                data-testid="customer-type-chip"
-              >
-                {customerTypeWord}
-              </span>
+            <span
+              className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
+              data-pos-field="customerType"
+              data-testid="customer-type-chip"
+            >
+              {customerTypeWord}
             </span>
           ) : undefined
         }
@@ -2116,7 +2137,32 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-      <Block title="Money">
+      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
+          Payments` had a hairline and a row of its own at the foot of the
+          card — a separator introducing one link, on a card whose entire
+          content is three numbers, and it left the fields staring at empty
+          space where the row used to be. The door now sits in the header bar
+          itself, beside the card's own name. The word is locked
+          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
+          navigates to the desk that owns collection, already scoped to this
+          order, which is the one thing Law C lets a summary add. */}
+      <Block
+        title="Money"
+        headerSlot={
+          !isNew && order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              /* The canonical Register, scoped to this order (payment
+                 MASTER §16; entry-point correction 2026-09-09). */
+              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
+            >
+              Open this order in Payment
+            </button>
+          ) : undefined
+        }
+      >
         {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
             2026-08-15 `Total large · Paid medium · Outstanding loudest`
             weighting). The weighting never reached the numerals anyway:
@@ -2127,59 +2173,54 @@ export default function SalesOrderWorkspace() {
             which is what read as "alignment wrong". One size on all three
             fixes the alignment and the fallback strings at the same time.
             Colour still separates them: Outstanding is red while owed. */}
-        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
-          <div>
-            <div className="text-label text-base-500">Total</div>
-            <div className="text-strong text-base-900" data-testid="money-total">
-              {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-            </div>
-          </div>
-          <div>
-            <div className="text-label text-base-500">Paid</div>
-            <div className="text-strong text-base-700" data-testid="money-paid">
-              <Money value={money.paid} />
-            </div>
-          </div>
+        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
+            last bare label-over-value pair on the page — the shape the rest of
+            the card stopped using when `Fact` took the kit's control skin. A
+            reader scanning down met boxes, boxes, boxes and then three loose
+            numbers, which reads as a different kind of thing rather than as
+            three answers this surface may not change.
+            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
+            door, and nothing here writes. The three-across grid is the same one
+            `Order info` and `Customer` use, so the amounts line up with every
+            other answer instead of packing left on a flex row.
+            Colour survives INSIDE the box: Outstanding is still red while any
+            of it is owed (owner ruling 2026-08-15), and all three keep
+            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
+            untouched. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Fact
+            label="Total"
+            value={
+              <span className="text-strong text-base-900" data-testid="money-total">
+                {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
+              </span>
+            }
+          />
+          <Fact
+            label="Paid"
+            value={
+              <span className="text-strong text-base-700" data-testid="money-paid">
+                <Money value={money.paid} />
+              </span>
+            }
+          />
           {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
               CUSTOMER owes HQ). It is the most-read number on the page
               (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
               (owner ruling 2026-08-15) — the colour carries that on its own,
               at the same size as its two neighbours. */}
-          <div>
-            <div className="text-label text-base-500">Outstanding</div>
-            <div
-              className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-              data-testid="money-outstanding"
-            >
-              {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-            </div>
-          </div>
-        </div>
-        {/* ⭐ A DOOR, NEVER A DUPLICATE (ownership Law C). Sales Order
-            SUMMARISES money and may never gain a form for it — so the one thing
-            it adds is the way OUT, to the desk that owns collection, already
-            scoped to this order. Read-only: it navigates, it writes nothing. */}
-        {!isNew && order && (
-          <div className="mt-3 border-t border-kit-slate-5 pt-3">
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
-            >
-              Open this order in Payments
-            </button>
-          </div>
-        )}
-        {/* 0362 (owner ruling 2026-08-19) — the black-and-white door that lets
-            an owing order deliver COD. Sales Order OWNS this record; raising
-            and deciding are ITS doors, not a money form (Law B untouched). */}
-        {!isNew && order && (
-          <PaymentApprovalBlock
-            orderId={order.id}
-            outstanding={money.known ? money.outstanding : 0}
+          <Fact
+            label="Outstanding"
+            value={
+              <span
+                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+                data-testid="money-outstanding"
+              >
+                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
+              </span>
+            }
           />
-        )}
+        </div>
       </Block>
 
       {/* ② ORDER INFO */}
@@ -2284,7 +2325,30 @@ export default function SalesOrderWorkspace() {
               </span>
             )}
           </div>
-          <div data-pos-field="stairCarry">
+          {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+              `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+              registry field it stands for is "Delivery access (floor / lift /
+              stair carry)" — three questions — and the other two sat outside
+              the tag entirely.
+              That is not cosmetic. The POS-parity contract test walks
+              `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+              this file; it cannot see WHAT the attribute wraps. So the test
+              reported "stair carry is covered" while checking one box of
+              three, and deleting `Lift available?` tomorrow would still pass.
+              THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+              on a hidden `<span>` with no control behind it, and the page
+              passed a completeness test it did not meet while the office rang
+              the shop to add a disposal service. The lesson was written into
+              the comment above that door and the same defect was live twelve
+              lines away.
+              A NESTED GRID, not a wrapper div: the three fields still sit on
+              the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
+              so nothing moves on screen — and they now read as the one topic
+              they are. */}
+          <div
+            data-pos-field="stairCarry"
+            className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+          >
             {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
                 The POS has clamped this since the wizard was written; this door
                 accepted any number, so an office-keyed order could promise a
@@ -2294,44 +2358,65 @@ export default function SalesOrderWorkspace() {
                 the input actually enforces. One statement, in the field's own
                 name, and the separate hint line goes with it. */}
             <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
-              type="number" min={0} max={MAX_DELIVERY_FLOOR}
+              type="number" min={1} max={MAX_DELIVERY_FLOOR}
               value={String(draft.delivery_floor)}
               onChange={(e) =>
                 setField(
                   "delivery_floor",
-                  Math.min(MAX_DELIVERY_FLOOR, Math.max(0, Number(e.target.value) || 0)),
+                  /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
+                     "office follow POS"). The floor was 0 here while the POS
+                     stepper starts at 1; the form already shows a missing
+                     floor as 1 (`?? 1`, four places), so the zero was a value
+                     only this box could type and nothing could mean. */
+                  Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
                 )
               } />
-          </div>
-          {/* ⭐ THE BLANK SAYS WHAT IT MEANS (YH, 2026-08-26). This was a bare
-              number box with `Empty = every item` underneath it — a rule the
-              reader had to hold in their head to interpret an empty cell. The
-              answer now sits IN the cell: an untouched field reads `All 5
-              items`, so nothing has to be remembered and the count it stands
-              for is on screen. Still null on the wire — 0104's column comment
-              rules that NULL means every item, and a number is never invented
-              here to avoid a blank. */}
           {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
-              then put a default value, rather than leaving it blank".
-              The default shown is the POS's OWN default for the same unset
-              field: every item on the order. The POS has never printed a blank
-              here, so an office cell that did was the two surfaces disagreeing
-              about one field again.
+              then put a default value, rather than leaving it blank". The
+              STORED value stays null until somebody types; this shows the
+              derived default and never writes one.
 
-              ⛔ NOT ZERO, and that is the one place this departs from the
-              literal ask. 0104 rules NULL = "dealer left it auto" = every
-              item, and the fee MULTIPLIES by that count — defaulting the box
-              to 0 would quietly reprice every stair-carry order to RM 0 while
-              looking like a formatting change. The STORED value stays null
-              until somebody types: this shows the derived default, it never
-              writes one. */}
+              ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
+              FIELD THAT NO LONGER EXISTED. They said an untouched box reads
+              `All 5 items` and that 0104's NULL means EVERY item, and warned
+              at length against defaulting to zero. Both were true when typed
+              on 2026-08-26/27 and were overturned HOURS later by YH's own
+              ruling that an unset count means NONE — which `stairCarryCount`
+              has implemented ever since, and which is why the box renders `0`.
+              A governance record that no longer describes its field is not
+              harmless: the next reader trusts it, and this one warned them off
+              the behaviour the code already had. Kept as a correction rather
+              than deleted, because the ruling it lost to is the point.
+
+              ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
+              The hint has said `0 to 5` since it was written and the box
+              accepted 99. The POS cannot produce that number — its stepper
+              stops at the item count — so an office-keyed order could hold a
+              count no shop floor could have quoted, while the working line
+              directly below priced the CLAMPED five. One card, two answers to
+              "how many items", and the saved one was the wrong one.
+              `stairCarryCount` is the same clamp the fee already runs and the
+              same one the server stamps with, imported rather than re-typed —
+              a second copy of a ceiling is how the two surfaces drifted in the
+              first place. `max` rides the input too, so the spinner and the
+              keyboard agree.
+              ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
+              is null and the item total is unknown — so the upper clamp is
+              simply not applied and the floor at zero still is. A guess at the
+              ceiling would be worse than no ceiling: it would silently cut a
+              number the operator typed correctly. Degrade, never abort. */}
           <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+            max={stair?.itemsTotal}
             hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
             value={String(draft.delivery_stair_items ?? 0)}
             onChange={(e) =>
               setField(
                 "delivery_stair_items",
-                e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),
+                e.target.value === ""
+                  ? null
+                  : stair
+                    ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
+                    : Math.max(0, Number(e.target.value) || 0),
               )
             } />
           {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
@@ -2345,6 +2430,7 @@ export default function SalesOrderWorkspace() {
             value={draft.delivery_has_lift ? "Has lift" : "No lift"}
             onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
             options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+          </div>
         </div>
         {/* The three fields above, added up out loud — the POS's own sentence
             (`pos/StairCarryFields.tsx`), so the office reads the number the
@@ -2354,13 +2440,24 @@ export default function SalesOrderWorkspace() {
             which is a sentence saying nothing happened, printed on the majority
             of orders. The fields above already state the floor and the lift; a
             line that only repeats them back is the noise Jess asked to cut. */}
-        {stair && stair.fee > 0 && (
+        {stairWorking && (
           <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
-            {stair.items} of {stair.itemsTotal} item{stair.itemsTotal === 1 ? "" : "s"} ×{" "}
-            {stair.floors} floor{stair.floors === 1 ? "" : "s"} above {stair.cfg.freeUpToFloor}F ×{" "}
-            <Money value={stair.cfg.perFloorPerItem} /> ={" "}
+            {stairWorking.quoted ? (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
+                {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
+                <Money value={stairWorking.perFloorPerItem} /> ={" "}
+              </>
+            ) : (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                charged{" "}
+              </>
+            )}
             <span className="font-semibold text-base-900">
-              <Money value={stair.fee} />
+              <Money value={stairWorking.fee} />
             </span>
           </p>
         )}
@@ -2393,10 +2490,21 @@ export default function SalesOrderWorkspace() {
             />
           </div>
         )}
-        {/* Merged from the retired `Sales ownership` card (Jess,
-            2026-08-26). The WORD is locked, so it survives as the
-            subsection's name; only the card border is gone. */}
-        <SubHead>Sales ownership</SubHead>
+      </Block>
+
+      {/* ⭐ SALES OWNERSHIP IS ITS OWN CARD AGAIN (YH, 2026-09-01).
+          It was merged into `Order info` on 2026-08-26 when Jess asked for
+          fewer, fuller cards, and it kept its locked word as a subsection
+          heading. It comes back out as a card because it is a different KIND
+          of fact from the rest of that card: `Order info` is what the customer
+          asked for — dates, floors, a lift — and this is who inside Carres
+          gets paid for it. One card, one topic, and the merge law is served by
+          the card being SMALL rather than by it being hidden inside a bigger
+          one.
+          The WORD is unchanged and still locked (COPY-STANDARD:1427). It reads
+          as a card title now, which is the same string in the same face —
+          `Block` uppercases every title, so nothing about the word moved. */}
+      <Block title="Sales ownership">
         {mode === "create" ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Select id="so-dealer" label="Dealer"
@@ -2423,8 +2531,29 @@ export default function SalesOrderWorkspace() {
               <div data-pos-field="outlet">
                 <Fact label="Showroom" value={sourceName(mode, viewedRevision, order, "outlet") || "Not recorded"} />
               </div>
+              {/* ⭐ THE DOOR SITS BESIDE THE NAME IT MOVES (YH, 2026-09-01).
+                  `Change salesperson` had a rule and a right-aligned row of its
+                  own under this grid — a separator, 12px of padding and a full
+                  row, introducing ONE button. It reads as a section, so the eye
+                  stops at it, and it separated the verb from the fact the verb
+                  acts on.
+                  It is the same shape `Change delivery date` already uses under
+                  `Requested Delivery Date`: a quiet text door under the answer
+                  it changes, which is where somebody looking at the wrong
+                  salesperson already has their eye. `useCanChangeSalesOwnership`
+                  is GATE 3's rule, imported rather than re-typed. */}
               <div data-pos-field="salesperson">
                 <Fact label="Salesperson" value={sourceName(mode, viewedRevision, order, "salesperson") || "Not recorded"} />
+                {mode !== "oldrev" && orderId && order && canChangeSalesOwnership && (
+                  <button
+                    type="button"
+                    onClick={() => setAttributionSignal((n) => n + 1)}
+                    data-testid="attribution-open"
+                    className="mt-1 text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                  >
+                    Change salesperson
+                  </button>
+                )}
               </div>
             </div>
             {/* An OLD revision is a photograph — it carries no lane. */}
@@ -2439,6 +2568,8 @@ export default function SalesOrderWorkspace() {
                 salespersonOptions={realSpOptions}
                 outletOptions={realOutletOptions}
                 dealerOptions={dealerOptions}
+                inlineTrigger={false}
+                openSignal={attributionSignal}
                 onApplied={() => {
                   void revisionsQ.refetch();
                   void baseQ.refetch();
@@ -2450,6 +2581,7 @@ export default function SalesOrderWorkspace() {
         )}
 
       </Block>
+
 
 
 
@@ -2554,7 +2686,46 @@ export default function SalesOrderWorkspace() {
                   return (
                   <tr key={i} className="border-t border-kit-slate-5">
                     <td className="py-1.5 pr-3 text-label font-semibold text-base-600">{liveLine ? categoryWord(liveLine) : "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 font-mono text-meta">{truth?.unitIds.length ? truth.unitIds.join(" · ") : "Not allocated"}</td>
+                    {/* ⭐ THE SHORT-LINE WORDS ARE RULED, AND `Not allocated`
+                        IS NOT ONE OF THEM (YH, 2026-09-01).
+                        `COPY-STANDARD.md`:1755 lists `Not allocated` in its
+                        `Do NOT use` column beside `No stock` and `Units not
+                        created yet`; the registered answer is the COUNT and
+                        then what is being waited on. `unitsShortWords` is that
+                        sentence, written once in shared, so this cell, the
+                        Order Route's STOCK node and the register expansion
+                        cannot drift into three spellings of one fact.
+                        A LOAD IS NOT A SHORTAGE. The Deliver To cell beside
+                        this one has always said `Loading…` while the expansion
+                        is in flight; this one did not, so a slow read printed
+                        `Not allocated` on a fully allocated line. Same guard,
+                        same word, same column behaviour. */}
+                    <td className="py-1.5 pr-3">
+                      {goodsTruthQ.isLoading && !truth ? (
+                        <span className="font-mono text-meta">Loading…</span>
+                      ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
+                        <div className="flex max-w-[220px] flex-wrap gap-1">
+                          {truth.unitIds.map((id) => (
+                            <span
+                              key={id}
+                              className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700"
+                            >
+                              {id}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        (() => {
+                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          return (
+                            <div className="font-mono text-meta">
+                              <div>{count}</div>
+                              <div className="mt-0.5 text-base-600">{waiting}</div>
+                            </div>
+                          );
+                        })()
+                      )}
+                    </td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{liveLine?.sku ?? "Not recorded"}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{r.qty}</td>
                     <td className={`py-1.5 pr-3 ${cjkClassName(r.name)}`}>
@@ -2567,27 +2738,82 @@ export default function SalesOrderWorkspace() {
                   </tr>
                   );
                 })}
-                {(detailQ.data?.addons ?? []).map((a, i) => (
+                {/* ⭐ A SERVICE ROW IS A GOODS ROW (YH, 2026-09-01). The two
+                    halves of this one table were written apart and read apart:
+                    a service printed `dispose-mattress` in the ITEM column —
+                    the raw database key, in the body face, where the goods rows
+                    print a product NAME — while `SalesOrderAddons` eighty
+                    pixels below printed `Mattress disposal` for the same row off
+                    the same catalog. One record, two names, and the key was the
+                    one the operator had to read.
+                    The cells now carry the goods rows' own classes (mono for
+                    the two identifier columns, `cjkClassName` on the item so a
+                    Chinese service name gets the same face a Chinese product
+                    gets) and the second line under the item is where a goods row
+                    already puts its configuration, so the SIZE of a sized
+                    service lands there instead of being dropped.
+                    The two cells a service can never fill read `Not recorded`,
+                    which is the ONE registered absence word
+                    (`COPY-STANDARD.md`:1679, YH 2026-08-29). They printed a bare
+                    `—`, which that same row lists in its `Do NOT use` column —
+                    so the service half of this table was BOTH the odd one out
+                    and off-dictionary. `Not recorded` is also what the goods
+                    rows already print in `Deliver To`, so the column now reads
+                    one way down its whole length. */}
+                {(detailQ.data?.addons ?? []).map((a, i) => {
+                  const serviceName = addonNameByKey.get(a.addon_key) ?? a.addon_key;
+                  const size = a.attrs?.size ?? null;
+                  return (
                   <tr key={`a-${i}`} className="border-t border-kit-slate-5">
                     <td className="py-1.5 pr-3 text-label font-semibold text-base-600">SERVICE</td>
-                    <td className="py-1.5 pr-3">—</td>
+                    <td className="py-1.5 pr-3 font-mono text-meta">Not recorded</td>
                     <td className="py-1.5 pr-3 font-mono text-meta">{a.addon_key}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{a.qty}</td>
-                    <td className="py-1.5 pr-3">{a.addon_key}</td>
-                    <td className="py-1.5">—</td>
+                    {/* ⭐ THE ROW CARRIES ITS OWN DOORS (YH, 2026-09-01). A
+                        service was printed twice — here, and again in a
+                        `Services` list below that repeated its name, size,
+                        quantity and price purely so it could hold two buttons.
+                        One record, two places, and with a second service on the
+                        order the operator had to match them by eye to know
+                        which row a `Remove` belonged to.
+                        ⛔ NOT A SEVENTH COLUMN: `docs/orders/MASTER.md` §0.1
+                        locks this table at six, and the document preview prints
+                        from the same six. The doors ride the ITEM cell as a
+                        quiet line under the name — which is where a goods row
+                        already puts its own configuration, so both row kinds
+                        keep one shape. */}
+                    <td className={`py-1.5 pr-3 ${cjkClassName(serviceName)}`}>
+                      <div>{serviceName}</div>
+                      {size && <div className="mt-0.5 text-meta text-base-600">{size}</div>}
+                      {mode === "object" && orderId && (
+                        <ServiceRowActions
+                          orderId={orderId}
+                          row={a}
+                          catalogAddons={catalogQ.data?.addons ?? []}
+                          status={order?.status ?? null}
+                        />
+                      )}
+                    </td>
+                    <td className="py-1.5">Not recorded</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
         {/* An OLD revision is a photograph and a draft has no order to write
-            to — the door belongs to the live object only. */}
+            to — the door belongs to the live object only.
+            ⭐ THE ATTRIBUTE STILL RIDES A REAL CONTROL. It was once a hidden
+            `<span>` carrying this exact string with nothing behind it, so the
+            page passed a POS-parity completeness test it did not meet while the
+            office rang the shop to add a disposal service. What is left in
+            `SalesOrderAddons` is the one act the table cannot perform — adding
+            a service that is not there yet — and the attribute rides that. */}
         {mode === "object" && orderId && (
           <div data-pos-field="orderAddons">
             <SalesOrderAddons
               orderId={orderId}
-              addons={detailQ.data?.addons ?? []}
               catalogAddons={catalogQ.data?.addons ?? []}
               status={order?.status ?? null}
             />
@@ -2614,7 +2840,7 @@ export default function SalesOrderWorkspace() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" data-so-theme={mode !== "create" ? "trial" : undefined}>
       <SalesOrderTabs
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the

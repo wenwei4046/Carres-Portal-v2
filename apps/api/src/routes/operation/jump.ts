@@ -167,7 +167,8 @@ jumpRouter.get("/", requireOperation, async (c) => {
     const onDate = grnDateFromQuery(parsed.types.length === 1 ? parsed.term : parsed.raw);
     let q = sb
       .from("warehouse_receipts")
-      .select("id, goods_received_at, submitted_at, purchase_orders(id, suppliers(name))")
+      // 0426 — the STORED formal number joins the derived legacy display.
+      .select("id, grn_no, goods_received_at, submitted_at, purchase_orders(id, suppliers(name))")
       .eq("status", "posted")
       .order("goods_received_at", { ascending: false, nullsFirst: false });
     q = onDate ? q.eq("goods_received_at", onDate) : q.limit(GRN_RECENT_WINDOW);
@@ -179,6 +180,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
     const matches: JumpDocumentResult[] = [];
     for (const row of (data ?? []) as Array<{
       id: string;
+      grn_no?: string | null;
       goods_received_at: string | null;
       submitted_at: string | null;
       purchase_orders:
@@ -186,11 +188,15 @@ jumpRouter.get("/", requireOperation, async (c) => {
         | Array<{ id: string; suppliers: { name: string | null } | Array<{ name: string | null }> | null }>
         | null;
     }>) {
-      const number = receivingRecordNo({
-        id: row.id,
-        goods_received_at: row.goods_received_at ?? undefined,
-        submitted_at: row.submitted_at ?? undefined,
-      });
+      // The stored formal number (0426) wins; a legacy posted session keeps
+      // its derived display — one function decides, everywhere.
+      const number =
+        (row.grn_no ?? "").trim() ||
+        receivingRecordNo({
+          id: row.id,
+          goods_received_at: row.goods_received_at ?? undefined,
+          submitted_at: row.submitted_at ?? undefined,
+        });
       if (number === "—") continue;
       /* The number carries its own `GRN-` prefix, so the raw query matches it
        * whether or not the operator typed one. */
@@ -201,7 +207,7 @@ jumpRouter.get("/", requireOperation, async (c) => {
         type: "GRN",
         number,
         party: sup?.name ?? null,
-        href: `/operation?tab=receiving&queue=received&receipt=${encodeURIComponent(row.id)}`,
+        href: `/operation?tab=receiving&session=${encodeURIComponent(row.id)}`,
       });
       if (matches.length >= PER_TYPE) break;
     }

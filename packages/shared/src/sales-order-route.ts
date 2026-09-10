@@ -54,6 +54,7 @@
  * (`Issued: 2026-08-13`); the page spells them through the one date format.
  */
 
+import { unitsShortWords } from "./line-readiness";
 import { deliveryGroupOf, type DeliveryGroupKey } from "./delivery-groups";
 /* ⭐ LAW D — the canvas ASKS these, it does not re-decide them. Both predicates
    were re-implemented inline here while this file's own comment claimed it
@@ -374,7 +375,11 @@ const receivingHref = (recordId: string) =>
 const stockHref = "/operation?tab=stock-onhand";
 const deliveryHref = (orderId: string) =>
   `/operation?tab=delivery&order=${encodeURIComponent(orderId)}`;
-const paymentsHref = (so: number) => `/operation?tab=payments&so=${so}`;
+// THE MONEY DOOR OPENS THE CANONICAL REGISTER (payment/MASTER.md §16).
+// `/operation?tab=payments` was the Master-Sheet Balance desk — a SECOND form
+// for one act, which ownership Law C forbids. The order context travels as
+// `?order=<SO No>`, which the Register reads as its scope.
+const paymentsHref = (so: number) => `/finance/payments?order=${so}`;
 const caseHref = (caseId: string) =>
   `/operation?tab=service-notes&case=${encodeURIComponent(caseId)}`;
 const claimHref = (claimId: string) =>
@@ -713,7 +718,7 @@ function stockDraft(
     complete: allReady,
     lines: allReady
       ? [`${units(line.committedQty)} ready`, codes || null, destination]
-      : [`${readyQty} of ${line.committedQty} Units ready`, "Waiting for purchase"],
+      : unitsShortWords(readyQty, line.committedQty),
     action: {
       ownerKey: "stock",
       label: "Create the Units",

@@ -112,17 +112,18 @@ describe("the empty query", () => {
       .map((el) => el.textContent);
     /* Six were stored; the MASTER caps the recent block at five, and the sixth
      * still appears once — below, as an ordinary destination. */
-    /* `operation:stock` is the Stock Register since CARD-2026-08-20-stock-register
-     * replaced On hand — same key, same route, the sidebar's own word. */
+    /* `operation:stock` is the Inventory Register — the 2026-09-01 Blueprint's
+     * word for the Warehouse master list (CARD-2026-09-01-warehouse-01-sidebar);
+     * same key, same route, the sidebar's own word. */
     expect(labels.slice(0, 5)).toEqual([
       "WorkOperations",
       "Sales OrdersOperations",
-      "StockOperations",
+      "InventoryOperations",
       "PaymentsOperations",
-      // `Delivery Work` since the Delivery module's pages joined the rail
-      // (CARD-2026-08-19-sidebar-expandable-modules) — same key, same route,
-      // the governed name.
-      "DeliveryOperations",
+      // `Monitor` since the four-page map made it the Delivery module's
+      // flagship child (CARD-2026-09-04-delivery-01) — same key, same route,
+      // the sidebar's own word.
+      "MonitorOperations",
     ]);
     expect(labels.filter((l) => l === "SuppliersOperations")).toHaveLength(1);
     expect(screen.getByText("Recent")).toBeInTheDocument();
@@ -270,7 +271,7 @@ describe("navigate-only", () => {
     renderJump();
     fireEvent.change(openSurface(), { target: { value: "Payments" } });
     fireEvent.click(screen.getByTestId("jump-to-destination"));
-    expect(screen.getByTestId("here")).toHaveTextContent("/operation?tab=payments");
+    expect(screen.getByTestId("here")).toHaveTextContent("/finance/payments");
     expect(JSON.parse(localStorage.getItem("carres-jump-recent") ?? "[]")).toEqual([
       "operation:payments",
     ]);

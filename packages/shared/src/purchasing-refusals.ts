@@ -43,6 +43,11 @@ export interface PurchasingRefusalFacts {
   actor?: string | null;
   /** The line's own requested quantity — the approved-quantity ceiling. */
   qty?: number | null;
+  /** 0422 — the Delivery Date asked for, and the earliest Delivery Date a
+   *  Manual Purchase may ask for (Proceed Date + the Purchasing Settings
+   *  number). Both arrive already formatted for the surface printing them. */
+  date?: string | null;
+  earliest?: string | null;
 }
 
 const some = (v: string | null | undefined, fallback: string) =>
@@ -59,6 +64,14 @@ export function purchasingRefusal(
 ): PurchasingRefusal {
   const sku = some(facts.sku, "This item");
   const supplier = some(facts.supplier, "the supplier");
+  /* The same fact for the five lines that OPEN a sentence with it. A real name
+     already carries its own capital, so this differs from `supplier` only when
+     no name was passed — and there it is the difference between "The supplier
+     must be collected to Carres Klang." and the same sentence starting
+     lowercase in the middle of a screen. `supplier` stays as it is because it
+     also lands mid-sentence ("...the price of B1201S-K for Hooka."), and one
+     constant cannot be right in both places. */
+  const supplierOpening = some(facts.supplier, "The supplier");
   const po = some(facts.po, "This purchase order");
   const dest = some(facts.destination, "that place");
 
@@ -207,15 +220,58 @@ export function purchasingRefusal(
         wrong: "The same buying line is on two purchase orders.",
         todo: "Go back to buying and tick the line once.",
       };
+    /* 0430 — a fully covered line stays VISIBLE as a receipt (T6), but it may
+       never be issued again: production minted six purchase orders for one
+       1-unit demand because nothing downstream of the receipt refused it. */
     case "already_on_po":
       return {
-        wrong: "One line is already on an open purchase order.",
-        todo: "Go back to buying and untick that line.",
+        wrong: `An open purchase order${facts.po ? ` (${facts.po})` : ""} already covers this line.`,
+        todo: "Nothing to buy here. Check the covering purchase order instead.",
       };
     case "sofa_merge":
       return {
         wrong: "One sofa purchase order carries one customer order.",
         todo: "Split the sofas by customer order, then issue again.",
+      };
+    /* ── THE MANUAL PURCHASE ISSUE PATH ───────────────────────────────────
+       Three codes the route has always raised and this file has never
+       answered, so each one reached the operator as the fallback: "The Portal
+       refused this purchase order. Tell IT the message on screen." Two of them
+       are the COMMONEST refusals on that door — somebody else issued the
+       request, or it is simply not approved yet — so the ordinary working day
+       read as a system fault, which is the exact thing this file exists to
+       stop.
+       `not_ready_to_order` USED TO CARRY BOTH facts: not-yet-approved AND
+       refused. One code cannot say two things, so the route now separates them
+       and each gets its own sentence — fact first, in the operator's words. */
+    case "unknown_request":
+      return {
+        wrong: "One Manual Purchase on this list is no longer there.",
+        todo: "Reload the page, then tick the ones that are left and issue again.",
+      };
+    case "not_ready_to_order":
+      return {
+        wrong: "One Manual Purchase has not been approved yet.",
+        todo: "Ask its approver to Approve it, then issue again.",
+      };
+    case "request_refused":
+      return {
+        wrong: "One Manual Purchase was refused.",
+        todo: "Go back and untick the refused one, then issue again.",
+      };
+    /* The Deliver To door on an existing request (0421). A request whose line
+       is already on a PO keeps its place: the PO names its own destination and
+       changes through Revise. A request with nothing left to deliver has no
+       place to move. */
+    case "request_ordered":
+      return {
+        wrong: "This request is already ordered. Deliver To cannot move.",
+        todo: "Revise the purchase order instead.",
+      };
+    case "request_closed":
+      return {
+        wrong: "This request is not going ahead.",
+        todo: "Raise a new request.",
       };
     case "nothing_to_issue":
       return {
@@ -229,7 +285,7 @@ export function purchasingRefusal(
       };
     case "production_days_required":
       return {
-        wrong: `${supplier} has no production days set.`,
+        wrong: `${supplierOpening} has no production days set.`,
         todo: `Ask Purchasing to set production days for ${supplier} in Settings.`,
       };
     case "unresolved_supplier":
@@ -240,23 +296,53 @@ export function purchasingRefusal(
     case "pickup_partner_required":
     case "supplier_collection_not_configured":
       return {
-        wrong: `${supplier} collection is not configured.`,
+        wrong: `${supplierOpening} collection is not configured.`,
         todo: "Set its collector and destination in Purchasing Settings, then issue again.",
       };
     case "supplier_collection_mismatch":
       return {
-        wrong: `${supplier} has a different collector in Purchasing Settings.`,
+        wrong: `${supplierOpening} has a different collector in Purchasing Settings.`,
         todo: "Reload the purchase, then issue it with the configured collector.",
       };
+    /* YH, 2026-09-02, meeting this on the issue screen: "????". Both lines
+       earned it. The first said `the supplier` — the fallback, because two of
+       the three callers passed no name — so on a batch spanning suppliers it
+       named none of them. The second, `Reload the purchase, then issue it to
+       the destination in Purchasing Settings`, asked for a refresh (not an
+       act, and not the problem) and never said WHICH destination or WHICH of
+       the two Deliver To settings to move. Its own neighbour eight lines down
+       has always got this right: `Remove the collector, then issue again.`
+       Named, and one act. */
     case "supplier_collection_destination_mismatch":
       return {
-        wrong: `${supplier} must be collected to its configured destination.`,
-        todo: "Reload the purchase, then issue it to the destination in Purchasing Settings.",
+        wrong: `${supplierOpening} must be collected to ${some(
+          facts.destination,
+          "its configured destination",
+        )}.`,
+        /* TWO Deliver To values disagree — this purchase's and the supplier's
+           in Settings — and naming both acts costs 17 words, past the 14 this
+           file is held to. So the act names the one that is normally wrong:
+           Settings holds the collection CONTRACT and changes rarely; the
+           purchase is today's transaction. An operator who really means to move
+           the contract still has the destination's name from line 1. */
+        todo: `Set Deliver To to ${some(facts.destination, "that destination")}, then issue again.`,
       };
     case "pickup_partner_not_allowed":
       return {
-        wrong: `${supplier} delivers the goods itself.`,
+        wrong: `${supplierOpening} delivers the goods itself.`,
         todo: "Remove the collector, then issue again.",
+      };
+    /* 0422 — the asked-for Delivery Date is before the earliest a Manual
+       Purchase may ask for: Proceed Date + `manual_purchase_min_delivery_days`
+       (calendar days, Purchasing Settings). The act names the one fix: move
+       the date. */
+    case "delivery_date_before_earliest":
+      return {
+        wrong: `Delivery Date ${some(facts.date, "asked for")} is earlier than the earliest date ${some(
+          facts.earliest,
+          "the items can arrive",
+        )}.`,
+        todo: `Set Delivery Date to ${some(facts.earliest, "the earliest date")} or later, then send again.`,
       };
     case "no_warehouse":
       return {
@@ -380,6 +466,11 @@ export const PURCHASING_REFUSAL_CODES = [
   "duplicate_build",
   "already_on_po",
   "sofa_merge",
+  "unknown_request",
+  "not_ready_to_order",
+  "request_refused",
+  "request_ordered",
+  "request_closed",
   "nothing_to_issue",
   "blocked_delivery_date",
   "production_days_required",
@@ -389,6 +480,7 @@ export const PURCHASING_REFUSAL_CODES = [
   "supplier_collection_mismatch",
   "supplier_collection_destination_mismatch",
   "pickup_partner_not_allowed",
+  "delivery_date_before_earliest",
   "no_warehouse",
   "unknown_source_order",
   "source_line_mismatch",

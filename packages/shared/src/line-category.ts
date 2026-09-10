@@ -320,5 +320,69 @@ export function defaultLineLocation(
   return "Carres Klang"; // own warehouse — the default consolidation point
 }
 
+/**
+ * ⭐ THE GOVERNED CATEGORY-WORD LADDER — one copy, every register
+ * (extracted from `SalesOrdersRegister.footerWord`, 2026-09-06, when the
+ * Receiving rail needed the same answer; Law D forbids a second ladder).
+ *
+ * The ladder is: recorded `attrs.category` → the catalog's `category` → the
+ * keyword classifier — the SAME order the SO document reads, so a register
+ * can always reproduce the document's word. The classifier branch survives
+ * only for the measured catalog gap (`resolvedCategory` documents the exit
+ * condition); no caller may write its own SKU-text rule instead of this one.
+ *
+ * A recorded category outside this vocabulary (e.g. `guarantee`) falls
+ * through to the SKU path unchanged — the ladder prints ONLY these words, by
+ * construction. `MP` and every other supplier abbreviation never reach the
+ * screen: the display word is always `Mattress protector`.
+ */
+export const GOODS_CATEGORY_WORDS = [
+  "Mattress",
+  "Bedframe",
+  "Sofa",
+  "Pillow",
+  "Mattress protector",
+  "Topper",
+  "Footrest",
+  "Accessory",
+  "Service",
+  "Other goods",
+] as const;
+
+export type GoodsCategoryWord = (typeof GOODS_CATEGORY_WORDS)[number];
+
+export function goodsCategoryWordOf(line: {
+  sku: string;
+  attrs?: Record<string, unknown> | null;
+  category?: string | null;
+}): GoodsCategoryWord {
+  const sku = line.sku;
+  if (lineKind(sku) === "service") return "Service";
+  const recorded = (
+    (typeof line.attrs?.category === "string" ? line.attrs.category : "") ||
+    (typeof line.category === "string" ? line.category : "")
+  )
+    .trim()
+    .toLowerCase();
+  if (recorded === "mattress") return "Mattress";
+  if (recorded === "bedframe") return "Bedframe";
+  if (recorded === "sofa") return "Sofa";
+  if (recorded === "service") return "Service";
+  if (recorded === "accessory") {
+    const short = accShort(sku);
+    return (GOODS_CATEGORY_WORDS as readonly string[]).includes(short)
+      ? (short as GoodsCategoryWord)
+      : "Accessory";
+  }
+  const cls = lineClass(sku);
+  if (cls === "mattress") return "Mattress";
+  if (cls === "bedframe") return "Bedframe";
+  if (cls === "sofa") return "Sofa";
+  const short = accShort(sku);
+  return (GOODS_CATEGORY_WORDS as readonly string[]).includes(short)
+    ? (short as GoodsCategoryWord)
+    : "Other goods";
+}
+
 // NOTE: STOCK_LOCATIONS is NOT re-exported here — it already leaves the shared
 // barrel via schemas/ops-order-control; a second export would collide.

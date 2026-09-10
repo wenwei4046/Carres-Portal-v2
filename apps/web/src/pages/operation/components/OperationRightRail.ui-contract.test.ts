@@ -7,9 +7,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (path: string) => readFileSync(join(here, path), "utf8");
 
 describe("ERP Shell V1 quick rail contract", () => {
-  it("uses the approved four panels in order and governed width", () => {
+  it("keeps Work as one navigation peek and uses the governed width", () => {
     const src = read("OperationRightRail.tsx");
-    expect(src).toContain('label: "Team"');
+    expect(src).not.toContain('label: "Team"');
     expect(src).toContain('label: "Calendar"');
     expect(src).toContain('label: "My Work"');
     expect(src).toContain('label: "Activity"');
@@ -35,13 +35,10 @@ describe("ERP Shell V1 quick rail contract", () => {
     expect(rail).not.toContain("icon: Flag");
   });
 
-  it("keeps Team an ERP-wide people snapshot with PO and GRN duty", () => {
-    const src = read("rail/TeamPanel.tsx");
-    expect(src).toContain("PO Duty");
-    expect(src).toContain("GRN Duty");
-    expect(src).toContain("View Team Work");
-    expect(src).not.toContain("Issue PO");
-    expect(src).not.toContain("Confirm ready date");
+  it("does not put duty editing or a second Team queue in Quick Rail", () => {
+    const src = read("OperationRightRail.tsx");
+    expect(src).not.toContain("TeamPanel");
+    expect(src).not.toContain("useUpdatePoDuty");
   });
 
   it("keeps Calendar about dated events instead of action taxonomy", () => {
@@ -53,8 +50,11 @@ describe("ERP Shell V1 quick rail contract", () => {
 
   it("makes My Work derived and removes generic manual workflow controls", () => {
     const src = read("rail/TasksPanel.tsx");
-    expect(src).toContain("Overdue");
-    expect(src).toContain("Today");
+    expect(src).toContain('label: "Late"');
+    expect(src).toContain('label: "Due today"');
+    expect(src).toContain('label: "Later"');
+    expect(src).toContain("useOpenWorkSet");
+    expect(src).not.toContain("/api/ops/tasks");
     expect(src).not.toContain("Add a task");
     expect(src).not.toContain("Take it");
     expect(src).not.toContain("Mark done");

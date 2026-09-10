@@ -2689,6 +2689,59 @@ describe("POST /api/operation/orders (create)", () => {
     expect(res.status).toBe(201);
     expect(rpc).toHaveBeenCalled();
   });
+
+  /* ⭐ THE OFFICE DOOR CARRIES THE SAME CEILING AS EVERY OTHER SURFACE (YH,
+     2026-09-01 — audit F-8).
+     `MAX_DELIVERY_FLOOR` is 3 because Carres does not stair-carry above the
+     3rd floor. The POS clamps to it, the shared schema caps at it, and this
+     door had no upper bound at all — so an office-keyed order could store a
+     floor no shop floor can produce, promising a carry nobody performs. */
+  async function saveFloor(floor: number) {
+    const rpc = vi.fn().mockResolvedValue({ data: { revision: 4, changed: [] }, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000b01/save", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ header: { delivery_floor: floor } }),
+      }),
+      env,
+    );
+    return { res, rpc };
+  }
+
+  it("refuses a floor above the one Carres carries to, and writes nothing", async () => {
+    const { res, rpc } = await saveFloor(7);
+    /* 422 — the shape is right and the VALUE is refused, which is what this
+       door already answers for every other out-of-range field. */
+    expect(res.status).toBe(422);
+    expect(rpc, "refused before the RPC, not by it").not.toHaveBeenCalled();
+  });
+
+  it("still accepts the top floor Carres does carry to", async () => {
+    const { res } = await saveFloor(3);
+    expect(res.status).toBe(201);
+  });
+
+  /* ⭐ RE-PINNED (YH, 2026-09-01 — "office follow POS"). This asserted that 0
+     stayed legal here, on the reasoning that the office inherits orders where
+     nobody recorded a floor. MEASURED, and the reasoning does not hold: the
+     office form reads the floor as `delivery_floor ?? 1` in all four places it
+     touches it, so a null already reaches the operator AND already saves as 1.
+     The zero was not an inherited value being protected — it was one only a
+     non-UI caller could produce. Both ends match the POS now: 1 to 3. */
+  it("refuses 0 too — the office asks the same 1-to-3 the POS does", async () => {
+    const { res, rpc } = await saveFloor(0);
+    expect(res.status).toBe(422);
+    expect(rpc, "refused before the RPC").not.toHaveBeenCalled();
+  });
+
+  it("still accepts 1 — the floor a customer actually stands on", async () => {
+    const { res } = await saveFloor(1);
+    expect(res.status).toBe(201);
+  });
 });
 
 /**
@@ -2742,6 +2795,40 @@ describe("GET /api/operation/orders/:id/commitment", () => {
 });
 
 describe("GET /api/operation/orders/:id/expansion", () => {
+  it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const from = vi.fn((table: string) => ({
+      select: vi.fn((columns: string) => {
+        let data: unknown = [];
+        if (table === "orders") data = { so: 1340 };
+        if (table === "order_lines") data = [
+          { id: "line-1", sku: "H1401F-K", qty: 1 },
+          { id: "line-2", sku: "H1401F-K", qty: 1 },
+        ];
+        if (table === "po_line_sources") data = columns.includes("order_id") && shared
+          ? [source, { ...source, order_id: "other-order", order_line_id: "other-line" }] : [source];
+        if (table === "ops_stock_items" && columns.includes("po_line_id")) data = [{ unit_code: "U1-000-070", po_line_id: "pol-1" }];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        return chain;
+      }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[] }>; place: unknown[] };
+    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070"]);
+    expect(body.lines[1].unitIds).toEqual([]);
+    // Incoming goods are not reported as physical allocated stock for Delivery.
+    expect(body.place).toEqual([]);
+  });
+
   it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
     const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
     const rows: Record<string, unknown> = {

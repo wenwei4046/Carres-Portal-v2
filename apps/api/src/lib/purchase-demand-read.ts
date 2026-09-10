@@ -6,6 +6,7 @@ import {
   readyStockRef,
   stockMatchKey,
   workWeekOffDaysFor,
+  transitDaysFor,
   type ProductCategory,
   type ToOrderLine,
   type ToOrderProposal,
@@ -664,6 +665,12 @@ export async function loadToOrder(
       deadline: deadline ? deadline.slice(0, 10) : null,
       leadDays,
       offDays: workWeekOffDaysFor(settings, supplierId),
+      /* The lorry leg. `expectedArrivalOf` has always ADDED this when stamping
+         a PO's `eta_date`; until 2026-09-09 the backward walk that produces
+         Order By did not SUBTRACT it, so a PO issued exactly on Order By landed
+         a working day after Goods Must Arrive. Same governed number, same
+         office calendar, one arithmetic (Law D). */
+      transitDays: transitDaysFor(settings, supplierId),
       placedAt: placedAt.slice(0, 10),
       committed: order.status === "proceed_order",
       so: order.so != null ? Number(order.so) : null,

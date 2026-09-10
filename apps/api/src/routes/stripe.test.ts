@@ -72,6 +72,8 @@ function makeSb(byTable: Record<string, TableCfg>, rpc?: { data: unknown; error:
         return builder;
       }),
       eq: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      limit: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
       maybeSingle: vi.fn(() => Promise.resolve(cfg.maybeSingle ?? { data: null, error: null })),
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
@@ -212,6 +214,42 @@ describe("POST /:id/stripe/checkout", () => {
     expect(body.maxAmount).toBe(1600);
   });
 
+  it("the cap is the SO across kinds: a live storage paper raises it, a voided one does not", async () => {
+    // total 2100 · paid 500 · storage issued 150+8 tax; the draft REPLACEMENT
+    // and the voided paper ask nothing (§2 exactly — no draft-debt rule)
+    // → cap 2100 + 158 − 500 = 1758.
+    const orderWithStorage = { ...ORDER, invoices: [
+      { kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null, replaces_invoice_id: null },
+      { kind: "additional_storage", status: "draft", amount: 100, tax_amount: 0, voided_at: null, replaces_invoice_id: "old-1" },
+      { kind: "additional_storage", status: "voided", amount: 40, tax_amount: 0, voided_at: "2026-09-01", replaces_invoice_id: null },
+      { kind: "sales", status: "issued", amount: 2100, tax_amount: 0, voided_at: null, replaces_invoice_id: null },
+      { kind: "storage", status: "draft", amount: 999, tax_amount: 0, voided_at: null, replaces_invoice_id: null },
+    ] };
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: orderWithStorage, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(
+      makeSb({ stripe_checkout_sessions: { single: { data: SESSION_ROW, error: null } } }) as never);
+    vi.mocked(stripeClient).mockReturnValue(makeStripe());
+    // 1758 exactly is allowed…
+    let res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1758 }),
+      }), env);
+    expect(res.status).toBe(201);
+    // …one ringgit above the combined obligation is refused with the cap named.
+    res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1759 }),
+      }), env);
+    expect(res.status).toBe(422);
+    const body = await res.json() as { code: string; maxAmount: number };
+    expect(body.code).toBe("amount_exceeds_outstanding");
+    expect(body.maxAmount).toBe(1758);
+  });
   it("201 mints a session (sen amount, dashboard-controlled methods) and tracks it", async () => {
     const user = makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } });
     const admin = makeSb({
@@ -270,6 +308,34 @@ describe("POST /:id/stripe/checkout", () => {
 });
 
 // =====================================================================
+// GET /api/orders/:id/stripe/checkout — the order's recent links
+describe("GET /:id/stripe/checkout", () => {
+  it("lists the order's sessions newest first, RLS-gated on the order read", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: ORDER, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(
+      makeSb({ stripe_checkout_sessions: { list: { data: [SESSION_ROW], error: null } } }) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { sessions: Array<{ sessionId: string; status: string }> };
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]).toMatchObject({ sessionId: "cs_test_abc", status: "open", amount: 1600 });
+  });
+  it("404 when RLS hides the order", async () => {
+    vi.mocked(userClient).mockReturnValue(
+      makeSb({ orders: { maybeSingle: { data: null, error: null } } }) as never);
+    vi.mocked(adminClient).mockReturnValue(makeSb({}) as never);
+    const res = await app.fetch(
+      new Request(`http://t/api/orders/${ORDER_ID}/stripe/checkout`, {
+        headers: { Authorization: `Bearer ${await makeJwt("operation")}` },
+      }), env);
+    expect(res.status).toBe(404);
+  });
+});
+
 // GET /api/orders/:id/stripe/checkout/:sid — poll + live reconcile
 // =====================================================================
 describe("GET /:id/stripe/checkout/:sid", () => {

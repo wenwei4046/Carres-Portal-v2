@@ -131,6 +131,10 @@ export const saveDeliveryArrangementInputSchema = z.object({
   /** Condo trips only; the building needs a name and a plate in advance. */
   driverName: z.string().trim().max(120).nullish(),
   vehicle: z.string().trim().max(60).nullish(),
+  /** Condo trips only (0412): what the building's management requires before
+   *  the truck may enter — permit reference, registered window, in the
+   *  building's own words. A Delivery-owned arrangement fact. */
+  condoRegistration: z.string().trim().max(2000).nullish(),
   /** Required when the save CHANGES an existing partner. */
   reason: z.enum(CHANGE_LOGISTICS_REASON_KEYS).nullish(),
 });
@@ -150,6 +154,8 @@ export interface DeliveryArrangementRow {
   reply_proof_path: string | null;
   driver_name: string | null;
   vehicle: string | null;
+  /** 0412 — optional so an older Worker degrades to "not recorded". */
+  condo_registration?: string | null;
   updated_at: string;
   updated_by: string | null;
 }
@@ -183,4 +189,83 @@ export function isLogisticsChange(
   if (!nextPartnerId) return false;
   if (!currentPartnerId) return false;
   return currentPartnerId !== nextPartnerId;
+}
+
+/* ── THE PARTNER PORTAL (Delivery Card 07, 0413) ────────────────────────────
+ *
+ * The ruled NETS screen (`docs/delivery/MASTER.md` §5): the partner sees only
+ * its own assigned deliveries and the minimum facts, and has exactly TWO acts —
+ * `Save Delivery Arrangement` and `Cannot Deliver`. No Accept (NETS is
+ * responsible without one), no money, no other partners, no reassignment.
+ */
+
+/** Why a partner cannot perform the arrangement — governed, primary-school
+ *  English. `other` demands a note so a shrug cannot be saved. */
+export const CANNOT_DELIVER_REASONS = [
+  { key: "customer_unreachable", label: "Cannot reach the customer" },
+  { key: "customer_date_impossible", label: "Cannot make the customer's date" },
+  { key: "no_capacity", label: "No capacity on that date" },
+  { key: "wrong_area", label: "We do not cover this area" },
+  { key: "information_wrong", label: "The delivery information is wrong" },
+  { key: "other", label: "Another reason (write it below)" },
+] as const;
+export type CannotDeliverReasonKey = (typeof CANNOT_DELIVER_REASONS)[number]["key"];
+export const CANNOT_DELIVER_REASON_KEYS = CANNOT_DELIVER_REASONS.map((r) => r.key) as [
+  CannotDeliverReasonKey,
+  ...CannotDeliverReasonKey[],
+];
+
+/** PUT /api/partner/deliveries/:orderId/arrangement?leg= — the partner's own
+ *  save. Deliberately a SUBSET of the operation form: no partner change, no
+ *  driver/vehicle/condo facts, no proof path — those stay Operations-owned. */
+export const partnerSaveArrangementInput = z
+  .object({
+    confirmedDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Confirmed date must be a date")
+      .nullish(),
+    confirmedTime: z.string().trim().max(60).nullish(),
+    expectedArrival: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "ETA must be a time")
+      .nullish(),
+    note: z.string().trim().max(2000).nullish(),
+  })
+  .strict();
+export type PartnerSaveArrangementInput = z.infer<typeof partnerSaveArrangementInput>;
+
+/** POST /api/partner/deliveries/:orderId/cannot-deliver?leg= */
+export const partnerCannotDeliverInput = z
+  .object({
+    reason: z.enum(CANNOT_DELIVER_REASON_KEYS),
+    note: z.string().trim().max(2000).nullish(),
+  })
+  .strict()
+  .refine((v) => v.reason !== "other" || Boolean(v.note && v.note.trim()), {
+    message: "Another reason needs the note filled in",
+    path: ["note"],
+  });
+export type PartnerCannotDeliverInput = z.infer<typeof partnerCannotDeliverInput>;
+
+/** One card on the partner's arrange screen — the ruled minimum facts only. */
+export interface PartnerDeliveryCard {
+  orderId: string;
+  leg: number;
+  doNumber: string | null;
+  customerName: string;
+  customerPhone: string | null;
+  /** Area words, never the full commercial record: city + state. */
+  area: string | null;
+  building: string | null;
+  goodsSummary: string;
+  /** The customer's requested date (Sales' promise), preformatted ISO. */
+  requestedDate: string | null;
+  specialRequirements: string | null;
+  confirmedDate: string | null;
+  confirmedTime: string | null;
+  expectedArrival: string | null;
+  note: string | null;
+  /** True once this partner has reported Cannot Deliver on the scope and
+   *  Operations has not yet re-arranged it. */
+  cannotDeliverReported: boolean;
 }

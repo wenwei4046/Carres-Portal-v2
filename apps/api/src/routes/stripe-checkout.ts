@@ -93,7 +93,7 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
   const { data, error } = await sb
     .from("orders")
     .select(
-      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty)",
+      "id, so, dealer_id, status, paid, customer_name, customer_email, order_lines(unit_price, qty), order_addons(unit_price, qty), invoices(kind, status, amount, tax_amount, voided_at, replaces_invoice_id)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -109,6 +109,11 @@ async function fetchOrderScoped(c: Context<AppEnv>, id: string) {
     customer_email: string | null;
     order_lines: Array<{ unit_price: number | string; qty: number }>;
     order_addons: Array<{ unit_price: number | string; qty: number }>;
+    invoices?: Array<{
+      kind: string; status: string; amount: number | string;
+      tax_amount: number | string; voided_at: string | null;
+      replaces_invoice_id: string | null;
+    }>;
   };
 }
 
@@ -131,6 +136,18 @@ function orderTotal(order: { order_lines: Array<{ unit_price: number | string; q
   const lines = (order.order_lines ?? []).reduce((s, l) => s + Number(l.unit_price) * l.qty, 0);
   const addons = (order.order_addons ?? []).reduce((s, a) => s + Number(a.unit_price) * a.qty, 0);
   return lines + addons;
+}
+
+/** The SO's live storage obligations (0438 papers) — the same rule the shared
+ *  `soRemaining` prints: ISSUED storage-kind invoices with their tax, §2
+ *  exactly (a draft asks nothing yet, a voided one is dead). A storage fee is
+ *  money the customer owes (payment/MASTER.md §2), so the link cap includes
+ *  it; the invariant is unchanged — a payment may never exceed what is owed,
+ *  and `paid` is subtracted ONCE from the combined obligation. */
+function storageObligations(order: { invoices?: Array<{ kind: string; status: string; amount: number | string; tax_amount: number | string; voided_at: string | null; replaces_invoice_id: string | null }> }): number {
+  return (order.invoices ?? [])
+    .filter((i) => i.kind !== "sales" && i.status === "issued" && !i.voided_at)
+    .reduce((s, i) => s + Number(i.amount) + Number(i.tax_amount), 0);
 }
 
 // POST /:id/stripe/checkout — mint one Checkout link for RM<amount>.
@@ -160,7 +177,7 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
       422,
     );
   }
-  const outstanding = Math.max(0, total - Number(order.paid));
+  const outstanding = Math.max(0, total + storageObligations(order) - Number(order.paid));
   if (outstanding <= 0) {
     return c.json(
       { error: "stripe_checkout_blocked", code: "already_paid", message: "Order is already fully paid." },
@@ -239,6 +256,33 @@ stripeCheckoutRouter.post("/:id/stripe/checkout", async (c) => {
   }
 
   return c.json({ session: shape(row as SessionRow) }, 201);
+});
+
+// GET /:id/stripe/checkout — the order's recent links, newest first (payment
+// MASTER §16 Online link: the Invoice object shows the standing link instead
+// of blindly minting a twin). Read-only; status changes belong to the
+// per-session poll and the webhook.
+stripeCheckoutRouter.get("/:id/stripe/checkout", async (c) => {
+  requireConfigured(c);
+  requireOrderRole(c.var.auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+
+  // Visibility gate first — RLS decides whether the caller may see the order.
+  await fetchOrderScoped(c, idCheck.data);
+
+  const admin = adminClient(c.env);
+  const { data, error } = await admin
+    .from("stripe_checkout_sessions")
+    .select(SESSION_COLS)
+    .eq("order_id", idCheck.data)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ sessions: ((data ?? []) as SessionRow[]).map(shape) });
 });
 
 // GET /:id/stripe/checkout/:sid — status poll + live reconcile while open.

@@ -14,7 +14,7 @@ import { INPUT_CLS } from "@/pages/operation/components/Modal";
 import { CategoryChip, CATEGORY_LABEL, CodeChip } from "../components/atoms";
 import { fmtRm } from "../format";
 import { skuMargin } from "../margin";
-import { SupplierOffersStrip } from "../components/SupplierOffers";
+import { SupplierOffersModal } from "../components/SupplierOffers";
 import NewSkuModal from "./NewSkuModal";
 import ImportSkusDialog from "./ImportSkusDialog";
 import { buildSkuExportCsv, downloadCsv } from "@/lib/sku-csv";
@@ -92,6 +92,9 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  /* Which SKU's supplier offers are open. The PARENT owns it, exactly as
+     `SkuMasterTab` does — a modal is one thing on the page, not one per row. */
+  const [offersFor, setOffersFor] = useState<FlatRow | null>(null);
   /* The roster is already cached by the order drawer / Suppliers tab; this
    * adds no server work of its own. Map once, look up per row. */
   const suppliersQ = useOperationSuppliers();
@@ -337,7 +340,7 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
             canEditPrices={isPrincipal}
             supplierName={r.sku.supplierId ? supplierNameById.get(r.sku.supplierId) ?? null : null}
             suppliers={suppliersQ.data?.suppliers ?? []}
-            heights={sofaHeights}
+            onOpenSuppliers={() => setOffersFor(r)}
           />
         ))}
       </div>
@@ -355,6 +358,21 @@ export default function OperationSkuCostTab({ catalog }: { catalog: CatalogRespo
         />
       )}
       {importOpen && <ImportSkusDialog onClose={() => setImportOpen(false)} />}
+      {/* ⭐ THE SAME DOOR THE SKU MASTER GRID OPENS (YH, 2026-09-01) — "click
+          on the code to show the modal, rather than a toggle expandable part".
+          `SkuMasterTab` has opened `SupplierOffersModal` from its code chip
+          since the offers shipped; this grid was the one that kept the strip,
+          so ONE capability had two interactions on two tabs of one page. The
+          component is the same component, not a lookalike. */}
+      {offersFor && (
+        <SupplierOffersModal
+          sku={offersFor.sku}
+          suppliers={suppliersQ.data?.suppliers ?? []}
+          category={offersFor.category ?? null}
+          heights={sofaHeights}
+          onClose={() => setOffersFor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -365,7 +383,7 @@ const CostRowView = memo(function CostRowView({
   canEditPrices,
   supplierName,
   suppliers,
-  heights,
+  onOpenSuppliers,
 }: {
   row: FlatRow;
   editMode: boolean;
@@ -378,14 +396,13 @@ const CostRowView = memo(function CostRowView({
   /** The roster, for the edit-mode picker. The IDENTITY written is always
    *  supplier_id; the name is only ever what the picker displays. */
   suppliers: Array<{ id: string; name: string }>;
-  /** Active sofa seat heights (0389) — the offers strip prices sofa offers
-   *  per height, the same axis the SKU Master grid prices the slot on. */
-  heights: string[];
+  /** Opens the shared `SupplierOffersModal` for this row — the parent owns
+   *  which SKU is open, exactly as `SkuMasterTab` does. */
+  onOpenSuppliers: () => void;
 }) {
   const { sku, category, productName } = row;
   const patch = usePatchCatalogSku();
   const discontinued = !!sku.discontinuedAt;
-  const [offersOpen, setOffersOpen] = useState(false);
   const margin = skuMargin(sku.price, sku.cost ?? null);
 
   // Blank clears back to "not set" (cost is nullable, unlike selling price).
@@ -485,8 +502,20 @@ const CostRowView = memo(function CostRowView({
       style={{ gridTemplateColumns: GRID_COLS, opacity: discontinued ? 0.5 : 1 }}
       data-testid={`opcost-row-${sku.sku}`}
     >
+      {/* THE CODE IS THE DOOR. One item code, one product name — click it and
+          a modal names every supplier that has quoted this SKU and at what
+          cost. `SkuMasterTab` has worked this way since the offers shipped;
+          this grid is now the same interaction, opening the same component. */}
       <div>
-        <CodeChip>{sku.sku}</CodeChip>
+        <button
+          type="button"
+          onClick={onOpenSuppliers}
+          aria-label={`Who supplies ${sku.sku}`}
+          data-testid={`opcost-suppliers-door-${sku.sku}`}
+          className="rounded-[3px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9 focus-visible:ring-offset-1"
+        >
+          <CodeChip>{sku.sku}</CodeChip>
+        </button>
       </div>
       <div className="text-body text-base-700 truncate" title={sku.description ?? ""}>
         {sku.description || <span className="text-base-400">—</span>}
@@ -533,17 +562,6 @@ const CostRowView = memo(function CostRowView({
             ) : null}
           </div>
         )}
-        {/* 0388 — the OTHER suppliers' paper. The slot above stays the routing
-            truth; this strip records what everyone else quoted so a second
-            source's code and prices stop living on paper only. */}
-        <button
-          type="button"
-          onClick={() => setOffersOpen((v) => !v)}
-          className="mt-0.5 text-label font-medium text-kit-blue-9 underline underline-offset-2"
-          data-testid={`opcost-offers-toggle-${sku.sku}`}
-        >
-          {offersOpen ? "Hide other suppliers" : "Other suppliers"}
-        </button>
       </div>
       <div className="text-right" data-testid={`opcost-cost-${sku.sku}`}>
         {editMode ? (
@@ -629,9 +647,6 @@ const CostRowView = memo(function CostRowView({
         )}
       </div>
     </div>
-    {offersOpen && (
-      <SupplierOffersStrip sku={sku} suppliers={suppliers} category={category ?? null} heights={heights} />
-    )}
     </>
   );
 });

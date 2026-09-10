@@ -213,6 +213,7 @@
     "apps/web/src/pages/operation/SalesOrderWorkspace.tsx",
     "apps/web/src/pages/operation/SalesOrdersRegister.tsx",
     "apps/web/src/pages/operation/StockTabs.tsx",
+    "apps/web/src/pages/operation/WarehouseOutboundWork.tsx",
     "apps/web/src/pages/operation/components/AbandonOrderModal.tsx",
     "apps/web/src/pages/operation/components/AdjustStockModal.tsx",
     "apps/web/src/pages/operation/components/AnnotationTimeline.tsx",

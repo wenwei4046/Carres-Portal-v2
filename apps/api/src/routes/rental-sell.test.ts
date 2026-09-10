@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import {
   SignJWT,
   createLocalJWKSet,
@@ -1050,6 +1050,13 @@ describe("POST /stripe/webhook — invoice.paid (0281 collection ledger)", () =>
 });
 
 describe("rental collections (0281) — the 84 months stop lying", () => {
+  beforeEach(() => {
+    // Keep due-today and overdue fixtures stable as the real calendar advances.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-07T04:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
   const BILLINGS = [
     { id: "b1", seq: 1, due_date: "2026-08-30", amount_due: 59, status: "paid",
       paid_at: "2026-08-30T04:00:00Z", paid_amount: 59, method: "stripe", reference: "cs_x",

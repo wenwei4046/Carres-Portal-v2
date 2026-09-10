@@ -77,6 +77,10 @@ export type ReceiptTemplateData = {
   reference: string | null;
   note: string | null;
   currency: string;
+  /** §4: "Voided Payment keeps a visible VOIDED receipt." The receipt is not
+   *  withdrawn when a payment is voided — it is reprinted saying so. */
+  voided?: boolean;
+  void_reason?: string | null;
 };
 
 /** Storage delivery-EXTENSION agreement (migration 0196; the two Delivery-
@@ -149,6 +153,8 @@ export type InvoiceTemplateData = {
 };
 
 export type PoTemplateData = {
+  /** Local review only; no PO number, version or unit identities exist yet. */
+  draft?: boolean;
   // Money-free payload of `purchasing_po_document` (migration 0307) — the
   // supplier-facing PO carries no RM figure (docs/pdf/PO-PDF-STANDARD.md §2).
   po_number: string;
@@ -184,8 +190,12 @@ export type PoTemplateData = {
      * payloads may omit it, in which case the PO-level destination applies. */
     destination?: { name: string; address: string } | null;
     attrs?: Record<string, unknown> | null;
-    /** ops_stock_items.unit_code — minted at PO-open under the locked
-     *  `U1-000-001` identity (0381); the Item ID column is fed by this. */
+    /** 0442 — the line's snapshotted stock identity mode. A `quantity` line
+     *  legitimately prints `—` in the UNIT ID column. */
+    identity_mode?: "exact_unit" | "quantity" | null;
+    /** ops_stock_items.unit_code — born at official PO issue under the locked
+     *  `U1-000-001` identity (0381/0443), bound to THIS line; the UNIT ID
+     *  column is fed by this. */
     unit_codes?: string[] | null;
     /**
      * ⭐ WHICH CUSTOMER ORDER EACH UNIT ON THIS LINE IS FOR (`po_line_sources`,
@@ -199,6 +209,60 @@ export type PoTemplateData = {
     sources?: Array<{ so: number | null; qty: number }> | null;
   }>;
   terms: string | null;
+};
+
+/**
+ * GOODS RECEIVED NOTE — the formal receiving document (owner correction
+ * 2026-09-06). Money-free like the PO and the DO: a receiving document talks
+ * quantity and identity, never price. The five quantity words are the
+ * governed set (`purchasing/MASTER.md` §5.8); `Deliver To` is where the PO
+ * instructed the supplier to deliver, `Goods arrived at` is where the goods
+ * physically arrived, `Goods received on` is the physical arrival date —
+ * three different facts, all printed.
+ */
+export type GrnTemplateData = {
+  grn_no: string;
+  /** `Valid` | `Cancelled` — the document status words. */
+  status_label: string;
+  /** The linked source document — a PO, or a CO when consignment. */
+  source: { po_number: string; is_consignment: boolean };
+  supplier: { name: string };
+  supplier_do_no: string;
+  deliver_to: string;
+  goods_arrived_at: string;
+  /** ISO date — the physical arrival date. */
+  goods_received_on: string | null;
+  lines: Array<{
+    sku: string;
+    /** Human words first (catalog variant); the caller falls back to the SKU. */
+    description: string;
+    /** The governed category word from the one shared ladder. */
+    category: string;
+    order_qty: number;
+    received_qty: number;
+    damaged_qty: number;
+    wrong_item_qty: number;
+    pending_delivery_qty: number;
+  }>;
+  /** Exact-Unit outcomes, when governed Units exist — the scan record is
+   *  part of the paper. */
+  unit_results?: Array<{ unit_code: string; outcome_label: string }>;
+  /** Extra goods — recorded separately, never Inventory, never pending. */
+  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  /** Evidence references — counts, not URLs (paper carries no dead links). */
+  evidence?: { photos: number; videos: number; do_file: boolean } | null;
+  /** The duty-evidence trio — normal holder · dated cover · actual actor. */
+  duty: {
+    holder_name: string | null;
+    cover_name: string | null;
+    actor_name: string | null;
+    authority_label: string | null;
+    posted_on: string | null;
+  };
+  /** Append-only amendment marking — printed on the paper itself. */
+  amendments?: Array<{ date: string; reason: string | null; by: string | null }>;
+  /** Cancellation marking — the record survives, plainly marked. */
+  cancelled?: { date: string | null; reason: string | null; by: string | null } | null;
 };
 
 export type SalesOrderTemplateData = {

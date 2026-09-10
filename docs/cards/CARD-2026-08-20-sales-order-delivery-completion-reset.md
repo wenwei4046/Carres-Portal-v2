@@ -1,4 +1,4 @@
-STATUS: QUEUED
+STATUS: CLOSED — OVERTAKEN, not built. Owner instruction 2026-09-01. See the closing note at the foot.
 DATE: 2026-08-20
 PR: #863
 IMPLEMENTATION: APPROVED — owner commissioned Codex to take over, audit the shipped work, and complete the missing Sales Order → Delivery blueprint on 2026-08-20.
@@ -538,3 +538,52 @@ grammar · Sales Portal/POS · AutoCount import ownership.
 Do not edit or reset the EXECUTED 2026-08-16 Delivery Order card. This new card
 is the continuation point. Chat, screenshots and old Claude plans are evidence,
 not a competing source of truth.
+
+---
+
+## Closing note — 2026-09-01
+
+**Closed as OVERTAKEN on the owner's instruction. Nothing here is
+outstanding, and one part of it was overruled by the owner herself.**
+
+Re-measured against the code before closing, slice by slice — the card's own
+status line was wrong on every one of them.
+
+| Slice | Card says | Measured |
+|---|---|---|
+| 1 · Delivery gets its own sidebar section | to build | **Overtaken.** A 2026-08-24 owner ruling collapsed Delivery to a single direct row. The card's target picture no longer exists |
+| 2 · SO ↔ DO lineage | to build | **Shipped** 2026-08-20 (`bcfa7b75`). The register prints `No delivery order yet` / one number / `2 Delivery Orders` |
+| 2 (§5) · A Delivery Orders block on the SO page | to build | **OVERRULED.** Jess removed that block on 2026-08-26 (`2515a136`, *"The Order tab stops re-printing what Order Route already owns"*). The card asks for something the owner has since taken out |
+| 3 · Owner resolution per rule | to build | **Shipped** 2026-08-27 (`8113aeca`) |
+| 4 · Order Route readability | to build | **Shipped.** `SalesOrderRoute.tsx` draws the three-row grammar the card specified |
+| 5 · Acceptance walk | to do | Nothing left to walk |
+
+**⛔ AND THE ONE QUESTION THAT LOOKED OPEN IS ALREADY RULED.** A reading of
+slice 3 suggested a live owner decision — whether Carres creates Delivery and
+Finance duty rosters, or whether those actions keep landing on the order's
+assigned person. It does not. `docs/orders/MASTER.md`, *BUILT 2026-08-27 — the
+Action Owner Engine resolution*, settles both halves:
+
+> The PIC keeps what is truthfully the relationship owner's — delay decision,
+> logistics choice and calls.
+
+> `collect` records `payment_duty` as its rule; no payment-duty roster exists
+> yet, so the PIC stands as governed COVER — money never sits unowned (the
+> 2026-08-19 incident is why). **When a payment-duty roster exists, only the
+> resolver changes.**
+
+So the current behaviour is the ruled behaviour, the extension point is named,
+and adding a roster later is a resolver change rather than a rebuild. There is
+no decision waiting on anybody.
+
+**⚠️ ONE LEFTOVER, recorded rather than swept up.**
+`apps/web/src/pages/operation/SalesOrderDeliveryOrdersBlock.tsx` and its test
+survive in the tree with no importer — the block Jess removed on 2026-08-26.
+Deleting a file nobody asked to delete is CLAUDE.md red line 5, so it stays
+until the owner says otherwise. It is named here so the next reader finds a
+record rather than a mystery.
+
+**The reading lesson.** This card sat QUEUED for twelve days describing work
+that was 80% shipped and partly reversed, and the status line said so the whole
+time. A card is a claim with a date, exactly like a carry-forward: re-measure it
+against the code before quoting it, and never build from a status line alone.

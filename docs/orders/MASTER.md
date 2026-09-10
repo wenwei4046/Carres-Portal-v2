@@ -763,10 +763,10 @@ the position being worked, never to a queue of nodes nobody has reached.
 
 **Owners come from the Work Engine roster only** (buddy cover included) — never hand-picked, never
 stored by the canvas, never hard-coded. The node shows initials; Team Work shows full names; the
-action sentence never repeats the person. **MEASURED BOUNDARY 2026-08-16:** only PO duty
-(`useOperationPoDuty` → Purchasing, Receiving) has a roster read on this page. Stock, Delivery,
-Sales and Payment resolve to no holder today, so those nodes render the instruction with no chip
-rather than an invented owner. Wiring their duty reads is approved-target, not built.
+action sentence never repeats the person. **MEASURED BOUNDARY 2026-09-07:** Purchasing and
+Receiving read PO Duty and GRN Duty from the shared Workspace resolver. Stock, Delivery, Sales and
+Payment render no owner chip until their own governed owner rule is admitted; the page never
+invents one.
 
 ### Connectors
 
@@ -810,11 +810,16 @@ ask (Law D — the guard that bound decision B, decision A and this ruling alike
 engine may never disagree):
 
 ```
-outstanding = 0                                   → ✓ Money in full
-APPROVED Delivery Payment Approval, still owing   → ✓ COD approved — collect before unloading
-owing, request pending                            → ✗ … approval waiting for decision
-owing, nothing raised                             → ✗ … collect, or request a payment approval
+outstanding = 0   → ✓ Money in full
+owing             → ✗ collect first — the delivery cannot be arranged while money is owed
 ```
+
+**RE-RULED 2026-09-01 — the exception is CLOSED.** The owner made money-in-full absolute: the
+Delivery Payment Approval door was removed from the screen (PR #1031) and nothing can request
+one any more. An approval granted before the removal is still honoured by the 0362 gate —
+history honoured, not a live path. The `order_delivery_payment_approvals` record, its doors and
+the trigger remain in the database untouched so that restoring the door, if ever re-ruled, is a
+revert rather than a rebuild.
 
 **The OPEN Finance exception (0355) is the SECOND, independent money requirement** — it blocks a
 fully-paid order, and an approval does not clear it. The full ruling, the approval record's
@@ -1719,10 +1724,23 @@ over this question is gone.
   `order_history` + `order_change_requests`. An approved+applied change
   request IS the customer-change record on that lane. Unifying them onto the
   revision ledger is a later card.
-- The Stage-3 amendment lane (ISSUE/ACCEPT/APPLY, 3.6–3.8) stays walled; until
-  it lands, the governed path for a customer change is the SAVE door with
-  `change_type='customer_change'`, exactly as Stage 2 shipped it — Card 1
-  labels the act, it does not open a new one.
+- ~~The Stage-3 amendment lane stays walled; until it lands, the governed path
+  for a customer change is the SAVE door.~~ **SPENT 2026-09-02 — its own
+  condition expired, and it is struck under Law 3 rather than left to
+  contradict the "read-only facts" rule above.** The lane LANDED:
+  `sales_order_submit_amendment` and `sales_order_decide_amendment` ship
+  (`0348`, `0354`), the route calls the first
+  (`apps/api/src/routes/operation/orders.ts:1884`), and `Change delivery date`
+  is on the object card (`SalesOrderWorkspace.tsx:2283`).
+  **THE GOVERNED PATH FOR A CUSTOMER DATE CHANGE IS THE AMENDMENT.** `0415`
+  makes the save door refuse it (`promise_moves_by_amendment`) — which is what
+  this paragraph had been quietly authorising for as long as it outlived its
+  own "until".
+  **The reading lesson, and why this is struck rather than removed:** a
+  sentence that says "until X lands" stops being law the day X lands, but it
+  goes on READING like law for as long as nobody re-measures X. This one
+  outlived its condition and became the only text in the repository
+  authorising a silent move of a customer's promised date.
 - Cannot answer "how much is physically fulfilled" — that is Card 2 (units)
   + Card 5 (delivery attempts), on purpose.
 
@@ -2672,9 +2690,12 @@ PO placed → Unit ID born → supplier can label it → Receiving confirms arri
 → reserve to SO or keep purchasing demand → out for delivery → delivered / returned
 ```
 
-Unit ID is born when the PO is placed, before receiving, and the same identity follows the
-physical item through supplier labelling, Receiving, Warehouse, reservation, Delivery, return,
-inspection and reuse. The register answers which real Unit exists, where it is, its condition,
+Unit ID is born when the official PO is issued — in the PO's own transaction, one per ordered
+piece of a Catalog-traced (exact-unit) SKU, bound to the PO line — before receiving, and the same
+identity follows the physical item through supplier labelling, Receiving, Warehouse, reservation,
+Delivery, return, inspection and reuse. Catalog quantity goods (interchangeable accessories) are
+born with no Unit ID and are reconciled by count; Receiving verifies IDs and never creates one
+(owner ruling 2026-09-07, Purchasing §6.2). The register answers which real Unit exists, where it is, its condition,
 which SO it is reserved for and the PO it came from.
 
 **Ready Stock law:** the system may offer compatible existing warehouse stock; a human decides
@@ -2945,7 +2966,7 @@ sort is TOTAL — two actions can never tie and flip between renders.
 fact about the ORDER, not about the kind of action.
 
 ```
-1  Broken commitment or today's run     Deliver today · Upload delivery photo
+1  Broken commitment or the day's run   Deliver on {weekday, date} · Upload delivery photo
 2  The customer must be told — THROUGH LOGISTICS, never by us
                                         Call {logistics} — arrange new delivery date
 3  Goods are not secured                Call {supplier} — confirm ready date · Issue PO
@@ -3011,7 +3032,7 @@ feed wiring), and `workItemsForOrder` resolves the person per RULE instead of bo
 fact exists (0363 records none; HR duty keys carry none), so those rules resolve to duty words or
 the PIC-as-cover exactly as written above. The `assigned Partner` half of the booking rule stays
 unresolved on purpose — a company without a login cannot close portal work. Buddy-cover beyond
-what `/api/operation/po-duty` already applies is not re-derived here.
+what the shared Workspace Duty resolver already applies is not re-derived here.
 
 **How the PIC is decided** (LIVE, migrations 0232 + 0235;
 `ops_order_control.assigned_staff / assigned_by / assigned_at` + `ops_staff_settings`):
@@ -3088,7 +3109,7 @@ are out, owing money is always RED: there is nothing left to wait for.
   assigned · the date confirmed · that date still ahead — there is nothing for a human to do,
   which is why the old `Confirm delivery with {customer}` was the one drawer row **no button in
   the portal could close.** It is a quiet FACT — `Delivering 27 Jul · 9–11 AM` — and
-  `Deliver today` takes over on the day.
+  the delivery-day action (`Deliver on {weekday, date}`) takes over on the day.
 
 ## 2.6 · What the flow reads
 
@@ -3154,8 +3175,10 @@ archive. **`Owing` and the delivery-photo queue are the two deliberate exception
 delivered orders, because the money and the proof outlive the delivery.
 
 **The bulk bar writes:** assign logistics (loops the ops-assign endpoint) · create follow-up
-tasks · mark completed (**server-scoped to AutoCount rows only**) · **No storage** (writes
-`storage_fee_override = 0`) · CSV · Print.
+tasks · mark completed (**server-scoped to AutoCount rows only**) · the legacy **No storage**
+direct write (`storage_fee_override = 0`) · CSV · Print. **The direct No storage write is measured
+legacy behaviour, not target authority, and must retire:** `payment/MASTER.md` owns written request,
+tiered duty and exact-end-date waiver. Orders may never silently forgive the charge.
 
 **The auto-assign sweep is SERVER-SIDE and fires once per page load from ANY operation
 session** — a staff member receives their share the moment THEY open the portal, with no
@@ -4139,8 +4162,8 @@ columns. **Cancelled orders are excluded server-side**, so `All` means every LIV
   **A facet may never print a number its own click cannot produce.**
 - **Nothing on the list says the same thing twice.** The `Delivery` cell never repeats the
   sentence `Actions` already carries; `Overdue` has exactly ONE home (the QUEUES rail);
-  a LOGISTICS row counting zero is not rendered — **but `Khor Yee · pending 0` stays, because a
-  person on the roster is not a filter statistic.**
+  a LOGISTICS row counting zero is not rendered. A current staff member with zero work remains
+  visible because a person on the roster is not a filter statistic; a departed staff member does not.
 - **Every money figure is `fmtMoney` from `packages/shared/src/money-format.ts`.** One spelling,
   asserted by identity, never by two implementations agreeing.
 - **The stage pill and the dots sit side by side.** The pill says WHERE the order is; the dots
@@ -4474,8 +4497,12 @@ can see or close. It moves to them the day that portal covers appointments.
 
 # §7 · Delivery on an order
 
-> **The delivery PAGE is [`../delivery/MASTER.md`](../delivery/MASTER.md). The ACTIONS are
-> defined here, once.** That page renders them and writes nothing.
+> **The delivery WORKSPACE is [`../delivery/MASTER.md`](../delivery/MASTER.md) and it OWNS the
+> delivery ARRANGEMENT** (owner ruling 2026-08-24): the Logistics Partner, Confirmed Delivery,
+> Confirmed Time, expected arrival, logistics note, reply proof and driver/vehicle are Delivery's
+> writes on `ops_delivery_arrangements` (0386). **This section defines the ORDER's own delivery
+> facts once** — the customer promise, the booking gate and the order-lifecycle Work triggers.
+> Sales Orders may never write an arrangement fact, and Delivery may never write a Sales fact.
 
 **`Assign logistics`** — trigger: the order needs delivering and no company is chosen ·
 completion: **a company is recorded. Never "they accepted"** — assigning is our decision ·
@@ -4511,7 +4538,9 @@ gate fails, the door refuses and names the gate; the request and the issuance ar
 every other issue event (`… — on Request Delivery Order`). It lives on the drawer's
 Delivery-order row.
 
-**`Deliver today`** — trigger: the confirmed date is today and nothing has been delivered ·
+**`Deliver on {weekday, date}`** (the delivery-day action; never displayed as `Deliver today` —
+the Delivery UI dictionary bans Today/Tomorrow) — trigger: the confirmed date is today and
+nothing has been delivered ·
 completion: **Delivered**, or a **Delivery Exception carrying its reason** (customer
 unreachable · customer rejected the date · driver absent · vehicle breakdown · condominium entry
 refused · lift booking not done · delivery failed). **Every module fails the same way: one
@@ -4525,7 +4554,7 @@ staff · due: the delivery day itself · completion: the loan row reads returned
 Work engine from the loan fact; it never blocks a delivery (Card 6's law is untouched).
 
 **`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
-exception holds the delivery (0355) · owner: the Finance owner — only Finance clears it, with
+exception holds the delivery (0355) · owner: the resolved `Payment Approver` Duty holder, with
 evidence · due: immediately · completion: the exception reads cleared. Composed by the Work
 engine; a duty with no roster holder yet shows its duty word, never a borrowed PIC.
 
@@ -4586,9 +4615,11 @@ uncollected at T−2 is a delivery about to slip; T−1 and later while owing is
 consumers, one module: the collections desk and the Work engine's `collect` due. The full
 ruling lives below in this section.
 
-### `Collect RM {amount} from {customer}`
+### `Ask the customer to pay`
 Trigger: outstanding > RM 0 · completion: outstanding = RM 0 ·
 **survives delivery** — a delivered order that still owes keeps this action and its red dot.
+Amount and customer are structured row/card facts; action owner is metadata/avatar. They are not
+duplicated in the action sentence.
 
 ### MONEY LEAVES A TRACE ON THE ORDER
 `payment_record` and `payment_void` write `payment.received` / `payment.voided` into the order's
@@ -4630,7 +4661,13 @@ still hold (owner re-confirmed 2026-08-19: *"已付清也要有 ETA 才发 DO"*)
 manual door is `Request Delivery Order` (§7) — the same path, the same gates, merely not
 waiting for the booking-confirm trigger.
 
-### `Delivery Payment Approval` — OWNER DEFINITION 2026-08-19 · APPROVED / LOCKED
+### `Delivery Payment Approval` — OWNER DEFINITION 2026-08-19 · **DOOR CLOSED 2026-09-01**
+
+**The owner closed the exception on 2026-09-01 (PR #1031): money in full before delivery is
+absolute, the raise/decide surface was removed from the screen, and nothing can request an
+approval any more.** The definition below is retained because the record, its doors and the
+0362 trigger stay in the database untouched: an approval granted before the closure is still
+honoured by the gate, and restoring the door — if ever re-ruled — is a revert, not a rebuild.
 
 One append-only record owned by Sales Orders (`order_delivery_payment_approvals`, 0362), beside
 the Finance exception it mirrors:
@@ -4676,7 +4713,11 @@ Nobody else may create, edit or delete a decision; deletion is refused by trigge
 is never re-decided (the 0355 pattern). **The database asserts the money law on the mint
 itself** (0362's `BEFORE INSERT` trigger on `ops_delivery_orders`): no document can be born for
 an owing order with no approved approval, whichever path writes it — including the legacy 0098
-dispatch backstop.
+dispatch backstop. Since `0442` (2026-09-07, payment/MASTER.md §2 convergence) the trigger's
+outstanding also counts the SO's live ISSUED Storage / Additional Storage Invoices, with `paid`
+subtracted exactly once from the combined obligation — an unpaid storage paper blocks the mint;
+a voided one (the waiver path) does not; the LEGACY C9 storage columns stay asserted by the TS
+API gate as before.
 
 ### WHAT AN APPROVAL MEANS — COD, defined by the owner 2026-08-19
 
@@ -4700,16 +4741,18 @@ arithmetic). A paid order's DO renders no COD line.
 ```
 WHAT IT IS      an explicit record, linked to the Sales Order (0355)
 IT CARRIES      creator · reason · status · timestamps · clear evidence
-WHO CREATES     Finance, and only Finance
-WHO CLEARS      Finance, and only Finance
+WHO CREATES     resolved Payment Approver
+WHO CLEARS      resolved Payment Approver
 STATUS OPEN     blocks the DO gate — regardless of payment, and an approval
                 does NOT clear it
 STATUS CLEARED  removes the block
 ```
 
-- **One record, one owner (Law A).** Finance creates, changes and clears it and owns its completion
-  evidence. Sales Orders READS it to answer the gate; Delivery READS it; neither may write it, and
-  no surface may offer a second door onto the act (Law C).
+- **One record, one owner (Law A).** Money In owns the exception record and completion evidence;
+  the resolved `Payment Approver` performs its governed create/clear actions. Sales Orders READS it
+  to answer the gate; Delivery READS it; neither may write it, and no surface may offer a second
+  door onto the act (Law C). The current Finance/principal-only implementation is a convergence gap,
+  not authority to keep a module-local person or role list.
 - **`clear evidence` is a required field, not a nicety.** A block liftable without saying why is the
   hand-keyed `payment_status` defect this MASTER already retired once.
 - **It is a decision, never a derived state.** Opening one is a judgement; owing money is a fact.
@@ -4745,7 +4788,7 @@ deadline day changed: `delivery − 2 working days`.**
 
 ```
 T−3  attention — chase begins
-T−2  DEADLINE — money in full (or the approval request is already raised)
+T−2  DEADLINE — money in full; since 2026-09-01 there is no exception path
 T−1  logistics takes the DO; the trip is scheduled
 T    delivery
 ```
@@ -4924,8 +4967,8 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 | buying the goods | **a SUMMARY, and a broken one** | `purchase_orders` — [`../purchasing/MASTER.md`](../purchasing/MASTER.md) | the PO exists · `received_qty` |
 | receiving the goods | **a SUMMARY** — the count is read, never written (D2) | `warehouse_receipts` · `receiving_events` — Purchasing | a posted Receiving Session |
 | reserving / releasing a unit | **a trigger** | `ops_stock_items` — [`../stock/MASTER.md`](../stock/MASTER.md) | the unit's status + `reserved_ref` |
-| booking a delivery | **THE OWNER of the record** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
-| the delivery WORKSPACE | a VIEW | nothing — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
+| booking a delivery | **THE OWNER of the customer promise** | `ops_order_control.booking_*` | a customer-confirmed date **and** slot |
+| the delivery ARRANGEMENT (partner, confirmed operational date/time, ETA, note, reply proof, driver/vehicle) | **Delivery's write** — this MASTER only reads it | `ops_delivery_arrangements` (0386) — [`../delivery/MASTER.md`](../delivery/MASTER.md) | — |
 | carrier rules | 🟡 **a duplicated editor** | the partner's own config | — |
 | a customer complaint | **a link** | `service_cases` — [`../service/MASTER.md`](../service/MASTER.md) | the customer confirmed |
 | a supplier claim | **not present** | `supplier_claims` — Purchasing | — |
@@ -5195,10 +5238,16 @@ Edit
 View
 Print
 ────────
-Issue Delivery Order
+Request Delivery Order
 ────────
 Cancel SO
 ```
+
+**The fourth row is re-worded by the system-issuance rulings** (Jess 2026-08-16 / 2026-08-19,
+overwriting the Loo 2026-08-11 `Issue Delivery Order` line): the SYSTEM issues the DO when the
+governed gate is met, so no surface may carry an `Issue` control. The one governed manual door
+is **`Request Delivery Order`** — the outstation trip's door, same single issuing path and same
+gates — and that is the only act this menu row may hand off to.
 
 **`Copy to new Sales Order` IS RETIRED — owner ruling (Jess, 2026-08-28, relayed by YH),
 overwriting the Loo 2026-08-11 line above.** Jess called the act dangerous, and the code says why:
@@ -5228,8 +5277,8 @@ spacing, hover/current treatment, permissions and confirmation components still 
 and interaction treatment. Each item routes to the Carres-owned capability rather than executing
 foreign business rules inside the grid: `Edit` opens the full Sales Order Workspace in edit intent;
 `View` opens the owned read view; `Print` uses the
-governed Sales Order document output; `Issue Delivery Order` hands off to the Delivery-owned issue
-flow; and `Cancel SO`
+governed Sales Order document output; `Request Delivery Order` hands off to the Delivery-owned
+governed request door (the system still issues through the one path); and `Cancel SO`
 uses the owned cancellation gate and destructive confirmation. The implementation cards must
 define the unresolved permission, eligibility, copy-boundary and cancellation rules before those
 new capabilities can write business data. Right-click is a desktop shortcut: it does not remove
@@ -5237,9 +5286,9 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 
 | What | Why it is not built |
 |---|---|
-| **`Issue Delivery Order` in the Sales Orders row context menu** | §11's locked menu lists it between `Print` and `Copy to new Sales Order`, and the Cancel slice deliberately did not add it. It is **Delivery's** issue flow, not a Sales Orders capability — the menu item is a handoff, and the handoff belongs to whichever card next touches the Delivery-owned issue door. Adding it from the Sales Orders side would have minted a second entrance to another module's act. |
+| **`Request Delivery Order` in the Sales Orders row context menu** | §11's locked menu lists the row (re-worded from `Issue Delivery Order` by the system-issuance rulings), and the Cancel slice deliberately did not add it. It is **Delivery's** governed request door, not a Sales Orders capability — the menu item is a handoff, and the handoff belongs to whichever card next touches that Delivery-owned door. Adding it from the Sales Orders side would have minted a second entrance to another module's act. |
 | **`Scan Order` in the normal-state `…` overflow** | The `…` overflow and `Scan Order` arrive together with the Intake card. Building the overflow first, with one item that answers `503`, would put an unfinished promise on an operator's screen — the exact defect the Settings gear's `Coming soon.` placeholder was. |
-| **The follow-up action after a FAILED delivery** | `Deliver today` completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
+| **The follow-up action after a FAILED delivery** | The delivery-day action (`Deliver on {weekday, date}`) completes on delivered OR a Delivery Exception with its reason, and **nothing yet turns that exception into the next action.** Approved shape: one Exception plus a Reason, then the next action. Belongs to whichever card next touches the delivery day. |
 | **Persistent Facts as a real strip** | RESERVED, not law. It needs the four facts to have ONE home first; on today's drawer they sit in four blocks under a frozen *"ZERO order data here"* ruling. **The first page migrated through `DetailShell` is where they get that home.** |
 | **Gap** | RESERVED, not built. The upgrade trigger is written into the model. |
 | **The drawer through `DetailShell`** | Approved as the destination; blocked because L4's persistent-facts tuple does not exist on the drawer yet. **Not a gap — a ruling.** |

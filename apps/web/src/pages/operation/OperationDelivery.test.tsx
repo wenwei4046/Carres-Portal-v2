@@ -1,29 +1,39 @@
 /**
- * DELIVERY WORK — the manual planning workspace, held as tests.
- * `CARD-2026-08-21-delivery-02-work-layout`.
+ * DELIVERY MONITOR — the page, held as tests.
+ * Owner UI corrections 2026-09-06 / 2026-09-07.
  *
- * The arithmetic is pinned in `delivery-work.test.ts`. What THIS file holds is
- * everything that could only go wrong once the numbers reach the screen:
+ * The arithmetic is pinned in `delivery-monitor.test.ts`. What THIS file holds
+ * is everything that could only go wrong once the numbers reach the screen:
  *
- *  1. **The old page is gone and cannot come back.** No `Work list` / `Calendar`
- *     switch, no KPI preamble, no Refresh, no action-card wall, no permanent
- *     detail pane, no `Due` / `Next Action` / `Priority` / `Today`.
- *  2. **The shape** — one 50px Destination Header, one 200px local rail, one
- *     expandable register.
- *  3. **The approved column order**, exactly.
- *  4. **▸ has one job** — this scope's goods, and only its own.
- *  5. **Nothing writes.** No `New DO` / `Issue` / `Release` / `Approve`.
+ *  1. **The shape** — one 50px Destination Header saying Monitor, the page
+ *     toolbar's `Day · Week · Month` (Week the desktop default), one
+ *     page-owned 240px FilterRail (WORK TO DO · STATE · LOGISTICS PARTNER ·
+ *     DELIVERY STATUS) with the complete month calendar fixed on top, and
+ *     never a `Calendar` rail row.
+ *  2. **One card, the approved fields** — confirmed time · DO No · Customer ·
+ *     City and State · Goods · Logistics Partner · Delivery Status; no phone,
+ *     money, owner, driver, vehicle, arrival or upload timestamp; NO checkbox.
+ *  3. **Every card is ONE link** — an issued DO opens the Delivery Order, a
+ *     row without one opens Edit Delivery.
+ *  4. **THE PROJECTION RULE** — any operational pick renders the standard
+ *     selectable work list; the calendar never grows selection; the work list
+ *     carries the checkboxes, select-all and the in-place `{N} selected ·
+ *     Clear · Assign logistics` toolbar; Day/Week/Month brings it back.
+ *  5. **Upload delivery proof** — a recorded result stays `Delivered`; the
+ *     row names the exact missing file(s).
+ *  6. **The URL is the state**, every retired spelling still answering.
+ *  7. **Mobile** is only ever the Day list; **tablet** Week is three days.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import type {
   DeliveryOrderRow,
   DeliveryPartnersListResponse,
   operationOrderListRow,
-  SalesOrderExpansionResponse,
 } from "@/lib/queries";
+import type { DeliveryArrangementRow } from "@carres/shared";
 
 let ordersState: {
   data: { orders: operationOrderListRow[] } | undefined;
@@ -35,26 +45,17 @@ let ordersState: {
 let partnersState: { data: DeliveryPartnersListResponse | undefined };
 let docsState: {
   data:
-    | { deliveryOrders: DeliveryOrderRow[]; attempts: []; handoverEvents: [] }
+    | { deliveryOrders: DeliveryOrderRow[]; attempts: unknown[]; handoverEvents: unknown[] }
     | undefined;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
   refetch: ReturnType<typeof vi.fn>;
 };
-let expansionState: { data: SalesOrderExpansionResponse | undefined; isLoading: boolean };
-/** Keyed by order id — the ONLY way to prove an expansion shows its OWN goods
- *  and not the row above it (the card's own acceptance line). */
-let expansionByOrder: Record<string, SalesOrderExpansionResponse> | null = null;
-let loansState: { data: { loans: unknown[] } | undefined };
-let arrangementsState: { data: { arrangements: unknown[] } | undefined };
-let assignState: { mutate: ReturnType<typeof vi.fn>; isPending: boolean };
-/** Every `navigate()` this page makes — the interaction contract, observed. */
-const navigateSpy = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
-  return { ...actual, useNavigate: () => navigateSpy };
-});
+let arrangementsState: {
+  data: { arrangements: DeliveryArrangementRow[] } | undefined;
+  refetch: ReturnType<typeof vi.fn>;
+};
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -63,19 +64,17 @@ vi.mock("@/lib/queries", async () => {
     useOperationOrders: () => ordersState,
     useDeliveryPartners: () => partnersState,
     useDeliveryOrdersRegister: () => docsState,
-    useSalesOrderExpansion: (orderId: string | null) =>
-      expansionByOrder
-        ? { data: expansionByOrder[orderId ?? ""], isLoading: false }
-        : expansionState,
-    useOrderLoans: () => loansState,
     useDeliveryArrangements: () => arrangementsState,
-    useAssignLogistics: () => assignState,
+    /* The ▸ expansion's Unit facts are their own query — quiet here. */
+    useSalesOrderExpansion: () => ({ data: undefined, isLoading: false }),
   };
 });
 
 import OperationDelivery from "./OperationDelivery";
+import { MONITOR_COPY } from "./delivery-monitor";
 
-const TODAY = "2026-08-21"; // a Friday
+/** The one consistent example: Friday, 4 September 2026. */
+const TODAY = "2026-09-04";
 
 function order(
   over: Partial<operationOrderListRow> & { id: string; so: number },
@@ -91,7 +90,7 @@ function order(
     customer_address_state: "Selangor",
     building_type: "Condominium",
     placed_at: "2026-08-01T00:00:00Z",
-    delivery_date: "2026-08-30",
+    delivery_date: null,
     delivery_date_tbd: false,
     source_system: null,
     source_ref: ["CR0854"],
@@ -115,16 +114,78 @@ function order(
   };
 }
 
-function wrap(node: React.ReactNode) {
+function arrangement(
+  over: Partial<DeliveryArrangementRow> & { order_id: string },
+): DeliveryArrangementRow {
+  return {
+    id: `arr-${over.order_id}`,
+    leg: 0,
+    partner_id: null,
+    partner_name: null,
+    confirmed_date: null,
+    confirmed_time: null,
+    expected_arrival: null,
+    logistics_note: null,
+    reply_proof_path: null,
+    driver_name: null,
+    vehicle: null,
+    updated_at: "2026-09-01T00:00:00Z",
+    updated_by: null,
+    ...over,
+  };
+}
+
+function doc(
+  over: Partial<DeliveryOrderRow> & { id: string; do_number: string },
+): DeliveryOrderRow {
+  return {
+    order_id: undefined,
+    issued_at: "2026-09-01T00:00:00Z",
+    trip_groups: null,
+    delivery_date: null,
+    time_slot: null,
+    logistics_partner: null,
+    voided_at: null,
+    void_reason: null,
+    orders: { id: "a", so: 1322, customer_name: "kong chai yin" },
+    ...over,
+  };
+}
+
+/** The URL is the page's state — this probe lets a test read it back. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
+}
+
+function wrap(node: React.ReactNode, initialEntry = "/operation?tab=delivery") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation?tab=delivery"]}>{node}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        {node}
+        <LocationProbe />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
+let viewportWidth = 1440;
 beforeEach(() => {
+  viewportWidth = 1440;
+  window.matchMedia = ((query: string) => ({
+    matches: (() => {
+      const m = /max-width:\s*(\d+)px/.exec(query);
+      return m ? viewportWidth <= Number(m[1]) : false;
+    })(),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    onchange: null,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
   ordersState = {
     data: { orders: [] },
     isLoading: false,
@@ -132,7 +193,15 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
-  partnersState = { data: { partners: [] } };
+  partnersState = {
+    data: {
+      partners: [
+        { id: "p-nets", name: "NETS" },
+        { id: "p-al", name: "AL" },
+        { id: "p-houzs", name: "HOUZS" },
+      ],
+    } as DeliveryPartnersListResponse,
+  };
   docsState = {
     data: { deliveryOrders: [], attempts: [], handoverEvents: [] },
     isLoading: false,
@@ -140,12 +209,7 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
-  expansionState = { data: { defaultDeliverTo: null, place: [], lines: [] }, isLoading: false };
-  expansionByOrder = null;
-  loansState = { data: { loans: [] } };
-  arrangementsState = { data: { arrangements: [] } };
-  assignState = { mutate: vi.fn(), isPending: false };
-  navigateSpy.mockClear();
+  arrangementsState = { data: { arrangements: [] }, refetch: vi.fn() };
   localStorage.clear();
   vi.useFakeTimers();
   vi.setSystemTime(new Date(`${TODAY}T09:00:00+08:00`));
@@ -154,21 +218,353 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("the old three-pane page is gone", () => {
-  beforeEach(() => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-  });
+/** One scope confirmed for Friday 4 Sep with an issued DO, one without a DO. */
+function seedTwoScopes() {
+  ordersState.data = {
+    orders: [
+      order({ id: "a", so: 1322, do_number: "DO-040926-0001" }),
+      order({ id: "b", so: 1323, customer_name: "aida rahim" }),
+    ],
+  };
+  docsState.data = {
+    deliveryOrders: [
+      doc({ id: "do-row-1", do_number: "DO-040926-0001", delivery_date: "2026-09-04", time_slot: "11:00–13:00" }),
+    ],
+    attempts: [],
+    handoverEvents: [],
+  };
+  arrangementsState.data = {
+    arrangements: [
+      arrangement({
+        order_id: "b",
+        partner_id: "p-nets",
+        partner_name: "NETS",
+        confirmed_date: "2026-09-05",
+        confirmed_time: "14:00–16:00",
+        expected_arrival: "15:00",
+      }),
+    ],
+  };
+}
 
-  it("carries no Work list / Calendar switch, no KPI preamble and no Refresh", () => {
+/** Three dateless unassigned scopes — the bulk-assignment population. */
+function seedUnassigned() {
+  ordersState.data = {
+    orders: [
+      order({ id: "u1", so: 1401 }),
+      order({ id: "u2", so: 1402, customer_name: "aida rahim" }),
+      order({ id: "u3", so: 1403, customer_name: "tan mei ling" }),
+    ],
+  };
+}
+
+describe("the shape", () => {
+  beforeEach(seedTwoScopes);
+
+  it("the DEFAULT landing is the Week calendar — six Mon–Sat columns, Week lit in the toolbar", () => {
     wrap(<OperationDelivery />);
-    expect(screen.queryByText("Work list")).toBeNull();
-    expect(screen.queryByText("Calendar")).toBeNull();
-    expect(screen.queryByRole("button", { name: /refresh/i })).toBeNull();
-    expect(screen.queryByTestId("delivery-queues")).toBeNull();
-    expect(screen.queryByTestId("delivery-detail")).toBeNull();
+    for (const day of ["2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05"]) {
+      expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-06")).toBeNull();
+    expect(screen.queryByTestId("delivery-monitor-work-list")).toBeNull();
+    const control = screen.getByTestId("delivery-monitor-calendar-view");
+    expect(within(control).getByRole("tab", { name: "Week" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(control).getByRole("tab", { name: "Day" })).toBeTruthy();
+    expect(within(control).getByRole("tab", { name: "Month" })).toBeTruthy();
+    // The toolbar states the range in the governed date spelling.
+    expect(screen.getByText(/Mon, 31 Aug\s*–\s*Sat, 5 Sep/)).toBeTruthy();
   });
 
-  it("never shows a generic employee label or a relative day word", () => {
+  it("draws one 50px Destination Header saying Monitor, with no page-owned control in it", () => {
+    wrap(<OperationDelivery />);
+    const header = screen.getByTestId("delivery-monitor-destination-header");
+    expect(header.className).toContain("h-[50px]");
+    expect(
+      within(header).getByTestId("delivery-monitor-destination-header-module-word").textContent,
+    ).toBe("Monitor");
+    expect(within(header).queryByText(/filters/i)).toBeNull();
+    expect(within(header).queryByText("Week")).toBeNull();
+  });
+
+  it("draws the page-owned 240px FilterRail with the four ruled groups — never a Calendar row, never Proof Required", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    expect(rail.className).toContain("w-[240px]");
+    for (const heading of ["WORK TO DO", "STATE", "LOGISTICS PARTNER", "DELIVERY STATUS"]) {
+      expect(within(rail).getByText(heading)).toBeTruthy();
+    }
+    for (const gone of [
+      "REGION",
+      "LOGISTICS",
+      "DELIVERY SCHEDULE",
+      "NEEDS CHECKING",
+      "Calendar",
+      "Delivered — Proof Required",
+      "All regions",
+      "All logistics",
+    ]) {
+      expect(within(rail).queryByText(gone)).toBeNull();
+    }
+    for (const row of [
+      "All delivery work",
+      "No logistics picked",
+      "No confirmed date",
+      "Overdue",
+      "Failed Delivery",
+      "Upload delivery proof",
+      "Waiting for warehouse",
+      "Ready for handover",
+      "Out for delivery",
+    ]) {
+      expect(within(rail).getByText(row)).toBeTruthy();
+    }
+  });
+
+  it("WORK TO DO keeps the ruled order, and Waiting for warehouse sits under DELIVERY STATUS only", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    const rows = [
+      "delivery-monitor-work-all",
+      "delivery-monitor-work-no_logistics",
+      "delivery-monitor-work-no_confirmed_date",
+      "delivery-monitor-work-overdue",
+      "delivery-monitor-work-failed",
+      "delivery-monitor-work-upload_proof",
+      "delivery-monitor-status-waiting_warehouse",
+      "delivery-monitor-status-ready_for_handover",
+      "delivery-monitor-status-out_for_delivery",
+    ].map((id) => within(rail).getByTestId(id));
+    for (let i = 1; i < rows.length; i += 1) {
+      expect(
+        rows[i - 1]!.compareDocumentPosition(rows[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(within(rail).getAllByText("No logistics picked")).toHaveLength(1);
+    expect(within(rail).getAllByText("Waiting for warehouse")).toHaveLength(1);
+    expect(within(rail).queryByTestId("delivery-monitor-work-waiting_warehouse")).toBeNull();
+  });
+
+  it("STATE lists direct state names from the real records — no sub-group headings", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    expect(within(rail).getByText("Selangor")).toBeTruthy();
+    for (const heading of ["EAST MALAYSIA", "WEST MALAYSIA", "SINGAPORE", "KLANG VALLEY"]) {
+      expect(within(rail).queryByText(heading)).toBeNull();
+    }
+  });
+
+  it("LOGISTICS PARTNER lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
+    wrap(<OperationDelivery />);
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    expect(within(rail).getByText("NETS")).toBeTruthy();
+    expect(within(rail).queryByText("AL")).toBeNull();
+    expect(within(rail).queryByText("HOUZS")).toBeNull();
+    expect(within(rail).queryByTestId("delivery-monitor-logistics-none")).toBeNull();
+  });
+
+  it("the rail carries the COMPLETE month calendar fixed above the scrolling filters", () => {
+    wrap(<OperationDelivery />);
+    const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    fireEvent.click(within(calendar).getByRole("button", { name: "Previous month" }));
+    expect(within(calendar).getByText(/August 2026/i)).toBeTruthy();
+    fireEvent.click(within(calendar).getByRole("button", { name: "Next month" }));
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    const rail = screen.getByTestId("delivery-monitor-rail");
+    const scrollRegion = rail.querySelector(".overflow-y-auto");
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion!.contains(calendar)).toBe(false);
+    const sunday = within(calendar).getByText("6").closest("button");
+    expect(sunday?.disabled).toBe(true);
+  });
+
+  it("clicking a rail date opens that date's DAY view and clears the picked queue", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
+    const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    fireEvent.click(within(calendar).getByText("15"));
+    const probe = screen.getByTestId("location-probe").textContent ?? "";
+    expect(probe).toContain("date=2026-09-15");
+    expect(probe).toContain("view=day");
+    expect(probe).not.toContain("region=");
+    expect(within(screen.getByTestId("delivery-monitor-daily")).getByText("Tue, 15 Sep")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Day" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("an individual empty day says the short `No deliveries`", () => {
+    wrap(<OperationDelivery />);
+    const day = screen.getByTestId("delivery-monitor-day-2026-09-02");
+    expect(within(day).getByText("No deliveries")).toBeTruthy();
+  });
+
+  it("draws no hour-by-hour vertical timeline", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.queryByTestId("delivery-monitor-hour-axis")).toBeNull();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/\b0[89]:00\b.*\b10:00\b.*\b11:00\b/);
+  });
+});
+
+describe("Day · Week · Month (owner correction 2026-09-07)", () => {
+  beforeEach(seedTwoScopes);
+
+  it("Day shows the selected operating day with full cards and steps one operating day", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("tab", { name: "Day" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=day");
+    const daily = screen.getByTestId("delivery-monitor-daily");
+    expect(within(daily).getByText("Fri, 4 Sep")).toBeTruthy();
+    expect(within(daily).getByTestId("delivery-monitor-card-a")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Next days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-05");
+    expect(within(screen.getByTestId("delivery-monitor-daily")).getByTestId("delivery-monitor-card-b")).toBeTruthy();
+  });
+
+  it("Month is a capacity overview — compact counts per date, no cards, arrows moving a whole month", () => {
+    /* A failed delivery on the 4th makes that day's Exceptions line real. */
+    ordersState.data!.orders.push(order({ id: "f", so: 1330, do_number: "DO-F", customer_name: "lim ah kow" }));
+    docsState.data!.deliveryOrders.push(doc({ id: "do-f", do_number: "DO-F", delivery_date: "2026-09-04" }));
+    docsState.data!.attempts.push({ do_number: "DO-F", result: "failed", reason_key: "customer_absent", recorded_at: "2026-09-04T10:00:00Z" });
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("tab", { name: "Month" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=month");
+    expect(screen.getByTestId("delivery-monitor-month-view")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-range").textContent).toBe("Sep 2026");
+    /* No card wall in the month. */
+    expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
+    const fourth = screen.getByTestId("delivery-monitor-month-day-2026-09-04");
+    expect(fourth.getAttribute("aria-label")).toBe(
+      "Fri, 4 Sep — 2 deliveries · 1 exception · 2 No logistics picked",
+    );
+    expect(within(fourth).getByText("Deliveries")).toBeTruthy();
+    expect(within(fourth).getByText("Exceptions")).toBeTruthy();
+    const fifth = screen.getByTestId("delivery-monitor-month-day-2026-09-05");
+    expect(fifth.getAttribute("aria-label")).toBe("Fri, 5 Sep — 1 delivery".replace("Fri", "Sat"));
+    expect(within(fifth).queryByText("Exceptions")).toBeNull();
+    expect(within(fifth).queryByText("No logistics picked")).toBeNull();
+    /* Sunday visible, not a choice. */
+    expect((screen.getByTestId("delivery-monitor-month-day-2026-09-06") as HTMLButtonElement).disabled).toBe(true);
+    /* The toolbar's month arrows replace the whole month. */
+    const next = screen.getByTestId("delivery-monitor-next");
+    expect(next.getAttribute("aria-label")).toBe("Next month");
+    fireEvent.click(next);
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-10-01");
+    expect(screen.getByTestId("delivery-monitor-range").textContent).toBe("Oct 2026");
+  });
+
+  it("clicking a Month date opens that date's Day view", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=month");
+    fireEvent.click(screen.getByTestId("delivery-monitor-month-day-2026-09-05"));
+    const probe = screen.getByTestId("location-probe").textContent ?? "";
+    expect(probe).toContain("view=day");
+    expect(probe).toContain("date=2026-09-05");
+    expect(within(screen.getByTestId("delivery-monitor-daily")).getByTestId("delivery-monitor-card-b")).toBeTruthy();
+  });
+
+  it("an empty month shows the ONE spanning state, never thirty empty cells", () => {
+    ordersState.data = { orders: [order({ id: "u1", so: 1401 })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=month");
+    expect(screen.queryByTestId("delivery-monitor-month-view")).toBeNull();
+    expect(
+      within(screen.getByTestId("delivery-monitor-empty-range")).getByText(
+        "No deliveries are scheduled from Tue, 1 Sep to Wed, 30 Sep.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("on the work list the control stays with nothing lit, and one click on Week returns the Calendar and clears every pick", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor&status=waiting_warehouse");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    const control = screen.getByTestId("delivery-monitor-calendar-view");
+    for (const name of ["Day", "Week", "Month"]) {
+      expect(within(control).getByRole("tab", { name }).getAttribute("aria-selected")).toBe("false");
+    }
+    fireEvent.click(within(control).getByRole("tab", { name: "Week" }));
+    const probe = screen.getByTestId("location-probe").textContent ?? "";
+    expect(probe).not.toContain("view=");
+    expect(probe).not.toContain("region=");
+    expect(probe).not.toContain("status=");
+    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+  });
+});
+
+describe("the spanning empty range", () => {
+  it("a fully empty window shows ONE spanning state, not six repeated sentences", () => {
+    ordersState.data = { orders: [order({ id: "u1", so: 1401 })] }; // dateless only
+    wrap(<OperationDelivery />);
+    const empty = screen.getByTestId("delivery-monitor-empty-range");
+    expect(
+      within(empty).getByText("No deliveries are scheduled from Mon, 31 Aug to Sat, 5 Sep."),
+    ).toBeTruthy();
+    expect(within(empty).getByText("1 delivery needs a confirmed date.")).toBeTruthy();
+    fireEvent.click(within(empty).getByText("Open No confirmed date"));
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=no_confirmed_date");
+  });
+
+  it("a search that matches nothing is a FILTERED empty, not a false empty-range claim", () => {
+    seedTwoScopes();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&q=zzz-no-match");
+    expect(screen.getByTestId("delivery-monitor-empty-search")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-empty-range")).toBeNull();
+  });
+});
+
+describe("one card", () => {
+  beforeEach(seedTwoScopes);
+
+  it("a card with an issued DO shows the DO number and opens the Delivery Order", () => {
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(within(card).getByText("DO-040926-0001")).toBeTruthy();
+    expect(within(card).getByText("Kong Chai Yin")).toBeTruthy();
+    expect(within(card).getByText("Klang, Selangor")).toBeTruthy();
+    expect(within(card).getByText("11:00–13:00")).toBeTruthy();
+    expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
+  });
+
+  it("a card without a DO says so and opens Edit Delivery", () => {
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-b");
+    expect(within(card).getByText("No delivery order yet")).toBeTruthy();
+    expect(within(card).getByText("Aida Rahim")).toBeTruthy();
+    expect(within(card).getByText("NETS")).toBeTruthy();
+    expect(within(card).getByText("Delivery confirmed")).toBeTruthy();
+    expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery/edit/b");
+  });
+
+  it("shows ONLY the approved fields — no expected arrival, phone, owner name or upload time", () => {
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-b");
+    expect(within(card).queryByText(/Expected arrival/)).toBeNull();
+    expect(within(card).queryByText(/15:00/)).toBeNull();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("0162389000");
+    expect(text).not.toContain("011-11108855");
+    for (const name of ["Yu Jun", "Shasha", "Khor Yee"]) expect(text).not.toContain(name);
+  });
+
+  it("a recorded delivery still owed evidence stays `Delivered` on the card — never Proof Required", () => {
+    ordersState.data!.orders.push(
+      order({ id: "d", so: 1325, do_number: "DO-D", customer_name: "lim ah kow", ops_order_control: { delivery_photos: [] } }),
+    );
+    docsState.data!.deliveryOrders.push(doc({ id: "do-d", do_number: "DO-D", delivery_date: "2026-09-03" }));
+    docsState.data!.attempts.push({ do_number: "DO-D", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" });
+    wrap(<OperationDelivery />);
+    const card = screen.getByTestId("delivery-monitor-card-d");
+    expect(within(card).getByText("Delivered")).toBeTruthy();
+    expect(document.body.textContent).not.toContain("Proof Required");
+  });
+
+  it("the calendar carries NO checkbox and no batch selection", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    const card = screen.getByTestId("delivery-monitor-card-a");
+    expect(within(card).queryAllByRole("button")).toHaveLength(0);
+    expect(document.querySelector("[draggable='true']")).toBeNull();
+  });
+
+  it("the calendar never prints a banned relative-day, mood or internal word", () => {
     wrap(<OperationDelivery />);
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/\bDue\b/);
@@ -177,582 +573,603 @@ describe("the old three-pane page is gone", () => {
     expect(text).not.toMatch(/\bToday\b/);
     expect(text).not.toMatch(/\bTomorrow\b/);
     expect(text).not.toMatch(/\bPending\b/);
-  });
-
-  it("offers no door that would write a Delivery Order", () => {
-    wrap(<OperationDelivery />);
-    for (const word of [/New DO/i, /^Issue$/i, /Release/i, /Approve/i]) {
-      expect(screen.queryByRole("button", { name: word })).toBeNull();
-    }
+    expect(text).not.toMatch(/\bscopes?\b/i);
+    expect(text).not.toMatch(/\bLeg\b/);
   });
 });
 
-describe("the shape", () => {
-  it("draws one 50px Destination Header saying only Delivery", () => {
+describe("the projection rule — an operational pick renders the work list", () => {
+  beforeEach(seedTwoScopes);
+
+  it("a WORK TO DO pick replaces the calendar with the standard DataGrid", () => {
+    ordersState.data!.orders.push(order({ id: "c", so: 1324, customer_name: "tan mei ling" }));
     wrap(<OperationDelivery />);
-    const header = screen.getByTestId("delivery-work-destination-header");
-    expect(header.className).toContain("h-[50px]");
-    expect(
-      within(header).getByTestId("delivery-work-destination-header-module-word").textContent,
-    ).toBe("Delivery");
-  });
-
-  it("draws the 200px local rail and one listing beside it", () => {
-    wrap(<OperationDelivery />);
-    expect(screen.getByTestId("delivery-work-rail").className).toContain("w-[200px]");
-    expect(screen.getByTestId("delivery-work-listing")).toBeTruthy();
-  });
-
-  it("orders the DELIVERY SCHEDULE rail: no confirmed date, Overdue, then real days", () => {
-    ordersState.data = {
-      orders: [
-        order({ id: "a", so: 1322 }),
-        order({
-          id: "b",
-          so: 1323,
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-19" },
-        }),
-        order({
-          id: "c",
-          so: 1324,
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    const rail = screen.getByTestId("delivery-work-rail");
-    const labels = within(rail)
-      .getAllByRole("button")
-      .map((b) => b.textContent ?? "");
-    expect(labels[0]).toContain("No confirmed date");
-    // `Overdue`, never `Date passed` — the rail is a work queue (owner 2026-08-24).
-    expect(labels[1]).toContain("Overdue");
-    /* The near-term window is always present, so the first real day is TODAY
-       rather than the first day that happens to hold work. */
-    expect(labels[2]).toContain("Fri, 21 Aug");
-    expect(labels.some((l) => l.includes("Mon, 24 Aug"))).toBe(true);
-  });
-
-  it("keeps every governed Logistics Partner on the rail at zero", () => {
-    wrap(<OperationDelivery />);
-    for (const name of ["NETS", "AL", "TEOW", "TT", "EU", "SSY", "HOUZS"]) {
-      expect(screen.getByTestId(`delivery-logistics-${name}`)).toBeTruthy();
-    }
-    expect(screen.getByTestId("delivery-logistics-all")).toBeTruthy();
-  });
-
-  it("combines the date and the logistics filter into one question", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          delivery_partners: { id: "p-nets", name: "NETS" },
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
-        }),
-        order({
-          id: "b",
-          so: 1323,
-          delivery_partners: { id: "p-al", name: "AL" },
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-24" },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.getByText("SO-1322")).toBeTruthy();
-    expect(screen.getByText("SO-1323")).toBeTruthy();
-
-    fireEvent.click(screen.getByTestId("delivery-date-2026-08-24"));
-    fireEvent.click(screen.getByTestId("delivery-logistics-NETS"));
-
-    expect(screen.getByText("SO-1322")).toBeTruthy();
-    expect(screen.queryByText("SO-1323")).toBeNull();
-  });
-});
-
-describe("the listing", () => {
-  beforeEach(() => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-  });
-
-  it("shows the approved default columns, in the approved order", () => {
-    wrap(<OperationDelivery />);
-    const headers = screen
-      .getAllByRole("columnheader")
-      .map((h) => h.textContent?.trim() ?? "")
-      .filter(Boolean);
-    /* The owner's corrected order (2026-08-24): the PLACE facts lead, then the
-       two dates kept apart, then who carries it. */
-    expect(headers).toEqual([
-      "SO / Ref",
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    for (const label of [
+      "SO No",
       "Customer",
-      "Delivery Location",
-      "Building",
       "Requested Delivery Date",
+      "Delivery Location",
+      "State",
+      "Logistics Partner",
       "Confirmed Delivery",
       "Confirmed Time",
-      "Logistics Partner",
       "Goods",
       "DO No",
       "Delivery Status",
-    ]);
-    // A register finds documents; it never names an owner or an action.
-    expect(headers).not.toContain("Owner");
-    expect(headers).not.toContain("Next Action");
-  });
-
-  it("⭐ Delivery Status says where the WORK is, never `Created` and never the DO absence", () => {
-    /* OWNER CORRECTION 2026-08-24, and it OVERWRITES the earlier twinning.
-       `DO No` answers *which document* and `Delivery Status` answers *where is
-       the work* — two questions, so two answers. The document's own word
-       `Created` belongs to the Delivery Orders Register and may not appear. */
-    wrap(<OperationDelivery />);
-    expect(screen.getAllByText("No delivery order yet")).toHaveLength(1);
-    expect(screen.getByText("Waiting for customer date")).toBeInTheDocument();
-    expect(screen.queryByText("Created")).toBeNull();
-  });
-
-  it("reads `Delivery confirmed` once a day is agreed, with no document yet", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          ops_order_control: { booking_stage: "confirmed", confirmed_date: "2026-08-28" },
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.getByText("Delivery confirmed")).toBeInTheDocument();
-  });
-
-  it("keeps the two Requested Delivery Date absences apart", () => {
-    ordersState.data = {
-      orders: [
-        order({ id: "a", so: 1322, delivery_date: null, delivery_date_tbd: false }),
-        order({ id: "b", so: 1323, delivery_date: null, delivery_date_tbd: true }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    // Nobody has asked this customer …
-    expect(screen.getByText("No delivery date")).toBeTruthy();
-    // … and this one HAS been asked and answered "not yet". Different facts,
-    // and both words are the portal's own, not this page's.
-    expect(screen.getByText("To be confirmed")).toBeTruthy();
-  });
-
-  it("prints the DO number as a door once the system has issued one", () => {
-    ordersState.data = {
-      orders: [order({ id: "a", so: 1322, do_number: "DO-210826-0001" })],
-    };
-    docsState.data = {
-      deliveryOrders: [
-        {
-          id: "do-1",
-          do_number: "DO-210826-0001",
-          issued_at: "2026-08-20T00:00:00Z",
-          trip_groups: null,
-          delivery_date: "2026-08-26",
-          time_slot: "12pm–3pm",
-          logistics_partner: "NETS",
-          voided_at: null,
-          void_reason: null,
-          orders: { id: "a", so: 1322, customer_name: "kong chai yin" },
-        },
-      ],
-      attempts: [],
-      handoverEvents: [],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.getByRole("button", { name: "DO-210826-0001" })).toBeTruthy();
-    /* The document's own confirmed day and slot, not the SO's promise. The
-       day is asserted INSIDE the listing: the rail carries the same date as
-       its own bucket, and a bare text match would pass on the rail alone. */
-    const listing = screen.getByTestId("delivery-work-listing");
-    expect(within(listing).getByText("Wed, 26 Aug")).toBeTruthy();
-    expect(within(listing).getByText("12pm–3pm")).toBeTruthy();
-    /* ⭐ The OPERATION's word, not the document's. A DO exists and nothing
-       physical has been recorded against it, so the job is with the Warehouse —
-       which is what the operator needs to read. `Created` describes the paper
-       and stays in the Delivery Orders Register (owner ruling 2026-08-24). */
-    expect(within(listing).getByText("Waiting for warehouse")).toBeTruthy();
-    expect(within(listing).queryByText("Created")).toBeNull();
-  });
-
-  it("counts SCOPES in the footer, legs included", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          delivery_stops: [
-            {
-              leg: 1,
-              partner_id: "p-teow",
-              partner_name: "TEOW",
-              from_loc: "Klang WH",
-              to_loc: "JB transit",
-              status: "pending",
-            },
-            {
-              leg: 2,
-              partner_id: "p-ssy",
-              partner_name: "SSY",
-              from_loc: "JB transit",
-              to_loc: "Singapore customer",
-              status: "pending",
-            },
-          ],
-        }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.getByText("2 delivery scopes")).toBeTruthy();
-    expect(screen.getByText(/Leg 1 · Klang WH → JB transit/)).toBeTruthy();
-    expect(screen.getByText(/Leg 2 · JB transit → Singapore customer/)).toBeTruthy();
-  });
-});
-
-describe("▸ has exactly one job", () => {
-  it("announces its state and opens THIS scope's goods and physical facts", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    expansionState.data = {
-      defaultDeliverTo: null,
-      place: [{ unitCode: "CAR-000123", siteName: "Carres Klang", holderName: null }],
-      lines: [
-        {
-          lineId: "l-1",
-          sku: "mattress:M1401F-K",
-          unitIds: ["CAR-000123"],
-          deliverTo: [{ name: "Carres Klang", qty: 1 }],
-        },
-      ],
-    };
-    wrap(<OperationDelivery />);
-
-    const chevron = screen.getByRole("button", { name: "Expand row" });
-    expect(chevron.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(chevron);
-    expect(
-      screen.getByRole("button", { name: "Collapse row" }).getAttribute("aria-expanded"),
-    ).toBe("true");
-
-    const box = screen.getByTestId("delivery-scope-expansion");
-    expect(within(box).getByTestId("goods-mini-table")).toBeTruthy();
-    expect(within(box).getByText("CAR-000123")).toBeTruthy();
-
-    const facts = within(box).getByTestId("delivery-scope-facts");
-    expect(facts.textContent).toContain("Where");
-    expect(facts.textContent).toContain("Carres Klang");
-    expect(facts.textContent).toContain("Who has it");
-    expect(facts.textContent).toContain("Stock ETA");
-
-    // No second Delivery form hides inside the disclosure.
-    expect(within(box).queryByRole("textbox")).toBeNull();
-    expect(within(box).queryByRole("combobox")).toBeNull();
-    expect(within(box).queryByRole("button", { name: /save/i })).toBeNull();
-  });
-
-  it("opens on the keyboard, and two expansions carry their OWN goods", () => {
-    ordersState.data = {
-      orders: [
-        order({
-          id: "a",
-          so: 1322,
-          order_lines: [{ id: "l-a", sku: "mattress:M-AAA", qty: 1, label: "Serena · King" }],
-        }),
-        order({
-          id: "b",
-          so: 1323,
-          order_lines: [{ id: "l-b", sku: "sofa:S-BBB", qty: 1, label: "Rialto · 3 seater" }],
-        }),
-      ],
-    };
-    expansionByOrder = {
-      a: {
-        defaultDeliverTo: null,
-        place: [{ unitCode: "UNIT-AAA", siteName: "Carres Klang", holderName: null }],
-        lines: [{ lineId: "l-a", sku: "mattress:M-AAA", unitIds: ["UNIT-AAA"], deliverTo: [] }],
-      },
-      b: {
-        defaultDeliverTo: null,
-        place: [{ unitCode: "UNIT-BBB", siteName: "NETS Warehouse", holderName: null }],
-        lines: [{ lineId: "l-b", sku: "sofa:S-BBB", unitIds: ["UNIT-BBB"], deliverTo: [] }],
-      },
-    };
-    wrap(<OperationDelivery />);
-
-    /* The chevron is a real button, so the keyboard reaches it and Enter opens
-       it — no key handler of this page's own. */
-    const [first, second] = screen.getAllByRole("button", { name: "Expand row" });
-    first!.focus();
-    expect(document.activeElement).toBe(first);
-    fireEvent.keyDown(first!, { key: "Enter", code: "Enter" });
-    fireEvent.click(first!);
-    fireEvent.click(second!);
-
-    const boxes = screen.getAllByTestId("delivery-scope-expansion");
-    expect(boxes).toHaveLength(2);
-    // Two mini-tables, each carrying only its own scope's Unit and item.
-    expect(screen.getAllByTestId("goods-mini-table")).toHaveLength(2);
-    expect(within(boxes[0]!).getByText("UNIT-AAA")).toBeTruthy();
-    expect(within(boxes[0]!).queryByText("UNIT-BBB")).toBeNull();
-    expect(within(boxes[1]!).getByText("UNIT-BBB")).toBeTruthy();
-    expect(within(boxes[1]!).queryByText("UNIT-AAA")).toBeNull();
-  });
-
-  it("draws the Loan block only when a loan is actually out", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    expect(screen.queryByTestId("delivery-scope-loan")).toBeNull();
-  });
-
-  it("names the loaned Unit, not its database key", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    loansState.data = {
-      loans: [
-        {
-          id: "loan-1",
-          order_id: "a",
-          source: "warehouse",
-          item_id: "11111111-1111-1111-1111-111111111111",
-          item_unit_code: "CAR-000999",
-          item_sku: "sofa:SOF-2",
-          status: "on_loan",
-          loaned_at: "2026-08-10T00:00:00Z",
-          borrowed_label: null,
-          supplier_name: null,
-        },
-      ],
-    };
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    const loan = screen.getByTestId("delivery-scope-loan");
-    expect(within(loan).getByText("CAR-000999")).toBeTruthy();
-    expect(within(loan).getByText("Carres Warehouse")).toBeTruthy();
-    expect(loan.textContent).not.toContain("11111111-1111");
-  });
-});
-
-/**
- * ⭐ THE INTERACTION CONTRACT — owner correction 2026-08-24.
- *
- * The production defect this whole card exists for: `onRowDoubleClick` was
- * wired to the SALES ORDER, so double-clicking a delivery scope threw a
- * logistics operator into a commercial document they must not edit.
- *
- * ```
- * Click SO No          → open Sales Order
- * Click DO No          → open Delivery Order
- * Click ▸              → expand, read-only
- * Double-click row     → open Edit Delivery
- * Select one           → Assign logistics + Edit Delivery
- * Select many          → Assign logistics only
- * ```
- */
-describe("the interaction contract", () => {
-  beforeEach(() => {
-    ordersState.data = {
-      orders: [
-        order({ id: "a", so: 1322, do_number: "DO-180826-3035" }),
-        order({ id: "b", so: 1323 }),
-      ],
-    };
-    docsState.data = {
-      deliveryOrders: [
-        {
-          id: "do-1",
-          do_number: "DO-180826-3035",
-          issued_at: "2026-08-18T00:00:00Z",
-          trip_groups: null,
-          delivery_date: "2026-08-26",
-          time_slot: "12pm–3pm",
-          logistics_partner: "NETS",
-          voided_at: null,
-          void_reason: null,
-          orders: { id: "a", so: 1322, customer_name: "kong chai yin" },
-        } as unknown as DeliveryOrderRow,
-      ],
-      attempts: [],
-      handoverEvents: [],
-    };
-  });
-
-  it("⭐ DOUBLE-CLICKING A ROW OPENS EDIT DELIVERY, NEVER THE SALES ORDER", () => {
-    wrap(<OperationDelivery />);
-    const cell = screen.getByText("SO-1323").closest("tr")!;
-    fireEvent.doubleClick(cell);
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/delivery/edit/b");
-    // The exact regression, asserted as an absence.
-    expect(navigateSpy).not.toHaveBeenCalledWith("/operation/orders/so/b");
-  });
-
-  it("SO No still opens the Sales Order — that door is unchanged", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByText("SO-1323"));
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/b");
-  });
-
-  it("DO No still opens the Delivery Order", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getByText("DO-180826-3035"));
-    expect(navigateSpy).toHaveBeenCalledWith("/operation/delivery-orders/DO-180826-3035");
-  });
-
-  it("⭐ ONE selected row offers BOTH actions", () => {
-    wrap(<OperationDelivery />);
-    const boxes = screen.getAllByRole("checkbox");
-    fireEvent.click(boxes[1]!);
-    const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("1 delivery scope selected")).toBeInTheDocument();
-    expect(within(bar).getByText("Assign logistics")).toBeInTheDocument();
-    expect(within(bar).getByText("Edit Delivery")).toBeInTheDocument();
-  });
-
-  it("⭐ MANY selected rows hide Edit Delivery — it opens one arrangement", () => {
-    wrap(<OperationDelivery />);
-    const boxes = screen.getAllByRole("checkbox");
-    fireEvent.click(boxes[1]!);
-    fireEvent.click(boxes[2]!);
-    const bar = screen.getByTestId("selection-bar");
-    expect(within(bar).getByText("2 delivery scopes selected")).toBeInTheDocument();
-    expect(within(bar).getByText("Assign logistics")).toBeInTheDocument();
-    expect(within(bar).queryByText("Edit Delivery")).toBeNull();
-  });
-
-  it("the selection bar REPLACES the toolbar rather than adding a second row", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByRole("checkbox")[1]!);
-    expect(screen.getByTestId("selection-bar")).toBeInTheDocument();
-    // The normal toolbar's search box is gone while a selection stands.
-    expect(screen.queryByPlaceholderText(/Search delivery scopes/i)).toBeNull();
-  });
-
-  it("`Edit Delivery` from the selection bar opens that one scope", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByRole("checkbox")[1]!);
-    fireEvent.click(within(screen.getByTestId("selection-bar")).getByText("Edit Delivery"));
-    expect(navigateSpy).toHaveBeenCalledWith(expect.stringContaining("/operation/delivery/edit/"));
-  });
-
-  it("`Assign logistics` opens the dialog, and the dialog issues nothing", () => {
-    wrap(<OperationDelivery />);
-    fireEvent.click(screen.getAllByRole("checkbox")[1]!);
-    fireEvent.click(within(screen.getByTestId("selection-bar")).getByText("Assign logistics"));
-    const dialog = screen.getByTestId("assign-logistics-dialog");
-    expect(dialog).toBeInTheDocument();
-    for (const word of [/^Issue$/i, /Release/i, /Approve/i, /New DO/i]) {
-      expect(within(dialog).queryByRole("button", { name: word })).toBeNull();
+    ]) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
-  });
-});
-
-describe("the disclosure is chrome, not an alarm", () => {
-  beforeEach(() => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-  });
-
-  it("says what OPENS on hover, not the mechanic", () => {
-    wrap(<OperationDelivery />);
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(0);
     expect(screen.getAllByTitle("Show delivery items").length).toBeGreaterThan(0);
   });
 
-  it("announces its state, and flips it", () => {
+  it("`All delivery work` lists every open row — dated, DO-less and dateless — and its footer counts deliveries", () => {
+    ordersState.data!.orders.push(order({ id: "c", so: 1324, customer_name: "tan mei ling" }));
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    for (const so of ["SO-1322", "SO-1323", "SO-1324"]) expect(screen.getByText(so)).toBeTruthy();
+    expect(screen.getByText("3 deliveries")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\bscopes?\b/i);
+  });
+
+  it("a STATE pick also renders the work list — the card wall is calendar-only", () => {
     wrap(<OperationDelivery />);
-    const chevron = screen.getAllByTitle("Show delivery items")[0]!;
-    expect(chevron).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(chevron);
-    expect(screen.getAllByTitle("Show delivery items")[0]!).toHaveAttribute(
-      "aria-expanded",
-      "true",
+    fireEvent.click(screen.getByTestId("delivery-monitor-region-Selangor"));
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
+  });
+
+  it("a LOGISTICS PARTNER pick renders the work list narrowed to that partner", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByTestId("delivery-monitor-logistics-p-nets"));
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByText("SO-1323")).toBeTruthy();
+    expect(screen.queryByText("SO-1322")).toBeNull();
+  });
+
+  it("a DELIVERY STATUS pick is a filter over recorded progress — Waiting for warehouse lists the arranged-but-not-ready rows", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByTestId("delivery-monitor-status-waiting_warehouse"));
+    expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_warehouse");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    /* SO-1322 holds a live DO with no handover yet — Waiting for warehouse. */
+    expect(screen.getByText("SO-1322")).toBeTruthy();
+    expect(screen.queryByText("SO-1323")).toBeNull();
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Waiting for warehouse");
+  });
+
+  it("combined active filters print above the list, and Clear filters returns to the Week calendar", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
+    const summary = screen.getByTestId("delivery-monitor-filter-summary");
+    expect(summary.textContent).toContain("No confirmed date · Selangor");
+    fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
+    const probe = screen.getByTestId("location-probe").textContent ?? "";
+    expect(probe).not.toContain("view=");
+    expect(probe).not.toContain("region=");
+    expect(screen.queryByTestId("delivery-monitor-work-list")).toBeNull();
+    expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
+  });
+
+  it("a legacy ?logistics=none URL still narrows and still prints its label", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&logistics=none");
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
+      "No confirmed date · No logistics picked",
+    );
+  });
+});
+
+describe("Upload delivery proof (owner correction 2026-09-07)", () => {
+  beforeEach(() => {
+    seedTwoScopes();
+    ordersState.data!.orders.push(
+      order({ id: "d", so: 1325, do_number: "DO-D", customer_name: "lim ah kow", ops_order_control: { delivery_photos: [] } }),
+      order({
+        id: "e",
+        so: 1326,
+        do_number: "DO-E",
+        customer_name: "ng siew lan",
+        ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }] },
+      }),
+    );
+    docsState.data!.deliveryOrders.push(
+      doc({ id: "do-d", do_number: "DO-D", delivery_date: "2026-09-03" }),
+      doc({ id: "do-e", do_number: "DO-E", delivery_date: "2026-09-03" }),
+    );
+    docsState.data!.attempts.push(
+      { do_number: "DO-D", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
+      { do_number: "DO-E", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" },
     );
   });
 
-  it("⭐ is NOT painted in the danger ink", () => {
-    /* It shipped as a 12px RED triangle in every row's leftmost gutter — the
-       portal's danger colour spent on "there is more here". */
+  it("the queue counts the rows still owed evidence and each row names the EXACT missing action(s)", () => {
     wrap(<OperationDelivery />);
-    const chevron = screen.getAllByTitle("Show delivery items")[0]!;
-    expect(chevron.getAttribute("style") ?? "").not.toContain("--c-burnt");
+    expect(screen.getByTestId("delivery-monitor-work-upload_proof").textContent).toContain("2");
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-upload_proof"));
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=upload_proof");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("SO-1325")).toBeTruthy();
+    expect(within(list).getByText("SO-1326")).toBeTruthy();
+    expect(within(list).queryByText("SO-1322")).toBeNull();
+    const lines = within(list).getAllByTestId("delivery-monitor-missing-proof").map((el) => el.textContent);
+    expect(lines).toContain("Upload delivery photo · Upload signed Delivery Order");
+    expect(lines).toContain("Upload signed Delivery Order");
+    /* The result word never changes. */
+    expect(within(list).getAllByText("Delivered").length).toBe(2);
+    expect(document.body.textContent).not.toContain("Proof Required");
+  });
+
+  it("the retired ?view=delivered_proof_required and ?checking= spellings open this queue", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=delivered_proof_required");
+    expect(screen.getByTestId("delivery-monitor-work-upload_proof").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
   });
 });
 
-describe("the rail says Overdue, and shows the days ahead", () => {
-  it("⭐ names the bucket `Overdue`, never `Date passed`", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    wrap(<OperationDelivery />);
-    const rail = screen.getByTestId("delivery-work-rail");
-    expect(within(rail).getByText("Overdue")).toBeInTheDocument();
-    expect(within(rail).queryByText("Date passed")).toBeNull();
+describe("bulk logistics assignment on the work list", () => {
+  beforeEach(seedUnassigned);
+
+  it("Monitor → No logistics picked → header select-all → `3 selected · Clear · Assign logistics`", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[0]!);
+    expect(screen.getByText("3 selected")).toBeTruthy();
+    expect(screen.getByText("Clear")).toBeTruthy();
+    /* The SELECTION toolbar's button — the row's own Actions cell offers the
+       same governed word one row at a time, so this pick is addressed by the
+       toolbar's testid rather than by a name three rows also carry. */
+    fireEvent.click(screen.getByTestId("selection-action-assign-logistics"));
+    const dialog = screen.getByTestId("assign-logistics-dialog");
+    expect(within(dialog).getByText("3 deliveries")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/\bscopes?\b/i);
   });
 
-  it("heads the group `DELIVERY SCHEDULE`", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    wrap(<OperationDelivery />);
-    expect(within(screen.getByTestId("delivery-work-rail")).getByText("DELIVERY SCHEDULE"))
-      .toBeInTheDocument();
+  it("`No logistics picked` holds every eligible row across all dates — no DO and no confirmed date included", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
+    for (const so of ["SO-1401", "SO-1402", "SO-1403"]) expect(screen.getByText(so)).toBeTruthy();
+    expect(screen.getAllByText("No delivery order yet").length).toBe(3);
   });
 
-  it("carries the near-term operating days even at zero, and no relative word", () => {
-    ordersState.data = { orders: [order({ id: "a", so: 1322 })] };
-    wrap(<OperationDelivery />);
-    const rail = screen.getByTestId("delivery-work-rail");
-    // TODAY is Fri 21 Aug 2026 — the window runs to Thu 27 Aug.
-    expect(within(rail).getByText("Fri, 21 Aug")).toBeInTheDocument();
-    expect(within(rail).getByText("Thu, 27 Aug")).toBeInTheDocument();
-    expect(within(rail).queryByText("Today")).toBeNull();
-    expect(within(rail).queryByText("Tomorrow")).toBeNull();
+  it("one unassigned row offers Assign logistics AND Edit Delivery; many rows never offer Edit Delivery", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
+    const rowBoxes = screen.getAllByRole("checkbox").slice(1);
+    fireEvent.click(rowBoxes[0]!);
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
+    expect(screen.getByTestId("selection-action-edit-delivery")).toBeTruthy();
+    fireEvent.click(rowBoxes[1]!);
+    expect(screen.queryByTestId("selection-action-edit-delivery")).toBeNull();
+    expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
+  });
+
+  it("a selected row that already has a partner turns the act into the governed Change logistics — never a bulk replacement", () => {
+    ordersState.data = { orders: [order({ id: "u1", so: 1401 }), order({ id: "u2", so: 1402 })] };
+    arrangementsState.data = {
+      arrangements: [arrangement({ order_id: "u1", partner_id: "p-nets", partner_name: "NETS" })],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const rowBoxes = screen.getAllByRole("checkbox").slice(1);
+    fireEvent.click(rowBoxes[0]!);
+    expect(screen.getByTestId("selection-action-change-logistics")).toBeTruthy();
+    expect(screen.queryByTestId("selection-action-assign-logistics")).toBeNull();
+    fireEvent.click(rowBoxes[1]!);
+    expect(screen.queryByTestId("selection-action-change-logistics")).toBeNull();
+    expect(screen.queryByTestId("selection-action-assign-logistics")).toBeNull();
+  });
+
+  it("changing the filter clears the selection", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
+    fireEvent.click(screen.getAllByRole("checkbox")[0]!);
+    expect(screen.getByText("3 selected")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
+    expect(screen.queryByText(/\d selected/)).toBeNull();
   });
 });
 
-describe("the entry rule keeps Sales work off this page", () => {
-  it("⭐ leaves out an order with no delivery address rather than printing `Not given`", () => {
+describe("the URL is the state", () => {
+  beforeEach(seedTwoScopes);
+
+  it("next REPLACES the displayed work week and writes the date to the URL", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("button", { name: "Next days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-11");
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    expect(screen.getByText("No deliveries are scheduled from Mon, 7 Sep to Sat, 12 Sep.")).toBeTruthy();
+  });
+
+  it("a shared URL restores the same week — the retired ?start= and ?view=calendar spellings included", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&start=2026-08-27&view=calendar");
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    expect(screen.getByText("No deliveries are scheduled from Mon, 24 Aug to Sat, 29 Aug.")).toBeTruthy();
+  });
+
+  it("a rail pick and the search ride the URL", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
+    expect(screen.getByTestId("location-probe").textContent).toContain("view=no_confirmed_date");
+  });
+
+  it("the search rides the URL from the calendar toolbar", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.change(screen.getByPlaceholderText("Search deliveries…"), { target: { value: "aida" } });
+    expect(screen.getByTestId("location-probe").textContent).toContain("q=aida");
+  });
+
+  it("the retired ?schedule= and ?checking= spellings still resolve", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&schedule=no_confirmed_date");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-work-no_confirmed_date").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("a retired ?view=waiting_warehouse (once a queue) resolves to the DELIVERY STATUS filter", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=waiting_warehouse");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-status-waiting_warehouse").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("SO-1322")).toBeTruthy();
+    expect(screen.queryByText("SO-1323")).toBeNull();
+  });
+
+  it("a restored filter URL narrows without a click", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&logistics=p-nets");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByText("SO-1323")).toBeTruthy();
+    expect(screen.queryByText("SO-1322")).toBeNull();
+  });
+
+  it("a carried-over ?q= never narrows the WORK LIST invisibly — the grid's own search is the one search there", () => {
+    ordersState.data!.orders.push(order({ id: "c", so: 1324, customer_name: "tan mei ling" }));
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&q=aida");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.getByText("SO-1324")).toBeTruthy();
+  });
+});
+
+describe("a Journey row on the work list", () => {
+  it("names its route, never the word Leg; its door carries the leg in the URL only", () => {
     ordersState.data = {
       orders: [
-        order({ id: "a", so: 1322 }),
         order({
-          id: "b",
-          so: 1323,
-          customer_address: null,
-          customer_address_city: null,
-          customer_address_state: null,
+          id: "j",
+          so: 1350,
+          customer_name: "tan ah seng",
+          delivery_stops: [
+            { leg: 1, partner_id: "3d0a2b6e-0000-4000-8000-000000000001", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: null, status: "pending" },
+            { leg: 2, partner_id: null, partner_name: null, from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: null, status: "pending" },
+          ],
+        } as Partial<operationOrderListRow> & { id: string; so: number }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("Klang WH → JB transit")).toBeTruthy();
+    expect(within(list).getByText("2 deliveries")).toBeTruthy();
+    expect(list.textContent).not.toMatch(/\bLeg\b/);
+    expect(list.textContent).not.toMatch(/\bscopes?\b/i);
+  });
+});
+
+describe("mobile is only ever the Day list", () => {
+  beforeEach(() => {
+    viewportWidth = 375;
+    seedTwoScopes();
+  });
+
+  it("shows one selected operating day — never the Week or Month grid, whatever the URL asks", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=month");
+    expect(screen.getByTestId("delivery-monitor-daily")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-card-a")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    expect(screen.queryByTestId("delivery-monitor-month-view")).toBeNull();
+    /* No Day · Week · Month control on a phone. */
+    expect(screen.queryByTestId("delivery-monitor-calendar-view")).toBeNull();
+  });
+
+  it("the date heading is sticky and each card row is at least 44px tall", () => {
+    wrap(<OperationDelivery />);
+    const daily = screen.getByTestId("delivery-monitor-daily");
+    expect(within(daily).getByText("Fri, 4 Sep").className).toContain("sticky");
+    expect(screen.getByTestId("delivery-monitor-card-a").className).toContain("min-h-11");
+  });
+
+  it("previous/next moves one operating day and skips Sunday", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&day=2026-09-05");
+    fireEvent.click(screen.getByRole("button", { name: "Next days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-07");
+    fireEvent.click(screen.getByRole("button", { name: "Previous days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-05");
+  });
+
+  it("the full month opens through the kit's standard date control", () => {
+    wrap(<OperationDelivery />);
+    expect(within(screen.getByTestId("delivery-monitor-date-control")).getByRole("button")).toBeTruthy();
+  });
+
+  it("a Sunday deep link lands on the next operating day", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&day=2026-09-06");
+    expect(within(screen.getByTestId("delivery-monitor-daily")).getByText("Mon, 7 Sep")).toBeTruthy();
+  });
+
+  it("uses the identical card link arithmetic as desktop", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-card-a").closest("a")?.getAttribute("href")).toBe(
+      "/operation/delivery-orders/do-row-1",
+    );
+  });
+
+  it("the rail is a drawer: absent until Show filters, gone again on Hide filters", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.queryByTestId("delivery-monitor-rail")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show filters" }));
+    expect(screen.getByTestId("delivery-monitor-rail")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide filters" }));
+    expect(screen.queryByTestId("delivery-monitor-rail")).toBeNull();
+  });
+
+  it("a work-list pick stays a selectable list on the phone", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
+    expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
+    expect(screen.queryByTestId("delivery-monitor-daily")).toBeNull();
+  });
+});
+
+describe("tablet Week is a fixed three-day window", () => {
+  beforeEach(() => {
+    viewportWidth = 1024;
+    seedTwoScopes();
+  });
+
+  it("shows the aligned half-week containing the date — never a horizontal scroll", () => {
+    wrap(<OperationDelivery />);
+    for (const day of ["2026-09-03", "2026-09-04", "2026-09-05"]) {
+      expect(screen.getByTestId(`delivery-monitor-day-${day}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("delivery-monitor-day-2026-08-31")).toBeNull();
+    expect(screen.getByText(/Thu, 3 Sep\s*–\s*Sat, 5 Sep/)).toBeTruthy();
+  });
+
+  it("previous/next replaces the visible three-day window", () => {
+    wrap(<OperationDelivery />);
+    fireEvent.click(screen.getByRole("button", { name: "Previous days" }));
+    expect(screen.getByTestId("location-probe").textContent).toContain("date=2026-09-01");
+    expect(screen.getByText("No deliveries are scheduled from Mon, 31 Aug to Wed, 2 Sep.")).toBeTruthy();
+  });
+
+  it("Day and Month still answer on a tablet, and the rail month calendar stays available", () => {
+    wrap(<OperationDelivery />);
+    expect(screen.getByTestId("delivery-monitor-month-calendar")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Month" }));
+    expect(screen.getByTestId("delivery-monitor-month-view")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Day" }));
+    expect(screen.getByTestId("delivery-monitor-daily")).toBeTruthy();
+  });
+});
+
+/* ── THE CHASE: what the customer asked for, and who must answer ───────── */
+
+describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
+  /** Four customers, three different requested days, seeded out of order. */
+  function seedChase() {
+    ordersState.data = {
+      orders: [
+        order({ id: "late", so: 1503, customer_name: "tan mei ling", delivery_date: "2026-09-30" }),
+        order({ id: "none", so: 1504, customer_name: "wong ah kaw", delivery_date: null }),
+        order({ id: "early", so: 1501, customer_name: "aida rahim", delivery_date: "2026-09-10" }),
+        order({ id: "mid", so: 1502, delivery_date: "2026-09-20" }),
+      ],
+    };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "early", partner_id: "p-nets", partner_name: "NETS" }),
+      ],
+    };
+  }
+
+  const headers = () =>
+    screen.getAllByRole("columnheader").map((h) => (h.textContent ?? "").trim());
+
+  it("shows `Requested Delivery Date` by default — no Columns chooser needed", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    expect(headers().some((h) => h.includes("Requested Delivery Date"))).toBe(true);
+  });
+
+  it("shows `Confirmed Delivery` as its OWN column — one date is never two names", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const found = headers();
+    expect(found.some((h) => h.includes("Confirmed Delivery"))).toBe(true);
+    expect(found.some((h) => h.includes("Confirmed Time"))).toBe(true);
+    /* The customer's date and the operational answer stay separate words. */
+    for (const retired of ["Customer Delivery", "Promised Delivery", "Deliver By"]) {
+      expect(found.some((h) => h.includes(retired))).toBe(false);
+    }
+  });
+
+  it("prints the ruled default column order, `Actions` last of the visible sheet", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const ruled = [
+      "SO No",
+      "Customer",
+      "State",
+      "Requested Delivery Date",
+      "Logistics Partner",
+      "Confirmed Delivery",
+      "Confirmed Time",
+      "DO No",
+      "Delivery Location",
+      "Goods",
+      "Delivery Status",
+      "Actions",
+    ];
+    const found = headers();
+    const at = (label: string) => found.findIndex((h) => h.includes(label));
+    expect(ruled.every((label) => at(label) >= 0)).toBe(true);
+    expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
+  });
+
+  it("orders the rows by Requested Delivery Date, earliest first, absences last", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const text = screen.getByTestId("delivery-monitor-work-list").textContent ?? "";
+    const seen = ["SO-1501", "SO-1502", "SO-1503", "SO-1504"].map((so) => text.indexOf(so));
+    expect(seen.every((i) => i >= 0)).toBe(true);
+    expect(seen).toEqual([...seen].sort((a, b) => a - b));
+  });
+
+  it("a row with NO Logistics Partner offers `Assign logistics`", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const button = screen.getByTestId("delivery-monitor-action-assign_logistics-mid");
+    expect(button.textContent).toBe("Assign logistics");
+    fireEvent.click(button);
+    const dialog = screen.getByTestId("assign-logistics-dialog");
+    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
+  });
+
+  it("a row WITH a Logistics Partner says `Call {partner} — confirm delivery date`", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    expect(screen.getByText("Call NETS — confirm delivery date")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-action-confirm_date-early").textContent).toBe(
+      "Edit Delivery",
+    );
+    /* No employee and no carrier is ever hard-coded into the sentence. */
+    for (const name of ["Chan", "Tan Ah", "Khor Yee"]) {
+      expect(screen.queryByText(new RegExp(`Call ${name}`))).toBeNull();
+    }
+  });
+
+  it("`Edit Delivery` opens THIS order and carries the queue back with it", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
+    fireEvent.click(screen.getByTestId("delivery-monitor-action-confirm_date-early"));
+    const url = screen.getByTestId("location-probe").textContent ?? "";
+    expect(url).toContain("/operation/delivery/edit/early");
+    expect(url).toContain("view%3Dno_confirmed_date");
+    expect(url).toContain("region%3DSelangor");
+  });
+
+  it("a row whose date IS confirmed leaves the queue and joins the calendar", () => {
+    ordersState.data = { orders: [order({ id: "early", so: 1501, delivery_date: "2026-09-10" })] };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({
+          order_id: "early",
+          partner_id: "p-nets",
+          partner_name: "NETS",
+          confirmed_date: "2026-09-04",
         }),
       ],
     };
-    wrap(<OperationDelivery />);
-    expect(screen.getByText("SO-1322")).toBeInTheDocument();
-    expect(screen.queryByText("SO-1323")).toBeNull();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    expect(screen.queryByText("SO-1501")).toBeNull();
+    /* The queue is empty because the work LEFT it — the workspace still holds
+       the row, so the governed filtered-empty word is the honest one. */
+    expect(screen.getByText(MONITOR_COPY.emptySearch)).toBeTruthy();
+
+    cleanup();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&date=2026-09-04&view=day");
+    const day = screen.getByTestId("delivery-monitor-daily");
+    expect(within(day).getByText("Kong Chai Yin")).toBeTruthy();
   });
 
-  it("leaves out an order whose only line is a service", () => {
-    ordersState.data = {
-      orders: [
-        order({ id: "b", so: 1323, order_lines: [{ id: "l-1", sku: "DELIVERY", qty: 1 }] }),
-      ],
-    };
-    wrap(<OperationDelivery />);
-    expect(screen.queryByText("SO-1323")).toBeNull();
+  it("never prints `scope` or `leg` while the chase is on screen", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    expect(document.body.textContent).not.toMatch(/\bscopes?\b/i);
+    expect(document.body.textContent).not.toMatch(/\bleg\b/i);
+  });
+
+  it("the act is also one right-click away — `Actions` is the twelfth column and a sheet scrolls", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const count = (name: string) => screen.queryAllByRole("button", { name }).length;
+    const assignsOnSheet = count("Assign logistics");
+    const editsOnSheet = count("Edit Delivery");
+
+    /* A row nobody carries: the menu adds BOTH doors. */
+    fireEvent.contextMenu(screen.getByText("SO-1502"));
+    expect(count("Assign logistics")).toBe(assignsOnSheet + 1);
+    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+
+    /* A row a partner already carries: the editor only — a partner is never
+       silently swapped from a context menu (`Change logistics` is the
+       governed act, and it asks for its reason). */
+    fireEvent.contextMenu(screen.getByText("SO-1501"));
+    expect(count("Assign logistics")).toBe(assignsOnSheet);
+    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+  });
+
+  it("keeps selection, the ▸ expansion and the per-column filters", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    /* Header select-all + one checkbox per row. */
+    expect(screen.getAllByRole("checkbox").length).toBe(5);
+    fireEvent.click(screen.getAllByRole("checkbox")[0]!);
+    expect(screen.getByText("4 selected")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("delivery-monitor-clear-filters"));
+    expect(screen.getByTestId("delivery-monitor-calendar-view")).toBeTruthy();
   });
 });
 
-describe("empty, loading and error all speak inside the listing", () => {
-  it("says there are no delivery scopes rather than showing a blank sheet", () => {
-    wrap(<OperationDelivery />);
-    expect(
-      within(screen.getByTestId("delivery-work-listing")).getByText("No delivery scopes"),
-    ).toBeTruthy();
+describe("the phone's chase list", () => {
+  it("is a readable list — the requested date, the partner and the act, with no Columns chooser", () => {
+    viewportWidth = 390;
+    ordersState.data = {
+      orders: [order({ id: "early", so: 1501, delivery_date: "2026-09-10" })],
+    };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "early", partner_id: "p-nets", partner_name: "NETS" }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    const card = screen.getByTestId("delivery-monitor-work-card-early");
+    expect(within(card).getByText("Requested Delivery Date")).toBeTruthy();
+    expect(within(card).getByText("Thu, 10 Sep")).toBeTruthy();
+    expect(within(card).getByText("Logistics Partner")).toBeTruthy();
+    expect(within(card).getByText("NETS")).toBeTruthy();
+    expect(within(card).getByText("Call NETS — confirm delivery date")).toBeTruthy();
+    expect(within(card).getByText("Edit Delivery")).toBeTruthy();
+    /* Not the desktop sheet squeezed: no grid, no Columns control. */
+    expect(screen.queryByRole("columnheader")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
   });
 
-  it("puts the failure and its retry inside the listing area", () => {
-    ordersState.isError = true;
-    ordersState.error = new Error("boom");
-    wrap(<OperationDelivery />);
-    const listing = screen.getByTestId("delivery-work-listing");
-    expect(within(listing).getByText("Delivery could not be loaded")).toBeTruthy();
-    fireEvent.click(within(listing).getByRole("button", { name: "Try again" }));
-    expect(ordersState.refetch).toHaveBeenCalled();
-    // The rail survives the failure — it is the page, not the result.
-    expect(screen.getByTestId("delivery-work-rail")).toBeTruthy();
+  it("carries its OWN search box — a carried-over ?q= never narrows it invisibly", () => {
+    viewportWidth = 390;
+    ordersState.data = {
+      orders: [
+        order({ id: "early", so: 1501, customer_name: "aida rahim", delivery_date: "2026-09-10" }),
+        order({ id: "mid", so: 1502, customer_name: "tan mei ling", delivery_date: "2026-09-20" }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&q=aida");
+    /* The URL search is ignored on a work list — both rows are here. */
+    expect(screen.getByTestId("delivery-monitor-work-card-early")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-work-card-mid")).toBeTruthy();
+    expect(screen.getByTestId("delivery-monitor-work-list-footer").textContent).toBe(
+      "2 deliveries",
+    );
+    /* Typing in the visible box does narrow it, and says so. */
+    fireEvent.change(screen.getByTestId("delivery-monitor-work-list-search"), {
+      target: { value: "aida" },
+    });
+    expect(screen.queryByTestId("delivery-monitor-work-card-mid")).toBeNull();
+    expect(screen.getByTestId("delivery-monitor-work-list-footer").textContent).toBe(
+      "1 of 2 deliveries",
+    );
+  });
+
+  it("keeps the filter drawer reachable and offers `Assign logistics` one delivery at a time", () => {
+    viewportWidth = 390;
+    ordersState.data = { orders: [order({ id: "mid", so: 1502, delivery_date: "2026-09-20" })] };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    expect(screen.getByTestId("delivery-monitor-show-filters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("delivery-monitor-action-assign_logistics-mid"));
+    const dialog = screen.getByTestId("assign-logistics-dialog");
+    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
   });
 });

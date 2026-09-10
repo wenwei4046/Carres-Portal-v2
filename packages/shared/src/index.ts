@@ -40,7 +40,9 @@ export {
 } from "./sales-order-route";
 
 export {
+  INSTALMENT_MONTHS,
   MAX_DELIVERY_FLOOR,
+  type InstalmentMonths,
   EARLIEST_SELL_GATED_CATEGORIES,
   maxLeadDaysFor,
   // Owner ruling 2026-08-15 — a Sales Order must contain goods.
@@ -90,6 +92,8 @@ export {
   purchasingSetNumberInput,
   purchasingSetPoDaysInput,
   purchasingSetProductionDaysInput,
+  purchasingSetTransitDaysInput,
+  TRANSIT_DAYS_RANGE,
   purchasingSetWorkWeekInput,
   type PurchasingCategory,
   type PurchasingNumberKey,
@@ -107,6 +111,7 @@ export {
   type PurchasingSetNumberInput,
   type PurchasingSetPoDaysInput,
   type PurchasingSetProductionDaysInput,
+  type PurchasingSetTransitDaysInput,
   type PurchasingSetWorkWeekInput,
 } from "./purchasing-settings";
 
@@ -184,6 +189,7 @@ export {
   type UpdateOrderInput,
   type CancelOrderInput,
   type SetOpsAssignedLogisticInput,
+  installmentMonthsField,
 } from "./schemas/orders";
 
 export {
@@ -495,6 +501,12 @@ export {
   receivePoWithDoInput,
   // Slice B (0315) — the Office Receiving Workspace's one write door.
   officeReceiveInput,
+  // 0426 — Amend / Void doors for a posted GRN.
+  receivingAmendInput,
+  receivingVoidInput,
+  // 0425 — Workspace → Staff & Duties.
+  workspaceAssignDutyInput,
+  workspaceCoverDutyInput,
   abandonOrderInput,
   warehousePickInput,
   recheckStockInput,
@@ -977,6 +989,10 @@ export {
   poArrivalGapOf,
   poCurrentActionOf,
   poDateHistoryOf,
+  poSupplierReplyOf,
+  poSupplierDeliveryDateOf,
+  poReplyDateOf,
+  poRecordedReplyOf,
   poOverdueDays,
   poReviseSaveGapOf,
   poRiskRungOf,
@@ -1139,7 +1155,39 @@ export {
   type WarehouseIncomingLine,
   type WarehouseIncomingPo,
   type WarehouseIncomingResponse,
+  // 0426 · the 2026-09-04 owner instruction — stored GRN, Actual Site, unit
+  // outcomes, extra goods, the save-blocker law and the Work feed.
+  receivingDisplayNo,
+  receivingSummaryOf,
+  receivingExtraQty,
+  pendingDeliveryAfterSave,
+  receivingSaveBlocker,
+  receivingWorkItems,
+  RECEIVING_UNIT_OUTCOME_LABEL,
+  RECEIVING_AUTHORITY_LABEL,
+  RECEIVING_WORK_WORDS,
+  // 2026-09-06 owner correction — the Register is the GRN record; the rail
+  // speaks exactly five governed category rows through the shared ladder.
+  RECEIVING_CATEGORY_ROWS,
+  receiptCategoryWords,
+  type ReceivingCategoryRow,
+  type ReceivingUnitOutcome,
+  type ReceivingUnitResult,
+  type ReceivingArrivalEvidence,
+  type ReceivingExtraLine,
+  type ReceivingSummary,
+  type ReceivingWorkSource,
 } from "./warehouse-receipt";
+// 2026-09-06 owner correction (Receiving page) — server-side GRN Register
+// pagination/facets and the rail Calendar's expected-arrival markers, one
+// arithmetic for the Worker and the page's tests alike.
+export {
+  buildGrnRegisterView,
+  expectedArrivalCounts,
+  type GrnRegisterFactRow,
+  type GrnRegisterSelection,
+  type GrnRegisterView,
+} from "./receiving-register";
 export {
   warehouseSubmitReceiptInput,
   warehouseReceiptReturnInput,
@@ -1166,6 +1214,25 @@ export {
   type UnitOwnership,
   type SkuAvailability,
 } from "./unit-availability";
+
+// CARD-2026-09-07-purchasing-10 · THE ONE UNIT IDENTITY. Every surface asks
+// THIS file what a row's Unit ID is, so a counted row can never print its
+// technical key as an identity (0442 · 0443 · 0453).
+export {
+  unitIdOf,
+  isExactUnit,
+  displayUnitId,
+  normaliseUnitIdQuery,
+  matchesUnitId,
+  looksLikeUnitId,
+  canonicalUnitIdFrom,
+  UNIT_ID_PATTERN,
+  QUANTITY_KEY_PATTERN,
+  LEGACY_UNIT_ID_PATTERN,
+  NO_UNIT_ID,
+  type IdentityScope,
+  type UnitIdentityRow,
+} from "./unit-identity";
 
 // CARD-2026-08-20-stock-register · THE STOCK REGISTER — the one current listing
 // of controlled Units. Pure: it READS 0366's availability and never re-derives
@@ -1253,12 +1320,23 @@ export {
   type PartnerWarningKey,
 } from "./partner-delivery-rules";
 export {
+  latestWarehouseReadyDate,
+  partnerJourneyCalendar,
+  type JourneyChain,
+  type JourneyChainInput,
+  type JourneyRegionRule,
+  type PartnerJourneyCalendar,
+} from "./partner-journey";
+export {
   partnerDeliveryRulesSchema,
   setPartnerDeliveryRulesInput,
+  journeyRegionRuleSchema,
+  setPartnerJourneyCalendarInput,
   partnerBookingWarningSchema,
   partnerBookingCheckResponseSchema,
   type PartnerDeliveryRulesWire,
   type SetPartnerDeliveryRulesInput,
+  type SetPartnerJourneyCalendarInput,
   type PartnerBookingWarningWire,
   type PartnerBookingCheckResponse,
 } from "./schemas/delivery-partner-rules";
@@ -1297,28 +1375,14 @@ export {
 } from "./delivery-board";
 
 export {
-  monthKeyMYT,
-  grnDutyMonth,
   isPoDayMYT,
   poUrgentBypass,
-  opsPoDutySchema,
-  opsPoDutyResponseSchema,
-  opsPoDutyRosterEntrySchema,
   nextPoDayMYT,
-  type OpsPoDutyRosterEntry,
-  updateOpsPoDutyInput,
-  pickNextDutyHolder,
-  canRaisePo,
-  isPoDutyEditor,
-  type OpsPoDuty,
-  type OpsPoDutyResponse,
-  type UpdateOpsPoDutyInput,
 } from "./schemas/ops-po-duty";
 
 // HR-P2 (0260) — permissions that follow the position, not the person.
-// `isOpsManager` / `isPoDutyEditor` are re-exported above from their original
-// modules so no existing importer had to change; everything genuinely new to
-// duty keys is exported here.
+// Duty keys and their authorization helpers are exported from their one
+// shared authority.
 export {
   DUTY_KEYS,
   isDutyKey,
@@ -1564,6 +1628,8 @@ export {
 // types live in the schemas/catalog export block; the adapters are reached via
 // Adapters.* like fabricTierConfigFromRow.
 export type { SofaCompartment, ModelSofaCompartment } from "./domain";
+/** 0442 — the Catalog-owned stock identity mode of a SKU. */
+export type { StockIdentityMode } from "./domain";
 
 // 0179 — sofa engine Phase 2: sofa combo domain type + the row→domain adapter +
 // the canonical seat-height axis. `sofaComboFromRow` is also reachable via
@@ -1792,6 +1858,11 @@ export {
   lineKind,
   lineSortRank,
   defaultLineLocation,
+  // The governed category-word ladder (2026-09-06) — extracted from the SO
+  // register footer so Receiving and Sales Orders speak one rule.
+  GOODS_CATEGORY_WORDS,
+  goodsCategoryWordOf,
+  type GoodsCategoryWord,
   type CoreCat,
   type LineClass,
   type ItemKind,
@@ -1799,6 +1870,7 @@ export {
 export {
   lineReadiness,
   readinessCounts,
+  unitsShortWords,
   type LineReadiness,
   type LineReadinessInput,
 } from "./line-readiness";
@@ -1999,6 +2071,14 @@ export {
   CHANGE_LOGISTICS_REASONS,
   CHANGE_LOGISTICS_REASON_KEYS,
   DEFAULT_KV_LOGISTICS,
+  CANNOT_DELIVER_REASONS,
+  CANNOT_DELIVER_REASON_KEYS,
+  partnerSaveArrangementInput,
+  partnerCannotDeliverInput,
+  type CannotDeliverReasonKey,
+  type PartnerSaveArrangementInput,
+  type PartnerCannotDeliverInput,
+  type PartnerDeliveryCard,
   type DeliveryScopeRef,
   type AssignLogisticsInput,
   type SaveDeliveryArrangementInput,
@@ -2009,12 +2089,22 @@ export {
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {
   DELIVERY_HANDOVER_KINDS,
+  HANDOVER_EVIDENCE_MAX_FILES,
+  HANDOVER_EVIDENCE_MIMES,
+  HANDOVER_EVIDENCE_VIDEO_MAX_BYTES,
+  HANDOVER_EVIDENCE_VIDEO_MIMES,
+  handoverEvidenceFileSchema,
   handoverGoodsLineSchema,
   recordHandoverInput,
+  recordOutboundPrepInput,
   signHandoverProofUploadInput,
+  WAREHOUSE_PREP_FACTS,
+  type HandoverEvidenceFile,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type RecordOutboundPrepInput,
   type SignHandoverProofUploadInput,
+  type WarehousePrepFact,
 } from "./schemas/delivery-handover";
 export {
   isWorkingDay,
@@ -2025,6 +2115,50 @@ export {
   type IsoDate,
   type WorkingDayOptions,
 } from "./working-days";
+export {
+  deliveryCustodyProjection,
+  deliveryOperationsReadyBy,
+  deliveryWarehouseScheduleEvents,
+  type DeliveryWarehouseScheduleEvent,
+  type DeliveryWarehouseScheduleEventKind,
+  type DeliveryWarehouseScheduleInput,
+} from "./delivery-warehouse-schedule";
+export {
+  buildOutboundRegisterView,
+  filterOutboundCards,
+  outboundExceptionLines,
+  outboundStatusWordOf,
+  outboundViewMatches,
+  WAREHOUSE_DASHBOARD_DATE_COUNT,
+  WAREHOUSE_OFF_DAYS,
+  warehouseEmptyDaySentence,
+  warehouseOperatingDates,
+  warehouseOutboundCards,
+  warehouseRangeShift,
+  warehouseUnitPendingReason,
+  type OutboundProduct,
+  type OutboundRegisterFacets,
+  type WarehouseOutboundCard,
+} from "./warehouse-outbound";
+export {
+  driverCollectedLine,
+  WAREHOUSE_MONITOR_EVENT_LABEL,
+  WAREHOUSE_MONITOR_GROUP_LABEL,
+  warehouseAssignedDriverLine,
+  warehouseLoadedLine,
+  warehouseMonitorArrivalEvents,
+  warehouseMonitorDayEvents,
+  warehouseMonitorEmptyDaySentence,
+  warehouseMonitorGroupOf,
+  warehouseMonitorPickupEvents,
+  warehouseMonitorTimeSentence,
+  warehouseRecordLoadedSentence,
+  warehouseUnitNotCollectedSentence,
+  type WarehouseExpectedArrival,
+  type WarehouseMonitorEvent,
+  type WarehouseMonitorEventKind,
+  type WarehouseMonitorGroup,
+} from "./warehouse-monitor";
 export {
   MY_HOLIDAYS_2026,
   MY_HOLIDAYS_2027_EARLY,
@@ -2138,6 +2272,10 @@ export {
   manualPurchaseRailModel,
   manualPurchaseWorkOrder,
   manualPurchaseWorkItems,
+  manualPurchaseWorkContext,
+  manualPurchaseObjectHeading,
+  manualPurchaseSourceSummary,
+  manualPurchaseSourceLine,
   manualPurchaseLineRemainingOf,
   manualPurchasePoSummary,
   manualPurchaseItemsSummary,
@@ -2145,6 +2283,7 @@ export {
   manualPurchaseDeliverToSummary,
   manualPurchaseForOf,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseIssueGroupCount,
   manualPurchaseIssueSentence,
   stillNeededOf,
@@ -2221,6 +2360,7 @@ export {
   type SoBatchCellSummary,
   type SoBatchPurchaseResponse,
   isSelectableForBuying,
+  isSelectableForOrder,
   defaultAllocations,
   setDestination,
   splitAllocation,
@@ -2884,5 +3024,25 @@ export * from "./sales-order-completion";
 // CARD 9 — the unified work engine: the five-part rule registry (Trigger ·
 // Owner · Action · Due · Completion fact) + WHO/ACTION/working-day composition.
 export * from "./work-engine";
+// Workspace foundation — company-wide owner-Duty assignments, cover resolution,
+// and immutable actor evidence. Capability/permission duties remain separate.
+export * from "./workspace-duty";
+// Workspace Work — the one server/client wire contract. Owning modules keep
+// trigger and completion truth; this only carries their open-action projection.
+export * from "./operation-work";
+export * from "./sales-order-work-source";
+export * from "./storage-obligation";
+export * from "./payment-collection-outcome";
+export * from "./payment-duplicate";
 // Purchase Orders — one evidence-derived Register state and Work vocabulary.
 export * from "./purchase-order-register";
+
+export { recordSupplierReplyInput } from "./schemas/operation";
+
+export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+
+export * from "./warehouse-inbound";
+
+export * from "./arrival-source";
+
+export * from "./warehouse-settings";

@@ -511,7 +511,13 @@ export function DoTemplate(data: DoTemplateData) {
             <Text style={styles.footerCenter}>Computer-generated document · Signatures above are the delivery record.</Text>
             <Text
               style={styles.footerPage}
-              render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+              /* Sub-document counters, exactly as the SO template reads them:
+                 in the batch print (`Print N delivery orders`) each DO keeps
+                 its OWN `Page 1 of 1`; for a single document the counters are
+                 equal and the output is byte-identical to before. */
+              render={({ subPageNumber, subPageTotalPages }) =>
+                `Page ${subPageNumber} of ${subPageTotalPages}`
+              }
             />
           </View>
         </View>

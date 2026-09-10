@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import {
   assignLogisticsInputSchema,
+  deliveryWarehouseScheduleEvents,
   saveDeliveryArrangementInputSchema,
+  signHandoverProofUploadInput,
   isLogisticsChange,
   type DeliveryScopeRef,
 } from "@carres/shared";
@@ -52,7 +54,7 @@ const deliveryArrangementsRouter = new Hono<AppEnv>();
 
 const ARRANGEMENT_SELECT =
   "id, order_id, leg, partner_id, confirmed_date, confirmed_time, expected_arrival, " +
-  "logistics_note, reply_proof_path, driver_name, vehicle, updated_at, updated_by, " +
+  "logistics_note, reply_proof_path, driver_name, vehicle, condo_registration, updated_at, updated_by, " +
   "delivery_partners(id, name)";
 
 type ArrangementRecord = {
@@ -67,6 +69,7 @@ type ArrangementRecord = {
   reply_proof_path: string | null;
   driver_name: string | null;
   vehicle: string | null;
+  condo_registration?: string | null;
   updated_at: string;
   updated_by: string | null;
   delivery_partners?: { id: string; name: string } | null;
@@ -87,6 +90,7 @@ const shape = (r: ArrangementRecord) => ({
   reply_proof_path: r.reply_proof_path,
   driver_name: r.driver_name,
   vehicle: r.vehicle,
+  condo_registration: r.condo_registration ?? null,
   updated_at: r.updated_at,
   updated_by: r.updated_by,
 });
@@ -101,6 +105,323 @@ deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   }
   return c.json({ arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape) });
 });
+
+/**
+ * Delivery's read-only Warehouse Schedule feed.
+ *
+ * This is visibility, never a second Schedule or Work queue. Only whole-order
+ * scopes are projected today: Stock's current allocation read binds exact
+ * Units to the Sales Order but cannot yet bind one Unit to one split-trip DO,
+ * so a leg projection would be invented truth.
+ */
+deliveryArrangementsRouter.get(
+  "/warehouse-schedule",
+  async (c) => {
+    const auth = c.var.auth;
+    const isInternal = auth.role === "operation" || auth.role === "principal";
+    const isWarehouse = auth.role === "warehouse" && Boolean(auth.warehouseId);
+    if (!isInternal && !isWarehouse) {
+      return c.json({ error: "Warehouse Schedule is not available to this role" }, 403);
+    }
+    /* Warehouse has deliberately no direct table policy (0302), so its read
+       uses admin only after the role+warehouse gate and is narrowed again by
+       the permanent Unit's warehouse_id below. */
+    const sb = isWarehouse
+      ? adminClient(c.env)
+      : userClient(c.env, auth.jwt);
+    const arrangementsRes = await sb
+      .from("ops_delivery_arrangements")
+      .select(ARRANGEMENT_SELECT);
+    if (arrangementsRes.error) {
+      const m = mapPgError(arrangementsRes.error);
+      return c.json(m.body, m.status);
+    }
+
+    const arrangements = (
+      (arrangementsRes.data ?? []) as unknown as ArrangementRecord[]
+    )
+      .map(shape)
+      .filter(
+        (row) =>
+          row.leg === 0 &&
+          Boolean(row.confirmed_date) &&
+          Boolean(row.partner_name),
+      );
+    if (arrangements.length === 0) return c.json({ events: [] });
+
+    const orderIds = [...new Set(arrangements.map((row) => row.order_id))];
+    const [ordersRes, deliveryOrdersRes] = await Promise.all([
+      sb
+        .from("orders")
+        .select(
+          "id, so, customer_address, delivered_at, do_file_path, pod_signature_url, placed_at, created_at",
+        )
+        .in("id", orderIds),
+      sb
+        .from("ops_delivery_orders")
+        .select("id, order_id, do_number, trip_groups, voided_at")
+        .in("order_id", orderIds),
+    ]);
+    const firstError = ordersRes.error ?? deliveryOrdersRes.error;
+    if (firstError) {
+      const m = mapPgError(firstError);
+      return c.json(m.body, m.status);
+    }
+
+    type OrderFact = {
+      id: string;
+      so: number;
+      customer_address: string | null;
+      delivered_at: string | null;
+      do_file_path: string | null;
+      pod_signature_url: string | null;
+      placed_at: string | null;
+      created_at: string | null;
+    };
+    type DeliveryOrderFact = {
+      id: string;
+      order_id: string;
+      do_number: string;
+      trip_groups: string[] | null;
+      voided_at: string | null;
+    };
+
+    const orders = (ordersRes.data ?? []) as OrderFact[];
+    const orderById = new Map(orders.map((row) => [row.id, row]));
+    const deliveryOrders = (
+      (deliveryOrdersRes.data ?? []) as DeliveryOrderFact[]
+    ).filter((row) => !row.voided_at);
+    const doIds = deliveryOrders.map((row) => row.id);
+    if (doIds.length === 0) return c.json({ events: [] });
+
+    /* The DO's required exact Units come from the ONE recorded scope (0424,
+       delivery_order_units) — never re-derived from reservation refs here.
+       A document with no recorded scope (an old split trip) stays absent:
+       absence is absence, never an invented Unit assignment. */
+    const scopeRes = await sb
+      .from("delivery_order_units")
+      .select("delivery_order_id, item_id")
+      .in("delivery_order_id", doIds);
+    if (scopeRes.error) {
+      const m = mapPgError(scopeRes.error);
+      return c.json(m.body, m.status);
+    }
+    const scopeRows = (scopeRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+    }>;
+    const itemIds = [...new Set(scopeRows.map((row) => row.item_id))];
+    if (itemIds.length === 0) return c.json({ events: [] });
+
+    const [unitsRes, prepRes, eventUnitsRes, handoversRes] = await Promise.all([
+      sb
+        .from("ops_stock_items")
+        .select("id, unit_code, warehouse_id, sku")
+        .in("id", itemIds),
+      sb
+        .from("delivery_unit_prep")
+        .select("delivery_order_id, item_id, fact, recorded_at")
+        .in("delivery_order_id", doIds),
+      sb
+        .from("delivery_handover_event_units")
+        .select("delivery_order_id, item_id, event_id, recorded_side")
+        .in("delivery_order_id", doIds),
+      sb
+        .from("delivery_handover_events")
+        .select("id, delivery_order_id, kind, proof_path, recorded_at, receiver_name, recorded_by")
+        .in("delivery_order_id", doIds),
+    ]);
+    const factsError =
+      unitsRes.error ?? prepRes.error ?? eventUnitsRes.error ?? handoversRes.error;
+    if (factsError) {
+      const m = mapPgError(factsError);
+      return c.json(m.body, m.status);
+    }
+
+    type UnitFact = {
+      id: string;
+      unit_code: string | null;
+      warehouse_id: string | null;
+      sku: string | null;
+    };
+    const units = ((unitsRes.data ?? []) as UnitFact[]).filter(
+      (row) => !isWarehouse || row.warehouse_id === auth.warehouseId,
+    );
+    const unitById = new Map(units.map((row) => [row.id, row]));
+
+    const warehouseIds = [
+      ...new Set(
+        units
+          .map((row) => row.warehouse_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const skus = [
+      ...new Set(units.map((row) => row.sku).filter((s): s is string => Boolean(s))),
+    ];
+    const [warehousesRes, skusRes] = await Promise.all([
+      warehouseIds.length
+        ? sb.from("warehouses").select("id, name").in("id", warehouseIds)
+        : Promise.resolve({ data: [], error: null }),
+      skus.length
+        ? sb.from("product_skus").select("sku, variant").in("sku", skus)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    const nameError = warehousesRes.error ?? skusRes.error;
+    if (nameError) {
+      const m = mapPgError(nameError);
+      return c.json(m.body, m.status);
+    }
+    const warehouseName = new Map(
+      ((warehousesRes.data ?? []) as Array<{ id: string; name: string }>).map(
+        (row) => [row.id, row.name],
+      ),
+    );
+    const productName = new Map(
+      ((skusRes.data ?? []) as Array<{ sku: string; variant: string | null }>).map(
+        (row) => [row.sku, row.variant],
+      ),
+    );
+
+    const handovers = (handoversRes.data ?? []) as Array<{
+      id: string;
+      delivery_order_id: string;
+      kind: string;
+      proof_path: string | null;
+      recorded_at: string;
+      receiver_name: string | null;
+      recorded_by: string | null;
+    }>;
+    const handoverById = new Map(handovers.map((row) => [row.id, row]));
+    const recorderIds = [
+      ...new Set(handovers.map((row) => row.recorded_by).filter(Boolean)),
+    ] as string[];
+    const recorderName = new Map<string, string>();
+    if (recorderIds.length > 0) {
+      const usersRes = await sb
+        .from("app_users")
+        .select("id, name, email")
+        .in("id", recorderIds);
+      if (usersRes.error) {
+        const m = mapPgError(usersRes.error);
+        return c.json(m.body, m.status);
+      }
+      for (const u of (usersRes.data ?? []) as Array<{
+        id: string;
+        name: string | null;
+        email: string | null;
+      }>) {
+        recorderName.set(u.id, u.name || u.email || "");
+      }
+    }
+    const prep = (prepRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+      fact: string;
+      recorded_at: string;
+    }>;
+    const eventUnits = (eventUnitsRes.data ?? []) as Array<{
+      delivery_order_id: string;
+      item_id: string;
+      event_id: string;
+      recorded_side: string;
+    }>;
+    const acceptedUnits = eventUnits.filter(
+      (row) => row.recorded_side === "warehouse",
+    );
+    /* The Logistics side's own exact-Unit receipt statement — the
+       counterparty's fact, kept beside the Warehouse's, never merged. */
+    const logisticsUnits = eventUnits.filter(
+      (row) => row.recorded_side === "logistics",
+    );
+
+    const events = arrangements.flatMap((arrangement) => {
+      const order = orderById.get(arrangement.order_id);
+      if (!order) return [];
+      return deliveryOrders
+        .filter((row) => row.order_id === arrangement.order_id)
+        .flatMap((deliveryOrder) => {
+          const doScope = scopeRows.filter(
+            (row) => row.delivery_order_id === deliveryOrder.id,
+          );
+          return doScope.flatMap((scope) => {
+        const unit = unitById.get(scope.item_id);
+        if (!unit?.unit_code) return [];
+        const prepAt = (fact: string) =>
+          prep.find(
+            (p) =>
+              p.delivery_order_id === deliveryOrder.id &&
+              p.item_id === scope.item_id &&
+              p.fact === fact,
+          )?.recorded_at ?? null;
+        const accepted = acceptedUnits.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.item_id === scope.item_id,
+        );
+        const acceptedEvent = accepted
+          ? handoverById.get(accepted.event_id)
+          : undefined;
+        const driverConfirmed = logisticsUnits.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.item_id === scope.item_id,
+        );
+        const driverConfirmedEvent = driverConfirmed
+          ? handoverById.get(driverConfirmed.event_id)
+          : undefined;
+        /* `Driver collected` is the LOGISTICS side's own receipt event —
+           never the Warehouse's loading record wearing the driver's name. */
+        const logisticsReceipt = handovers.find(
+          (row) =>
+            row.delivery_order_id === deliveryOrder.id &&
+            row.kind === "received_by_logistics",
+        );
+        return deliveryWarehouseScheduleEvents({
+          unitId: unit.unit_code,
+          deliveryOrderId: deliveryOrder.id,
+          orderId: order.id,
+          leg: arrangement.leg,
+          so: order.so,
+          fromLocation: unit.warehouse_id
+            ? warehouseName.get(unit.warehouse_id) ?? "Not recorded"
+            : "Not recorded",
+          toCustomer: order.customer_address ?? "Not recorded",
+          logisticsPartner: arrangement.partner_name as string,
+          driverName: arrangement.driver_name,
+          vehicle: arrangement.vehicle,
+          doNumber: deliveryOrder.do_number,
+          collectionDate: arrangement.confirmed_date as string,
+          collectionWindow: arrangement.confirmed_time,
+          customerHandoverDate: arrangement.confirmed_date,
+          actualCollectionAt: logisticsReceipt?.recorded_at ?? null,
+          actualArrivalAt: order.delivered_at,
+          hasCollectionEvidence: Boolean(logisticsReceipt?.proof_path),
+          hasDeliveryEvidence: Boolean(
+            order.pod_signature_url || order.do_file_path,
+          ),
+          soDate: (order.placed_at ?? order.created_at)?.slice(0, 10) ?? null,
+          sku: unit.sku,
+          productName: unit.sku ? productName.get(unit.sku) ?? null : null,
+          unitScannedAt: prepAt("scanned"),
+          unitCheckedAt: prepAt("checked"),
+          unitPackedAt: prepAt("packed"),
+          unitHandedOverAt: acceptedEvent?.recorded_at ?? null,
+          unitDriverConfirmedAt:
+            driverConfirmedEvent?.recorded_at ??
+            (driverConfirmed ? logisticsReceipt?.recorded_at ?? null : null),
+          unitHasEvidence: accepted ? Boolean(acceptedEvent?.proof_path) : false,
+          unitWarehouseOperator: acceptedEvent?.recorded_by
+            ? recorderName.get(acceptedEvent.recorded_by) ?? null
+            : null,
+          unitDeliveryPerson: acceptedEvent?.receiver_name ?? null,
+        });
+          });
+        });
+    });
+    return c.json({ events });
+  },
+);
 
 /**
  * ONE scope, for Edit Delivery. Returns the arrangement, its carrier history
@@ -295,6 +616,8 @@ deliveryArrangementsRouter.post("/assign", requireOperationOrPrincipal, async (c
     const event = isLogisticsChange(before.partnerId, partnerId) ? "changed" : "assigned";
     const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
       arrangement_id: saved.id,
+      order_id: s.orderId,
+      leg: s.leg,
       event,
       from_partner_id: before.partnerId,
       to_partner_id: partnerId,
@@ -374,6 +697,7 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
         reply_proof_path: input.replyProofPath ?? null,
         driver_name: input.driverName ?? null,
         vehicle: input.vehicle ?? null,
+        condo_registration: input.condoRegistration ?? null,
         updated_at: new Date().toISOString(),
         updated_by: userId,
       },
@@ -392,6 +716,8 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     const event = !nextPartner ? "cleared" : isLogisticsChange(before.partnerId, nextPartner) ? "changed" : "assigned";
     const { error: evErr } = await sb.from("ops_delivery_arrangement_events").insert({
       arrangement_id: (saved as unknown as ArrangementRecord).id,
+      order_id: orderId,
+      leg,
       event,
       from_partner_id: before.partnerId,
       to_partner_id: nextPartner,
@@ -406,5 +732,122 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
 
   return c.json({ arrangement: shape(saved as unknown as ArrangementRecord) });
 });
+
+/**
+ * POST /:orderId/reply-proof/sign-upload?leg= — Delivery Card 05.
+ *
+ * The partner's ACTUAL reply (a WhatsApp screenshot) is the evidence the
+ * arrangement law demands: prepared, copied, opened or sent never means
+ * confirmed (`docs/delivery/MASTER.md` §2). This door signs an upload into the
+ * private proof bucket under the arrangement's own key; the saved
+ * `reply_proof_path` then rides `Save Delivery` like every other field. Same
+ * photo family and limits as the handover proof (0363's door).
+ */
+deliveryArrangementsRouter.post(
+  "/:orderId/reply-proof/sign-upload",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const orderId = c.req.param("orderId");
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+    const leg = Number(c.req.query("leg") ?? "0") || 0;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+    }
+    const parsed = signHandoverProofUploadInput.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return c.json(
+        {
+          error: "invalid_input",
+          message: issue?.message ?? "invalid input",
+          field: issue?.path.join(".") ?? "unknown",
+        },
+        422,
+      );
+    }
+
+    const { data: order, error } = await sb
+      .from("orders")
+      .select("id")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    if (!order) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+
+    const ext =
+      parsed.data.mimeType === "image/png"
+        ? "png"
+        : parsed.data.mimeType === "image/webp"
+          ? "webp"
+          : "jpg";
+    const path = `arrangement/${orderId}/${leg}/${crypto.randomUUID()}-reply.${ext}`;
+    const admin = adminClient(c.env);
+    const { data, error: signErr } = await admin.storage
+      .from("proof-of-delivery")
+      .createSignedUploadUrl(path);
+    if (signErr) {
+      return c.json({ error: "sign_upload_failed", message: signErr.message }, 500);
+    }
+    return c.json({ token: data.token, path: data.path });
+  },
+);
+
+/**
+ * POST /:orderId/message-prepared?leg= — Delivery Card 05's deferred half (0412).
+ *
+ * Preparation is an ACTIVITY fact: the operator copied/opened the prepared
+ * WhatsApp message for a partner. The SQL door appends the arrangement event
+ * and the order_history line together and writes NO arrangement field —
+ * prepared, copied, opened or sent never means confirmed (MASTER §2/§13).
+ */
+deliveryArrangementsRouter.post(
+  "/:orderId/message-prepared",
+  requireOperationOrPrincipal,
+  async (c) => {
+    const orderId = c.req.param("orderId");
+    if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+      return c.json({ error: "not_found", message: "Order not found" }, 404);
+    }
+    const leg = Number(c.req.query("leg") ?? "0") || 0;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+    }
+    const partnerId = (body as { partnerId?: unknown })?.partnerId;
+    if (typeof partnerId !== "string" || !/^[0-9a-f-]{36}$/i.test(partnerId)) {
+      return c.json(
+        { error: "invalid_input", message: "partnerId must be a logistics partner id" },
+        422,
+      );
+    }
+
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { error } = await sb.rpc("delivery_arrangement_message_prepared", {
+      p_order_id: orderId,
+      p_leg: leg,
+      p_partner_id: partnerId,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    return c.json({ recorded: true });
+  },
+);
 
 export default deliveryArrangementsRouter;

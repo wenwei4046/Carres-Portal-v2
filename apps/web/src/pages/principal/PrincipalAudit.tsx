@@ -36,6 +36,31 @@ const ROLE_FILTERS = [
   "bd",
 ] as const;
 
+/**
+ * MPR IS RETIRED FROM PRESENTATION (Purchasing Card 08, 2026-09-04). The
+ * stored audit evidence is never rewritten — a legacy row still holds its
+ * `MPR-…`/`REQ-…` token — but the SCREEN translates that token to the
+ * visible label `Manual Purchase`. New Manual Purchase rows reference the
+ * request UUID internally, and a UUID is never printed either.
+ */
+const LEGACY_REQUEST_TOKEN = /\b(?:MPR-\d{8}-\d{4}|REQ-\d+)\b/;
+const UUID_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function displayAction(action: string): string {
+  return action.replace(
+    new RegExp(LEGACY_REQUEST_TOKEN.source, "g"),
+    "Manual Purchase",
+  );
+}
+
+function displayRef(ref: string | null): string | null {
+  if (!ref) return null;
+  const trimmed = ref.trim();
+  if (LEGACY_REQUEST_TOKEN.test(trimmed)) return "Manual Purchase";
+  if (UUID_TOKEN.test(trimmed)) return null;
+  return trimmed.slice(0, 8);
+}
+
 const ROLE_COLORS: Record<string, string> = {
   principal: "#D64F20",
   dealer:    "#3c5a78",
@@ -107,10 +132,10 @@ export default function PrincipalAudit() {
           >
             <RoleChip role={e.role ?? "system"} />
             <div className="min-w-0">
-              <div className="text-base-900">{e.action}</div>
+              <div className="text-base-900">{displayAction(e.action)}</div>
               <div className="text-label text-base-500 mt-0.5">
                 {e.actor ?? "—"}
-                {e.ref ? ` · ${e.ref.slice(0, 8)}` : ""}
+                {displayRef(e.ref) ? ` · ${displayRef(e.ref)}` : ""}
               </div>
             </div>
             <div className="font-mono text-label text-base-400 whitespace-nowrap">

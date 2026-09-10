@@ -143,6 +143,8 @@ function happyTables(overrides?: Partial<Record<string, ReturnType<typeof tableM
       { data: confirmedRow, error: null },
     ),
     ops_stock_items: tableMock({ data: [], error: null }),
+    // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+    invoices: tableMock({ data: [], error: null }),
     ...overrides,
   };
 }
@@ -211,6 +213,51 @@ describe("POST /api/operation/orders/:id/booking/confirm", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { gateWarnings: string[] };
     expect(body.gateWarnings.join(" ")).toContain("1500.00");
+  });
+
+  it("gate convergence — an unpaid Storage Invoice warns with the COMBINED remainder on a goods-paid SO", async () => {
+    // Goods RM 2,500 fully paid; a live issued Storage Invoice of RM 150 + 8
+    // tax stands ⇒ the SO still owes RM 158 and the confirm door says so.
+    const sb = makeSb(
+      happyTables({
+        invoices: tableMock({
+          data: [
+            { kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null },
+            // dead and draft papers ask nothing (§2)
+            { kind: "additional_storage", status: "voided", amount: 99, tax_amount: 0, voided_at: "2026-09-01" },
+            { kind: "storage", status: "draft", amount: 999, tax_amount: 0, voided_at: null },
+          ],
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.join(" ")).toContain("158.00");
+  });
+
+  it("gate convergence — payment covering the combined obligation leaves NO stale storage warning", async () => {
+    const sb = makeSb(
+      happyTables({
+        orders: tableMock({
+          data: { id: ORDER_ID, so: 1234, paid: 2658, ops_assigned_logistic: PARTNER_ID },
+          error: null,
+        }),
+        invoices: tableMock({
+          data: [{ kind: "storage", status: "issued", amount: 150, tax_amount: 8, voided_at: null }],
+          error: null,
+        }),
+      }),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const res = await post(await makeJwt("operation"), OK_BODY);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { gateWarnings: string[] };
+    expect(body.gateWarnings.filter((w) => /RM/.test(w))).toEqual([]);
   });
 
   it("the reserved-units ledger (SO-ref) satisfies goods ready without line_received", async () => {

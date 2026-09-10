@@ -48,7 +48,11 @@ import { recomputeAndExplodeSofaBuildLines } from "../lib/sofa-recompute";
 import { recomputeOptionPickLines } from "../lib/option-picks-recompute";
 import { recomputeSpecialAddonLines } from "../lib/special-addons-recompute";
 import { recomputeStairCarry } from "../lib/stair-carry-recompute";
-import { restampStairCarry, touchesStairInputs } from "../lib/stair-carry-restamp";
+import {
+  restampAfterLineWrite,
+  restampStairCarry,
+  touchesStairInputs,
+} from "../lib/stair-carry-restamp";
 import { SERVER_EXCLUSIVE_ADDON_KEYS } from "@carres/shared";
 import { recomputeDeliveryFee } from "../lib/delivery-fee-recompute";
 import { validateFreeItemClaims, resolveDefaultFreeGiftLines } from "../lib/free-gift-resolve";
@@ -2926,6 +2930,8 @@ ordersRouter.post("/:id/lines", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "add_lines_blocked");
   if (errRes) return errRes;
+  /* ⭐ THE GOODS ARE A STAIR-FEE INPUT — see `restampAfterLineWrite`. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
@@ -3153,6 +3159,8 @@ ordersRouter.post("/:id/lines/replace", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "replace_blocked");
   if (errRes) return errRes;
+  /* Same reason: a replace moves the item count. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 
@@ -3667,6 +3675,8 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
     });
     const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
     if (errRes) return errRes;
+    /* An APPROVED replace moves the count exactly as the direct door does. */
+    await restampAfterLineWrite(sb, id);
     return c.json(await fetchAndShapeOrder(sb, id));
   }
 
@@ -3730,6 +3740,8 @@ ordersRouter.post("/:id/change-requests/:reqId/decide", async (c) => {
   });
   const errRes = addLinesRpcError(c, rpcError, "decide_blocked");
   if (errRes) return errRes;
+  /* An APPROVED add moves the count exactly as the direct door does. */
+  await restampAfterLineWrite(sb, id);
   return c.json(await fetchAndShapeOrder(sb, id));
 });
 

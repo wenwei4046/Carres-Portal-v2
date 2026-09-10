@@ -9,6 +9,8 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import { rm, rmCompact } from "@/lib/format-currency";
+import { fmtDate } from "@/lib/fmt-date";
+import { FinanceKpi } from "@/components/FinanceKpi";
 
 type InvoiceStatus = "unpaid" | "partial" | "paid";
 type InvoiceTab    = "all" | InvoiceStatus;
@@ -142,9 +144,9 @@ export default function FinanceInvoices() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <Kpi label="Gross billed" value={rmCompact(totals.gross)} hint={`${filtered.length} invoices`} />
-        <Kpi label="Net (excl. tax)" value={rmCompact(totals.net)} hint="Revenue base" tone="ok" />
-        <Kpi label="SST collected" value={rmCompact(totals.tax)} hint="8% portion" />
+        <FinanceKpi label="Gross billed" value={rmCompact(totals.gross)} hint={`${filtered.length} invoices`} />
+        <FinanceKpi label="Net (excl. tax)" value={rmCompact(totals.net)} hint="Revenue base" tone="ok" />
+        <FinanceKpi label="SST collected" value={rmCompact(totals.tax)} hint="8% portion" />
       </div>
 
       <div className="flex gap-1 mb-3.5 border-b border-border">
@@ -239,39 +241,9 @@ function InvoiceTableRow({ row, onPdf }: { row: InvoiceRow; onPdf: () => void })
   );
 }
 
-function Kpi({
-  label, value, hint, tone, accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "warn" | "ok";
-  accent?: boolean;
-}) {
-  const valueTone = tone === "warn" ? "text-primary" : tone === "ok" ? "text-success" : "text-foreground";
-  return (
-    <div className={`bg-card rounded-md border ${accent ? "border-primary" : "border-border"} px-5 py-[18px]`}>
-      <div className={`text-label uppercase tracking-[0.06em] font-semibold ${accent ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </div>
-      <div className={`font-display text-page mt-1.5 leading-none tabular-nums ${valueTone}`}>
-        {value}
-      </div>
-      {hint && <div className="text-label text-muted-foreground mt-1.5">{hint}</div>}
-    </div>
-  );
-}
-
+// The one portal date spelling (COPY-STANDARD): weekday first, year only when
+// it is not this year, Kuala Lumpur time. `toLocaleDateString` was a second
+// spelling that also moved with the browser's timezone.
 function formatIssuedDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString("en-MY", {
-      year:  "2-digit",
-      month: "short",
-      day:   "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  return fmtDate(iso);
 }

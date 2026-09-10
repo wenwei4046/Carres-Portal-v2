@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRentalApprovals, useDecideRentalAgreement, type RentalApproval } from "@/lib/queries";
 import { rm } from "@/lib/format-currency";
+import { fmtDate } from "@/lib/fmt-date";
+import { FinanceKpi } from "@/components/FinanceKpi";
 import { supabase } from "@/lib/supabase";
 
 /** The private evidence bucket 0267 created. No delete policy — a signed
@@ -102,14 +104,14 @@ export default function FinanceRentalApprover() {
       </header>
 
       <div className="grid grid-cols-3 gap-3.5 mb-6">
-        <Kpi label="Waiting on you" value={String(totals.count)} hint="Applications undecided" />
-        <Kpi
+        <FinanceKpi label="Waiting on you" value={String(totals.count)} hint="Applications undecided" />
+        <FinanceKpi
           label="Credit at stake"
           value={rm(totals.credit)}
           hint="Total over the full terms"
           accent
         />
-        <Kpi label="Monthly if all approved" value={rm(totals.monthly)} hint="Combined monthly fee" />
+        <FinanceKpi label="Monthly if all approved" value={rm(totals.monthly)} hint="Combined monthly fee" />
       </div>
 
       {approvalsQ.isLoading ? (
@@ -190,7 +192,7 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
             {r.signedAt ? (
               <span
                 className="px-2 py-0.5 rounded-full text-label font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                title={`Signed ${new Date(r.signedAt).toLocaleString()}`}
+                title={`Signed ${fmtDate(r.signedAt, { time: true })}`}
               >
                 Signed by {r.signedName ?? "customer"}
                 {r.templateVersion != null ? ` · T&C v${r.templateVersion}` : ""}
@@ -224,8 +226,8 @@ function ApplicationCard({ r }: { r: RentalApproval }) {
 
       <div className="grid gap-x-6 gap-y-2 px-4 py-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Product" value={r.sku} mono />
-        <Field label="Starts" value={r.startDate} />
-        <Field label="Applied" value={new Date(r.createdAt).toLocaleDateString()} />
+        <Field label="Starts" value={fmtDate(r.startDate)} />
+        <Field label="Applied" value={fmtDate(r.createdAt)} />
         <Field label="Email" value={r.customer.email ?? "—"} />
         <Field label="Address" value={r.customer.address ?? "—"} />
         <Field label="Due once at signing" value={r.oneOffTotal > 0 ? rm(r.oneOffTotal) : "—"} />
@@ -316,32 +318,6 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
       <div className={`text-body text-foreground break-words ${mono ? "font-mono" : ""}`}>
         {value}
       </div>
-    </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`bg-card rounded-md border p-4 ${accent ? "border-primary/40" : "border-border"}`}
-    >
-      <div className="text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground">
-        {label}
-      </div>
-      <div className="font-mono text-page font-semibold text-foreground tabular-nums mt-1">
-        {value}
-      </div>
-      <div className="text-label text-muted-foreground mt-0.5">{hint}</div>
     </div>
   );
 }

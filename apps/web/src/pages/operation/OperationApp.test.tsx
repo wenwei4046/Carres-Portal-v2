@@ -38,6 +38,20 @@ vi.mock("./OperationOrders", () => ({
 vi.mock("./OperationWarehouse", () => ({
   default: () => <div data-testid="warehouse-stub">warehouse</div>,
 }));
+// 【WAREHOUSE】 CARD 02 — Unit Detail is a route that must MOUNT (the same
+// walk-found defect class as Edit Delivery: Route declared, `isUrlDriven`
+// unaware, dashboard drawn over a real Unit address — measured live
+// 2026-09-03). The register and plan pages self-fetch; stubs, because this
+// suite owns routing and slim-bar suppression only.
+vi.mock("./WarehouseUnitDetail", () => ({
+  default: () => <div data-testid="unit-detail-stub">unit-detail</div>,
+}));
+vi.mock("./WarehouseStockRegister", () => ({
+  default: () => <div data-testid="stock-register-stub">stock-register</div>,
+}));
+vi.mock("./OperationStockPlan", () => ({
+  default: () => <div data-testid="stock-plan-stub">stock-plan</div>,
+}));
 vi.mock("./OperationMovements", () => ({
   default: () => <div data-testid="movements-stub">movements</div>,
 }));
@@ -60,11 +74,19 @@ vi.mock("./OperationToOrder", () => ({
 vi.mock("./OperationManualPurchase", () => ({
   default: () => <div data-testid="manual-purchase-stub">manual-purchase</div>,
 }));
-// CARD-2026-08-21-delivery-02 — Delivery Work draws its own Destination Header
-// and self-fetches; this suite only asks which route mounts it, and whether the
+// CARD-2026-09-04-delivery-01 — Monitor draws its own Destination Header and
+// self-fetches; this suite only asks which route mounts it, and whether the
 // slim global bar stands down when it does.
 vi.mock("./OperationDelivery", () => ({
-  default: () => <div data-testid="delivery-work-stub">delivery-work</div>,
+  default: () => <div data-testid="delivery-monitor-stub">delivery-monitor</div>,
+}));
+// The restored Delivery Orders register and the DO object page both
+// self-fetch; this suite owns only WHICH ROUTE MOUNTS WHICH.
+vi.mock("./DeliveryOrdersRegister", () => ({
+  default: () => <div data-testid="delivery-orders-register-stub">do-register</div>,
+}));
+vi.mock("./DeliveryOrderPage", () => ({
+  default: () => <div data-testid="delivery-order-page-stub">do-object</div>,
 }));
 // Edit Delivery (2026-08-24) self-fetches the arrangement — stubbed; what this
 // suite owns is that the URL actually MOUNTS it, which is precisely what the
@@ -241,26 +263,45 @@ describe("OperationApp — one header on Manual Purchase", () => {
  * suppressed already, which is exactly why one route looked right and its
  * sibling did not.
  */
-describe("OperationApp — one header on Delivery Work", () => {
-  it("?tab=delivery mounts the page and stands the global top bar down", () => {
+describe("OperationApp — one header on Monitor", () => {
+  it("?tab=delivery mounts Monitor and stands the global top bar down", () => {
     renderApp("/operation?tab=delivery");
-    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("delivery-monitor-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+    // Monitor renders ONCE — never twice through two matching branches.
+    expect(screen.getAllByTestId("delivery-monitor-stub")).toHaveLength(1);
   });
 
-  it("its rail choices survive the mount — both filters ride the URL", () => {
-    renderApp("/operation?tab=delivery&date=__no_date&logistics=NETS");
-    expect(screen.getByTestId("delivery-work-stub")).toBeInTheDocument();
+  it("its rail choices survive the mount — every filter rides the URL", () => {
+    renderApp("/operation?tab=delivery&schedule=no_confirmed_date&logistics=p-nets");
+    expect(screen.getByTestId("delivery-monitor-stub")).toBeInTheDocument();
   });
 });
 
-describe("OperationApp — Delivery is one page", () => {
-  it("the old Delivery Orders list address returns to the unified Delivery page", async () => {
+/**
+ * THE FOUR DELIVERY PAGES (CARD-2026-09-04-delivery-01). Monitor is
+ * `?tab=delivery`; the register address is RESTORED as a real destination —
+ * it no longer redirects into Monitor — and the DO object and Edit Delivery
+ * routes keep reaching their existing components unchanged.
+ */
+describe("OperationApp — the Delivery destinations", () => {
+  it("/operation/delivery-orders mounts the existing register, not a redirect", () => {
     renderApp("/operation/delivery-orders");
-    expect(await screen.findByTestId("delivery-work-stub")).toBeInTheDocument();
+    expect(screen.getByTestId("delivery-orders-register-stub")).toBeInTheDocument();
     expect(screen.getByTestId("location-probe")).toHaveTextContent(
-      "/operation?tab=delivery",
+      "/operation/delivery-orders",
     );
+    expect(screen.queryByTestId("delivery-monitor-stub")).not.toBeInTheDocument();
+  });
+
+  it("the register route stands the slim global bar down", () => {
+    renderApp("/operation/delivery-orders");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("/operation/delivery-orders/:doId still mounts the DO object page", () => {
+    renderApp("/operation/delivery-orders/DO-040926-0001");
+    expect(screen.getByTestId("delivery-order-page-stub")).toBeInTheDocument();
   });
 });
 
@@ -284,6 +325,59 @@ describe("OperationApp — Edit Delivery mounts at its URL", () => {
   it("a leg keeps its query string", () => {
     renderApp("/operation/delivery/edit/order-1?leg=2");
     expect(screen.getByTestId("edit-delivery-stub")).toBeInTheDocument();
+  });
+});
+
+/**
+ * 【WAREHOUSE】 CARD 02 — UNIT DETAIL IS A ROUTE THAT MOUNTS. The Route shipped
+ * 2026-08-21 (`stock/unit/:unitCode`) and never joined `isUrlDriven`, so a
+ * Unit's permanent address rendered the DASHBOARD — measured live 2026-09-03 on
+ * /operation/stock/unit/id-aam135002. A component test cannot see that; only
+ * mounting the APP at the URL can.
+ */
+describe("OperationApp — a Unit's permanent address mounts Unit Detail", () => {
+  it("/operation/stock/unit/:unitCode mounts the page, not the dashboard", () => {
+    renderApp("/operation/stock/unit/id-aam135002");
+    expect(screen.getByTestId("unit-detail-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
+  });
+
+  it("and the slim global bar stands down — the page draws its own header", () => {
+    renderApp("/operation/stock/unit/id-aam135002");
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 【WAREHOUSE】 CARD 02 — ONE TOP ROW PER WAREHOUSE SURFACE. The Inventory
+ * Register and the two de-navigated legacy Stock pages draw their own 50px
+ * Destination Header (ModuleHeader embeds TopBarIcons), so the slim global bar
+ * must stand down — the same defect Manual Purchase and Delivery Work each
+ * shipped with, measured live on the CARD 01 production walk (two Jump to,
+ * two bells, two gears on one screen).
+ */
+describe("OperationApp — Warehouse surfaces draw one top row, not two", () => {
+  it("?tab=stock-onhand mounts the Inventory Register with no slim bar", () => {
+    renderApp("/operation?tab=stock-onhand");
+    expect(screen.getByTestId("stock-register-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("?tab=stock-plan keeps its route and loses the slim bar", () => {
+    renderApp("/operation?tab=stock-plan");
+    expect(screen.getByTestId("stock-plan-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("?tab=movements keeps its route and loses the slim bar", () => {
+    renderApp("/operation?tab=movements");
+    expect(screen.getByTestId("movements-stub")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-topbar-stub")).not.toBeInTheDocument();
+  });
+
+  it("the dashboard keeps the slim bar — suppression is per surface, not global", () => {
+    renderApp("/operation?tab=dashboard");
+    expect(screen.getByTestId("global-topbar-stub")).toBeInTheDocument();
   });
 });
 
@@ -324,5 +418,35 @@ describe("OperationApp — the retired Purchase Demands address", () => {
     renderApp("/operation?tab=purchase");
     expect(screen.getByTestId("to-order-stub")).toBeInTheDocument();
     expect(screen.queryByTestId("purchase-demands-stub")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐ THE OLD PAYMENTS URL LEADS TO THE CANONICAL EXPERIENCE (2026-09-09).
+ *
+ * `?tab=payments` mounted the Master-Sheet "Balance" collections desk — its
+ * own Summary band, its own queue chips, its own editable balance and
+ * storage-fee fields — for the whole time the approved read-only Register was
+ * live at `/finance/payments`. Two forms for one act make two records
+ * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is deleted and the
+ * address forwards. A bookmark is not a reason to keep a duplicate; it is a
+ * reason to make the old address land.
+ */
+describe("OperationApp — the retired Payments desk", () => {
+  it("?tab=payments leads to the canonical Payments Register", () => {
+    renderApp("/operation?tab=payments");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/payments");
+  });
+
+  it("a scoped bookmark keeps its order", () => {
+    renderApp("/operation?tab=payments&so=1319");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/finance/payments?order=1319",
+    );
+  });
+
+  it("nothing of the desk is left to render", () => {
+    renderApp("/operation?tab=payments");
+    expect(screen.queryByTestId("dashboard-stub")).not.toBeInTheDocument();
   });
 });

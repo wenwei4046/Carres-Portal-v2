@@ -34,6 +34,13 @@ import { parseEmergencyContact } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
 import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
+
+/** D4 — the register needs exactly ONE fact from a delivery order: its number.
+ *  Narrow on purpose. The list read now embeds `ops_delivery_orders(do_number)`
+ *  per order, and that shape satisfies this without carrying the delivery
+ *  register's whole row; a full `DeliveryOrderRow` still assigns, so the
+ *  register's own tests may keep passing complete rows. */
+export type RegisterDeliveryOrder = Pick<DeliveryOrderRow, "do_number">;
 import {
   digits,
   itemsSummary,
@@ -52,7 +59,43 @@ import {
  *  18. Same table, two spellings of empty (YH, 2026-08-29). */
 export { NOT_RECORDED, conciseLocality } from "@/lib/locality";
 import { NOT_RECORDED, conciseLocality } from "@/lib/locality";
+import { DATE_TO_BE_CONFIRMED_CELL } from "./sales-order-guidance";
 export const NO_DATE_YET = "No delivery date";
+
+/**
+ * ⭐ ONE ARITHMETIC FOR `Requested Delivery Date` (Architecture Law D).
+ *
+ * The date the CUSTOMER is asking Carres to deliver on — Sales Orders owns it
+ * and every other surface only reads it. It was derived in three places
+ * (this register's row, `delivery-work.ts` and `delivery-orders-register.ts`)
+ * with three copies of the same `delivery_date_tbd` guard: three expressions
+ * that agreed today and would drift the first time one of them was touched.
+ *
+ * `tbd` is a SEPARATE fact from an absent date: the customer HAS asked for a
+ * delivery and the day is not settled yet, which is not the same as never
+ * having named one, so the caller may print the two absences differently.
+ */
+export function requestedDeliveryOf(o: {
+  delivery_date?: string | null;
+  delivery_date_tbd?: boolean | null;
+}): { iso: string | null; tbd: boolean } {
+  const tbd = Boolean(o.delivery_date_tbd);
+  return { iso: tbd ? null : o.delivery_date ?? null, tbd };
+}
+
+/**
+ * ⭐ AND ONE SPELLING OF ITS CELL. Three different things can be true of a
+ * requested date — a day, `To be confirmed`, or nothing asked for — and the
+ * cell, the search, the per-column filter and the Excel export must say the
+ * SAME one. Delivery's two registers each flattened `To be confirmed` into
+ * `No delivery date` on the way to the sheet, which told an Excel reader the
+ * customer had named no day when the customer had asked for one still being
+ * settled.
+ */
+export function requestedDeliveryText(v: { iso: string | null; tbd: boolean }): string {
+  if (v.iso) return fmtDate(v.iso);
+  return v.tbd ? DATE_TO_BE_CONFIRMED_CELL : NO_DATE_YET;
+}
 
 /**
  * `Carres Kelana Jaya` → `Kelana Jaya`, for the SHOWROOM column only.
@@ -103,7 +146,7 @@ export interface RegisterRow {
   poNumbers: string[];
   /** Every Delivery document produced by this SO. `orders.do_number` is only
    *  the current mirror and may never hide failed, voided or rebooked DOs. */
-  deliveryOrders: DeliveryOrderRow[];
+  deliveryOrders: RegisterDeliveryOrder[];
   total: MoneyState;
   paid: MoneyState;
   balance: MoneyState;
@@ -120,7 +163,7 @@ export interface RegisterRow {
 
 export function buildRegisterRow(
   o: operationOrderListRow,
-  deliveryOrders: DeliveryOrderRow[] = [],
+  deliveryOrders: RegisterDeliveryOrder[] = [],
 ): RegisterRow {
   const money = moneyOfOrder(o);
   const phone = o.customer_phone ?? "";
@@ -136,7 +179,7 @@ export function buildRegisterRow(
     phone,
     items: itemsSummary(o),
     ordered: o.placed_at,
-    customerDelivery: o.delivery_date_tbd ? null : (o.delivery_date ?? null),
+    customerDelivery: requestedDeliveryOf(o).iso,
     deliveryLocation: conciseLocality(o.customer_address_city, o.customer_address_state),
     poNumbers: o.po_numbers ?? [],
     deliveryOrders,

@@ -81,16 +81,18 @@ export type PurchaseDemandTimingState =
   | "not_enough_production_time";
 
 /**
- * The blockers. `no_production_days` is the ONE Purchasing-owned setup facet
- * (`SETUP TO FIX`); the other three belong to Sales/Catalog and are named on
- * their own rows, never as Purchasing rail facets.
+ * The blockers. `no_production_days` and `no_pickup_partner` are the
+ * Purchasing-owned setup blockers; the other three belong to Sales/Catalog and
+ * are named on their own rows, never as Purchasing rail facets.
  */
 export type PurchaseDemandBlockerState =
   | "no_customer_date"
   | "no_sku"
   | "no_supplier"
   | "no_cost"
-  | "no_production_days";
+  | "no_production_days"
+  /** The supplier is collected from the factory and no collector is set. */
+  | "no_pickup_partner";
 
 export type PurchaseDemandState = PurchaseDemandTimingState | PurchaseDemandBlockerState;
 
@@ -110,6 +112,7 @@ export const PURCHASE_DEMAND_STATES: readonly PurchaseDemandState[] = [
   "no_supplier",
   "no_cost",
   "no_production_days",
+  "no_pickup_partner",
 ] as const;
 
 export function isPurchaseDemandTimingState(v: unknown): v is PurchaseDemandTimingState {
@@ -144,6 +147,7 @@ export function purchaseDemandStateWords(
     no_supplier: "Supplier not assigned",
     no_cost: "Catalog cost is missing",
     no_production_days: "Production days are missing",
+    no_pickup_partner: "Collection is not configured",
   };
 }
 
@@ -183,6 +187,7 @@ export const PURCHASE_DEMAND_OWNER_DUTY: Record<PurchaseDemandState, string | nu
   no_supplier: "PO duty",
   no_cost: "PO duty",
   no_production_days: "Purchasing Settings",
+  no_pickup_partner: "Purchasing Settings",
 };
 
 export function isPurchaseDemandState(v: unknown): v is PurchaseDemandState {
@@ -336,6 +341,7 @@ const ACTION_OWNER_RULE: Record<PurchaseDemandState, string> = {
   no_supplier: "Current PO Duty",
   no_cost: "Catalog/Master Data through Current PO Duty",
   no_production_days: "Purchasing Settings authority",
+  no_pickup_partner: "Purchasing Settings authority",
 };
 
 /**
@@ -355,6 +361,7 @@ const ACTION_COMPLETION_FACT: Record<PurchaseDemandState, string> = {
   no_supplier: "Approved supplier relationship exists",
   no_cost: "Approved Catalog cost exists",
   no_production_days: "Governed supplier/category days exist",
+  no_pickup_partner: "Governed supplier collection rule exists",
 };
 
 /**
@@ -507,7 +514,26 @@ export function purchaseDemandQuantities(build: {
 } {
   const modular = isOnePoPerOrder(category) && build.lines.length > 1;
   const fully = build.fullyOnPo === true;
-  const toBuy = fully ? 0 : build.qty;
+  /* A build every unit of which sits on an open purchase order is STILL
+     buyable. `toBuy` used to be forced to 0 here, which made the row fail
+     `isSelectableForBuying` and disappear from SO Batch Purchase entirely.
+
+     The coverage that produced `fullyOnPo` is a GLOBAL, per-SKU pool: the
+     engine drains `openPoBySku` earliest-deadline-first with no customer link
+     at all, so the purchase order "covering" this order may have been raised
+     for somebody else and may stop covering it on the next refresh (T6,
+     `to-order.ts`). A buyer looking at their own Sales Order could not see
+     that, could not act on it, and was given no sentence saying why — the row
+     simply had no tick. YH ruled on 2026-09-03 that a line with a supplier, a
+     cost and a price is buyable, and that the buyer decides whether the pooled
+     coverage is good enough. This states the quantity and lets them choose.
+
+     `qtyNeeded` below still reads `build.qty` for a covered build rather than
+     adding the coverage back: `build.qty` is already what the covering
+     purchase order carries (T6), so adding `coveredByOpenPo` to it would count
+     the same units twice. `onPo` continues to report the coverage, so the row
+     shows both numbers and the operator can see they overlap. */
+  const toBuy = build.qty;
   const qtyNeeded = modular || fully
     ? build.qty
     : build.qty + build.coveredByOpenPo + build.takenFromStock;
@@ -549,6 +575,13 @@ export function purchaseDemandHelpLine(row: {
       return `Add production days for ${row.supplier ?? "the supplier"} · ${
         row.category ? categoryLabel(row.category) : "the category"
       }`;
+    /* COPY-STANDARD line 900 owns this pair, and its `todo` says "Set its
+       collector and destination in Purchasing Settings". `its` works there
+       because the refusal's first line names the supplier. Here the first line
+       is a state word with no name in it, so the supplier is named again
+       rather than left dangling. */
+    case "no_pickup_partner":
+      return `Set the collector for ${row.supplier ?? "the supplier"} in Purchasing Settings`;
     default:
       return null;
   }
@@ -711,6 +744,7 @@ export const purchaseDemandStateSchema = z.enum([
   "no_supplier",
   "no_cost",
   "no_production_days",
+  "no_pickup_partner",
 ]);
 
 export const soBatchPurchaseActionSchema = z.object({

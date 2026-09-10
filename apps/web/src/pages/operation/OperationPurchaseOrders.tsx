@@ -7,7 +7,6 @@ import {
   myHolidaySet,
   ordinalLabel,
   poDateHistoryOf,
-  PO_DELAY_REASONS,
   PO_STATE_ACTION_SHORT,
   PO_WORK_STATES,
   PO_WORK_STATE_LABEL,
@@ -68,7 +67,6 @@ import {
   useRecordBalanceDateMutation,
   useRecordReadyDate,
   useRecordSend,
-  useRecordSupplierDate,
   useRevisePo,
   useSetMessageTemplate,
   useOperationWarehouse,
@@ -1892,11 +1890,17 @@ function PoWorkArea({
           className="mt-1 pl-2 border-l-2 border-kit-blue-9"
           data-testid="po-date-extend"
         >
-          <SupplierDateForm po={po} confirmed={eta.confirmed} supplierName={supplierName} />
-          {/* THE QUEUE, AND — for the balance call — ITS DOOR (Q14). The
-              tomorrow call keeps no trigger here: its door is `SupplierDateForm`
-              one line above on this same surface, and a second one would
-              re-open exactly the two-doors defect this card closes. */}
+          {/* ⛔ THE SUPPLIER-DATE FORM LIVED HERE, UNREACHABLE (YH, 2026-09-01,
+              defect 5). It was the ONLY caller of `useRecordSupplierDate`, and
+              it sat below this file's live re-export inside
+              `LegacyOperationPurchaseOrders` — which no route mounts. So the
+              register counted "Ask {supplier} for the delivery date" in two
+              rail rows and two Work sentences while the door to answer it
+              rendered NOWHERE, and a reader grepping for the writer found this
+              and concluded the door was wired.
+              The real door is now `SupplierDateBlock` on the live
+              `purchase-orders/PurchaseOrdersPage.tsx` Document view. */}
+          {/* THE QUEUE, AND — for the balance call — ITS DOOR (Q14). */}
           {calls.map((c) =>
             c.key === "confirm_balance_delivery_date" && c.poLineId ? (
               <BalanceDateRow key={c.poLineId} call={c} po={po} />
@@ -2026,7 +2030,7 @@ function CallStatement({
  * 35 lines**, so a button on the item row would have given one fact two to five
  * doors. That is the very defect this card removes, one tier down.
  *
- * The manner is `SupplierDateForm`'s, not `ReadyDateField`'s: this is a
+ * The manner is the retired `SupplierDateForm`'s, not `ReadyDateField`'s: this is a
  * multi-field form, and Jess ruled those get a real button ("i cant save?").
  * Every visible string is ruled — the queue word, `Record balance date` and
  * `Balance date recorded` are `order-action-words`', and the line's own fact is
@@ -3114,190 +3118,6 @@ function LineRow({
  * Reason is the countable CATEGORY; Remarks is the free-text story. Two
  * fields, never folded: a category that swallows prose cannot be counted.
  */
-function SupplierDateForm({
-  po,
-  confirmed,
-  supplierName,
-}: {
-  po: operationPoListRow;
-  confirmed: boolean;
-  supplierName: string;
-}) {
-  /**
-   * The date this call is ABOUT — `purchase_orders.eta_date`, because that is
-   * literally what `purchasing_record_tomorrow_delivery` reads
-   * (`v_about := v_po.eta_date`) and refuses to run without.
-   *
-   * **It does NOT key on `confirmed`, and that is load-bearing.** Provenance
-   * now says *the supplier has never named an arrival*, which is true of a PO
-   * carrying our own estimate — but the RPC still holds that estimate as the
-   * date being answered. Tying `held` to provenance would send `shipping` with
-   * a `firstDate` the RPC ignores for that answer, and the supplier's real date
-   * would be recorded as a promise about our guess and then dropped. The form's
-   * arithmetic must match the door's; only the WORDING follows provenance.
-   */
-  const held = po.eta_date ?? null;
-  // INLINE EDIT, the same manner as the line surface (Jess, 2026-08-02): the
-  // extend is QUIET until you ask to record something. A Remarks box standing
-  // open on a panel nobody is editing is furniture, and a Reason picker that
-  // only appears once a date differs is invisible until then — so the whole
-  // form appears together, on one click, and Enter saves it.
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState("");
-  const [reason, setReason] = useState<string>(PO_DELAY_REASONS[0]);
-  const [remarks, setRemarks] = useState("");
-  // Remarks is the EXCEPTION, not the rule (Jess, 2026-08-02) — most answers
-  // are a date and a reason. It stays folded until asked for.
-  const [remarksOpen, setRemarksOpen] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const save = useRecordSupplierDate(po.id);
-
-  const moved = held != null && date !== "" && date !== held;
-  const shiftDays =
-    held && date
-      ? Math.round(
-          (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${held}T00:00:00Z`)) /
-            86_400_000,
-        )
-      : 0;
-
-  const close = () => {
-    setOpen(false);
-    setDate("");
-    setRemarks("");
-    setRemarksOpen(false);
-    setErr(null);
-  };
-
-  function submit() {
-    if (date === "" || save.isPending) return;
-    setErr(null);
-    const body =
-      held == null
-        ? { answer: "shipping" as const, firstDate: date, remarks: remarks || undefined }
-        : moved
-          ? { answer: "delayed" as const, newDate: date, reason, remarks: remarks || undefined }
-          : { answer: "shipping" as const, remarks: remarks || undefined };
-    save.mutate(body, {
-      onSuccess: close,
-      onError: (e) => setErr(e instanceof Error ? e.message : String(e)),
-    });
-  }
-  const keys = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") submit();
-    if (e.key === "Escape") close();
-  };
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-testid="po-date-open"
-        className="text-body text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
-      >
-        {/* `a NEW date` only once there IS an old one the supplier gave. A PO
-            wearing our own estimate has had no supplier date at all, so it asks
-            for the first — the string this page already carried, now reaching
-            the POs that always needed it. */}
-        {confirmed ? "Record a new date…" : "Record the supplier's date…"}
-      </button>
-    );
-  }
-
-  return (
-    <div className="py-1" data-testid="po-date-form">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          value={date}
-          autoFocus
-          onChange={(e) => setDate(e.target.value)}
-          onKeyDown={keys}
-          aria-label={held == null ? "Supplier delivery date" : "New supplier delivery date"}
-          data-testid="po-date-input"
-          className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-        />
-        {moved && (
-          <select
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            onKeyDown={keys}
-            aria-label="Reason"
-            data-testid="po-date-reason"
-            className="h-8 rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12"
-          >
-            {PO_DELAY_REASONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        )}
-        {remarksOpen ? (
-          <input
-            type="text"
-            value={remarks}
-            autoFocus
-            onChange={(e) => setRemarks(e.target.value)}
-            onKeyDown={keys}
-            placeholder="Remarks"
-            aria-label="Remarks"
-            data-testid="po-date-remarks"
-            className="h-8 flex-1 min-w-[8rem] rounded-control border border-kit-slate-5 bg-white px-2 text-body text-kit-slate-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kit-blue-9"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setRemarksOpen(true)}
-            data-testid="po-date-remarks-open"
-            className="text-label text-kit-slate-9 border-b border-dashed border-kit-slate-5 hover:text-kit-slate-12"
-          >
-            + Remarks
-          </button>
-        )}
-        {/* A MULTI-field form needs a button (Jess: "i cant save?"). Enter-to-
-            save is an inline-edit gesture for ONE value; here it is a hint at
-            best, and a hidden control at worst. Esc still cancels. */}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={date === "" || save.isPending}
-          data-testid="po-date-save"
-          className={`${DOC_BTN} disabled:opacity-40`}
-        >
-          {save.isPending ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={close}
-          data-testid="po-date-cancel"
-          className="text-label text-kit-slate-9 hover:text-kit-slate-12"
-        >
-          Cancel
-        </button>
-      </div>
-      {/* Say what Save will record BEFORE it happens; silent until a date is
-          keyed, because with nothing keyed there is nothing to record. */}
-      {date !== "" && (
-        <div className="text-label text-kit-slate-9" data-testid="po-date-effect">
-          {held == null
-            ? `First date from ${supplierName}.`
-            : shiftDays > 0
-              ? `Delay ${shiftDays} day${shiftDays === 1 ? "" : "s"} from ${fmtDateShort(held)}.`
-              : shiftDays < 0
-                ? `Earlier by ${-shiftDays} day${shiftDays === -1 ? "" : "s"} than ${fmtDateShort(held)}.`
-                : `Same date — the supplier confirms ${fmtDateShort(held)}.`}
-        </div>
-      )}
-      {err && (
-        <div className="mt-1 text-label text-kit-red-11" data-testid="po-date-error">
-          {err}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /**
  * ACTIVITY — Work + History (Jess, 2026-08-02, renamed from Communication):

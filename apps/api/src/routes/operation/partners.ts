@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { setPartnerDeliveryRulesInput } from "@carres/shared";
+import {
+  setPartnerDeliveryRulesInput,
+  setPartnerJourneyCalendarInput,
+} from "@carres/shared";
 import { mapPgError } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -35,7 +38,7 @@ operationPartnersRouter.get("/", async (c) => {
     // T9 (0283) — the carrier's own delivery rules ride the list every consumer
     // already fetches, so the drawer can show them without a second round trip.
     .select(
-      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days",
+      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas",
     )
     .order("name", { ascending: true });
   if (error) {
@@ -120,7 +123,75 @@ operationPartnersRouter.put("/:id/delivery-rules", async (c) => {
   const { data, error: readErr } = await sb
     .from("delivery_partners")
     .select(
-      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days",
+      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) {
+    const m = mapPgError(readErr);
+    return c.json(m.body, m.status);
+  }
+  if (!data) throw new HTTPException(404, { message: "Logistic partner not found" });
+  return c.json({ partner: data });
+});
+
+/**
+ * PUT /api/operation/partners/:id/journey-calendar — Delivery Card 03 (0411).
+ *
+ * The carrier's own pickup week, per-region delivery/transit facts and
+ * surcharge areas. They feed the ONE backward calculation
+ * (`packages/shared/src/partner-journey.ts`, MASTER §5.1); they INFORM the
+ * operator and never block an assignment. Whole calendar every time — the
+ * 0283 no-partial-patch law — through the audited `set_partner_journey_calendar`
+ * door for exactly the 0283 column-narrowing reason.
+ */
+operationPartnersRouter.put("/:id/journey-calendar", async (c) => {
+  const id = c.req.param("id");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    throw new HTTPException(404, { message: "Logistic partner not found" });
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = setPartnerJourneyCalendarInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue && issue.path.length > 0 ? issue.path.join(".") : "<root>";
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: `Invalid journey calendar at ${path}: ${issue?.message ?? "validation failed"}`,
+      },
+      422,
+    );
+  }
+
+  const pickupDays =
+    parsed.data.pickupDays === null
+      ? null
+      : Array.from(new Set(parsed.data.pickupDays)).sort();
+
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { error } = await sb.rpc("set_partner_journey_calendar", {
+    p_partner_id: id,
+    p_pickup_days: pickupDays,
+    p_journey_regions: parsed.data.regions,
+    p_surcharge_areas: parsed.data.surchargeAreas,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+
+  const { data, error: readErr } = await sb
+    .from("delivery_partners")
+    .select(
+      "id, name, contact, zones, whatsapp_group_url, off_days, blackout_dates, daily_capacity, booking_lead_days, pickup_days, journey_regions, surcharge_areas",
     )
     .eq("id", id)
     .maybeSingle();

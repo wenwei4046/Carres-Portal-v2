@@ -151,6 +151,71 @@ beforeEach(() => {
 });
 
 describe("50% work + 50% the actual document", () => {
+  it("resumes a covering PO with its saved supplier doors without issuing twice", async () => {
+    stubReads((path) => {
+      if (path.includes("issue-batch")) throw { body: { code: "already_on_po", po: "PO-existing" } };
+      if (path.endsWith("/issue-context")) return {
+        id: "PO-existing", supplierId: "s-hooka", supplierName: "Hooka",
+        destinationId: KLANG.id, destination: "Carres Klang",
+        whatsappGroupUrl: "https://chat.whatsapp.com/saved-group",
+      };
+      return undefined;
+    });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTitle("PO-existing purchase order");
+    expect(screen.queryByTestId("so-batch-issue-error")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open existing PO")).not.toBeInTheDocument();
+    expect(await screen.findByText("Open WhatsApp group")).toHaveAttribute("href", "https://chat.whatsapp.com/saved-group");
+    expect(apiFetch.mock.calls.filter(([p]) => String(p).includes("issue-batch"))).toHaveLength(1);
+    expect(apiFetch).toHaveBeenCalledWith("/api/operation/pos/PO-existing/sends");
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("keeps the existing PO action available when opening fails", async () => {
+    stubReads((path) => {
+      if (path.includes("issue-batch")) throw { body: { code: "already_on_po", po: "PO-existing" } };
+      if (path.endsWith("/issue-context")) throw new Error("offline");
+      return undefined;
+    });
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByText("Could not open PO-existing.");
+    expect(screen.getByRole("button", { name: "Issue PO" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Issue PO" }));
+    await waitFor(() => expect(apiFetch.mock.calls.filter(([p]) => String(p).endsWith("/issue-context"))).toHaveLength(2));
+    expect(apiFetch.mock.calls.filter(([p]) => String(p).includes("issue-batch"))).toHaveLength(1);
+  });
+
+  it("renders a money-free draft on entry, changes with navigation, and creates nothing", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
+    vi.mocked(renderPoPdf).mockClear();
+    const view = renderWorkspace([doc(), SECOND]);
+    await screen.findByTitle("Draft purchase order preview");
+    expect(renderPoPdf).toHaveBeenLastCalledWith(expect.objectContaining({
+      draft: true, po_number: "DRAFT", po_id: "", issue_date: "", eta_date: null,
+      supplier: expect.objectContaining({ name: "Hooka" }),
+      lines: [{ sku: "B1201S-K", description: "Booqit · King", qty: 2, unit: "unit", sources: [{ so: 1318, qty: 2 }] }],
+    }));
+    expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
+    fireEvent.click(screen.getByTestId("so-batch-issue-next"));
+    await waitFor(() => expect(renderPoPdf).toHaveBeenLastCalledWith(expect.objectContaining({
+      supplier: expect.objectContaining({ name: "Ohana" }),
+      destination: expect.objectContaining({ name: "AL Sungai Buloh" }),
+    })));
+    view.unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it("lets the operator retry a failed draft without issuing a PO", async () => {
+    const { renderPoPdf } = await import("@/lib/pdf/render");
+    vi.mocked(renderPoPdf).mockRejectedValueOnce(new Error("render failed"));
+    renderWorkspace();
+    await screen.findByText("Could not load the preview.");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByTitle("Draft purchase order preview");
+    expect(apiFetch.mock.calls.some(([p]) => String(p).includes("issue-batch"))).toBe(false);
+  });
   /**
    * ⭐ 50 / 50 AT 1130px AND WIDER; STACKED BELOW IT (closure §10).
    *
@@ -344,6 +409,20 @@ describe("Issue PO creates every document in one request", () => {
     expect(screen.getByTestId("so-batch-evidence-PO-2041")).toHaveTextContent("PO-2041");
     expect(screen.queryByTestId("so-batch-issue-create")).not.toBeInTheDocument();
   });
+
+  it("Back to buying stays reachable after Issue PO, and it is the SAME door as before — not Purchase Orders", async () => {
+    issued();
+    renderWorkspace();
+    fireEvent.click(screen.getByTestId("so-batch-issue-create"));
+    await screen.findByTestId("so-batch-evidence-PO-2041");
+    /* Leaving is safe (file header): the numbered PO already exists, so the
+       same `Back to buying` door stays open — same label, same handler,
+       never a route to a different module's register. */
+    const back = screen.getByTestId("so-batch-issue-back");
+    expect(back).toHaveTextContent("Back to buying");
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("Issue PO stays open until the PDF actually reaches the supplier", () => {
@@ -479,12 +558,36 @@ describe("the issue review only reviews the purchase order", () => {
     expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
   });
 
+  /* The refusal names BOTH parties by name — the supplier that refused and the
+     destination it must go to. It used to name neither, so on a batch spanning
+     suppliers the operator could not tell which one had stopped, and had to go
+     to Settings to learn where it wanted to go. Pin the whole sentence: the
+     names are the fix, and a fallback that quietly returns must fail here. */
   it("refuses a destination that differs from the governed collection rule", () => {
     renderWorkspace([{ ...fixedPickup, destinationId: BULOH.id }]);
     expect(screen.getByTestId("so-batch-issue-create")).toBeDisabled();
     expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
-      "Nice Future must be collected to its configured destination.",
+      "Nice Future must be collected to Carres Klang.",
     );
+    expect(screen.getByTestId("so-batch-issue-blocker")).toHaveTextContent(
+      "Set Deliver To to Carres Klang, then issue again.",
+    );
+  });
+
+  /* A supplier that DELIVERS its own goods is never collected, so its fixed
+     destination is a setting nothing reads — and the server never refuses on
+     it. The browser used to, which greyed out Issue PO for a document the
+     server would have accepted, with no way past it from the screen. */
+  it("does not refuse a supplier that delivers its own goods", () => {
+    renderWorkspace([
+      {
+        ...fixedPickup,
+        supplierKind: "own_logistics",
+        destinationId: BULOH.id,
+      },
+    ]);
+    expect(screen.queryByTestId("so-batch-issue-blocker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-issue-create")).toBeEnabled();
   });
 
   it("sends only the selected demand and destination arrangement", async () => {

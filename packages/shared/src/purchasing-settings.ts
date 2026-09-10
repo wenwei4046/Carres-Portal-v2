@@ -42,11 +42,16 @@ export function isPurchasingCategory(v: unknown): v is PurchasingCategory {
 
 /** The single numbers a manager may edit one at a time. Mirrored by the
  *  CHECK inside `purchasing_set_number()` — a typo is refused by the
- *  database, not only by the browser. */
+ *  database, not only by the browser.
+ *
+ *  `manual_purchase_min_delivery_days` (0422) — CALENDAR days, like
+ *  `earliest_sell_days`. The earliest Delivery Date a Manual Purchase may
+ *  ask for is its Proceed Date + this many days; 0 means no floor. */
 export const PURCHASING_NUMBER_KEYS = [
   "order_by_buffer_days",
   "earliest_sell_days",
   "logistics_call_working_days",
+  "manual_purchase_min_delivery_days",
 ] as const;
 export type PurchasingNumberKey = (typeof PURCHASING_NUMBER_KEYS)[number];
 
@@ -60,6 +65,7 @@ export const PURCHASING_NUMBER_RANGE: Record<PurchasingNumberKey, { min: number;
   order_by_buffer_days: { min: 0, max: 60 },
   earliest_sell_days: { min: 0, max: 365 },
   logistics_call_working_days: { min: 0, max: 30 },
+  manual_purchase_min_delivery_days: { min: 0, max: 365 },
 };
 
 /** Production working days are bounded by the SQL CHECK too. */
@@ -135,6 +141,9 @@ export interface PurchasingSettings {
   earliestSellDays: number;
   logisticsCallWorkingDays: number;
   poDays: readonly number[];
+  /** 0422 — CALENDAR days after the Proceed Date; the earliest Delivery
+   *  Date a Manual Purchase may ask for. 0 means no floor. */
+  manualPurchaseMinDeliveryDays: number;
   suppliers: readonly PurchasingSupplierRow[];
   productionDays: readonly PurchasingProductionDays[];
   destinations: readonly PurchasingDestinationSetting[];
@@ -420,6 +429,7 @@ export const purchasingSettingsResponseSchema = z.object({
   earliestSellDays: z.number().int(),
   logisticsCallWorkingDays: z.number().int(),
   poDays: weekdayList,
+  manualPurchaseMinDeliveryDays: z.number().int(),
   suppliers: z.array(
     z.object({
       id: z.string(),
@@ -540,6 +550,34 @@ export const purchasingSetProductionDaysInput = z
   })
   .strict();
 export type PurchasingSetProductionDaysInput = z.infer<typeof purchasingSetProductionDaysInput>;
+
+/**
+ * The lorry leg's range, mirroring `purchasing_set_supplier_transit_days`'s own
+ * `0..60` guard (migration 0318). The RPC is the boundary; this only stops a
+ * pointless round trip.
+ */
+export const TRANSIT_DAYS_RANGE = { min: 0, max: 60 } as const;
+
+/**
+ * Set one supplier's transit days.
+ *
+ * The number and its audited write door have existed since 0318; until
+ * 2026-09-09 NOTHING in the portal called them, while Manual Purchase told the
+ * operator "Add transit days for {supplier} in Settings" and Settings had no
+ * such field. `days` is NOT nullable — the RPC refuses null, and a supplier
+ * whose lorry leg is unknown must stay unknown rather than be written as 0.
+ */
+export const purchasingSetTransitDaysInput = z
+  .object({
+    supplierId: z.string().uuid(),
+    days: z
+      .number()
+      .int()
+      .min(TRANSIT_DAYS_RANGE.min)
+      .max(TRANSIT_DAYS_RANGE.max),
+  })
+  .strict();
+export type PurchasingSetTransitDaysInput = z.infer<typeof purchasingSetTransitDaysInput>;
 
 export const purchasingSetWorkWeekInput = z
   .object({

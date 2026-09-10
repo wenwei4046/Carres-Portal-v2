@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import "./manual-purchase-create.css";
+import registerStyles from "./ManualPurchaseRegister.module.css";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -20,17 +22,20 @@ import {
   manualPurchaseItemsSummary,
   manualPurchaseLeadDayFacts,
   manualPurchaseLineRemainingOf,
+  manualPurchaseObjectHeading,
   manualPurchaseOrderByLine,
   manualPurchaseOrderByOf,
   manualPurchasePoSummary,
   manualPurchaseRailFacts,
   manualPurchaseRailModel,
   manualPurchaseSelectable,
+  manualPurchaseNotSelectableReason,
   manualPurchaseStatusOf,
   manualPurchaseSupplierSummary,
   manualPurchaseTimingOf,
   manualPurchaseWorkOrder,
   purchasingRefusal,
+  type PurchasingSupplierCollectionSetting,
   stillNeededOf,
   type DemandPickItem,
   type DemandPurpose,
@@ -59,16 +64,17 @@ import {
 } from "@/components/register/DataGrid";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { addDaysIso } from "@/lib/excel-date-filter";
 import { fmtDate } from "@/lib/fmt-date";
 import {
   useAlreadyOnPo,
   useCreatePurchaseRequest,
-  useCreatePurchaseRequestLine,
   useDecidePurchaseRequest,
   useIssuePurchaseRequests,
   useManualPurchaseDetail,
   useManualPurchasePlan,
   useManualPurchaseRegister,
+  useMoveManualPurchaseDeliverTo,
   type ManualPurchasePlanLine,
   type ManualPurchaseRegisterPayload,
   type PurchaseRequestLineRow,
@@ -89,6 +95,16 @@ import {
   FilterRailRow,
 } from "./components/workspace-rail";
 
+function addDaysToIso(iso: string, days: number): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year, month - 1, day + days);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
 /**
  * MANUAL PURCHASE — the request, the approval, the order
  * (PURCHASING CARD 04 — the permanent Register;
@@ -97,7 +113,9 @@ import {
  * The permanent right-side Register: one Manual Purchase request per parent
  * row, complete history by default (ordered records included — `All not
  * ordered` is Card 03's explicit rail filter, never a silent default), the
- * eleven governed columns in the Card's exact order, the read-only
+ * ten governed columns in Card 08's exact order (no visible document
+ * number — before `Issue PO` a Manual Purchase has none; after it the only
+ * purchasing identity is the actual `PO No`), the read-only
  * expansion, and selection that admits ONLY `Ready to order` remainder.
  * PO Duty appears nowhere until a selection exists, then once, beside the
  * issue action (the SO Batch sibling grammar).
@@ -151,7 +169,6 @@ interface ExpansionLine {
 
 interface RequestRegisterRow {
   id: string;
-  reqNo: string;
   purpose: string;
   /** Card 06 §3.1 — the actual hand-off fact (`created_at`), immutable. */
   proceedDate: string;
@@ -246,7 +263,9 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       lines: lines.map((l) => ({
         qty: l.qty,
         issuedQty: l.issued_qty,
-        remainingQty: l.remaining_qty,
+        /* The APPROVER's number, not the database's generated
+           `qty − issued_qty`. See `manualPurchaseStatusOf`. */
+        approvedQty: l.approved_qty,
         cancelledAt: l.cancelled_at,
         poId: l.po_id,
         received: l.received,
@@ -257,7 +276,6 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
     );
     return {
       id: r.id,
-      reqNo: r.req_no,
       purpose: r.purpose,
       proceedDate: r.created_at,
       approval: manualPurchaseApprovalOf({
@@ -354,29 +372,26 @@ export default function OperationManualPurchase() {
   const navigate = useNavigate();
   const issue = useIssuePurchaseRequests();
 
-  /* Card 06 §7 — a Work action deep-links the exact MPR:
-     `?tab=manual-purchase&mpr={id}` opens the object directly. The param is
-     consumed so `‹ Manual Purchase` returns to the Register, not a loop. */
+  /* Card 06 §7 / Card 08 — a Work action deep-links the exact request by
+     its invisible UUID: `?tab=manual-purchase&mp={id}` opens the object
+     directly (`mpr` survives as a read-only alias for pre-Card-08
+     bookmarks). The param is consumed so `‹ Manual Purchase` returns to
+     the Register, not a loop. */
   const [searchParams, setSearchParams] = useSearchParams();
-  const linkedMpr = searchParams.get("mpr");
+  const linkedRequest = searchParams.get("mp") ?? searchParams.get("mpr");
   useEffect(() => {
-    if (!linkedMpr) return;
-    setMode({ detail: linkedMpr });
+    if (!linkedRequest) return;
+    setMode({ detail: linkedRequest });
     const next = new URLSearchParams(searchParams);
+    next.delete("mp");
     next.delete("mpr");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedMpr]);
+  }, [linkedRequest]);
 
   const rows = useMemo(
     () => (q.data ? buildRows(q.data) : []),
     [q.data],
-  );
-
-  /** Card 03 §3 — the real action owner's name beside `Need approval`. */
-  const approverLine = useMemo(
-    () => manualPurchaseApproverLine((q.data?.approvers ?? []).map((a) => a.name)),
-    [q.data?.approvers],
   );
 
   /**
@@ -449,9 +464,24 @@ export default function OperationManualPurchase() {
   /* ── SELECTION (Card 04) — only `Ready to order` remainder may be ticked;
      PO Duty exists on this page ONLY beside a live selection. ─────────── */
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [issueError, setIssueError] = useState<string | null>(null);
+  /* ⭐ A REFUSAL IS TWO LINES HERE TOO (YH, 2026-09-01). This held ONE
+     string, built by joining `message` and `action` with a space — so the fact
+     and the act ran together into a single red sentence, on the one surface in
+     this file that was not already using `TwoLines`. The object page eighty
+     lines down has held the pair since it was written; the Register simply
+     never did. Same shape, same component, no new one. */
+  const [issueError, setIssueError] = useState<{ wrong: string; todo: string } | null>(
+    null,
+  );
   const selectable = (r: RequestRegisterRow) =>
     manualPurchaseSelectable(r.status.kind, r.remainingQty);
+  /** The sentence beside a row the tick refuses; null when it may be ticked.
+   *  A row still waiting for approval already says so in the same cell, so
+   *  it gets no second line. */
+  const deadReason = (r: RequestRegisterRow) =>
+    r.status.kind === "waiting_approval"
+      ? null
+      : manualPurchaseNotSelectableReason(r.status.kind, r.remainingQty, r.approval.kind);
   const selectedRows = useMemo(
     () => filtered.filter((r) => selected.has(r.id) && selectable(r)),
     [filtered, selected],
@@ -465,8 +495,43 @@ export default function OperationManualPurchase() {
     setIssueError(null);
     const ids = selectedRows.map((r) => r.id);
     if (ids.length === 0) return;
+    /* ⭐ THE SAME GATE THE SERVER APPLIES, BEFORE THE REQUEST IS SENT (owner,
+       2026-09-03; the SoBatchIssueWorkspace shape). A collected supplier's
+       goods land where Purchasing Settings says; a Manual Purchase that names
+       somewhere else is refused by the issue door with the same two lines
+       this prints. Refusing here saves the round trip and — since a request's
+       Deliver To has no door to move it — says so before anything is tried.
+       `supplierCollections` carries ONLY factory-pickup suppliers
+       (`purchasing-settings.ts`), so no kind gate is needed here, and a
+       payload without the field (an older API) gates nothing. */
+    if (q.data) {
+      const collectionBySupplier = new Map(
+        (q.data.supplierCollections ?? []).map((c) => [c.supplierId, c]),
+      );
+      const destName = new Map(q.data.destinations.map((d) => [d.id, d.name]));
+      for (const row of selectedRows) {
+        for (const wall of row.issueWalls) {
+          const rule = wall.supplierId ? collectionBySupplier.get(wall.supplierId) : undefined;
+          if (rule?.destinationId && rule.destinationId !== wall.destinationId) {
+            setIssueError(
+              purchasingRefusal("supplier_collection_destination_mismatch", {
+                supplier: rule.supplierName || null,
+                destination: destName.get(rule.destinationId) ?? null,
+              }),
+            );
+            return;
+          }
+        }
+      }
+    }
     if (ids.length > 20) {
-      setIssueError("Select at most 20 requests for one issue.");
+      /* The one cap this door enforces in the browser. It is a refusal like
+         any other, so it wears the refusal shape rather than a lone sentence
+         invented at the throw site. */
+      setIssueError({
+        wrong: "One issue can carry 20 Manual Purchases at most.",
+        todo: `Untick ${ids.length - 20} of them, then issue again.`,
+      });
       return;
     }
     try {
@@ -478,12 +543,31 @@ export default function OperationManualPurchase() {
       void q.refetch();
     } catch (e) {
       /* THE APPROVED TWO LINES: the fact, then the act. */
-      const body = (e as { body?: { message?: string; action?: string; code?: string } })
-        .body;
-      const fallback = purchasingRefusal(body?.code);
-      setIssueError(
-        `${body?.message ?? fallback.wrong} ${body?.action ?? fallback.todo}`.trim(),
-      );
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            sku?: string | null;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      /* Every fact the server sent, not just the code. `refuse()` echoes its
+         facts beside `message`, so a code that arrives without a sentence
+         still names the supplier and the destination instead of degrading to
+         `the supplier` (the SoBatchIssueWorkspace shape). */
+      const fallback = purchasingRefusal(body?.code, {
+        sku: body?.sku ?? null,
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
+      setIssueError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
     }
   }
 
@@ -511,14 +595,18 @@ export default function OperationManualPurchase() {
             <StatusPill tone={APPROVAL_TONE[r.approval.kind]}>
               {r.approval.label}
             </StatusPill>
-            {/* Card 03 §3 — while approval is needed the row names the REAL
-                action owner. Nothing resolved prints nothing. */}
-            {r.approval.kind === "need_approval" && approverLine ? (
+            {/* A DEAD TICK SAYS WHY (MPR-20260904-8935, 2026-09-04). The row
+                read `Approved`, Approved Qty 0, Still To Order 0, and its
+                checkbox was greyed with nothing on screen naming the cause —
+                the SO Batch Deliver To cell's defect (#1056), met again here.
+                The sentence comes from the same two facts the tick reads, so
+                it can never disagree with the checkbox. */}
+            {r.status.kind !== "ordered" && deadReason(r) ? (
               <span
-                className="block truncate text-label font-normal text-base-600"
-                data-testid={`mp-approver-${r.id}`}
+                className="block text-label font-normal text-kit-amber-11"
+                data-testid="mp-row-dead-reason"
               >
-                {approverLine}
+                {deadReason(r)}
               </span>
             ) : null}
           </span>
@@ -527,34 +615,14 @@ export default function OperationManualPurchase() {
         filterValue: (r) => r.approval.label,
       },
       {
-        key: "mpr_no",
-        label: MW.colMprNo,
-        width: 168,
-        sortable: true,
-        filterType: "numbering",
-        accessor: (r) => (
-          <button
-            type="button"
-            className="font-mono font-medium text-blue-700 underline-offset-2 hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-              setMode({ detail: r.id });
-            }}
-          >
-            {r.reqNo}
-          </button>
-        ),
-        searchValue: (r) => r.reqNo,
-        filterValue: (r) => r.reqNo,
-      },
-      {
         key: "po_no",
         label: MW.colPoNo,
         width: 150,
         sortable: true,
         accessor: (r) => {
-          /* ONLY real lineage (Card 04 §3.4): none / the clickable number /
-             `{n} POs` — the exact mapping lives in the expansion. */
+          /* ONLY real lineage (Card 04 §3.4; Card 08 §3.2): `—` is a fact,
+             never a button; ONE PO is the clickable document; several open
+             the object's exact linked PO list. */
           if (r.poNos.length === 1) {
             return (
               <button
@@ -567,6 +635,22 @@ export default function OperationManualPurchase() {
                 }}
               >
                 {r.poNos[0]}
+              </button>
+            );
+          }
+          if (r.poNos.length > 1) {
+            return (
+              <button
+                type="button"
+                className="text-kit-blue-11 underline-offset-2 hover:underline"
+                data-testid={`mp-po-list-${r.id}`}
+                title="Open the linked Purchase Orders"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setMode({ detail: r.id });
+                }}
+              >
+                {manualPurchasePoSummary(r.poNos)}
               </button>
             );
           }
@@ -603,13 +687,29 @@ export default function OperationManualPurchase() {
         label: MW.colFor,
         width: 170,
         sortable: true,
+        /* Card 08 §3.2 — `For` is the clear single-click entrance to the
+           Manual Purchase object (the retired number column's one job); the
+           row's deep-link identity stays the invisible UUID. */
         accessor: (r) => (
-          <span className="block truncate" title={r.forText}>
-            {r.forText}
-          </span>
+          <button
+            type="button"
+            className="block max-w-full truncate text-left font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+            title={r.forText || purposeLabelOf(r.purpose)}
+            data-testid={`mp-open-${r.id}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMode({ detail: r.id });
+            }}
+          >
+            {/* A historical row whose structured For was never stored still
+                needs its entrance — the purpose word stands in, never a
+                number and never an empty button. */}
+            {r.forText || purposeLabelOf(r.purpose)}
+          </button>
         ),
         searchValue: (r) => r.forText,
         filterValue: (r) => r.forText,
+        exportValue: (r) => r.forText,
       },
       {
         key: "items",
@@ -680,16 +780,19 @@ export default function OperationManualPurchase() {
         filterValue: (r) => r.requestedBy,
       },
     ],
-    [approverLine, navigate],
+    [navigate],
   );
 
   if (mode === "create") {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <PurchasingTabs />
         <CreateRequestWorkspace
           destinations={q.data?.destinations ?? []}
+          defaultDestinationId={q.data?.defaultDestinationId ?? null}
+          supplierCollections={q.data?.supplierCollections ?? []}
           staff={q.data?.users ?? []}
+          minDeliveryDays={q.data?.minDeliveryDays ?? 0}
+          todayIso={q.data?.todayIso ?? null}
           onDone={() => {
             setMode("register");
             void q.refetch();
@@ -699,7 +802,7 @@ export default function OperationManualPurchase() {
     );
   }
 
-  /* Card 05 §3 — clicking the MPR number opens WORK: the full-width object
+  /* Card 05 §3 / Card 08 §3.2 — the `For` cell opens WORK: the full-width object
      replaces the Register content. The Register stays MOUNTED underneath
      (visibility only), so `‹ Manual Purchase` restores the complete state
      the operator left — rail filters, search, column filters, sort, scroll
@@ -709,7 +812,7 @@ export default function OperationManualPurchase() {
   const gridIndex = detailId != null ? gridRows.findIndex((r) => r.id === detailId) : -1;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={`${detailId == null ? registerStyles.page : ""} flex h-full min-h-0 flex-col`}>
       {detailId == null && <PurchasingTabs />}
       <div className="relative min-h-0 flex-1">
       <div
@@ -933,9 +1036,12 @@ export default function OperationManualPurchase() {
             }
             groupBanner={false}
             /* The identity survives horizontal scrolling — the DataGrid's
-               governed capability, pinned on the Manual Purchase No. */
-            stickyIdentity={{ columnKey: "mpr_no" }}
+               governed capability, pinned on the business fact `For`
+               (Card 08 §3.2: the sticky column is a fact, never a hidden
+               number). */
+            stickyIdentity={{ columnKey: "for" }}
             expandable={{
+              flush: true,
               renderExpansion: (r) => <RequestExpansion row={r} />,
               testId: (r) => `mp-expand-${r.id}`,
             }}
@@ -1010,10 +1116,17 @@ export default function OperationManualPurchase() {
               </span>
             </div>
           ) : null}
-          {issueError && selectedRows.length > 0 ? (
-            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-issue-selected-error">
-              {issueError}
-            </p>
+          {/* ⭐ A REFUSAL OUTLIVES THE SELECTION THAT CAUSED IT (YH,
+              2026-09-01). This was gated on `selectedRows.length > 0`, and the
+              refusal that most needs reading is the one where the rows go away:
+              somebody else issued the request, the refetch drops it from the
+              list, the selection empties — and the sentence explaining all of
+              that disappeared in the same tick. The operator saw a list that
+              had quietly changed and no reason for it. */}
+          {issueError ? (
+            <div className="mt-1" data-testid="mp-issue-selected-error">
+              <TwoLines wrong={issueError.wrong} todo={issueError.todo} />
+            </div>
           ) : null}
         </div>
 
@@ -1023,7 +1136,22 @@ export default function OperationManualPurchase() {
         <ManualPurchaseObject
           key={detailId}
           id={detailId}
-          registerReqNo={detailRow?.reqNo ?? null}
+          registerHeading={
+            detailRow
+              ? {
+                  identity: manualPurchaseObjectHeading({
+                    purposeLabel: purposeLabelOf(detailRow.purpose),
+                    forText: detailRow.forText,
+                  }),
+                  context: [
+                    fmtDate(detailRow.proceedDate.slice(0, 10)),
+                    detailRow.supplierText,
+                  ]
+                    .filter((part) => part !== "")
+                    .join(" · "),
+                }
+              : null
+          }
           position={
             gridIndex >= 0 ? { index: gridIndex + 1, total: gridRows.length } : null
           }
@@ -1228,14 +1356,31 @@ const PICK_COLUMNS: readonly Column<DemandPickItem>[] = [
 ];
 
 const LINE_GRID = "minmax(0,1fr) 53px minmax(0,1fr) auto";
+/** The picker window. Bounded because `/demand/pick-items` returns every
+ *  supplied SKU (to-order.ts) — the ceiling is a render budget, not a rule.
+ *  The list scrolls inside a `max-h-64` box, so a needle that matches many
+ *  items reaches all of them instead of stopping at the eighth. */
+const PICK_LIMIT = 50;
 
 function CreateRequestWorkspace({
   destinations,
+  defaultDestinationId,
+  supplierCollections,
   staff,
+  minDeliveryDays,
+  todayIso,
   onDone,
 }: {
   destinations: Array<{ id: string; name: string }>;
+  defaultDestinationId: string | null;
+  supplierCollections: PurchasingSupplierCollectionSetting[];
   staff: Array<{ id: string; name: string | null }>;
+  /** 0422 — Purchasing Settings' calendar days after the Proceed Date, as
+   *  the Register read it. 0 means no floor. */
+  minDeliveryDays: number;
+  /** The server's Malaysia date — the Proceed Date fallback while the plan
+   *  has not answered yet. */
+  todayIso: string | null;
   onDone: () => void;
 }) {
   const email = useAuth((s) => s.session?.user?.email ?? "");
@@ -1268,8 +1413,14 @@ function CreateRequestWorkspace({
   const [lines, setLines] = useState<LineDraft[]>(() => [blankLine()]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  /** The header, once created, is a record — retries reuse it. */
-  const [requestId, setRequestId] = useState<string | null>(null);
+  /* ⭐ THE HEADER IS NO LONGER REMEMBERED ACROSS A FAILURE (0410). It used to
+     be: "the header, once created, is a record — retries reuse it." That was
+     true of the old six-transaction shape, where a failed Send really did
+     leave a committed header worth re-using. `0410` makes the whole request
+     one transaction, so a refusal leaves nothing to re-use and remembering an
+     id would point at a row that was rolled back. The setter stays because the
+     successful id is still read by the caller. */
+  const [, setRequestId] = useState<string | null>(null);
   const [headerError, setHeaderError] = useState<string | null>(null);
 
   /* The Service Case picker rides the existing governed list read — no
@@ -1286,10 +1437,8 @@ function CreateRequestWorkspace({
   });
 
   const createHeader = useCreatePurchaseRequest();
-  const createLine = useCreatePurchaseRequestLine();
 
   const active = activeId ?? lines[0]?.id;
-  const chosenDest = dest ?? destinations[0]?.id;
 
   /* ── THE SERVER DATE PLAN (Card 06 §3) ─────────────────────────────────
      The server previews Proceed Date (its Malaysia date) and, once every
@@ -1308,9 +1457,40 @@ function CreateRequestWorkspace({
       ),
     [plan.data],
   );
+
+  /* ── DELIVER TO IS THE RULE'S WHEN A RULE EXISTS (owner, 2026-09-03) ────
+     A supplier Carres collects from has ONE place its goods land, kept in
+     Purchasing Settings. The issue door refuses any purchase that names
+     somewhere else, and a Manual Purchase has no door to move its Deliver To
+     afterwards — so offering the choice here was offering a dead end (the
+     SoBatchRegister.changeWholeLeaf principle: a governed destination is not
+     the purchase's to move; the operator changes the rule in Settings). The
+     plan already names each picked SKU's supplier, so the rule is derived,
+     never stored: pick a collected item and the field locks; remove it and
+     the choice returns. Two picked items governed to DIFFERENT places cannot
+     be one request (0401 pins one Deliver To per request); that case is left
+     to the issue door's refusal until the owner rules split-or-refuse.
+     Otherwise: the person's choice, then the governed default, then the
+     first destination — the same order SO Batch uses. */
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const sku of pickedSkus) {
+      const supplierId = planBySku.get(sku)?.supplierId;
+      const rule = supplierId ? bySupplier.get(supplierId) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [pickedSkus, planBySku, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const chosenDest =
+    governedRule?.destinationId ?? dest ?? defaultDestinationId ?? destinations[0]?.id;
   /* The server's proposal fills the field only while the person has not
      chosen a date; a chosen date is theirs and is preserved (§3.2). */
   const planDefault = plan.data?.deliveryDateDefault ?? null;
+  const minimumDeliveryDate = plan.data?.proceedDate
+  ? addDaysToIso(plan.data.proceedDate, 14)
+  : undefined;
   useEffect(() => {
     if (!dateTouched && planDefault != null) setDeliveryDate(planDefault);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1366,6 +1546,27 @@ function CreateRequestWorkspace({
    *  with no date leaves the approver and the issuer with nothing to plan
    *  against. Found empty-but-sendable on the 2026-08-19 owner walk. */
   const dateOk = deliveryDate !== "";
+  /** 0422 — the earliest Delivery Date a Manual Purchase may ask for is the
+   *  Proceed Date + Purchasing Settings' calendar days. The Proceed Date is
+   *  the one this form already shows from `/plan` (today on the server),
+   *  falling back to the Register's `todayIso`. A chosen date before that
+   *  floor is refused HERE in the door's own words, so the person moves it
+   *  before Send rather than after a 422. 0 days: no floor, no sentence.
+   *  The plan's proposed date is a proposal only and is NOT combined with
+   *  this floor. */
+  const proceedDateIso = plan.data?.proceedDate ?? todayIso;
+  const earliestDeliveryDate =
+    minDeliveryDays > 0 && proceedDateIso != null
+      ? addDaysIso(proceedDateIso, minDeliveryDays)
+      : null;
+  const dateTooEarly =
+    dateOk && earliestDeliveryDate != null && deliveryDate < earliestDeliveryDate;
+  const dateTooEarlyWords = dateTooEarly
+    ? purchasingRefusal("delivery_date_before_earliest", {
+        date: fmtDate(deliveryDate),
+        earliest: fmtDate(earliestDeliveryDate),
+      })
+    : null;
 
   const canSend =
     !saving &&
@@ -1375,6 +1576,7 @@ function CreateRequestWorkspace({
     staffOk &&
     subsidiaryOk &&
     dateOk &&
+    !dateTooEarly &&
     chosenDest != null &&
     submittable.length > 0 &&
     submittable.every(qtyOk) &&
@@ -1393,6 +1595,8 @@ function CreateRequestWorkspace({
       ? MW.sendNeedsLeadDays
       : !dateOk
         ? MW.sendNeedsDate
+        : dateTooEarly
+          ? MW.sendNeedsLaterDate
         : !caseOk
           ? MW.sendNeedsServiceCase
           : !staffOk
@@ -1418,102 +1622,119 @@ function CreateRequestWorkspace({
   }
 
   /**
-   * ONE act with a per-row result (the retired dialog's proven contract):
-   * the header lands first and is reused on retry; then one POST per line in
-   * order. A failed line keeps its row with the server's own words, and
-   * pressing Send again retries exactly those.
+   * ⭐ ONE ACT, ONE TRANSACTION (0410, YH 2026-09-01).
+   *
+   * THE SHAPE THIS REPLACES. The header landed in its own call, its id was
+   * read back, and then one call per line ran in a loop — six network writes
+   * and six database transactions for one thing the operator did once. A
+   * failure on line 3 left a COMMITTED header holding two of five lines, on no
+   * screen, behind no door, and it travelled: the Register listed it, an
+   * approver could Approve it, and the issue door would raise a Purchase Order
+   * for the two lines that happened to land.
+   *
+   * ⛔ AND THE BROWSER COULD NOT FIX IT HERE. A retry, a cleanup call, a
+   * confirm dialog — each is a second client-side write that can itself fail,
+   * leaving the same window open. Only a database transaction can make a group
+   * of writes all-or-nothing, which is what `0410` is.
+   *
+   * The per-row result is KEPT, because it is the thing the retired dialog
+   * proved and the operator reads. What changed is its meaning: a refused
+   * request now leaves NOTHING behind, so pressing Send again re-sends the
+   * whole thing rather than resuming a half-written record. `requestId`
+   * therefore stops being remembered across a failure — remembering it was
+   * only ever a way to re-use an orphan.
    */
   async function send() {
     if (!canSend || !chosenDest) return;
     setSaving(true);
     setHeaderError(null);
 
-    let reqId = requestId;
-    if (reqId === null) {
-      try {
-        const created = await createHeader.mutateAsync({
-          purpose,
-          destinationId: chosenDest,
-          requiredBy: deliveryDate || null,
-          why: purpose === "other_purchase" ? why.trim() : null,
-          serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
-          staffUserId:
-            purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
-          subsidiaryName:
-            purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
-        });
-        reqId = created.id;
-        setRequestId(created.id);
-      } catch (e) {
-        setHeaderError(e instanceof Error ? e.message : W.createFailed);
-        setSaving(false);
-        return;
-      }
-    }
-
     const targets = submittable.map((l) => l.id);
+    const payload = targets
+      .map((id) => lines.find((l) => l.id === id))
+      .filter((l): l is NonNullable<typeof l> & { sku: string } => Boolean(l?.sku));
+    if (payload.length === 0) {
+      setSaving(false);
+      return;
+    }
     setLines((ls) =>
       ls.map((l) =>
         targets.includes(l.id) ? { ...l, state: "pending", error: null } : l,
       ),
     );
 
-    let created = 0;
-    for (const id of targets) {
-      const line = lines.find((l) => l.id === id);
-      if (!line || !line.sku) continue;
-      try {
-        await createLine.mutateAsync({
-          requestId: reqId,
-          sku: line.sku,
-          qty: Number(line.qty),
-          destinationId: chosenDest,
+    try {
+      const created = await createHeader.mutateAsync({
+        purpose,
+        destinationId: chosenDest,
+        requiredBy: deliveryDate || null,
+        why: purpose === "other_purchase" ? why.trim() : null,
+        serviceCaseId: purpose === "service_case" ? (serviceCaseId ?? null) : null,
+        staffUserId:
+          purpose === "internal_staff_purchase" ? (staffUserId ?? null) : null,
+        subsidiaryName:
+          purpose === "subsidiary_purchase" ? subsidiaryName.trim() : null,
+        lines: payload.map((l) => ({
+          sku: l.sku,
+          qty: Number(l.qty),
           requiredBy: deliveryDate || null,
-          note: line.note.trim() || null,
-          purpose,
-        });
-        created += 1;
-        patch(id, { state: "created", error: null });
-      } catch (e) {
-        patch(id, {
-          state: "failed",
-          error: e instanceof Error ? e.message : W.createFailed,
-        });
-      }
+          note: l.note.trim() || null,
+        })),
+      });
+      setRequestId(created.id);
+      for (const l of payload) patch(l.id, { state: "created", error: null });
+      setSaving(false);
+      onDone();
+    } catch (e) {
+      /* Nothing was written, so every row goes back to failed together —
+         naming one line as the culprit would be a guess, and the server's own
+         sentence already names it when it knows. */
+      const word = e instanceof Error ? e.message : W.createFailed;
+      setHeaderError(word);
+      for (const l of payload) patch(l.id, { state: "failed", error: word });
+      setSaving(false);
     }
-    setSaving(false);
-    if (created === targets.length) onDone();
   }
 
   const namedStaff = staff.filter((s) => (s.name ?? "").trim() !== "");
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4"
-      data-testid="manual-purchase-create"
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-body font-semibold uppercase tracking-[0.1em] text-base-900">
-          {MW.createTitle}
+    <>
+      {/* The action pair lives on the shell's own header row (壳画头), aligned
+          with the `Manual Purchase` nameplate and pushed to the right — never
+          inside the card. The dark card bar carries only the section title. */}
+      <PurchasingTabs
+        right={
+          <span className="flex items-center gap-3">
+            <Button variant="ghost" onClick={onDone}>
+              {MW.cancel}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!canSend}
+              loading={saving}
+              onClick={() => void send()}
+              data-testid="mp-send"
+            >
+              {sendLabel}
+            </Button>
+          </span>
+        }
+      />
+      <div
+        className="mp-create-page flex min-h-0 flex-1 flex-col overflow-auto p-4"
+        data-testid="manual-purchase-create"
+      >
+      <section className="mp-create-card">
+      <div className="mp-create-header">
+        <h2 className="mp-create-title">
+          New Manual Purchase
         </h2>
-        <span className="flex items-center gap-3">
-          <Button variant="ghost" onClick={onDone}>
-            {MW.cancel}
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!canSend}
-            loading={saving}
-            onClick={() => void send()}
-            data-testid="mp-send"
-          >
-            {sendLabel}
-          </Button>
-        </span>
       </div>
 
       {/* ── The header — asked once for the whole request ── */}
-      <div className="grid max-w-[720px] grid-cols-2 gap-3">
+      <div className="mp-create-body flex flex-col gap-6">
+      <div className="mp-create-general grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label htmlFor="mp-purpose" className="text-meta text-kit-slate-11">
             {MW.needFor}
@@ -1533,8 +1754,23 @@ function CreateRequestWorkspace({
             id="mp-dest"
             value={chosenDest}
             onValueChange={setDest}
+            disabled={governedRule != null}
             options={destinations.map((d) => ({ value: d.id, label: d.name }))}
           />
+          {/* The lock names its rule in the ONE approved sentence for this
+              fact (COPY-STANDARD, `supplier_collection_destination_mismatch`
+              line 1) — no new word reaches the screen. */}
+          {governedRule ? (
+            <p className="pt-1 text-meta text-kit-slate-11" data-testid="mp-dest-governed">
+              {
+                purchasingRefusal("supplier_collection_destination_mismatch", {
+                  supplier: governedRule.supplierName || null,
+                  destination:
+                    destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+                }).wrong
+              }
+            </p>
+          ) : null}
         </div>
         {/* Card 06 §4 — `Proceed Date` is a read-only FACT: the server's
             Malaysia-date preview before Send; the stored hand-off truth
@@ -1548,15 +1784,24 @@ function CreateRequestWorkspace({
         {/* `Delivery Date` — the ONE date input. The server proposes the
             slowest selected line's arrival once lead facts are complete; a
             chosen date is the person's and is never silently overwritten. */}
-        <DatePicker
-          id="mp-delivery-date"
-          label={MW.deliveryDate}
-          value={deliveryDate || null}
-          onChange={(v) => {
-            setDateTouched(true);
-            setDeliveryDate(v ?? "");
-          }}
-        />
+        <div>
+          <DatePicker
+            id="mp-delivery-date"
+            label={MW.deliveryDate}
+            minDate={minimumDeliveryDate}
+            value={deliveryDate || null}
+            onChange={(v) => {
+              setDateTouched(true);
+              setDeliveryDate(v ?? "");
+            }}
+          />
+          {/* 0422 — the door's own refusal, printed before Send is pressed. */}
+          {dateTooEarlyWords ? (
+            <p className="mt-1 text-meta text-kit-red-11" data-testid="mp-date-too-early">
+              {dateTooEarlyWords.wrong} {dateTooEarlyWords.todo}
+            </p>
+          ) : null}
+        </div>
         <div>
           <span className="text-meta text-kit-slate-11">{MW.raisedBy}</span>
           {/* A FACT, never a control — the server stamps created_by itself. */}
@@ -1638,38 +1883,34 @@ function CreateRequestWorkspace({
         </p>
       ) : null}
 
-      {/* ── ITEMS · one row per SKU, the dialog's proven split ── */}
-      <div className="flex max-w-[900px] flex-col gap-2" data-testid="mp-lines">
-        <div className="flex items-center justify-between">
-          <h3 className="text-label font-semibold uppercase tracking-[0.14em] text-base-500">
-            {MW.items}
-          </h3>
-          <Button variant="ghost" onClick={addLine} data-testid="mp-line-add">
-            {MW.addLine}
-          </Button>
-        </div>
+      {/* ── ITEMS · one row per SKU, the dialog's proven split ──
+          ONE grid holds the caption row and every line, so the four tracks are
+          resolved once and `Note` sits over the note it names. Two grids
+          sharing a template do not share widths — the trailing `auto` track
+          held nothing in the caption row and `Remove` in the lines, and the
+          captions drifted (owner, 2026-09-03). A line is `contents`: its four
+          cells join the grid directly; whatever stacks under it (supplier,
+          lead gap, already-have, error, picker) spans the full row. */}
+      <div className="mp-create-items flex min-w-0 flex-col gap-3" data-testid="mp-lines">
+        <h3 className="text-body font-semibold text-base-900">
+          Order Items
+        </h3>
 
         <div
-          className="grid items-center gap-2 text-label text-kit-slate-11"
+          className="grid items-center gap-x-2 gap-y-2"
           style={{ gridTemplateColumns: LINE_GRID }}
         >
-          <span>{W.itemLabel}</span>
-          <span>{W.itemsColQty}</span>
-          <span>{W.remark}</span>
+          <span className="text-label text-kit-slate-11">{W.itemLabel}</span>
+          <span className="text-label text-kit-slate-11">{W.itemsColQty}</span>
+          <span className="text-label text-kit-slate-11">{MW.note}</span>
           <span />
-        </div>
 
-        {lines.map((line, i) => {
-          const picked = items.find((it) => it.sku === line.sku) ?? null;
-          const showPicker = line.id === active && line.sku == null;
-          const done = line.state === "created";
-          return (
-            <div key={line.id} className="flex flex-col gap-1">
-              <div
-                className="grid items-center gap-2"
-                style={{ gridTemplateColumns: LINE_GRID }}
-                data-testid={`mp-line-${i}`}
-              >
+          {lines.map((line, i) => {
+            const picked = items.find((it) => it.sku === line.sku) ?? null;
+            const showPicker = line.id === active && line.sku == null;
+            const done = line.state === "created";
+            return (
+              <div key={line.id} className="contents" data-testid={`mp-line-${i}`}>
                 {/* SKU + Model, never the model word alone — four Booqit
                     variants rendered as the single word `Booqit` is P15's
                     own defect returned (2026-08-19 owner walk). */}
@@ -1694,7 +1935,7 @@ function CreateRequestWorkspace({
                 />
                 <Input
                   id={`mp-note-${i}`}
-                  aria-label={W.remark}
+                  aria-label={MW.note}
                   value={line.note}
                   disabled={done}
                   onChange={(e) => patch(line.id, { note: e.target.value })}
@@ -1710,66 +1951,84 @@ function CreateRequestWorkspace({
                     {MW.remove}
                   </Button>
                 )}
+
+                {/* Everything that stacks under the line spans the row. An
+                    empty stack draws nothing, so it costs no grid gap. */}
+                <div className="col-span-full flex flex-col gap-1 empty:hidden">
+                  {picked?.supplier ? (
+                    <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
+                      {W.supplierLabel}: {picked.supplier}
+                    </p>
+                  ) : null}
+
+                  {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
+                      the governed two lines, and the act deep-links Settings.
+                      Send stays `Send — lead days are not set` until repaired;
+                      nothing substitutes zero or a browser date. */}
+                  {leadGaps
+                    .filter((g) => g.sku === line.sku)
+                    .map((g) => (
+                      <span
+                        key={`${g.sku}-${g.wrong}`}
+                        className="flex min-w-0 flex-col"
+                        data-testid={`mp-lead-gap-${i}`}
+                      >
+                        <span className="text-body font-medium text-kit-red-11">
+                          {g.wrong}
+                        </span>
+                        <Link
+                          to="/operation?tab=purchasing-settings"
+                          className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
+                        >
+                          {g.todo}
+                        </Link>
+                      </span>
+                    ))}
+
+                  {picked ? (
+                    <AlreadyHave
+                      sku={picked.sku}
+                      free={picked.free}
+                      qty={Number(line.qty) || 0}
+                      index={i}
+                    />
+                  ) : null}
+
+                  {line.error ? (
+                    <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
+                      {line.error}
+                    </p>
+                  ) : null}
+
+                  {showPicker ? (
+                    <LinePicker
+                      items={items}
+                      needle={line.needle}
+                      loading={pick.isLoading}
+                      onPick={(sku) => patch(line.id, { sku, needle: "" })}
+                    />
+                  ) : null}
+                </div>
               </div>
+            );
+          })}
+        </div>
 
-              {picked?.supplier ? (
-                <p className="text-meta text-kit-slate-11" data-testid={`mp-supplier-${i}`}>
-                  {W.supplierLabel}: {picked.supplier}
-                </p>
-              ) : null}
-
-              {/* Card 06 §3.4 — a missing lead number is NAMED on its line in
-                  the governed two lines, and the act deep-links Settings.
-                  Send stays `Send — lead days are not set` until repaired;
-                  nothing substitutes zero or a browser date. */}
-              {leadGaps
-                .filter((g) => g.sku === line.sku)
-                .map((g) => (
-                  <span
-                    key={`${g.sku}-${g.wrong}`}
-                    className="flex min-w-0 flex-col"
-                    data-testid={`mp-lead-gap-${i}`}
-                  >
-                    <span className="text-body font-medium text-kit-red-11">
-                      {g.wrong}
-                    </span>
-                    <Link
-                      to="/operation?tab=purchasing-settings"
-                      className="text-label text-kit-blue-11 underline-offset-2 hover:underline"
-                    >
-                      {g.todo}
-                    </Link>
-                  </span>
-                ))}
-
-              {picked ? (
-                <AlreadyHave
-                  sku={picked.sku}
-                  free={picked.free}
-                  qty={Number(line.qty) || 0}
-                  index={i}
-                />
-              ) : null}
-
-              {line.error ? (
-                <p className="text-meta text-kit-red-11" data-testid={`mp-line-failed-${i}`}>
-                  {line.error}
-                </p>
-              ) : null}
-
-              {showPicker ? (
-                <LinePicker
-                  items={items}
-                  needle={line.needle}
-                  loading={pick.isLoading}
-                  onPick={(sku) => patch(line.id, { sku, needle: "" })}
-                />
-              ) : null}
-            </div>
-          );
-        })}
+        {/* The add control sits where the operator's eye ends — under the last
+            line — and wears the neutral box, not the ghost: in this block it
+            is the only road to a second item, and a boxless grey word next to
+            grey captions read as one more caption (owner, 2026-09-03). Not
+            `primary`: `Send for approval` already holds the screen's one. */}
+        <div className="flex">
+          <Button variant="neutral" onClick={addLine} data-testid="mp-line-add">
+            {MW.addLine}
+          </Button>
+        </div>
       </div>
+      </div>
+      </section>
     </div>
+    </>
   );
 }
 
@@ -1839,24 +2098,33 @@ function LinePicker({
 }) {
   const shown = useMemo(() => {
     const n = needle.trim().toLowerCase();
-    if (!n) return items.slice(0, 8);
+    if (!n) return items.slice(0, PICK_LIMIT);
     return items
       .filter(
         (i) => i.label.toLowerCase().includes(n) || i.sku.toLowerCase().includes(n),
       )
-      .slice(0, 8);
+      .slice(0, PICK_LIMIT);
   }, [items, needle]);
 
+  /* The kit's DataTable is its own scroller (`min-h-0 flex-1 overflow-auto`)
+     and needs a parent that BOUNDS its height to shrink against; in an
+     auto-height column `flex-1` resolves to content height and the list
+     never scrolls. The wrapper carries the ceiling ONLY — never a second
+     `overflow-*`, which DataTable.tsx warns scrolls in jsdom and dies in a
+     browser. 256px = the head plus five rows and half of the sixth, the
+     kit's own bounded-list height (DataTable's column filter). */
   return (
-    <DataTable<DemandPickItem>
-      rows={shown}
-      columns={PICK_COLUMNS}
-      rowId={(i) => i.sku}
-      onRowOpen={(i) => onPick(i.sku)}
-      label={W.pickerTableLabel}
-      loading={loading}
-      empty={null}
-    />
+    <div className="mp-create-picker flex max-h-64 min-h-0 flex-col">
+      <DataTable<DemandPickItem>
+        rows={shown}
+        columns={PICK_COLUMNS}
+        rowId={(i) => i.sku}
+        onRowOpen={(i) => onPick(i.sku)}
+        label={W.pickerTableLabel}
+        loading={loading}
+        empty={null}
+      />
+    </div>
   );
 }
 
@@ -1964,6 +2232,150 @@ function Fact({
   );
 }
 
+/**
+ * THE DELIVER TO DOOR ON AN EXISTING REQUEST (0421).
+ *
+ * MPR-20260903-3381 was refused at Issue with "Set Deliver To to Ohana, then
+ * issue again" and the request had nowhere to do that. This fact swaps into a
+ * choice of open places behind `Change`; `Save` asks the server to move the
+ * header and every live line together. The same rule the create form applies
+ * (1083) applies here: when every live line's supplier is collected to ONE
+ * place, the choice is locked to that place and the approved sentence says
+ * why — so the operator's Save simply moves the request where the issue door
+ * wants it.
+ */
+function DeliverToFact({
+  requestId,
+  destinationId,
+  destinations,
+  live,
+  supplierCollections,
+  movable,
+}: {
+  requestId: string;
+  destinationId: string;
+  destinations: Array<{ id: string; name: string; active?: boolean }>;
+  live: PurchaseRequestLineRow[];
+  supplierCollections: PurchasingSupplierCollectionSetting[];
+  movable: boolean;
+}) {
+  const move = useMoveManualPurchaseDeliverTo();
+  const [editing, setEditing] = useState(false);
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<{ wrong: string; todo: string } | null>(null);
+
+  const name = destinations.find((d) => d.id === destinationId)?.name ?? "";
+  const governed = useMemo(() => {
+    const bySupplier = new Map(supplierCollections.map((c) => [c.supplierId, c]));
+    const seen = new Map<string, PurchasingSupplierCollectionSetting>();
+    for (const l of live) {
+      const rule = l.supplier_id ? bySupplier.get(l.supplier_id) : undefined;
+      if (rule?.destinationId) seen.set(rule.destinationId, rule);
+    }
+    return [...seen.values()];
+  }, [live, supplierCollections]);
+  const governedRule = governed.length === 1 ? governed[0] : null;
+  const value = governedRule?.destinationId ?? chosen ?? destinationId;
+  /* Open places only — plus the request's own, so the field never shows a
+     blank for a place that has since closed. */
+  const options = destinations
+    .filter((d) => d.active !== false || d.id === destinationId)
+    .map((d) => ({ value: d.id, label: d.name }));
+
+  function close() {
+    setEditing(false);
+    setChosen(undefined);
+    setError(null);
+  }
+
+  async function save() {
+    setError(null);
+    try {
+      await move.mutateAsync({ id: requestId, destinationId: value });
+      close();
+    } catch (e) {
+      /* THE APPROVED TWO LINES, with every fact the server sent. */
+      const body = (
+        e as {
+          body?: {
+            message?: string;
+            action?: string;
+            code?: string;
+            supplier?: string | null;
+            destination?: string | null;
+          };
+        }
+      ).body;
+      const fallback = purchasingRefusal(body?.code, {
+        supplier: body?.supplier ?? null,
+        destination: body?.destination ?? null,
+      });
+      setError({
+        wrong: body?.message ?? fallback.wrong,
+        todo: body?.action ?? fallback.todo,
+      });
+    }
+  }
+
+  if (!editing) {
+    return (
+      <>
+        {name}
+        {movable ? (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="ml-2 text-label text-kit-blue-11 underline-offset-2 hover:underline"
+            data-testid="mp-detail-deliver-to-change"
+          >
+            {MW.change}
+          </button>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <span className="flex flex-col gap-1.5">
+      <Select
+        id="mp-detail-deliver-to-select"
+        value={value}
+        onValueChange={setChosen}
+        disabled={governedRule != null || move.isPending}
+        options={options}
+      />
+      {governedRule ? (
+        <span className="text-meta text-kit-slate-11" data-testid="mp-detail-deliver-to-governed">
+          {
+            purchasingRefusal("supplier_collection_destination_mismatch", {
+              supplier: governedRule.supplierName || null,
+              destination:
+                destinations.find((d) => d.id === governedRule.destinationId)?.name ?? null,
+            }).wrong
+          }
+        </span>
+      ) : null}
+      {error ? (
+        <TwoLines wrong={error.wrong} todo={error.todo} testId="mp-detail-deliver-to-error" />
+      ) : null}
+      <span className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() => void save()}
+          disabled={move.isPending}
+          data-testid="mp-detail-deliver-to-save"
+        >
+          {MW.save}
+        </Button>
+        <Button size="sm" variant="neutral" onClick={close} disabled={move.isPending}>
+          {MW.cancel}
+        </Button>
+      </span>
+    </span>
+  );
+}
+
 /** WHAT WE ALREADY HAVE — one row per live SKU. `free` rides the pick-items
  *  read and `already on PO` the open-cover endpoint (the same reads the
  *  create workspace uses — Law D); `Still Needed` is PRINTED. */
@@ -2024,12 +2436,10 @@ function ApprovalLineRow({
   index: number;
 }) {
   const onPo = useAlreadyOnPo(line.sku);
+  /* `Still Needed` is printed for the approver to read, never typed in for
+     them — the Approved Qty is seeded by the object from the requested
+     quantity (see `ManualPurchaseObject`). */
   const still = stillNeededOf(line.qty, free, onPo.data?.alreadyOnPo ?? 0);
-  const seeded = value !== undefined;
-  useEffect(() => {
-    if (!seeded && onPo.data) onChange(String(still));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onPo.data]);
   const qty = Number(value);
   const cost = line.unit_cost ?? null;
   return (
@@ -2101,15 +2511,17 @@ function TwoLines({
 
 function ManualPurchaseObject({
   id,
-  registerReqNo,
+  registerHeading,
   position,
   onStep,
   onBack,
 }: {
   id: string;
-  /** The Register row's own number — the header identity prints instantly
-   *  while the object read is in flight. */
-  registerReqNo: string | null;
+  /** The Register row's own business heading (Card 08 §3.3 — `{Need for} ·
+   *  {For}` plus the quieter `{Proceed Date} · {supplier}` context) — the
+   *  header prints instantly while the object read is in flight. No number,
+   *  no UUID. */
+  registerHeading: { identity: string; context: string } | null;
   /** The filtered Register position (`4 of 69`) — context, never truth;
    *  null when the open object left the filtered list. */
   position: { index: number; total: number } | null;
@@ -2128,7 +2540,14 @@ function ManualPurchaseObject({
   const navigate = useNavigate();
   const decide = useDecidePurchaseRequest();
 
-  /** The approver's per-line numbers — seeded once from `Still Needed`. */
+  /** The approver's per-line numbers, seeded once per line from the REQUESTED
+   *  quantity the moment the detail read lands. Field-guide defect 23: this
+   *  used to be seeded inside each row from `Still Needed`, which is
+   *  `qty − free − already on PO` — two separate reads (the pick-items list and
+   *  the already-have read), and the seed fired when the SECOND arrived using
+   *  whatever the FIRST had returned by then. So the field could open at 0 from
+   *  a half-read, and a click on Approve saved that 0 as the decision. The
+   *  request's own ask is one fact from one read; the approver cuts it down. */
   const [cuts, setCuts] = useState<Record<string, string>>({});
   const [refusing, setRefusing] = useState(false);
   const [refuseReason, setRefuseReason] = useState("");
@@ -2137,7 +2556,54 @@ function ManualPurchaseObject({
   );
 
   const d = q.data;
-  const reqNo = d?.request.req_no ?? registerReqNo ?? "";
+  /* Card 08 §3.3 — the object header speaks business facts only:
+     `{Need for} · {For}` as the identity, `{Proceed Date} · {supplier}` as
+     the quieter context. The loaded object recomputes them from its own
+     read; until it lands, the Register row's hand-off prints. No MPR, no
+     UUID, in the heading or the browser title. */
+  const loadedHeading = (() => {
+    if (!d) return null;
+    const destNameById = new Map(d.destinations.map((dd) => [dd.id, dd.name]));
+    const liveL = d.lines.filter((l) => l.cancelled_at === null);
+    const supNameById = new Map(d.suppliers.map((s) => [s.id, s.name]));
+    return {
+      identity: manualPurchaseObjectHeading({
+        purposeLabel: purposeLabelOf(d.request.purpose),
+        forText: manualPurchaseForOf({
+          purpose: d.request.purpose,
+          destinationName: destNameById.get(d.request.destination_id) ?? null,
+          serviceCaseNo: d.serviceCaseNo,
+          staffName: d.request.for_staff_user_id
+            ? (d.users.find((u) => u.id === d.request.for_staff_user_id)?.name ?? null)
+            : null,
+          subsidiaryName: d.request.for_subsidiary_name,
+          why: d.request.why,
+        }),
+      }),
+      context: [
+        fmtDate(d.request.created_at.slice(0, 10)),
+        manualPurchaseSupplierSummary(
+          liveL.map((l) =>
+            l.supplier_id ? (supNameById.get(l.supplier_id) ?? "") : "",
+          ),
+        ),
+      ]
+        .filter((part) => part !== "")
+        .join(" · "),
+    };
+  })();
+  const heading = loadedHeading ??
+    registerHeading ?? { identity: MW.page, context: "" };
+  useEffect(() => {
+    if (!d) return;
+    setCuts((c) => {
+      const next = { ...c };
+      for (const l of d.lines) {
+        if (l.cancelled_at === null && next[l.id] === undefined) next[l.id] = String(l.qty);
+      }
+      return next;
+    });
+  }, [d]);
 
   const status = d
     ? manualPurchaseStatusOf({
@@ -2148,7 +2614,8 @@ function ManualPurchaseObject({
         lines: d.lines.map((l) => ({
           qty: l.qty,
           issuedQty: l.issued_qty,
-          remainingQty: l.remaining_qty,
+          /* The APPROVER's number — see `manualPurchaseStatusOf`. */
+          approvedQty: l.approved_qty,
           cancelledAt: l.cancelled_at,
           poId: l.po_id,
           received: l.received,
@@ -2195,7 +2662,8 @@ function ManualPurchaseObject({
      another source of row truth. ─────────────────────────────────────── */
   const header = (
     <SalesOrderTabs
-      identity={reqNo}
+      identity={heading.identity}
+      customer={heading.context || null}
       status={
         status ? (
           <StatusPill tone={STATUS_TONE[status.kind]}>{status.label}</StatusPill>
@@ -2207,7 +2675,7 @@ function ManualPurchaseObject({
         event.preventDefault();
         onBack();
       }}
-      docTitle={reqNo ? `${reqNo} — Carres` : undefined}
+      docTitle={`${MW.page} — Carres`}
       right={
         position ? (
           <span className="flex shrink-0 items-center gap-0.5" data-testid="mp-object-position">
@@ -2318,6 +2786,11 @@ function ManualPurchaseObject({
       const n = Number(cuts[l.id]);
       return cuts[l.id] !== undefined && Number.isInteger(n) && n >= 0 && n <= l.qty;
     });
+  /* Approving EVERY line at 0 is a refusal wearing the wrong button: the
+     status arithmetic derives `Not going ahead` from it, with no reason on
+     record (MPR-20260904-8935). One line at 0 among others is a legitimate
+     partial cut and stays allowed. */
+  const allZero = cutsReady && live.every((l) => Number(cuts[l.id]) === 0);
 
   /* WHAT WE ALREADY HAVE — one row per live SKU, quantities summed. */
   const haveRows: Array<{ sku: string; requestedQty: number }> = [];
@@ -2383,8 +2856,22 @@ function ManualPurchaseObject({
               <Fact label={MW.colFor} testId="mp-detail-for">
                 {forText}
               </Fact>
-              <Fact label={MW.colDeliverTo}>
-                {destName.get(request.destination_id) ?? ""}
+              <Fact label={MW.colDeliverTo} testId="mp-detail-deliver-to">
+                <DeliverToFact
+                  requestId={request.id}
+                  destinationId={request.destination_id}
+                  destinations={d.destinations}
+                  live={live}
+                  supplierCollections={d.supplierCollections ?? []}
+                  /* Movable until a line is on a PO: the RPC refuses the rest
+                     (refused, every line cancelled) and the same arithmetic
+                     hides the door here so it is never offered and refused. */
+                  movable={
+                    status != null &&
+                    (status.kind === "waiting_approval" || status.kind === "ready_to_order") &&
+                    !lines.some((l) => l.po_id != null || (l.po_ids?.length ?? 0) > 0)
+                  }
+                />
               </Fact>
               {/* The real staff display name — never `operation`, an email, a
                   role or `(you)`. A shared-account record whose individual
@@ -2570,6 +3057,13 @@ function ManualPurchaseObject({
                     todo={purchasingRefusal("invalid_cut_qty", { qty: cutInvalid.qty }).todo}
                   />
                 ) : null}
+                {allZero ? (
+                  <TwoLines
+                    testId="mp-approve-zero"
+                    wrong="Every line is approved at 0."
+                    todo="Refuse the request instead."
+                  />
+                ) : null}
                 {decideError ? (
                   <TwoLines
                     testId="mp-decide-error"
@@ -2617,7 +3111,7 @@ function ManualPurchaseObject({
                   {/* The ONE primary action in this section (Card 05 §3.5). */}
                   <Button
                     variant="primary"
-                    disabled={!cutsReady}
+                    disabled={!cutsReady || allZero}
                     loading={decide.isPending}
                     onClick={() => void submitDecision("approve")}
                     data-testid="mp-approve"

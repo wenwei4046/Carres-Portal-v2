@@ -458,6 +458,8 @@ describe("POST /:id/booking/confirm — partner rules warn, they never block", (
         },
       ),
       ops_stock_items: tableMock({ data: [], error: null }),
+      // Gate convergence (2026-09-07): the feeder reads the SO's storage papers.
+      invoices: tableMock({ data: [], error: null }),
       delivery_partners: tableMock({ data: partner, error: null }),
     };
   }

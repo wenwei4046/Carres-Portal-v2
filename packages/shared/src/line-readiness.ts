@@ -78,6 +78,24 @@ export function lineReadiness({
   return "no_po";
 }
 
+/**
+ * THE RULED WORDS FOR A LINE WHOSE UNITS ARE SHORT (COPY-STANDARD.md:1755).
+ *
+ * `Not allocated` sits in that row's `Do NOT use` column, beside `No stock` and
+ * `Units not created yet`. The registered answer is TWO strings — the count,
+ * then what is being waited on — because a short line is a fact plus an action,
+ * which is the two-line standard the whole portal is written to.
+ *
+ * It lives here, once, because three surfaces need the same sentence: the Order
+ * Route's STOCK node (`sales-order-route.ts`), the Sales Order object page's
+ * Goods table, and the Sales Orders register expansion behind it. This
+ * codebase's signature defect is one rule written in three places with the next
+ * case added to none of them — so there is one place, and it is this one.
+ */
+export function unitsShortWords(ready: number, committed: number): [string, string] {
+  return [`${ready} of ${committed} Units ready`, "Waiting for purchase"];
+}
+
 /** Roll a set of goods lines up for the Items badge / header stat strip:
  *  "<ready> ready · <toReserve> to reserve" (readyLines = reserved lines only).
  *  `unknown` is counted on its own — folding it into `noPo` would send an

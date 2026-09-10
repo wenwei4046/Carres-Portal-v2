@@ -25,6 +25,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, GraduationCap, HelpCircle, Settings } from "lucide-react";
 import { useOperationOrders, type operationOrderListRow } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
+import { buildInfo, checkForUpdate, shortCommit, type UpdateCheck } from "@/lib/build-info";
 import { TASKS_KEY } from "./rail/TasksPanel";
 import JumpTo from "./JumpTo";
 import type { OpsTasksListResponse } from "@carres/shared";
@@ -61,13 +62,32 @@ export default function GlobalTopBar() {
 /** Which module's settings the launcher offers first. A module appears only
  *  when it actually OWNS settings — an entry that opens an empty page is a
  *  promise about the product, which is the thing the old placeholder did. */
-function moduleSettingsFor(pathname: string): { label: string; href: string } | null {
+/** The Warehouse map is four `?tab=` destinations, not four pathnames
+ *  (`portal-nav.ts`: Monitor · Inbound · Inventory · Outbound). The launcher
+ *  reads the tab, because reading only the pathname would offer Warehouse
+ *  Settings on every Operations page or on none. */
+const WAREHOUSE_TABS = new Set([
+  "warehouse-monitor",
+  "warehouse-inbound",
+  "warehouse-outbound",
+  "warehouse-dashboard",
+  "stock-onhand",
+]);
+
+function moduleSettingsFor(
+  pathname: string,
+  search = "",
+): { label: string; href: string } | null {
   if (pathname.startsWith("/operation/issues")) return { label: "Issue Tracker Settings", href: "/operation/settings/issue-tracker" };
   if (pathname.startsWith("/operation/orders")) {
     return { label: "Sales Order Settings", href: "/operation/settings/sales-orders" };
   }
   if (pathname.startsWith("/operation/purchasing") || pathname.startsWith("/operation/to-order")) {
     return { label: "Purchasing Settings", href: "/operation/settings/purchasing" };
+  }
+  const tab = new URLSearchParams(search).get("tab") ?? "";
+  if (WAREHOUSE_TABS.has(tab)) {
+    return { label: "Warehouse Settings", href: "/operation/settings/warehouse/details" };
   }
   return null;
 }
@@ -78,7 +98,7 @@ function moduleSettingsFor(pathname: string): { label: string; href: string } | 
 export function TopBarIcons() {
   const navigate = useNavigate();
   const location = useLocation();
-  const moduleSettings = moduleSettingsFor(location.pathname);
+  const moduleSettings = moduleSettingsFor(location.pathname, location.search);
   const { data } = useOperationOrders({});
   const orders = useMemo(() => data?.orders ?? [], [data]);
   const tasksQ = useQuery<OpsTasksListResponse>({
@@ -113,6 +133,8 @@ export function TopBarIcons() {
   }, [orders, tasksQ.data]);
 
   const [open, setOpen] = useState<null | "alerts" | "help" | "settings">(null);
+  /* 0430 — the Help menu's version check. null = not asked this open. */
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -240,6 +262,48 @@ export function TopBarIcons() {
                 </span>
               </span>
             </button>
+            {/* 0430 — the running version is IDENTIFIABLE, and updating is the
+                operator's own safe click: nothing reloads on its own, so an
+                unfinished form is never thrown away by a version check. */}
+            <div className="border-t border-base-100 px-3 py-2" data-testid="help-version">
+              <span className="text-body text-base-800 block">
+                Version {shortCommit(buildInfo.commit)}
+              </span>
+              {buildInfo.builtAt ? (
+                <span className="text-meta text-base-400 block">
+                  Built {new Date(buildInfo.builtAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                </span>
+              ) : null}
+              {update?.state === "available" ? (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  data-testid="help-update-reload"
+                  className="mt-1.5 h-7 rounded-md border border-base-200 px-2 text-meta text-primary hover:bg-hovertint"
+                >
+                  Reload to update
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="help-update-check"
+                  onClick={() => {
+                    setUpdate(null);
+                    void checkForUpdate().then(setUpdate);
+                  }}
+                  className="mt-1.5 h-7 rounded-md border border-base-200 px-2 text-meta text-base-600 hover:bg-hovertint"
+                >
+                  Check for update
+                </button>
+              )}
+              {update?.state === "latest" ? (
+                <span className="text-meta text-base-400 block mt-1">You are on the latest version</span>
+              ) : update?.state === "available" ? (
+                <span className="text-meta text-base-400 block mt-1">A newer version is ready</span>
+              ) : update?.state === "unreachable" ? (
+                <span className="text-meta text-base-400 block mt-1">The version check did not reach the server</span>
+              ) : null}
+            </div>
           </div>
         )}
       </div>

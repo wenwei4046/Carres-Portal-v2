@@ -432,11 +432,19 @@ toOrderRouter.get("/", requireOperation, async (c) => {
     for (const proposal of proposals) {
       for (const row of proposal.rows) {
         for (const build of row.builds) {
-          if (build.fullyOnPo) alreadyCovered += 1;
-          else if (proposal.blocked === "production_days")
+          /* `alreadyCovered` reports, it no longer excludes. A build sitting
+             wholly on an open purchase order is issuable like any other since
+             the SO Batch register began offering it a tick, so counting it
+             here as NOT issuable would have this door and that one disagree
+             about the same build. The tally stays because "these units are
+             already on order" is worth saying; it just no longer decides. */
+          if (proposal.blocked === "production_days")
             blockedProductionDays += 1;
           else if (row.delivery == null) blockedDeliveryDate += 1;
-          else issuable += 1;
+          else {
+            issuable += 1;
+            if (build.fullyOnPo) alreadyCovered += 1;
+          }
         }
       }
     }
@@ -1208,6 +1216,17 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     /* Absent from the recomputation means CHANGED, CANCELLED, COVERED or
        never real. All four read the same from here, and all four must fail. */
     if (!hit) return refuse(c, 409, "unknown_demand");
+    /* ⭐ 0430 — A RECEIPT IS NOT A BUY. T6 keeps a fully covered build VISIBLE
+       (its qty states what the covering purchase order bought), and nothing
+       here refused it — so re-issuing the same covered demand minted a fresh
+       purchase order every time. Production carries the proof: six open POs,
+       each sourcing the SAME 1-unit order line of SO-1340 (2026-09-04/05).
+       The door now refuses the receipt BY NAME, whatever the screen showed. */
+    if (hit.build.fullyOnPo) {
+      return refuse(c, 422, "already_on_po", {
+        po: hit.build.coveredByOpenPoPos?.[0] ?? null,
+      });
+    }
     if (hit.proposal.blocked === "production_days") {
       return refuse(c, 422, "production_days_required", {
         supplier: hit.proposal.supplierName ?? null,
@@ -1400,6 +1419,10 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
     ) {
       return refuse(c, 422, "supplier_collection_destination_mismatch", {
         supplier: group.proposal.supplierName ?? null,
+        /* The destination the operator must move TO, by name. Without it the
+           sentence can only say "its configured destination" and the operator
+           has to go and look it up — which is the message doing half its job. */
+        destination: destById.get(collection.fixedDestinationId)?.name ?? null,
       });
     }
 
@@ -1553,7 +1576,31 @@ toOrderRouter.post("/issue-batch", requireOperation, async (c) => {
           : detail === "supplier_price_changed"
             ? 409
             : 422;
-      return refuse(c, status, detail);
+      /* ⭐ NAME THE PARTIES (YH, 2026-09-03). This forwarded the database's
+         code with NO facts, so every batch refusal reached the operator as the
+         factless fallback — "The supplier must be collected to its configured
+         destination" — on a batch spanning suppliers, naming none of them and
+         showing the error beside whichever document happened to be on screen.
+         The route knows every document it just built, so it names the one the
+         rule is about: the only supplier here whose governed destination is not
+         the one it was issued to. When no single document answers, the facts
+         stay empty and the honest fallback is what appears. */
+      const facts: Parameters<typeof purchasingRefusal>[1] = {};
+      const hint = (batchErr as { hint?: string }).hint;
+      if (hint) {
+        try {
+          const named = JSON.parse(hint) as Record<string, unknown>;
+          for (const k of ["supplier", "destination", "sku", "po"] as const) {
+            const v = named[k];
+            if (typeof v === "string" && v.trim() !== "") facts[k] = v;
+          }
+        } catch {
+          /* A hint that is not the JSON we write is a hint from somewhere else.
+             The refusal still leaves in the approved two lines, unnamed — which
+             is what it did before this existed. */
+        }
+      }
+      return refuse(c, status, detail, facts);
     }
     const m = mapPgError(batchErr);
     return c.json(m.body, m.status);

@@ -41,10 +41,10 @@ describe("PurchasingTabs — the destination word", () => {
     expect(document.title).toBe("Manual Purchase · Purchasing — Carres");
   });
 
-  it("`Goods Receipts` — and `Receiving` is gone from the header", () => {
+  it("`Receiving` — and the retired `Goods Receipts` is gone from the header", () => {
     renderAt("/operation?tab=receiving");
-    expect(screen.getByText("Goods Receipts")).toBeInTheDocument();
-    expect(screen.queryByText("Receiving")).not.toBeInTheDocument();
+    expect(screen.getByText("Receiving")).toBeInTheDocument();
+    expect(screen.queryByText("Goods Receipts")).not.toBeInTheDocument();
     expect(screen.queryByText(/GRN/)).not.toBeInTheDocument();
   });
 
@@ -68,7 +68,7 @@ describe("PurchasingTabs — the destination word", () => {
     const header = screen.getByTestId("purchasing-tabs");
     // The destination format prints the page's own name and nothing before it.
     expect(header.textContent).not.toContain("Purchasing ·");
-    expect(screen.getByText("Goods Receipts").className).toContain("text-page");
+    expect(screen.getByText("Receiving").className).toContain("text-page");
     // No nameplate icon: at 24px the word carries the identity by itself.
     expect(header.querySelector("svg")).toBeNull();
   });
@@ -89,6 +89,6 @@ describe("PurchasingTabs — the destination word", () => {
 
   it("the browser tab says the same word", () => {
     renderAt("/operation?tab=receiving");
-    expect(document.title).toBe("Goods Receipts · Purchasing — Carres");
+    expect(document.title).toBe("Receiving · Purchasing — Carres");
   });
 });

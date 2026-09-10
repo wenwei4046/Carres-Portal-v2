@@ -191,8 +191,8 @@ export const SPACE = {
 // 8 DISTINCT non-status hues (Jess 2026-07-19: "every staff own icon" — the old
 // 6-cool set landed Shasha + Yu Jun on near-identical purples). Deliberately
 // AVOIDS the status hues (green/amber/red), flame + selection-blue, so a person
-// never reads as a state. Ordered so the current 3 staff hash to well-separated
-// colours: Yu Jun→blue · Khor Yee→rose · Shasha→teal.
+// never reads as a state. This palette is identity infrastructure, not a staff
+// roster; current membership comes only from the authoritative staff source.
 export const AVATAR_COLORS: { bg: string; fg: string }[] = [
   { bg: "#E0E7FF", fg: "#3730A3" }, // indigo
   { bg: "#DBEAFE", fg: "#1E40AF" }, // blue

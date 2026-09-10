@@ -33,6 +33,7 @@ import { orderActionDueIso, OFFICE_OFF_DAYS } from "./order-action-due";
 import type { OrderOpenAction } from "./order-actions";
 import { orderActionQueue, type OrderActionKey } from "./order-action-words";
 import { countWorkingDays, type IsoDate, type WorkingDayOptions } from "./working-days";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 
 // ─── The rule registry — five parts, or no entry ─────────────────────────────
 
@@ -42,19 +43,24 @@ import { countWorkingDays, type IsoDate, type WorkingDayOptions } from "./workin
  * Owner Rule and Display Owner fields" approved-target gap). The `owner` prose
  * stays as documentation; THIS key is what the composition resolves:
  *
- *   po_duty        the current month's PO-duty holder (ops_po_duty roster —
- *                  the ONE rostered duty that exists today)
+ *   po_duty        the effective PO Duty resolution from Workspace
  *   salesperson    the order's responsible salesperson (missing customer
  *                  promise — §0.1 row 1); a name, not an ops account
  *   order_pic      the order's PIC — the customer-relationship owner, and the
  *                  governed proxy where the named rule's roster does not exist
  *                  yet (ACTION-FLOW Law 4 rung 2's own reasoning: a task owned
  *                  by a party with no login is one nobody can see or close)
- *   payment_duty   Payment MASTER §5's owner — no payment-duty roster exists,
- *                  so the PIC stands as governed cover: money may never sit
- *                  unowned (the 2026-08-19 incident is why)
+ *   payment_duty   the effective Payment Duty resolution from Workspace;
+ *                  unresolved fails closed and never borrows the order PIC
+ *   payment_approver  the effective Payment Approver resolution from Workspace
+ *                  — §12 gives void, reallocation and overpayment review to
+ *                  this duty and to nobody else; unresolved fails closed
  *   delivery_duty  governed Delivery ownership — no delivery-staff roster
  *                  fact exists; the duty word stands (measured-boundary rule)
+ *   warehouse_duty §6 gives the storage check to Warehouse and names no duty;
+ *                  no warehouse roster fact exists, so the word stands — the
+ *                  same measured-boundary rule delivery_duty and finance_duty
+ *                  already follow
  *   finance_duty   only Finance clears it — no roster fact; the word stands
  *   system         never a person's work
  */
@@ -63,18 +69,21 @@ export type WorkOwnerRule =
   | "salesperson"
   | "order_pic"
   | "payment_duty"
+  | "payment_approver_duty"
   | "delivery_duty"
+  | "warehouse_duty"
   | "finance_duty"
   | "system"
   /* The cross-module rules' own precise keys — recorded now so the later
    * feed wiring cannot misresolve a month (their feeds are not composed by
    * `workItemsForOrder`; Card 9's recorded boundary): */
-  | "grn_duty" // the FOLLOWING month's ops_po_duty row (purchasing/MASTER §2.2)
-  | "claim_month_po_duty"; // the holder of the month the claim was OPENED — forever
+  | "grn_duty" // the effective GRN Duty resolution from Workspace
+  | "claim_month_po_duty" // the holder of the month the claim was OPENED — forever
+  | "purchasing_approver";
 
 export interface WorkRule {
   key: string;
-  module: "orders" | "purchasing" | "receiving" | "claims";
+  module: "orders" | "purchasing" | "receiving" | "claims" | "delivery" | "payment";
   /** ① when the item exists — the owning engine's trigger, in words. */
   trigger: string;
   /** ② who — the rule in words, never a stored owner field (§2.2). */
@@ -96,7 +105,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "orders",
     trigger: "no purchase order covers these goods (goodsUnordered)",
     owner:
-      "the current PO Duty (§0.1 Action Owner Engine — ops_po_duty, the month's holder; buddy cover by the pool's absence law). Until 2026-08-27 this borrowed the order's PIC",
+      "the effective PO Duty holder from Workspace; dated Buddy cover changes who acts without changing the normal owner",
     ownerRule: "po_duty",
     action: orderActionQueue("issue_po"),
     dueRule:
@@ -128,7 +137,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "arrange_new_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "the decision is 'new_date' and no reachable booking exists",
     owner:
       "the order's PIC as governed proxy (§0.1: customer date/time confirmation → assigned Partner or governed proxy owner; ACTION-FLOW Law 4 rung 2 — the conversation is logistics', the ACTION in this portal is ours, and a partner has no login to close it)",
@@ -139,7 +148,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "assign_logistics",
-    module: "orders",
+    module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
     owner:
       "the order's PIC as governed proxy — no delivery-staff roster fact exists (0363 records none), and choosing the company is an operations act on the order",
@@ -150,7 +159,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "confirm_delivery_date",
-    module: "orders",
+    module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
     owner:
       "the order's PIC as governed proxy (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line already names the partner)",
@@ -182,7 +191,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "deliver_today",
-    module: "orders",
+    module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
     owner:
       "the order's PIC as governed proxy — Delivery ownership has no staff roster fact yet; the PIC watches today's run reach its result",
@@ -194,7 +203,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   {
     key: "upload_delivery_photo",
-    module: "orders",
+    module: "delivery",
     trigger: "delivered with no photo on file",
     owner:
       "the order's PIC — the proof arrives on the order's own WhatsApp thread; filing it is the relationship owner's act",
@@ -206,9 +215,9 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   {
     key: "collect",
     module: "orders",
-    trigger: "outstanding > RM 0 — and it survives delivery",
+    trigger: "outstanding > RM 0 with goods ready or arrival confirmed; collection survives delivery",
     owner:
-      "Payment duty (payment/MASTER §5) — no payment-duty roster exists yet, so the order's PIC stands as governed cover: money may never sit unowned (the 2026-08-19 incident is why the gate reversed)",
+      "the effective Payment Duty holder from Workspace; unresolved fails closed and never borrows the order PIC",
     ownerRule: "payment_duty",
     action: orderActionQueue("collect"),
     dueRule:
@@ -218,7 +227,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
   {
     key: "collect_loan_item",
-    module: "orders",
+    module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
     owner:
       "Delivery staff (blueprint card owner rule) — no delivery-staff roster fact exists yet, so no person resolves and the duty word stands (the canvas's measured-boundary rule)",
@@ -262,14 +271,97 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
  *  server feeds are wired (Card 9's recorded boundary). */
 export const MODULE_WORK_RULES: readonly WorkRule[] = [
   {
+    key: "manual_purchase.approve",
+    module: "purchasing",
+    trigger: "a Manual Purchase request requires a decision and has none",
+    owner: "the configured Purchasing approver duty holder",
+    ownerRule: "purchasing_approver",
+    action: "Approve purchase",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "a stored approval or refusal decision on the purchase request",
+  },
+  {
+    key: "manual_purchase.issue_po",
+    module: "purchasing",
+    trigger: "approved Manual Purchase demand remains uncovered or its current PO version has not reached the supplier",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Issue PO",
+    dueRule: "no later than the request's Order By date on the OFFICE calendar",
+    completionFact: "confirmed-sent evidence for every linked current PO version (po_sends)",
+  },
+  {
     key: "purchasing.confirm_ready_date",
     module: "purchasing",
     trigger: "an open PO owing goods with no standing ready/arrival promise",
-    owner: "the month's PO-duty holder (ops_po_duty; buddy cover by the Orders pool's absence law)",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "po_duty",
     action: "Confirm ready date",
     dueRule: "customer date − buffer (OFFICE week) − production (FACTORY week)",
     completionFact: "a standing promise row (po_supplier_promises)",
+  },
+  {
+    key: "payment.collect_customer_balance",
+    module: "payment",
+    trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
+    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "payment_duty",
+    action: "Ask the customer to pay",
+    dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
+    completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
+    /* §10 row: `Overpaid/unallocated money | Payment Approver | Review RM
+     * {amount} | allocated/classified`. Both endings are authority's own and
+     * neither invents a word: ALLOCATED is §5's "allocate valid obligation"
+     * (the 0450 correction door), CLASSIFIED is the exceptional refund §13
+     * already allows — "never AUTO-create Customer Credit or Refund" forbids
+     * the automatic kind, not the decided one. No Customer Credit exists
+     * anywhere, so none is implied here. */
+    key: "payment.review_overpayment",
+    module: "payment",
+    trigger: "an order holds more money than its live obligations ask for, and no approved refund covers the excess",
+    owner: "the effective Payment Approver duty holder from Workspace (§12: void, reallocation, overpayment review)",
+    ownerRule: "payment_approver_duty",
+    action: "Review RM {amount}",
+    dueRule: "opens with the overpayment; §10 gives this row no clock",
+    completionFact: "the order's overpaid figure is RM 0 after allocation, or an approved refund covers it (order_refunds)",
+  },
+  {
+    /* §10 row 2 — the SAME act with a should-have-been-done state. It is its
+     * own registry entry because its TRIGGER and its CLOCK are different: the
+     * customer named a day, that day passed, and the money is still owed. The
+     * due date is the promise, not the delivery window, so "late" counts from
+     * the day the customer chose. One invoice raises this OR the window item,
+     * never both — the promise replaces the window once it is broken. */
+    key: "payment.missed_promise",
+    module: "payment",
+    trigger: "the customer promised to pay on a named day, that day has passed and the balance is still outstanding",
+    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "payment_duty",
+    action: "Ask the customer to pay",
+    dueRule: "the day the customer promised, on the OFFICE calendar",
+    completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
+    key: "purchasing.supplier_reply",
+    module: "purchasing",
+    trigger: "the current PO version was sent and the supplier has not confirmed its delivery date",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask the supplier to confirm the PO delivery date",
+    dueRule: "the Malaysia calendar day the current PO version was first confirmed sent, moved only to the next OFFICE working day",
+    completionFact: "an evidenced supplier answer for the exact current PO version, including channel, recipient, reporter, recorder and times",
+  },
+  {
+    key: "purchasing.supplier_date_passed",
+    module: "purchasing",
+    trigger: "the evidenced supplier delivery date passed while the PO still has goods owing",
+    owner: "the effective PO Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
+    ownerRule: "po_duty",
+    action: "Ask the supplier when the goods will arrive",
+    dueRule: "the supplier delivery date, moved only to the next OFFICE working day when it falls on an office closure",
+    completionFact: "a new evidenced supplier answer and governed delivery date for the exact current PO version",
   },
   {
     key: "purchasing.confirm_tomorrows_delivery",
@@ -292,14 +384,25 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     completionFact: "a balance promise for the line (po_supplier_promises)",
   },
   {
+    /* §6 — "Every configured inspection interval (currently 30 days) raises
+     * `Check the stored furniture`." It could not enter the registry before
+     * 0452, because there was no authoritative completion fact: nothing
+     * recorded that anyone had ever looked. Now the look is a record, so the
+     * rule closes on that record and not on anybody's word. */
+    key: "payment.check_stored_furniture",
+    module: "payment",
+    trigger: "an open storage case has not been checked within the configured inspection interval",
+    owner: "Warehouse — §6 gives the check to the warehouse floor; no warehouse duty roster exists, so the word stands",
+    ownerRule: "warehouse_duty",
+    action: "Check the stored furniture",
+    dueRule: "the last check, or the storage start when there is none, plus the configured inspection days",
+    completionFact: "a storage inspection recorded on or after the due day (payment_storage_inspections, 0452)",
+  },
+  {
     key: "receiving.check_in",
     module: "receiving",
     trigger: "goods have an arrival promise and no posted Receiving Session covers them",
-    // `offset−1` used to stand here with no direction, and it was read
-    // backwards where it mattered. The rota reaches FORWARD: GRN duty for a
-    // month is the NEXT month's `ops_po_duty` row (`grnDutyMonth`) — see
-    // `purchasing/MASTER.md` §2.2, whose table is the evidence.
-    owner: "the month's GRN-duty holder (ops_po_duty, the FOLLOWING month; never the PO holder)",
+    owner: "the effective GRN Duty holder from Workspace; never inferred from PO Duty",
     ownerRule: "grn_duty",
     action: "Check in",
     dueRule: "the promised arrival day",
@@ -329,6 +432,15 @@ const ORDER_RULE_BY_KEY = new Map<string, WorkRule>(
 
 // ─── The composed work item ──────────────────────────────────────────────────
 
+/** A Work owner may be a rostered account or a named business person (for
+ * example the responsible salesperson). A name-only owner must never be
+ * encoded as a synthetic account id: My Work and permissions consume real
+ * account ids only. */
+export interface WorkOwnerPerson {
+  userId: string | null;
+  name: string | null;
+}
+
 export interface WorkItem {
   ruleKey: string;
   module: WorkRule["module"];
@@ -336,6 +448,14 @@ export interface WorkItem {
   soRef: string;
   orderId: string;
   action: string;
+  /** Structured ownership. My Work reads actingPerson; Team Work groups by
+   * normalOwner. Cover never overwrites either fact. */
+  ownerRule: WorkOwnerRule;
+  ownerDutyKey: string | null;
+  normalOwner: WorkOwnerPerson | null;
+  activeCover: WorkOwnerPerson | null;
+  actingPerson: WorkOwnerPerson | null;
+  ownerState: WorkspaceDutyResolution["state"];
   /** WHO — resolved from the rule's `ownerRule` (§0.1 Action Owner Engine):
    *  the PO-duty holder, the salesperson, or the PIC — else the honest gap. */
   ownerName: string | null;
@@ -434,9 +554,11 @@ export interface OrderWorkContext {
   picName: string | null;
   /** The PIC's account id — My Work filters on the resolved id. */
   picUserId?: string | null;
-  /** This month's PO-duty holder (ops_po_duty) — resolves the `po_duty`
-   *  rules. Absent/null = duty layer dormant → the duty word stands. */
+  /** One-release legacy PO-duty input. New callers supply `dutyResolutions`.
+   *  Absent/null = the duty word stands; it never falls back to PIC. */
   poDuty?: { userId: string; name: string | null } | null;
+  /** Shared resolver answers keyed by the action's Owner Rule. */
+  dutyResolutions?: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
   /** The order's responsible salesperson — resolves `salesperson` rules.
    *  A name from Sales ownership, not an ops account. */
   salespersonName?: string | null;
@@ -571,41 +693,94 @@ export function workItemsForOrder(
    *  A person where a roster or the order's own fact names one; the PIC as
    *  governed cover where the rule's roster does not exist yet; the duty
    *  word where no person truthfully performs the act. Never hand-picked. */
+  type ResolvedOwner = {
+    ownerRule: WorkOwnerRule;
+    ownerDutyKey: string | null;
+    normalOwner: WorkOwnerPerson | null;
+    activeCover: WorkOwnerPerson | null;
+    actingPerson: WorkOwnerPerson | null;
+    ownerState: WorkspaceDutyResolution["state"];
+    ownerName: string | null;
+    ownerUserId: string | null;
+    ownerDuty?: string;
+  };
+  const directOwner = (
+    ownerRule: WorkOwnerRule,
+    person: WorkOwnerPerson | null,
+    ownerDuty?: string,
+  ): ResolvedOwner => ({
+    ownerRule,
+    ownerDutyKey: null,
+    normalOwner: person,
+    activeCover: null,
+    actingPerson: person,
+    ownerState: person ? "primary" : "not_assigned",
+    ownerName: person?.name ?? null,
+    ownerUserId: person?.userId ?? null,
+    ...(ownerDuty ? { ownerDuty } : {}),
+  });
+  const dutyOwner = (
+    ownerRule: WorkOwnerRule,
+    dutyKey: string,
+    unresolvedWord: string,
+  ): ResolvedOwner => {
+    const resolution = ctx.dutyResolutions?.[ownerRule];
+    if (resolution) {
+      return {
+        ownerRule,
+        ownerDutyKey: resolution.dutyKey,
+        normalOwner: resolution.normalOwner,
+        activeCover: resolution.activeCover,
+        actingPerson: resolution.actingPerson,
+        ownerState: resolution.state,
+        ownerName: resolution.actingPerson?.name ?? null,
+        ownerUserId: resolution.actingPerson?.userId ?? null,
+        ...(resolution.state === "not_assigned" ? { ownerDuty: unresolvedWord } : {}),
+      };
+    }
+    // One-release compatibility for callers not yet supplying the shared
+    // resolution. It never applies to another Duty and never falls back to PIC.
+    if (ownerRule === "po_duty" && ctx.poDuty) {
+      const person = { userId: ctx.poDuty.userId, name: ctx.poDuty.name };
+      return {
+        ...directOwner(ownerRule, person),
+        ownerDutyKey: dutyKey,
+      };
+    }
+    return {
+      ...directOwner(ownerRule, null, unresolvedWord),
+      ownerDutyKey: dutyKey,
+    };
+  };
   const resolveOwner = (
     key: OrderActionKey,
-  ): { ownerName: string | null; ownerUserId: string | null; ownerDuty?: string } => {
+  ): ResolvedOwner => {
     const rule = ORDER_RULE_BY_KEY.get(key);
-    const pic = {
-      ownerName: ctx.picName,
-      ownerUserId: ctx.picUserId ?? null,
-    };
+    const pic = ctx.picName || ctx.picUserId
+      ? { userId: ctx.picUserId ?? null, name: ctx.picName }
+      : null;
     switch (rule?.ownerRule) {
       case "po_duty":
-        return ctx.poDuty
-          ? { ownerName: ctx.poDuty.name, ownerUserId: ctx.poDuty.userId }
-          : // Duty layer dormant — the duty word stands, never the PIC
-            // borrowed for Purchasing's work.
-            { ownerName: null, ownerUserId: null, ownerDuty: "Purchasing" };
+        return dutyOwner("po_duty", "po_duty", "Purchasing");
       case "salesperson": {
         const name = ctx.salespersonName?.trim();
-        return name
-          ? { ownerName: name, ownerUserId: null }
-          : { ownerName: null, ownerUserId: null, ownerDuty: "Sales" };
+        return directOwner(
+          "salesperson",
+          name ? { userId: null, name } : null,
+          name ? undefined : "Sales",
+        );
       }
       case "delivery_duty":
-        return { ownerName: null, ownerUserId: null, ownerDuty: "Delivery staff" };
+        return directOwner("delivery_duty", null, "Delivery staff");
       case "finance_duty":
-        return { ownerName: null, ownerUserId: null, ownerDuty: "Finance" };
+        return directOwner("finance_duty", null, "Finance");
       case "payment_duty":
-        // No payment-duty roster exists yet — the PIC stands as governed
-        // cover (money may never sit unowned); the duty word only when
-        // there is no PIC either.
-        return ctx.picName || ctx.picUserId
-          ? pic
-          : { ownerName: null, ownerUserId: null, ownerDuty: "Payment" };
+        return dutyOwner("payment_duty", "payment_duty", "Payment");
+      case "system":
+        return directOwner("system", null, "System");
       default:
         // order_pic — and any unregistered key fails safe to the same.
-        return pic;
+        return directOwner("order_pic", pic, pic ? undefined : "Operations");
     }
   };
 
@@ -623,12 +798,19 @@ export function workItemsForOrder(
           )
         : 0;
     const owner = resolveOwner(a.key);
+    const module = ORDER_RULE_BY_KEY.get(a.key)?.module ?? "orders";
     return {
       ruleKey: a.key,
-      module: "orders" as const,
+      module,
       soRef: `SO-${ctx.so}`,
       orderId: ctx.orderId,
       action: orderActionQueue(a.key),
+      ownerRule: owner.ownerRule,
+      ownerDutyKey: owner.ownerDutyKey,
+      normalOwner: owner.normalOwner,
+      activeCover: owner.activeCover,
+      actingPerson: owner.actingPerson,
+      ownerState: owner.ownerState,
       ownerName: owner.ownerName,
       ownerUserId: owner.ownerUserId,
       ...(owner.ownerDuty ? { ownerDuty: owner.ownerDuty } : {}),

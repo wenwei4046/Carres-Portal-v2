@@ -1704,6 +1704,33 @@ describe("the batch issue refuses before it creates anything", () => {
     );
   });
 
+  it("a fully covered receipt is refused BY NAME — re-issuing it is how six POs bought one unit", async () => {
+    /* 0430 — T6 keeps a fully covered build visible (a receipt stating what
+       the covering PO bought), and nothing here refused it: production minted
+       six open purchase orders for the SAME 1-unit order line of SO-1340 over
+       two days. The receipt's demandId is still in the index; the door must
+       answer `already_on_po`, never create another document. */
+    const t = TABLES();
+    t.purchase_order_lines = {
+      data: [{ po_id: "PO-2051", sku: "5539-1A(LHF)", qty: 5, received_qty: 0 }],
+      error: null,
+    };
+    const sb = makeSb(t);
+    const demands = await readyDemands(sb);
+    const receipt = demands.find((d) => d.orderId === "o2");
+    expect(receipt).toBeDefined();
+    sb.rpcCalls.length = 0;
+    const res = await postBatch({
+      selections: [
+        { demandId: receipt!.demandId, allocations: [{ destinationId: KLANG, qty: receipt!.qty }] },
+      ],
+      documentDecisions: [],
+    });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { code?: string }).code).toBe("already_on_po");
+    expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
   it("an allocation total that does not equal the server's own remainder", async () => {
     const sb = makeSb(TABLES());
     const demands = await readyDemands(sb);
@@ -2013,6 +2040,40 @@ describe("the retired door's laws, re-asked of the batch door", () => {
     });
     expect(res.status).toBe(400);
     expect(sb.rpcCalls.filter((c) => c.fn === "purchasing_issue_pos_batch")).toHaveLength(0);
+  });
+
+  /* ⭐ THE DATABASE'S REFUSAL KEEPS ITS NAMES (YH, 2026-09-03).
+     The route reads the collection rule as the OPERATOR while the guard is
+     `security definer`, so the rule can be invisible to the code that has to
+     explain it — and this refusal reached the screen as "The supplier must be
+     collected to its configured destination", naming neither party, beside
+     whichever document happened to be showing. 0418 sends the names in `hint`;
+     this pins that they reach the operator instead of the fallback. */
+  it("names the supplier and the destination the database refused over", async () => {
+    const { sb, demands } = await ready();
+    /* Only the batch call is replaced — the PO-duty read and every other RPC
+       keep their real answers, or the route refuses for the wrong reason. */
+    const passThrough = sb.rpc.getMockImplementation()!;
+    sb.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== "purchasing_issue_pos_batch") return passThrough(fn, args);
+      return {
+        data: null,
+        error: {
+          code: "P0001",
+          message: "The PO destination must match Purchasing Settings.",
+          details: "supplier_collection_destination_mismatch",
+          hint: JSON.stringify({ supplier: "Ohana", destination: "Carres Klang" }),
+        },
+      };
+    });
+    const res = await postBatch({
+      selections: allTo(demands, KLANG),
+      documentDecisions: pricedAll(demands, KLANG),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { message?: string; action?: string };
+    expect(body.message).toBe("Ohana must be collected to Carres Klang.");
+    expect(body.action).toBe("Set Deliver To to Carres Klang, then issue again.");
   });
 
   it("a browser collector cannot replace a missing governed collection rule", async () => {

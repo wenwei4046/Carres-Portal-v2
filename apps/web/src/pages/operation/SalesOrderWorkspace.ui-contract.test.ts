@@ -8,9 +8,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const workspace = readFileSync(join(here, "SalesOrderWorkspace.tsx"), "utf8");
 const header = readFileSync(join(here, "SalesOrderTabs.tsx"), "utf8");
 const attribution = readFileSync(join(here, "SalesOrderAttribution.tsx"), "utf8");
+const addons = readFileSync(join(here, "SalesOrderAddons.tsx"), "utf8");
+const queries = readFileSync(join(here, "../../lib/queries.ts"), "utf8");
 const amendDate = readFileSync(join(here, "SalesOrderAmendDeliveryDate.tsx"), "utf8");
 const amendment = readFileSync(join(here, "SalesOrderAmendment.tsx"), "utf8");
 const render = readFileSync(join(here, "../../lib/pdf/render.ts"), "utf8");
+const route = readFileSync(
+  join(here, "../../../../../packages/shared/src/sales-order-route.ts"),
+  "utf8",
+);
 /* The POS half of the parity contract (owner ruling 2026-08-26). A fact both
    surfaces ask for must offer the same answers, so the list lives in shared and
    BOTH files are read here — a POS that stopped importing it would pass its own
@@ -203,11 +209,19 @@ describe("Sales Order object template contract", () => {
   /* ⭐ FEWER CARDS, SAME FACTS — owner ruling 2026-08-26 (Jess): "make it merge
      more". `DELIVERY ADDRESS` joined `CUSTOMER` and `SALES OWNERSHIP` joined
      `ORDER INFO`. The merge may not cost a locked WORD, so each keeps its exact
-     name as a subsection heading; what it loses is a border, a 24px gap and a
-     second heading rule. */
-  it("merges the address into Customer and ownership into Order info, keeping both names", () => {
+     name; what it loses is a border, a 24px gap and a second heading rule.
+
+     ⭐ RE-PINNED 2026-09-01 (YH): `Sales ownership` came back OUT as a card of
+     its own. Jess's ruling was "fewer, fuller cards", and this half of it did
+     not serve that — `Order info` is what the CUSTOMER asked for (dates,
+     floors, a lift) and sales ownership is who inside Carres gets paid, so the
+     merged card held two topics rather than one fuller one. `Delivery address`
+     is untouched: it is the same party's fact as the customer above it, which
+     is why that half of the merge still reads as one card. */
+  it("merges the address into Customer, and gives ownership its own card again", () => {
     expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
-    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).toContain('<Block title="Sales ownership">');
+    expect(workspace).not.toContain("<SubHead>Sales ownership</SubHead>");
     expect(workspace).not.toContain('<Block title="Delivery address">');
     /* Every field of both merged sections still renders. */
     expect(workspace).toContain('data-pos-field="address"');
@@ -234,6 +248,7 @@ describe("Sales Order object template contract", () => {
       "Customer",
       "Money",
       "Order info",
+      "Sales ownership",
       "Goods",
       "What this change started elsewhere",
     ]);
@@ -273,10 +288,19 @@ describe("Sales Order object template contract", () => {
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038
-     rules it read-only on both surfaces. */
-  it("answers new-or-existing in the Customer heading, and still never lets it be typed", () => {
+     rules it read-only on both surfaces. It rides the header bar as a compact
+     pill (Jess, 2026-09-10 density pass) rather than matching the card
+     title's own shouting face — a badge reads as a fact, not a second title. */
+  it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
-    expect(workspace).toContain("headerSlot=");
+    // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
+    // checkout holds LF, and the same file must match on both.
+    const start = workspace.search(/<Block\s+title="Customer"/);
+    const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
+    expect(start).toBeGreaterThan(-1);
+    expect(customer).toContain("headerSlot=");
+    expect(customer).toContain('data-testid="customer-type-chip"');
+    expect(customer).toContain("rounded-full");
     expect(workspace).not.toContain('label="Customer type (auto)"');
     expect(workspace).toContain("customerTypeWord");
     /* The accent is spent once, on the tab underline — a chip may not take it. */
@@ -309,6 +333,33 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("cfg.freeUpToFloor");
     expect(workspace).toContain("cfg.perFloorPerItem");
     expect(workspace).not.toMatch(/freeUpToFloor\s*[:=]\s*\d/);
+  });
+
+  /* ⭐ A SAVED ORDER READS ITS OWN CHARGE, NEVER TODAY'S RATE (YH, 2026-09-01).
+     The working-out priced from the live `floor_config` singleton in EVERY
+     mode, so a principal moving the rate made one page print two numbers: the
+     sentence narrated the new rate while MONEY, the PDF and every payment cap
+     kept the fee that was actually stamped. An old revision was worse — it
+     mixed the snapshot's floor with the CURRENT order's line count.
+
+     ⛔ The live rate may reach this sentence on a CREATE and nowhere else,
+     because a create is the one state with no stamped row to read. */
+  it("prices the working-out from the stamped row once the order exists", () => {
+    expect(workspace).toContain("const stairWorking = useMemo");
+    /* The saved branch reads the stamped STAIR_CARRY row — the same row MONEY
+       reads, so the two cannot disagree on one page. */
+    expect(workspace).toContain("STAIR_CARRY_ADDON_KEY");
+    /* A REVISION IS A PHOTOGRAPH: its own lines and its own addons, never the
+       order's current ones. */
+    expect(workspace).toContain('mode === "oldrev" ? (viewedRevision?.snapshot ?? null) : null');
+    /* The rendered fee is the one the memo resolved per mode, never the live
+       re-derivation. */
+    expect(workspace).toContain("<Money value={stairWorking.fee} />");
+    expect(
+      workspace,
+      "the live rate must not be rendered directly — it is create-only, via stairWorking",
+    ).not.toContain("<Money value={stair.cfg.perFloorPerItem} />");
+    expect(workspace).not.toContain("<Money value={stair.fee} />");
   });
 
   /* ⭐ PROCEED DATE IS READ-ONLY ON AN EXISTING ORDER (Jess, 2026-08-26),
@@ -558,10 +609,11 @@ describe("Sales Order object template contract", () => {
   });
 
   it("names the governed ownership request and hides it from Operation", () => {
-    /* The section merged into `Order info` on 2026-08-26 and kept its locked
-       word as the subsection heading — the merge moved the border, not the
-       name (COPY-STANDARD:1427 still governs the door below it). */
-    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    /* The word is locked (COPY-STANDARD:1427) and has now been a card, a
+       merged subsection, and a card again. It is the SAME STRING through all
+       three — `Block` uppercases every title, so becoming a card title moved
+       the border and never the name. */
+    expect(workspace).toContain('<Block title="Sales ownership">');
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");
@@ -606,11 +658,21 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Report a customer, product, delivery or installation problem.");
   });
 
-  it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
-    expect(workspace).toContain("Open this order in Payments");
-    expect(workspace).toContain("tab=payments&so=");
+  it("adds one READ-ONLY door to Payments, scoped to this order, riding the card's own header bar", () => {
+    expect(workspace).toContain("Open this order in Payment");
+    expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
+    const start = workspace.search(/<Block\s+title="Money"/);
+    const money = workspace.slice(start, workspace.indexOf('</Block>', start));
+    expect(start).toBeGreaterThan(-1);
+    expect(money).toContain("headerSlot=");
+    expect(money).not.toContain('mt-3 flex justify-end');
+    /* The door lives in the header now, so it renders BEFORE the three
+       amounts rather than in a row underneath them. */
+    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeLessThan(
+      money.indexOf('data-testid="money-outstanding"'),
+    );
   });
 
   /* THE PIN MOVED, NOT THE FACT (YH, 2026-08-28). This used to assert the
@@ -702,5 +764,280 @@ describe("Sales Order record grammar contract", () => {
     expect(workspace).toContain('const OBJECT_VIEWS = ["Order", "Revisions", "History", "Order Route"]');
     expect(workspace).toContain("onViewRevision={setViewRev}");
     expect(workspace).toContain('disabled={mode === "oldrev"}');
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ONE FORM, ONE GRAMMAR (YH, 2026-09-01)
+
+   Three separate reports about the same page, and they turn out to be one
+   complaint: the Order screen was drawn in two grammars and the reader had to
+   learn by trial which shapes accept typing.
+
+   These are SOURCE SCANS, like the alignment pin above, for the same reason —
+   jsdom computes no layout, so a render test cannot see that two boxes wear
+   different skins, and mounting this 3,100-line workspace to prove a border is
+   the wrong price. Each assertion names the ONE token a later edit would flip
+   back, and each has an inverted half so the old shape cannot return quietly.
+   ═════════════════════════════════════════════════════════════════════════ */
+describe("Sales Order object page — one form grammar", () => {
+  it("draws a recorded answer in the same box as the question that would ask it", () => {
+    /* `Fact` is the page's read-only field. It must render through the kit's
+       own frame and the kit's own control skin — the point is that there is
+       ONE skin and this shares it, so a change to the control travels here
+       instead of leaving a second, drifting copy behind. */
+    expect(workspace).toContain('import FieldFrame from "@/components/kit/FieldFrame"');
+    expect(workspace).toContain('import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe"');
+    expect(workspace).toContain('data-kit="readonly-field"');
+    expect(workspace).toContain("${CONTROL_BASE} ${CONTROL_BORDER.rest}");
+    /* Announced as what it is drawn as. A box that looks typable and reads to
+       a screen reader as loose text is the same defect in the other channel. */
+    expect(workspace).toContain('role="textbox"');
+    expect(workspace).toContain("aria-readonly");
+    /* THE OLD SHAPE: a bare micro-label with body text under it, no box. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">{label}</div>');
+  });
+
+  it("prints a service by its name and never by its database key", () => {
+    /* The Goods table printed `a.addon_key` in the Item column — the raw key,
+       where every goods row prints a product name — while `SalesOrderAddons`
+       eighty pixels below printed the catalog name for the same row from the
+       same bundle. One record, two names, and the key was the one on top.
+       ONE map, read by both, so they cannot disagree again (Law D). */
+    expect(workspace).toContain("const addonNameByKey = useMemo(");
+    expect(workspace).toContain("addonNameByKey.get(a.addon_key) ?? a.addon_key");
+    /* The service row now wears the goods row's own cells: the CJK face on the
+       item, and the second line where a goods row already puts its config. */
+    expect(workspace).toContain("cjkClassName(serviceName)");
+    /* THE OLD SHAPE: the key rendered straight into the Item cell. */
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">{a.addon_key}</td>');
+    /* COPY-STANDARD:1679 — `Not recorded` is the ONE absence word, and the
+       bare `—` the service row used sits in that row's `Do NOT use` column. */
+    expect(workspace).not.toContain('<td className="py-1.5">—</td>');
+    expect(workspace).not.toContain('<td className="py-1.5 pr-3">—</td>');
+  });
+
+  it("no longer offers the delivery payment approval door", () => {
+    /* ⭐ RE-PINNED ON AN OWNER INSTRUCTION, 2026-09-01. This asserted the
+       opposite this morning — that `0362`'s door survived, moved under
+       `Outstanding`. The owner has since instructed that the door be removed,
+       so the assertion is INVERTED rather than deleted: a quiet
+       reintroduction has to fail here.
+
+       WHAT THE REMOVAL MEANS, pinned so it cannot be read as a tidy-up.
+       `0362` made "money in full before delivery" the default and allowed one
+       exception, decided by the principal, which opened the Delivery Order as
+       COD. This was the only surface that could raise or decide one, so the
+       rule is now ABSOLUTE: `ops_delivery_orders_money_gate` still refuses a
+       Delivery Order while a Sales Order's goods money is outstanding, and
+       nothing can ask for the exception. An owing order is undeliverable
+       until it is paid. That is the intended effect.
+
+       AND NOTHING BELOW THE SCREEN WAS DROPPED. The record, both RPCs, the
+       API routes and the database trigger are untouched — an approval already
+       granted stays honoured, and putting the door back is a revert. */
+    expect(workspace).not.toContain("function PaymentApprovalBlock(");
+    expect(workspace).not.toContain("Request payment approval");
+    expect(workspace).not.toContain("useRequestPaymentApproval");
+    expect(workspace).not.toContain("useDecidePaymentApproval");
+    /* The money summary itself is unchanged and still read-only (Law B). */
+    expect(workspace).toContain('data-testid="money-outstanding"');
+    expect(workspace).not.toContain("Record payment");
+  });
+
+  it("boxes the three money amounts without giving Money a door", () => {
+    /* The last bare label-over-value pair on the page. `Fact` is read-only by
+       construction, so this is a SHAPE change and Law B is untouched — the
+       Money card still summarises and still writes nothing. */
+    for (const amount of ["Total", "Paid", "Outstanding"]) {
+      expect(workspace).toContain(`label="${amount}"`);
+    }
+    /* Colour and size survive INSIDE the box: red while owed (owner ruling
+       2026-08-15), one `text-strong` on all three (YH, 2026-08-28). */
+    expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"');
+    expect(workspace).toContain('data-testid="money-outstanding"');
+    /* THE OLD SHAPE: three loose amounts packed left on a flex row. */
+    expect(workspace).not.toContain('<div className="text-label text-base-500">Total</div>');
+    expect(workspace).not.toContain("flex flex-wrap items-baseline gap-x-8 gap-y-3");
+  });
+
+  it("says how many Units are ready instead of the word the dictionary refuses", () => {
+    /* COPY-STANDARD:1755 puts `Not allocated` in its `Do NOT use` column. The
+       registered answer is the count and then what is being waited on, and it
+       is written ONCE in shared so the Goods table, the Order Route STOCK node
+       and the register expansion cannot drift into three spellings. */
+    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    /* The rendered STRING is gone; the governance comment recording WHY it
+       went stays, which is why this pins the quoted literal. */
+    expect(workspace).not.toContain('"Not allocated"');
+    expect(route).toContain("unitsShortWords(readyQty, line.committedQty)");
+    expect(route).not.toContain("Waiting for purchase");
+    /* A LOAD IS NOT A SHORTAGE — the Deliver To cell has always guarded this;
+       the Unit ID cell printed a shortage while the read was still in flight. */
+    expect(workspace).toContain("goodsTruthQ.isLoading && !truth");
+  });
+
+  it("makes the stair-carry parity tag cover the field it names", () => {
+    /* THE DEFECT, AND IT IS THE SECOND TIME. `data-pos-field="stairCarry"`
+       wrapped the FLOOR box alone, while the registry field it stands for is
+       "Delivery access (floor / lift / stair carry)". The completeness check
+       below only asserts the attribute EXISTS in this file — it cannot see
+       what the attribute wraps — so it reported the field covered while
+       checking one box of three, and deleting `Lift available?` would still
+       have passed. `orderAddons` failed exactly this way once already, on a
+       hidden span with no control behind it.
+       This asserts the SPAN: everything from the tag to the next
+       `data-pos-field` must contain all three controls. */
+    /* The ATTRIBUTE, not the mention of it — the comment above the tag names
+       it in prose, and a plain `indexOf` would find that first. */
+    const attribute = /\n\s*data-pos-field="stairCarry"/;
+    const tag = attribute.exec(workspace);
+    expect(tag, "the tag exists as an attribute").not.toBeNull();
+    const from = tag!.index;
+    /* The span ends at the NEXT tag of any kind. Every remaining mention is a
+       real field, so a plain `indexOf` is enough once we are past this one. */
+    const next = workspace.indexOf('data-pos-field="', from + 30);
+    expect(next, "there is a following tag to bound the span").toBeGreaterThan(from);
+    const span = workspace.slice(from, next);
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"']) {
+      expect(span, `${id} sits inside the stairCarry tag`).toContain(id);
+    }
+    /* ⭐ AND NOTHING CLOSES THE TAG EARLY. Text order is not containment: a
+       `</div>` after the floor box would end the tag while leaving the other
+       two ids further down the file, and an order-only assertion passes on
+       that — measured, by breaking it on purpose. A source scan cannot read
+       the DOM, so it reads the one thing that decides nesting here: the tag's
+       div must not close before the last of its three controls. */
+    const toLift = workspace.slice(from, workspace.indexOf('id="so-lift"', from));
+    expect(toLift, "the stairCarry div is not closed before the lift").not.toContain("</div>");
+    /* Nothing moved on screen: the three fields keep the parent's own three
+       tracks rather than collapsing into one cell. */
+    expect(workspace).toContain("sm:col-span-3 sm:grid-cols-3");
+  });
+
+  it("never prints a database key on a customer's document", () => {
+    /* An OLD REVISION's PDF is a customer document. It built its own rows from
+       the stored snapshot and read `String(a.addon_key)`, so it printed
+       `dispose_mattress` where the live document prints `Mattress disposal` —
+       the live path was never wrong, because `base.addons` arrives labelled
+       from the server. */
+    expect(workspace).not.toContain("label: String(a.addon_key)");
+    expect(workspace).toContain("addonLabel: (key: string) => string");
+    expect(workspace).toContain("addonNameByKey.get(key) ?? key");
+    /* A REVISION IS A PHOTOGRAPH. Where the stored row carries its own label,
+       that is what the customer agreed to and that is what prints — the
+       catalog is asked only where the photograph is silent. */
+    expect(workspace).toContain('(a as { label?: unknown }).label === "string"');
+  });
+
+  it("enforces the stair-carry ceiling it has always printed", () => {
+    /* THE DEFECT: the hint has read `0 to 5` since it was written and the box
+       accepted 99. The POS stepper stops at the item count
+       (`StairCarryFields.tsx`), so the office could save a count no shop floor
+       could quote, while the working line on the same card priced the clamped
+       five — one card, two answers, and the saved one was the wrong one.
+       `stairCarryCount` is the clamp the FEE already runs and the SERVER
+       stamps with. Imported, never re-typed: a second copy of a ceiling is how
+       these two surfaces drifted apart the first time. */
+    expect(workspace).toContain("stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)");
+    expect(workspace).toContain("max={stair?.itemsTotal}");
+    /* THE OLD SHAPE: a lower clamp only, so anything above the item count
+       went straight through. */
+    expect(workspace).not.toContain(
+      'e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0),',
+    );
+    /* NO CEILING WITHOUT A COUNT — until the catalog answers, the item total
+       is unknown, and a guessed ceiling would silently cut a correct answer.
+       The floor at zero still applies. */
+    expect(workspace).toContain("Math.max(0, Number(e.target.value) || 0)");
+    /* The POS half of the same rule, so the parity is asserted and not
+       assumed: both surfaces reach the one shared clamp. */
+    expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
+  });
+
+  it("keeps the card title's mono/uppercase/flame treatment off ordinary subsection headings", () => {
+    /* A card TITLE (`CUSTOMER`, `MONEY`, …) is the one shouting heading per
+       card: mono face, uppercase, tracked, flame-dark (`signature-700`,
+       `01-design-tokens.md` §2 — an existing declared token, no new value).
+       `SubHead` (`Delivery address`, `Emergency contact`) sits INSIDE that
+       card and previously copied the same shouting treatment at a smaller
+       size — which made a reader read the SHADE/face to tell a section from
+       the card's own name. It now renders as the ordinary field-group
+       heading (`text-strong`, `01-design-tokens.md` §1): the ordinary face,
+       the ordinary case, one step down in size from the card title. */
+    const title = "font-mono text-strong uppercase tracking-[0.08em] text-signature-700";
+    const sub = "text-strong text-base-900";
+    expect(workspace, "the card title").toContain(title);
+    expect(workspace, "the subsection heading").toContain(sub);
+    /* THE OLD SHAPE: the subsection heading copying the card title's own
+       shouting treatment. */
+    expect(workspace).not.toContain(
+      "gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700",
+    );
+    /* ⛔ AND NOT THE ACCENT ON A CARD TITLE. `01-design-tokens.md` §2.2 spends
+       blue once per screen and the tab underline already holds it; a blue
+       card title would be the second spend and the current thing would stop
+       standing out. */
+    expect(workspace).not.toContain("uppercase tracking-[0.08em] text-kit-blue");
+    /* Nor any status hue, for the same reason. */
+    for (const job of ["text-kit-green", "text-kit-amber", "text-kit-red", "text-danger"]) {
+      expect(workspace, `${job} is a status colour, not a heading colour`).not.toContain(
+        `uppercase tracking-[0.08em] ${job}`,
+      );
+    }
+  });
+
+  it("keeps a service to ONE row, carrying its own doors", () => {
+    /* A service was printed TWICE: as a row in the Goods table, and again in a
+       `Services` list below that repeated its name, its size, its quantity and
+       its price purely so it could hold two buttons. One record, two places —
+       and with a second service on the order the operator had to match them by
+       eye to know which row a `Remove` belonged to.
+       The doors live in the row now. The list is gone. */
+    expect(workspace).toContain("ServiceRowActions");
+    expect(addons).toContain("export function ServiceRowActions(");
+    /* THE LIST AND ITS HEADING: gone from the panel entirely. */
+    expect(addons).not.toContain('<span className="text-label text-base-500">Services</span>');
+    expect(addons).not.toContain("so-addons-empty");
+    /* ⛔ NOT A SEVENTH COLUMN — §0.1 locks the table at six, and the document
+       preview prints from the same six. The header row is unchanged. */
+    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
+      expect(workspace).toContain(`>${label}</th>`);
+    }
+    expect(workspace).not.toContain(">Actions</th>");
+    /* The one act the table cannot perform — adding a service that is not
+       there yet — is what the panel keeps, and the POS-parity attribute rides
+       THAT rather than a hidden span with nothing behind it. */
+    expect(workspace).toContain('data-pos-field="orderAddons"');
+    expect(addons).toContain('data-testid="so-addon-open"');
+    expect(addons).toContain("Add a service");
+    /* ⭐ AND THE TABLE ACTUALLY REFRESHES (YH, 2026-09-01 — "ensure numbers
+       and generated SO are correct"). The table is now the ONLY place a new
+       service appears, so the add path must invalidate the key the office
+       reads. `["orders"]` never reached `["operation","orders",id]` — see
+       `order-addon-invalidation.test.ts` for the prefix proof. */
+    expect(queries).toContain('void qc.invalidateQueries({ queryKey: ["operation", "orders"] });');
+  });
+
+  it("puts the salesperson door beside the salesperson, not in a row of its own", () => {
+    /* The page's own grammar: `Change delivery date` sits under the date it
+       moves. The ownership door now sits under the name it moves, in the same
+       quiet text shape, and the lane below keeps only the request panel —
+       which is truth and does deserve its rule. */
+    expect(workspace).toContain("inlineTrigger={false}");
+    expect(workspace).toContain("openSignal={attributionSignal}");
+    expect(workspace).toContain("setAttributionSignal((n) => n + 1)");
+    expect(workspace).toContain("Change salesperson");
+    /* GATE 3's rule is imported, never re-typed — one rule, one place. */
+    expect(workspace).toContain("useCanChangeSalesOwnership");
+    expect(attribution).toContain("export function useCanChangeSalesOwnership()");
+    /* THE OLD SHAPE: a hairline drawn across the lane whether or not anything
+       is in it, which is what gave one button a section of its own. */
+    expect(attribution).not.toContain(
+      '<div className="mt-3 border-t border-kit-slate-5 pt-3" data-testid="attribution-lane">',
+    );
+    expect(attribution).toContain(
+      'className={request ? "mt-3 border-t border-kit-slate-5 pt-3" : ""}',
+    );
   });
 });

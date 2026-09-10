@@ -72,7 +72,8 @@ const purchaseDemandsRouter = new Hono<AppEnv>();
  *                       `purchase_orders.so`, never `so_refs`, never a global
  *                       SKU/supplier/customer match.
  *   `purchase_orders`   status (a cancelled PO never counts), the CURRENT
- *                       version, the official `eta_date`, the issued
+ *                       version, the immutable `official_delivery_date`
+ *                       (never the live planning `eta_date`), the issued
  *                       supplier and `Deliver To`.
  *   `po_sends`          confirmed-sent evidence AT the current version
  *                       (0377/0378). `external_open` never counts; supplier
@@ -135,7 +136,7 @@ async function loadRegisterRows(
     id: string;
     status: string;
     version: number | null;
-    eta_date: string | null;
+    official_delivery_date: string | null;
     supplier_id: string | null;
     destination_id: string | null;
   };
@@ -146,7 +147,7 @@ async function loadRegisterRows(
     const [pos, sends] = await Promise.all([
       sb
         .from("purchase_orders")
-        .select("id, status, version, eta_date, supplier_id, destination_id")
+        .select("id, status, version, official_delivery_date, supplier_id, destination_id")
         .in("id", batch),
       sb.from("po_sends").select("po_id, po_version, kind").eq("kind", "confirmed_sent").in("po_id", batch),
     ]);
@@ -246,7 +247,7 @@ async function loadRegisterRows(
             ? (supplierNames.get(po.supplier_id) ?? null)
             : null,
           destinationId: po.destination_id,
-          etaDate: po.eta_date?.slice(0, 10) ?? null,
+          officialDeliveryDate: po.official_delivery_date?.slice(0, 10) ?? null,
           sentCurrentVersion: sentCurrent(po),
         };
       });
@@ -286,6 +287,12 @@ function ownerOf(
 }
 
 purchaseDemandsRouter.get("/", requireOperation, async (c) => {
+  const rawSo = c.req.query("so");
+  const scopeSo = rawSo == null || rawSo === "" ? null : Number(rawSo);
+  if (scopeSo != null && (!Number.isInteger(scopeSo) || scopeSo <= 0)) {
+    return c.json({ error: "invalid_so", code: "invalid_param" }, 400);
+  }
+
   const sb = userClient(c.env, c.var.auth.jwt);
   const me = c.var.auth.id;
 
@@ -438,12 +445,28 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
       // guard costs nothing and keeps the boundary explicit.
       if (row.readyStock) continue;
       for (const build of row.builds) {
-        /* A FULLY COVERED build does not remain in SO Batch Purchase (Card
-           02-A §3): it is found through Purchase Orders, Stock and Order
-           Route. The engine reads `status = 'open'` and nothing else, so the
-           moment that purchase order is cancelled the coverage falls away and
-           the demand returns here by recomputation — nothing is stored. */
-        if (build.fullyOnPo === true) continue;
+        /* A FULLY COVERED build STAYS, and stays buyable.
+           Card 02-A §3 said such a build "does not remain in SO Batch
+           Purchase … found through Purchase Orders, Stock and Order Route",
+           and this line dropped it. Measured on production 2026-09-03: SO-1297
+           still rendered its two goods lines, with no tick-box, no supplier,
+           no Deliver To and no sentence, because the parent row is drawn from
+           `order.lines` while the tick is drawn from these leaves. The card's
+           "does not remain" and Card 02-B's permanent register cannot both be
+           obeyed, and what shipped obeyed neither.
+
+           The coverage is also weaker than the card assumes. It comes from a
+           per-SKU pool with no customer attribution (T6), so the covering
+           purchase order may belong to another customer and may stop covering
+           this one on the next refresh. Card 02-B forbids naming that document
+           here — lineage `po_line_sources` only — so the screen cannot even
+           tell the buyer where the units went.
+
+           YH ruled on 2026-09-03: a line with a supplier, a cost and a price
+           is tickable, and the buyer judges the coverage. The row now carries
+           `onPo` beside `toBuy`, so the overlap is visible rather than
+           decided for them. This reverses Card 02-A §3 and needs the owner's
+           confirmation on the PR. */
         const q = purchaseDemandQuantities(build, proposal.category);
         /* THE ENGINE'S OWN ARRIVAL DATE. `stockReady` IS `arriveBy` — the day
            the goods must be at Carres for this customer promise to hold. */
@@ -456,11 +479,23 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
            construction — the read refuses the others line by line into
            `registerFacts` below. The one blocker it can still carry is the
            missing customer date. */
+        /* A factory-collected supplier with no collector set in Purchasing
+           Settings CANNOT be issued: `to-order.ts` refuses the plan with
+           `pickup_partner_required` after the operator has ticked and pressed
+           Issue PO. Named HERE instead, so the row is untickable and says why,
+           rather than failing at the end of the act (YH, 2026-09-03). The row
+           already carried both facts; nothing new is read. */
+        const pickupPartnerMissing =
+          (supplierKinds.get(proposal.supplierId) ?? "own_logistics") ===
+            "factory_pickup" &&
+          !collectionBySupplier.get(proposal.supplierId)?.procurementPartnerId;
         const state: PurchaseDemandState =
           row.delivery == null
             ? "no_customer_date"
             : catalogCostMissing
               ? "no_cost"
+            : pickupPartnerMissing
+              ? "no_pickup_partner"
             : build.readyIfOrderedToday != null
               ? purchaseDemandTimingOf({
                   today,
@@ -626,21 +661,44 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
    * a purchase order sent to a yard that shut last month must still be able to
    * print where it went — and `active` is what stops it being CHOSEN again.
    * Filtering it out here would make an old document unreadable. */
-  let destinations: PurchasingDestination[] = [];
-  try {
-    const dest = await sb
-      .from("purchasing_destinations")
-      .select("id, name, is_default, active")
-      .order("name");
-    destinations = ((dest.data ?? []) as Record<string, unknown>[]).map((d) => ({
-      id: d.id as string,
-      name: (d.name as string) ?? "",
-      isDefault: d.is_default === true,
-      active: d.active !== false,
-    }));
-  } catch (e) {
-    console.error("so batch — destinations unavailable", (e as Error).message);
+  /* ⛔ THIS READ MAY NOT FAIL SOFT (YH, 2026-09-01).
+     It used to. The `try/catch` below was dead code for a failed query:
+     supabase-js returns a query error in the RESULT OBJECT and does not throw,
+     so `dest.error` went unread, `dest.data` was null, and `destinations`
+     quietly became `[]`. The log line "destinations unavailable" could not
+     fire.
+     WHAT AN EMPTY LIST COSTS. The whole buying capability of
+     `/operation?tab=purchase` dies and the page looks completely normal: every
+     checkbox is a no-op because a tick must be allocated to a destination, no
+     Deliver To dropdown draws, no Split button draws, and `Issue PO` never
+     appears. Nobody can tell it from a UI bug — which is exactly how it was
+     reported ("the boxes are all not clickable").
+     A page that cannot buy must SAY it cannot buy. This is the same rule the
+     lineage read above already follows. */
+  const dest = await sb
+    .from("purchasing_destinations")
+    .select("id, name, is_default, active")
+    .order("name");
+  if (dest.error) {
+    console.error("so batch — destinations unavailable", dest.error.message);
+    return c.json(
+      {
+        error: "destinations_unavailable",
+        code: "destinations_unavailable",
+        message: "The Deliver To list could not be read, so nothing can be bought on this page.",
+        action: "Reload the page. If it happens again, tell IT.",
+      },
+      500,
+    );
   }
+  const destinations: PurchasingDestination[] = (
+    (dest.data ?? []) as Record<string, unknown>[]
+  ).map((d) => ({
+    id: d.id as string,
+    name: (d.name as string) ?? "",
+    isDefault: d.is_default === true,
+    active: d.active !== false,
+  }));
   const defaultDestination = destinations.find((d) => d.isDefault && d.active) ?? null;
 
   /* WHO MAY COLLECT FROM A FACTORY. Read here rather than on the issue POST so
@@ -657,10 +715,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     console.error("so batch — procurement partners unavailable", (e as Error).message);
   }
 
+  const scopedRows =
+    scopeSo == null ? rows : rows.filter((row) => row.so === scopeSo);
+  const scopedRegisterRows =
+    scopeSo == null
+      ? registerRes.registerRows
+      : registerRes.registerRows.filter((row) => row.so === scopeSo);
+
   const body: SoBatchPurchaseResponse = {
     today,
-    rows,
-    registerRows: registerRes.registerRows,
+    rows: scopedRows,
+    registerRows: scopedRegisterRows,
     destinations,
     /* No default configured means NO default. Picking the first active one
        would silently make some warehouse the standing answer, and the standing

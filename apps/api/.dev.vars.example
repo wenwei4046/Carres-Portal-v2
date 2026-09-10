@@ -11,3 +11,24 @@ SUPABASE_JWT_SECRET=your-jwt-secret
 
 # 0232 staff PIN login — HS256 secret for the short-lived staff session token.
 STAFF_SESSION_SECRET=any-long-random-string
+
+# 0223 Stripe online collection (payment/MASTER.md §16).
+# THE ISOLATED TEST ENVIRONMENT IS THIS FILE. Stripe test mode is the same
+# account with different keys, and this Worker has ONE production environment —
+# so putting a test key in the deployed secrets would REPLACE the live one.
+# `wrangler dev` reads .dev.vars instead, which never leaves this machine and is
+# gitignored, so the whole journey can be walked against Stripe TEST mode with
+# nothing in production touched.
+#
+#   1. Stripe dashboard, TEST mode (the toggle, top right) → Developers → API
+#      keys → the SECRET key. It starts sk_test_ — never sk_live_.
+#   2. Developers → Webhooks → add an endpoint at http://localhost:8787/stripe
+#      (or your tunnel) → its signing secret. It starts whsec_.
+#   3. Paste both below in your own .dev.vars. Never into a chat, a commit or a
+#      screenshot.
+#
+# Both unset ⇒ the feature is OFF: the routes answer 503 stripe_not_configured
+# and the page says it is not set up yet. That is the correct degrade, not a bug.
+STRIPE_SECRET_KEY=sk_test_your-test-mode-secret-key
+STRIPE_WEBHOOK_SECRET=whsec_your-test-mode-webhook-signing-secret
+

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { resolveActorNames } from "../../lib/actor-names";
 import { restampStairCarry, touchesStairInputs } from "../../lib/stair-carry-restamp";
 import { HTTPException } from "hono/http-exception";
 import type { MiddlewareHandler } from "hono";
@@ -12,6 +13,8 @@ import {
   type DeliveryPaymentApproval,
   confirmProceedRequestInputSchema,
   ListOperationOrdersQuery,
+  installmentMonthsField,
+  MAX_DELIVERY_FLOOR,
   recheckStockInput,
   reselectPartnerInput,
   deliveryQueueLeads,
@@ -21,7 +24,9 @@ import {
   resolveCurrentCustomerCommitment,
   resolveOrderCompletion,
   resolveUnitAllocation,
+  invoiceStorageSumOf,
   storageHold,
+  storageObligation,
   transferReadyInputSchema,
   warehousePickInput,
   type AllocationUnit,
@@ -109,50 +114,6 @@ function mapPipelineV2Error(error: { code?: string; message?: string; details?: 
     };
   }
   return mapPgError(error);
-}
-
-/**
- * ⭐ ONE ACTOR RESOLVER FOR EVERY SALES ORDER RECORD (CARD 2026-08-27).
- *
- * History events and Revision rows both answer "who did this" from the same
- * two identity sources, and Law D says a derived fact has ONE arithmetic —
- * this function is that arithmetic, extracted from the detail route where it
- * was born (2026-08-24) so the Revisions read cannot drift from it.
- *
- * TWO SOURCES, BECAUSE ONE CANNOT SEE EVERYONE. The internal-staff half is
- * `actor_display_names` (0390) — a narrow definer door returning exactly
- * (id, name) for principal/operation/finance/bd/hr/warehouse accounts. The
- * production walk of SO-1329 proved why a plain `app_users` read is not
- * enough: 0235's peers policy shows an operation JWT only operation-role
- * rows, so a PRINCIPAL actor rendered as an audit defect on the very order
- * that recorded her. The sales-side half is `salespersons` (0002
- * `salespersons_scoped_read`), which carries `user_id` and the salesperson's
- * own display name. The staff door wins where both answer: it is the
- * account; the salesperson row is the sales-side profile of the same person
- * — and the door deliberately returns NO dealer-side rows, so that rule
- * cannot print a shop login name over the person's own.
- *
- * BOUNDED: each distinct id is asked for once, however many events or
- * revisions it authored. FAILS OPEN: a read error or an unresolved id leaves
- * the record unnamed — the caller classifies that as an audit-data defect; a
- * person is never invented and an event is never dropped.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveActorNames(sb: any, ids: ReadonlyArray<string | null | undefined>): Promise<Map<string, string>> {
-  const distinct = [...new Set(ids.filter((v): v is string => !!v))];
-  const byId = new Map<string, string>();
-  if (distinct.length === 0) return byId;
-  const [staffRes, sellerRes] = await Promise.all([
-    sb.rpc("actor_display_names", { p_ids: distinct }),
-    sb.from("salespersons").select("user_id, name").in("user_id", distinct),
-  ]);
-  for (const r of (staffRes.data ?? []) as Array<{ id: string; name: string | null }>) {
-    if (r.name) byId.set(r.id, r.name);
-  }
-  for (const r of (sellerRes.data ?? []) as Array<{ user_id: string | null; name: string | null }>) {
-    if (r.user_id && r.name && !byId.has(r.user_id)) byId.set(r.user_id, r.name);
-  }
-  return byId;
 }
 
 /**
@@ -319,7 +280,24 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
       // register could not show a column for a fact its list never carried.
       // Four scalar columns on the SAME single read - no extra subrequest,
       // no new access (operation already reads them on GET /:id).
-      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), ops_sofa_loans(status), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
+      //
+      // 2026-09-02 (D4) - `ops_delivery_orders(do_number)`: the SO register's
+      // DO No column used to cross-join the DELIVERY REGISTER, and that read is
+      // `.order("issued_at", desc).limit(500)`. An order whose delivery order
+      // fell outside the newest 500 got an empty array, and the cell printed the
+      // POSITIVE claim "No delivery order yet" - a register stating as fact
+      // something it had only failed to look far enough to see. Past 500 DOs it
+      // gets quietly wrong rather than visibly empty, which is the same shape as
+      // `claims-facet-counts-a-truncated-page` in carry-forwards.md; that entry
+      // rules the fix is server-side in the call that already produces the fact,
+      // and explicitly NOT "raise the limit", which only moves the number at
+      // which it starts lying. An EMBED, not a second query: PostgREST resolves
+      // it inside this same request, so the Worker spends no extra subrequest,
+      // and each order carries its own delivery orders with no cap to fall out
+      // of. Voided DOs are NOT filtered here - the delivery register does not
+      // filter them either, and this column must not start counting differently
+      // from the surface it links to.
+      "id, so, status, operation_stage, warehouse_id, customer_name, customer_phone, customer_address, customer_email, customer_billing, customer_billing_same, customer_emergency, customer_address_line1, customer_address_line2, customer_address_city, customer_address_state, customer_address_postcode, building_type:entry_data->fields->>building_type, customer_race, customer_gender, customer_birthday, delivery_floor, delivery_has_lift, delivery_stair_items, channel, placed_at, delivery_date, delivery_date_tbd, proceed_date, source_system, source_ref, ops_assigned_logistic, delivery_partner_id, delivery_stops, request_for_delivery_at, partner_accepted_at, partner_rejected_at, partner_rejected_reason, do_number, invoice_no, invoiced_at, payment_method, installment_months, dispatched_at, delivered_at, outlet_id, salesperson_id, dealer_id, paid, dealers(name), outlets(name), salespersons(name), delivery_partners!orders_delivery_partner_id_fkey(id, name), order_lines(id, sku, qty, unit_price, attrs, source_po), order_addons(addon_key, qty, unit_price), ops_delivery_orders(do_number), order_supplier_threads(id, supplier_id, category, operation_stage, po_id, delivery_partner_id, delivery_partners(id, name), confirm_delivery_date, request_for_delivery_at, partner_accepted_at, partner_rejected_at, purchase_orders(placed_at)), order_finance_exceptions(status), ops_sofa_loans(status), order_annotations(content, tag, created_at), ops_order_control(customer_request, action_for_logistic, carres_remark, warehouse_remark, logistic_eta, balance, payment_status, storage_from, storage_fee_override, storage_fee_msbf, storage_fee_sof, storage_paid, storage_collected_at, storage_waiver_status, called_customer, line_etas, line_stock_status, assigned_staff, booking_stage, confirmed_date, confirmed_time_slot, delivery_photos, booking_groups, delay_decision, delay_decision_eta, delay_decision_at, delay_detected_at, delay_detected_eta)",
     )
     // Pipeline v2 (C3): include `status='place'` rows so the FE kanban can
     // render the "Placed" column. proceed_order + delivered preserved as
@@ -859,7 +837,31 @@ const revisionHeaderInput = z
     customer_emergency: z.string().nullable().optional(),
     customer_billing: z.string().nullable().optional(),
     proceed_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-    delivery_floor: z.number().int().min(0).optional(),
+    /* ⭐ THE OFFICE DOOR ENFORCES THE FLOOR CARRES ACTUALLY CARRIES TO (YH,
+       2026-09-01 — audit F-8).
+       Two numbers, two jobs, both correct: `MAX_DELIVERY_FLOOR` is 3 because
+       Carres does not stair-carry above the 3rd floor (a policy-locked upper
+       bound, `constants.ts:1-5`), and `floor_config.free_up_to_floor` is 2
+       because floors 1 and 2 carry no charge — so charging begins at the 3rd
+       and stops there too.
+       The POS clamps to 3 and the shared schema caps at 3
+       (`schemas/orders.ts:242`, `:420`, `:747`). THIS door had no ceiling at
+       all, so an office-keyed order could store floor 7: a number no shop
+       floor can produce, promising a carry nobody performs, on a job Carres
+       has said it will not do.
+       ⭐ AND THE FLOOR OF THE RANGE FOLLOWS THE POS TOO (YH, 2026-09-01 —
+       "office follow POS"). This kept `min(0)` for one commit on the reasoning
+       that the office inherits orders where nobody recorded a floor, and that
+       raising it would refuse an ordinary correction of a row this door did
+       not create.
+       MEASURED, AND THE CONCERN DOES NOT HOLD. The office form does not have a
+       zero to send: it reads the floor as `delivery_floor ?? 1` in all four
+       places it touches it (`SalesOrderWorkspace.tsx:217`, `:537`, `:591`,
+       `:1121`), so a null or absent floor already reaches the operator — and
+       already saves — as 1. `min(0)` was not protecting an inherited zero; it
+       was admitting one that only a non-UI caller could produce.
+       Both ends now match the POS exactly: 1 to 3. */
+    delivery_floor: z.number().int().min(1).max(MAX_DELIVERY_FLOOR).optional(),
     delivery_has_lift: z.boolean().optional(),
     /**
      * 0354 — the rest of what the Sales Portal asks. The object page's form IS
@@ -1056,6 +1058,38 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   if (firstError) { const m = mapPgError(firstError); return c.json(m.body, m.status); }
   if (!order) return c.json({ error: "Order not found" }, 404);
 
+  // Incoming Units already exist on the official PO. Follow the immutable
+  // PO-line/source-line link, never a SKU match across the whole PO. A shared
+  // PO line does not yet identify which physical Unit belongs to which SO.
+  const { data: sources, error: sourceErr } = await sb.from("po_line_sources")
+    .select("po_line_id, order_line_id").eq("order_id", id);
+  if (sourceErr) { const m = mapPgError(sourceErr); return c.json(m.body, m.status); }
+  const sourceRows = (sources ?? []) as Array<{ po_line_id: string | null; order_line_id: string | null }>;
+  const sourcePoLineIds = [...new Set(sourceRows.map((s) => s.po_line_id).filter((v): v is string => Boolean(v)))];
+  const incomingByLine = new Map<string, string[]>();
+  if (sourcePoLineIds.length) {
+    const { data: owners, error: ownerErr } = await sb.from("po_line_sources")
+      .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
+    if (ownerErr) { const m = mapPgError(ownerErr); return c.json(m.body, m.status); }
+    const ownerRows = (owners ?? []) as Array<{ po_line_id: string; order_id: string | null; order_line_id: string | null }>;
+    const exclusive = new Map<string, string>();
+    for (const poLineId of sourcePoLineIds) {
+      const linked = ownerRows.filter((s) => s.po_line_id === poLineId);
+      const lineId = linked[0]?.order_line_id;
+      if (lineId && linked.every((s) => s.order_id === id && s.order_line_id === lineId)) exclusive.set(poLineId, lineId);
+    }
+    if (exclusive.size) {
+      const { data: incoming, error: incomingErr } = await sb.from("ops_stock_items")
+        .select("unit_code, po_line_id").in("po_line_id", [...exclusive.keys()])
+        .eq("status", "incoming").eq("identity_scope", "unit");
+      if (incomingErr) { const m = mapPgError(incomingErr); return c.json(m.body, m.status); }
+      for (const unit of (incoming ?? []) as Array<{ unit_code: string; po_line_id: string }>) {
+        const lineId = exclusive.get(unit.po_line_id);
+        if (lineId && unit.unit_code) incomingByLine.set(lineId, [...(incomingByLine.get(lineId) ?? []), unit.unit_code]);
+      }
+    }
+  }
+
   const destinationRows = (destinations ?? []) as Array<{ id: string; name: string; is_default: boolean }>;
   const destinationName = new Map(destinationRows.map((d) => [d.id, d.name]));
   const defaultDeliverTo = destinationRows.find((d) => d.is_default)?.name ?? null;
@@ -1121,7 +1155,10 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
       return {
         lineId: line.id,
         sku: line.sku,
-        unitIds: unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? [],
+        unitIds: [...new Set([
+          ...(unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? []),
+          ...(incomingByLine.get(line.id) ?? []),
+        ])].sort(),
         deliverTo: deliverTo.length ? deliverTo : (defaultDeliverTo ? [{ name: defaultDeliverTo, qty: Number(line.qty) || 0 }] : []),
       };
     }),
@@ -1164,7 +1201,7 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
   if (!ord) return c.json({ error: "Order not found" }, 404);
   const soRef = `SO-${ord.so}`;
 
-  const [unitsRes, refundsRes, loansRes] = await Promise.all([
+  const [unitsRes, refundsRes, loansRes, invoicesRes] = await Promise.all([
     sb
       .from("ops_stock_items")
       .select("id, unit_code, sku, status, condition, warehouse_id, po_no, qty, date_in, sold_at")
@@ -1176,8 +1213,13 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
       .from("ops_sofa_loans")
       .select("status, source, returned_to_supplier_at")
       .eq("order_id", id),
+    // Gate convergence (2026-09-07): the completion reader must see the SAME
+    // §2 storage obligation the gate and Payment print.
+    sb.from("invoices")
+      .select("kind, status, amount, tax_amount, voided_at")
+      .eq("order_id", id),
   ]);
-  for (const r of [unitsRes, refundsRes, loansRes]) {
+  for (const r of [unitsRes, refundsRes, loansRes, invoicesRes]) {
     if (r.error) {
       const m = mapPgError(r.error);
       return c.json(m.body, m.status);
@@ -1237,19 +1279,27 @@ operationOrdersRouter.get("/:id/completion", requireOperation, async (c) => {
     collectedAt: (ctrl?.storage_collected_at as string | null) ?? null,
     waiverStatus: (ctrl?.storage_waiver_status as string | null) ?? null,
   });
+  // Gate convergence (2026-09-07): invoice-backed storage beats legacy C9
+  // when papers exist, netted so `paid` subtracts once (`storageObligation`,
+  // the ONE precedence law) — `owing`, never `fee`, survives on the legacy
+  // path exactly as before (collectedAt clears it; Law D readers agree).
+  const lineSum = lines.reduce((s, l) => s + price(l), 0);
+  const addonSum = addons.reduce((s, a) => s + price(a), 0);
+  const invoiceRows = (invoicesRes.data ?? []) as Parameters<typeof invoiceStorageSumOf>[0];
+  const storage = storageObligation({
+    invoiceStorageSum: invoiceStorageSumOf(invoiceRows),
+    goodsTotal: lineSum + addonSum,
+    paid: ord.paid,
+    legacyOwing: hold.owing,
+    legacyReleased: hold.released,
+  });
   const money = orderMoney({
-    lineSum: lines.reduce((s, l) => s + price(l), 0),
-    addonSum: addons.reduce((s, a) => s + price(a), 0),
+    lineSum,
+    addonSum,
     paid: ord.paid,
     controlBalance: (ctrl?.balance as number | string | null) ?? null,
-    // `owing`, never `fee`. `storageHold` defines `owing = collectedAt ? 0 : fee`
-    // (storage-hold.ts), so once the fee has been COLLECTED the two part company
-    // and `fee` bills money already banked — an order that ever carried a storage
-    // fee could then never read as complete. `order-control.ts` and
-    // `OperationOrdersControl.tsx` both pass `owing`; this is the third reader of
-    // one derived fact and it agrees with them (Law D).
-    storageOwing: hold.owing,
-    storageReleased: hold.released,
+    storageOwing: storage.owing,
+    storageReleased: storage.released,
   });
 
   const completion = resolveOrderCompletion({
@@ -1846,7 +1896,20 @@ const amendmentSubmitInput = z.object({
         .optional(),
       delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       delivery_date_tbd: z.boolean().optional(),
-      installment_months: z.number().int().min(0).nullable().optional(),
+      /* ⭐ THE SAME RULE THE CREATE DOOR ALREADY ENFORCES (YH, 2026-09-01).
+         This door declared its own weaker one — `z.number().int().min(0)` —
+         while the shared schema three files over had the real union and the
+         POS had a two-button picker. So a proposal of 9 months passed here,
+         passed `sales_order_submit_amendment` (which validates no values at
+         all), passed `sales_order_decide_amendment` (which writes it raw), and
+         died on `0007`'s CHECK at the PRINCIPAL's Approve press — as raw
+         constraint text, on the screen of the one person who cannot fix it,
+         after the customer had already been told the change was going in.
+         Refused at the earliest honest place now: the moment the proposal is
+         submitted, by the person who typed it, while they can still change it.
+         ⚠️ 6 and 12 are what the database holds; nobody recorded WHY. See
+         `INSTALMENT_MONTHS`. */
+      installment_months: installmentMonthsField.optional(),
     })
     .strict(),
   reason: z.string().trim().min(1, "An amendment says why").max(500),

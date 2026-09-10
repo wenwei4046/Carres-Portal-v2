@@ -4,6 +4,7 @@ import PartnerDashboard from "./PartnerDashboard";
 import PartnerFactoryPickupsPage from "./PartnerFactoryPickupsPage";
 import PartnerIncoming from "./PartnerIncoming";
 import PartnerPickupsPage from "./PartnerPickupsPage";
+import PartnerArrangePage from "./PartnerArrangePage";
 import PartnerFleet from "./PartnerFleet";
 import PartnerProfile from "./PartnerProfile";
 
@@ -31,6 +32,7 @@ export default function PartnerApp() {
               factory-pickups = supplier → warehouse (procurement leg)
               deliveries      = warehouse → customer (customer leg)
               Old `/pickups` redirects to factory-pickups for shared links. */}
+          <Route path="arrange" element={<PartnerArrangePage />} />
           <Route path="factory-pickups" element={<PartnerFactoryPickupsPage />} />
           <Route path="deliveries" element={<PartnerPickupsPage />} />
           <Route

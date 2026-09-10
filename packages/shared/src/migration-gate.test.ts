@@ -151,11 +151,16 @@ describe("the collision rule itself", () => {
 });
 
 describe("the baseline is the measured historical set, and nothing more", () => {
-  it("names exactly the eleven numbers that already collide in this repository", () => {
+  it("names exactly the thirteen numbers that already collide in this repository", () => {
     const src = readFileSync(SCRIPT, "utf8");
     for (const n of [
       "0165", "0166", "0204", "0206", "0232",
       "0233", "0239", "0241", "0242", "0255", "0267",
+      /* 0417 joined 2026-09-03 (the #1065/#1066 merge race) and 0424 joined
+         2026-09-04 (the #1091/#1093 race): each pair fully committed, so
+         neither half may rename (red line 6); each is baselined with its
+         measured applied/unapplied split recorded beside it. */
+      "0417", "0424",
     ]) {
       expect(src, n).toContain(`"${n}"`);
     }

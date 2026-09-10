@@ -77,6 +77,8 @@ export const productSkuFromRow = (r: DB.ProductSkuRow): D.ProductSku => ({
   supplierId: r.supplier_id,
   // 0375 — the supplier's own item code rides the same pass-through.
   supplierCode: r.supplier_code ?? null,
+  // 0442 — the stored stock identity mode; null stays null ("Catalog has not said").
+  stockIdentityMode: r.stock_identity_mode ?? null,
   discontinuedAt: r.discontinued_at,
   // 0170 — sell-side flag (default true to match the column default when a
   // legacy query didn't select it) + editable description.

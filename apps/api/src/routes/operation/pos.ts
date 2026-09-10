@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { resolveActorNames } from "../../lib/actor-names";
 import {
   arrivalFromReadyDate,
   assignPickupPartnerInput,
@@ -10,7 +11,7 @@ import {
   officeReceiveInput,
   recordBalanceDateInput,
   recordReadyDateInput,
-  recordTomorrowDeliveryInput,
+  recordSupplierReplyInput,
   confirmPoSentInput,
   recordSendInput,
   revisePoInput,
@@ -148,7 +149,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       // factory holds, and when the current one was minted. The panel prints
       // `PO-2041 · Version 2` and derives "Version N has not reached the
       // supplier" from `revised_at` against the latest send; nothing stores it.
-        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, expected_ready_date, placed_at, purpose, version, revised_at",
+        "id, supplier_id, warehouse_id, destination_id, status, sup_status, so, so_refs, eta_date, official_delivery_date, expected_ready_date, placed_at, purpose, version, revised_at",
       );
 
     if (status !== "all") q = q.eq("status", status);
@@ -184,7 +185,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
     poIds,
     (ids) => sb
       .from("purchase_order_lines")
-      .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark, demand_id")
+      .select("id, po_id, sku, qty, received_qty, damaged_qty, wrong_item_qty, short_since, attrs, destination_id, ops_remark, demand_id, identity_mode")
       .in("po_id", ids)
       .order("id"),
   );
@@ -274,13 +275,18 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         .filter((id): id is string => !!id),
     ),
   ];
-  const requestNoById = new Map<string, string>();
+  /* Card 08 §3.5 — a Manual Purchase source has no visible number. The
+     visible reference is the label `Manual Purchase`; identity stays the
+     request UUID, and the business facts (Proceed Date, purpose) travel so
+     detailed source lines can tell two purchases apart. `req_no` is legacy
+     compatibility data and is not read. */
+  const requestFactsById = new Map<string, { proceedDate: string | null }>();
   if (requestIds.length > 0) {
     const requestResult = await readEveryChunked<Record<string, unknown>, string>(
       requestIds,
       (ids) => sb
         .from("purchase_requests")
-        .select("id, req_no")
+        .select("id, created_at")
         .in("id", ids)
         .order("id"),
     );
@@ -289,7 +295,12 @@ operationPosRouter.get("/", requireOperation, async (c) => {
       return c.json(m.body, m.status);
     }
     for (const request of requestResult.data) {
-      requestNoById.set(request.id as string, request.req_no as string);
+      requestFactsById.set(request.id as string, {
+        proceedDate:
+          typeof request.created_at === "string"
+            ? request.created_at.slice(0, 10)
+            : null,
+      });
     }
   }
   const tomorrowAboutByPo = new Map<string, string | null>();
@@ -316,7 +327,7 @@ operationPosRouter.get("/", requireOperation, async (c) => {
           // client never received), and the date history prints `remarks` beside
           // the countable `reason` (0310). Found while wiring Q5's ready date;
           // fixed rather than left, since both are one word in this string.
-          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at",
+          "id, po_id, po_line_id, kind, answer, about_date, about_qty, previous_date, new_date, reason, remarks, recorded_at, po_version, channel, recipient, evidence, reported_by, reported_at, recorded_by, duty_user_id, acting_user_id",
         )
         .in("po_id", ids)
         .order("recorded_at", { ascending: false })
@@ -599,6 +610,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
             const row = r as Record<string, unknown>;
             return [row.sent_by, row.duty_user_id, row.acting_user_id];
           })
+          .concat([...promisesByPo.values()].flatMap(rows => rows.flatMap(row =>
+            [row.recorded_by, row.duty_user_id, row.acting_user_id])))
           .filter((v): v is string => typeof v === "string" && v.length > 0),
       ),
     ];
@@ -620,6 +633,13 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         const label =
           ((u.name as string | null) ?? "").trim() || ((u.email as string | null) ?? "");
         if (label) actorName.set(u.id as string, label);
+      }
+    }
+    for (const replies of promisesByPo.values()) {
+      for (const reply of replies) {
+        reply.recorded_by_name = actorName.get(reply.recorded_by as string) ?? null;
+        reply.duty_name = actorName.get(reply.duty_user_id as string) ?? null;
+        reply.acting_name = actorName.get(reply.acting_user_id as string) ?? null;
       }
     }
     for (const r of sendRows) {
@@ -648,16 +668,21 @@ operationPosRouter.get("/", requireOperation, async (c) => {
   const withAnswers = pos.map((p) => {
     const row = p as Record<string, unknown>;
     const lines = (row.purchase_order_lines as Array<Record<string, unknown>> | null) ?? [];
+    /* Several Manual Purchases share one visible label, so they dedupe by
+       the source UUID, never by the label (Card 08 §3.5). A legacy line
+       whose demand has no request header keeps one label-only source. */
     const manualSources = lines.flatMap((line) => {
       const demandId = line.demand_id;
       if (typeof demandId !== "string") return [];
       const demand = demandById.get(demandId);
       if (!demand) return [];
+      const facts = demand.requestId ? requestFactsById.get(demand.requestId) : null;
       return [{
         kind: "manual_purchase" as const,
-        reference:
-          (demand.requestId ? requestNoById.get(demand.requestId) : null) ??
-          "Manual Purchase",
+        reference: "Manual Purchase",
+        request_id: demand.requestId,
+        purpose: demand.purpose,
+        proceed_date: facts?.proceedDate ?? null,
       }];
     });
     const sources = [...(salesSourcesByPo.get(row.id as string) ?? []), ...manualSources]
@@ -665,7 +690,11 @@ operationPosRouter.get("/", requireOperation, async (c) => {
         (source, index, all) =>
           all.findIndex(
             (candidate) =>
-              candidate.kind === source.kind && candidate.reference === source.reference,
+              candidate.kind === source.kind &&
+              (source.kind === "manual_purchase"
+                ? (candidate as { request_id?: string | null }).request_id ===
+                  (source as { request_id?: string | null }).request_id
+                : candidate.reference === source.reference),
           ) === index,
       );
     return {
@@ -684,9 +713,8 @@ operationPosRouter.get("/", requireOperation, async (c) => {
           0,
         );
         const demand = typeof l.demand_id === "string" ? demandById.get(l.demand_id) : null;
-        const manualReference = demand
-          ? (demand.requestId ? requestNoById.get(demand.requestId) : null) ?? "Manual Purchase"
-          : null;
+        const manualFacts =
+          demand?.requestId ? requestFactsById.get(demand.requestId) : null;
         return {
           ...l,
           sources: salesLineSources,
@@ -696,12 +724,15 @@ operationPosRouter.get("/", requireOperation, async (c) => {
               reference: `SO-${Number(source.so)}`,
               qty: Number(source.qty ?? 0),
             }]),
-            ...(manualReference ? [{
+            ...(demand ? [{
               kind: "manual_purchase" as const,
-              reference: manualReference,
+              reference: "Manual Purchase",
               // A mixed legacy row can carry both ledgers. Preserve its Manual
               // Purchase reference without claiming the full line twice.
               qty: Math.max(0, Number(l.qty ?? 0) - salesAllocated) || null,
+              request_id: demand.requestId,
+              purpose: demand.purpose,
+              proceed_date: manualFacts?.proceedDate ?? null,
             }] : []),
           ],
           balance_answer_about_qty: balanceAboutByLine.get(l.id as string) ?? null,
@@ -1261,23 +1292,24 @@ operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
       ].filter((id): id is string => typeof id === "string" && id.length > 0),
     ),
   ];
-  const names = new Map<string, string>();
-  if (userIds.length > 0) {
-    const { data: users, error: usersError } = await sb
-      .from("app_users")
-      .select("id, name, email")
-      .in("id", userIds);
-    if (usersError) {
-      const mapped = mapPgError(usersError);
-      return c.json(mapped.body, mapped.status);
-    }
-    for (const user of (users ?? []) as Array<Record<string, unknown>>) {
-      const label =
-        ((user.name as string | null) ?? "").trim() ||
-        ((user.email as string | null) ?? "").trim();
-      if (label) names.set(user.id as string, label);
-    }
-  }
+  /* ⭐ THE SAME RESOLVER THE RAIL AND THE SALES ORDER RECORDS USE
+     (CARD-2026-08-27 §1, built 2026-09-01). This carried the identical defect:
+     a plain `app_users` read under the caller's JWT, so `0235`'s peers policy
+     left every principal actor unnamed on a PO's own audit — including the one
+     acting under `0403`'s operations-superuser authority, which is precisely
+     the act an audit exists to attribute.
+
+     ⚠️ THE EMAIL FALLBACK GOES WITH IT, and that is a deliberate improvement
+     rather than a loss. This printed `name || email`, so a staff row with no
+     name showed an email address as if it were a person's name — PII on an
+     audit screen, and not a governed word. An unresolved actor now simply has
+     no name, which every other record reader already treats as the honest
+     answer (`Staff identity not recorded`) instead of a guess.
+
+     ⛔ NOT a bare `actor_display_names` call, for the same reason as the rail:
+     the door is internal-staff only, and the resolver's second source keeps
+     sales-side actors named for a principal reader. */
+  const names = await resolveActorNames(sb, userIds);
   return c.json({
     revisions: revisions.map((row) => ({
       ...row,
@@ -1310,10 +1342,14 @@ operationPosRouter.get("/:id/audit", requireOperation, async (c) => {
  */
 operationPosRouter.get("/:id/units", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
+  // 0442/0443 — Units are LINE-bound (`po_line_id`) and only `identity_scope
+  // = 'unit'` rows are Carres Unit IDs; a quantity line's bulk register rows
+  // are never shown as Unit IDs.
   const { data, error } = await sb
     .from("ops_stock_items")
-    .select("unit_code, sku, status")
+    .select("unit_code, sku, status, po_line_id")
     .eq("po_no", c.req.param("id"))
+    .eq("identity_scope", "unit")
     .order("unit_code", { ascending: true });
   if (error) {
     const m = mapPgError(error);
@@ -1335,9 +1371,70 @@ operationPosRouter.get("/:id/units", requireOperation, async (c) => {
 // its answer is a second truth about the same paper.
 // 2026-05-12 (Loo): browser renders @react-pdf locally (Workers WASM ban —
 // see render.ts note in apps/web/src/lib/pdf/).
+// Resume the existing document's send step without issuing another PO.
+operationPosRouter.get("/:id/issue-context", requireOperation, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data: po, error } = await sb.from("purchase_orders")
+    .select("id, supplier_id, destination_id, status")
+    .eq("id", c.req.param("id")).maybeSingle();
+  if (error) { const m = mapPgError(error); return c.json(m.body, m.status); }
+  if (!po) return c.json({ message: "PO not found" }, 404);
+  if (po.status === "cancelled") return c.json({ message: "Cancelled POs cannot be printed" }, 422);
+  const [supplier, destination] = await Promise.all([
+    sb.from("suppliers").select("name, whatsapp_group_url, contact_email, contact")
+      .eq("id", po.supplier_id).maybeSingle(),
+    sb.from("purchasing_destinations").select("name")
+      .eq("id", po.destination_id).maybeSingle(),
+  ]);
+  const lookupError = supplier.error ?? destination.error;
+  if (lookupError) { const m = mapPgError(lookupError); return c.json(m.body, m.status); }
+  return c.json({
+    id: po.id,
+    supplierId: po.supplier_id,
+    supplierName: supplier.data?.name ?? null,
+    destinationId: po.destination_id,
+    destination: destination.data?.name ?? null,
+    whatsappGroupUrl: supplier.data?.whatsapp_group_url ?? null,
+    contactEmail: supplier.data?.contact_email ?? null,
+    contact: supplier.data?.contact ?? null,
+  });
+});
+
 operationPosRouter.get("/:id/print-data", requireOperation, async (c) => {
   const poId = c.req.param("id");
   const sb = userClient(c.env, c.var.auth.jwt);
+
+  // 0430 — `?version=N` reprints the KEPT document of an already-sent version,
+  // exactly as recorded at its first confirmed send. Without the parameter the
+  // live document authority answers, as it always has. A version nobody kept
+  // is a named absence, never a reconstruction.
+  const versionRaw = c.req.query("version");
+  if (versionRaw != null && versionRaw !== "") {
+    const version = Number(versionRaw);
+    if (!Number.isInteger(version) || version <= 0) {
+      return c.json({ error: "invalid_version", code: "invalid_param" }, 400);
+    }
+    const kept = await sb.rpc("purchasing_po_version_document", {
+      p_po_id: poId,
+      p_version: version,
+    });
+    if (kept.error) {
+      const details = String((kept.error as { details?: string }).details ?? "");
+      if (details === "version_document_missing") {
+        return c.json(
+          {
+            error: "not_found",
+            code: "version_document_missing",
+            message: "No kept document for this PO version",
+          },
+          404,
+        );
+      }
+      const m = mapPgError(kept.error);
+      return c.json(m.body, m.status);
+    }
+    return c.json(kept.data as Record<string, unknown>);
+  }
 
   const { data: doc, error } = await sb.rpc("purchasing_po_document", { p_po_id: poId });
   if (error) {
@@ -1503,6 +1600,12 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
     // Omitted → the RPC stamps today in MYT. The browser's clock never
     // decides a business date.
     p_goods_received_at: parsed.data.goodsReceivedAt ?? null,
+    // 0426 — Actual Site, arrival photo/video evidence, extra goods and the
+    // idempotency key. All optional; the RPC owns every rule.
+    p_actual_site_id: parsed.data.actualSiteId ?? null,
+    p_arrival_evidence: parsed.data.arrivalEvidence ?? [],
+    p_extra_lines: parsed.data.extraLines ?? [],
+    p_save_key: parsed.data.saveKey ?? null,
     p_lines: parsed.data.lines.map((l) => ({
       id: l.id,
       received_now: l.receivedNow,
@@ -1511,6 +1614,14 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
       damaged_photos: l.damagedPhotos ?? [],
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
       wrong_item_photos: l.wrongItemPhotos ?? [],
+      // 0426 — per-Unit outcomes (ERP-ARCHITECTURE §3.4); absent = the
+      // quantity line the validator already governs.
+      units: (l.units ?? []).map((u) => ({
+        unit_code: u.unitCode,
+        outcome: u.outcome,
+        issue_kind: u.issueKind ?? null,
+        note: u.note ?? null,
+      })),
     })),
   });
   if (error) {
@@ -1554,6 +1665,17 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
   }
   const sessions = (rows ?? []) as Array<Record<string, unknown>>;
   const ids = sessions.map((s) => s.id as string);
+
+  // 0426 — the EXPECTED Units for this PO (minted `incoming` at issue), so the
+  // session can record one physical result per governed Unit
+  // (ERP-ARCHITECTURE §3.4). A PO whose units predate the mint simply returns
+  // none and the quantity line stays the lawful path.
+  const { data: unitRows } = await sb
+    .from("ops_stock_items")
+    .select("id, unit_code, sku, status, po_line_id")
+    .eq("po_no", poId)
+    .eq("identity_scope", "unit")
+    .order("unit_code");
 
   const { data: evs } = ids.length
     ? await sb
@@ -1601,6 +1723,7 @@ operationPosRouter.get("/:id/receiving", requireOperation, async (c) => {
         ? (userNames.get(e.actor_id as string) ?? null)
         : null,
     })),
+    expected_units: unitRows ?? [],
   });
 });
 
@@ -1853,6 +1976,9 @@ operationPosRouter.post("/:id/chase-event", requireOperation, async (c) => {
 // so an operator meets a sentence rather than a Postgres string
 // (`attribution_becomes_a_constraint`'s lesson, 0296).
 const SUPPLIER_CALL_422: Record<string, string> = {
+  po_not_sent: "po_not_sent",
+  reply_evidence_required: "reply_evidence_required",
+  stale_po_version: "stale_po_version",
   invalid_input: "invalid_input",
   new_date_required: "new_date_required",
   po_not_open: "po_not_open",
@@ -1894,31 +2020,16 @@ function mapSupplierCallError(
   return c.json(m.body, m.status);
 }
 
-// ----- POST /:id/tomorrow-delivery -----
-// `Call {supplier} — confirm tomorrow's delivery`, counted per PO. Two answers
-// and no third (§3): shipping, or delayed with a new date. A DELAYED answer
-// moves the PO's expected arrival AND reaches `ops_order_control.line_etas`,
-// which is what opens **Delay planning** by itself — the Orders flow's stage 1,
-// unchanged. Purchasing never invents a second delay conversation and never
-// opens a call to the customer.
+// Record the answer to the exact sent PO version with outside evidence.
+// The transaction preserves the original document date and projects only goods
+// arrival planning to the Sales lines explicitly linked to this PO.
 operationPosRouter.post("/:id/tomorrow-delivery", requireOperation, async (c) => {
-  const parsed = await parseJsonBody(c, recordTomorrowDeliveryInput);
+  const parsed = await parseJsonBody(c, recordSupplierReplyInput);
   if (!parsed.ok) return c.json(parsed.body, parsed.status);
   const sb = userClient(c.env, c.var.auth.jwt);
-  // Remarks + the first-confirm date ride the extended RPC (draft migration —
-  // until it is applied this door serves the 0306 signature only, which is why
-  // the extras are omitted when absent rather than sent as nulls).
-  const extras: Record<string, unknown> = {};
-  if (parsed.data.remarks != null) extras.p_remarks = parsed.data.remarks;
-  const { data, error } = await sb.rpc("purchasing_record_tomorrow_delivery", {
+  const { data, error } = await sb.rpc("purchasing_record_supplier_reply", {
     p_po_id: c.req.param("id"),
-    p_answer: parsed.data.answer,
-    p_new_date:
-      parsed.data.answer === "delayed"
-        ? parsed.data.newDate
-        : (parsed.data.firstDate ?? null),
-    p_reason: parsed.data.reason ?? null,
-    ...extras,
+    p_reply: parsed.data,
   });
   if (error) return mapSupplierCallError(c, error);
   return c.json({ ok: true, result: data });

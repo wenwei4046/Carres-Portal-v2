@@ -37,7 +37,7 @@ vi.mock("@/lib/queries", async () => {
     useDeliveryPartners: () => ({
       data: {
         partners: [
-          { id: "p-nets", name: "NETS" },
+          { id: "p-nets", name: "NETS", whatsapp_group_url: "https://chat.whatsapp.com/nets" },
           { id: "p-al", name: "AL" },
         ],
       },
@@ -53,7 +53,7 @@ vi.mock("@/lib/pdf/render", () => ({
   renderDoPdf: vi.fn().mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" })),
 }));
 
-import EditDelivery from "./EditDelivery";
+import EditDelivery, { returnPathOf } from "./EditDelivery";
 
 const ORDER = {
   id: "order-a",
@@ -73,11 +73,11 @@ const ORDER = {
   order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1 }],
 };
 
-function wrap() {
+function wrap(entry = "/operation/delivery/edit/order-a") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/operation/delivery/edit/order-a"]}>
+      <MemoryRouter initialEntries={[entry]}>
         <EditDelivery />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -135,6 +135,12 @@ describe("the ownership boundary", () => {
     wrap();
     fireEvent.click(screen.getByTestId("edit-delivery-open-sales-order"));
     expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/order-a");
+  });
+
+  it("opens the exact Sales Order Route without copying its facts or writers", () => {
+    wrap();
+    fireEvent.click(screen.getByTestId("edit-delivery-open-order-route"));
+    expect(navigateSpy).toHaveBeenCalledWith("/operation/orders/so/order-a?route=1");
   });
 
   it("never offers Issue, Release or Approve", () => {
@@ -249,5 +255,105 @@ describe("the way back", () => {
     wrap();
     fireEvent.click(screen.getByTestId("edit-delivery-back"));
     expect(navigateSpy).toHaveBeenCalledWith("/operation?tab=delivery");
+  });
+});
+
+describe("the chase door (Delivery Card 05)", () => {
+  it("shows the prepared message once a partner is chosen, and says sending is not confirmation", () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("edit-delivery-partner"), {
+      target: { value: "p-nets" },
+    });
+    const block = screen.getByTestId("edit-delivery-chase");
+    expect(within(block).getByText("Ask NETS for the delivery date")).toBeTruthy();
+    const msg = screen.getByTestId("edit-delivery-chase-message").textContent ?? "";
+    expect(msg).toContain("SO-1322");
+    expect(msg).toContain("Customer asked:");
+    expect(msg).toContain("Please confirm the delivery date and time.");
+    // The law, on screen: prepared/copied/opened/sent never means confirmed.
+    expect(within(block).getByText(/Sending is not confirmation/)).toBeTruthy();
+    // The group door goes straight to the partner's own WhatsApp group.
+    expect(
+      screen.getByTestId("edit-delivery-open-whatsapp").getAttribute("href"),
+    ).toBe("https://chat.whatsapp.com/nets");
+  });
+
+  it("says so when the partner has no WhatsApp group saved, instead of a dead door", () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("edit-delivery-partner"), {
+      target: { value: "p-al" },
+    });
+    expect(screen.queryByTestId("edit-delivery-open-whatsapp")).toBeNull();
+    expect(screen.getByText("No WhatsApp group saved for this partner")).toBeTruthy();
+  });
+
+  it("shows no chase block while no partner is chosen", () => {
+    wrap();
+    expect(screen.queryByTestId("edit-delivery-chase")).toBeNull();
+  });
+});
+
+describe("the reply proof is an UPLOAD, not a typed path (Delivery Card 05)", () => {
+  it("offers a file picker and no free-text path input", () => {
+    wrap();
+    const upload = screen.getByTestId("edit-delivery-proof-upload");
+    expect(upload.getAttribute("type")).toBe("file");
+    expect(upload.getAttribute("accept")).toContain("image/jpeg");
+    // The old text input bound to the path is gone.
+    expect(screen.getByTestId("edit-delivery-proof").querySelector("input[type='text']")).toBeNull();
+  });
+});
+
+describe("condominium registration (Delivery Card 06, 0412)", () => {
+  it("offers the registration field on a CONDO delivery and sends it on save", () => {
+    wrap();
+    const field = screen.getByTestId("edit-delivery-condo-registration");
+    fireEvent.change(field, { target: { value: "Guard house permit GH-88, register before 10am" } });
+    fireEvent.click(screen.getByTestId("edit-delivery-save"));
+    const payload = saveMutate.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.condoRegistration).toBe("Guard house permit GH-88, register before 10am");
+  });
+
+  it("offers no registration field on a landed house", () => {
+    detailState.data = {
+      order: { ...ORDER, building_type: "Landed" },
+      arrangement: null,
+      history: [],
+    };
+    wrap();
+    expect(screen.queryByTestId("edit-delivery-condo-registration")).toBeNull();
+  });
+});
+
+describe("the chase returns to the queue it came from", () => {
+  const QUEUE = "/operation?tab=delivery&view=no_confirmed_date&region=Selangor";
+
+  it("saving the confirmed date lands back on the SAME work list", () => {
+    wrap(`/operation/delivery/edit/order-a?from=${encodeURIComponent(QUEUE)}`);
+    fireEvent.click(screen.getByRole("button", { name: "Save Delivery" }));
+    const onSuccess = saveMutate.mock.calls[0]![1]!.onSuccess as () => void;
+    onSuccess();
+    expect(navigateSpy).toHaveBeenCalledWith(QUEUE);
+  });
+
+  it("with no queue behind it, the editor still lands on Monitor", () => {
+    wrap();
+    fireEvent.click(screen.getByRole("button", { name: "Save Delivery" }));
+    const onSuccess = saveMutate.mock.calls[0]![1]!.onSuccess as () => void;
+    onSuccess();
+    expect(navigateSpy).toHaveBeenCalledWith("/operation?tab=delivery");
+  });
+
+  it("only a portal path is honoured — a pasted external URL never is", () => {
+    expect(returnPathOf(QUEUE)).toBe(QUEUE);
+    expect(returnPathOf(null)).toBe("/operation?tab=delivery");
+    for (const hostile of [
+      "https://example.com",
+      "//example.com",
+      "/dealer/orders",
+      "javascript:alert(1)",
+    ]) {
+      expect(returnPathOf(hostile)).toBe("/operation?tab=delivery");
+    }
   });
 });

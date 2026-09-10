@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   purchaseOrderRegisterFacts,
   purchaseOrderWork,
+  purchaseOrderReplyWorkItems,
   type PurchaseOrderRegisterInput,
 } from "./purchase-order-register";
 
@@ -51,11 +52,23 @@ describe("Purchase Order Register authority", () => {
     }, "2026-08-28");
 
     expect(facts.filters).toContain("supplier_update_required");
-    expect(facts.supplierHas).toBe("Version 1");
+    expect(facts.sentToSupplier).toBe("PO V1");
     expect(purchaseOrderWork({ ...base, version: 2, sends: base.sends }, facts)).toEqual({
-      problem: "Version 2 has not been sent",
-      action: "Issue Version 2 to Hooka",
+      problem: "PO V2 has not been sent",
+      action: "Issue PO V2 to Hooka",
     });
+  });
+
+  it("received goods without a confirmed-send record stay honestly Not sent", () => {
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      status: "received",
+      lines: [{ qty: 3, receivedQty: 3 }],
+      sends: [],
+    }, "2026-08-28");
+
+    expect(facts.sentToSupplier).toBe("Not sent");
+    expect(facts.latestConfirmedSend).toBeNull();
   });
 
   it("derives ordered, received and open balance from governed line quantities", () => {
@@ -98,7 +111,7 @@ describe("Purchase Order Register authority", () => {
 
     expect(facts.filters).toContain("supplier_date_passed");
     expect(purchaseOrderWork(input, facts)).toEqual({
-      problem: "The supplier date has passed and 3 are still open",
+      problem: "Supplier delivery date passed",
       action: "Ask Hooka when the goods will arrive",
     });
   });
@@ -116,5 +129,66 @@ describe("Purchase Order Register authority", () => {
     expect(purchaseOrderWork(base, completed)).toBeNull();
     expect(cancelled.operationStatus).toBe("Cancelled");
     expect(purchaseOrderWork(base, cancelled)).toBeNull();
+  });
+
+  it("a completed PO without sending evidence leaves work but never fabricates a send", () => {
+    /* Correction card §5 — receiving completion and sending evidence are two
+       facts. Completed goods close the send WORK (no PDF is owed), while the
+       Sent to Supplier fact stays an honest `Not sent`. */
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      status: "received",
+      lines: [{ qty: 3, receivedQty: 3 }],
+      sends: [],
+    }, "2026-08-28");
+    expect(facts.filters).toEqual(["completed"]);
+    expect(facts.filters).not.toContain("pdf_not_sent");
+    expect(facts.sentToSupplier).toBe("Not sent");
+  });
+
+  it("a revised PO whose latest version is unsent is BOTH not-sent and update-required — overlap, not exclusivity", () => {
+    /* Correction card §5 — the rail's facets overlap by design; their counts
+       describe rows matching each facet, never a partition of the register. */
+    const facts = purchaseOrderRegisterFacts({
+      ...base,
+      version: 2,
+      sends: [{ kind: "confirmed_sent", channel: "whatsapp", poVersion: 1, sentAt: "2026-08-27T09:00:00Z" }],
+    }, "2026-08-28");
+    expect(facts.filters).toContain("pdf_not_sent");
+    expect(facts.filters).toContain("supplier_update_required");
+    /* And it left the chase facets: nothing asks a supplier about a version
+       Carres has not sent. */
+    expect(facts.filters).not.toContain("supplier_date_missing");
+    expect(facts.filters).not.toContain("supplier_date_passed");
+    expect(facts.sentToSupplier).toBe("PO V1");
+  });
+});
+
+
+describe("shared supplier reply Work", () => {
+  const sent = { kind: "confirmed_sent" as const, channel: "whatsapp", poVersion: 1, sentAt: "2026-09-03T17:00:00Z" };
+  const person = { userId: "po-duty", name: "Jess" };
+  const owner = { dutyKey: "po_duty", onDate: "2026-09-08", normalOwner: person,
+    actingPerson: person, activeCover: null, buddy: null, state: "primary" as const, assignmentId: "assignment" };
+  it("starts on the Malaysia send day and resending does not reset its clock", () => {
+    const items = purchaseOrderReplyWorkItems({ ...base, sends: [sent, { ...sent, sentAt: "2026-09-07T01:00:00Z" }] }, owner, "2026-09-08", new Set());
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ dueIso: "2026-09-04", workingDaysLate: 2, ownerUserId: "po-duty", ruleKey: "purchasing.supplier_reply", action: "Ask Hooka to confirm the PO delivery date" });
+  });
+  it("does not chase an unsent revision, completed goods, or a current future reply", () => {
+    for (const patch of [{ version: 2 }, { lines: [{ qty: 3, receivedQty: 3 }] }, { supplierDate: "2026-09-10" }]) {
+      expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent], ...patch }, owner, "2026-09-08", new Set())).toEqual([]);
+    }
+  });
+  it("routes to active cover while retaining the normal owner for Team Work", () => {
+    const cover = { userId: "cover", name: "Cover" };
+    const [item] = purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, { ...owner, activeCover: cover, actingPerson: cover, state: "covered" }, "2026-09-08", new Set());
+    expect(item).toMatchObject({ ownerUserId: "cover", normalOwner: person, activeCover: cover, ownerDutyKey: "po_duty", ownerState: "covered" });
+    expect(purchaseOrderReplyWorkItems({ ...base, sends: [sent] }, null, "2026-09-08", new Set())[0]).toMatchObject({ ownerUserId: null, normalOwner: null, ownerState: "not_assigned" });
+  });
+  it("rolls an office holiday forward without changing the supplier date", () => {
+    const input = { ...base, sends: [sent], supplierDate: "2026-09-05" };
+    expect(purchaseOrderReplyWorkItems(input, owner, "2026-09-09", new Set(["2026-09-07"]))[0]).toMatchObject({ dueIso: "2026-09-08", ruleKey: "purchasing.supplier_date_passed" });
+    expect(input.supplierDate).toBe("2026-09-05");
   });
 });

@@ -803,6 +803,11 @@ catalogRouter.post("/skus", async (c) => {
         : {}),
       description,
       pos_active: parsed.data.posActive ?? true,
+      // 0442 — stored only when Catalog said it; never defaulted from the
+      // category here. Absent → NULL → official PO issue refuses by name.
+      ...(parsed.data.stockIdentityMode !== undefined
+        ? { stock_identity_mode: parsed.data.stockIdentityMode }
+        : {}),
     })
     .select("*")
     .single();
@@ -847,6 +852,9 @@ catalogRouter.patch("/skus/:id", async (c) => {
   // 0170 — sell-side toggle + editable description.
   if (parsed.data.posActive !== undefined) patch.pos_active = parsed.data.posActive;
   if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+  // 0442 — the stock identity mode is a Catalog fact; the DB ledgers every change.
+  if (parsed.data.stockIdentityMode !== undefined)
+    patch.stock_identity_mode = parsed.data.stockIdentityMode;
   if (Object.keys(patch).length === 0) {
     return c.json({ error: "no_fields", code: "no_fields", message: "patch body is empty" }, 422);
   }
@@ -1556,6 +1564,10 @@ catalogRouter.post("/models/:id/generate-skus", async (c) => {
       supplier_id: supplierId,
       ...(anySupplierCode ? { supplier_code: supplierCodeFor(v) } : {}),
       pos_active: true,
+      // 0442 — every generated SKU is born with the mode the keyer stated.
+      ...(parsed.data.stockIdentityMode
+        ? { stock_identity_mode: parsed.data.stockIdentityMode }
+        : {}),
       description: autoBedSkuDescription(
         modelRow.category,
         (modelRow.name as string) ?? "",
@@ -2319,6 +2331,7 @@ catalogRouter.put("/models/:modelId/compartments/:compartmentId", async (c) => {
     priceOverride: parsed.data.priceOverride ?? null,
     supplierId: parsed.data.supplierId,
     supplierCode: parsed.data.supplierCode,
+    stockIdentityMode: parsed.data.stockIdentityMode,
   });
   if (!synced.ok) return c.json(synced.body, synced.status);
 

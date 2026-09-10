@@ -6,6 +6,7 @@ import {
   isSellableStockStatus,
   type OpsStockItem,
   type OpsStockListResponse,
+  unitIdOf,
 } from "@carres/shared";
 import OpsStockListView from "./OpsStockListView";
 import ImportStockDialog from "./components/ImportStockDialog";
@@ -171,7 +172,9 @@ function categoryKey(r: OpsStockItem): string {
 }
 
 function matchesQuery(r: OpsStockItem, q: string): boolean {
-  const hay = [r.sku, r.unitCode, r.reservedRef, r.poNo, r.sourceRef, r.supplier]
+  // The Unit ID is searched through the resolver, so a counted row's technical
+  // key is not findable as an identity — it is not one (0453).
+  const hay = [r.sku, unitIdOf(r), r.reservedRef, r.poNo, r.sourceRef, r.supplier]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
