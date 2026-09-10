@@ -34,9 +34,9 @@ interface InvoiceRow extends FinanceArAgingRow {
  * is `total * 0.08 / 1.08`. KPIs split gross / net / SST.
  *
  * Issue + PDF download:
- *   - "+ New invoice" button surfaces a toast directing finance to use
- *     the per-row Issue invoice flow on the AR drawer. The schema doesn't
- *     support batch issue; per-row keeps the auth/audit story clean.
+ *   - "+ New invoice" button surfaces a toast directing finance to the
+ *     order's Generate invoice (0476: the AR drawer's Issue invoice and its
+ *     legacy route are gone).
  *   - PDF download is a stub here — Q7=A locks server-side render via
  *     @react-pdf/renderer for tax compliance, deferred to Chunk C.
  */
@@ -91,7 +91,7 @@ export default function FinanceInvoices() {
 
   function handleNewInvoice() {
     toast.info(
-      "To issue a tax invoice, open the matching receivable on the AR page → Issue invoice. Server-side gate requires status=delivered AND paid >= total.",
+      "To issue a Sales Invoice, open the order and choose Generate invoice.",
       { duration: 6000 },
     );
   }
@@ -103,7 +103,7 @@ export default function FinanceInvoices() {
     }
     const invId = invoiceIdByNo.get(row.invoice_no);
     if (!invId) {
-      toast.warning(`${row.invoice_no} not yet issued by finance — open AR drawer → Issue invoice first`);
+      toast.warning(`${row.invoice_no} is not issued yet — open the order and choose Generate invoice first`);
       return;
     }
     try {

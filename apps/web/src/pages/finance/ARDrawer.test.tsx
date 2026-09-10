@@ -18,11 +18,7 @@ vi.mock("@/lib/api", () => ({
     }
   },
 }));
-vi.mock("@/lib/pdf/render", () => ({
-  renderInvoicePdf: vi.fn(),
-}));
 import { apiFetch } from "@/lib/api";
-import { renderInvoicePdf } from "@/lib/pdf/render";
 
 function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -34,20 +30,29 @@ function wrap(ui: React.ReactNode) {
   );
 }
 
-const PAID_DELIVERED_ROW: FinanceArAgingRow = {
+const ROW: FinanceArAgingRow = {
   order_id:      "11111111-1111-1111-1111-000000000001",
   so:            1240,
-  customer_name: "Tan Wei Ming",
+  customer_name: "Probe Customer AR",
   dealer_id:     "d1",
-  dealer_name:   "Carres KL",
+  dealer_name:   "Probe Dealer",
   placed_at:     "2026-04-29T00:00:00Z",
   days:          11,
   aging:         "0-30",
   total:         12500,
-  paid:          12500,
-  outstanding:   0,
+  paid:          10000,
+  outstanding:   2500,
   invoice_no:    "INV-2026-0001",
   status:        "delivered",
+};
+
+const REGISTRY = {
+  methods: [
+    { method: "bank", label: "Bank transfer", account_code: "1120", account_name: "Bank", active: true, sort: 1 },
+    { method: "cash", label: "Cash", account_code: "1110", account_name: "Cash", active: false, sort: 4 },
+    { method: "probe_wallet", label: "Probe Wallet", account_code: "1130", account_name: "Card", active: true, sort: 7 },
+  ],
+  money_accounts: [],
 };
 
 beforeEach(() => {
@@ -55,86 +60,49 @@ beforeEach(() => {
 });
 
 describe("ARDrawer", () => {
-  it("renders Issue invoice button when delivered + fully paid", () => {
+  it("has no Issue invoice button — one invoice door per act (0476)", () => {
     vi.mocked(apiFetch).mockResolvedValue([]);
-
-    render(wrap(<ARDrawer row={PAID_DELIVERED_ROW} onClose={() => {}} />));
-
-    expect(screen.getByRole("button", { name: /Issue invoice/i })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /Download invoice/i }),
-    ).not.toBeInTheDocument();
+    render(wrap(<ARDrawer row={{ ...ROW, paid: 12500, outstanding: 0 }} onClose={() => {}} />));
+    expect(screen.queryByRole("button", { name: /Issue invoice/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Download invoice/i })).not.toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalledWith("/api/finance/invoices/issue", expect.anything());
   });
 
-  it("post-issue: swaps Issue → Download button using id from RPC response", async () => {
-    const NEW_INVOICE_ID = "22222222-2222-2222-2222-000000000099";
-    vi.mocked(apiFetch).mockImplementation(async (url, init) => {
-      if (init?.method === "POST" && url.includes("/api/finance/invoices/issue")) {
-        return {
-          id:         NEW_INVOICE_ID,
-          invoice_no: "INV-2026-0001",
-          order_id:   PAID_DELIVERED_ROW.order_id,
-          amount:     12500,
-          tax_amount: 925.93,
-          issued_at:  "2026-05-09",
-        };
-      }
+  it("Record receipt offers the Active methods from Settings → Payment and sends the key", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) return REGISTRY;
+      if (url.includes("/order-receipt")) return { id: "p1" };
       return [];
     });
-
-    const onClose = vi.fn();
-    render(wrap(<ARDrawer row={PAID_DELIVERED_ROW} onClose={onClose} />));
-
-    fireEvent.click(screen.getByRole("button", { name: /Issue invoice/i }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Download invoice/i }),
-      ).toBeInTheDocument();
+    render(wrap(<ARDrawer row={ROW} onClose={() => {}} />));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    await waitFor(() => expect(screen.getByRole("option", { name: "Probe Wallet" })).toBeInTheDocument());
+    const options = Array.from(screen.getByLabelText("Method").querySelectorAll("option"))
+      .map((o) => o.getAttribute("value"));
+    expect(options).toEqual(["bank", "probe_wallet"]);
+    fireEvent.change(screen.getByLabelText("Method"), { target: { value: "probe_wallet" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      "/api/finance/payments/order-receipt", expect.objectContaining({ method: "POST" })));
+    const call = vi.mocked(apiFetch).mock.calls.find(([u]) => u === "/api/finance/payments/order-receipt")!;
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({
+      orderId: ROW.order_id, amount: 2500, method: "probe_wallet",
     });
-
-    // Drawer stays open — user must explicitly click Download.
-    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("Download click hits the JSON data route + renders client-side", async () => {
-    const NEW_INVOICE_ID = "33333333-3333-3333-3333-000000000100";
-    vi.mocked(apiFetch).mockImplementation(async (url, init) => {
-      if (init?.method === "POST" && url.includes("/api/finance/invoices/issue")) {
-        return { id: NEW_INVOICE_ID, invoice_no: "INV-2026-0001" };
-      }
-      if (url.includes("/pdf-data")) {
-        // Browser-side render gets the template data, not a PDF blob.
-        return { invoice_no: "INV-2026-0001" };
-      }
+  it("the default is bank, never the old bank_transfer word", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (url: string) => {
+      if (url.includes("/payment-settings/methods")) throw new Error("down");
+      if (url.includes("/order-receipt")) return { id: "p1" };
       return [];
     });
-    vi.mocked(renderInvoicePdf).mockResolvedValue(
-      new Blob(["%PDF-1.4 fake"], { type: "application/pdf" }),
-    );
-    Object.assign(window.URL, {
-      createObjectURL: vi.fn(() => "blob:mock"),
-      revokeObjectURL: vi.fn(),
-    });
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-
-    render(wrap(<ARDrawer row={PAID_DELIVERED_ROW} onClose={() => {}} />));
-
-    fireEvent.click(screen.getByRole("button", { name: /Issue invoice/i }));
-
-    const download = await screen.findByRole("button", { name: /Download invoice/i });
-    fireEvent.click(download);
-
-    await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith(
-        `/api/finance/invoices/${NEW_INVOICE_ID}/pdf-data`,
-      );
-    });
-    await waitFor(() => {
-      expect(renderInvoicePdf).toHaveBeenCalled();
-    });
-    expect(openSpy).toHaveBeenCalledWith("blob:mock", "_blank");
-
-    openSpy.mockRestore();
+    render(wrap(<ARDrawer row={ROW} onClose={() => {}} />));
+    fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
+    expect(screen.getByLabelText("Method")).toHaveValue("bank");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      "/api/finance/payments/order-receipt", expect.anything()));
+    const call = vi.mocked(apiFetch).mock.calls.find(([u]) => u === "/api/finance/payments/order-receipt")!;
+    expect(JSON.parse(String((call[1] as RequestInit).body)).method).toBe("bank");
   });
 });

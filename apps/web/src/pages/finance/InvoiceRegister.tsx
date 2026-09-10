@@ -15,6 +15,7 @@ import InvoiceAskToPay from "./InvoiceAskToPay";
 import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
+import InvoiceVoidReplace from "./InvoiceVoidReplace";
 import CustomerStatement from "./CustomerStatement";
 import InvoiceCalendar, { type CalendarEntryKind } from "./InvoiceCalendar";
 import { useAuth } from "@/lib/auth";
@@ -256,7 +257,8 @@ export default function InvoiceRegister() {
         : <InvoiceObject invoice={invoice} rows={rows} today={today} opts={opts}
             onAsk={canAsk ? () => setAsking(true) : undefined}
             onResult={canAsk ? () => setResulting(true) : undefined}
-            canStorage={role === "operation" || role === "principal"} />
+            canStorage={role === "operation" || role === "principal"}
+            canCorrect={role === "principal"} />
     : <div className="p-6 text-body"><p>{query.isLoading ? "Loading invoice…" : "Invoice not available."}</p>
       <button className="btn-secondary mt-3" onClick={close}>Back to Invoices</button></div>
     : params.get("view") === "calendar"
@@ -338,13 +340,17 @@ function Inspect({ row, rows, today, opts, onOpen }: {
 /** One continuous scroll — Money → Goods and Delivery → Storage → What to do
  *  → Invoice → Related Payments → Communication History (payment/MASTER.md
  *  §16; Storage joined with 0436 — a goods-side fact that becomes money). */
-function InvoiceObject({ invoice, rows, today, opts, onAsk, onResult, canStorage = false }: {
+function InvoiceObject({ invoice, rows, today, opts, onAsk, onResult, canStorage = false, canCorrect = false }: {
   invoice: InvoiceRegisterRow; rows: InvoiceRegisterRow[]; today: string; opts: { holidays?: Set<string> };
   onAsk?: () => void;
   /** §3 — record what the customer answered (0446). */
   onResult?: () => void;
   /** The posting door's staff may open the §6 storage doors. */
   canStorage?: boolean;
+  /** 0476 — Void and replace. Shown to the principal only: the SQL admits the
+   *  Payment Approver duty too, but the screen cannot resolve a duty, and an
+   *  unauthorised person must never see the door. */
+  canCorrect?: boolean;
 }) {
   const f = factsOf(invoice, rows, today, opts);
   const partner = invoice.orders?.delivery_partners?.name ?? invoice.orders?.ops_assigned_logistic ?? null;
@@ -403,6 +409,8 @@ function InvoiceObject({ invoice, rows, today, opts, onAsk, onResult, canStorage
         {invoice.invoice_no
           ? <p>Print opens the invoice document.</p>
           : <p>A draft has no document yet. Issue the invoice first.</p>}
+        {canCorrect && invoice.status === "issued" && invoice.invoice_no &&
+          <InvoiceVoidReplace invoiceId={invoice.id} invoiceNo={invoice.invoice_no} />}
       </Facts>
       <Facts title="Related Payments">
         {payments.length ? payments.map((p) => <p key={p.id}>

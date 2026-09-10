@@ -1,28 +1,15 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  useIssueInvoice,
   useRecordReceipt,
   useFinancePayments,
   type FinanceArAgingRow,
   type FinancePaymentRow,
 } from "@/lib/queries";
-import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { renderInvoicePdf } from "@/lib/pdf/render";
-import type { InvoiceTemplateData } from "@/lib/pdf/types";
 import DownloadSalesOrderButton from "@/components/DownloadSalesOrderButton";
 import { rm } from "@/lib/format-currency";
-import type { PaymentMethod } from "@carres/shared";
-
-const METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: "bank_transfer", label: "Bank transfer" },
-  { value: "duitnow_qr",    label: "DuitNow QR" },
-  { value: "cheque",        label: "Cheque" },
-  { value: "cash",          label: "Cash" },
-  { value: "credit_card",   label: "Credit card" },
-  { value: "debit_card",    label: "Debit card" },
-];
+import { useManualMethods } from "@/lib/payment-methods";
 
 /**
  * AR Drawer — slides in from the right when a receivable row is clicked.
@@ -30,20 +17,17 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
  * Visual reference: `reference/proto/finance-ar.jsx:111-226`. Wires:
  *   - Record receipt: useRecordReceipt(orderId, amount, method, reference)
  *     → POST /api/finance/payments/order-receipt → finance_record_receipt
- *     RPC. Closes A1 partial: orders.paid bumps + payments(direction=in).
- *   - Issue invoice: useIssueInvoice(orderId, amount, taxAmount?) → POST
- *     /api/finance/invoices/issue → invoice_issue RPC. Q2=A locked: route
- *     gates on order.status='delivered'; this UI also pre-checks
- *     row.outstanding === 0 (full paid) before showing the button so the
- *     finance person doesn't get a 422 from the server.
+ *     RPC. The methods are the Active rows of Settings → Payment → Payment
+ *     methods (0476), so `bank` lands in the bank account — the old
+ *     `bank_transfer` word was coerced to `other`, which the ledger refused.
  *   - Payment history: useFinancePayments({ orderId }) → GET
  *     /api/finance/payments?orderId=... — list of inbound payments
  *     against this order.
- *   - Download invoice PDF (post-issue): closes phase-5-ardrawer-download-button
- *     carry-forward. After successful issue, captures the new invoice id from
- *     the RPC response (returns the full `invoices` row per 0003:289) and
- *     swaps the Issue button for a Download button that streams the
- *     server-rendered PDF (Q7=A) via apiFetchBlob → ObjectURL → window.open.
+ *
+ * No Issue invoice button (0476 — one invoice door per act). It called the
+ * legacy `invoice_issue`: a number outside the governed series and no journal
+ * entry. A Sales Invoice is issued from the order (Balance → Generate invoice)
+ * or when the order is dispatched; both post to the ledger.
  *
  * Closes on overlay click, X button, or Escape.
  */
@@ -57,9 +41,11 @@ export default function ARDrawer({
   const [recPanelOpen, setRecPanelOpen] = useState(false);
   const [recAmt, setRecAmt]             = useState(String(row.outstanding || ""));
   const [recRef, setRecRef]             = useState("");
-  const [recMethod, setRecMethod]       = useState<PaymentMethod>("bank_transfer");
-  const [issuedInvoiceId, setIssuedInvoiceId] = useState<string | null>(null);
+  const [chosenMethod, setRecMethod]    = useState<string>("bank");
   const role = useAuth((s) => s.role);
+  const { methods, label: methodLabel } = useManualMethods();
+  const recMethod = methods.some((m) => m.value === chosenMethod)
+    ? chosenMethod : methods[0]?.value ?? chosenMethod;
 
   const payments = useFinancePayments({ orderId: row.order_id });
   const recordReceipt = useRecordReceipt({
@@ -71,36 +57,6 @@ export default function ARDrawer({
     },
     onError: (e) => toast.error(`Receipt failed: ${e.message}`),
   });
-  const issueInvoice = useIssueInvoice({
-    onSuccess: (data) => {
-      // invoice_issue RPC (0003:289) returns the full invoices row; capture
-      // the id so the Download button can hit /api/finance/invoices/:id/pdf
-      // without a follow-up list refetch.
-      const inv = data as { id?: string; invoice_no?: string } | null;
-      if (inv?.id) setIssuedInvoiceId(inv.id);
-      toast.success(`Invoice issued for ${inv?.invoice_no ?? row.invoice_no}`);
-      // Note: deliberately NOT onClose() — user should be able to click
-      // Download next without re-opening the drawer.
-    },
-    onError: (e) => toast.error(`Issue failed: ${e.message}`),
-  });
-
-  async function downloadInvoicePdf() {
-    if (!issuedInvoiceId) return;
-    try {
-      // Server returns JSON; @react-pdf renders client-side (Workers WASM ban).
-      const data = await apiFetch<InvoiceTemplateData>(
-        `/api/finance/invoices/${issuedInvoiceId}/pdf-data`,
-      );
-      const blob = await renderInvoicePdf(data);
-      const url  = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) {
-      const msg = e instanceof ApiError ? e.message : String(e);
-      toast.error(`PDF download failed: ${msg}`);
-    }
-  }
 
   function submitReceipt() {
     const amt = parseFloat(recAmt);
@@ -116,26 +72,6 @@ export default function ARDrawer({
       idempotencyKey: crypto.randomUUID(),
     });
   }
-
-  function submitIssue() {
-    if (row.status !== "delivered") {
-      toast.warning("Order must be delivered before invoice can issue");
-      return;
-    }
-    if (row.outstanding > 0.01) {
-      toast.warning("Customer must be fully paid before invoice can issue");
-      return;
-    }
-    // SST 8% inclusive: tax = total * 0.08 / 1.08
-    const tax = +(row.total * 0.08 / 1.08).toFixed(2);
-    issueInvoice.mutate({
-      orderId:   row.order_id,
-      amount:    row.total,
-      taxAmount: tax,
-    });
-  }
-
-  const canIssue = row.status === "delivered" && row.outstanding <= 0.01;
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-end">
@@ -226,10 +162,10 @@ export default function ARDrawer({
                   <select
                     aria-label="Method"
                     value={recMethod}
-                    onChange={(e) => setRecMethod(e.target.value as PaymentMethod)}
+                    onChange={(e) => setRecMethod(e.target.value)}
                     className="w-full px-2.5 py-1.5 border border-border rounded text-meta mb-2 bg-card"
                   >
-                    {METHODS.map((m) => (
+                    {methods.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
@@ -280,7 +216,7 @@ export default function ARDrawer({
                     className="flex justify-between py-1 text-meta border-b border-dashed border-border last:border-0"
                   >
                     <span>
-                      {p.direction === "in" ? "Receipt" : "Outbound"} · {p.method}
+                      {p.direction === "in" ? "Receipt" : "Outbound"} · {methodLabel(p.method)}
                       {p.reference ? ` · ${p.reference}` : ""}
                     </span>
                     <span className="text-muted-foreground font-mono">
@@ -292,32 +228,6 @@ export default function ARDrawer({
             </div>
           </div>
 
-          <div className="flex gap-2">
-            {issuedInvoiceId ? (
-              <button
-                type="button"
-                onClick={downloadInvoicePdf}
-                title="Download tax invoice PDF"
-                className="flex-1 py-2 rounded-md bg-primary text-primary-foreground font-semibold text-meta"
-              >
-                Download invoice (PDF)
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={submitIssue}
-                disabled={!canIssue || issueInvoice.isPending}
-                title={
-                  !canIssue
-                    ? "Issue available only after delivery + full payment"
-                    : "Issue tax invoice"
-                }
-                className="flex-1 py-2 rounded-md border border-border text-meta disabled:opacity-60"
-              >
-                {issueInvoice.isPending ? "Issuing…" : "Issue invoice"}
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </div>
