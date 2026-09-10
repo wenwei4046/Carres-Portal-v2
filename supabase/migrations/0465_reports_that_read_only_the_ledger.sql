@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0463_reports_that_read_only_the_ledger.sql
+-- 0465_reports_that_read_only_the_ledger.sql
 -- CARRES GENERAL LEDGER · AGENT E — THE READ SIDE
 -- (build contract `.claude/LEDGER-CONTRACT.md`; rulings J/K/L/M/N.)
 --
@@ -106,7 +106,7 @@ revoke all on function public.gl_report_guard() from public;
 grant execute on function public.gl_report_guard() to authenticated;
 
 comment on function public.gl_report_guard() is
-  'Report gate (0463): raises for non-internal callers and returns gl_config.go_live_on so every report can print it (ruling L).';
+  'Report gate (0465): raises for non-internal callers and returns gl_config.go_live_on so every report can print it (ruling L).';
 
 
 -- ── 1 · trial balance ────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ revoke all on function public.gl_trial_balance(date) from public;
 grant execute on function public.gl_trial_balance(date) to authenticated;
 
 comment on function public.gl_trial_balance(date) is
-  'Trial balance from posted, unreversed ledger rows only (0463). Zero-movement accounts appear with zeros; the final TOTAL row carries `balances`.';
+  'Trial balance from posted, unreversed ledger rows only (0465). Zero-movement accounts appear with zeros; the final TOTAL row carries `balances`.';
 
 
 -- ── 2 · one account, line by line, with a real opening balance ───────────────
@@ -380,7 +380,7 @@ revoke all on function public.gl_account_ledger(text, date, date) from public;
 grant execute on function public.gl_account_ledger(text, date, date) to authenticated;
 
 comment on function public.gl_account_ledger(text, date, date) is
-  'One account, date then entry-no order, with a real OPENING row computed from everything before p_from (0463). Ledger tables only.';
+  'One account, date then entry-no order, with a real OPENING row computed from everything before p_from (0465). Ledger tables only.';
 
 
 -- ── 3 · profit and loss, replacing the invented one ──────────────────────────
@@ -525,7 +525,7 @@ revoke all on function public.gl_profit_and_loss(date, date) from public;
 grant execute on function public.gl_profit_and_loss(date, date) to authenticated;
 
 comment on function public.gl_profit_and_loss(date, date) is
-  'P&L from gl_entry_lines only (0463). Replaces finance_monthly_pl (0064:219-291), whose COGS was revenue*0.55 and whose opex was a constant 42000.';
+  'P&L from gl_entry_lines only (0465). Replaces finance_monthly_pl (0064:219-291), whose COGS was revenue*0.55 and whose opex was a constant 42000.';
 
 
 -- ── 4 · balance sheet, with the equation returned rather than assumed ────────
@@ -710,7 +710,7 @@ revoke all on function public.gl_balance_sheet(date) from public;
 grant execute on function public.gl_balance_sheet(date) to authenticated;
 
 comment on function public.gl_balance_sheet(date) is
-  'Balance sheet from ledger rows only (0463). The unclosed result is derived into equity and the accounting equation is RETURNED (equation_balances / equation_difference), never assumed.';
+  'Balance sheet from ledger rows only (0465). The unclosed result is derived into equity and the accounting equation is RETURNED (equation_balances / equation_difference), never assumed.';
 
 
 -- ── 5 · one party, one statement ─────────────────────────────────────────────
@@ -856,7 +856,7 @@ revoke all on function public.gl_party_statement(text, uuid, date, date) from pu
 grant execute on function public.gl_party_statement(text, uuid, date, date) to authenticated;
 
 comment on function public.gl_party_statement(text, uuid, date, date) is
-  'One party''s control-account activity with a real OPENING row (0463). Party by id, never by name. Ledger tables only.';
+  'One party''s control-account activity with a real OPENING row (0465). Party by id, never by name. Ledger tables only.';
 
 
 -- ── 6 · the self-check ───────────────────────────────────────────────────────
@@ -1067,4 +1067,4 @@ revoke all on function public.gl_ledger_health() from public;
 grant execute on function public.gl_ledger_health() to authenticated;
 
 comment on function public.gl_ledger_health() is
-  'Falsifiable ledger self-check (0463). ALWAYS returns 11 labelled rows: row 1 is PASS or FAIL. An empty result means the function itself is broken, never that the ledger is clean.';
+  'Falsifiable ledger self-check (0465). ALWAYS returns 11 labelled rows: row 1 is PASS or FAIL. An empty result means the function itself is broken, never that the ledger is clean.';

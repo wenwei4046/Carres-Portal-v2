@@ -1,11 +1,11 @@
 -- =============================================================================
--- 0464_an_invoice_is_where_revenue_is_recognised.sql
+-- 0466_an_invoice_is_where_revenue_is_recognised.sql
 -- FINANCE LEDGER · CARD F — THE OTHER HALF OF EVERY RECEIPT
 -- (build contract .claude/LEDGER-CONTRACT.md, CORRECTION 4)
 --
--- 0461 walked customer money through the gate: Dr the bank, Cr trade
+-- 0465 walked customer money through the gate: Dr the bank, Cr trade
 -- receivables. It is a correct entry and it is exactly half of an accounting
--- truth. Nothing in 0459-0463 ever DEBITS trade receivables, so the control
+-- truth. Nothing in 0465-0465 ever DEBITS trade receivables, so the control
 -- account only ever falls, the profit-and-loss report shows no revenue at all,
 -- and the one number Jess would actually look at — what customers owe today —
 -- comes out negative and stays there.
@@ -19,10 +19,10 @@
 --     Cr  4100 / 4200 / 4300 / 4400 income, split by what was actually sold
 --
 -- ── ① THE SPLIT IS A MAP, NOT A CASE STATEMENT ──────────────────────────────
--- 0459's income range names four things Carres sells — furniture, rental,
+-- 0465's income range names four things Carres sells — furniture, rental,
 -- delivery, storage. An invoice total has to land on those four and nowhere
 -- else. `gl_income_account_map` holds the routing as DATA, in the same spirit
--- as 0461's `gl_payment_account_map`, so a new add-on is a row a principal
+-- as 0465's `gl_payment_account_map`, so a new add-on is a row a principal
 -- writes with `gl_map_income_account` and not a migration.
 --
 -- Its three component types are the three things an invoice total is made of:
@@ -59,7 +59,7 @@
 --                  attribution is verified against evidence on the order; it
 --                  is never assumed from the sign of the number.
 --   residual < 0   the invoice bills LESS than the lines add up to. That is a
---                  discount, and 0459 defines no contra-revenue account, so it
+--                  discount, and 0465 defines no contra-revenue account, so it
 --                  REFUSES rather than quietly shrinking furniture sales.
 --
 -- Note what is NOT here: no "miscellaneous income", no rounding bucket, no
@@ -69,8 +69,8 @@
 --
 -- ── ③ THE STORAGE FEE IS RECOGNISED HERE AND COLLECTED NOWHERE ─────────────
 -- 🔴 STATED PLAINLY BECAUSE IT IS THE ONE KNOWN INCONSISTENCY THIS FILE SHIPS.
--- 0461 skips a `kind = 'storage'` receipt entirely, on the stated grounds that
--- "it needs a storage-income account the chart does not define yet". 0459 DOES
+-- 0465 skips a `kind = 'storage'` receipt entirely, on the stated grounds that
+-- "it needs a storage-income account the chart does not define yet". 0465 DOES
 -- define one — 4400. So from here on: an invoice that bills a storage fee
 -- debits receivables for it, and the cash that settles it never credits them
 -- back. Receivables will overstate by exactly the storage fees collected.
@@ -84,7 +84,7 @@
 -- component as a named, quantified, non-comparable difference every time it is
 -- run. A gap that names itself and its own size is a work item. A silently
 -- absent revenue line is the failure this whole build exists to remove.
--- THE FIX BELONGS IN 0461, NOT HERE: delete its `kind = 'storage'` early
+-- THE FIX BELONGS IN 0465, NOT HERE: delete its `kind = 'storage'` early
 -- return and let a storage receipt post Dr bank / Cr receivables like any
 -- other. This file does not reach into another card's writer to do it.
 --
@@ -104,11 +104,11 @@
 -- until a real per-unit landed cost exists, and the P&L reports revenue with no
 -- cost line rather than profit with an invented one.
 --
--- ── ⑤ FAILURE POLICY — IDENTICAL TO 0461, ON PURPOSE ───────────────────────
+-- ── ⑤ FAILURE POLICY — IDENTICAL TO 0465, ON PURPOSE ───────────────────────
 -- There is NO `exception when others` anywhere near a ledger call in this file.
 -- If the posting raises, the invoice raises with it and the whole transaction
 -- rolls back: no invoice row, no `orders.invoice_no`, no history line, no
--- journal entry. 0461 chose that and argued it at length; two money writers
+-- journal entry. 0465 chose that and argued it at length; two money writers
 -- that disagree about what happens when the ledger refuses is worse than
 -- either policy on its own. The one place an exception handler DOES appear is
 -- `gl_receivables_reconcile`, which must return a row even when the chart is
@@ -116,7 +116,7 @@
 -- breakage rather than raise on it.
 --
 -- A pre-go-live invoice records exactly as it does today and is quietly NOT
--- posted (ruling L), by the same mechanism 0461 uses for a pre-go-live payment.
+-- posted (ruling L), by the same mechanism 0465 uses for a pre-go-live payment.
 -- A void calls `gl_reverse`. Nothing here deletes anything.
 --
 -- ── ⑥ WHICH DEFINITION THIS FILE SITS ON TOP OF — READ THIS FIRST ───────────
@@ -124,16 +124,16 @@
 -- it NEXT must know what they are standing on, so the chain is written down:
 --
 --     0229_issue_order_invoice.sql:27   CREATE OR REPLACE ... (uuid, numeric)
---     0230 .. 0463                      NOTHING. Verified, not assumed.
---     0464 (this file)                  the 0229 body, verbatim, + the ledger
+--     0230 .. 0465                      NOTHING. Verified, not assumed.
+--     0466 (this file)                  the 0229 body, verbatim, + the ledger
 --                                       call and the `gl_entry_id` return key.
 --
 -- HOW THAT WAS VERIFIED, so the next person can repeat it rather than trust it:
 -- every migration in the tree was searched, case-insensitively, for the name
 -- `issue_order_invoice` and for every writer of the `invoices` table or of
 -- `orders.invoice_no`. The name appears in exactly three files — 0229 (the sole
--- definition), 0461:671 (a prose reference), and this one. No migration between
--- 0230 and 0463 redefines it, drops it, or changes its `(uuid, numeric)`
+-- definition), 0465:671 (a prose reference), and this one. No migration between
+-- 0230 and 0465 redefines it, drops it, or changes its `(uuid, numeric)`
 -- identity. §10's sanity block asserts that identity so a future drift stops
 -- the migration instead of leaving a stale overload beside a live one.
 --
@@ -170,7 +170,7 @@ create table if not exists public.gl_income_account_map (
 );
 
 comment on table public.gl_income_account_map is
-  'Invoice component -> the income account it credits (0464). GOODS is keyed by orders.source_system and permits a bounded ''*'' row; ADDON is keyed by addons.key and NEVER has one — an unmapped add-on makes the invoice refuse, by design.';
+  'Invoice component -> the income account it credits (0466). GOODS is keyed by orders.source_system and permits a bounded ''*'' row; ADDON is keyed by addons.key and NEVER has one — an unmapped add-on makes the invoice refuse, by design.';
 comment on column public.gl_income_account_map.component_key is
   'GOODS: orders.source_system, or ''*''. ADDON: addons.key, exact only. STORAGE: ''*''.';
 
@@ -204,7 +204,7 @@ as $fn$
 $fn$;
 
 comment on function public.gl_income_account_for(text,text) is
-  'The income account this invoice component credits (0464). NULL means unmapped — the caller must refuse, never substitute a default income account.';
+  'The income account this invoice component credits (0466). NULL means unmapped — the caller must refuse, never substitute a default income account.';
 
 revoke all on function public.gl_income_account_for(text,text) from public, anon;
 grant execute on function public.gl_income_account_for(text,text) to authenticated;
@@ -270,12 +270,12 @@ revoke all on function public.gl_map_income_account(text,text,text,text) from pu
 grant execute on function public.gl_map_income_account(text,text,text,text) to authenticated;
 
 
--- ── 4 · seed the map against the chart 0459 actually created ─────────────────
+-- ── 4 · seed the map against the chart 0465 actually created ─────────────────
 -- Matched by NAME inside the active, income, non-header leaves rather than by
--- hard-coded code, for the same reason 0461 does it: agent A owns the chart and
--- the ledger must not carry a second copy of its numbering. Unlike 0461's bank
+-- hard-coded code, for the same reason 0465 does it: agent A owns the chart and
+-- the ledger must not carry a second copy of its numbering. Unlike 0465's bank
 -- seeds, a missing account here RAISES — all four income streams are named in
--- 0459, so their absence means the chart is not the chart this file was built
+-- 0465, so their absence means the chart is not the chart this file was built
 -- against, and a half-seeded income map is worse than no migration.
 do $seed$
 declare
@@ -305,7 +305,7 @@ begin
      and a.name ilike '%storage%' order by a.code limit 1;
 
   if v_furniture is null or v_rental is null or v_delivery is null or v_storage is null then
-    raise exception '0464: the chart is missing an income account this file needs (furniture %, rental %, delivery %, storage %)',
+    raise exception '0466: the chart is missing an income account this file needs (furniture %, rental %, delivery %, storage %)',
       coalesce(v_furniture,'MISSING'), coalesce(v_rental,'MISSING'),
       coalesce(v_delivery,'MISSING'), coalesce(v_storage,'MISSING')
       using errcode = '22023', detail = 'income_chart_incomplete';
@@ -314,29 +314,29 @@ begin
   insert into gl_income_account_map (component_type, component_key, account_code, note) values
     -- The ordinary sale. Bounded wildcard: see the header, ①.
     ('GOODS',   '*',               v_furniture,
-     'Any priced goods line on an ordinary order (0464 seed)'),
+     'Any priced goods line on an ordinary order (0466 seed)'),
     -- A rental-born order (0275 stamps orders.source_system = ''rental'').
     ('GOODS',   'rental',          v_rental,
-     'A rental-born order never books rent as furniture (0464 seed)'),
+     'A rental-born order never books rent as furniture (0466 seed)'),
 
     -- Delivery money. 0184 seeded the three trip-fee keys, 0393 the stair carry.
-    ('ADDON',   'DELIVERY',        v_delivery, 'Delivery trip fee (0464 seed)'),
-    ('ADDON',   'DELIVERY_CROSS',  v_delivery, 'Cross-category delivery surcharge (0464 seed)'),
-    ('ADDON',   'DELIVERY_ADD',    v_delivery, 'Additional delivery fee (0464 seed)'),
-    ('ADDON',   'STAIR_CARRY',     v_delivery, 'Stair carry, charged on the delivery trip (0464 seed)'),
+    ('ADDON',   'DELIVERY',        v_delivery, 'Delivery trip fee (0466 seed)'),
+    ('ADDON',   'DELIVERY_CROSS',  v_delivery, 'Cross-category delivery surcharge (0466 seed)'),
+    ('ADDON',   'DELIVERY_ADD',    v_delivery, 'Additional delivery fee (0466 seed)'),
+    ('ADDON',   'STAIR_CARRY',     v_delivery, 'Stair carry, charged on the delivery trip (0466 seed)'),
 
     -- Disposal is crew work sold on the delivery trip and is booked with the
     -- rest of that trip''s money. It is a JUDGEMENT, written down so it can be
     -- argued with: if Carres ever wants disposal reported separately, add a
     -- disposal income account to the chart and remap these three rows — no
     -- migration needed, gl_map_income_account is the door.
-    ('ADDON',   'dispose-mattress', v_delivery, 'Old-mattress disposal, sold on the delivery trip (0464 seed)'),
-    ('ADDON',   'dispose-sofa',     v_delivery, 'Old-sofa disposal, sold on the delivery trip (0464 seed)'),
-    ('ADDON',   'dispose-bedframe', v_delivery, 'Old-bed-frame disposal, sold on the delivery trip (0464 seed)'),
+    ('ADDON',   'dispose-mattress', v_delivery, 'Old-mattress disposal, sold on the delivery trip (0466 seed)'),
+    ('ADDON',   'dispose-sofa',     v_delivery, 'Old-sofa disposal, sold on the delivery trip (0466 seed)'),
+    ('ADDON',   'dispose-bedframe', v_delivery, 'Old-bed-frame disposal, sold on the delivery trip (0466 seed)'),
 
     -- The storage fee, which is billed on the invoice and carried on no line.
     ('STORAGE', '*',               v_storage,
-     'Storage fee billed on the invoice; verified against ops_order_control before it is credited (0464 seed)')
+     'Storage fee billed on the invoice; verified against ops_order_control before it is credited (0466 seed)')
   on conflict (component_type, component_key) do nothing;
 
   -- Every add-on key that exists but has no row will make its order's invoice
@@ -348,7 +348,7 @@ begin
        and not exists (select 1 from gl_income_account_map m
                         where m.component_type = 'ADDON' and m.component_key = a.key)
   ) then
-    raise warning '0464: these active add-on keys are UNMAPPED and will make an invoice refuse until gl_map_income_account names an account: %',
+    raise warning '0466: these active add-on keys are UNMAPPED and will make an invoice refuse until gl_map_income_account names an account: %',
       (select string_agg(a.key, ', ' order by a.key) from addons a
         where a.active
           and not exists (select 1 from gl_income_account_map m
@@ -415,7 +415,7 @@ begin
       using errcode = '42P01', detail = 'order_not_found';
   end if;
 
-  -- 2310 SST payable ships INACTIVE (0459:258): Carres is not SST-registered,
+  -- 2310 SST payable ships INACTIVE (0465:258): Carres is not SST-registered,
   -- so there is no account a tax amount could credit. A non-zero tax refuses
   -- rather than being folded into revenue.
   if round(coalesce(v_inv.tax_amount, 0), 2) <> 0 then
@@ -547,14 +547,14 @@ end;
 $fn$;
 
 comment on function public._sales_invoice_to_ledger(text) is
-  'Turns one issued invoice into Dr receivables / Cr income, split by what was sold (0464). Returns null for a pre-go-live, voided or zero invoice; raises on anything it cannot attribute.';
+  'Turns one issued invoice into Dr receivables / Cr income, split by what was sold (0466). Returns null for a pre-go-live, voided or zero invoice; raises on anything it cannot attribute.';
 
 revoke all on function public._sales_invoice_to_ledger(text) from public, anon, authenticated;
 
 
 -- ── 6 · the canonical issuer, unchanged, plus the ledger step ────────────────
 -- ⚠ BUILT ON 0229_issue_order_invoice.sql:27, WHICH IS STILL THE LIVE BODY.
--- Nothing between 0230 and 0463 redefines this function — see the header, ⑥,
+-- Nothing between 0230 and 0465 redefines this function — see the header, ⑥,
 -- for how that was checked. If you are the next migration to replace it, copy
 -- THIS body, not 0229's, and add your own line to that chain.
 --
@@ -654,7 +654,7 @@ begin
     p_order_id::text
   );
 
-  -- ── 0464 · revenue is recognised here. No exception handler, by design.
+  -- ── 0466 · revenue is recognised here. No exception handler, by design.
   -- If this raises, everything above rolls back with it. See the header, ⑤.
   v_entry := public._sales_invoice_to_ledger(v_invoice_no);
 
@@ -733,7 +733,7 @@ end;
 $fn$;
 
 comment on function public.invoices_reverse_ledger_on_void() is
-  'Voiding an invoice contra-reverses its journal entry (0464). Never a delete. A pre-go-live or never-posted invoice has no entry and this is a no-op.';
+  'Voiding an invoice contra-reverses its journal entry (0466). Never a delete. A pre-go-live or never-posted invoice has no entry and this is a no-op.';
 
 drop trigger if exists invoices_reverse_ledger_on_void_trg on public.invoices;
 create trigger invoices_reverse_ledger_on_void_trg
@@ -759,7 +759,7 @@ create trigger invoices_reverse_ledger_on_void_trg
 -- figures are `comparable` only when nothing is unreadable:
 --   · an invoice issued after go-live with no journal entry (it refused, or it
 --     was minted by a door this file does not wire — see §9);
---   · a storage fee recognised here whose receipt 0461 never credits back
+--   · a storage fee recognised here whose receipt 0465 never credits back
 --     (the header, ③);
 --   · a receivables control account the chart cannot name unambiguously.
 -- `pre_go_live_open_*` is NOT a comparability break — both sides exclude those
@@ -844,7 +844,7 @@ begin
      where i.voided_at is null
        and i.issued_at >= v_go_live;
 
-    -- Every receipt that reduces what a customer owes, storage included. 0461
+    -- Every receipt that reduces what a customer owes, storage included. 0465
     -- does not post the storage ones; that is exactly what makes `difference`
     -- non-zero and why the storage figure is reported beside it.
     select round(coalesce(sum(p.amount), 0), 2)
@@ -868,7 +868,7 @@ begin
             and e.posted and not e.reversed);
 
     -- Storage money recognised on an invoice and collected without ever
-    -- crediting receivables back (0461's kind = 'storage' skip).
+    -- crediting receivables back (0465's kind = 'storage' skip).
     select round(coalesce(sum(p.amount), 0), 2)
       into v_stor
       from order_payments p
@@ -890,7 +890,7 @@ begin
     end if;
     if v_stor <> 0 then
       v_missing := v_missing || format(
-        'RM %s of storage receipts are recognised as revenue on an invoice but never credited back to receivables (0461 skips kind = ''storage''), so the ledger overstates what customers owe by that amount',
+        'RM %s of storage receipts are recognised as revenue on an invoice but never credited back to receivables (0465 skips kind = ''storage''), so the ledger overstates what customers owe by that amount',
         v_stor);
     end if;
     if v_pre_n > 0 then
@@ -921,7 +921,7 @@ end;
 $fn$;
 
 comment on function public.gl_receivables_reconcile() is
-  'Ledger receivables against operational receivables (0464). Always exactly one row. `missing_first` names everything that could not be read BEFORE the numbers, and `comparable` is false whenever anything is missing.';
+  'Ledger receivables against operational receivables (0466). Always exactly one row. `missing_first` names everything that could not be read BEFORE the numbers, and `comparable` is false whenever anything is missing.';
 
 revoke all on function public.gl_receivables_reconcile() from public, anon;
 grant execute on function public.gl_receivables_reconcile() to authenticated;
@@ -945,7 +945,7 @@ grant execute on function public.gl_receivables_reconcile() to authenticated;
 --      (0429:351) only when no live invoice exists. NOT WIRED: it runs as
 --      whoever moved the order to dispatched, which is the LOGISTICS role, and
 --      `gl_post`'s role gate admits only finance / operation / principal
---      (0460:164). Appending a posting call would make every logistics dispatch
+--      (0466:164). Appending a posting call would make every logistics dispatch
 --      fail. The fix is a decision, not a patch: either admit 'logistics' to
 --      gl_post, or retire the minting half of the trigger now that 0429 gave it
 --      an adopt path and the prepare/issue doors exist.
@@ -990,7 +990,7 @@ begin
                        '_sales_invoice_to_ledger','invoices_reverse_ledger_on_void',
                        'gl_receivables_reconcile');
   if v < 5 then
-    raise exception '0464 sanity: expected the five functions, got %', v;
+    raise exception '0466 sanity: expected the five functions, got %', v;
   end if;
 
   -- THE SIGNATURE ASSERTION. `create or replace` cannot change a signature —
@@ -1009,29 +1009,29 @@ begin
    order by 1
    limit 1;
   if v_ident is distinct from 'uuid, numeric' then
-    raise exception '0464 sanity: issue_order_invoice has identity arguments (%), expected (uuid, numeric) — the chain in this file''s header ⑥ is broken',
+    raise exception '0466 sanity: issue_order_invoice has identity arguments (%), expected (uuid, numeric) — the chain in this file''s header ⑥ is broken',
       coalesce(v_ident, 'the function does not exist');
   end if;
   select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'issue_order_invoice';
   if v <> 1 then
-    raise exception '0464 sanity: % overloads of issue_order_invoice exist, expected exactly 1', v;
+    raise exception '0466 sanity: % overloads of issue_order_invoice exist, expected exactly 1', v;
   end if;
 
-  -- The two 0461 helpers §5 calls, asserted by identity for the same reason.
+  -- The two 0465 helpers §5 calls, asserted by identity for the same reason.
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'gl_ar_control_account'
        and pg_get_function_identity_arguments(p.oid) = ''
   ) then
-    raise exception '0464 sanity: gl_ar_control_account() is missing or no longer takes no arguments';
+    raise exception '0466 sanity: gl_ar_control_account() is missing or no longer takes no arguments';
   end if;
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'gl_customer_party_for_order'
        and pg_get_function_identity_arguments(p.oid) = 'uuid'
   ) then
-    raise exception '0464 sanity: gl_customer_party_for_order(uuid) is missing or changed signature';
+    raise exception '0466 sanity: gl_customer_party_for_order(uuid) is missing or changed signature';
   end if;
 
   -- EXACTLY ONE void trigger, not merely at least one. Two triggers on
@@ -1042,7 +1042,7 @@ begin
      and not t.tgisinternal
      and t.tgfoid = 'public.invoices_reverse_ledger_on_void()'::regprocedure;
   if v <> 1 then
-    raise exception '0464 sanity: % triggers fire the invoice void reversal, expected exactly 1', v;
+    raise exception '0466 sanity: % triggers fire the invoice void reversal, expected exactly 1', v;
   end if;
   if not exists (
     select 1 from pg_trigger t
@@ -1050,7 +1050,7 @@ begin
        and t.tgname = 'invoices_reverse_ledger_on_void_trg'
        and not t.tgisinternal
   ) then
-    raise exception '0464 sanity: the invoice void reversal trigger is not attached';
+    raise exception '0466 sanity: the invoice void reversal trigger is not attached';
   end if;
 
   -- The columns §5 decomposes an invoice with. 0429 gave `invoices` a
@@ -1069,51 +1069,51 @@ begin
      or not exists (select 1 from information_schema.columns
                      where table_schema = 'public' and table_name = 'invoices'
                        and column_name = 'issued_at') then
-    raise exception '0464 sanity: a column the invoice decomposition reads has moved';
+    raise exception '0466 sanity: a column the invoice decomposition reads has moved';
   end if;
 
   -- The map must be seeded, and must NOT carry an add-on catch-all.
   select count(*) into v from public.gl_income_account_map;
   if v < 6 then
-    raise exception '0464 sanity: the income map seeded only % row(s)', v;
+    raise exception '0466 sanity: the income map seeded only % row(s)', v;
   end if;
   if exists (select 1 from public.gl_income_account_map
               where component_type = 'ADDON' and component_key = '*') then
-    raise exception '0464 sanity: an ADDON catch-all row exists — an unmapped add-on must refuse, not default';
+    raise exception '0466 sanity: an ADDON catch-all row exists — an unmapped add-on must refuse, not default';
   end if;
   if exists (
     select 1 from public.gl_income_account_map m
       join public.gl_accounts a on a.code = m.account_code
      where a.kind <> 'INCOME' or not a.is_active
   ) then
-    raise exception '0464 sanity: the income map points at a non-income or retired account';
+    raise exception '0466 sanity: the income map points at a non-income or retired account';
   end if;
   if exists (
     select 1 from public.gl_income_account_map m
      where exists (select 1 from public.gl_accounts c where c.parent_code = m.account_code)
   ) then
-    raise exception '0464 sanity: the income map points at a header account';
+    raise exception '0466 sanity: the income map points at a header account';
   end if;
 
   -- Reads are internal; writes are nobody's.
   if has_table_privilege('authenticated', 'public.gl_income_account_map', 'insert')
      or has_table_privilege('authenticated', 'public.gl_income_account_map', 'update')
      or has_table_privilege('authenticated', 'public.gl_income_account_map', 'delete') then
-    raise exception '0464 sanity: the income account map is directly writable';
+    raise exception '0466 sanity: the income account map is directly writable';
   end if;
   if has_table_privilege('anon', 'public.gl_income_account_map', 'select') then
-    raise exception '0464 sanity: anon can read the income account map';
+    raise exception '0466 sanity: anon can read the income account map';
   end if;
   if exists (select 1 from pg_policy
               where polrelid = 'public.gl_income_account_map'::regclass
                 and polcmd <> 'r') then
-    raise exception '0464 sanity: a write policy exists on the income account map';
+    raise exception '0466 sanity: a write policy exists on the income account map';
   end if;
   if has_function_privilege('anon', 'public.gl_receivables_reconcile()', 'execute') then
-    raise exception '0464 sanity: gl_receivables_reconcile is callable by anon';
+    raise exception '0466 sanity: gl_receivables_reconcile is callable by anon';
   end if;
   if has_function_privilege('authenticated', 'public._sales_invoice_to_ledger(text)', 'execute') then
-    raise exception '0464 sanity: the posting helper is callable directly';
+    raise exception '0466 sanity: the posting helper is callable directly';
   end if;
 
   -- NOT exercised here: gl_receivables_reconcile guards on gl_may_read(), and a
@@ -1121,5 +1121,5 @@ begin
   -- whole file back. Its one-row-always property is a property of its body —
   -- every return path goes through the single `return query` at the end.
 
-  raise notice '0464 OK: an invoice recognises revenue, a void reverses it, and receivables can be reconciled';
+  raise notice '0466 OK: an invoice recognises revenue, a void reverses it, and receivables can be reconciled';
 end $sanity$;

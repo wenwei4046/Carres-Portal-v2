@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0461_customer_money_reaches_the_ledger.sql
+-- 0465_customer_money_reaches_the_ledger.sql
 -- FINANCE LEDGER · CARD C — THE CUSTOMER MONEY CARRES ALREADY RECORDS
 -- NOW ALSO POSTS A JOURNAL ENTRY.
 --
@@ -13,7 +13,7 @@
 -- moves `orders.paid` and writes `order_payments` + `payment_allocations`, and
 -- nothing anywhere says which bank the money landed in or that the customer
 -- owes RM X less than before. Carres has an operational money truth and no
--- accounting truth. 0459 gave us a chart and a start line, 0460 gave us the
+-- accounting truth. 0465 gave us a chart and a start line, 0466 gave us the
 -- one gate. This file walks the customer's money through it.
 --
 -- THE FOUR THINGS THIS MIGRATION DOES:
@@ -107,7 +107,7 @@
 --              credited back where the money actually sits; a payment with no
 --              allocation row at all keeps the 0430 behaviour exactly.
 --
--- An earlier draft of this file copied both bodies out of 0351. Because 0461
+-- An earlier draft of this file copied both bodies out of 0351. Because 0465
 -- sorts after 0450, that draft would have silently reverted 0430, 0449 and
 -- 0450 — duplicate-safe method words, receipt snapshots, void reasons, the
 -- approver gate and allocation-following reversal — under a migration whose
@@ -152,7 +152,7 @@ alter table public.gl_payment_account_map
   );
 
 comment on table public.gl_payment_account_map is
-  'Payment method/channel -> the debit account customer money lands in (0461). A method with no row is UNMAPPED and its payments REFUSE to post; that is intentional. Never add a catch-all row.';
+  'Payment method/channel -> the debit account customer money lands in (0465). A method with no row is UNMAPPED and its payments REFUSE to post; that is intentional. Never add a catch-all row.';
 comment on column public.gl_payment_account_map.source_channel is
   '''*'' = any channel. A channel-specific row beats the wildcard, because ''online'' through Stripe and ''online'' typed by an operator are different money in different places.';
 
@@ -187,7 +187,7 @@ as $fn$
 $fn$;
 
 comment on function public.gl_account_for_payment_method(text,text) is
-  'The account customer money of this method/channel debits (0461). NULL means unmapped — the caller must refuse, never substitute.';
+  'The account customer money of this method/channel debits (0465). NULL means unmapped — the caller must refuse, never substitute.';
 
 -- The credit side. Deliberately NOT a hard-coded code: agent A owns the chart
 -- and the ledger must not carry a second copy of its numbering. Accounts
@@ -298,7 +298,7 @@ grant execute on function public.gl_ar_control_account() to authenticated;
 --   · paid_on < gl_config.go_live_on   — ruling L. The clean start line.
 --
 -- There used to be a second skip here, for kind = 'storage', on the grounds
--- that the chart had no storage-income account. It has one (4400), and 0464
+-- that the chart had no storage-income account. It has one (4400), and 0466
 -- recognises storage revenue when the invoice is issued — so a storage
 -- collection IS an ordinary settlement of a receivable, and skipping it
 -- overstated receivables by exactly the storage cash taken. Now posted like
@@ -415,7 +415,7 @@ declare
   v_seq integer;
   v_method text;
   v_snapshot jsonb;   -- 0449
-  v_entry uuid;       -- 0461
+  v_entry uuid;       -- 0465
 begin
   if p_order_id is null or p_amount is null or p_amount <= 0 or p_paid_on is null then
     raise exception 'order, positive amount and paid-on date are required'
@@ -536,7 +536,7 @@ begin
   values (public.app_role(), coalesce((select name from app_users where id = auth.uid()), p_source_channel),
           format('Payment recorded · RM %s · %s · %s', p_amount, p_kind, p_method), v_receipt);
 
-  -- ── 0461 · the ledger. No exception handler, by design. ────────────────────
+  -- ── 0465 · the ledger. No exception handler, by design. ────────────────────
   -- If this raises, the payment above rolls back with it. See the header.
   v_entry := public._customer_payment_to_ledger(v_row.id);
 
@@ -547,7 +547,7 @@ end;
 $fn$;
 
 comment on function public._customer_payment_post(uuid,numeric,date,text,text,text,text,text,text,text,text,text,jsonb,boolean) is
-  'The ONE canonical customer-payment writer (0351; 0430 widened the method dictionary; 0449 captures the immutable receipt snapshot; 0461 posts the journal entry). Ledger row, allocation, orders.paid, the receipt number, the snapshot and the GL entry are one transaction — if the ledger refuses, the payment rolls back with it, by design.';
+  'The ONE canonical customer-payment writer (0351; 0430 widened the method dictionary; 0449 captures the immutable receipt snapshot; 0465 posts the journal entry). Ledger row, allocation, orders.paid, the receipt number, the snapshot and the GL entry are one transaction — if the ledger refuses, the payment rolls back with it, by design.';
 
 revoke all on function public._customer_payment_post(uuid,numeric,date,text,text,text,text,text,text,text,text,text,jsonb,boolean) from public, anon, authenticated;
 
@@ -567,7 +567,7 @@ declare
   v_duty jsonb := public.workspace_resolve_duty('payment_approver', null);
   v_alloc record;
   v_any boolean := false;
-  v_doc_no text; v_entry uuid; v_contra uuid;   -- 0461
+  v_doc_no text; v_entry uuid; v_contra uuid;   -- 0465
 begin
   -- 0430 §1: a void with no reason is refused.
   if nullif(btrim(coalesce(p_reason, '')), '') is null then
@@ -608,7 +608,7 @@ begin
 
   insert into ops_activity_log(order_id,action,actor_id,detail) values(v_row.order_id,'payment.voided',auth.uid(),jsonb_build_object('amount',v_row.amount,'payment_id',v_row.id,'reason',p_reason));
 
-  -- ── 0461 · contra-reverse the journal entry, if this payment ever made one.
+  -- ── 0465 · contra-reverse the journal entry, if this payment ever made one.
   -- A payment recorded before go-live has no entry; that is the quiet skip,
   -- not a failure. Anything else that goes wrong rolls the void back.
   v_doc_no := coalesce(nullif(btrim(coalesce(v_row.receipt_no, '')), ''), v_row.id::text);
@@ -625,7 +625,7 @@ end;
 $fn$;
 
 comment on function public.payment_void(uuid, text) is
-  '0430 + 0450 + 0461: Payment Approver duty (Shared Duty Resolver) or principal voids a payment, with a REQUIRED reason. A void is a stamp, never a delete. 0450: the paid reversal follows the LIVE ALLOCATIONS, so a payment whose allocation was corrected onto another SO is credited back where the money actually sits; a payment with no allocation row keeps the 0430 behaviour. 0461: the journal entry is contra-reversed with gl_reverse, never deleted — a payment recorded before go-live has no entry and that is the quiet skip, not a failure.';
+  '0430 + 0450 + 0465: Payment Approver duty (Shared Duty Resolver) or principal voids a payment, with a REQUIRED reason. A void is a stamp, never a delete. 0450: the paid reversal follows the LIVE ALLOCATIONS, so a payment whose allocation was corrected onto another SO is credited back where the money actually sits; a payment with no allocation row keeps the 0430 behaviour. 0465: the journal entry is contra-reversed with gl_reverse, never deleted — a payment recorded before go-live has no entry and that is the quiet skip, not a failure.';
 
 revoke all on function public.payment_void(uuid,text) from public, anon;
 grant execute on function public.payment_void(uuid,text) to authenticated;
@@ -681,7 +681,7 @@ revoke all on function public.gl_map_payment_account(text,text,text,text) from p
 grant execute on function public.gl_map_payment_account(text,text,text,text) to authenticated;
 
 
--- ── 4d · seed the map against whatever chart 0459 actually created ───────────
+-- ── 4d · seed the map against whatever chart 0465 actually created ───────────
 -- The chart's CODES belong to agent A, so this seed matches on account NAME
 -- inside the asset, active, non-control, non-header leaves — and where it
 -- finds nothing it writes NOTHING. 'other' is never seeded: it is the
@@ -725,24 +725,24 @@ begin
   -- cash over the counter.
   if v_cash is not null then
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('cash','*', v_cash, 'Cash taken at the counter (0461 seed)')
+    values ('cash','*', v_cash, 'Cash taken at the counter (0465 seed)')
     on conflict do nothing; v_seeded := v_seeded + 1;
   end if;
 
   -- a transfer, and a cheque, both land in the bank.
   if v_bank is not null then
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('bank','*', v_bank, 'Bank transfer (0461 seed)')
+    values ('bank','*', v_bank, 'Bank transfer (0465 seed)')
     on conflict do nothing; v_seeded := v_seeded + 1;
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('cheque','*', v_bank, 'Cheque banked (0461 seed) — remap if a cheque-clearing account is added')
+    values ('cheque','*', v_bank, 'Cheque banked (0465 seed) — remap if a cheque-clearing account is added')
     on conflict do nothing; v_seeded := v_seeded + 1;
   end if;
 
   -- terminal card, only if the chart holds a merchant account.
   if v_card is not null then
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('card','*', v_card, 'Card terminal settlement (0461 seed)')
+    values ('card','*', v_card, 'Card terminal settlement (0465 seed)')
     on conflict do nothing; v_seeded := v_seeded + 1;
   end if;
 
@@ -750,19 +750,19 @@ begin
   -- its own row so a later second gateway does not need a schema change.
   if v_gate is not null then
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('online','*', v_gate, 'Online gateway (0461 seed)')
+    values ('online','*', v_gate, 'Online gateway (0465 seed)')
     on conflict do nothing; v_seeded := v_seeded + 1;
     insert into gl_payment_account_map(method, source_channel, account_code, note)
-    values ('online','stripe_checkout', v_gate, 'Stripe checkout (0461 seed)')
+    values ('online','stripe_checkout', v_gate, 'Stripe checkout (0465 seed)')
     on conflict do nothing; v_seeded := v_seeded + 1;
   end if;
 
-  raise notice '0461 seed: % mapping row(s) written', v_seeded;
-  if v_cash is null then raise warning '0461: payment method ''cash'' is UNMAPPED — cash payments will refuse to post until gl_map_payment_account names an account'; end if;
-  if v_bank is null then raise warning '0461: payment methods ''bank'' and ''cheque'' are UNMAPPED — they will refuse to post until gl_map_payment_account names an account'; end if;
-  if v_card is null then raise warning '0461: payment method ''card'' is UNMAPPED — deliberately not defaulted to the bank account; map it explicitly'; end if;
-  if v_gate is null then raise warning '0461: payment method ''online'' is UNMAPPED — deliberately not defaulted to the bank account; map it explicitly'; end if;
-  raise warning '0461: payment method ''other'' is UNMAPPED and stays that way — it is the unrecognised-method bucket and must never carry a default account';
+  raise notice '0465 seed: % mapping row(s) written', v_seeded;
+  if v_cash is null then raise warning '0465: payment method ''cash'' is UNMAPPED — cash payments will refuse to post until gl_map_payment_account names an account'; end if;
+  if v_bank is null then raise warning '0465: payment methods ''bank'' and ''cheque'' are UNMAPPED — they will refuse to post until gl_map_payment_account names an account'; end if;
+  if v_card is null then raise warning '0465: payment method ''card'' is UNMAPPED — deliberately not defaulted to the bank account; map it explicitly'; end if;
+  if v_gate is null then raise warning '0465: payment method ''online'' is UNMAPPED — deliberately not defaulted to the bank account; map it explicitly'; end if;
+  raise warning '0465: payment method ''other'' is UNMAPPED and stays that way — it is the unrecognised-method bucket and must never carry a default account';
 end $seed$;
 
 
@@ -817,7 +817,7 @@ revoke delete on public.payments, public.invoices, public.refunds from authentic
 revoke insert, update on public.payments from authenticated;
 
 comment on table public.payments is
-  'Legacy money table. The FOR ALL write policy was dropped in 0461 — customer receipts belong to order_payments via _customer_payment_post, and nothing in the application writes here through PostgREST.';
+  'Legacy money table. The FOR ALL write policy was dropped in 0465 — customer receipts belong to order_payments via _customer_payment_post, and nothing in the application writes here through PostgREST.';
 
 
 -- ── 6 · sanity — schema shape only, never a production row count ─────────────
@@ -831,7 +831,7 @@ begin
                        'gl_customer_party_for_order','_customer_payment_to_ledger',
                        'gl_map_payment_account');
   if v < 5 then
-    raise exception '0461 sanity: expected the five ledger-bridge functions, got %', v;
+    raise exception '0465 sanity: expected the five ledger-bridge functions, got %', v;
   end if;
 
   -- ── the two re-created functions: signature, and the behaviour this file
@@ -845,7 +845,7 @@ begin
        and pg_get_function_identity_arguments(p.oid) =
            'uuid, numeric, date, text, text, text, text, text, text, text, text, text, jsonb, boolean'
   ) then
-    raise exception '0461 sanity: _customer_payment_post lost its signature';
+    raise exception '0465 sanity: _customer_payment_post lost its signature';
   end if;
 
   -- And exactly one copy of it, with 0430's dictionary and 0449's snapshot
@@ -853,7 +853,7 @@ begin
   select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = '_customer_payment_post';
   if v <> 1 then
-    raise exception '0461 sanity: % copies of _customer_payment_post', v;
+    raise exception '0465 sanity: % copies of _customer_payment_post', v;
   end if;
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -861,7 +861,7 @@ begin
        and p.prosrc like '%duitnow_qr%'            -- 0430 §3
        and p.prosrc like '%v_snapshot%'            -- 0449
   ) then
-    raise exception '0461 sanity: the writer was rebuilt from a stale body — 0430''s method dictionary or 0449''s receipt snapshot is missing';
+    raise exception '0465 sanity: the writer was rebuilt from a stale body — 0430''s method dictionary or 0449''s receipt snapshot is missing';
   end if;
 
   -- payment_void keeps its two-argument signature…
@@ -870,12 +870,12 @@ begin
      where n.nspname = 'public' and p.proname = 'payment_void'
        and pg_get_function_identity_arguments(p.oid) = 'uuid, text'
   ) then
-    raise exception '0461 sanity: payment_void lost its signature';
+    raise exception '0465 sanity: payment_void lost its signature';
   end if;
   select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'payment_void';
   if v <> 1 then
-    raise exception '0461 sanity: % copies of payment_void', v;
+    raise exception '0465 sanity: % copies of payment_void', v;
   end if;
   -- …and 0430's approver gate plus 0450's allocation-following reversal.
   if not exists (
@@ -885,7 +885,7 @@ begin
        and p.prosrc like '%workspace_resolve_duty%'         -- 0430 §2
        and p.prosrc like '%payment_allocations a%'          -- 0450 §3
   ) then
-    raise exception '0461 sanity: payment_void was rebuilt from a stale body — 0430''s required reason/approver gate or 0450''s allocation-following reversal is missing';
+    raise exception '0465 sanity: payment_void was rebuilt from a stale body — 0430''s required reason/approver gate or 0450''s allocation-following reversal is missing';
   end if;
 
   -- 0448 rewrote payment_record, the human door ABOVE the writer. This file
@@ -895,38 +895,38 @@ begin
      where n.nspname = 'public' and p.proname = 'payment_record'
        and p.prosrc like '%possible_duplicate_payment%'      -- 0448 §2
   ) then
-    raise exception '0461 sanity: payment_record lost 0448''s likely-duplicate gate';
+    raise exception '0465 sanity: payment_record lost 0448''s likely-duplicate gate';
   end if;
 
   if exists (select 1 from pg_policy where polrelid = 'public.payments'::regclass
               and polname = 'payments_write_finance') then
-    raise exception '0461 sanity: the payments write door survived';
+    raise exception '0465 sanity: the payments write door survived';
   end if;
   if not exists (select 1 from pg_policy where polrelid = 'public.payments'::regclass
               and polname = 'payments_scoped_read') then
-    raise exception '0461 sanity: the payments read policy was lost';
+    raise exception '0465 sanity: the payments read policy was lost';
   end if;
 
   -- 'w' = UPDATE, 'a' = INSERT in pg_policy.polcmd.
   if not exists (select 1 from pg_policy where polrelid = 'public.invoices'::regclass
               and polname = 'invoices_write_finance' and polcmd = 'w') then
-    raise exception '0461 sanity: the invoice void door is not UPDATE-only';
+    raise exception '0465 sanity: the invoice void door is not UPDATE-only';
   end if;
   if not exists (select 1 from pg_policy where polrelid = 'public.refunds'::regclass
               and polname = 'refunds_write_finance' and polcmd = 'a') then
-    raise exception '0461 sanity: the refund door is not INSERT-only';
+    raise exception '0465 sanity: the refund door is not INSERT-only';
   end if;
 
   if has_table_privilege('authenticated', 'public.payments', 'insert')
      or has_table_privilege('authenticated', 'public.payments', 'delete')
      or has_table_privilege('authenticated', 'public.invoices', 'delete')
      or has_table_privilege('authenticated', 'public.refunds', 'delete') then
-    raise exception '0461 sanity: a money table can still be written or deleted directly';
+    raise exception '0465 sanity: a money table can still be written or deleted directly';
   end if;
 
   if has_table_privilege('authenticated', 'public.gl_payment_account_map', 'insert') then
-    raise exception '0461 sanity: the payment account map is directly writable';
+    raise exception '0465 sanity: the payment account map is directly writable';
   end if;
 
-  raise notice '0461 OK: customer money reaches the ledger, and the three legacy write doors are shut';
+  raise notice '0465 OK: customer money reaches the ledger, and the three legacy write doors are shut';
 end $sanity$;
