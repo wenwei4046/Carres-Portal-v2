@@ -293,7 +293,7 @@ describe("Sales Order object template contract", () => {
      title's own shouting face — a badge reads as a fact, not a second title. */
   it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
-    const start = workspace.indexOf('<Block\r\n        title="Customer"');
+    const start = workspace.search(/<Block\s+title="Customer"/);
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(customer).toContain("headerSlot=");
@@ -661,7 +661,7 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.indexOf('<Block\r\n        title="Money"');
+    const start = workspace.search(/<Block\s+title="Money"/);
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(money).toContain("headerSlot=");
