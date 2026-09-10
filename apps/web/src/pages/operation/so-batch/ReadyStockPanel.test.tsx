@@ -168,6 +168,24 @@ describe("viewing", () => {
     expect(screen.getAllByText("Carres Klang Warehouse").length).toBeGreaterThan(0);
   });
 
+  /** `Covered` is retired from SO Batch Purchase; the fact is what is said. */
+  it("says no item line needs a Unit rather than calling it covered", async () => {
+    draw(
+      response({
+        units: response().units.map((u) => ({
+          ...u,
+          matchingLineIds: [],
+          blocked: u.identityScope === "quantity" ? ("counted_stock" as const) : ("no_line_needs_it" as const),
+        })),
+      }),
+    );
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    expect(within(row).getByText("No item line needs it")).toBeInTheDocument();
+    expect(within(row).queryByText(/Covered/)).toBeNull();
+    expect(within(row).queryByRole("checkbox")).toBeNull();
+  });
+
   it("says whose goods a consignment Unit is", async () => {
     draw();
     await open();
@@ -185,7 +203,12 @@ describe("counted stock", () => {
     const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000e");
     expect(within(row).queryByRole("checkbox")).toBeNull();
     expect(within(row).queryByText("QTY-000000001")).toBeNull();
-    expect(within(row).getAllByText("Counted stock").length).toBeGreaterThan(0);
+    /* COPY-STANDARD: a quantity-scoped goods line has no Unit ID by law, so
+       its Unit ID cell is the absence dash. `No Unit ID` would imply one is
+       owed. What the goods ARE is said in its own column. */
+    expect(within(row).getAllByText("—").length).toBeGreaterThan(0);
+    expect(within(row).queryByText(/No Unit ID/)).toBeNull();
+    expect(within(row).getByText("Counted stock")).toBeInTheDocument();
     expect(within(row).getByText("893")).toBeInTheDocument();
   });
 });

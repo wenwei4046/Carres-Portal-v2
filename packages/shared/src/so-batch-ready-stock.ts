@@ -112,8 +112,13 @@ export const READY_STOCK_BLOCKED_WORDS: Record<
   NonNullable<ReadyStockUnit["blocked"]>,
   string
 > = {
-  counted_stock: "Counted stock · no Unit ID",
-  no_line_needs_it: "Already covered",
+  /* `docs/COPY-STANDARD.md`: a quantity-scoped goods line has no Unit ID BY
+     LAW, so its Unit ID cell is the absence dash and this column says what
+     the goods are instead — never `No Unit ID`, which implies one is owed. */
+  counted_stock: "Counted stock",
+  /* `Covered` is RETIRED from SO Batch Purchase, never to return. The fact is
+     that no item line still needs these goods, and that is what it says. */
+  no_line_needs_it: "No item line needs it",
 };
 
 /**

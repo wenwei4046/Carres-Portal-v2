@@ -260,11 +260,14 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                         </td>
                         <td className="px-2">
                           {/* A counted row's key is NOT a Unit ID and never
-                              prints under this heading as if it were. */}
+                              prints under this heading as if it were. The
+                              governed answer for a quantity-scoped goods line
+                              is the absence dash — `No Unit ID` would imply
+                              one is owed (`docs/COPY-STANDARD.md`). */}
                           {u.identityScope === "unit" && u.unitCode ? (
                             u.unitCode
                           ) : (
-                            <Absence>Counted stock</Absence>
+                            <Absence>—</Absence>
                           )}
                         </td>
                         <td className="px-2">{conditionWord(u.condition)}</td>
