@@ -61,6 +61,25 @@ function referenceOf(order: OrderRow): string | null {
 }
 
 /**
+ * The Unit a refusal is about, off the DETAIL 0473 writes (`unit_id=<uuid>`).
+ *
+ * It reads DETAIL first and the message second because PostgREST puts the two
+ * in different fields and older refusals carried neither — this never invents
+ * an id, it only finds one that is there.
+ */
+export function readyStockRefusedUnitId(error: {
+  details?: string | null;
+  message?: string | null;
+}): string | null {
+  const where = `${error.details ?? ""} ${error.message ?? ""}`;
+  return (
+    where.match(
+      /unit_id=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/,
+    )?.[1] ?? null
+  );
+}
+
+/**
  * GET /api/operation/purchase/demands/:orderId/ready-stock
  *
  * READING THIS RESERVES NOTHING. It is a projection and it writes no row.
@@ -261,7 +280,21 @@ soBatchReadyStockRouter.post("/ready-stock/reserve", requireOperation, async (c)
       (error as { message?: string }).message?.match(
         /(order_line_required|order_line_not_found|line_not_in_order|unit_not_found|unit_does_not_match_line|unit_not_available|quantity_row_not_bindable|line_already_covered|unit_no_longer_free|no_units_chosen|too_many_units|line_needs_sales_order_ref|line_needs_exact_unit)/,
       )?.[1] ?? null;
-    return c.json({ ...(m.body as object), ...(code ? { code } : {}) }, m.status);
+    /**
+     * WHICH Unit stopped the act (0473). The batch door re-raises every refusal
+     * with `unit_id=<uuid>` in DETAIL, because it is the only place that knows
+     * which pick it was standing on. Without it an operator who chose five
+     * Units has to untick them one at a time to find the stale one — four more
+     * races. `null` is a real answer: a refusal raised before the loop
+     * (`no_units_chosen`) is about no Unit at all, and a pre-0473 database
+     * names none either, in which case the browser prints the same sentence it
+     * printed yesterday and simply names nobody.
+     */
+    const itemId = readyStockRefusedUnitId(error);
+    return c.json(
+      { ...(m.body as object), ...(code ? { code } : {}), ...(itemId ? { itemId } : {}) },
+      m.status,
+    );
   }
 
   return c.json(data);

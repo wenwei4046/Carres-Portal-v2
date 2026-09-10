@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   READY_STOCK_BLOCKED_WORDS,
   readyStockRefusalWord,
+  readyStockReserveResultSchema,
   readyStockResponseSchema,
   type ReadyStockResponse,
 } from "@carres/shared";
@@ -61,7 +62,34 @@ function conditionWord(c: string | null): string {
   return CONDITION_WORDS[c] ?? c;
 }
 
-export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: number | null }) {
+/**
+ * WHAT THE ACT DID, IN UNITS.
+ *
+ * The door is atomic, so there are exactly two outcomes and the screen says
+ * which: every chosen Unit went in, or none did and ONE of them is the reason.
+ * A count alone is not enough — an operator who chose five and is told
+ * "someone else took that Unit" would otherwise untick them one at a time to
+ * find out which, and every attempt is another race.
+ */
+type ActResult =
+  | { ok: true; count: number; unitCodes: string[] }
+  | { ok: false; sentence: string; unitId: string | null; unitCode: string | null };
+
+export default function ReadyStockPanel({
+  orderId,
+  so,
+  onReserved,
+}: {
+  orderId: string;
+  so: number | null;
+  /**
+   * The item lines this act answered. The Register drops every purchasing tick
+   * standing on them, because the `To buy` those ticks were arranged against
+   * has just changed — and `Issue PO` is one click, while the recomputed read
+   * is a round trip away.
+   */
+  onReserved?: (orderId: string, orderLineIds: readonly string[]) => void;
+}) {
   const [open, setOpen] = useState(false);
   /**
    * TWO STATES, because they are two decisions. `chosen` is whether this
@@ -72,6 +100,7 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
    */
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [lineChoice, setLineChoice] = useState<Map<string, string>>(new Map());
+  const [act, setAct] = useState<ActResult | null>(null);
   const queryClient = useQueryClient();
 
   /**
@@ -100,7 +129,7 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
 
   const reserve = useMutation({
     mutationFn: () =>
-      apiFetch<{ reserved: number }>(
+      apiFetch<unknown>(
         "/api/operation/purchase/demands/ready-stock/reserve",
         {
           method: "POST",
@@ -113,11 +142,26 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
           }),
         },
       ),
-    onSuccess: (res) => {
+    onSuccess: (raw) => {
+      /* Parsed, not trusted — and what came back is what the DOOR committed,
+         never what the browser asked for. */
+      const parsed = readyStockReserveResultSchema.safeParse(raw);
+      const committed = parsed.success ? parsed.data.units : [];
+      const count = parsed.success ? parsed.data.reserved : chosen.size;
       toast.success(
-        `Reserved ${res.reserved} Unit${res.reserved === 1 ? "" : "s"}${so == null ? "" : ` to SO-${so}`}`,
+        `Reserved ${count} Unit${count === 1 ? "" : "s"}${so == null ? "" : ` to SO-${so}`}`,
       );
+      setAct({
+        ok: true,
+        count,
+        unitCodes: committed
+          .map((u) => codeOf(u.itemId))
+          .filter((codeWord): codeWord is string => codeWord != null),
+      });
       setChosen(new Set());
+      /* The item lines the goods now answer — the Register's ticks on them were
+         arranged against a `To buy` that has just changed. */
+      onReserved?.(orderId, [...new Set(committed.map((u) => u.orderLineId))]);
       /* The server's own recomputation decides what still needs buying — the
          Register is invalidated rather than edited in place. */
       void queryClient.invalidateQueries({ queryKey: ["so-batch-ready-stock", orderId] });
@@ -125,10 +169,25 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
       void queryClient.invalidateQueries({ queryKey: ["operation", "orders", orderId, "expansion"] });
     },
     onError: (e: Error) => {
-      const code = e instanceof ApiError ? ((e.body as { code?: string } | null)?.code ?? null) : null;
-      toast.error(readyStockRefusalWord(code));
+      const body = e instanceof ApiError ? (e.body as { code?: string; itemId?: string } | null) : null;
+      const sentence = readyStockRefusalWord(body?.code ?? null);
+      toast.error(sentence);
+      /* 0473 names the Unit the act stopped on. The choice is LEFT ALONE, so
+         the operator unticks that one and presses again rather than rebuilding
+         a selection the refusal never touched. */
+      setAct({
+        ok: false,
+        sentence,
+        unitId: body?.itemId ?? null,
+        unitCode: body?.itemId ? codeOf(body.itemId) : null,
+      });
     },
   });
+
+  /** A Unit's own ID, for a sentence that has to name it. */
+  function codeOf(itemId: string): string | null {
+    return (q.data?.units ?? []).find((u) => u.itemId === itemId)?.unitCode ?? null;
+  }
 
   /** The line this Unit answers: the operator's pick, else its only match. */
   function lineFor(itemId: string): string {
@@ -139,6 +198,9 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
   }
 
   function toggle(itemId: string) {
+    /* A result is about the act that produced it. The moment the choice moves,
+       last act's sentence is history and stops being shown beside a new one. */
+    setAct(null);
     setChosen((prev) => {
       const next = new Set(prev);
       if (next.has(itemId)) next.delete(itemId);
@@ -229,6 +291,9 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                 <tbody className="divide-y divide-base-200 text-body">
                   {q.data!.units.map((u) => {
                     const selected = chosen.has(u.itemId);
+                    /* THE UNIT THE LAST ACT STOPPED ON. Amber, because it is an
+                       exception to fix, not a failure of the goods (§ tokens). */
+                    const refused = act != null && !act.ok && act.unitId === u.itemId;
                     const defaultLine = u.matchingLineIds[0] ?? null;
                     const pickedLine = lineChoice.get(u.itemId) ?? defaultLine;
                     return (
@@ -239,10 +304,21 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                            top and bottom — distinct from the purchasing
                            selection above, and from keyboard focus, which the
                            browser's own ring still draws. */
+                        /* ⚠️ `var(--kit-blue-9)` shipped here on 2026-09-10 and
+                           drew NOTHING: the kit palette is a Tailwind colour
+                           scale, and no stylesheet defines that custom
+                           property — an invalid box-shadow is dropped whole, so
+                           the selected row had its fill and no rule. The token
+                           is read from the theme instead, which is the same
+                           locked value and actually resolves. Amber has only
+                           steps 3 and 11 by law, so the refused row carries the
+                           fill alone rather than inventing a step. */
                         className={
-                          selected
-                            ? "divide-x divide-base-200 bg-kit-blue-3 shadow-[inset_0_1px_var(--kit-blue-9),inset_0_-1px_var(--kit-blue-9)]"
-                            : "divide-x divide-base-200"
+                          refused
+                            ? "divide-x divide-base-200 bg-kit-amber-3"
+                            : selected
+                              ? "divide-x divide-base-200 bg-kit-blue-3 shadow-[inset_0_1px_theme(colors.kit.blue.9),inset_0_-1px_theme(colors.kit.blue.9)]"
+                              : "divide-x divide-base-200"
                         }
                         style={{ height: 38 }}
                       >
@@ -329,6 +405,41 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                 {reserve.isPending ? "Reserving…" : "Choose Ready Unit"}
               </button>
             </div>
+
+            {/* WHAT THE ACT DID, IN UNITS — never a bare count.
+                The door commits every chosen Unit or none, so this says which
+                Units went in, or which one stopped the act and that nothing
+                went in. */}
+            {act ? (
+              <div
+                data-testid={`ready-stock-act-${orderId}`}
+                className={`border-t border-base-200 px-3 py-2 text-body ${
+                  act.ok ? "bg-kit-blue-3" : "bg-kit-amber-3"
+                }`}
+              >
+                {act.ok ? (
+                  <>
+                    <div>
+                      {`Reserved ${act.count} Unit${act.count === 1 ? "" : "s"}`}
+                      {so == null ? "" : ` to SO-${so}`}
+                    </div>
+                    {act.unitCodes.length > 0 ? (
+                      <div className="text-meta text-base-600">
+                        {`Unit ID · ${act.unitCodes.join(" · ")}`}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <div>{act.sentence}</div>
+                    <div className="text-meta text-base-600">
+                      {act.unitCode ? `Unit ID · ${act.unitCode} · ` : ""}
+                      No Unit was reserved.
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : null}
 
             {/* WHAT THE ORDER NOW STANDS AT — real facts from the server's own
                 read, never a demo sentence. Only lines that Ready Stock has
