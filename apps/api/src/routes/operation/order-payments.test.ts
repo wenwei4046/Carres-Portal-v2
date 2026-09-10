@@ -75,6 +75,11 @@ function makeSb(
         return builder;
       }),
       eq: vi.fn(() => builder),
+      /* `.in()` — the recorder-name lookup filters app_users by a list of ids.
+         The builder had no such method, so the route 500'd inside the mock
+         while the real PostgREST client was fine. A mock that cannot express a
+         call the route makes does not prove the route works. */
+      in: vi.fn(() => builder),
       order: vi.fn(() => builder),
       single: vi.fn(() => Promise.resolve(cfg.single ?? { data: null, error: null })),
       maybeSingle: vi.fn(() => Promise.resolve(cfg.maybeSingle ?? { data: null, error: null })),
@@ -161,6 +166,77 @@ describe("GET /:id/payments", () => {
     const body = (await res.json()) as { payments: typeof rows };
     expect(body.payments).toHaveLength(1);
     expect(sb.from).toHaveBeenCalledWith("order_payments");
+  });
+
+  /* ⭐ WHO RECORDED IT, AS A NAME. The ledger stores `recorded_by` as a user
+     id, and a uuid on screen tells an operator nothing about who to ask. The
+     SO PDF already resolves the same column the same way; this is that lookup
+     on the reading endpoint, not a second rule. */
+  it("200 — resolves the recorder's name from app_users", async () => {
+    const rows = [
+      { id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26", method: "cash", kind: "payment", recorded_by: "u9" },
+    ];
+    const sb = makeSb({
+      order_payments: { list: { data: rows, error: null } },
+      app_users: { list: { data: [{ id: "u9", name: "Shasha" }], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { payments: Array<{ recorded_by_name: string | null }> };
+    expect(body.payments[0].recorded_by_name).toBe("Shasha");
+    expect(sb.from).toHaveBeenCalledWith("app_users");
+  });
+
+  /* ⛔ A NAME IS CONTEXT; LOSING IT MAY NEVER COST THE LEDGER. An unreadable
+     `app_users` leaves the name null and the ledger intact — the screen then
+     prints `Not recorded` rather than emptying the card. */
+  it("200 — an unreadable app_users leaves the name null and the rows whole", async () => {
+    const rows = [
+      { id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26", method: "cash", kind: "payment", recorded_by: "u9" },
+    ];
+    const sb = makeSb({
+      order_payments: { list: { data: rows, error: null } },
+      app_users: { list: { data: null, error: { message: "permission denied" } } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { payments: Array<{ recorded_by_name: string | null; amount: number }> };
+    expect(body.payments).toHaveLength(1);
+    expect(body.payments[0].amount).toBe(1500);
+    expect(body.payments[0].recorded_by_name).toBeNull();
+  });
+
+  /* No recorder on the row means no lookup at all — an id-less ledger must not
+     send an empty `.in()` to PostgREST. */
+  it("200 — skips the lookup entirely when no row names a recorder", async () => {
+    const rows = [
+      { id: PAY_ID, order_id: ORDER_ID, amount: 1500, paid_on: "2026-06-26", method: "cash", kind: "payment", recorded_by: null },
+    ];
+    const sb = makeSb({ order_payments: { list: { data: rows, error: null } } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER_ID}/payments`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(sb.from).not.toHaveBeenCalledWith("app_users");
   });
 });
 

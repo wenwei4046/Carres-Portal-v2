@@ -58,6 +58,7 @@ import {
   CUSTOMER_GENDER_OPTIONS,
   CUSTOMER_RACE_OPTIONS,
   deliveryReasonLabel,
+  fmtMoney,
   EMERGENCY_RELATIONSHIPS,
   LIFT_OPTIONS,
   lineClass,
@@ -85,6 +86,7 @@ import FieldFrame from "@/components/kit/FieldFrame";
 import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
+import PaymentLedger from "./components/SalesOrderPaymentLedger";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
@@ -1933,11 +1935,6 @@ export default function SalesOrderWorkspace() {
           </span>
         </div>
       )}
-      {!isNew && (order?.source_ref ?? []).length > 0 && (
-        <div className="px-1 text-meta text-base-500">
-          Customer reference {(order?.source_ref ?? []).join(" · ")}
-        </div>
-      )}
 
       {/* ① CUSTOMER — now the whole customer, address included (Jess,
           2026-08-26). `Delivery address` was its own card between `Emergency
@@ -2089,6 +2086,153 @@ export default function SalesOrderWorkspace() {
             onValueChange={(v) => setField("building_type", v)}
             options={BUILDING_TYPE_OPTIONS.map((b) => ({ value: b, label: b }))} />
         </div>
+        {/* ⭐ DELIVERY ACCESS SITS WITH THE ADDRESS IT DESCRIBES
+            (approved Sales Order detail composition, 2026-09-10). Floor,
+            lift and stair carry answer "what happens when the lorry
+            reaches THIS address" — they stood on `Order info`, a card away
+            from the address they qualify, so a reader checking a
+            condominium delivery held the address in their head while they
+            went to find the floor. Nothing about the fields changed: the
+            same clamps, the same `stairCarry` POS-parity tag, the same
+            working line, moved whole. */}
+        <SubHead>Delivery access</SubHead>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
+                `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
+                registry field it stands for is "Delivery access (floor / lift /
+                stair carry)" — three questions — and the other two sat outside
+                the tag entirely.
+                That is not cosmetic. The POS-parity contract test walks
+                `POS_FORM_BUILTINS` and asserts each key's attribute appears in
+                this file; it cannot see WHAT the attribute wraps. So the test
+                reported "stair carry is covered" while checking one box of
+                three, and deleting `Lift available?` tomorrow would still pass.
+                THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
+                on a hidden `<span>` with no control behind it, and the page
+                passed a completeness test it did not meet while the office rang
+                the shop to add a disposal service. The lesson was written into
+                the comment above that door and the same defect was live twelve
+                lines away.
+                A NESTED GRID, not a wrapper div: the three fields still sit on
+                the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
+                so nothing moves on screen — and they now read as the one topic
+                they are. */}
+            <div
+              data-pos-field="stairCarry"
+              className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
+            >
+              {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
+                  The POS has clamped this since the wizard was written; this door
+                  accepted any number, so an office-keyed order could promise a
+                  carry nobody performs. */}
+              {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
+                  under the box, which reads as advice rather than as the limit
+                  the input actually enforces. One statement, in the field's own
+                  name, and the separate hint line goes with it. */}
+              <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
+                type="number" min={1} max={MAX_DELIVERY_FLOOR}
+                value={String(draft.delivery_floor)}
+                onChange={(e) =>
+                  setField(
+                    "delivery_floor",
+                    /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
+                       "office follow POS"). The floor was 0 here while the POS
+                       stepper starts at 1; the form already shows a missing
+                       floor as 1 (`?? 1`, four places), so the zero was a value
+                       only this box could type and nothing could mean. */
+                    Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
+                  )
+                } />
+            {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
+                then put a default value, rather than leaving it blank". The
+                STORED value stays null until somebody types; this shows the
+                derived default and never writes one.
+
+                ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
+                FIELD THAT NO LONGER EXISTED. They said an untouched box reads
+                `All 5 items` and that 0104's NULL means EVERY item, and warned
+                at length against defaulting to zero. Both were true when typed
+                on 2026-08-26/27 and were overturned HOURS later by YH's own
+                ruling that an unset count means NONE — which `stairCarryCount`
+                has implemented ever since, and which is why the box renders `0`.
+                A governance record that no longer describes its field is not
+                harmless: the next reader trusts it, and this one warned them off
+                the behaviour the code already had. Kept as a correction rather
+                than deleted, because the ruling it lost to is the point.
+
+                ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
+                The hint has said `0 to 5` since it was written and the box
+                accepted 99. The POS cannot produce that number — its stepper
+                stops at the item count — so an office-keyed order could hold a
+                count no shop floor could have quoted, while the working line
+                directly below priced the CLAMPED five. One card, two answers to
+                "how many items", and the saved one was the wrong one.
+                `stairCarryCount` is the same clamp the fee already runs and the
+                same one the server stamps with, imported rather than re-typed —
+                a second copy of a ceiling is how the two surfaces drifted in the
+                first place. `max` rides the input too, so the spinner and the
+                keyboard agree.
+                ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
+                is null and the item total is unknown — so the upper clamp is
+                simply not applied and the floor at zero still is. A guess at the
+                ceiling would be worse than no ceiling: it would silently cut a
+                number the operator typed correctly. Degrade, never abort. */}
+            <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
+              max={stair?.itemsTotal}
+              hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
+              value={String(draft.delivery_stair_items ?? 0)}
+              onChange={(e) =>
+                setField(
+                  "delivery_stair_items",
+                  e.target.value === ""
+                    ? null
+                    : stair
+                      ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
+                      : Math.max(0, Number(e.target.value) || 0),
+                )
+              } />
+            {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
+                2026-08-26). The POS asks `Lift available?` and offers two named
+                answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
+                Operations asked the same fact as a bare tickbox, so an unticked
+                box meant BOTH "no lift" and "nobody said", and the two surfaces
+                did not tally. Two named options, the POS's exact words, and a
+                blank that still reads as a blank. */}
+            <Select id="so-lift" label="Lift available?"
+              value={draft.delivery_has_lift ? "Has lift" : "No lift"}
+              onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
+              options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
+            </div>
+        </div>
+        {/* The three fields above, added up out loud — the POS's own sentence
+            (`pos/StairCarryFields.tsx`), so the office reads the number the
+            salesperson quoted instead of re-deriving it.
+            ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
+            the zero too — "No stair carry — floor 1 is within the free 2F" —
+            which is a sentence saying nothing happened, printed on the majority
+            of orders. The fields above already state the floor and the lift; a
+            line that only repeats them back is the noise Jess asked to cut. */}
+        {stairWorking && (
+          <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
+            {stairWorking.quoted ? (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
+                {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
+                <Money value={stairWorking.perFloorPerItem} /> ={" "}
+              </>
+            ) : (
+              <>
+                {stairWorking.items} of {stairWorking.itemsTotal} item
+                {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
+                charged{" "}
+              </>
+            )}
+            <span className="font-semibold text-base-900">
+              <Money value={stairWorking.fee} />
+            </span>
+          </p>
+        )}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4" data-pos-field="billing">
           <div className="sm:col-span-4">
             <Checkbox id="so-billing-same" label="Billing address same as delivery"
@@ -2137,91 +2281,6 @@ export default function SalesOrderWorkspace() {
       </Block>
 
       {/* ⑥ MONEY — read-only forever (ownership Law B). */}
-      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
-          Payments` had a hairline and a row of its own at the foot of the
-          card — a separator introducing one link, on a card whose entire
-          content is three numbers, and it left the fields staring at empty
-          space where the row used to be. The door now sits in the header bar
-          itself, beside the card's own name. The word is locked
-          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
-          navigates to the desk that owns collection, already scoped to this
-          order, which is the one thing Law C lets a summary add. */}
-      <Block
-        title="Money"
-        headerSlot={
-          !isNew && order ? (
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              /* The canonical Register, scoped to this order (payment
-                 MASTER §16; entry-point correction 2026-09-09). */
-              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
-            >
-              Open this order in Payment
-            </button>
-          ) : undefined
-        }
-      >
-        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
-            2026-08-15 `Total large · Paid medium · Outstanding loudest`
-            weighting). The weighting never reached the numerals anyway:
-            `<Money>` renders every amount at its `row` tone, so all three
-            digits were ALREADY 13px and only the CONTAINERS differed. Three
-            different container sizes meant three different line-heights, so
-            under `items-end` the three amounts did not sit on one line —
-            which is what read as "alignment wrong". One size on all three
-            fixes the alignment and the fallback strings at the same time.
-            Colour still separates them: Outstanding is red while owed. */}
-        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
-            last bare label-over-value pair on the page — the shape the rest of
-            the card stopped using when `Fact` took the kit's control skin. A
-            reader scanning down met boxes, boxes, boxes and then three loose
-            numbers, which reads as a different kind of thing rather than as
-            three answers this surface may not change.
-            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
-            door, and nothing here writes. The three-across grid is the same one
-            `Order info` and `Customer` use, so the amounts line up with every
-            other answer instead of packing left on a flex row.
-            Colour survives INSIDE the box: Outstanding is still red while any
-            of it is owed (owner ruling 2026-08-15), and all three keep
-            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
-            untouched. */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact
-            label="Total"
-            value={
-              <span className="text-strong text-base-900" data-testid="money-total">
-                {money.known && money.total != null ? <Money value={money.total} /> : "No price yet"}
-              </span>
-            }
-          />
-          <Fact
-            label="Paid"
-            value={
-              <span className="text-strong text-base-700" data-testid="money-paid">
-                <Money value={money.paid} />
-              </span>
-            }
-          />
-          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
-              CUSTOMER owes HQ). It is the most-read number on the page
-              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
-              (owner ruling 2026-08-15) — the colour carries that on its own,
-              at the same size as its two neighbours. */}
-          <Fact
-            label="Outstanding"
-            value={
-              <span
-                className={`text-strong ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
-                data-testid="money-outstanding"
-              >
-                {!money.known ? "No price yet" : money.outstanding > 0 ? <Money value={money.outstanding} /> : "Paid in full"}
-              </span>
-            }
-          />
-        </div>
-      </Block>
 
       {/* ② ORDER INFO */}
       {/* No subtitle (YH, 2026-08-26). The 2026-08-24 teaching line explained
@@ -2325,142 +2384,17 @@ export default function SalesOrderWorkspace() {
               </span>
             )}
           </div>
-          {/* ⭐ THE TAG COVERS THE FIELD IT NAMES (YH, 2026-09-01).
-              `data-pos-field="stairCarry"` wrapped the FLOOR box alone. The
-              registry field it stands for is "Delivery access (floor / lift /
-              stair carry)" — three questions — and the other two sat outside
-              the tag entirely.
-              That is not cosmetic. The POS-parity contract test walks
-              `POS_FORM_BUILTINS` and asserts each key's attribute appears in
-              this file; it cannot see WHAT the attribute wraps. So the test
-              reported "stair carry is covered" while checking one box of
-              three, and deleting `Lift available?` tomorrow would still pass.
-              THIS IS THE SECOND TIME. `orderAddons` carried the same attribute
-              on a hidden `<span>` with no control behind it, and the page
-              passed a completeness test it did not meet while the office rang
-              the shop to add a disposal service. The lesson was written into
-              the comment above that door and the same defect was live twelve
-              lines away.
-              A NESTED GRID, not a wrapper div: the three fields still sit on
-              the parent's own three tracks (`sm:col-span-3 sm:grid-cols-3`),
-              so nothing moves on screen — and they now read as the one topic
-              they are. */}
-          <div
-            data-pos-field="stairCarry"
-            className="grid grid-cols-1 gap-3 sm:col-span-3 sm:grid-cols-3"
-          >
-            {/* Carres does not stair-carry above floor 3 (MAX_DELIVERY_FLOOR).
-                The POS has clamped this since the wizard was written; this door
-                accepted any number, so an office-keyed order could promise a
-                carry nobody performs. */}
-            {/* The ceiling rides the LABEL (YH, 2026-08-26) — it was a hint
-                under the box, which reads as advice rather than as the limit
-                the input actually enforces. One statement, in the field's own
-                name, and the separate hint line goes with it. */}
-            <Input id="so-floor" label={`Floor (Max is ${MAX_DELIVERY_FLOOR}rd Floor)`}
-              type="number" min={1} max={MAX_DELIVERY_FLOOR}
-              value={String(draft.delivery_floor)}
-              onChange={(e) =>
-                setField(
-                  "delivery_floor",
-                  /* ⭐ THE SAME 1-TO-3 THE POS CLAMPS TO (YH, 2026-09-01 —
-                     "office follow POS"). The floor was 0 here while the POS
-                     stepper starts at 1; the form already shows a missing
-                     floor as 1 (`?? 1`, four places), so the zero was a value
-                     only this box could type and nothing could mean. */
-                  Math.min(MAX_DELIVERY_FLOOR, Math.max(1, Number(e.target.value) || 1)),
-                )
-              } />
-          {/* ⭐ THE CELL ALWAYS CARRIES A NUMBER (YH, 2026-08-27) — "no ask
-              then put a default value, rather than leaving it blank". The
-              STORED value stays null until somebody types; this shows the
-              derived default and never writes one.
-
-              ⚠️ THE TWO COMMENTS THAT STOOD HERE UNTIL 2026-09-01 DESCRIBED A
-              FIELD THAT NO LONGER EXISTED. They said an untouched box reads
-              `All 5 items` and that 0104's NULL means EVERY item, and warned
-              at length against defaulting to zero. Both were true when typed
-              on 2026-08-26/27 and were overturned HOURS later by YH's own
-              ruling that an unset count means NONE — which `stairCarryCount`
-              has implemented ever since, and which is why the box renders `0`.
-              A governance record that no longer describes its field is not
-              harmless: the next reader trusts it, and this one warned them off
-              the behaviour the code already had. Kept as a correction rather
-              than deleted, because the ruling it lost to is the point.
-
-              ⭐ AND THE CEILING IS ENFORCED, NOT JUST STATED (YH, 2026-09-01).
-              The hint has said `0 to 5` since it was written and the box
-              accepted 99. The POS cannot produce that number — its stepper
-              stops at the item count — so an office-keyed order could hold a
-              count no shop floor could have quoted, while the working line
-              directly below priced the CLAMPED five. One card, two answers to
-              "how many items", and the saved one was the wrong one.
-              `stairCarryCount` is the same clamp the fee already runs and the
-              same one the server stamps with, imported rather than re-typed —
-              a second copy of a ceiling is how the two surfaces drifted in the
-              first place. `max` rides the input too, so the spinner and the
-              keyboard agree.
-              ⛔ NO CEILING WITHOUT A COUNT. Until the catalog answers, `stair`
-              is null and the item total is unknown — so the upper clamp is
-              simply not applied and the floor at zero still is. A guess at the
-              ceiling would be worse than no ceiling: it would silently cut a
-              number the operator typed correctly. Degrade, never abort. */}
-          <Input id="so-stair-items" label="Items needing stair carry" type="number" min={0}
-            max={stair?.itemsTotal}
-            hint={stair ? `0 to ${stair.itemsTotal}` : undefined}
-            value={String(draft.delivery_stair_items ?? 0)}
-            onChange={(e) =>
-              setField(
-                "delivery_stair_items",
-                e.target.value === ""
-                  ? null
-                  : stair
-                    ? stairCarryCount(stair.itemsTotal, Number(e.target.value) || 0)
-                    : Math.max(0, Number(e.target.value) || 0),
-              )
-            } />
-          {/* ⭐ THE SAME QUESTION, ASKED THE SAME WAY ON BOTH SIDES (Jess,
-              2026-08-26). The POS asks `Lift available?` and offers two named
-              answers — `No lift` / `Has lift` (`pos/StairCarryFields.tsx`).
-              Operations asked the same fact as a bare tickbox, so an unticked
-              box meant BOTH "no lift" and "nobody said", and the two surfaces
-              did not tally. Two named options, the POS's exact words, and a
-              blank that still reads as a blank. */}
-          <Select id="so-lift" label="Lift available?"
-            value={draft.delivery_has_lift ? "Has lift" : "No lift"}
-            onValueChange={(v) => setField("delivery_has_lift", v === "Has lift")}
-            options={LIFT_OPTIONS.map((o) => ({ value: o, label: o }))} />
-          </div>
+          {/* ⭐ THE CUSTOMER'S OWN REFERENCE IS ORDER INFO, NOT CHROME
+              (approved composition, 2026-09-10). It was a grey meta line
+              floating above the cards, which is where a reader looks for page
+              chrome, not for a fact they must quote back to a customer. It is
+              `orders.source_ref` — a text[], because one customer legitimately
+              carries several spellings — and it is read-only: the importer is
+              its only writer. */}
+          {!isNew && (order?.source_ref ?? []).length > 0 && (
+            <Fact label="Customer reference" value={(order?.source_ref ?? []).join(" · ")} />
+          )}
         </div>
-        {/* The three fields above, added up out loud — the POS's own sentence
-            (`pos/StairCarryFields.tsx`), so the office reads the number the
-            salesperson quoted instead of re-deriving it.
-            ⭐ ONLY WHEN THERE IS A CHARGE (YH, 2026-08-26). It used to narrate
-            the zero too — "No stair carry — floor 1 is within the free 2F" —
-            which is a sentence saying nothing happened, printed on the majority
-            of orders. The fields above already state the floor and the lift; a
-            line that only repeats them back is the noise Jess asked to cut. */}
-        {stairWorking && (
-          <p className="mt-2 text-meta text-base-500" data-testid="so-stair-working">
-            {stairWorking.quoted ? (
-              <>
-                {stairWorking.items} of {stairWorking.itemsTotal} item
-                {stairWorking.itemsTotal === 1 ? "" : "s"} × {stairWorking.floors} floor
-                {stairWorking.floors === 1 ? "" : "s"} above {stairWorking.freeUpToFloor}F ×{" "}
-                <Money value={stairWorking.perFloorPerItem} /> ={" "}
-              </>
-            ) : (
-              <>
-                {stairWorking.items} of {stairWorking.itemsTotal} item
-                {stairWorking.itemsTotal === 1 ? "" : "s"} carried to floor {stairWorking.floor} —
-                charged{" "}
-              </>
-            )}
-            <span className="font-semibold text-base-900">
-              <Money value={stairWorking.fee} />
-            </span>
-          </p>
-        )}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CustomFields fields={tab("target").custom} values={draft.custom} onChange={setCustom} />
         </div>
@@ -2675,7 +2609,16 @@ export default function SalesOrderWorkspace() {
                   <th className="py-1 pr-3 text-left font-medium">SKU</th>
                   <th className="py-1 pr-3 text-right font-medium">Qty</th>
                   <th className="py-1 pr-3 text-left font-medium">Item</th>
-                  <th className="py-1 text-left font-medium">Deliver To</th>
+                  <th className="py-1 pr-3 text-left font-medium">Deliver To</th>
+                  {/* ⭐ THE MONEY COLUMNS RIDE THE RIGHT EDGE (approved Sales
+                      Order detail composition, 2026-09-10). The six ruled
+                      columns keep their ruled order and alignment; what the
+                      customer AGREED to pay is appended, so an operator can
+                      read the commitment without opening the PDF beside it.
+                      A free gift is a line at RM 0.00: visible as goods,
+                      charged nothing, counted nowhere twice. */}
+                  <th className="py-1 pr-3 text-right font-medium">Unit price</th>
+                  <th className="py-1 text-right font-medium">Line total</th>
                 </tr>
               </thead>
               <tbody>
@@ -2734,7 +2677,9 @@ export default function SalesOrderWorkspace() {
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
-                    <td className="py-1.5">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 pr-3">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
                   </tr>
                   );
                 })}
@@ -2794,12 +2739,31 @@ export default function SalesOrderWorkspace() {
                         />
                       )}
                     </td>
-                    <td className="py-1.5">Not recorded</td>
+                    <td className="py-1.5 pr-3">Not recorded</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
                   </tr>
                   );
                 })}
               </tbody>
             </table>
+            {/* ⭐ ONE TOTAL, AND IT IS THE CANONICAL ONE (ownership Law D).
+                `money` is `orderMoney({lineSum, addonSum})` — the SAME value
+                the register, the document and the Payments card already read,
+                never a re-sum of the rows above. Goods and services are added
+                once BETWEEN them, so a service (stair carry included, which is
+                a stamped `STAIR_CARRY` addon row since 0393) is counted in the
+                total exactly once and is never charged again as a separate
+                summary. An old Revision totals its own photograph, because
+                `money` reads the snapshot in that mode. */}
+            <div className="mt-2 flex justify-end border-t border-kit-slate-5 pt-2">
+              <div className="flex items-baseline gap-3">
+                <span className="text-label uppercase tracking-wide text-base-500">Total</span>
+                <span className="text-strong tabular-nums text-base-900" data-testid="goods-total">
+                  {money.known && money.total != null ? fmtMoney(money.total) : "No price yet"}
+                </span>
+              </div>
+            </div>
           </div>
         )}
         {/* An OLD revision is a photograph and a draft has no order to write
@@ -2819,6 +2783,90 @@ export default function SalesOrderWorkspace() {
             />
           </div>
         )}
+      </Block>
+
+      {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
+          Payments` had a hairline and a row of its own at the foot of the
+          card — a separator introducing one link, on a card whose entire
+          content is three numbers, and it left the fields staring at empty
+          space where the row used to be. The door now sits in the header bar
+          itself, beside the card's own name. The word is locked
+          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
+          navigates to the desk that owns collection, already scoped to this
+          order, which is the one thing Law C lets a summary add. */}
+      <Block
+        title="Money"
+        headerSlot={
+          !isNew && order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              /* The canonical Register, scoped to this order (payment
+                 MASTER §16; entry-point correction 2026-09-09). */
+              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
+            >
+              Open this order in Payments
+            </button>
+          ) : undefined
+        }
+      >
+        {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
+            2026-08-15 `Total large · Paid medium · Outstanding loudest`
+            weighting). The weighting never reached the numerals anyway:
+            `<Money>` renders every amount at its `row` tone, so all three
+            digits were ALREADY 13px and only the CONTAINERS differed. Three
+            different container sizes meant three different line-heights, so
+            under `items-end` the three amounts did not sit on one line —
+            which is what read as "alignment wrong". One size on all three
+            fixes the alignment and the fallback strings at the same time.
+            Colour still separates them: Outstanding is red while owed. */}
+        {/* ⭐ THE THREE AMOUNTS ARE FIELDS TOO (YH, 2026-09-01). They were the
+            last bare label-over-value pair on the page — the shape the rest of
+            the card stopped using when `Fact` took the kit's control skin. A
+            reader scanning down met boxes, boxes, boxes and then three loose
+            numbers, which reads as a different kind of thing rather than as
+            three answers this surface may not change.
+            Money stays READ-ONLY (ownership Law B): a box is a shape, not a
+            door, and nothing here writes. The three-across grid is the same one
+            `Order info` and `Customer` use, so the amounts line up with every
+            other answer instead of packing left on a flex row.
+            Colour survives INSIDE the box: Outstanding is still red while any
+            of it is owed (owner ruling 2026-08-15), and all three keep
+            `text-strong` so the numerals stay one size — the 2026-08-28 fix,
+            untouched. */}
+        <PaymentLedger orderId={isNew ? null : (orderId ?? null)} />
+        {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE
+            RIGHT EDGE ITS AMOUNTS ALREADY USE (approved composition,
+            2026-09-10). `Total` is NOT repeated here — it is stated once,
+            under the Goods table that produces it. What this card answers is
+            the collections question: how much came in, how much is still out.
+            ⭐ AND THEY ARE THE CANONICAL FIGURES, NOT A RE-SUM OF THE ROWS.
+            `money.paid` is `orders.paid` through `orderMoney` — the number
+            every gate reads. Adding the rows up here instead would be a SECOND
+            arithmetic for one fact (Law D), and it would disagree the moment a
+            row is a history mirror (`counted_in_paid: false`) or a storage
+            collection, neither of which is goods money. */}
+        <div className="mt-3 flex justify-end border-t border-kit-slate-5 pt-3">
+          <div className="grid gap-x-6 gap-y-1 text-right" style={{ gridTemplateColumns: "auto auto" }}>
+            <span className="text-label uppercase tracking-wide text-base-500">Paid</span>
+            <span className="text-strong tabular-nums text-base-700" data-testid="money-paid">
+              {fmtMoney(money.paid)}
+            </span>
+          {/* ⭐ THE CUSTOMER-MONEY WORD IS `Outstanding` (CLAUDE.md §7 — what the
+              CUSTOMER owes HQ). It is the most-read number on the page
+              (ui/MASTER.md §6.4 ⑤) and stays RED while any of it is owed
+              (owner ruling 2026-08-15) — the colour carries that on its own,
+              at the same size as its two neighbours. */}
+            <span className="text-label uppercase tracking-wide text-base-500">Outstanding</span>
+            <span
+              className={`text-strong tabular-nums ${money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"}`}
+              data-testid="money-outstanding"
+            >
+              {!money.known ? "No price yet" : money.outstanding > 0 ? fmtMoney(money.outstanding) : "Paid in full"}
+            </span>
+          </div>
+        </div>
       </Block>
 
 
@@ -3151,21 +3199,27 @@ function promisedWord(mode: Mode, rev: SalesOrderRevisionRow | null, order: Orde
   return d ? fmtDate(d) : "No delivery date";
 }
 
-function itemRows(
+/** The goods rows a Sales Order prints, with the money each line carries.
+ *  EXPORTED so the arithmetic can be tested without a DOM: a gift is a line at
+ *  price 0 and an old Revision totals its OWN photograph, and neither is
+ *  observable through the six-column table alone. */
+export function itemRows(
   mode: Mode,
   rev: SalesOrderRevisionRow | null,
   detailLines: Array<{ sku: string; qty: number; unit_price: number; label?: string | null }>,
-): Array<{ name: string; qty: number; total: number }> {
+): Array<{ name: string; qty: number; unitPrice: number; total: number }> {
   if (mode === "oldrev" && rev) {
     return (rev.snapshot.lines ?? []).map((l) => ({
       name: l.description?.trim() || l.sku,
       qty: Number(l.qty),
+      unitPrice: Number(l.unit_price),
       total: Number(l.qty) * Number(l.unit_price),
     }));
   }
   return detailLines.map((l) => ({
     name: lineName(l),
     qty: l.qty,
+    unitPrice: Number(l.unit_price),
     total: Number(l.unit_price) * Number(l.qty),
   }));
 }

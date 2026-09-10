@@ -244,12 +244,19 @@ describe("Sales Order object template contract", () => {
   it("keeps four cards, in the ruled order, with the two folds merged in", () => {
     const cards = [...workspace.matchAll(/<Block$\s+title="([^"]+)"|<Block title="([^"]+)"/gm)]
       .map((m) => m[1] ?? m[2]);
+    /* ⭐ RE-PINNED 2026-09-10 — the approved Sales Order detail composition.
+       `Money` moved from SECOND to below `Goods`. It is the same card with the
+       same locked word; what changed is that it now reads AFTER the thing it is
+       about. The order total is stated once, under the Goods table that
+       produces it, and this card answers the collections question underneath
+       it — so a reader goes value → what came in → what is still out in one
+       downward sweep instead of meeting the money before the goods. */
     expect(cards).toEqual([
       "Customer",
-      "Money",
       "Order info",
       "Sales ownership",
       "Goods",
+      "Money",
       "What this change started elsewhere",
     ]);
     /* `Emergency contact` survives as a named subsection of CUSTOMER… */
@@ -372,9 +379,16 @@ describe("Sales Order object template contract", () => {
      was a SPELLING of "only create offers the picker", and that sentence is no
      longer the rule. The invariant that survives is stated directly instead. */
   it("records a proceed date it HAS, and offers one it never recorded", () => {
+    /* ⚠️ THE END BOUNDARY MOVED WITH THE FIELDS, 2026-09-10. This span used to
+       end at `data-pos-field="stairCarry"`, which sat directly below the
+       proceed date on `Order info`. Floor / lift / stair carry are delivery
+       ACCESS facts and now sit with the address they qualify, ABOVE this card —
+       so that marker no longer bounds anything here and the slice came back
+       empty (a passing-looking assertion on ''). The card's own end is the
+       honest boundary. */
     const field = workspace.slice(
       workspace.indexOf('data-pos-field="proceedDate"'),
-      workspace.indexOf('data-pos-field="stairCarry"'),
+      workspace.indexOf('<Block title="Sales ownership">'),
     );
     /* A recorded date is a photograph, on every mode that is not create. */
     expect(field).toContain('<Fact label="Proceed date"');
@@ -659,7 +673,11 @@ describe("Sales Order object template contract", () => {
   });
 
   it("adds one READ-ONLY door to Payments, scoped to this order, riding the card's own header bar", () => {
-    expect(workspace).toContain("Open this order in Payment");
+    /* COPY-STANDARD:1771 registers `Open this order in Payments` — plural, in
+       the "use exactly" column. The screen said `Payment`, which is the kind of
+       one-letter drift a dictionary exists to stop. */
+    expect(workspace).toContain("Open this order in Payments");
+    expect(workspace).not.toContain("Open this order in Payment\n");
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
@@ -667,7 +685,12 @@ describe("Sales Order object template contract", () => {
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
     expect(money).toContain("headerSlot=");
-    expect(money).not.toContain('mt-3 flex justify-end');
+    /* THE OLD SHAPE: a second, redundant door in the card BODY. The bar under
+       the amounts is now the Paid/Outstanding pair, which is not a door — so
+       the invariant is stated as what it always meant: exactly one door, and it
+       is the header's. */
+    expect(money.match(/data-testid="workspace-open-payments"/g) ?? []).toHaveLength(1);
+    expect(money).not.toContain("Record payment");
     /* The door lives in the header now, so it renders BEFORE the three
        amounts rather than in a row underneath them. */
     expect(money.indexOf('data-testid="workspace-open-payments"')).toBeLessThan(
@@ -682,17 +705,28 @@ describe("Sales Order object template contract", () => {
      containers differed, which is exactly why the three numbers did not line
      up. The surviving invariant is what the block is FOR — three named money
      facts, one size, and red while any is owed. */
-  it("shows Total · Paid · Outstanding at ONE size, red while owed", () => {
-    expect(workspace).toContain('data-testid="money-total"');
+  it("states Paid + Outstanding under the ledger, one size, red while owed", () => {
+    /* ⭐ 2026-09-10 — `Total` LEFT THIS CARD. It is stated once, under the Goods
+       table that produces it (`data-testid="goods-total"`); repeating it beside
+       Paid would be the scattered summary the approved composition removes.
+       The two figures that remain are the collections facts. */
+    expect(workspace).toContain('data-testid="goods-total"');
+    expect(workspace).not.toContain('data-testid="money-total"');
     expect(workspace).toContain('data-testid="money-paid"');
     expect(workspace).toContain('data-testid="money-outstanding"');
-    expect(workspace).toContain('className="text-strong text-base-900" data-testid="money-total"');
-    expect(workspace).toContain('className="text-strong text-base-700" data-testid="money-paid"');
-    expect(workspace).toContain('`text-strong ${money.known && money.outstanding > 0');
-    // The retired sizes may not come back on any of the three.
-    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
+    /* One size on both, and red only while something is owed. */
+    expect(workspace).toContain('className="text-strong tabular-nums text-base-700" data-testid="money-paid"');
+    expect(workspace).toContain('`text-strong tabular-nums ${money.known && money.outstanding > 0');
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger"');
+    // The retired sizes may not come back.
+    expect(workspace).not.toContain('className="text-title text-base-900" data-testid="money-total"');
     expect(workspace).not.toContain('label="Balance"');
+    /* ⭐ EXACT AMOUNTS, TO THE CENT. `fmtMoney` is the governed spelling for
+       "what is owed, what was paid" (money-format.ts, Loo 2026-07-28); the
+       rounding `<Money>` recipe would print RM 2,500 against a ledger row of
+       RM 2,499.50 and the receipt would disagree with the screen. */
+    expect(workspace).toContain("fmtMoney(money.paid)");
+    expect(workspace).toContain("fmtMoney(money.outstanding)");
   });
 
   it("carries NO guidance banner — the amber field note and the owned Work action say it once (owner 2026-08-18)", () => {
@@ -845,13 +879,18 @@ describe("Sales Order object page — one form grammar", () => {
     expect(workspace).not.toContain("Record payment");
   });
 
-  it("boxes the three money amounts without giving Money a door", () => {
-    /* The last bare label-over-value pair on the page. `Fact` is read-only by
-       construction, so this is a SHAPE change and Law B is untouched — the
-       Money card still summarises and still writes nothing. */
-    for (const amount of ["Total", "Paid", "Outstanding"]) {
-      expect(workspace).toContain(`label="${amount}"`);
+  it("states the money amounts without giving Money a door", () => {
+    /* ⭐ 2026-09-10 — the amounts are no longer three `Fact` boxes. `Total` is
+       under Goods; `Paid` and `Outstanding` are a right-aligned pair beneath
+       the ledger they summarise, on the same right edge its `Amount` column
+       already uses, so the eye reads one column of numerals.
+       LAW B IS UNTOUCHED, which is the invariant this test exists for: the
+       card still summarises and still writes nothing. */
+    expect(workspace).toContain("<PaymentLedger orderId=");
+    for (const amount of ["Paid", "Outstanding"]) {
+      expect(workspace).toContain(`>${amount}</span>`);
     }
+    expect(workspace).toContain('data-testid="goods-total"');
     /* Colour and size survive INSIDE the box: red while owed (owner ruling
        2026-08-15), one `text-strong` on all three (YH, 2026-08-28). */
     expect(workspace).toContain('money.known && money.outstanding > 0 ? "text-danger" : "text-base-900"');
@@ -953,6 +992,107 @@ describe("Sales Order object page — one form grammar", () => {
     /* The POS half of the same rule, so the parity is asserted and not
        assumed: both surfaces reach the one shared clamp. */
     expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
+  });
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE APPROVED SALES ORDER DETAIL COMPOSITION — 2026-09-10.
+     Four moves, each of which puts a fact beside the fact it belongs with.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  it("keeps delivery ACCESS with the address it describes, not on Order info", () => {
+    /* Floor / lift / stair carry qualify ONE address. They sat on `Order info`,
+       a card away from it. The whole `stairCarry` group moved under the
+       `Delivery address` subsection — the clamps, the POS-parity tag and the
+       working line unchanged. */
+    expect(workspace).toContain("<SubHead>Delivery access</SubHead>");
+    const customerCard = workspace.slice(
+      workspace.indexOf('title="Customer"'),
+      workspace.indexOf('<Block title="Order info">'),
+    );
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"']) {
+      expect(customerCard, `${id} sits with the address`).toContain(id);
+    }
+    /* …and the working line came with them, so the fee is explained where the
+       three fields that produce it are read. */
+    expect(customerCard).toContain('data-testid="so-stair-working"');
+    /* Order info is left with what the CUSTOMER asked for: dates. */
+    const orderInfo = workspace.slice(
+      workspace.indexOf('<Block title="Order info">'),
+      workspace.indexOf('<Block title="Sales ownership">'),
+    );
+    expect(orderInfo).not.toContain('id="so-floor"');
+  });
+
+  it("groups the customer's own reference under Order info, not in page chrome", () => {
+    /* `orders.source_ref` is a text[] — one customer legitimately carries
+       several spellings — and it is read-only: the importer is its only
+       writer. It was a grey meta line floating above the cards. */
+    const orderInfo = workspace.slice(
+      workspace.indexOf('<Block title="Order info">'),
+      workspace.indexOf('<Block title="Sales ownership">'),
+    );
+    expect(orderInfo).toContain('<Fact label="Customer reference"');
+    expect(orderInfo).toContain('(order?.source_ref ?? []).join(" · ")');
+    /* THE OLD SHAPE: the same fact as chrome. */
+    expect(workspace).not.toContain('<div className="px-1 text-meta text-base-500">');
+  });
+
+  it("states the agreed price and the line total on the goods rows, right-aligned", () => {
+    const goods = workspace.slice(
+      workspace.indexOf('<Block title="Goods">'),
+      workspace.indexOf('data-testid="goods-total"'),
+    );
+    for (const label of ["Unit price", "Line total"]) {
+      expect(goods).toContain(`>${label}</th>`);
+    }
+    /* Numerals right-aligned and tabular, so a column of money reads as one. */
+    expect(goods).toContain('text-right font-medium">Unit price</th>');
+    expect(goods).toContain('text-right font-medium">Line total</th>');
+    expect(goods).toContain("{fmtMoney(r.unitPrice)}");
+    expect(goods).toContain("{fmtMoney(r.total)}");
+    /* A SERVICE row carries the same two columns off `order_addons`, so the
+       table has one shape down its whole length. */
+    expect(goods).toContain("{fmtMoney(Number(a.unit_price ?? 0))}");
+    /* The six ruled columns are untouched and still present. */
+    for (const label of ["Category", "Unit ID", "SKU", "Qty", "Item", "Deliver To"]) {
+      expect(goods).toContain(`>${label}</th>`);
+    }
+  });
+
+  it("states ONE total, under the table that produces it, from the canonical rule", () => {
+    expect(workspace).toContain('data-testid="goods-total"');
+    /* ⛔ NEVER A RE-SUM OF THE PRINTED ROWS. `money` is `orderMoney`, the same
+       value the register and the document read (Law D). */
+    expect(workspace).toContain("money.known && money.total != null ? fmtMoney(money.total) : \"No price yet\"");
+    /* And it is stated ONCE — the Money card no longer repeats it. */
+    expect(workspace).not.toContain('data-testid="money-total"');
+  });
+
+  it("reads the payment ledger without ever gaining a form for it (Law B)", () => {
+    expect(workspace).toContain("<PaymentLedger orderId=");
+    const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
+    /* Every column the approved composition names. */
+    for (const label of ["Date", "Method", "Amount", "Reference", "Receipt", "Slip", "Recorded by"]) {
+      expect(ledger).toContain(`>${label}</th>`);
+    }
+    /* ⛔ A SUMMARY MAY NEVER GAIN A FORM. Recording, voiding and refunding are
+       Payment's acts; the only control here opens a slip somebody uploaded. */
+    for (const write of [
+      "useRecordPayment", "useVoidPayment", "useRefund", "<form", "Record payment", "Void payment",
+    ]) {
+      expect(ledger, `the ledger must not write (${write})`).not.toContain(write);
+    }
+    /* `Voided` IS allowed and is the point: it is the read-only stamp on a
+       reversed row, not a control. The banned list above is write AFFORDANCES,
+       and the distinction is the whole of Law B. */
+    expect(ledger).toContain("Voided");
+    /* A VOIDED ROW IS NOT MONEY, and no reader spells `voided_at` itself. */
+    expect(ledger).toContain("isLivePayment(p)");
+    expect(ledger).not.toContain("p.voided_at ==");
+    /* Amounts to the cent — the receipt may not disagree with the screen. */
+    expect(ledger).toContain("fmtMoney(Number(p.amount ?? 0))");
+    /* The method word and the slip door are the drawer's own, imported. */
+    expect(ledger).toContain('from "@/lib/payment-display"');
   });
 
   it("keeps the card title's mono/uppercase/flame treatment off ordinary subsection headings", () => {
