@@ -620,6 +620,20 @@ describe("Purchase Order object", () => {
     expect(panes.firstElementChild?.className).toContain("min-w-0");
   });
 
+  it("shows the print-data refusal and corrective action instead of a generic PDF error", async () => {
+    vi.mocked(apiFetch).mockRejectedValue({
+      body: { code: "destination_address_missing", message: "No address on file for this PO's destination" },
+    });
+    try {
+      renderPage("/operation/procurement?po=PO-20260828-4827");
+      expect(await screen.findByText("No address on file for this PO's destination")).toBeInTheDocument();
+      expect(screen.getByText(/Ask Purchasing to add the address/)).toBeInTheDocument();
+      expect(screen.queryByText("The official PDF could not be opened")).toBeNull();
+    } finally {
+      vi.mocked(apiFetch).mockResolvedValue({});
+    }
+  });
+
   it("wears the Sales Order's card heading and keeps the long Unit ID list last (2026-09-04)", () => {
     renderPage("/operation/procurement?po=PO-20260828-4827");
     const facts = screen.getByTestId("po-document-panes").firstElementChild!;

@@ -4,7 +4,7 @@
 // list chrome around the same register, contrary to the Sales Orders template.
 import { useCallback, useMemo, useState } from "react";
 import "./purchase-order-detail.css";
-import registerStyles from "../PurchasingRegister.module.css";
+import registerStyles from "./PurchaseOrdersRegister.module.css";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
 import { ArrowLeft, Download, FileCheck2, RotateCcw, PanelLeftOpen, X } from "lucide-react";
 import {
@@ -1489,16 +1489,27 @@ function RouteProblem({ title, problem, action, onRetry }: { title: string; prob
 function OfficialPreview({ poId }: { poId: string }) {
   /* The same blob `Download PDF` saves, painted as pages. The header already
      names the PO, so the paper carries no caption strip of its own. */
+  const [refusal, setRefusal] = useState<{ wrong: string; todo: string } | null>(null);
   const render = useCallback(async () => {
-    const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
-    return renderPoPdf(data);
+    setRefusal(null);
+    try {
+      const data = await apiFetch<PoTemplateData>(`/api/operation/pos/${encodeURIComponent(poId)}/print-data`);
+      return await renderPoPdf(data);
+    } catch (error) {
+      const body = (error as { body?: { message?: string; action?: string; code?: string } } | null)?.body;
+      if (body?.message || body?.code) {
+        const fallback = purchasingRefusal(body.code, { po: poId });
+        setRefusal({ wrong: body.message ?? fallback.wrong, todo: body.action ?? fallback.todo });
+      }
+      throw error;
+    }
   }, [poId]);
   const { pdfError, setPane, retry } = usePdfCanvases(poId, render);
   return (
     <div className="mx-auto w-full max-w-[700px]">
       {pdfError ? (
         <div className="mb-3">
-          <ReadProblem problem="The official PDF could not be opened" action="Try again. If it still fails, ask the system owner to check the PO document." onRetry={retry} />
+          <ReadProblem problem={refusal?.wrong ?? "The official PDF could not be opened"} action={refusal?.todo ?? "Try again. If it still fails, ask the system owner to check the PO document."} onRetry={retry} />
         </div>
       ) : null}
       <div ref={setPane} data-testid="pdf-pane" aria-label="Official purchase order preview" />

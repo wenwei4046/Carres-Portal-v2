@@ -1022,6 +1022,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               onRowDoubleClick={openOrder}
               contextMenu={rowMenu}
               expandable={{
+                flush: true,
                 renderExpansion,
                 testId: (o) => `so-batch-expand-${o.orderId}`,
               }}

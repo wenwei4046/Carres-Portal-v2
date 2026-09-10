@@ -1093,6 +1093,12 @@ describe("the expansion — the ONE shared child table", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
     expect(within(box).getByTestId("goods-mini-table")).toBeInTheDocument();
+    const expansionCell = box.closest("td")!;
+    const parentRow = expansionCell.parentElement!.previousElementSibling!;
+    expect(expansionCell.colSpan).toBe(parentRow.children.length - 2);
+    expect(expansionCell.parentElement!.children).toHaveLength(3);
+    expect(expansionCell.previousElementSibling).toHaveAttribute("data-testid", "grid-expansion-gutter-__expand__");
+    expect(expansionCell).toHaveStyle({ padding: "0px" });
     /* The exact item-to-PO/supplier/destination/date mapping. */
     const first = within(box).getByTestId("so-batch-part-H1401S-K");
     expect(first).toHaveTextContent("PO-20260820-1111");

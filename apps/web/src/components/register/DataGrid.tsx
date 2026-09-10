@@ -278,6 +278,8 @@ export type DataGridProps<T> = {
   expandable?: {
     /** Render the sub-row body. Return null to render an empty row. */
     renderExpansion: (row: T) => ReactNode;
+    /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
+    flush?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -1673,7 +1675,7 @@ function DataGridInner<T>({
                  one — but HORIZONTAL padding is exactly what the gutter cells
                  replaced, so it stays at zero: the left edge is the first data
                  column's, the right edge is the parent table's. */
-              style={{ padding: "12px 0", borderTop: "1px solid var(--line)" }}
+              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
               {expandable.renderExpansion(row)}
             </td>
