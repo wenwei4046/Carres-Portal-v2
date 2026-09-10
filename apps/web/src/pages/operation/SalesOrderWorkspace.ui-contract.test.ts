@@ -288,15 +288,19 @@ describe("Sales Order object template contract", () => {
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038
-     rules it read-only on both surfaces. */
-  it("answers new-or-existing inside the Customer card, and still never lets it be typed", () => {
+     rules it read-only on both surfaces. It now actually rides the header bar
+     (it only sat in the body before), sharing the card title's own font size
+     and face so the two labels read as one header. */
+  it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
-    const start = workspace.indexOf('<Block title="Customer">');
+    const start = workspace.indexOf('<Block\r\n        title="Customer"');
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
-    expect(customer).not.toContain("headerSlot=");
-    expect(customer).toContain('mb-2 flex justify-start');
+    expect(customer).toContain("headerSlot=");
     expect(customer).toContain('data-testid="customer-type-chip"');
+    expect(customer).toContain(
+      'className="font-mono text-label uppercase tracking-[0.08em] text-signature-700"',
+    );
     expect(workspace).not.toContain('label="Customer type (auto)"');
     expect(workspace).toContain("customerTypeWord");
     /* The accent is spent once, on the tab underline — a chip may not take it. */
@@ -654,16 +658,19 @@ describe("Sales Order object template contract", () => {
     expect(workspace).not.toContain("Report a customer, product, delivery or installation problem.");
   });
 
-  it("adds one READ-ONLY door to Payments, scoped to this order, and no money form", () => {
+  it("adds one READ-ONLY door to Payments, scoped to this order, riding the card's own header bar", () => {
     expect(workspace).toContain("Open this order in Payment");
     expect(workspace).toContain("/finance/payments?order=");
     expect(workspace).not.toContain("Record payment");
     expect(workspace).not.toContain("Collect $");
-    const start = workspace.indexOf('<Block title="Money">');
+    const start = workspace.indexOf('<Block\r\n        title="Money"');
     const money = workspace.slice(start, workspace.indexOf('</Block>', start));
-    expect(money).not.toContain("headerSlot");
-    expect(money).toContain('mt-3 flex justify-end');
-    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeGreaterThan(
+    expect(start).toBeGreaterThan(-1);
+    expect(money).toContain("headerSlot=");
+    expect(money).not.toContain('mt-3 flex justify-end');
+    /* The door lives in the header now, so it renders BEFORE the three
+       amounts rather than in a row underneath them. */
+    expect(money.indexOf('data-testid="workspace-open-payments"')).toBeLessThan(
       money.indexOf('data-testid="money-outstanding"'),
     );
   });
@@ -948,40 +955,29 @@ describe("Sales Order object page — one form grammar", () => {
     expect(stairCarry).toContain("Math.min(itemsTotal, parsed)");
   });
 
-  it("gives every heading on the page one colour and one face", () => {
-    /* YH, 2026-09-01: "card headers should have the same color".
-       They did not. A card title was `text-base-900` in the mono face and a
-       subsection heading was `text-base-600` in the UI face, so on one card
-       the reader met two kinds of heading and had to read the SHADE to work
-       out whether the second was a section or a field label.
-       Same colour, same face, same tracking; the hierarchy moves to SIZE,
-       which is where it belongs — a subsection is a smaller instance of the
-       same thing rather than a different species. */
-    /* ⭐ AND THE COLOUR IS THE BRAND'S (YH, 2026-09-02 — "I asked for color on
-       the card titles"). One shade for every heading was the first half; this
-       is the second. `signature-700` is flame-dark, an EXISTING declared token
-       — no new value is invented, which §2 of the Constitution locks.
-       ⛔ WHY NOT ANY OTHER HUE. `index.css`:187 assigns every colour a job:
-       flame = action, blue = selection, green/amber/red = status, and §2.2
-       adds "decoration by hue is not a job". Every hue in the system is
-       spoken for, so a heading painted blue would read as selected and one
-       painted amber as a warning. Flame-dark is the one tone that carries the
-       brand without carrying a JOB — a heading is not an action, so it cannot
-       be mistaken for the one flame CTA the page is allowed. */
+  it("keeps the card title's mono/uppercase/flame treatment off ordinary subsection headings", () => {
+    /* A card TITLE (`CUSTOMER`, `MONEY`, …) is the one shouting heading per
+       card: mono face, uppercase, tracked, flame-dark (`signature-700`,
+       `01-design-tokens.md` §2 — an existing declared token, no new value).
+       `SubHead` (`Delivery address`, `Emergency contact`) sits INSIDE that
+       card and previously copied the same shouting treatment at a smaller
+       size — which made a reader read the SHADE/face to tell a section from
+       the card's own name. It now renders as the ordinary field-group
+       heading (`text-strong`, `01-design-tokens.md` §1): the ordinary face,
+       the ordinary case, one step down in size from the card title. */
     const title = "font-mono text-strong uppercase tracking-[0.08em] text-signature-700";
-    const sub = "font-mono text-label uppercase tracking-[0.08em] text-signature-700";
+    const sub = "text-strong text-base-900";
     expect(workspace, "the card title").toContain(title);
     expect(workspace, "the subsection heading").toContain(sub);
-    /* THE OLD SHAPE: a lighter, different-faced subsection. Pinned on the
-       heading's OWN class string — `text-label font-semibold text-base-600`
-       alone also matches the goods table's Category cell, which is a cell and
-       not a heading and is deliberately untouched. */
+    /* THE OLD SHAPE: the subsection heading copying the card title's own
+       shouting treatment. */
     expect(workspace).not.toContain(
-      "gap-x-2 text-label font-semibold text-base-600 first:mt-0",
+      "gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700",
     );
-    /* ⛔ AND NOT THE ACCENT. `01-design-tokens.md` §2.2 spends blue once per
-       screen and the tab underline already holds it; a blue heading would be
-       the second spend and the current thing would stop standing out. */
+    /* ⛔ AND NOT THE ACCENT ON A CARD TITLE. `01-design-tokens.md` §2.2 spends
+       blue once per screen and the tab underline already holds it; a blue
+       card title would be the second spend and the current thing would stop
+       standing out. */
     expect(workspace).not.toContain("uppercase tracking-[0.08em] text-kit-blue");
     /* Nor any status hue, for the same reason. */
     for (const job of ["text-kit-green", "text-kit-amber", "text-kit-red", "text-danger"]) {

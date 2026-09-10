@@ -1,29 +1,4 @@
-/* Match the bright purchasing registers without changing the PO object. */
+/* Compatibility entry point for the shared purchasing register theme. */
 .page {
   composes: page from "../PurchasingRegister.module.css";
-  background: #f7f8fa;
-  color: #1f2937;
-}
-
-.page [data-testid="po-register-content"] [data-testid="sales-orders-grid"] {
-  --c-paper: #ffffff;
-  --c-cream: #f7f8fa;
-  --c-ink: #1f2937;
-  --line: #d5dce4;
-  --fg-muted: #667085;
-  --fg-soft: #667085;
-  --kit-blue-3: #f3f8fc;
-  color: #1f2937;
-}
-
-.page [data-testid="po-register-content"] [data-testid="grid-header"],
-.page [data-testid="po-register-content"] [data-testid="grid-header"] th {
-  background: #f1f4f7;
-  color: #1f2937;
-  border-color: #d5dce4;
-  font-weight: 600;
-}
-
-.page [data-testid="po-register-content"] [data-testid="grid-parent-row"] > td {
-  border-color: #d5dce4;
 }

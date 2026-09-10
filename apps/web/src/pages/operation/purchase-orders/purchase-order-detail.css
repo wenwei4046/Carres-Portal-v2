@@ -36,7 +36,6 @@
   color: #94a3b8;
 }
 
-.so-detail-style .so-customer-status,
 .so-detail-style [data-testid="subhead-delivery-address"],
 .so-detail-style [data-testid="subhead-emergency-contact"] {
   color: #334155;
