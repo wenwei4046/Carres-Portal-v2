@@ -2704,3 +2704,35 @@ Before merging a UI change:
 - [ ] Zero jargon (rule 9).
 - [ ] Tooltips do not repeat the label.
 - [ ] Dates go through `fmtDate()`.
+
+---
+
+## Finance ledger words — PROPOSAL, awaiting owner review
+
+*PROPOSAL / NOT LAW. Each word is what the build put on screen; the owner may replace any of them.
+Falsifier: a Finance user reads one of these and does not know what it means or does.*
+
+### Money in that is not a sale — Other debtors and Other receipts (migration 0478)
+
+| Word | Meaning |
+|---|---|
+| `Other debtors` | Finance destination: parties that are not customers and owe Carres money, and the invoices raised to them. |
+| `Other receipts` | Finance destination: money into our bank or cash that is not customer order money (loan in, director's money, other income, or payment of an other debtor invoice). |
+| `Party` / `Parties` | Someone Carres bills or receives money from who is neither a customer nor a supplier — a sister company, a lender, a director. |
+| `Company or person` · `SSM or IC number` | The party's kind and its registration number. |
+| `New invoice` · `New party` · `New receipt` | The one create action on each register (Row 2). |
+| `Issue invoice` | Gives the draft its ARI number and adds its total to what the party owes. Asks first. |
+| `Save draft` | Keeps the invoice without a number; it owes nothing yet. |
+| `Cancel invoice` | A draft simply stops. An issued invoice is reversed on its own date by the finance approver. |
+| `Record receipt` | Records money received; it gets its RV number at once. Asks first. Same verb as `Record payment`. |
+| `Cancel receipt` | The finance approver reverses a receipt; the invoices it paid owe that money again. |
+| `Draft` · `Issued` · `Cancelled` | An other debtor invoice's status. |
+| `Recorded` · `Cancelled` | An other receipt's status (the database words `posted` / `voided` never reach the screen). |
+| `Draft — no number yet` | The Invoice No cell of a draft. |
+| `Not issued yet` · `Paid in full` | The Outstanding cell of a draft, and of an issued invoice with nothing left to pay. |
+| `Outstanding` | Extended here: what a party that is not a customer still owes on issued invoices. `Balance` stays banned. |
+| `What for` | The column saying what an invoice or receipt was for, in the chart's own account names. |
+| `Received from` · `Received into` · `Payer name` | Who paid; which bank or cash account the money went into; the payer when there is no party. |
+| `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
+| `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
+| `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |

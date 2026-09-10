@@ -85,6 +85,7 @@ import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financeExceptionsRouter from "./routes/finance/exceptions";
 import financeReconciliationRouter from "./routes/finance/reconciliation";
+import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
@@ -265,6 +266,8 @@ api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
 api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
+// Money in that is not a sale (0478): other debtor invoices and receipts.
+api.route("/finance/other-money-in", financeOtherMoneyInRouter);
 // The one money blocker on a delivery order (0355, owner ruling 2026-08-16).
 // Mounted before the catch-all `/finance` reconciliation router below.
 api.route("/finance/exceptions", financeExceptionsRouter);

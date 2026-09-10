@@ -11,6 +11,8 @@ import FinanceRefunds from "./FinanceRefunds";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
+import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
+import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -60,6 +62,10 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          {/* 0478 — money in that is not a sale: other debtor invoices and
+              other receipts. Finance only; customer money stays in Payments. */}
+          <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />
+          <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>
