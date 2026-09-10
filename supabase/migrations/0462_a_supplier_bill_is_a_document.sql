@@ -1124,7 +1124,7 @@ as $fn$
 declare
   v_go_live date;
 begin
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'accounts payable is internal'
       using errcode = '42501', detail = 'not_internal';
   end if;
@@ -1198,7 +1198,7 @@ as $fn$
 declare
   v_go_live date;
 begin
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'accounts payable is internal'
       using errcode = '42501', detail = 'not_internal';
   end if;
@@ -1243,7 +1243,7 @@ revoke all on public.payment_voucher_allocations from anon, authenticated;
 
 -- ...then give the READ back. `revoke all` plus a select policy cancel out:
 -- with no SELECT privilege the policy is never consulted and no internal user
--- can see a bill at all. The grant is what makes is_internal() below mean
+-- can see a bill at all. The grant is what makes gl_may_read() below mean
 -- something. Insert, update and delete stay revoked, and no write policy
 -- exists for anyone.
 grant select on public.supplier_bills              to authenticated;
@@ -1252,13 +1252,13 @@ grant select on public.payment_vouchers            to authenticated;
 grant select on public.payment_voucher_allocations to authenticated;
 
 create policy supplier_bills_read_internal
-  on public.supplier_bills for select using (public.is_internal());
+  on public.supplier_bills for select using (public.gl_may_read());
 create policy supplier_bill_lines_read_internal
-  on public.supplier_bill_lines for select using (public.is_internal());
+  on public.supplier_bill_lines for select using (public.gl_may_read());
 create policy payment_vouchers_read_internal
-  on public.payment_vouchers for select using (public.is_internal());
+  on public.payment_vouchers for select using (public.gl_may_read());
 create policy payment_voucher_allocations_read_internal
-  on public.payment_voucher_allocations for select using (public.is_internal());
+  on public.payment_voucher_allocations for select using (public.gl_may_read());
 
 revoke all on function public.has_finance_approver(uuid)            from public, anon;
 revoke all on function public.ap_refuse_before_go_live(date, text)  from public, anon;

@@ -598,7 +598,7 @@ security definer
 set search_path = public, pg_temp
 as $fn$
 begin
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'gl_trial_balance_check refused: internal roles only'
       using errcode = '42501', detail = 'gl_trial_balance_check_forbidden';
   end if;
@@ -663,11 +663,11 @@ grant select on public.gl_entry_lines to authenticated;
 
 drop policy if exists gl_entries_read_internal on public.gl_entries;
 create policy gl_entries_read_internal on public.gl_entries
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 
 drop policy if exists gl_entry_lines_read_internal on public.gl_entry_lines;
 create policy gl_entry_lines_read_internal on public.gl_entry_lines
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 
 -- ── 7 · sanity ───────────────────────────────────────────────────────────────
 do $sanity$

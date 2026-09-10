@@ -161,7 +161,7 @@ revoke all on public.gl_payment_account_map from anon, authenticated;
 grant select on public.gl_payment_account_map to authenticated;
 drop policy if exists gl_payment_account_map_read_internal on public.gl_payment_account_map;
 create policy gl_payment_account_map_read_internal on public.gl_payment_account_map
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 -- No insert/update/delete policy, for anyone. gl_map_payment_account is the door.
 
 

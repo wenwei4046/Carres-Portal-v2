@@ -179,7 +179,7 @@ revoke all on public.gl_income_account_map from anon, authenticated;
 grant select on public.gl_income_account_map to authenticated;
 drop policy if exists gl_income_account_map_read_internal on public.gl_income_account_map;
 create policy gl_income_account_map_read_internal on public.gl_income_account_map
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 -- No insert/update/delete policy, for anyone. gl_map_income_account is the door.
 
 
@@ -800,7 +800,7 @@ declare
   v_pre_amt   numeric(12,2) := 0;
   v_missing   text[] := array[]::text[];
 begin
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'gl_receivables_reconcile refused: internal roles only'
       using errcode = '42501', detail = 'gl_receivables_reconcile_forbidden';
   end if;
@@ -1116,7 +1116,7 @@ begin
     raise exception '0464 sanity: the posting helper is callable directly';
   end if;
 
-  -- NOT exercised here: gl_receivables_reconcile guards on is_internal(), and a
+  -- NOT exercised here: gl_receivables_reconcile guards on gl_may_read(), and a
   -- migration runs with no auth.uid(), so calling it would refuse and roll the
   -- whole file back. Its one-row-always property is a property of its body —
   -- every return path goes through the single `return query` at the end.

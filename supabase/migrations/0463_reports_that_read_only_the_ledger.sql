@@ -45,7 +45,7 @@
 --   ② Asking for a date before go-live returns an explicit BEFORE_GO_LIVE row,
 --     never an empty set. "No rows" and "the ledger had not started yet" look
 --     identical to a reader and mean completely different things.
---   ③ It re-checks `is_internal()` in its own body and RAISES. It fails CLOSED.
+--   ③ It re-checks `gl_may_read()` in its own body and RAISES. It fails CLOSED.
 --     A caller with no session gets an error, never a clean empty table that
 --     reads as "the business did nothing".
 --   ④ Nothing is materialised. Every call recomputes from posted rows
@@ -86,7 +86,7 @@ begin
   -- FAIL CLOSED. An unauthenticated or non-internal caller gets an exception,
   -- not an empty result. An empty result is indistinguishable from a quiet
   -- month, and a permission failure must never be able to look like one.
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'gl reports are internal only'
       using errcode = '42501';
   end if;
@@ -914,7 +914,7 @@ declare
   v_fails         int := 0;
 begin
   -- Fail closed, same as every other report here.
-  if not public.is_internal() then
+  if not public.gl_may_read() then
     raise exception 'gl reports are internal only'
       using errcode = '42501';
   end if;

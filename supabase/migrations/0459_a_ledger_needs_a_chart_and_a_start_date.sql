@@ -20,7 +20,7 @@
 --      Retire the last child of a header and it stays a header — it cannot
 --      silently become postable behind everyone's back.
 --
---   ② A START LINE (ruling L). The ledger opens on 2026-10-01. Everything before
+--   ② A START LINE (ruling L). The ledger opens on 2026-09-10. Everything before
 --      that date belongs to AutoCount and the Master Sheet and is never posted.
 --      The date is configurable because a go-live slips; it may be pushed FORWARD
 --      and never dragged back, and once one entry exists it is frozen outright.
@@ -45,6 +45,36 @@
 -- `principal`, not for anyone. Reads are internal; writes go through the
 -- `security definer` functions or they do not happen.
 -- =============================================================================
+
+-- ── 0 · who may read the ledger ──────────────────────────────────────────────
+--
+-- Not `is_internal()`. That helper admits `operation` and `bd` as well as
+-- finance and principal (0266_disabled_accounts_actually_lose_access.sql:103),
+-- and the ledger carries what the company earns, what it owes and what every
+-- customer still has not paid. Owner ruling, 10 Sep 2026: only Finance sees
+-- Finance.
+--
+-- This reads through `app_role()`, which since 0266:93 returns null for a
+-- disabled account — so revoking somebody's access revokes their sight of the
+-- ledger in the same breath, with nothing else to remember.
+--
+-- Widening this later is one line. Discovering that operations could read the
+-- profit and loss all along is not.
+create or replace function public.gl_may_read()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $fn$
+  select coalesce(public.app_role() in ('finance','principal'), false)
+$fn$;
+
+comment on function public.gl_may_read() is
+  'Who may read the general ledger and its reports: finance and principal only, and only while their account is active. Deliberately narrower than is_internal(), which also admits operation and bd. Owner ruling 10 Sep 2026.';
+
+revoke all on function public.gl_may_read() from public, anon;
+grant execute on function public.gl_may_read() to authenticated;
 
 -- ── 1 · the chart ────────────────────────────────────────────────────────────
 create table public.gl_accounts (
@@ -238,7 +268,7 @@ revoke all on function public.gl_set_go_live(date) from anon;
 grant execute on function public.gl_set_go_live(date) to authenticated;
 
 -- ── 6 · the start line itself ────────────────────────────────────────────────
-insert into public.gl_config (id, go_live_on) values (true, date '2026-10-01');
+insert into public.gl_config (id, go_live_on) values (true, date '2026-09-10');
 
 -- ── 7 · the prefixes, claimed once ───────────────────────────────────────────
 insert into public.gl_doc_series (prefix, description) values
@@ -324,13 +354,13 @@ grant select on public.gl_doc_series   to authenticated;
 grant select on public.gl_doc_counters to authenticated;
 
 create policy gl_accounts_read_internal on public.gl_accounts
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 create policy gl_config_read_internal on public.gl_config
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 create policy gl_doc_series_read_internal on public.gl_doc_series
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 create policy gl_doc_counters_read_internal on public.gl_doc_counters
-  for select using ((select public.is_internal()));
+  for select using ((select public.gl_may_read()));
 
 -- ── 10 · sanity ──────────────────────────────────────────────────────────────
 do $sanity$
@@ -366,8 +396,8 @@ begin
   end if;
 
   select go_live_on into v_date from public.gl_config where id;
-  if v_date is distinct from date '2026-10-01' then
-    raise exception '0459 sanity: go-live is %, expected 2026-10-01', v_date;
+  if v_date is distinct from date '2026-09-10' then
+    raise exception '0459 sanity: go-live is %, expected 2026-09-10', v_date;
   end if;
 
   select count(*) into v from public.gl_doc_series where prefix in ('JE','SB','PV');
@@ -411,5 +441,5 @@ begin
     raise exception '0459 sanity: gl_set_go_live callable by anon';
   end if;
 
-  raise notice '0459 OK: the ledger has a chart, a start line of 2026-10-01, and one numbering registry';
+  raise notice '0459 OK: the ledger has a chart, a start line of 2026-09-10, and one numbering registry';
 end $sanity$;
