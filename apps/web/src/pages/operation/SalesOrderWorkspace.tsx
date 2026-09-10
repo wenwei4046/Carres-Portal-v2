@@ -758,27 +758,15 @@ export function Block({
  * MASTER.md's block order names the section). So the section keeps its exact
  * word and loses only its border, its own 24px gap and its second heading rule.
  *
- * Deliberately quieter than a card title: `text-label` against the card's
- * `text-strong`, so one card still reads as one thing.
+ * Deliberately quieter than a card title: the ordinary field-group heading
+ * (`text-strong`, `01-design-tokens.md` §1) rather than the card title's own
+ * mono/uppercase treatment — one "shouting" heading per card, and this reads
+ * as a smaller instance of the same body text.
  */
 function SubHead({ children, note }: { children: React.ReactNode; note?: string }) {
-  /* ⭐ ONE COLOUR FOR EVERY HEADING ON THE PAGE (YH, 2026-09-01 — "card
-     headers should have the same color").
-     They did not. A card title was `text-base-900` in the mono face; a
-     subsection heading was `text-base-600` in the UI face — so on one card the
-     reader met two different kinds of heading and had to work out from the
-     shade whether the second one was a section or a field label. The `Services`
-     label that used to sit inside `Goods` was a third shade again.
-     THE COLOUR IS THE CARD TITLE'S OWN, and no new token is added. The accent
-     is deliberately NOT used: `01-design-tokens.md` §2.2 spends blue once per
-     screen and the tab underline already holds it, so a blue heading here would
-     be the second spend and the current thing would stop standing out.
-     THE HIERARCHY MOVES TO SIZE, which is where it belongs. Same face, same
-     tracking, same colour, one step down in size — a subsection reads as a
-     smaller instance of the same thing rather than as a different species. */
   return (
     <p
-      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 font-mono text-label uppercase tracking-[0.08em] text-signature-700 first:mt-0"
+      className="mb-2 mt-4 flex flex-wrap items-baseline gap-x-2 text-strong text-base-900 first:mt-0"
       data-testid={`subhead-${String(children).replace(/\s+/g, "-").toLowerCase()}`}
     >
       {children}
@@ -1956,17 +1944,20 @@ export default function SalesOrderWorkspace() {
           contact` and `Money`; a reader looking up "where does this go" had to
           pass two unrelated sections to find it. It is the same party's fact,
           so it is the same card, under its own locked name. */}
-      <Block title="Customer">
-          {customerBuiltins["customerType"]?.enabled !== false ? (
-            <div className="mb-2 flex justify-start" data-pos-field="customerType">
-              <span
-                className="so-customer-status font-mono text-label uppercase tracking-[0.08em]"
-                data-testid="customer-type-chip"
-              >
-                {customerTypeWord}
-              </span>
-            </div>
-          ) : null}
+      <Block
+        title="Customer"
+        headerSlot={
+          customerBuiltins["customerType"]?.enabled !== false ? (
+            <h2
+              className="font-mono text-label uppercase tracking-[0.08em] text-signature-700"
+              data-pos-field="customerType"
+              data-testid="customer-type-chip"
+            >
+              {customerTypeWord}
+            </h2>
+          ) : undefined
+        }
+      >
         {/* ⭐ THREE ACROSS (YH, 2026-08-27) — the six identity fields were two
             per row, which made the card six rows tall for facts that are one
             line each. At three they land as exactly two rows: who they are,
@@ -2149,11 +2140,27 @@ export default function SalesOrderWorkspace() {
       {/* ⭐ THE DOOR RIDES THE TITLE (YH, 2026-09-01). `Open this order in
           Payments` had a hairline and a row of its own at the foot of the
           card — a separator introducing one link, on a card whose entire
-          content is three numbers. The word is locked (COPY-STANDARD:1595) and
-          unchanged; only the row is gone. It still writes nothing: it
+          content is three numbers, and it left the fields staring at empty
+          space where the row used to be. The door now sits in the header bar
+          itself, beside the card's own name. The word is locked
+          (COPY-STANDARD:1595) and unchanged. It still writes nothing: it
           navigates to the desk that owns collection, already scoped to this
           order, which is the one thing Law C lets a summary add. */}
-      <Block title="Money">
+      <Block
+        title="Money"
+        headerSlot={
+          !isNew && order ? (
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
+            >
+              Open this order in Payment
+            </button>
+          ) : undefined
+        }
+      >
         {/* ⭐ THREE AMOUNTS, ONE SIZE (YH, 2026-08-28 — overwrites the
             2026-08-15 `Total large · Paid medium · Outstanding loudest`
             weighting). The weighting never reached the numerals anyway:
@@ -2212,18 +2219,6 @@ export default function SalesOrderWorkspace() {
             }
           />
         </div>
-        {!isNew && order ? (
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              data-testid="workspace-open-payments"
-              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
-              onClick={() => navigate(`/operation?tab=payments&so=${order.so}`)}
-            >
-              Open this order in Payment
-            </button>
-          </div>
-        ) : null}
       </Block>
 
       {/* ② ORDER INFO */}
