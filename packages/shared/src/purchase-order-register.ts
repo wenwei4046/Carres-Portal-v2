@@ -1,5 +1,9 @@
 import { addWorkingDays, countWorkingDays } from "./working-days";
-import { PURCHASING_OFFICE_OFF_DAYS } from "./purchasing-supplier-calls";
+import {
+  PURCHASING_OFFICE_OFF_DAYS,
+  tomorrowDeliveryCallOf,
+  type SupplierCallPo,
+} from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 import type { WorkItem } from "./work-engine";
@@ -220,5 +224,99 @@ export function purchaseOrderReplyWorkItems(
     ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
     tone: passed ? "warning" : "info", locked: false, broken: false,
     dueIso: due, workingDaysLate: due && due < today ? countWorkingDays(due, today, options) : 0,
+  }];
+}
+
+/**
+ * ⭐ THE ADVANCE ARRIVAL CHECK, IN SHARED WORK (owner ruling 2026-09-10).
+ *
+ * `purchasing.confirm_tomorrows_delivery` has been a defined rule
+ * (`work-engine.ts`) with a real engine (`tomorrowDeliveryCallOf`) since it
+ * was written, and the only thing that ever read that engine was the Purchase
+ * Orders PAGE. So the obligation existed, computed correctly, and reached
+ * nobody's Work list: the duty holder had to open one register to discover a
+ * call that the shared projection never told them about.
+ *
+ * This is the missing consumer, and deliberately nothing more. The trigger,
+ * the due and the reopen-on-a-moved-date behaviour are NOT restated here —
+ * `tomorrowDeliveryCallOf` owns that arithmetic and this function calls it
+ * (Law D: a derived fact has ONE arithmetic). What is added is the half the
+ * page never needed: the resolved PO Duty owner, so the row reaches the
+ * person whose duty it is rather than whoever happens to open the register.
+ *
+ * A MISSING CRON IS NOT WHAT WAS WRONG. Shared Work derives at READ time, the
+ * same as every sibling projection; there was simply no projection for this
+ * rule.
+ */
+export function purchaseOrderArrivalCheckWorkItems(
+  input: {
+    id: string;
+    supplierId: string;
+    supplierName: string;
+    status: "open" | "received" | "cancelled";
+    /** OUR predicted arrival — `expectedArrivalOf`'s production + transit
+     *  result, as persisted on `purchase_orders.eta_date`. No anchor, no
+     *  call: nothing is invented to stand in for it. */
+    etaDateIso: string | null;
+    /** The date the latest recorded arrival answer was ABOUT. A factory that
+     *  moves the day again makes the old answer an answer about nothing, and
+     *  the call reopens — that rule lives in `tomorrowDeliveryCallOf`. */
+    tomorrowAnswerAboutDateIso: string | null;
+    lines: readonly { qty: number; receivedQty: number }[];
+  },
+  owner: WorkspaceDutyResolution | null,
+  today: string,
+  holidays: ReadonlySet<string> = myHolidaySet(),
+): WorkItem[] {
+  /* The call engine reads only status, the anchor, the answer's about-date
+   * and each line's outstanding quantity. The remaining `SupplierCallLine`
+   * fields belong to the per-LINE balance call, which this projection does
+   * not raise, so they are filled with their own "nothing recorded" values
+   * rather than invented identifiers. */
+  const po: SupplierCallPo = {
+    poId: input.id,
+    supplierId: input.supplierId,
+    status: input.status,
+    etaDateIso: input.etaDateIso,
+    tomorrowAnswerAboutDateIso: input.tomorrowAnswerAboutDateIso,
+    lines: input.lines.map((line, i) => ({
+      id: `${input.id}#${i}`,
+      sku: "",
+      qty: line.qty,
+      receivedQty: line.receivedQty,
+      shortSinceIso: null,
+      balanceAnswerAboutQty: null,
+    })),
+  };
+  const call = tomorrowDeliveryCallOf(po, { todayIso: today, holidays });
+  if (!call) return [];
+  const options = { offDays: PURCHASING_OFFICE_OFF_DAYS, holidays };
+  return [{
+    ruleKey: "purchasing.confirm_tomorrows_delivery",
+    module: "purchasing",
+    soRef: input.id,
+    orderId: input.id,
+    /* The governed queue word, with the supplier's real name from the data —
+     * never a hard-coded carrier (COPY-STANDARD, purchasing queue words). */
+    action: `Call ${input.supplierName} — confirm tomorrow's delivery`,
+    ownerRule: "po_duty",
+    ownerDutyKey: "po_duty",
+    normalOwner: owner?.normalOwner ?? null,
+    activeCover: owner?.activeCover ?? null,
+    actingPerson: owner?.actingPerson ?? null,
+    ownerState: owner?.state ?? "not_assigned",
+    ownerName: owner?.actingPerson?.name ?? null,
+    ownerUserId: owner?.actingPerson?.userId ?? null,
+    ...(owner?.actingPerson ? {} : { ownerDuty: "PO Duty" }),
+    /* Late only once the check day has passed — `late` is the call engine's
+     * own verdict, so the row and the register can never disagree. */
+    tone: call.late ? "warning" : "info",
+    locked: false,
+    broken: false,
+    dueIso: call.dueIso,
+    workingDaysLate:
+      call.dueIso && call.dueIso < today
+        ? countWorkingDays(call.dueIso, today, options)
+        : 0,
   }];
 }

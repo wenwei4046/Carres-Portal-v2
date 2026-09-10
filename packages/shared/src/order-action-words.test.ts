@@ -348,13 +348,25 @@ describe("purchasing action words — the dictionary, verbatim", () => {
     // Loo's own reason for ruling them (2026-07-29). A relative word would be a
     // sentence about a day that has already passed.
     expect(tomorrowDeliveryAnswerLabel("shipping", "Wed, 5 Aug 26"))
-      .toBe("It ships on Wed, 5 Aug 26");
+      .toBe("It arrives on Wed, 5 Aug 26");
     expect(tomorrowDeliveryAnswerLabel("delayed", "Wed, 5 Aug 26"))
-      .toBe("It ships later than Wed, 5 Aug 26");
+      .toBe("It arrives later than Wed, 5 Aug 26");
     for (const a of ["shipping", "delayed"] as const) {
       expect(tomorrowDeliveryAnswerLabel(a, "Wed, 5 Aug 26")).not.toMatch(
         /\b(tomorrow|today|yesterday|now|soon)\b/i,
       );
+    }
+  });
+
+  it("the answers name ARRIVAL, never shipping — the date they carry is eta_date", () => {
+    // Owner ruling 2026-09-10. The call is anchored on `eta_date`, which is
+    // production + transit; a shipping verb on it invites the transit leg to
+    // be added twice. A real dispatch/ready day has its own door.
+    for (const a of ["shipping", "delayed"] as const) {
+      expect(tomorrowDeliveryAnswerLabel(a, "Wed, 5 Aug 26")).not.toMatch(
+        /\b(ship|ships|shipping|shipped|dispatch|dispatched|leaves)\b/i,
+      );
+      expect(tomorrowDeliveryAnswerLabel(a, "Wed, 5 Aug 26")).toMatch(/\barrives\b/);
     }
   });
 

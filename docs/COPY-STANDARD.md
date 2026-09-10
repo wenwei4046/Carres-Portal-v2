@@ -572,7 +572,7 @@ question, the answers are locked strings like any other:
 | Action | The question | The answers | The queue tooltip |
 |---|---|---|---|
 | `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date — decide before anyone calls (Delay planning)` |
-| `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It ships on {date}` · `It ships later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
+| `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It arrives on {date}` · `It arrives later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
 
 Both answers name **the promised date** rather than "yes" and "no", because the reader must
 not have to remember what was asked.
@@ -583,6 +583,16 @@ when the user opens the action."* The action opens the working day before the go
 stays open until somebody answers it — so a relative word is only true on the first day.
 `Shipping tomorrow`, answered two days late, is a sentence about a day that has already passed.
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
+
+**AND THE VERB NAMES ARRIVAL (owner ruling 2026-09-10, replacing the retired `It ships on
+{date}` · `It ships later than {date}`).** `{date}` was always the expected arrival — the line
+above already said so — while the sentence said `ships`, and a shipping verb on an arrival date
+is the one reading that makes a reader add the transit leg a second time and move the arrival
+twice. The answers now read **`It arrives on {date}`** · **`It arrives later than {date}`**.
+A supplier answer that genuinely names a factory-ready or dispatch day is a DIFFERENT fact with
+its own door (`Confirm ready date` → `expected_ready_date`) and becomes an arrival only through
+the governed transit calculation. The stored `shipping` answer value is unchanged: it is a
+ledger value, never a word on a screen.
 
 **The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
 model, 2026-08-29). `Confirm supplier delivery`, `Supplier has not confirmed the PO date`,

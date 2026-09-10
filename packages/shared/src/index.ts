@@ -3039,7 +3039,10 @@ export * from "./purchase-order-register";
 
 export { recordSupplierReplyInput } from "./schemas/operation";
 
-export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+export {
+  purchaseOrderReplyWorkItems,
+  purchaseOrderArrivalCheckWorkItems,
+} from "./purchase-order-register";
 
 export * from "./warehouse-inbound";
 
