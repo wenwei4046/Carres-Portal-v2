@@ -1179,7 +1179,7 @@ is on the shelf for it*.
   impossible — the door recomputes and refuses — but the operator's next move is now the
   recalculated quantity rather than an error.
 
-**THE PRODUCTION PROOF (2026-09-11).** Migration `0473` applied through the governed path, and its
+**THE PRODUCTION PROOF (2026-09-11, re-measured on `64a16a9e` after the Manual Purchase refactor merged over it).** Migration `0473` applied through the governed path, and its
 live `md5(prosrc)` reconciles with the committed file body — production runs the SQL this repository
 carries, not a hand-retyped copy. A **rolled-back probe** as the operation actor refused a
 deliberately mismatched pick with `sqlstate=22023 · unit_does_not_match_line ·
