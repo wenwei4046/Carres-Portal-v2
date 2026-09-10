@@ -3044,3 +3044,5 @@ export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
 export * from "./warehouse-inbound";
 
 export * from "./arrival-source";
+
+export * from "./warehouse-settings";

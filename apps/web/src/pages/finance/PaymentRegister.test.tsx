@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PaymentRegister from "./PaymentRegister";
 
 const state = vi.hoisted(() => ({ data: [] as unknown[], isLoading: false, isError: false,
-  refetch: vi.fn(), error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})) }));
+  refetch: vi.fn(), isSuccess: true, error: null as Error | null, sheet: vi.fn((_data: unknown) => ({})) }));
 vi.mock("xlsx", () => ({ utils: { json_to_sheet: state.sheet, book_new: () => ({}),
   book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
 vi.mock("@/lib/queries", () => ({
@@ -40,16 +40,17 @@ beforeEach(() => {
   state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-060926-0002", amount: 100,
     voided_at: "2026-09-06", void_reason: "Duplicate" }];
   state.isError = false;
+  state.isSuccess = true;
   state.isLoading = false;
   state.error = null;
   state.sheet.mockClear();
   duty.me = null; duty.role = "operation"; duty.actor = null;
   localStorage.clear();
 });
-function show() {
+function show(at = "/finance/payments") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>
-    <MemoryRouter><PaymentRegister /></MemoryRouter>
+    <MemoryRouter initialEntries={[at]}><PaymentRegister /></MemoryRouter>
   </QueryClientProvider>);
 }
 describe("Payments Register", () => {
@@ -240,3 +241,101 @@ describe("the §11 history axes", () => {
   });
 });
 
+/**
+ * ⭐ ONE ORDER'S MONEY (entry-point correction, 2026-09-09).
+ *
+ * The Sales Order's `Open this order in Payment` door and every bookmark of
+ * the retired `/operation?tab=payments&so=` desk arrive here asking about ONE
+ * order. Without the scope they would open a list of every payment Carres has
+ * ever taken — which is not an answer, it is the operator's search problem
+ * handed back to them.
+ */
+describe("Payments Register — the order scope", () => {
+  it("shows only the scoped order, and says which one", () => {
+    state.data = [
+      payment,
+      { ...payment, id: "p9", receipt_no: "RC-060926-0009",
+        orders: { id: "o9", so: 999, customer_name: "Another Customer" } },
+    ];
+    show("/finance/payments?order=123");
+    expect(screen.getByTestId("payment-register-order-scope")).toHaveTextContent("SO-123 only");
+    expect(screen.getByText("RC-060926-0001")).toBeInTheDocument();
+    expect(screen.queryByText("RC-060926-0009")).not.toBeInTheDocument();
+  });
+
+  it("leaves the scope on one control, and the whole list comes back", () => {
+    state.data = [
+      payment,
+      { ...payment, id: "p9", receipt_no: "RC-060926-0009",
+        orders: { id: "o9", so: 999, customer_name: "Another Customer" } },
+    ];
+    show("/finance/payments?order=123");
+    fireEvent.click(screen.getByRole("button", { name: "Show all payments" }));
+    expect(screen.getByText("RC-060926-0009")).toBeInTheDocument();
+    expect(screen.queryByTestId("payment-register-order-scope")).not.toBeInTheDocument();
+  });
+
+  it("carries the scope across the toolbar switch to Invoices", () => {
+    show("/finance/payments?order=123");
+    expect(screen.getByRole("link", { name: "Invoices" }))
+      .toHaveAttribute("href", "/finance/invoices?order=123");
+  });
+
+  it("says the order is empty rather than showing an empty portal", () => {
+    state.data = [{ ...payment, orders: { id: "o9", so: 999, customer_name: "Another" } }];
+    show("/finance/payments?order=123");
+    expect(screen.getByText("No payment is recorded on SO-123 yet.")).toBeInTheDocument();
+  });
+
+  it("is absent when nothing is scoped — the unscoped listing is unchanged", () => {
+    show();
+    expect(screen.queryByTestId("payment-register-order-scope")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Invoices" }))
+      .toHaveAttribute("href", "/finance/invoices");
+  });
+});
+
+/* Measured on production 2026-09-09: the Invoices Register footer read
+   `1 invoices · RM 2,499.00 still needed`. A count interpolated straight into
+   a plural noun is the tell that nobody read the line aloud, and the operator
+   reads this one every day. Both Registers now agree with themselves. */
+describe("the footer counts in English", () => {
+  it("says one payment, not one payments", () => {
+    state.data = [payment];
+    show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("1 payment · RM 200.00 received");
+  });
+  it("still says payments for none and for many", () => {
+    state.data = [];
+    const { unmount } = show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("0 payments");
+    unmount();
+    state.data = [payment, { ...payment, id: "p2", receipt_no: "RC-2" }];
+    show();
+    expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("2 payments");
+  });
+});
+
+/**
+ * ⭐ NO CONFIRMED ANSWER IS NOT AN EMPTY LIST — measured on production
+ * 2026-09-09, and the reason this module keeps re-learning it.
+ *
+ * React Query PAUSES a query rather than erroring it, and a paused query
+ * reports `status:"pending" · fetchStatus:"paused" · isError:false ·
+ * data:undefined`. `isLoading` is `isPending && isFetching`, so it is FALSE
+ * while paused — and the grid drew its definitive `No payments yet` with a
+ * `RM 0.00` total over a read that had never finished. The register must speak
+ * only from a successful read.
+ */
+describe("a read that has not succeeded never reads as zero", () => {
+  it("shows the loading grid, not the empty message, and states no total", () => {
+    state.isSuccess = false;
+    state.isError = false;
+    state.isLoading = false; // exactly what a PAUSED query reports
+    state.data = undefined as never;
+    show();
+    expect(screen.queryByText(/No payments yet/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("grid-footer")).toHaveTextContent("Loading…");
+    expect(screen.queryByText(/RM 0\.00/)).not.toBeInTheDocument();
+  });
+});

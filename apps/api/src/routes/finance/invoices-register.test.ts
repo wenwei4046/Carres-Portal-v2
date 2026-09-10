@@ -5,6 +5,7 @@ import { _setJwksForTesting } from "../../middleware/auth";
 
 vi.mock("../../lib/supabase", () => ({ userClient: vi.fn() }));
 import { userClient } from "../../lib/supabase";
+import { selectIsWellFormed, INVOICE_REGISTER_SELECT_FOR_TEST } from "./invoices";
 
 const env = {
   SUPABASE_URL: "https://t.x",
@@ -420,3 +421,50 @@ describe("GET /api/finance/invoices/statement/:orderId", () => {
   });
 });
 
+
+/**
+ * ⭐ THE SELECT IS A GRAMMAR, AND THE COMPILER DOES NOT READ IT (2026-09-09).
+ *
+ * Production truth measured this day: `GET /api/finance/invoices/register`
+ * returned HTTP 500 on every call, and the Invoices Register drew
+ * `No invoices yet · RM 0.00 still needed` over the failure. The cause was two
+ * missing `+` operators in `INVOICE_REGISTER_SELECT` (PR #1169, 2026-09-08):
+ * adjacent string literals are NOT concatenated, so ASI ended the expression
+ * at the first one and the select silently became
+ *
+ *   …,ops_order_control(balance,confirmed_date,line_etas,line_stock_status,
+ *
+ * — an unclosed embedded resource with a dangling comma, which PostgREST
+ * rejects. It typed, it built, it deployed, and it shipped a dead destination.
+ *
+ * These assertions run on the real constant, so the next dropped `+` fails
+ * here instead of in production.
+ */
+describe("INVOICE_REGISTER_SELECT is a well-formed select", () => {
+  it("closes every embedded resource it opens", () => {
+    expect(selectIsWellFormed(INVOICE_REGISTER_SELECT_FOR_TEST)).toBe(true);
+  });
+
+  it("carries the storage columns the 2026-09-08 correction added", () => {
+    for (const column of [
+      "storage_from", "storage_fee_override", "storage_fee_msbf",
+      "storage_fee_sof", "storage_collected_at", "storage_waiver_status",
+    ]) {
+      expect(INVOICE_REGISTER_SELECT_FOR_TEST).toContain(column);
+    }
+  });
+
+  it("catches the exact truncation that shipped, and the shapes beside it", () => {
+    // The production string, byte for byte.
+    expect(selectIsWellFormed(
+      "id,orders(id,so,ops_order_control(balance,line_stock_status,",
+    )).toBe(false);
+    expect(selectIsWellFormed("id,orders(so),")).toBe(false);
+    expect(selectIsWellFormed("id,orders(,so)")).toBe(false);
+    expect(selectIsWellFormed("id,orders(so,)")).toBe(false);
+    expect(selectIsWellFormed("id,,orders(so)")).toBe(false);
+    expect(selectIsWellFormed("id,orders(so))")).toBe(false);
+    // And a healthy one still passes.
+    expect(selectIsWellFormed("id,orders(so,ops_order_control(balance))")).toBe(true);
+  });
+});

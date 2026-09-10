@@ -7,6 +7,10 @@ vi.mock("./SalesOrderSettings", () => ({ default: () => <div>Sales settings</div
 vi.mock("./OperationPurchasingSettings", () => ({ default: () => <div>Purchasing settings</div> }));
 vi.mock("./IssueTrackerSettings", () => ({ default: () => <div>Issue settings</div> }));
 vi.mock("./PaymentSettings", () => ({ default: () => <div>Payment settings</div> }));
+vi.mock("./WarehouseSettings", async () => {
+  const actual = await vi.importActual<typeof import("./WarehouseSettings")>("./WarehouseSettings");
+  return { ...actual, default: () => <div>Warehouse settings</div> };
+});
 
 describe("SettingsWorkspace navigation", () => {
   it("uses canonical central module routes from a nested settings destination", () => {
@@ -111,5 +115,63 @@ describe("SettingsWorkspace rail — the governed shell", () => {
     renderAt();
     expect(screen.getByTestId("settings-rail")).toBeInTheDocument();
     spy.mockRestore();
+  });
+});
+
+/* The Warehouse group owns FIVE rows — the card's five sections of one page,
+   not five module settings pages (owner card 2026-09-09). */
+describe("SettingsWorkspace — the Warehouse group", () => {
+  const renderAt = (path: string) =>
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/operation/settings/*" element={<SettingsWorkspace />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("lists the five sections under ONE `Warehouse` group heading", () => {
+    renderAt("/operation/settings/warehouse/details");
+    expect(
+      screen.getByText("Warehouse", { selector: "[data-settings-group]" }),
+    ).toBeInTheDocument();
+    for (const [label, slug] of [
+      ["Warehouse Details", "details"],
+      ["Working Hours", "working-hours"],
+      ["Public Holidays", "public-holidays"],
+      ["Special Dates", "special-dates"],
+      ["Access", "access"],
+    ] as const) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+        "href",
+        `/operation/settings/warehouse/${slug}`,
+      );
+    }
+  });
+
+  it("renders the page at a Warehouse section — never an empty placeholder", () => {
+    renderAt("/operation/settings/warehouse/access");
+    expect(screen.getByText("Warehouse settings")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Access" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("lands `/warehouse` on Warehouse Details rather than nothing", () => {
+    renderAt("/operation/settings/warehouse");
+    expect(screen.getByRole("link", { name: "Warehouse Details" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("leaves every other module on exactly one row", () => {
+    renderAt("/operation/settings/sales-orders");
+    for (const name of [
+      "Sales Order Settings",
+      "Purchasing Settings",
+      "Payment Settings",
+      "Issue Tracker Settings",
+    ]) {
+      expect(screen.getAllByRole("link", { name })).toHaveLength(1);
+    }
   });
 });

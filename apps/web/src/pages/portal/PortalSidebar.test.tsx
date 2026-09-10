@@ -204,8 +204,28 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     renderAt("/operation");
     const row = child("payments");
     expect(row.tagName).toBe("A");
-    expect(row).toHaveAttribute("href", "/operation?tab=payments");
     expect(screen.queryByTestId("nav-module-finance")).not.toBeInTheDocument();
+  });
+
+  /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER (2026-09-09).
+     The row pointed at `/operation?tab=payments` — the Master-Sheet Balance
+     desk with its own Summary, queues and editable balance/storage fields —
+     for the whole time the approved Register lived at `/finance/payments`.
+     This is the assertion that failed to exist: the rail was tested for its
+     SHAPE and never for its DESTINATION. */
+  it("Payments opens the canonical Register, never the retired desk", () => {
+    renderAt("/operation");
+    const row = child("payments");
+    expect(row).toHaveAttribute("href", "/finance/payments");
+    expect(row.getAttribute("href")).not.toContain("tab=payments");
+  });
+
+  it("the Payments row stays lit on both Register listings", () => {
+    for (const path of ["/finance/payments", "/finance/invoices"]) {
+      const { unmount } = renderAt(path);
+      expect(child("payments").className).toContain("bg-kit-blue-3");
+      unmount();
+    }
   });
 });
 

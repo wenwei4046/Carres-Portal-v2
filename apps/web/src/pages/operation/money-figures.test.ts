@@ -29,7 +29,13 @@ const DIR = dirname(fileURLToPath(import.meta.url));
 /** The files holding the five surfaces that print what a customer owes. */
 const LANE = [
   "OperationOrdersControl.tsx",
-  "OperationPayments.tsx",
+  // The Master-Sheet Balance desk (`OperationPayments.tsx`) was deleted on
+  // 2026-09-09 when the everyday `Payments` row started opening the canonical
+  // Register. Its place in this lane belongs to the surface that prints those
+  // figures now — reached from HERE by relative path, because the lane is a
+  // list of files in this folder and the Register lives in `../finance`.
+  "../finance/PaymentRegister.tsx",
+  "../finance/InvoiceRegister.tsx",
   "OperationDelivery.tsx",
 ] as const;
 

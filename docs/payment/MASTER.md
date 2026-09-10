@@ -263,9 +263,10 @@ Operation informed customer. Payment may show linked read-only history; it does 
 **OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is
 production-verified and the §16/§17 registers, objects, actions, Settings and Calendar are
 deployed with exact-SHA proof and local walks, but the governed acceptance is not complete:
-the authenticated production walk, the complete §16 message assembly (blocked on the
-owner-approved Important Notes wording), Reports, Stripe convergence, the storage journeys and
-the Refund/Recon retirement remain open below.
+the complete §16 message assembly (blocked on the owner-approved Important Notes wording),
+Stripe convergence and the production VISUAL pass remain open below. **The everyday entry point
+was corrected on 2026-09-09** — until then the sidebar `Payments` row still opened the retired
+Master-Sheet desk, so none of the deployed §16 work reached the operator by its normal route.
 
 ### Production-verified — Customer payment posting convergence
 
@@ -285,6 +286,142 @@ Production evidence, reconfirmed 2026-09-03: migration
 entrance, idempotency mapping, role gate and void contract; focused web tests prove the shared money
 states and Finance reader; the production ERP, POS, both Pages projects and API Worker reported the
 same deployed `main` SHA.
+
+### PRODUCTION-VERIFIED — the entry point and the Invoices repair, 2026-09-09
+
+Walked authenticated on the deployed ERP as `principal@carres.com`. ERP page and API Worker both
+reported `a7db9fbc` (`de30da24` entry point + `a7db9fbc` Invoices repair; verified by ANCESTRY —
+a sibling merge landed between them).
+
+| Walked | Result |
+|---|---|
+| Sidebar `Payments` row | `href="/finance/payments"` — was `/operation?tab=payments` on `5da8dab3` |
+| Clicking it | the canonical Register: `Payments · Invoices` toolbar, eight columns, read-only |
+| Summary band · Queues | **gone** (were `Balance owing RM 134,060` · `Collect/Waiting stock/Stock late/Storage running`) |
+| Editable fields on the destination | **0** — were **106**, including per-row `bal RM 0` / `storage RM 0` |
+| Toolbar → Invoices | `INV-FIX-3208 · SO-1313 · RM 2,499.00 · Arrival not confirmed · Sun, 4 Oct` |
+| Invoice date cell → Calendar | opens `?view=calendar&date=2026-10-04&so=…&from=delivery`, October month rail, the SO highlighted on its day, `Back to Invoices` |
+| `/operation?tab=payments&so=1313` | lands on `/finance/payments?order=1313`, chip `SO-1313 only` + `Show all payments`, honest `No payment is recorded on SO-1313 yet.` |
+| Toolbar switch under scope | `/finance/invoices?order=1313` — the scope survives |
+
+**THE ZERO WAS A LIE, AND THE REPAIR PROVED IT.** Before `a7db9fbc` the Invoices Register drew
+`0 invoices · RM 0.00 still needed`; after it, the same page drew `1 invoice · RM 2,499.00 still
+needed`. There was always an invoice. The 500 hid it and the screen reported the hiding as zero.
+That is the strongest available argument for the absent-is-not-zero law: the lie was not
+detectable from the screen, only from the read behind it.
+
+**The Payments Register's own zero is TRUE**, and was checked rather than assumed:
+`GET /api/finance/payments/register` answers `{"rows":[],"total":0}` at HTTP 200. No canonical
+receipt has been posted in production, which is what CLAUDE.md §6 expects of a clean-start
+database.
+
+**Corrected in the same pass:** both Register footers said `1 invoices` / `1 payments` — a count
+interpolated straight into a plural noun, on the line an operator reads every day.
+
+**AND THE REASON THE ERROR BRANCH NEVER FIRED — root-caused, 2026-09-09.** The branch is not
+broken; it was never reached. React Query **PAUSES** a query rather than erroring it, and a paused
+query reports `status:"pending" · fetchStatus:"paused" · isError:false · data:undefined` — read
+live off the React fiber on the deployed page, with the failure reproduced by forcing the endpoint
+to 500 in one tab. Because `isLoading` is `isPending && isFetching`, **`isLoading` is FALSE while
+paused**, so `DataGrid` suppressed neither its empty message nor its footer, and
+`rows = query.data ?? []` supplied the empty list. The screen therefore asserted
+`0 invoices · RM 0.00 still needed` from a read that had never finished.
+
+**Fixed:** both Registers pass `isLoading={!query.isSuccess}` — skeleton and `Loading…` until the
+answer is real. Each carries a test that fails against `query.isLoading`, verified by reverting.
+
+**This is a portal-wide pattern, not an Invoices bug.** Seven registers outside Payment still pass
+`isLoading={query.isLoading}` and will read a paused read as a confirmed zero — listed with the
+one-line fix in `docs/carry-forwards.md`. They belong to Purchasing, Receiving, Warehouse and
+Suppliers and are left to their owners.
+
+### 🔴 FOUND BY THE PRODUCTION WALK — the Invoices Register was dead, 2026-09-09
+
+**Measured, not inferred.** The authenticated walk that verified the entry point above went on
+through the Register toolbar to Invoices and found `GET /api/finance/invoices/register` returning
+**HTTP 500 on every call** — both Worker hosts, the app's own request included — while the page
+drew `No invoices yet. A prepared or issued invoice will appear here.` and
+`0 invoices · RM 0.00 still needed`, with no alert and no `Try again`.
+
+**That is the ABSENT-IS-NOT-ZERO failure stated as law elsewhere in this file: a read that failed
+was painted as an empty list and RM 0.00.** An operator would have concluded Carres has no
+invoices.
+
+**Root cause — two missing `+` operators**, `apps/api/src/routes/finance/invoices.ts`, shipped by
+PR #1169 (`e36e0f11`, 2026-09-08, the void-is-not-a-waiver storage correction). Adjacent string
+literals are not concatenated in JavaScript: ASI ended the expression at the first one and
+evaluated the rest away, so `INVOICE_REGISTER_SELECT` silently became
+
+```
+…,ops_order_control(balance,confirmed_date,line_etas,line_stock_status,
+```
+
+— seven open parentheses against five closed, a dangling comma, and all six storage columns
+absent. PostgREST rejects it, the route throws its own 500, and the destination is dead. **It
+typed, it built, it passed CI and it deployed.** The route's own 31 tests all pass against the
+truncated string, because every one of them mocks the Supabase client and none reads the select.
+
+**Fixed and guarded.** The operators are restored and `selectIsWellFormed` now asserts the real
+constant: every embedded resource closes, no dangling or doubled separator, and the storage
+columns are present. Reverting either `+` fails that test. A PostgREST select is a nested grammar
+carried in a hand-built string that no compiler reads — the guard is the only thing that can.
+
+**Consequence for the entry point above.** From 2026-09-08 to 2026-09-09 the Invoices Register and
+the §17 Calendar behind its date cells were unreachable in production. The entry-point correction
+did not cause this and did not depend on it; it is what made the walk find it.
+
+### THE ENTRY POINT — the everyday `Payments` row opens the Register, 2026-09-09
+
+**The gap this closes, stated plainly.** Every §16/§17 surface above was built, deployed and
+proved at `/finance/*` — and the sidebar row an operator actually clicks every day still opened
+`/operation?tab=payments`, the Master-Sheet "Balance" collections desk. So the approved Payment
+experience was, from the operator's chair, not delivered: they saw a Summary band, queue chips
+and EDITABLE balance and storage-fee fields, and never reached the Register at all. Building a
+better page at a second address is not replacing the first one.
+
+**Why it survived so long.** `PortalSidebar.test.tsx` asserted the row's SHAPE — that `Payments`
+is a plain row and not a chevron hiding one child — and never once asserted where it went. A
+rail test that never checks a destination cannot fail when the destination is wrong.
+
+**The ruling applied.** `docs/ERP-ARCHITECTURE.md` ownership Law C — *a door, never a duplicate;
+two forms for one act make two records*. The desk was the second form for recording and editing
+customer money. It is deleted, not deprecated, not hidden behind a flag.
+
+**What now happens (this change):**
+
+* The Operations rail's `Payments` row links to `/finance/payments` — the canonical read-only
+  Register — and stays lit across both of its listings. §12 already admits operation staff to
+  Payments and Invoices, and `FinanceApp` already bounces them off every finance-only page.
+* `Payments · Invoices` remains the Register toolbar's own switch (§16), so the rail keeps ONE
+  Finance row; a second rail row for Invoices would be a second control for one act.
+* The §17 Calendar keeps its approved entry: the Invoice `Expected arrival` and
+  `Customer Delivery` date cells.
+* `/operation?tab=payments` forwards to `/finance/payments`. The desk's `?so=<SO No>` scope
+  travels with it as `?order=<SO No>`, which both Registers read — the Sales Order's
+  `Open this order in Payment` door and the shared route engine's Money door now spell it that
+  way. `?so=` was NOT reused: §17 already spends it on the Calendar's highlighted order, where
+  it holds an `order_id` UUID. The scope narrows the LISTING only; the Invoice object, Inspect
+  and the record-payment composition keep the complete set, because they derive one customer's
+  money across their Sales Orders.
+* Deleted: `OperationPayments.tsx`, `payments-money-state.ts` and their tests. The word-scan and
+  money-rounding guards that watched the desk were moved onto the two Registers rather than
+  deleted with it — a retired surface must never take a live guard with it.
+
+**NOTHING WAS SILENTLY REMOVED — checked write door by write door.** The desk held exactly ONE
+mutation: `PATCH /api/operation/orders/:id/control` writing `balance` and `storage_fee_override`
+from two free-text cells on every listing row (measured on the deleted file: 106 editable inputs
+on the live production page, 2026-09-09). That is the capability §13 already names an
+**intentional reject** — *arbitrary outstanding/storage edit*. The route is untouched and both
+fields keep their governed homes: `storage_fee_override` in the Order Detail Drawer and the
+Orders Control page, and the approved storage path remains the §7 waiver ladder on the Invoice.
+Every canonical §16 action — Record payment · Ask to pay · Send receipt · Print receipt · Payment
+link · Correct allocation · Void — already lives on the Payment and Invoice objects the Registers
+open. Historical money is untouched in the database, and the Payments Register IS the §11 history
+surface (gap item 26). Operation access is unchanged: §12's route guard already admits operation
+staff to `/finance/payments` and `/finance/invoices`.
+
+Nothing about money arithmetic, the Delivery gate, permissions or the Register/object designs
+changed here. This is the destination correction only.
 
 ### Deployed — the Payments Register answers the Finance door, 2026-09-06
 

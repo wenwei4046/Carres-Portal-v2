@@ -1,3 +1,37 @@
+## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
+
+**Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
+
+React Query PAUSES a query rather than erroring it. A paused query reports
+`status:"pending" · fetchStatus:"paused" · isError:false · data:undefined`, and because
+`isLoading` is `isPending && isFetching`, **`isLoading` is FALSE while paused.** A register that
+passes `isLoading={query.isLoading}` to `DataGrid` therefore draws its definitive empty message —
+and its footer total — over a read that never finished. Measured live: the Invoices Register
+printed `0 invoices · RM 0.00 still needed` while its read was paused. There was an invoice.
+
+**The fix, one line per register:** `isLoading={!query.isSuccess}` — the grid shows its skeleton
+and the footer says `Loading…` until the answer is real. `DataGrid` already suppresses both the
+empty message and the status summary while `isLoading` is true, so nothing else changes.
+
+**Done in Payment** (`PaymentRegister.tsx`, `InvoiceRegister.tsx`), each with a test that fails
+against `query.isLoading`.
+
+**Still open — these seven, owned by other modules:**
+
+```
+apps/web/src/pages/operation/OperationSupplierClaims.tsx
+apps/web/src/pages/operation/OperationReceiving.tsx
+apps/web/src/pages/operation/WarehouseInbound.tsx
+apps/web/src/pages/operation/OperationSupplierItems.tsx
+apps/web/src/pages/operation/OperationToOrder.tsx
+apps/web/src/pages/operation/OperationManualPurchase.tsx
+apps/web/src/pages/operation/purchase-orders/PurchaseOrdersPage.tsx
+```
+
+Each is a surface where "nothing here" and "we could not read it" currently look identical to the
+operator. Not changed here because they belong to Purchasing, Receiving, Warehouse and Suppliers;
+each owner should take the one-line change with a test.
+
 # Open carry-forwards (living doc)
 
 > **What this is**: the full text of every open carry-forward (CF), moved out of CLAUDE.md
@@ -11,6 +45,47 @@
 ### 17.5 Open carry-forwards
 
 **HIGH**:
+- `warehouse-settings-capabilities-recorded-not-yet-enforced` — **OPEN, 2026-09-09** (PR #1191,
+  migrations 0456 · 0457 · 0458). `Settings → Warehouse → Access` records four capabilities.
+  `Manage Warehouse Settings` is GENUINELY enforced — 0457 widened
+  `warehouse_settings_gate()` additively, proved in a rolled-back probe. The other three are
+  **recorded configuration only**: `Confirm inbound receipt` is still authorised by GRN Duty
+  (`receiving_require_post_authority`), `Confirm collection from Warehouse` by the signed-in Site
+  operator on `delivery_handover_record`, and `Perform stock count` by nothing at all because
+  Stock Counts are not built (Stock MASTER §13). The page SAYS this per row rather than implying
+  an enforcement that does not exist. **Deliberately not rewired in that card** — widening two
+  shipped, production-verified physical doors is its own change with its own probe.
+  **Falsifier / next step:** a card that makes `warehouse_holds_capability` an ADDITIONAL
+  accepted path inside those two doors, with a rolled-back probe proving neither GRN Duty nor the
+  Site operator lost anything.
+- `warehouse-holiday-calendar-has-no-verified-source` — **OPEN, 2026-09-09** (PR #1191). The
+  versioned holiday-calendar boundary is built and ships EMPTY. **No authoritative
+  machine-readable Malaysian / Selangor holiday source has been selected or approved**, so there
+  is no automatic sync and none is claimed on screen; a person imports a calendar naming its
+  source, its reference and when they verified it. `packages/shared/src/my-holidays.ts` was
+  measured and REFUSED as an authority: its own header says eleven of its eighteen 2026 rows are
+  unverified lunar/Islamic dates. That starter list still feeds the PROCUREMENT working-day
+  engine, so Warehouse availability and PO date maths currently read different holiday truth —
+  **a real convergence gap, not a duplicate**. **Falsifier / next step:** Jess (or Operations)
+  names the official source; one import makes the Warehouse calendar real, after which a card can
+  decide whether the working-day engine reads the same imported rows.
+- `warehouse-klang-has-no-recorded-delivery-address` — **OPEN, 2026-09-09** (PR #1191, 0456).
+  `warehouses.address` held the seeded string `NETS-managed facility (Klang)` — an OPERATOR
+  description, not an address — and the operator now has its own column. 0456 cleared it (only
+  where it still matched that exact seeded text). **Consequence:** `purchasing_destinations` row
+  `Carres Klang` is warehouse-linked and reads its address through that column, so the **PO PDF's
+  `Deliver To` prints the site name with no address line** until an authorised user records the
+  real one in `Settings → Warehouse → Warehouse Details`. A blank line is honest; an operator
+  description printed as a delivery address is not. **Falsifier / next step:** the real Klang
+  address is typed into Warehouse Details, and one PO PDF is re-rendered to prove `Deliver To`.
+- `0454-issue-action-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-09. NOT THIS
+  LANE'S.** `supabase/migrations/0454_an_issue_action_has_one_identity_and_one_result.sql` landed
+  on `main` in PR #1189 and is **absent from `supabase_migrations.schema_migrations`** (measured
+  twice, 2026-09-09 17:35 and 18:35 MYT). It is either unapplied or SQL-editor-applied without a
+  tracker row — the second is the recurring `0318`/`0319`, `0348`/`0349` pattern. Found because
+  it collided with this card's `0454`, which was renumbered to `0456`/`0457` and whose two
+  tracker rows were renamed to match. **Falsifier / next step:** the Issue Tracker lane applies it
+  through the governed path, or confirms its objects are live and inserts the tracker row.
 - ~~`receiving-grn-card-01-awaits-merge-apply-and-production-proof`~~ — **CLOSED 2026-09-04 WITH
   ITS PRODUCTION PROOF.** 0425/0426 APPLIED via the governed MCP path (tracker 20260904125205 /
   20260904125800), PR #1099 merged `7a897494`, deployed, production-smoked with committed test
