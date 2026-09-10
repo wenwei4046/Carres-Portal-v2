@@ -1057,6 +1057,26 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**LOCAL FILTER RAIL — COMPACT FACT DROPDOWN — APPROVED / LOCKED, owner ruling 2026-09-11.**
+A rail SECTION whose facts are a long, open-ended list collapses into ONE control —
+`FilterRailSelect` in the same `workspace-rail.tsx` — instead of printing every value as a row.
+
+- **WHICH SECTIONS, AND WHY.** A section stays a list of ROWS when it is the same few every day
+  and its counts are what the operator scans first thing in the morning — the daily worklist and
+  timing lenses (`WORK TO DO`, `TO ORDER`, `ORDER TIMING`, `REGION`, `SETUP TO FIX`). A section
+  becomes a dropdown when it is a FACT LIST that grows with the business: today
+  `PURCHASE PURPOSE` (Manual Purchase), `PRODUCT` and `SUPPLIER` (both purchasing Registers).
+  **Measured 2026-09-11** on the Manual Purchase rail at a 1024×768 window: the collapsed rail's
+  content is 718px and does not scroll; with those thirteen fact rows it is ~1132px, so the
+  timing rows — the ones that say what to do today — sat below the fold.
+- **IT IS THE SAME FILTER, NOT A SECOND MODEL.** The control writes the same single-slot section
+  value the rows wrote: sections still combine with AND, the section's own `All …` word is the
+  first option and its clear, and one section never holds two values. It is never a multi-select.
+- **NOTHING QUIET IS LOST.** The count rides in the option text (`Ohana · 4`), and a narrowed
+  control wears the rail's own ACTIVE treatment — the `kit-blue-3` field with the `kit-blue-9`
+  left-edge marker — so a narrowed section is exactly as visible as a selected row was.
+- **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
+
 **LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated

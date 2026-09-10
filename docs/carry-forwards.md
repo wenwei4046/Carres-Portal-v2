@@ -595,3 +595,37 @@ primitive fixes it in the same move.
   row already applied keeps its own name; what must stop is a repository with two 0346s, which
   is how a future `ls`-based number gets picked (red line 7) and how the next chat silently
   skips a migration that was never checked in.
+
+---
+
+## `purchasing-approver-duty-has-no-holder` — OWNER ACTION OWED, opened 2026-09-11
+
+**🟡 The Purchasing Approver duty now EXISTS and nobody holds it.** Migration `0474` adds
+`purchasing_approver` to `org_duties` and moves `purchasing_decide_request` onto
+`purchasing_approver_gate`, closing a gap measured on production the same day: the key was
+offered in Staff & Duties and named by the Work Engine as `manual_purchase.approve`'s owner
+duty, but no `org_duties` row existed, so no position could ever hold it — `Approve purchase`
+had no owner in Work, and Approve/Refuse worked only through the legacy `ops_manager` check.
+
+**Nothing changed on the day it landed, and that is deliberate.** The gate's third rung lets the
+`ops_manager` holder (Jess, the one active holder) keep deciding **while `purchasing_approver`
+has no active holder**, so behaviour is identical until the duty is assigned. This file exists
+so the assignment is not forgotten.
+
+**What is owed, and by whom:** Jess (or whoever holds `account_creator`/HR) assigns
+**Purchasing Approver** to a position in `Workspace → Staff & Duties`. No migration, no deploy
+and no code change is involved — it is configuration, and CLAUDE.md §6 is explicit that
+configuration is what must survive go-live.
+
+**What happens the moment it is assigned:** the assigned holder becomes the approver in the SQL
+door, in `canApprove` (which draws the controls and the approver-only money) and in the Work
+row's owner — all three read the same three rungs in the same order. The `ops_manager` fallback
+disappears by itself, in the gate and in the reader, with no further migration.
+
+**Falsifier / how to close this:**
+```sql
+select u.name from org_position_duties pd
+  join app_users u on u.position_id = pd.position_id
+ where pd.duty_key = 'purchasing_approver' and u.status = 'active';
+```
+One or more rows = closed. Zero rows = the fallback is still carrying the approval.

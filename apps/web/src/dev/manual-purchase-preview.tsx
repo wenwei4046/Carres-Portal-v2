@@ -130,10 +130,20 @@ const REGISTER = {
       item_label: "Booqit Corner", category: "sofa" }),
     line({ request_id: R3, sku: "7011-3S", qty: 1, remaining_qty: 1,
       item_label: "Dorsett 3 Seater", category: "sofa", supplier_id: S_DORSETT }),
+    /* ⭐ A LINE SPLIT ACROSS TWO POs — the case the settled goods table exists
+       for. 3 units went onto PO_A and 1 onto PO_B; the expansion must print
+       3 and 1, never 4 and 4. */
     line({ request_id: R4, sku: "B1201S-K", qty: 4, issued_qty: 4, po_id: PO_A,
-      po_ids: [PO_A, PO_B], item_label: "Sonic K", category: "mattress" }),
+      po_ids: [PO_A, PO_B],
+      allocations: [
+        { poId: PO_A, qty: 3, destinationId: KLANG },
+        { poId: PO_B, qty: 1, destinationId: BULOH },
+      ],
+      item_label: "Sonic K", category: "mattress" }),
+    /* Part issued: ONE allocation row plus a `To purchase` remainder row. */
     line({ request_id: R5, sku: "M1401F-Q", qty: 3, approved_qty: 2, issued_qty: 1,
       po_id: PO_C, po_ids: [PO_C], remaining_qty: 1,
+      allocations: [{ poId: PO_C, qty: 1, destinationId: KLANG }],
       item_label: "Atlas Q", category: "bedframe", supplier_id: S_OHANA }),
     line({ request_id: R6, sku: "5539-L", qty: 1, remaining_qty: 1,
       item_label: "Booqit L Shape", category: "sofa", supplier_id: S_HOOKA }),
@@ -142,9 +152,14 @@ const REGISTER = {
       destination_id: BULOH }),
   ],
   pos: [
-    { id: PO_A, po_no: "PO-20260828-3301" },
-    { id: PO_B, po_no: "PO-20260828-6644" },
-    { id: PO_C, po_no: "PO-20260827-9012" },
+    /* The ORIGINAL supplier-facing date (0428/0430) and the document's own
+       supplier — the goods table's exact mapping reads both. */
+    { id: PO_A, po_no: "PO-20260828-3301", official_delivery_date: "2026-09-18",
+      supplier_id: S_HOOKA },
+    { id: PO_B, po_no: "PO-20260828-6644", official_delivery_date: "2026-09-25",
+      supplier_id: S_OHANA },
+    { id: PO_C, po_no: "PO-20260827-9012", official_delivery_date: "2026-09-30",
+      supplier_id: S_OHANA },
   ],
   serviceCases: [{ id: SC_1, case_no: "SC-20260815-3311" }],
   destinations: [
@@ -294,6 +309,46 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (url.includes("/purchasing/requests/issue")) {
     return answer({ poIds: [], documents: 1 });
+  }
+  /* MANUAL PURCHASE · READY STOCK — the read the expansion's second section
+     makes when it is OPENED. It writes nothing and has no reservation twin,
+     so this preview seeds a read and nothing else. */
+  if (url.includes("/ready-stock")) {
+    return answer({
+      requestId: url.split("/requests/")[1]?.split("/")[0] ?? "",
+      groups: [
+        {
+          matchKey: "preview-1",
+          item: "Sonic K",
+          skus: ["B1201S-K"],
+          requestedQty: 4,
+          freeQty: 14,
+          units: [
+            { itemId: "aaaa0001-0000-4000-8000-000000000001", unitCode: "U1-000-014",
+              identityScope: "unit", sku: "B1201S-K", condition: "new",
+              siteName: "Carres Klang", holderName: null, ownership: "carres_owned",
+              supplier: null, qty: 1, dateIn: "2026-07-02" },
+            { itemId: "aaaa0001-0000-4000-8000-000000000002", unitCode: "U1-000-021",
+              identityScope: "unit", sku: "B1201S-K", condition: "exhibition",
+              siteName: "AL Sungai Buloh", holderName: null,
+              ownership: "supplier_consignment", supplier: "Hooka", qty: 1,
+              dateIn: "2026-06-11" },
+            { itemId: "aaaa0001-0000-4000-8000-000000000003", unitCode: "QTY-B1201S-K",
+              identityScope: "quantity", sku: "B1201S-K", condition: null,
+              siteName: "Carres Klang", holderName: null, ownership: "carres_owned",
+              supplier: null, qty: 12, dateIn: null },
+          ],
+        },
+        {
+          matchKey: "preview-2",
+          item: "Atlas Q",
+          skus: ["M1401F-Q"],
+          requestedQty: 3,
+          freeQty: 0,
+          units: [],
+        },
+      ],
+    });
   }
   if (url.includes("/purchasing/requests")) return answer(REGISTER);
   if (url.includes("pick-items")) return answer(PICK);

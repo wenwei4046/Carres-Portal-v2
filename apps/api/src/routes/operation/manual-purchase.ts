@@ -13,11 +13,15 @@ import {
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
   railItemLabel,
+  stockMatchKey,
   transitDaysFor,
+  type ManualPurchaseReadyStockGroup,
+  type ManualPurchaseReadyStockResponse,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { dutyHolders, myDuties } from "../../lib/duties";
 import { purchasingActorMayIssue } from "../../lib/purchasing-po-authority";
+import { readFreeStock } from "../../lib/purchase-demand-read";
 import {
   loadPurchasingSettings,
   type LoadedPurchasingSettings,
@@ -152,21 +156,38 @@ function withDatePlan(
   });
 }
 
-/** The approver is the Settings manager — the card names them one and the
- *  same gate (`ops_manager` duty or principal). `canApprove` decides what
- *  RENDERS (the money, the Approve row); `purchasing_decide_request`
- *  re-gates in SQL, which is the actual protection.
+/** `canApprove` decides what RENDERS (the money, the Approve row);
+ *  `purchasing_decide_request` re-gates in SQL, which is the actual
+ *  protection.
  *
- *  ⭐ THE RENDER GATE ASKS EXACTLY WHAT THE DOOR ASKS. The SQL gate
- *  (`purchasing_settings_gate`, 0360/0303) passes the `principal` role or a
- *  real `ops_manager` POSITION duty — it has no legacy-email pass. The old
- *  `isOpsManager` check here did (the shared operation@ login is a manager
- *  for other daily surfaces), so the shared login was offered Approve/Refuse
- *  the door then refused — measured on production, MPR-20260829-2779,
- *  2026-08-29. One authority, two consumers: the web hides, SQL enforces. */
+ *  ⭐ THE RENDER GATE ASKS EXACTLY WHAT THE DOOR ASKS. That is the whole
+ *  point of this function, and it is why it changes whenever the door does.
+ *  The old `isOpsManager` check admitted the shared `operation@` login, which
+ *  is a manager for other daily surfaces — so the shared login was OFFERED
+ *  Approve/Refuse and the door then refused it (measured on production,
+ *  MPR-20260829-2779, 2026-08-29).
+ *
+ *  0474 moved the door onto its own gate — `purchasing_approver_gate`:
+ *  `principal`, or an active position holding `purchasing_approver`, or the
+ *  `ops_manager` holder while that duty has NO active holder. Deciding a
+ *  purchase is no longer the same permission as writing Purchasing Settings,
+ *  because `purchasing_settings_gate` still guards those ten Settings doors
+ *  and nobody should gain them by being allowed to approve a purchase.
+ *  This function walks the identical three rungs, in the identical order,
+ *  and — like the door — honours no email list. */
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
   if (c.var.auth.role === "principal") return true;
-  return (await myDuties(c)).includes("ops_manager");
+  const mine = await myDuties(c);
+  if (mine.includes("purchasing_approver")) return true;
+  if (!mine.includes("ops_manager")) return false;
+  /* The self-retiring rung: the operations manager keeps deciding only while
+     the Purchasing Approver duty is unassigned. The moment somebody holds it,
+     this returns false here and the SQL door refuses there — together. */
+  const holders = await dutyHolders(c);
+  const claimed = Object.values(holders).some((duties) =>
+    duties.includes("purchasing_approver"),
+  );
+  return !claimed;
 }
 
 /**
@@ -184,7 +205,33 @@ async function resolveApprovers(
   users: Array<{ id: string; name: string | null; email: string | null }>,
 ): Promise<Array<{ id: string; name: string | null }>> {
   const holders = await dutyHolders(c);
-  let approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
+  /**
+   * ⭐ THE PURCHASING APPROVER IS ASKED FOR FIRST (0474; owner instruction
+   * 2026-09-11, "verify Jess's Purchasing Approver route through the shared
+   * duty authority").
+   *
+   * The Work Engine has named `purchasing_approver` as the owner of
+   * `manual_purchase.approve` since it was written, and the Staff & Duties
+   * catalogue offers it — but `org_duties` had no such row, so no position
+   * could hold it and this reader never asked for it. Measured on production
+   * 2026-09-11: zero holders, and `Approve purchase` therefore had no owner
+   * in Work while the Register printed one from `ops_manager`. Two answers to
+   * "who approves this", from two different keys.
+   *
+   * The ladder is the gate's own, in the same order, so the name the screen
+   * prints and the person the SQL door admits cannot disagree:
+   *   1. `purchasing_approver` — the approved target.
+   *   2. `ops_manager` — ONLY while nobody holds the duty above. It retires
+   *      itself the moment Jess assigns the duty, in the gate and here.
+   *   3. the legacy email list — last, and only if neither duty resolves at
+   *      all, so a duty read that fails soft still names somebody.
+   */
+  let approvers = users.filter((u) =>
+    (holders[u.id] ?? []).includes("purchasing_approver"),
+  );
+  if (approvers.length === 0) {
+    approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
+  }
   if (approvers.length === 0) {
     approvers = users.filter((u) =>
       (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
@@ -256,7 +303,14 @@ async function withCatalogAndLineage(
 ): Promise<
   | {
       lines: Array<Record<string, unknown>>;
-      pos: Array<{ id: string; po_no: string; version: number | null }>;
+      pos: Array<{
+        id: string;
+        po_no: string;
+        version: number | null;
+        /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
+        official_delivery_date: string | null;
+        supplier_id: string | null;
+      }>;
       /** po_id → the qty this set of lines actually put on that document. */
       orderedByPo: Map<string, number>;
       error: null;
@@ -300,13 +354,32 @@ async function withCatalogAndLineage(
     lineIds.length > 0
       ? await sb
           .from("purchase_order_lines")
-          .select("po_id, demand_id, qty")
+          .select("po_id, demand_id, qty, destination_id")
           .in("demand_id", lineIds)
       : { data: [] as Array<Record<string, unknown>>, error: null };
   if (lineageErr) return { error: lineageErr };
   const poIdsByDemand = new Map<string, Set<string>>();
   const orderedByPo = new Map<string, number>();
   const lineageDemands = new Set<string>();
+  /**
+   * ⭐ EACH QUANTITY BELONGS TO THE DOCUMENT THAT ACTUALLY CARRIES IT (owner
+   * ruling 2026-09-11).
+   *
+   * The lineage read already knew which purchase orders a demand line went
+   * onto; it threw away HOW MUCH went onto each one and kept only the set of
+   * numbers. So the expansion printed one row carrying the whole request
+   * quantity beside a comma-joined list of documents — read left to right,
+   * that says every one of those POs ordered the full amount. On a line split
+   * across two suppliers it overstates the buy by exactly the split.
+   *
+   * `purchase_order_lines` has carried `qty` and `destination_id` per line all
+   * along (0311 · 0361); this keeps them, so the goods table can print one row
+   * per ALLOCATION with that document's own quantity and its own destination.
+   */
+  const allocationsByDemand = new Map<
+    string,
+    Array<{ poId: string; qty: number; destinationId: string | null }>
+  >();
   for (const pl of lineagePoLines ?? []) {
     const d = pl.demand_id as string | null;
     if (!d) continue;
@@ -318,6 +391,14 @@ async function withCatalogAndLineage(
       pl.po_id as string,
       (orderedByPo.get(pl.po_id as string) ?? 0) + Number(pl.qty ?? 0),
     );
+    allocationsByDemand.set(d, [
+      ...(allocationsByDemand.get(d) ?? []),
+      {
+        poId: pl.po_id as string,
+        qty: Number(pl.qty ?? 0),
+        destinationId: (pl.destination_id as string | null) ?? null,
+      },
+    ]);
   }
   /* A pre-0361 issue left no `demand_id` on the PO line; the demand's own
      `po_id` + `issued_qty` is the only stored account of that document. */
@@ -327,6 +408,13 @@ async function withCatalogAndLineage(
         l.po_id as string,
         (orderedByPo.get(l.po_id as string) ?? 0) + Number(l.issued_qty ?? 0),
       );
+      allocationsByDemand.set(l.id as string, [
+        {
+          poId: l.po_id as string,
+          qty: Number(l.issued_qty ?? 0),
+          destinationId: (l.destination_id as string | null) ?? null,
+        },
+      ]);
     }
   }
   const allPoIds = [
@@ -335,20 +423,32 @@ async function withCatalogAndLineage(
       ...[...poIdsByDemand.values()].flatMap((s) => [...s]),
     ]),
   ];
-  let pos: Array<{ id: string; po_no: string; version: number | null }> = [];
+  let pos: Array<{
+    id: string;
+    po_no: string;
+    version: number | null;
+    official_delivery_date: string | null;
+    supplier_id: string | null;
+  }> = [];
   if (allPoIds.length > 0) {
     /* `version` rides along for the Work lens: `Issue the purchase order`
        completes only when the CURRENT version has confirmed-sent evidence
-       (Card 06 §7), and the current version is the PO's own fact. */
+       (Card 06 §7), and the current version is the PO's own fact.
+       `official_delivery_date` is the ORIGINAL supplier-facing date stamped
+       at birth (0428/0430) — never `eta_date`, which is the LIVE planning
+       arrival and moves when a factory ready date is recorded. The SO Batch
+       sibling column reads exactly this field. */
     const poRes = await sb
       .from("purchase_orders")
-      .select("id, version")
+      .select("id, version, official_delivery_date, supplier_id")
       .in("id", allPoIds);
     if (poRes.error) return { error: poRes.error };
     pos = (poRes.data ?? []).map((p) => ({
       id: p.id as string,
       po_no: p.id as string,
       version: (p.version as number | null) ?? null,
+      official_delivery_date: (p.official_delivery_date as string | null) ?? null,
+      supplier_id: (p.supplier_id as string | null) ?? null,
     }));
   }
 
@@ -363,6 +463,9 @@ async function withCatalogAndLineage(
         category: cat?.category ?? null,
         item_label: cat?.itemLabel ?? (l.sku as string),
         po_ids: [...poIds],
+        /* One entry per purchase order this line actually went onto, with
+           THAT document's quantity and destination. Empty = nothing issued. */
+        allocations: allocationsByDemand.get(l.id as string) ?? [],
       };
     }),
     pos,
@@ -394,7 +497,14 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
   /** id → po_no, for every PO the lines' REAL lineage names (Card 04 §3.4),
    *  plus the Card 06 completion fact: whether the CURRENT version has
    *  confirmed-sent evidence. */
-  let pos: Array<{ id: string; po_no: string; sent: boolean }> = [];
+  let pos: Array<{
+    id: string;
+    po_no: string;
+    sent: boolean;
+    /** The goods table's `PO Delivery Date` column (0428/0430). */
+    official_delivery_date: string | null;
+    supplier_id: string | null;
+  }> = [];
   if (ids.length > 0) {
     const res = await sb
       .from("purchase_demands")
@@ -445,6 +555,8 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
       id: p.id,
       po_no: p.po_no,
       sent: sentVersions.has(`${p.id}::${p.version ?? 1}`),
+      official_delivery_date: p.official_delivery_date,
+      supplier_id: p.supplier_id,
     }));
   }
 
@@ -834,6 +946,150 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     todayIso: todayMyt(),
     planUnavailable,
   });
+});
+
+/**
+ * GET /:id/ready-stock — MANUAL PURCHASE · READY STOCK (settled design,
+ * owner ruling 2026-09-11).
+ *
+ * ONE QUESTION: *is the product this internal purchase asks for already on
+ * our shelf, and exactly which Units are they?*
+ *
+ * ── THIS DOOR WRITES NOTHING, AND THAT IS THE DESIGN ────────────────────────
+ *
+ * The SO Batch sibling can commit a Unit to a customer's item line, because a
+ * customer item line is OWED goods. An internal replenishment is owed by
+ * nobody: no Unit on the shelf answers "buy ten more pillows for stock". So
+ * this route has no reservation twin, the section it feeds has no `Choose
+ * Ready Unit`, and the requested quantity is never netted against `freeQty`.
+ * Seeing stock is information for the approver, not an allocation.
+ *
+ * A specific internal need may only be reduced once an authoritative
+ * allocation, transfer or usage record actually covers it — none of which is
+ * this read.
+ *
+ * ── WHAT IT DOES DECIDE: NOTHING ────────────────────────────────────────────
+ *
+ * Availability is `stock_unit_register_v`'s (0371) through the ONE
+ * `readFreeStock` reader — the same offer the SO Batch section shows, so two
+ * purchasing pages cannot disagree about what is free. Matching is
+ * `stockMatchKey`, the portal's one configuration-aware rule (pinned to its
+ * SQL twin by a contract test): the SKU TEXT alone would match a King to a
+ * Super King.
+ *
+ * ── LAZY, LIKE ITS SIBLING ──────────────────────────────────────────────────
+ *
+ * Read only when a row is opened. The Register answers for every request at
+ * once; counting the whole warehouse for rows nobody expanded would be work
+ * done for nothing.
+ */
+manualPurchaseRouter.get("/:id/ready-stock", requireOperation, async (c) => {
+  const id = c.req.param("id");
+  if (!z.string().uuid().safeParse(id).success) {
+    return c.json({ error: "invalid_request_id", code: "invalid_param" }, 400);
+  }
+  const sb = userClient(c.env, c.var.auth.jwt);
+
+  const { data: request, error: reqErr } = await sb
+    .from("purchase_requests")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (reqErr) {
+    const m = mapPgError(reqErr);
+    return c.json(m.body, m.status);
+  }
+  if (!request) {
+    return c.json({ error: "request_not_found", code: "request_not_found" }, 404);
+  }
+
+  /* LIVE lines only. A line somebody marked not going ahead asks for nothing,
+     so offering shelf stock against it would be an answer to a dead question. */
+  const { data: lineRows, error: lineErr } = await sb
+    .from("purchase_demands")
+    .select("id, sku, qty, cancelled_at")
+    .eq("request_id", id);
+  if (lineErr) {
+    const m = mapPgError(lineErr);
+    return c.json(m.body, m.status);
+  }
+  const live = (lineRows ?? []).filter((l) => l.cancelled_at === null);
+
+  /* The Catalog's human words, read the same way the Register reads them —
+     whole and matched here, never `.in()` over free-text SKUs (a live row
+     carries a double quote, `Leg 4"`, which breaks the filter). */
+  const { data: catRows, error: catErr } = await sb
+    .from("product_skus")
+    .select("sku, variant, variant_kind, product_models(name)");
+  if (catErr) {
+    const m = mapPgError(catErr);
+    return c.json(m.body, m.status);
+  }
+  const itemLabelBySku = new Map(
+    (catRows ?? []).map((r) => {
+      const model = r.product_models as unknown as { name: string | null } | null;
+      return [
+        r.sku as string,
+        railItemLabel(
+          (model?.name ?? "").trim() || (r.sku as string),
+          r.variant_kind === "size" ? ((r.variant as string) ?? null) : null,
+        ),
+      ];
+    }),
+  );
+
+  /* One group per matching product/configuration — never per SKU string, and
+     never per request line: two lines of the same goods are one shelf
+     question. */
+  const asked = new Map<string, { item: string; skus: Set<string>; qty: number }>();
+  for (const l of live) {
+    const sku = l.sku as string;
+    const key = stockMatchKey(sku);
+    const group = asked.get(key) ?? {
+      item: itemLabelBySku.get(sku) ?? sku,
+      skus: new Set<string>(),
+      qty: 0,
+    };
+    group.skus.add(sku);
+    group.qty += Math.max(0, Number(l.qty) || 0);
+    asked.set(key, group);
+  }
+
+  const { freeUnitsByKey } = await readFreeStock(sb);
+
+  const groups: ManualPurchaseReadyStockGroup[] = [...asked.entries()].map(
+    ([matchKey, group]) => {
+      const units = freeUnitsByKey.get(matchKey) ?? [];
+      return {
+        matchKey,
+        item: group.item,
+        skus: [...group.skus].sort(),
+        /* The ASK, printed beside the shelf and never reduced by it. */
+        requestedQty: group.qty,
+        freeQty: units.reduce((n, u) => n + Math.max(1, u.qty), 0),
+        units: units.map((u) => ({
+          itemId: u.id,
+          unitCode: u.unitCode,
+          identityScope: u.identityScope === "quantity" ? ("quantity" as const) : ("unit" as const),
+          sku: u.sku,
+          condition: u.condition,
+          siteName: u.siteName,
+          holderName: u.holderName,
+          ownership:
+            u.ownership === "supplier_consignment"
+              ? ("supplier_consignment" as const)
+              : ("carres_owned" as const),
+          supplier: u.supplier,
+          qty: u.qty,
+          dateIn: u.dateIn,
+        })),
+      };
+    },
+  );
+  groups.sort((a, b) => a.item.localeCompare(b.item));
+
+  const body: ManualPurchaseReadyStockResponse = { requestId: id, groups };
+  return c.json(body);
 });
 
 const decideBody = z.object({

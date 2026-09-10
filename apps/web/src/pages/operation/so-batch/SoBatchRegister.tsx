@@ -38,7 +38,12 @@ import { fmtDate } from "@/lib/fmt-date";
 import { conciseLocality, NOT_RECORDED } from "@/lib/locality";
 import { useSalesOrderExpansion } from "@/lib/queries";
 import { avatarColor, personInitials } from "@/lib/staff-avatar";
-import { FilterRail, FilterRailGroup, FilterRailRow } from "../components/workspace-rail";
+import {
+  FilterRail,
+  FilterRailGroup,
+  FilterRailRow,
+  FilterRailSelect,
+} from "../components/workspace-rail";
 import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
@@ -291,12 +296,6 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
   );
   const toggleTiming = useCallback((s: PurchaseDemandTimingState) => {
     setFilter((prev) => ({ ...prev, timing: prev.timing === s ? null : s }));
-  }, []);
-  const toggleProduct = useCallback((c: SoBatchProductCategory) => {
-    setFilter((prev) => ({ ...prev, product: prev.product === c ? null : c }));
-  }, []);
-  const toggleSupplier = useCallback((name: string) => {
-    setFilter((prev) => ({ ...prev, supplier: prev.supplier === name ? null : name }));
   }, []);
   const toggleRegion = useCallback((name: string) => {
     setFilter((prev) => ({ ...prev, region: prev.region === name ? null : name }));
@@ -861,48 +860,54 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
               />
             ))}
           </FilterRailGroup>
+          {/* ── PRODUCT AND SUPPLIER ARE COMPACT DROPDOWNS (owner ruling
+              2026-09-11, the shared purchasing rail grammar) ──────────────
+              Both are FACT lists rather than the daily worklist, and the
+              supplier list grows with the business: as rows they pushed
+              `ORDER TIMING` — what to buy today — below the fold of a 240px
+              rail. The control writes the same single-slot section value the
+              rows wrote, so `All …` still clears only its own section and
+              sections still combine with AND. The counts ride in the option
+              text; `TO ORDER` and `ORDER TIMING` keep their visible rows. */}
           <FilterRailGroup title={SO_BATCH_RAIL.product.heading}>
             {/* The CATALOG's categories, never SKU-text inference. `All
                 products` is the section's clear — and where the uncommon
                 categories live. */}
-            <FilterRailRow
-              active={filter.product == null}
-              onClick={() => setFilter((prev) => ({ ...prev, product: null }))}
-              testId="so-batch-product-all"
-              label={SO_BATCH_RAIL.product.all}
+            <FilterRailSelect
+              label={SO_BATCH_RAIL.product.heading}
+              allLabel={SO_BATCH_RAIL.product.all}
+              testId="so-batch-product-select"
+              value={filter.product}
+              options={SO_BATCH_RAIL.product.categories.map((c) => ({
+                value: c.category,
+                label: c.word,
+                count: rail.productCounts[c.category],
+              }))}
+              onChange={(product) =>
+                setFilter((prev) => ({
+                  ...prev,
+                  product: product as SoBatchProductCategory | null,
+                }))
+              }
             />
-            {SO_BATCH_RAIL.product.categories.map((c) => (
-              <FilterRailRow
-                key={c.category}
-                active={filter.product === c.category}
-                onClick={() => toggleProduct(c.category)}
-                testId={`so-batch-product-${c.category}`}
-                label={c.word}
-                count={rail.productCounts[c.category]}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title={SO_BATCH_RAIL.supplier.heading}>
             {/* Actual names from the Register's own supplier projection —
                 dynamic, alphabetical, never hardcoded. A name with no match
                 under the other filters drops off; the SELECTED name stays,
                 with its honest 0. */}
-            <FilterRailRow
-              active={filter.supplier == null}
-              onClick={() => setFilter((prev) => ({ ...prev, supplier: null }))}
-              testId="so-batch-supplier-all"
-              label={SO_BATCH_RAIL.supplier.all}
+            <FilterRailSelect
+              label={SO_BATCH_RAIL.supplier.heading}
+              allLabel={SO_BATCH_RAIL.supplier.all}
+              testId="so-batch-supplier-select"
+              value={filter.supplier}
+              options={rail.suppliers.map((s) => ({
+                value: s.name,
+                label: s.name,
+                count: s.count,
+              }))}
+              onChange={(supplier) => setFilter((prev) => ({ ...prev, supplier }))}
             />
-            {rail.suppliers.map((s) => (
-              <FilterRailRow
-                key={s.name}
-                active={filter.supplier === s.name}
-                onClick={() => toggleSupplier(s.name)}
-                testId={`so-batch-supplier-${s.name}`}
-                label={s.name}
-                count={s.count}
-              />
-            ))}
           </FilterRailGroup>
           <FilterRailGroup title={SO_BATCH_RAIL.region.heading}>
             <FilterRailRow

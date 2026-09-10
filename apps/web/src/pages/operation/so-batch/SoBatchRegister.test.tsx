@@ -858,6 +858,17 @@ describe("the rail — Card 02-A wording, Card 02-B counting", () => {
 
 describe("the rail — purchasing fact sections, navigation not selection", () => {
   const rail = () => screen.getByTestId("so-batch-rail");
+  /** PRODUCT and SUPPLIER are compact dropdowns (owner ruling 2026-09-11);
+   *  `""` is the section's `All …` option — the clear. */
+  const pick = (testId: string, value: string) =>
+    fireEvent.change(screen.getByTestId(testId), { target: { value } });
+  /** The count moved into the option text (`Ohana · 4`); it did not vanish. */
+  const optionText = (testId: string, value: string): string => {
+    const select = screen.getByTestId(testId) as HTMLSelectElement;
+    const option = [...select.options].find((o) => o.value === value);
+    if (!option) throw new Error(`no option "${value}" in ${testId}`);
+    return option.textContent ?? "";
+  };
 
   it("hides completely, reopens from the Register toolbar, and remembers the choice", () => {
     const first = renderRegister();
@@ -947,59 +958,58 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
   it("product filters by the CATALOG category and counts unique Sales Orders", () => {
     renderRegister();
     /* o5 is the one order with a sofa line — one ORDER, though it also has a
-       mattress line. */
-    expect(screen.getByTestId("so-batch-product-sofa").textContent).toContain("1");
-    expect(screen.getByTestId("so-batch-product-mattress").textContent).toContain("7");
-    expect(screen.getByTestId("so-batch-product-bedframe").textContent).toContain("0");
-    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+       mattress line. The counts moved into the option text when the section
+       became a dropdown (owner ruling 2026-09-11); they did not disappear. */
+    expect(optionText("so-batch-product-select", "sofa")).toContain("1");
+    expect(optionText("so-batch-product-select", "mattress")).toContain("7");
+    expect(optionText("so-batch-product-select", "bedframe")).toContain("0");
+    pick("so-batch-product-select", "sofa");
     expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
   });
 
   it("a multi-category order counts under EVERY matching category and appears once", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
+    pick("so-batch-product-select", "mattress");
     expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
-    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+    pick("so-batch-product-select", "sofa");
     expect(screen.getAllByTestId("so-batch-row-o5")).toHaveLength(1);
   });
 
-  it("`All products` clears the product dimension and is active at rest", () => {
+  it("`All products` clears the product dimension and is the value at rest", () => {
     renderRegister();
-    const all = screen.getByTestId("so-batch-product-all");
-    expect(all).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
-    expect(all).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(all);
-    expect(all).toHaveAttribute("aria-pressed", "true");
+    const select = () => screen.getByTestId("so-batch-product-select") as HTMLSelectElement;
+    expect(select().value).toBe("");
+    /* At rest the control is quiet; narrowed, it wears the rail's own active
+       treatment — a narrowed section must not read as an unset one. */
+    expect(select().className).not.toContain("bg-kit-blue-3");
+    pick("so-batch-product-select", "mattress");
+    expect(select().className).toContain("bg-kit-blue-3");
+    pick("so-batch-product-select", "");
+    expect(select().value).toBe("");
     expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
   });
 
   it("suppliers are dynamic, alphabetical, and the Register's own projection", () => {
     renderRegister();
-    const text = rail().textContent ?? "";
+    const select = screen.getByTestId("so-batch-supplier-select") as HTMLSelectElement;
     /* Hooka before Ohana — and nobody else, because the fixtures name nobody
        else. Ohana enters through outstanding demand (o4, o8) AND lineage
-       (o5); one projection, one row. */
-    expect(screen.getByTestId("so-batch-supplier-Hooka")).toBeInTheDocument();
-    expect(screen.getByTestId("so-batch-supplier-Ohana")).toBeInTheDocument();
-    expect(text.indexOf("Hooka")).toBeLessThan(text.indexOf("Ohana"));
-    expect(
-      within(rail())
-        .getAllByRole("button")
-        .filter((b) => b.getAttribute("data-testid")?.startsWith("so-batch-supplier-")),
-    ).toHaveLength(3); // All suppliers + the two real names
+       (o5); one projection, one option. */
+    const values = [...select.options].map((o) => o.value);
+    expect(values).toEqual(["", "Hooka", "Ohana"]);
+    expect([...select.options][0]!.textContent).toBe("All suppliers");
   });
 
   it("the supplier filter narrows by the same facts the Supplier column prints", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-supplier-Ohana"));
+    pick("so-batch-supplier-select", "Ohana");
     /* Ohana touches o4 + o8 (outstanding) and o5 (PO lineage). */
     expect(screen.getByTestId("so-batch-row-o4")).toBeInTheDocument();
     expect(screen.getByTestId("so-batch-row-o5")).toBeInTheDocument();
     expect(screen.getByTestId("so-batch-row-o8")).toBeInTheDocument();
     expect(screen.queryByTestId("so-batch-row-o1")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("so-batch-supplier-all"));
+    pick("so-batch-supplier-select", "");
     expect(screen.getByTestId("so-batch-row-o1")).toBeInTheDocument();
   });
 
@@ -1017,8 +1027,8 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
   it("filters combine across sections — All not ordered + Mattress + Hooka", () => {
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-all-not-ordered"));
-    fireEvent.click(screen.getByTestId("so-batch-product-mattress"));
-    fireEvent.click(screen.getByTestId("so-batch-supplier-Hooka"));
+    pick("so-batch-product-select", "mattress");
+    pick("so-batch-supplier-select", "Hooka");
     for (const on of ["o1", "o3", "o8"]) {
       expect(screen.getByTestId(`so-batch-row-${on}`)).toBeInTheDocument();
     }
@@ -1029,25 +1039,28 @@ describe("the rail — purchasing fact sections, navigation not selection", () =
 
   it("counts cross-update against the other selected sections", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-product-sofa"));
+    pick("so-batch-product-select", "sofa");
     /* Under `Sofa`, nothing is outstanding and nothing can order early —
        the numbers say so instead of keeping yesterday's totals. */
     expect(screen.getByTestId("so-batch-all-not-ordered").textContent).toContain("0");
     expect(screen.getByTestId("so-batch-state-can_order_early").textContent).toContain("0");
     /* A supplier with no sofa drops off; the sofa's own suppliers stay. */
-    expect(screen.getByTestId("so-batch-supplier-Ohana")).toBeInTheDocument();
-    expect(screen.queryByTestId("so-batch-supplier-Hooka")).toBeInTheDocument(); // o5 lineage
+    const values = [
+      ...(screen.getByTestId("so-batch-supplier-select") as HTMLSelectElement).options,
+    ].map((o) => o.value);
+    expect(values).toContain("Ohana");
+    expect(values).toContain("Hooka"); // o5 lineage
   });
 
   it("the SELECTED supplier stays visible with 0 when another filter empties it", () => {
     renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-supplier-Hooka"));
+    pick("so-batch-supplier-select", "Hooka");
     fireEvent.click(screen.getByTestId("so-batch-state-no_production_days"));
     /* The only setup order is Ohana's — Hooka matches nothing now, but the
        operator must still SEE the narrowing to clear it. */
-    const hooka = screen.getByTestId("so-batch-supplier-Hooka");
-    expect(hooka).toHaveAttribute("aria-pressed", "true");
-    expect(hooka.textContent).toContain("0");
+    const select = screen.getByTestId("so-batch-supplier-select") as HTMLSelectElement;
+    expect(select.value).toBe("Hooka");
+    expect(optionText("so-batch-supplier-select", "Hooka")).toContain("0");
   });
 
   it("one timing filter at a time — a new pick replaces, a second click clears", () => {
