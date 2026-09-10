@@ -37,7 +37,6 @@ vi.mock("../../lib/purchasing-settings", () => ({
 }));
 
 import { stockMatchKey } from "@carres/shared";
-import { dutyHolders } from "../../lib/duties";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 
