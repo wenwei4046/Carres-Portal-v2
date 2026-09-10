@@ -49,6 +49,8 @@ import toOrderRouter from "./routes/operation/to-order";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
+// Settings → Warehouse — the ONE Warehouse Settings surface (0456 · 0457).
+import warehouseSettingsRouter from "./routes/operation/warehouse-settings";
 import opsStaffRouter from "./routes/operation/staff";
 import orderPaymentsRouter from "./routes/operation/order-payments";
 import bulkCompleteRouter from "./routes/operation/bulk-complete";
@@ -221,6 +223,7 @@ api.route("/operation/purchase/demands", purchaseDemandsRouter);
 api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
 api.route("/operation/purchasing/settings", purchasingSettingsRouter);
+api.route("/operation/warehouse-settings", warehouseSettingsRouter);
 // 0232 staff assignment pool — GET / + PUT /:userId
 api.route("/operation/staff", opsStaffRouter);
 api.route("/operation/partners", operationPartnersRouter);

@@ -916,6 +916,24 @@ Every Settings section draws the same page header: a `kicker` naming the module 
 `h1.text-page font-display` naming the page. Purchasing Settings had neither and opened straight
 onto a paragraph; it was corrected in the same change.
 
+**A MODULE GROUP MAY OWN MORE THAN ONE RAIL ROW — APPROVED / LOCKED, owner card 2026-09-09. BUILT.**
+Every module before Warehouse had exactly one settings page, so the rail carried one row per group.
+`Warehouse` is five SECTIONS of one page — `Warehouse Details · Working Hours · Public Holidays ·
+Special Dates · Access` — not five module settings pages, and they sit as five rows under one
+`Warehouse` group heading. The rail treatment is unchanged: 240px, flush left, one straight right
+divider, `blue-3` wash with a 2px `blue-9` line inset left on the active row. A group may still not
+invent a second Settings home, and a section that opens nothing may not appear.
+
+**A SETTINGS PAGE MAY CARRY ONE HEADER `Save changes` — APPROVED / LOCKED, owner card 2026-09-09.
+BUILT.** This narrows, and does not repeal, the 2026-08-14 SETTINGS TEMPLATE rule that raw config
+fields and Save/Cancel controls are not the default view. That rule was written against per-field
+Save/Cancel scattered through a page of database-shaped inputs. A module settings page that edits
+one coherent configuration instead renders plain-language groups and readable rows, holds the
+operator's edits as a draft, and commits them with **one** `Save changes` in the Page Header's right
+cluster. It obeys the Receiving button law: disabled while nothing has changed, and when something
+is invalid it NAMES the gap — `Save changes — say why this date is different`. It never becomes a
+second per-field control, and it never appears on a settings page that has no draft to commit.
+
 **REGISTER TOAST PLACEMENT — APPROVED / LOCKED (Loo, 2026-08-11).** Toasts use the proven 2990
 behaviour translated into Carres components: one fixed overlay tray at the viewport's bottom-right,
 stacking additional messages upward. A toast never occupies document flow and never moves, resizes

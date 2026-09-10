@@ -375,7 +375,11 @@ const receivingHref = (recordId: string) =>
 const stockHref = "/operation?tab=stock-onhand";
 const deliveryHref = (orderId: string) =>
   `/operation?tab=delivery&order=${encodeURIComponent(orderId)}`;
-const paymentsHref = (so: number) => `/operation?tab=payments&so=${so}`;
+// THE MONEY DOOR OPENS THE CANONICAL REGISTER (payment/MASTER.md §16).
+// `/operation?tab=payments` was the Master-Sheet Balance desk — a SECOND form
+// for one act, which ownership Law C forbids. The order context travels as
+// `?order=<SO No>`, which the Register reads as its scope.
+const paymentsHref = (so: number) => `/finance/payments?order=${so}`;
 const caseHref = (caseId: string) =>
   `/operation?tab=service-notes&case=${encodeURIComponent(caseId)}`;
 const claimHref = (claimId: string) =>

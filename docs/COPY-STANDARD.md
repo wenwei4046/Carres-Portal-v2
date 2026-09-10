@@ -2634,6 +2634,46 @@ reason both failures exist, so a caller that formats first is the thing to look 
 
 ---
 
+## Warehouse Settings — owner card 2026-09-09
+
+The one Warehouse configuration surface (`stock/MASTER.md` §11). Two words here are
+**exceptions written by the owner**, and the exception is scoped so the older rulings stand:
+
+- **`Save changes`** is the Warehouse Settings header button. It stays banned on the Sales Order
+  object page and in the `⚠ {n} changes` bar, whose spelling is still `Discard` · `Save`. The
+  difference is real: those name an act inside a form that is already typeable; this one names
+  the page's single commit, and the page has no other Save. It obeys the Receiving button law —
+  a disabled Save NAMES its gap: `Save changes — say why this date is different`.
+- **`Not configured`** is a SETTING nobody has recorded. It is not `Not recorded`, which stays
+  the one word for an empty REGISTER cell. A register cell is a fact about a record; a settings
+  row is a rule the business has not decided yet, and `Configure it` is the next act.
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The page | **`Warehouse Settings`** | Warehouse Maintenance · Warehouse Config · Site Settings |
+| Its five sections | **`Warehouse Details`** · **`Working Hours`** · **`Public Holidays`** · **`Special Dates`** · **`Access`** | Closed Dates · Cut-off · Calendar · Permissions · Roles |
+| A setting nobody has recorded | **`Not configured`** | Not set · None · N/A · Empty · a blank · **`0`** |
+| A person nobody has named | **`Not assigned`** | Unassigned · Nobody · TBD · — |
+| No such individual exists in the ERP at all | **`No individual recorded`** | Unknown person · No contact · a made-up name |
+| The site's own state | **`Active`** · **`Closed`** | Open · Operating · Disabled · Inactive |
+| The organisation that runs the site | **`Operated by`** | Operator · Vendor · 3PL · Partner. It names an ORGANISATION; a PERSON is `Key contact`, and the two are never merged |
+| The person to call at the site | **`Key contact`** | Contact person · PIC · In charge · Owner |
+| Goods coming IN | **`Receiving hours`** | Inbound hours · Delivery window · Goods-in |
+| Goods going OUT | **`Collection hours`** | Outbound hours · Pickup window · Dispatch |
+| That activity is unavailable that day | **`Closed`** | Unavailable · Off · Rest day · Holiday |
+| The five kinds of Special Date | **`Closed all day`** · **`Receiving unavailable`** · **`Collection unavailable`** · **`Special receiving hours`** · **`Special collection hours`** | Blackout · Exception · Non-working day |
+| The five public-holiday choices | **`Closed`** · **`Receiving only`** · **`Collection only`** · **`Normal working hours`** · **`Special hours`** | Half day · Skeleton crew · Limited |
+| The policy nobody has saved | **`Public-holiday policy    Not configured`** | Disabled · Off · Default |
+| Why a resolved day is what it is | **`Special hours`** · **`Company closure`** · **`{State} public holiday`** · **`Normal working hours`** · **`Not configured`** | Override · Rule 1 · System default |
+| The four Warehouse capabilities | **`Manage Warehouse Settings`** · **`Confirm inbound receipt`** · **`Confirm collection from Warehouse`** · **`Perform stock count`** | Warehouse admin · Full access · Supervisor |
+
+**`Chase`, `Handle`, `Review`, `Manage stock` and `Edit` do not appear on this page.** Neither
+does a standing warning such as *"Changes apply to future work and never rewrite recorded
+history"* — the rule is enforced by there being no writer, and by the audit trail; a sentence
+that repeats a guarantee the operator cannot verify is noise.
+
+---
+
 ## Header rules (see UI-KIT for the shell)
 
 Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:

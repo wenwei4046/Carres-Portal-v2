@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { operationWorkItemSchema, operationWorkStableId, type OperationWorkItem } from "./operation-work";
+import { countWorkingDays } from "./working-days";
+import type { WorkspaceDutyResolution } from "./workspace-duty";
 
 export const issueObjectKinds = ["item", "delivery", "document", "payment", "customer_information", "staff_work", "other"] as const;
 export const issueObservedProblems = ["wrong_item", "damaged", "missing", "wrong_quantity", "late", "no_reply", "wrong_information", "work_not_done", "not_sure"] as const;
@@ -25,15 +28,77 @@ export function buildIssueEnglish(raw: IssueIntake): string {
   return `${input.affectedObject} ${problemText[input.observedProblem]} when ${where} ${link} on ${englishDate(input.observedOn)}. ${proof} were added by ${input.foundByName}. ${input.impact}.`;
 }
 
-export const issueWorkSchema = z.object({ owner: z.string().min(1), object: z.string().min(1), recipient: z.string().min(1), action: z.string().min(4).refine((v) => !/^(call|ask|check|choose|upload|add|send|save|follow up|review|handle|resolve)$/i.test(v.trim()), "Action must name what to do"), requiredResult: z.string().min(3), dueOn: z.string().date() });
-export function buildIssueWorkTitle(raw: z.input<typeof issueWorkSchema>) { const w = issueWorkSchema.parse(raw); return `${w.owner} · ${w.action} for ${w.object} · Contact ${w.recipient} · Need: ${w.requiredResult} · By ${englishDate(w.dueOn)}`; }
+export const issueActionOwnerRules = ["issue_triage_duty", "issue_review_approver"] as const;
+export type IssueActionOwnerRule = (typeof issueActionOwnerRules)[number];
+
+const governedActionSchema = z.string().trim().min(4).refine(
+  (value) => !/^[^·]+\s·\s/.test(value),
+  "Owner identity belongs in structured metadata, not the action sentence",
+);
+
+export const issueActionInputSchema = z.object({
+  trigger: z.string().trim().min(3),
+  ownerRule: z.enum(issueActionOwnerRules),
+  action: governedActionSchema,
+  recipient: z.string().trim().min(1),
+  requiredResult: z.string().trim().min(3),
+  dueOn: z.string().date(),
+}).strict();
+
+export const issueActionResultInputSchema = z.object({
+  resultCode: z.enum(["accepted", "rejected", "proof_added", "correction_confirmed", "repair_confirmed", "replacement_confirmed", "answer_recorded"]),
+  result: z.string().trim().min(3),
+  nextAction: issueActionInputSchema.optional(),
+}).strict();
+
+export type IssueActionSource = {
+  id: string; issueId: string; issueNo: string; trigger: string;
+  ownerRule: IssueActionOwnerRule; action: string; recipient: string;
+  requiredResult: string; dueOn: string; materiality: "routine" | "significant" | "critical";
+};
+
+export function projectIssueActionWork(input: {
+  actions: readonly IssueActionSource[];
+  dutyResolutions: Partial<Record<IssueActionOwnerRule, WorkspaceDutyResolution>>;
+  today: string;
+}): OperationWorkItem[] {
+  return input.actions.map((source) => {
+    const duty = input.dutyResolutions[source.ownerRule] ?? null;
+    const late = source.dueOn < input.today
+      ? Math.max(1, countWorkingDays(source.dueOn, input.today))
+      : 0;
+    return operationWorkItemSchema.parse({
+      id: operationWorkStableId("issue_tracker", source.id, "current_action"),
+      module: "issue_tracker",
+      ruleKey: "current_action",
+      object: { kind: "issue", id: source.issueId, label: source.issueNo },
+      problem: source.trigger,
+      action: source.action,
+      recipient: source.recipient,
+      requiredResult: source.requiredResult,
+      completionFact: "Current Issue action has a governed result",
+      owner: {
+        rule: source.ownerRule,
+        dutyKey: source.ownerRule,
+        normal: duty?.normalOwner ?? null,
+        activeCover: duty?.activeCover ?? null,
+        acting: duty?.actingPerson ?? null,
+        state: duty?.state ?? "not_assigned",
+      },
+      timing: { dueOn: source.dueOn, workingDaysLate: late, bucket: late > 0 ? "overdue" : source.dueOn === input.today ? "today" : "later" },
+      destination: `/operation/issues?issue=${encodeURIComponent(source.issueId)}`,
+      tone: source.materiality === "critical" ? "danger" : source.materiality === "significant" ? "warning" : "info",
+      locked: false,
+      broken: duty === null || duty.state === "not_assigned",
+    });
+  });
+}
 
 export const createIssueInputSchema = z.object({
   intake: issueIntakeSchema,
   sourceModule: z.string().min(1),
   materiality: z.enum(["routine", "significant", "critical"]).default("routine"),
-  work: issueWorkSchema,
-  actionOwnerId: z.string().uuid().optional(),
+  currentAction: issueActionInputSchema,
 });
 export const addFaultOwnerInputSchema = z.object({
   ownerKind: z.enum(["related_party", "internal_staff", "internal_team", "other"]), relatedPartyId: z.string().uuid().optional(), staffId: z.string().uuid().optional(), ownerName: z.string().min(1),

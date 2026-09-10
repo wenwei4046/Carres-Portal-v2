@@ -405,3 +405,42 @@ writing to the migration ledger changes deployment behaviour repo-wide and deser
 One file, one transaction, with its own four-assertion sanity block. It refuses to commit if the
 legacy generator survives, if the DEFAULT survives, if any function still calls the generator, or
 if the register did not gain `identity_scope`.
+
+## 17 · The authenticated production walk (2026-09-09, `principal@carres.com`)
+
+`0453` applied through the governed path, PR #1180 merged `056fcd7b`, and production converged to
+that exact SHA on all five canonical surfaces (both Pages projects, both canonical hosts, the API
+Worker).
+
+**Measured immediately after the apply:** the legacy generator is gone, no function calls it, the
+DEFAULT is gone, the trigger is live, the register exposes `identity_scope`, `security_invoker` is
+intact on both views — and **the series is still 82, the row count still 222, and all 140
+historical codes are untouched.**
+
+**Live behaviour, asserted inside a transaction that rolled back:**
+
+| Check | Result |
+|---|---|
+| An insert naming no `unit_code` | **REFUSED** — `null value in column "unit_code" … violates not-null constraint`. This is the reported defect: the same insert used to yield `id-aam135002`. |
+| A new lowercase `id-` exact unit | **REFUSED** — `an exact unit is born with a Carres Unit ID (U1-000-001), not id-zzz999999` |
+| A real exact unit | born `U1-000-083` |
+| 20 counted pieces | keyed `QTY-015042599`, identified by nothing |
+| 140 historical `id-` rows | still fully updatable, none renamed |
+
+**Authenticated walk of the deployed UI:**
+
+| Walk | Result |
+|---|---|
+| `GET /api/ops/stock/register` as a signed-in operator | **PASS** — 200, 222 units, `identityScope` present: 217 `unit`, 5 `quantity` |
+| Inventory register, counted rows | **PASS** — the Unit ID column prints `—` for the 15-, 319- and 555-piece rows. **Not one of the five technical keys appears anywhere on screen**, and no raw UUID does either |
+| Inventory register, exact units | **PASS** — legacy `id-…` codes print exactly as stored, so the labels in the warehouse stay readable |
+| Scan `u1000082` (lowercase, no hyphens) | **PASS** — resolves, and the page shows the STORED `U1-000-082`; the scrambled spelling is never echoed |
+| Scan `ID-AAM135002` (uppercase legacy) | **PASS** — resolves, and displays as stored, `id-aam135002` |
+| Scan a counted row's key | **PASS** at the door — the API answers `404 No Unit with that ID` |
+
+🔴 **One defect the walk found, fixed in the follow-up:** the scan door answered 404 correctly, but
+`WarehouseUnitDetail` rendered a **blank page** — no message, no instruction. Reproduced with an
+ordinary unknown code, so it predates this Card; but `0453` deliberately makes one more thing
+unresolvable, so the empty state is this Card's to fix. It now says
+`No Unit carries that ID.` with `Check the label and search again from Inventory.`, covered by
+`WarehouseUnitDetail.test.tsx`.

@@ -2219,6 +2219,24 @@ export default function SalesOrderWorkspace() {
             }
           />
         </div>
+        
+        fix/zul-dev-branch
+
+        {!isNew && order ? (
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              data-testid="workspace-open-payments"
+              className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+              /* The canonical Register, scoped to this order (payment
+                 MASTER §16; entry-point correction 2026-09-09). */
+              onClick={() => navigate(`/finance/payments?order=${order.so}`)}
+            >
+              Open this order in Payment
+            </button>
+          </div>
+        ) : null}
+ main
       </Block>
 
       {/* ② ORDER INFO */}

@@ -3,6 +3,7 @@ import {
   countWorkingDays,
   myHolidaySet,
   operationWorkItemFromProjection,
+  projectIssueActionWork,
   operationWorkResponseSchema,
   poSupplierDeliveryDateOf,
   purchaseOrderReplyWorkItems,
@@ -47,6 +48,7 @@ import operationSuppliersRouter from "./suppliers";
 import workspaceDutiesRouter from "./workspace-duties";
 import opsStaffRouter from "./staff";
 import financeInvoicesRouter from "../finance/invoices";
+import issuesRouter from "../ops/issues";
 import {
   invoiceNeeded,
   invoicePaymentTiming,
@@ -1028,9 +1030,10 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/workspace-duties", workspaceDutiesRouter);
   internal.route("/staff", opsStaffRouter);
   internal.route("/finance-invoices", financeInvoicesRouter);
+  internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks] =
+         invoices, outcomes, refunds, storageChecks, issueSource] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1064,6 +1067,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readCollectionOutcomes(c),
       readRefunds(c),
       readStorageChecks(c),
+      readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -1072,6 +1076,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   // §12 gives overpayment review to the Payment Approver, never to Payment
   // Duty — an unassigned approver leaves the item honestly ownerless.
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
+  const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
+  const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
     ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
@@ -1128,9 +1134,17 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     invoices, refunds, approver: paymentApprover, today,
   });
   const storageCheckItems = projectStorageCheckWork({ cases: storageChecks, today });
+  const issueItems = projectIssueActionWork({
+    actions: issueSource.actions,
+    dutyResolutions: {
+      ...(issueTriageDuty ? { issue_triage_duty: issueTriageDuty } : {}),
+      ...(issueReviewApprover ? { issue_review_approver: issueReviewApprover } : {}),
+    },
+    today,
+  });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     receivingItems, paymentItems, overpaymentItems, storageCheckItems],
+     receivingItems, paymentItems, overpaymentItems, storageCheckItems, issueItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

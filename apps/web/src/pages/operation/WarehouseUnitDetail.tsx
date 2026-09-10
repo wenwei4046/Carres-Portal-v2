@@ -209,7 +209,22 @@ export default function WarehouseUnitDetail() {
               )}
             </section>
           </div>
-        ) : null}
+        ) : (
+          /* An operator who scans something we cannot resolve must be TOLD so.
+             This branch is reached whenever the read settled with no Unit —
+             an unknown code, and (since 0453) a counted row's technical key,
+             which is deliberately not addressable because nothing was ever
+             printed for it. A blank screen is not an answer. */
+          <div
+            className="rounded-md border border-base-200 bg-white p-6"
+            data-testid="stock-unit-not-found"
+          >
+            <p className="text-body text-base-800">No Unit carries that ID.</p>
+            <p className="mt-1 text-meta text-base-500">
+              Check the label and search again from Inventory.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

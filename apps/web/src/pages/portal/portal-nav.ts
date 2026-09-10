@@ -108,7 +108,10 @@ export const SECTION_ORDER: ReadonlyArray<PortalSection> = [
  * (Dashboard · Work · Issue Tracker, ruled plain by the card) and `Finance`,
  * whose single `Payments` page would otherwise hide behind a chevron that
  * reveals one row of the same name. A control that opens nothing new is the
- * dead control `docs/03-page-patterns.md:149` bans.
+ * dead control `docs/03-page-patterns.md:149` bans. `Payments` stays ONE row
+ * after the 2026-09-09 entry-point correction: Payment MASTER §16 puts the
+ * `Payments · Invoices` switch in the Register's own toolbar, so a second
+ * rail row for Invoices would be a second control for one act.
  *
  * The icon is the module's ONE face — the same law the Purchasing `ShoppingBag`
  * already followed (Loo, 2026-08-02). Children carry no icon at all now, so
@@ -429,7 +432,36 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
-      { key: "payments", label: "Payments", icon: Wallet, section: "Finance" },
+      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER — the
+       * entry-point correction, 2026-09-09.
+       *
+       * This row used to link to `/operation?tab=payments`, the Master-Sheet
+       * "Balance" collections desk: its own Summary band, its own queue chips
+       * and its own EDITABLE balance / storage-fee fields. Payment MASTER §16
+       * approved a different destination — the read-only Payments Register,
+       * its `Payments · Invoices` toolbar, the Invoice object that owns the
+       * writing, and the §17 Calendar behind the Invoice date cells — and
+       * every one of those shipped at `/finance/*` while this row still
+       * pointed at the old desk. Two forms for one act make two records
+       * (`docs/ERP-ARCHITECTURE.md` ownership Law C), so the desk is gone and
+       * this is the one door.
+       *
+       * `path` (not `financePath`) on purpose: `navItemHref` reads `path` for
+       * every non-finance area, so the row links absolutely out of
+       * `/operation` and lights on the destination it actually opens. Both
+       * `operation` and `principal` may stand there — `/finance/*` admits
+       * operation staff to Payments and Invoices (§12), and `FinanceApp`
+       * bounces them off every finance-only page. */
+      {
+        key: "payments",
+        label: "Payments",
+        icon: Wallet,
+        path: "/finance/payments",
+        // The Invoices Register is the same destination's second listing (its
+        // toolbar switches between the two), so the row stays lit there.
+        activeFor: ["path:/finance/payments", "path:/finance/invoices"],
+        section: "Finance",
+      },
       // Rental base (0247-0249, Loo 2026-07-25) — rent-to-own agreements +
       // the deployed-unit asset registry. Dormant until the POS rental lane.
       { key: "rental", label: "Rental", icon: Repeat, section: "Customer Care" },

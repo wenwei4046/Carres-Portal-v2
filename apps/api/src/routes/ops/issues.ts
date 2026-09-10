@@ -1,16 +1,16 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { addFaultOwnerInputSchema, addIssueMoneyInputSchema, buildIssueEnglish, buildIssueWorkTitle, createIssueInputSchema, issueReviewInputSchema } from "@carres/shared";
+import { addFaultOwnerInputSchema, addIssueMoneyInputSchema, buildIssueEnglish, createIssueInputSchema, issueActionResultInputSchema, issueReviewInputSchema } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
 const router = new Hono<AppEnv>();
-const ISSUE_SELECT = "*, issue_links(*), issue_evidence(*), issue_staff_involvement(*), issue_fault_owners(*), issue_money_links(*), issue_reviews(*), issue_timeline(*)";
+const ISSUE_SELECT = "*, issue_actions(*), issue_links(*), issue_evidence(*), issue_staff_involvement(*), issue_fault_owners(*), issue_money_links(*), issue_reviews(*), issue_timeline(*)";
 
 router.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt); const view = c.req.query("view") ?? "all";
-  let q = sb.from("issues").select("*, issue_links(*), issue_fault_owners(*), issue_money_links(*)").order("observed_on", { ascending: false }).order("issue_no", { ascending: false });
+  let q = sb.from("issues").select("*, issue_actions(*), issue_links(*), issue_fault_owners(*), issue_money_links(*)").order("observed_on", { ascending: false }).order("issue_no", { ascending: false });
   if (view === "needs_triage") q = q.eq("status", "needs_triage");
   if (view === "open") q = q.not("status", "in", "(closed,voided)");
   if (view === "wednesday") q = q.or("discussed_on.is.null,status.not.in.(closed,voided)");
@@ -27,6 +27,13 @@ router.get("/related-parties", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.from("issue_related_parties").select("*").eq("active", true).order("name");
   if (error) throw new HTTPException(500, { message: error.message }); return c.json({ items: data ?? [] });
 });
+
+router.get("/work-source", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb.from("issue_actions").select("id,issue_id,trigger,owner_rule,action,recipient,required_result,due_on,issues!inner(issue_no,materiality)").eq("status", "open").order("due_on");
+  if (error) throw new HTTPException(500, { message: error.message });
+  return c.json({ actions: (data ?? []).map((row: any) => ({ id: row.id, issueId: row.issue_id, issueNo: row.issues.issue_no, trigger: row.trigger, ownerRule: row.owner_rule, action: row.action, recipient: row.recipient, requiredResult: row.required_result, dueOn: row.due_on, materiality: row.issues.materiality })) });
+});
 router.post("/related-parties", requireOperationOrPrincipal, async (c) => {
   const raw = await c.req.json<{ name?: string; kind?: string; reportContact?: string; reportRecipient?: string }>();
   if (!raw.name || !["supplier","logistics","warehouse","customer","other"].includes(raw.kind ?? "")) throw new HTTPException(400, { message: "Name and party type are required" });
@@ -42,9 +49,6 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
     business_impact: body.intake.impact, materiality: body.materiality, observed_on: body.intake.observedOn,
     affected_object: body.intake.affectedObject, official_english: officialEnglish, optional_detail: body.intake.optionalDetail ?? null,
     recorded_by: c.var.auth.id, found_by_kind: body.intake.foundByKind, found_by_name: body.intake.foundByName,
-    current_action_owner: body.actionOwnerId ?? null, current_action_owner_name: body.work.owner,
-    current_action_object: body.work.object, current_action_recipient: body.work.recipient, current_action_do: body.work.action,
-    current_action_result: body.work.requiredResult, current_action_due_on: body.work.dueOn,
     review_requirement: body.materiality === "routine" ? "standard" : "full",
   }).select("id,issue_no").single();
   if (error || !issue) throw new HTTPException(500, { message: error?.message ?? "Issue was not recorded" });
@@ -52,10 +56,10 @@ router.post("/", requireOperationOrPrincipal, async (c) => {
   if (linkError) throw new HTTPException(500, { message: linkError.message });
   const { error: evidenceError } = await sb.from("issue_evidence").insert(body.intake.evidence.map((proof) => ({ issue_id: issue.id, kind: proof.kind, label: `${proof.count} ${proof.kind.replaceAll("_", " ")}`, added_by: c.var.auth.id })));
   if (evidenceError) throw new HTTPException(500, { message: evidenceError.message });
-  const title = buildIssueWorkTitle({ ...body.work, object: issue.issue_no });
-  const { data: task } = await sb.from("ops_tasks").insert({ title, detail: officialEnglish, created_by: c.var.auth.id, assigned_to: body.actionOwnerId ?? null, priority: body.materiality === "critical" ? "urgent" : "normal", due_at: `${body.work.dueOn}T09:00:00+08:00` }).select("id").single();
-  if (task) await sb.from("issues").update({ work_task_id: task.id, status: "open" }).eq("id", issue.id);
-  return c.json({ id: issue.id, issueNo: issue.issue_no, officialEnglish, workTitle: title }, 201);
+  const { error: actionError } = await sb.from("issue_actions").insert({ issue_id: issue.id, sequence: 1, trigger: body.currentAction.trigger, owner_rule: body.currentAction.ownerRule, action: body.currentAction.action, recipient: body.currentAction.recipient, required_result: body.currentAction.requiredResult, due_on: body.currentAction.dueOn, opened_by: c.var.auth.id });
+  if (actionError) throw new HTTPException(500, { message: actionError.message });
+  await sb.from("issues").update({ status: "open" }).eq("id", issue.id);
+  return c.json({ id: issue.id, issueNo: issue.issue_no, officialEnglish }, 201);
 });
 
 router.get("/reports/:partyId", requireOperationOrPrincipal, async (c) => {
@@ -70,6 +74,8 @@ router.get("/reports/:partyId", requireOperationOrPrincipal, async (c) => {
 });
 
 router.get("/:id", requireOperationOrPrincipal, async (c) => { const sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.from("issues").select(ISSUE_SELECT).eq("id", c.req.param("id")).single(); if (error || !data) throw new HTTPException(404, { message: "Issue not found" }); return c.json(data); });
+
+router.post("/:id/actions/:actionId/result", requireOperationOrPrincipal, async (c) => { const body = await parse(c, issueActionResultInputSchema), sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.rpc("issue_record_action_result", { p_issue_id: c.req.param("id"), p_action_id: c.req.param("actionId"), p_result_code: body.resultCode, p_result: body.result, p_next_action: body.nextAction ?? null }); if (error) throw new HTTPException(error.code === "42501" ? 403 : error.code === "P0002" ? 404 : 422, { message: error.message }); return c.json(data ?? {}); });
 
 router.post("/:id/fault-owners", requireOperationOrPrincipal, async (c) => { const body = await parse(c, addFaultOwnerInputSchema), sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.from("issue_fault_owners").insert({ issue_id: c.req.param("id"), owner_kind: body.ownerKind, related_party_id: body.relatedPartyId ?? null, staff_id: body.staffId ?? null, owner_name: body.ownerName, finding: body.finding, act_or_omission: body.actOrOmission, response: body.response, response_detail: body.responseDetail ?? null, reviewer_id: c.var.auth.id, reviewed_at: new Date().toISOString(), created_by: c.var.auth.id }).select("id").single(); if (error) throw new HTTPException(500, { message: error.message }); return c.json(data, 201); });
 router.post("/:id/money", requireOperationOrPrincipal, async (c) => { const body = await parse(c, addIssueMoneyInputSchema), sb = userClient(c.env, c.var.auth.jwt); const { data, error } = await sb.from("issue_money_links").insert({ issue_id: c.req.param("id"), track: body.track, amount: body.amount, currency: body.currency, event_date: body.eventDate, counterparty_name: body.counterpartyName, cost_bearer_id: body.costBearerId ?? null, reason: body.reason, finance_record_kind: body.financeRecordKind, finance_record_id: body.financeRecordId, recorded_by: c.var.auth.id }).select("id").single(); if (error) throw new HTTPException(500, { message: error.message }); return c.json(data, 201); });
