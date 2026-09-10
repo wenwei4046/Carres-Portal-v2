@@ -261,6 +261,64 @@ describe("POST …/ready-stock/reserve", () => {
     expect(call.args.p_picks).toHaveLength(2);
   });
 
+  /** The same fake, with the reserve door refusing the way Postgres does. */
+  function refusingClient(error: { code: string; message: string; details?: string }) {
+    const c = client(fixture());
+    const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      c.rpcCalls.push({ fn, args });
+      return { data: null, error };
+    });
+    return { ...c, rpc };
+  }
+
+  async function reserveWith(c: object) {
+    vi.mocked(userClient).mockReturnValue(c as never);
+    const res = await app.fetch(
+      new Request("http://t/api/operation/purchase/demands/ready-stock/reserve", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await makeJwt("operation")}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: ORDER,
+          picks: [{ itemId: "11111111-1111-4111-8111-111111111111", orderLineId: LINE_A }],
+        }),
+      }),
+      env,
+    );
+    return { res, body: (await res.json()) as Record<string, unknown> };
+  }
+
+  it("hands the browser the door's own word AND the Unit it is about", async () => {
+    /* 0473 writes `unit_id=` into DETAIL, because the batch door is the only
+       place that knows which pick it was standing on. */
+    const { res, body } = await reserveWith(
+      refusingClient({
+        code: "40001",
+        message: "unit_no_longer_free",
+        details:
+          "someone else took that Unit · unit_id=11111111-1111-4111-8111-111111111111",
+      }),
+    );
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("unit_no_longer_free");
+    expect(body.itemId).toBe("11111111-1111-4111-8111-111111111111");
+  });
+
+  it("names no Unit when the database named none, rather than inventing one", async () => {
+    const { res, body } = await reserveWith(
+      refusingClient({
+        code: "22023",
+        message: "unit_does_not_match_line",
+        details: "that Unit is not the goods this item line ordered",
+      }),
+    );
+    expect(res.status).toBe(422);
+    expect(body.code).toBe("unit_does_not_match_line");
+    expect(body.itemId).toBeUndefined();
+  });
+
   it("refuses a body that names no pick", async () => {
     const { res, c } = await reserve({ orderId: ORDER, picks: [] });
     expect(res.status).toBe(400);

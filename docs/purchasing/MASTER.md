@@ -1112,7 +1112,7 @@ Missing provenance prints an absence; line-level PO arrays are never copied onto
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
-**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10 (migration 0471).** Directly beneath
+**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10/11 (migrations 0471 · 0472 · 0473).** Directly beneath
 `GoodsMiniTable`, and INDEPENDENTLY collapsible, sits `Ready Stock`: the free stock that could
 answer this Sales Order's item lines. It is a sibling SECTION, never a column and never a second
 mini-table — the goods table answers *what was ordered and what covers it*, this one answers *what
@@ -1156,6 +1156,28 @@ is on the shelf for it*.
   existing purchase order.
 - **Consignment stock is choosable and is labelled.** §7.7 already rules that reservation creates no
   supplier notice; what the operator needs is to SEE that the goods belong to a supplier.
+- **The act states what it did, in Units — and a refusal names the Unit it is about (0473).** There
+  are exactly two outcomes and the section prints which. A success names every Unit the DOOR
+  committed, never what the browser asked for. A refusal prints the door's own governed sentence,
+  the Unit that stopped the act, and `No Unit was reserved.` — the atomic guarantee stated once, for
+  every refusal alike. The chosen set is LEFT ALONE after a refusal, so the operator unticks that one
+  Unit and presses again instead of rebuilding a selection nothing touched. Before this, an operator
+  who chose five Units and read *"someone else took that Unit"* had to untick them one at a time to
+  find out which — four more races.
+- **⭐ A PURCHASING TICK DIES WITH THE NUMBER IT WAS TAKEN AGAINST — LOCKED 2026-09-11.** A tick in
+  the Register above is an arrangement of `To buy` units across destinations, so it is only
+  meaningful against the `To buy` the operator saw. That number MOVES under an open page: this
+  section commits a Unit, a colleague issues a purchase order, a reservation is released. Measured
+  before the fix: tick `To buy 3`, reserve 2 Units here, press `Issue PO` — the browser sent 3
+  against a server remainder of 1, the door refused it by name (`allocation_mismatch`, the law held)
+  and the operator was handed an error instead of the recalculated quantity. So each tick now
+  remembers its own `To buy` and is DROPPED when the server's recomputation disagrees — and the
+  ticks standing on the item lines a reservation just answered are dropped at once, before the
+  recomputed numbers arrive, because that read is a round trip away and `Issue PO` is one click.
+  **The tick is never silently re-pointed at the new number**: a tick is a decision about a
+  quantity, and a decision the system rewrites is not the operator's. Over-allocation was already
+  impossible — the door recomputes and refuses — but the operator's next move is now the
+  recalculated quantity rather than an error.
 
 **THE DOCUMENT PARTITION — ONE CONTRACT, BOTH SIDES.** A purchase order is one
 `Supplier × Deliver To × Category × (one-PO-per-order category ? Source Order : —)`. The browser and

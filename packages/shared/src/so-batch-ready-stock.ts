@@ -149,7 +149,11 @@ export const READY_STOCK_REFUSAL_WORDS: Record<string, string> = {
   unit_not_available: "That Unit is not free and sound ready stock.",
   quantity_row_not_bindable: "Counted stock has no Unit ID to commit to one item line.",
   line_already_covered: "That item line is already covered by Ready Stock or a purchase order.",
-  unit_no_longer_free: "Someone else took that Unit. Nothing was reserved.",
+  /* The outcome is stated ONCE, by the panel, for every refusal alike — the
+     door is atomic, so `No Unit was reserved.` is true of all of them and
+     saying it twice in this one made the two sentences disagree in length
+     about a fact they share. */
+  unit_no_longer_free: "Someone else took that Unit.",
   no_units_chosen: "Choose a Unit first.",
   too_many_units: "Choose at most 50 Units at a time.",
   no_reference: "This Sales Order has no number yet.",

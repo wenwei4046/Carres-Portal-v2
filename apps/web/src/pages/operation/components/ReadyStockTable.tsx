@@ -73,6 +73,12 @@ export interface ReadyStockTableSelection {
    * its place and loses its checkbox — the fact belongs beside the goods.
    */
   blockedWord: (row: ReadyStockTableRow) => string | null;
+  /**
+   * THE UNIT THE LAST ACT STOPPED ON (#1215). Amber, because it is an
+   * exception to fix, not a failure of the goods. Only a page that can ACT
+   * has one, which is why it rides with `selection`.
+   */
+  isRefused?: (itemId: string) => boolean;
 }
 
 /** The page-specific trailing column, when the page has one. */
@@ -152,17 +158,29 @@ export default function ReadyStockTable({
           {rows.map((u) => {
             const blocked = selection?.blockedWord(u) ?? null;
             const chosen = selection?.isChosen(u.itemId) ?? false;
+            const refused = selection?.isRefused?.(u.itemId) ?? false;
             return (
               <tr
                 key={u.itemId}
                 data-testid={`ready-stock-unit-${u.itemId}`}
                 /* SELECTED UNIT: light-blue row with a thin blue rule top and
                    bottom — distinct from the purchasing selection above, and
-                   from keyboard focus, which the browser's own ring draws. */
+                   from keyboard focus, which the browser's own ring draws.
+                   ⚠️ `var(--kit-blue-9)` shipped here on 2026-09-10 and drew
+                   NOTHING: the kit palette is a Tailwind colour scale and no
+                   stylesheet defines that custom property — an invalid
+                   box-shadow is dropped whole, so the selected row had its
+                   fill and no rule (found and fixed in #1215). The token is
+                   read from the theme instead: same locked value, and it
+                   actually resolves. Amber has only steps 3 and 11 by law, so
+                   the refused row carries the fill alone rather than inventing
+                   a step. */
                 className={
-                  chosen
-                    ? "divide-x divide-base-200 bg-kit-blue-3 shadow-[inset_0_1px_var(--kit-blue-9),inset_0_-1px_var(--kit-blue-9)]"
-                    : "divide-x divide-base-200"
+                  refused
+                    ? "divide-x divide-base-200 bg-kit-amber-3"
+                    : chosen
+                      ? "divide-x divide-base-200 bg-kit-blue-3 shadow-[inset_0_1px_theme(colors.kit.blue.9),inset_0_-1px_theme(colors.kit.blue.9)]"
+                      : "divide-x divide-base-200"
                 }
                 style={{ height: 38 }}
               >

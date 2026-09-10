@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type {
@@ -1395,5 +1395,186 @@ describe("SO Batch Register — PO Delivery Date", () => {
     // o1 has no purchase order at all — a different answer, and it stays blank.
     expect(screen.getByTestId("so-batch-po-date-o1")).toHaveTextContent("");
     expect(screen.getByTestId("so-batch-po-date-o1")).not.toHaveTextContent("Not recorded");
+  });
+});
+
+/* ─── THE DEMAND MOVES UNDER AN OPEN TICK ───────────────────────────────── */
+
+/**
+ * ⭐ A TICK IS AN ARRANGEMENT OF A NUMBER, SO IT DIES WITH THAT NUMBER.
+ *
+ * `To buy` is the server's remainder, and it moves while the page is open:
+ * Ready Stock commits a Unit to one of the order's item lines, a colleague
+ * issues a purchase order, a reservation is released. Ticking `To buy 3` and
+ * then pressing `Issue PO` against a remainder of 1 sent an arrangement the
+ * door refused (`allocation_mismatch`) — the law held and the operator got an
+ * error instead of the recalculated quantity.
+ */
+describe("a tick whose To buy has changed", () => {
+  function again(over: Partial<SoBatchPurchaseResponse>) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return (
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+          <SoBatchRegister data={data(over)} isLoading={false} onIssue={onIssue} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+  }
+
+  it("is dropped when the recomputed remainder is smaller", () => {
+    const { rerender } = renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("selection-bar")).toHaveTextContent("1 selected · 2 units");
+    /* Two Units of the two were answered off the shelf. */
+    rerender(
+      again({
+        rows: [
+          leaf({ readyStock: 1, takenFromStock: 1, toBuy: 1 }),
+          LEAF_O3,
+          LEAF_O8A,
+          LEAF_O8B,
+          LEAF_O4,
+        ],
+      }),
+    );
+    expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument();
+    expect(screen.getByTestId("so-batch-select-o1")).not.toBeChecked();
+  });
+
+  it("does not resurrect when the remainder comes back to the old number", () => {
+    const { rerender } = renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    rerender(again({ rows: [leaf({ toBuy: 1 }), LEAF_O3, LEAF_O8A, LEAF_O8B, LEAF_O4] }));
+    rerender(again({ rows: [LEAF_O1, LEAF_O3, LEAF_O8A, LEAF_O8B, LEAF_O4] }));
+    /* A decision nobody took twice may not come back on its own. */
+    expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument();
+  });
+
+  it("leaves every OTHER tick of the same order exactly where it was", () => {
+    const { rerender } = renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-select-o8"));
+    rerender(
+      again({
+        rows: [
+          LEAF_O1,
+          LEAF_O3,
+          { ...LEAF_O8A, toBuy: 0, readyStock: 1, takenFromStock: 1 },
+          LEAF_O8B,
+          LEAF_O4,
+        ],
+      }),
+    );
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledWith([
+      { demandId: "build::o8::b", allocations: [{ destinationId: KLANG, qty: 1 }] },
+    ]);
+  });
+});
+
+/* ─── READY STOCK'S CONSEQUENCE FOR THE PURCHASING TICK ─────────────────── */
+
+describe("choosing a Ready Unit", () => {
+  const READY = {
+    orderId: "o1",
+    so: 1318,
+    reference: "SO-1318",
+    lines: [
+      {
+        orderLineId: "l1",
+        sku: "B1201S-K",
+        item: "Booqit",
+        qty: 2,
+        reservedQty: 0,
+        reservedUnitCodes: [],
+        onPoQty: 0,
+        remainingQty: 2,
+      },
+    ],
+    units: [
+      {
+        itemId: "33333333-0000-0000-0000-00000000000a",
+        unitCode: "U1-000-001",
+        identityScope: "unit" as const,
+        sku: "B1201S-K",
+        condition: "new",
+        siteName: "Carres Klang Warehouse",
+        holderName: null,
+        ownership: "carres_owned" as const,
+        supplier: null,
+        qty: 1,
+        dateIn: "2026-08-01",
+        matchingLineIds: ["l1"],
+        blocked: null,
+      },
+    ],
+  };
+
+  /**
+   * Two doors answer here: the section's read, and the one act. Everything
+   * else keeps the suite's empty Sales Order expansion. The cast is the
+   * suite's single `apiFetch` mock speaking three shapes, not a claim about
+   * any of them — each is parsed by the component that asked for it.
+   */
+  function answerReadyStock() {
+    apiFetch.mockImplementation(async (path: unknown) => {
+      const p = String(path);
+      if (p.endsWith("/ready-stock")) return READY as unknown as SalesOrderExpansionResponse;
+      if (p.includes("ready-stock/reserve")) {
+        return {
+          reserved: 1,
+          reference: "SO-1318",
+          units: [{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: "l1" }],
+        } as unknown as SalesOrderExpansionResponse;
+      }
+      return { defaultDeliverTo: null, place: [], lines: [] } as SalesOrderExpansionResponse;
+    });
+  }
+
+  /**
+   * THE TICK GOES BEFORE THE NUMBERS ARRIVE. The refetch that recomputes
+   * `To buy` is a round trip away and `Issue PO` is one click, so the tick on
+   * the answered item line is dropped the moment the door says yes — not when
+   * the new remainder turns up.
+   */
+  it("drops the purchasing tick standing on the item line it answered", async () => {
+    answerReadyStock();
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-select-o1"));
+    expect(screen.getByTestId("so-batch-issue")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
+    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    const row = await screen.findByTestId(
+      "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
+    );
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("so-batch-issue")).not.toBeInTheDocument(),
+    );
+    /* And the act says what it did, in Units. */
+    expect(screen.getByTestId("ready-stock-act-o1")).toHaveTextContent(
+      "Unit ID · U1-000-001",
+    );
+  });
+
+  it("leaves another order's tick alone", async () => {
+    answerReadyStock();
+    renderRegister();
+    fireEvent.click(screen.getByTestId("so-batch-select-o3"));
+    fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
+    fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
+    const row = await screen.findByTestId(
+      "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
+    );
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId("ready-stock-act-o1");
+    fireEvent.click(screen.getByTestId("so-batch-issue"));
+    expect(onIssue).toHaveBeenCalledWith([
+      { demandId: "build::o3::b3", allocations: [{ destinationId: KLANG, qty: 1 }] },
+    ]);
   });
 });
