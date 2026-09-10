@@ -1106,6 +1106,51 @@ Missing provenance prints an absence; line-level PO arrays are never copied onto
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
 
+**READY STOCK — BUILT AND PRODUCTION-VERIFIED 2026-09-10 (migration 0471).** Directly beneath
+`GoodsMiniTable`, and INDEPENDENTLY collapsible, sits `Ready Stock`: the free stock that could
+answer this Sales Order's item lines. It is a sibling SECTION, never a column and never a second
+mini-table — the goods table answers *what was ordered and what covers it*, this one answers *what
+is on the shelf for it*.
+
+- **Reading it reserves nothing.** The read is lazy (opened rows only) and writes no row. Selecting
+  a Unit still writes nothing. Only `Choose Ready Unit` writes, and its selection is entirely
+  separate from the Register's purchasing tick.
+- **The offer is the authoritative register**, `stock_unit_register_v` filtered on
+  `availability = 'available'` — the ONE availability arithmetic (0371), which already excludes a
+  released-but-damaged Unit, anything needing repair and anything on hold. **No warehouse filter:**
+  goods at a second site are still goods Carres owns. `Condition` is a GRADE and a separate fact —
+  a `Display` Unit is fully available. `Where`, `Owner` (Carres · Supplier) and `Qty` are read, not
+  assumed.
+- **A counted row is shown and is not choosable.** `identity_scope = 'quantity'` stock (0453) wears
+  a `QTY-` key, never a Unit ID, and 0368's ruling — bulk is not bindable — is enforced at the
+  reservation door, not by a screen. Hiding it would make a full shelf read as an empty one.
+- **A reserved Unit names the SO ITEM LINE it answers**, not just the order.
+  `ops_stock_items.reserved_order_line_id` is that binding; `reserved_ref` still names the order.
+  A Sales Order with two item lines of one SKU — SO-1251, SO-1207 and SO-1246 carry exactly that
+  today — is the case this exists for. When a caller names no line the door RESOLVES one and has
+  exactly two outcomes: a single candidate, or a named refusal. It never picks out of several.
+- **The door validates in SQL on the locked row**: the line belongs to that Sales Order, the goods
+  match by `stock_match_key` (its SQL twin is pinned to the TypeScript rule by a contract test over
+  the live 327-SKU corpus; zero collisions across the 236 Catalog SKUs, measured 2026-09-10), the
+  Unit is an exact Unit, it is `available`, and the line still has a remaining requirement of
+  `qty − Ready Stock bound − non-cancelled PO lineage` — the same expression
+  `soBatchOrderLineOutstandingQty` prints. **There is no override**: not a reason box, not a note.
+- **One act is one transaction.** `so_batch_reserve_ready_units` loops the one governed draw door
+  inside a single transaction: every chosen Unit or none, and a race refuses the whole act by name.
+  It is not a second writer.
+- **Release and substitution give the requirement back.** `ops_stock_release` and
+  `ops_stock_reassign` clear the binding, so the customer's requirement returns to this Register by
+  itself. `ops_stock_pool_usage` is NOT rewound — it counts the DECISION and stays append-only
+  (0292); coverage is a different question and now has its own answer. Coverage reads the binding
+  for every new reservation and the historical ledger only for units that carry none, and the two
+  sets are disjoint by Unit so nothing is counted twice.
+- **The original demand survives.** After reserving, the section states
+  `Requested N = Ready Stock n + On PO n + To purchase n` with the exact Unit IDs. The ordered
+  quantity is never quietly rewritten, and choosing stock never cancels, replaces or edits an
+  existing purchase order.
+- **Consignment stock is choosable and is labelled.** §7.7 already rules that reservation creates no
+  supplier notice; what the operator needs is to SEE that the goods belong to a supplier.
+
 **THE DOCUMENT PARTITION — ONE CONTRACT, BOTH SIDES.** A purchase order is one
 `Supplier × Deliver To × Category × (one-PO-per-order category ? Source Order : —)`. The browser and
 the server compute that key from the same facts (`documentPartitionKey`), so `Issue N POs`, `1 of N`,

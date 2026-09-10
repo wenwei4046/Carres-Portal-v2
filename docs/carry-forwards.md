@@ -86,6 +86,23 @@ each owner should take the one-line change with a test.
   it collided with this card's `0454`, which was renumbered to `0456`/`0457` and whose two
   tracker rows were renamed to match. **Falsifier / next step:** the Issue Tracker lane applies it
   through the governed path, or confirms its objects are live and inserts the tracker row.
+- `0461-to-0469-merged-to-main-but-absent-from-the-tracker` — **OPEN, 2026-09-10. NOT THIS
+  LANE'S.** Nine migrations are on `main` and **absent from `supabase_migrations.schema_migrations`**
+  (measured 2026-09-10 while applying the SO Batch Ready Stock work): `0461`–`0468`, the Finance
+  ledger set, plus `0469_a_reversal_and_its_contra_are_both_counted`. The tracker's numeric tail
+  is `0458` while the repository's is `0472`. This is the same shape as the `0454` scar above and
+  is nine times larger. Found because the Ready Stock lane had to establish which of its own
+  dependencies were live: `0442`/`0443`/`0444`/`0453` ARE applied, which is what `0471` stands on,
+  so nothing here was blocked and **nothing here was touched.** **Falsifier / next step:** the
+  Finance lane applies them through the governed path, or confirms their objects are live and
+  inserts the tracker rows. Until then any reader of the tracker tail will under-count by nine.
+- `so-batch-ready-stock-delegator-awaits-0472` — **OPEN, 2026-09-10, THIS LANE'S, and it closes
+  the moment production reports the merge SHA.** `0471` deliberately left a 7-argument
+  `ops_stock_pool_draw` delegator so that neither the pre-deploy nor the post-deploy bundle ever
+  called a function that did not exist. Two doors for one act is exactly what ERP Architecture
+  Law C forbids, so it is debt with a same-day maturity: `0472` drops it and asserts the door is
+  one function again. **Falsifier / next step:** `0472` applied, and `pg_proc` shows exactly one
+  `ops_stock_pool_draw`, the one that names `p_order_line_id`.
 - ~~`receiving-grn-card-01-awaits-merge-apply-and-production-proof`~~ — **CLOSED 2026-09-04 WITH
   ITS PRODUCTION PROOF.** 0425/0426 APPLIED via the governed MCP path (tracker 20260904125205 /
   20260904125800), PR #1099 merged `7a897494`, deployed, production-smoked with committed test

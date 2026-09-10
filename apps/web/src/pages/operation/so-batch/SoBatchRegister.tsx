@@ -43,6 +43,7 @@ import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import { DestinationSummarySelect, ResponsiveValues } from "./ResponsiveValues";
+import ReadyStockPanel from "./ReadyStockPanel";
 import GoodsMiniTable, {
   categoryWord,
   type GoodsMiniLine,
@@ -1359,6 +1360,13 @@ function SoBatchOrderExpansion({
           },
         }}
       />
+      {/* ⭐ READY STOCK — an INDEPENDENTLY collapsible table directly below
+          the order's own goods (owner-accepted design, 2026-09-10). It is a
+          sibling section, not a column and not a second mini-table: the
+          goods table answers *what was ordered and what covers it*, this one
+          answers *what is on the shelf for it*. Its selection is its own —
+          choosing a Unit never touches the purchasing tick above. */}
+      <ReadyStockPanel orderId={order.orderId} so={order.so} />
     </div>
   );
 }
