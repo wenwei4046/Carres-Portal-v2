@@ -123,11 +123,11 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
   };
 }
 
-function renderPage() {
+function renderPage(initialEntry = "/operation?tab=purchase") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/operation?tab=purchase"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <OperationToOrder />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -152,6 +152,13 @@ describe("the page reads the ONE projection and draws the Register", () => {
     await screen.findByTestId("so-batch-page");
     expect(apiFetch).toHaveBeenCalledTimes(1);
     expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands");
+  });
+
+  it("keeps the Sales Order scope when the direct to-order URL is reloaded", async () => {
+    apiFetch.mockResolvedValue(payload());
+    renderPage("/operation/to-order?so=1204");
+    await screen.findByTestId("so-batch-page");
+    expect(apiFetch.mock.calls[0]![0]).toBe("/api/operation/purchase/demands?so=1204");
   });
 
   it("opens straight onto the header, the order-timing rail and the Register", async () => {
