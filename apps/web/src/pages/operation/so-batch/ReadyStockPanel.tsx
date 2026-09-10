@@ -15,6 +15,10 @@ import {
 } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 import { toast } from "sonner";
+import ReadyStockTable, {
+  ReadyStockDisclosure,
+  type ReadyStockTableRow,
+} from "../components/ReadyStockTable";
 
 /**
  * ⭐ READY STOCK — the collapsible table directly under a Sales Order's goods
@@ -42,25 +46,15 @@ import { toast } from "sonner";
  *   · THE ORIGINAL DEMAND SURVIVES. After reserving, the summary states
  *     `Requested N = Ready Stock n (Unit IDs) + On PO n + To purchase n`. The
  *     ordered quantity is never quietly rewritten.
+ *
+ * ⭐ THE BOX ITSELF IS SHARED (owner ruling 2026-09-11). The disclosure frame,
+ * the ruled columns and the condition vocabulary live in
+ * `../components/ReadyStockTable`, so the settled Manual Purchase section is
+ * the SAME table minus the capabilities it has no business owning — never a
+ * second copy that starts identical and drifts. What stays here is what is
+ * genuinely this page's: the item-line binding, the refused-Unit highlight,
+ * and the one act that writes.
  */
-
-const CONDITION_WORDS: Record<string, string> = {
-  new: "New",
-  exhibition: "Display",
-  old: "Fair (used)",
-  refurbished: "Refurbished",
-  damaged: "Damaged",
-};
-
-/** `Absence` is a FACT, not an apology — `docs/COPY-STANDARD.md`. */
-function Absence({ children }: { children: React.ReactNode }) {
-  return <span className="text-base-400">{children}</span>;
-}
-
-function conditionWord(c: string | null): string {
-  if (!c) return "Not recorded";
-  return CONDITION_WORDS[c] ?? c;
-}
 
 /**
  * WHAT THE ACT DID, IN UNITS.
@@ -124,6 +118,12 @@ export default function ReadyStockPanel({
 
   const lineById = useMemo(
     () => new Map((q.data?.lines ?? []).map((l) => [l.orderLineId, l])),
+    [q.data],
+  );
+  /* The shared table prints the GOODS; the item-line binding is this page's
+     own fact, so the cells that need it look the Unit back up here. */
+  const unitById = useMemo(
+    () => new Map((q.data?.units ?? []).map((u) => [u.itemId, u])),
     [q.data],
   );
 
@@ -212,199 +212,96 @@ export default function ReadyStockPanel({
   const chosenCount = chosen.size;
 
   return (
-    /* THE CARRES SECTION CONNECTOR — the light-grey rounded menu-style frame
-       the expansion already uses between its sections. It sits BETWEEN the
-       goods table and this one, not on every row. */
-    <div
-      className="mt-2 overflow-hidden rounded-control border border-base-200 bg-white"
-      data-testid={`ready-stock-${orderId}`}
+    <ReadyStockDisclosure
+      testId={`ready-stock-${orderId}`}
+      open={open}
+      onToggle={() => setOpen((v) => !v)}
     >
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        /* 36px, the section handle — the item rows below are the ruled 38px. */
-        className="flex h-9 w-full items-center gap-2 bg-base-50 px-3 text-left text-body font-semibold text-base-900 hover:bg-base-100"
-      >
-        <span aria-hidden>{open ? "▾" : "▸"}</span>
-        <span>Ready Stock</span>
-      </button>
+      {q.isPending ? (
+        <div className="px-3 py-2 text-meta text-base-500">Reading the stock register…</div>
+      ) : q.isError ? (
+        <div className="px-3 py-2 text-meta">
+          <button
+            type="button"
+            className="text-kit-blue-11 hover:underline"
+            onClick={() => void q.refetch()}
+          >
+            Ready Stock could not be read. Try again
+          </button>
+        </div>
+      ) : (q.data?.units.length ?? 0) === 0 ? (
+        <div className="px-3 py-2 text-meta text-base-500">
+          No stock on the shelf matches this order.
+        </div>
+      ) : (
+        <>
+          <div className="px-3 py-2 text-meta text-base-500">
+            Choose the Unit that answers an item line. Viewing does not reserve.
+          </div>
+          <ReadyStockTable
+            label={so == null ? "Ready Stock for this order" : `Ready Stock for SO-${so}`}
+            rows={q.data!.units as ReadyStockTableRow[]}
+            selection={{
+              isChosen: (itemId) => chosen.has(itemId),
+              onToggle: toggle,
+              /* A Unit the door refuses keeps its checkbox and its choice —
+                 the operator unticks that one and presses again. */
+              isRefused: (itemId) => act != null && !act.ok && act.unitId === itemId,
+              blockedWord: (row) => {
+                const unit = unitById.get(row.itemId);
+                if (unit?.blocked) return READY_STOCK_BLOCKED_WORDS[unit.blocked];
+                /* A Unit with no matching line cannot be committed either,
+                   even where the server sent no code for it. */
+                return unit && unit.matchingLineIds.length > 0 ? null : "—";
+              },
+            }}
+            extraColumn={{
+              header: "For item line",
+              width: 170,
+              cell: (row) => {
+                const unit = unitById.get(row.itemId);
+                if (!unit) return null;
+                if (unit.matchingLineIds.length === 1) {
+                  return <span>{lineById.get(unit.matchingLineIds[0]!)?.item ?? "—"}</span>;
+                }
+                /* TWO ITEM LINES OF ONE SKU is the case this whole build
+                   exists for: the operator says WHICH, and the server refuses
+                   to guess if they do not. */
+                const picked = lineChoice.get(unit.itemId) ?? unit.matchingLineIds[0] ?? "";
+                return (
+                  <select
+                    aria-label={`Item line for ${unit.unitCode ?? "Unit"}`}
+                    className="w-full rounded-control border border-base-300 bg-white px-1 py-0.5 text-body"
+                    value={picked}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setLineChoice((prev) => new Map(prev).set(unit.itemId, v));
+                    }}
+                  >
+                    {unit.matchingLineIds.map((id, i) => (
+                      <option key={id} value={id}>
+                        {`Line ${i + 1} · ${lineById.get(id)?.item ?? id}`}
+                      </option>
+                    ))}
+                  </select>
+                );
+              },
+            }}
+          />
 
-      {open ? (
-        q.isPending ? (
-          <div className="px-3 py-2 text-meta text-base-500">Reading the stock register…</div>
-        ) : q.isError ? (
-          <div className="px-3 py-2 text-meta">
+          <div className="flex items-center gap-3 border-t border-base-200 px-3 py-2">
+            <span className="text-meta text-base-500">
+              {chosenCount === 0 ? "No Unit chosen" : `${chosenCount} chosen`}
+            </span>
             <button
               type="button"
-              className="text-kit-blue-11 hover:underline"
-              onClick={() => void q.refetch()}
+              disabled={chosenCount === 0 || reserve.isPending}
+              onClick={() => reserve.mutate()}
+              className="rounded-control bg-kit-blue-9 px-3 py-1.5 text-body font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
-              Ready Stock could not be read. Try again
+              {reserve.isPending ? "Reserving…" : "Choose Ready Unit"}
             </button>
           </div>
-        ) : (q.data?.units.length ?? 0) === 0 ? (
-          <div className="px-3 py-2 text-meta text-base-500">
-            No stock on the shelf matches this order.
-          </div>
-        ) : (
-          <>
-            <div className="px-3 py-2 text-meta text-base-500">
-              Choose the Unit that answers an item line. Viewing does not reserve.
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-left" style={{ minWidth: 940 }}>
-                <colgroup>
-                  <col style={{ width: 36 }} />
-                  <col style={{ width: 140 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 150 }} />
-                  <col style={{ width: 120 }} />
-                  <col style={{ width: 170 }} />
-                  <col />
-                </colgroup>
-                <thead className="border-y border-base-200 bg-base-50">
-                  <tr className="divide-x divide-base-200">
-                    <th className="px-2 py-1.5" aria-label="Choose Unit" />
-                    {[
-                      "Unit ID",
-                      "Condition",
-                      "Qty",
-                      "Where",
-                      "Owner",
-                      "For item line",
-                      "Item",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        scope="col"
-                        /* Long headings may wrap to two lines; the ruled row
-                           height below is unaffected. */
-                        className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base-200 text-body">
-                  {q.data!.units.map((u) => {
-                    const selected = chosen.has(u.itemId);
-                    /* THE UNIT THE LAST ACT STOPPED ON. Amber, because it is an
-                       exception to fix, not a failure of the goods (§ tokens). */
-                    const refused = act != null && !act.ok && act.unitId === u.itemId;
-                    const defaultLine = u.matchingLineIds[0] ?? null;
-                    const pickedLine = lineChoice.get(u.itemId) ?? defaultLine;
-                    return (
-                      <tr
-                        key={u.itemId}
-                        data-testid={`ready-stock-unit-${u.itemId}`}
-                        /* SELECTED UNIT: light-blue row with a thin blue rule
-                           top and bottom — distinct from the purchasing
-                           selection above, and from keyboard focus, which the
-                           browser's own ring still draws. */
-                        /* ⚠️ `var(--kit-blue-9)` shipped here on 2026-09-10 and
-                           drew NOTHING: the kit palette is a Tailwind colour
-                           scale, and no stylesheet defines that custom
-                           property — an invalid box-shadow is dropped whole, so
-                           the selected row had its fill and no rule. The token
-                           is read from the theme instead, which is the same
-                           locked value and actually resolves. Amber has only
-                           steps 3 and 11 by law, so the refused row carries the
-                           fill alone rather than inventing a step. */
-                        className={
-                          refused
-                            ? "divide-x divide-base-200 bg-kit-amber-3"
-                            : selected
-                              ? "divide-x divide-base-200 bg-kit-blue-3 shadow-[inset_0_1px_theme(colors.kit.blue.9),inset_0_-1px_theme(colors.kit.blue.9)]"
-                              : "divide-x divide-base-200"
-                        }
-                        style={{ height: 38 }}
-                      >
-                        <td className="px-2 text-center">
-                          {u.blocked == null && defaultLine ? (
-                            <input
-                              type="checkbox"
-                              aria-label={`Choose ${u.unitCode ?? "Unit"}`}
-                              checked={selected}
-                              onChange={() => toggle(u.itemId)}
-                            />
-                          ) : (
-                            <Absence>—</Absence>
-                          )}
-                        </td>
-                        <td className="px-2">
-                          {/* A counted row's key is NOT a Unit ID and never
-                              prints under this heading as if it were. The
-                              governed answer for a quantity-scoped goods line
-                              is the absence dash — `No Unit ID` would imply
-                              one is owed (`docs/COPY-STANDARD.md`). */}
-                          {u.identityScope === "unit" && u.unitCode ? (
-                            u.unitCode
-                          ) : (
-                            <Absence>—</Absence>
-                          )}
-                        </td>
-                        <td className="px-2">{conditionWord(u.condition)}</td>
-                        <td className="px-2 tabular-nums">{u.qty}</td>
-                        <td className="px-2">
-                          {u.siteName ?? <Absence>Not recorded</Absence>}
-                        </td>
-                        <td className="px-2">
-                          {u.ownership === "supplier_consignment" ? (
-                            <span title={u.supplier ?? undefined}>Supplier</span>
-                          ) : (
-                            "Carres"
-                          )}
-                        </td>
-                        <td className="px-2">
-                          {u.blocked ? (
-                            <Absence>{READY_STOCK_BLOCKED_WORDS[u.blocked]}</Absence>
-                          ) : u.matchingLineIds.length === 1 ? (
-                            <span>{lineById.get(u.matchingLineIds[0]!)?.item ?? "—"}</span>
-                          ) : (
-                            /* TWO ITEM LINES OF ONE SKU is the case this whole
-                               build exists for: the operator says WHICH, and
-                               the server refuses to guess if they do not. */
-                            <select
-                              aria-label={`Item line for ${u.unitCode ?? "Unit"}`}
-                              className="w-full rounded-control border border-base-300 bg-white px-1 py-0.5 text-body"
-                              value={pickedLine ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setLineChoice((prev) => new Map(prev).set(u.itemId, v));
-                              }}
-                            >
-                              {u.matchingLineIds.map((id, i) => (
-                                <option key={id} value={id}>
-                                  {`Line ${i + 1} · ${lineById.get(id)?.item ?? id}`}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                        <td className="px-2">{u.sku}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center gap-3 border-t border-base-200 px-3 py-2">
-              <span className="text-meta text-base-500">
-                {chosenCount === 0 ? "No Unit chosen" : `${chosenCount} chosen`}
-              </span>
-              <button
-                type="button"
-                disabled={chosenCount === 0 || reserve.isPending}
-                onClick={() => reserve.mutate()}
-                className="rounded-control bg-kit-blue-9 px-3 py-1.5 text-body font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {reserve.isPending ? "Reserving…" : "Choose Ready Unit"}
-              </button>
-            </div>
 
             {/* WHAT THE ACT DID, IN UNITS — never a bare count.
                 The door commits every chosen Unit or none, so this says which
@@ -462,10 +359,9 @@ export default function ReadyStockPanel({
                     </div>
                   ))}
               </div>
-            ) : null}
-          </>
-        )
-      ) : null}
-    </div>
+          ) : null}
+        </>
+      )}
+    </ReadyStockDisclosure>
   );
 }

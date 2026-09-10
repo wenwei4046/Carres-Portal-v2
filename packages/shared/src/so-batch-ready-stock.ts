@@ -1,10 +1,25 @@
 import { z } from "zod";
 
 /**
- * ── SO BATCH PURCHASE · READY STOCK ────────────────────────────────────────
+ * ── READY STOCK — THE ONE CONTRACT, BOTH PURCHASING SURFACES ───────────────
  *
- * The contract for the collapsible table under a Sales Order's own goods:
- * what free stock could answer this order's item lines, and the one act that
+ * The contract for the collapsible table under a buying row's own goods:
+ * what free stock could answer it. Written for SO Batch Purchase first; the
+ * settled Manual Purchase design (owner ruling 2026-09-11) reads the same
+ * vocabulary from here rather than growing a second one, so `Display` can
+ * never mean two things on two purchasing pages (Law D).
+ *
+ * ⭐ THE TWO SURFACES DIFFER IN EXACTLY ONE PLACE, AND IT IS A BUSINESS
+ * DIFFERENCE, NOT A STYLE ONE.
+ *
+ *   SO BATCH      a customer item line is owed goods, so a Unit can be
+ *                 COMMITTED to it — `Choose Ready Unit` writes.
+ *   MANUAL        an internal replenishment is not owed by any Unit on the
+ *                 shelf. The section SHOWS what is there and writes nothing:
+ *                 no reservation act is copied across, and a replenishment
+ *                 quantity is never automatically reduced by inventory.
+ *
+ * For SO Batch, what follows is the item-line contract and the one act that
  * commits an exact Unit to an exact line.
  *
  * THREE THINGS THIS CONTRACT INSISTS ON, and each is a measured defect it
@@ -147,3 +162,81 @@ export const READY_STOCK_REFUSAL_WORDS: Record<string, string> = {
 export function readyStockRefusalWord(code: string | null | undefined): string {
   return (code && READY_STOCK_REFUSAL_WORDS[code]) || "That Unit could not be reserved.";
 }
+
+/**
+ * ⭐ CONDITION IS A GRADE, AND IT IS NOT AVAILABILITY — one arithmetic, both
+ * purchasing surfaces (Law D; owner ruling 2026-09-11).
+ *
+ * A `Display` unit is FULLY available; the grade is a separate fact and gets
+ * its own column rather than being folded into a single "status" word. This
+ * map lived in the SO Batch panel as a private constant; the settled Manual
+ * Purchase design needs the identical words, and two private copies of a
+ * vocabulary is how `exhibition` ends up reading `Display` on one page and
+ * `Exhibition` on the other.
+ *
+ * An unrecognised grade prints ITSELF — never a blank, and never a borrowed
+ * word it did not earn.
+ */
+export const READY_STOCK_CONDITION_WORDS: Record<string, string> = {
+  new: "New",
+  exhibition: "Display",
+  old: "Fair (used)",
+  refurbished: "Refurbished",
+  damaged: "Damaged",
+};
+
+/** `docs/COPY-STANDARD.md` — an absent grade is a stated fact, not a blank. */
+export const READY_STOCK_CONDITION_ABSENT = "Not recorded";
+
+export function readyStockConditionWord(condition: string | null | undefined): string {
+  if (!condition) return READY_STOCK_CONDITION_ABSENT;
+  return READY_STOCK_CONDITION_WORDS[condition] ?? condition;
+}
+
+/**
+ * ── MANUAL PURCHASE · READY STOCK — the settled design, 2026-09-11 ─────────
+ *
+ * `Is this product already on our shelf?`, grouped by the goods themselves.
+ *
+ * FIVE THINGS THIS SHAPE REFUSES TO PRETEND, and every one of them is an
+ * owner instruction rather than a taste:
+ *
+ *  1. **VIEWING IS NEITHER SELECTION NOR RESERVATION.** There is no pick
+ *     list, no chosen set and no act — hence no `picks`, no `reserve` input
+ *     and no `blocked` reason in this contract. Nothing here can write.
+ *  2. **A REPLENISHMENT IS NOT REDUCED BY WHAT IS ON THE SHELF.** The group
+ *     states what the request asked for and what exists, side by side. The
+ *     ask is never rewritten, and nothing nets one against the other.
+ *  3. **MATCHING RESPECTS THE WHOLE CONFIGURATION, NOT THE SKU TEXT.** The
+ *     group key is `stockMatchKey` — the portal's one rule, pinned to its
+ *     SQL twin by a contract test — so a size or fabric that differs is a
+ *     different group rather than a false match.
+ *  4. **CONDITION AND AVAILABILITY ARE DIFFERENT FACTS.** Everything offered
+ *     is already `available`; `condition` rides beside it as a grade.
+ *  5. **A COUNTED ROW IS SHOWN AND IS NOT A UNIT** (0453 · 0368). Hiding
+ *     bulk stock would make a full shelf read as an empty one.
+ */
+export const manualPurchaseReadyStockGroupSchema = z.object({
+  /** `stockMatchKey` of the requested SKU — the group's identity. */
+  matchKey: z.string(),
+  /** The Catalog words the request line prints, so the group is readable. */
+  item: z.string(),
+  /** Every requested SKU that matched into this group. */
+  skus: z.array(z.string()),
+  /** What the request ASKED for across those lines. Never reduced here. */
+  requestedQty: z.number().int(),
+  /** Free pieces on the shelf under this key — exact Units and counted rows. */
+  freeQty: z.number().int(),
+  units: z.array(readyStockUnitSchema.omit({ matchingLineIds: true, blocked: true })),
+});
+export type ManualPurchaseReadyStockGroup = z.infer<
+  typeof manualPurchaseReadyStockGroupSchema
+>;
+
+export const manualPurchaseReadyStockResponseSchema = z.object({
+  requestId: z.string(),
+  groups: z.array(manualPurchaseReadyStockGroupSchema),
+});
+export type ManualPurchaseReadyStockResponse = z.infer<
+  typeof manualPurchaseReadyStockResponseSchema
+>;

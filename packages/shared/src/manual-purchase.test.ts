@@ -551,20 +551,36 @@ describe("Card 06 §7 · the two Work actions", () => {
     });
   });
 
-  it("a numbered PO completes nothing — the current version must be confirmed sent", () => {
-    const open = manualPurchaseWorkItems(
-      input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: false }),
+  it("an ISSUED PO is a commitment — a missing send confirmation raises no work", () => {
+    /* ⭐ OWNER RULING 2026-09-11. This used to keep `Issue PO` open on a fully
+       ordered request whose purchase orders carried no confirmed-sent row.
+       Measured on production the same day: 62 purchase orders exist and 3
+       carry that evidence — so the rule raised an "Issue PO" task against 59
+       documents that had already been issued, inviting a SECOND purchase
+       order for goods already bought. Copying a PO into WhatsApp is not proof
+       of sending, and the absence of proof is not a reason to buy again. */
+    expect(
+      manualPurchaseWorkItems(
+        input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: false }),
+        { approver, poDuty },
+        "2026-09-01",
+      ),
+    ).toEqual([]);
+    expect(
+      manualPurchaseWorkItems(
+        input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: true }),
+        { approver, poDuty },
+        "2026-09-01",
+      ),
+    ).toEqual([]);
+    /* The evidence itself is untouched — it is still read, still stored, and
+       still worth showing on the document. It simply may not make work. */
+    const stillOpen = manualPurchaseWorkItems(
+      input({ status: "ready_to_order", remainingQty: 2, hasPos: true, posAllSent: false }),
       { approver, poDuty },
       "2026-09-01",
     );
-    expect(open.map((i) => i.ruleKey)).toEqual(["manual_purchase.issue_po"]);
-
-    const done = manualPurchaseWorkItems(
-      input({ status: "ordered", remainingQty: 0, hasPos: true, posAllSent: true }),
-      { approver, poDuty },
-      "2026-09-01",
-    );
-    expect(done).toEqual([]);
+    expect(stillOpen.map((i) => i.ruleKey)).toEqual(["manual_purchase.issue_po"]);
   });
 
   it("a refused or arrived request carries no work; late counts Office working days", () => {
@@ -622,35 +638,41 @@ import {
   manualPurchaseSupplierSummary,
 } from "./manual-purchase";
 
-describe("Card 06 · the eleven column words", () => {
-  it("spells the Card's exact column heads once — Requested Date / Needed By retired", () => {
+describe("the settled nine column words", () => {
+  it("spells the settled column heads once, in order — owner ruling 2026-09-11", () => {
     expect([
-      MANUAL_PURCHASE_WORDS.colProceedDate,
       MANUAL_PURCHASE_WORDS.colApproval,
+      MANUAL_PURCHASE_WORDS.colRequestedBy,
+      MANUAL_PURCHASE_WORDS.colProceedDate,
       MANUAL_PURCHASE_WORDS.colPoNo,
-      MANUAL_PURCHASE_WORDS.colDeliveryDate,
-      MANUAL_PURCHASE_WORDS.colFor,
+      MANUAL_PURCHASE_WORDS.colPurpose,
       MANUAL_PURCHASE_WORDS.colItems,
-      MANUAL_PURCHASE_WORDS.colQty,
       MANUAL_PURCHASE_WORDS.colSupplier,
       MANUAL_PURCHASE_WORDS.colDeliverTo,
-      MANUAL_PURCHASE_WORDS.colRequestedBy,
+      MANUAL_PURCHASE_WORDS.colDeliveryDate,
     ]).toEqual([
-      "Proceed Date",
       "Approval Status",
+      "Requested By",
+      "Proceed Date",
       "PO No",
-      "Delivery Date",
-      "For",
+      "Purpose",
       "Items",
-      "Qty",
       "Supplier",
       "Deliver To",
-      "Requested By",
+      "Delivery Date",
     ]);
     const words = JSON.stringify(MANUAL_PURCHASE_WORDS);
     expect(words).not.toContain("Requested Date");
     expect(words).not.toContain("Needed By");
     expect(words).not.toContain("Needed by");
+  });
+
+  it("`For` survives as the OBJECT's fact and `Qty` leaves the dictionary", () => {
+    /* The structured `For` still labels the object's Request section; it is
+       simply no longer a Register column. `colQty` is gone entirely — a word
+       nothing may print is a word that should not exist to be printed. */
+    expect(MANUAL_PURCHASE_WORDS.colFor).toBe("For");
+    expect("colQty" in MANUAL_PURCHASE_WORDS).toBe(false);
   });
 
   it("the form's date words and the lead-days Send gap are governed", () => {

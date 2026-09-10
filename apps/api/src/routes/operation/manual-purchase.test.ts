@@ -18,6 +18,9 @@ vi.mock("../../lib/duties", () => ({
   myDuties: vi.fn().mockResolvedValue([]),
   dutyHolders: vi.fn().mockResolvedValue({}),
 }));
+vi.mock("../../lib/purchase-demand-read", () => ({
+  readFreeStock: vi.fn(),
+}));
 vi.mock("../../lib/purchasing-settings", () => ({
   // The frozen ETA arithmetic is the SHARED function; the loader is mocked to
   // a minimal settings shape whose arithmetic degrades to `today` — this test
@@ -33,6 +36,8 @@ vi.mock("../../lib/purchasing-settings", () => ({
   }),
 }));
 
+import { stockMatchKey } from "@carres/shared";
+import { readFreeStock } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 
 /**
@@ -1989,5 +1994,285 @@ describe("POST /purchasing/requests — the earliest Delivery Date a Manual Purc
     const res = await create({ ...HEADER, requiredBy: "2020-01-01", lines: LINES }, rpc);
     expect(res.status).toBe(200);
     expect(rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * GET /:id/ready-stock — MANUAL PURCHASE · READY STOCK
+ *
+ * The settled design's read: *is the product this internal purchase asks for
+ * already on our shelf, and exactly which Units are they?* It writes nothing,
+ * it nets nothing, and it has no reservation twin.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("GET /purchasing/requests/:id/ready-stock", () => {
+  const REQ = "aaaaaaaa-0000-0000-0000-0000000000aa";
+  const UNIT = "ffffffff-0000-0000-0000-000000000001";
+  const BULK = "ffffffff-0000-0000-0000-000000000002";
+
+  function readySb(lines: Array<Record<string, unknown>>) {
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub({ id: REQ });
+          case "purchase_demands":
+            return tableStub(lines);
+          case "product_skus":
+            return tableStub([
+              {
+                sku: "5539-2NA",
+                variant: null,
+                variant_kind: null,
+                product_models: { name: "Ohana 2 Seater" },
+              },
+            ]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn(),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function readyStock(lines: Array<Record<string, unknown>>) {
+    vi.mocked(userClient).mockReturnValue(readySb(lines));
+    const jwt = await makeJwt("operation");
+    return app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/ready-stock`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+  }
+
+  beforeEach(() => {
+    vi.mocked(readFreeStock).mockResolvedValue({
+      stockWarehouse: null,
+      freeStock: {},
+      stockQtyById: new Map(),
+      freeUnitsByKey: new Map([
+        [
+          stockMatchKey("5539-2NA"),
+          [
+            {
+              id: UNIT,
+              unitCode: "U1-000-014",
+              sku: "5539-2NA",
+              qty: 1,
+              condition: "exhibition",
+              siteName: "Carres Klang",
+              holderName: null,
+              ownership: "carres_owned",
+              supplier: null,
+              identityScope: "unit",
+              dateIn: "2026-08-01",
+            },
+            {
+              id: BULK,
+              unitCode: "QTY-5539-2NA",
+              sku: "5539-2NA",
+              qty: 12,
+              condition: null,
+              siteName: "Carres Klang",
+              holderName: null,
+              ownership: "carres_owned",
+              supplier: null,
+              identityScope: "quantity",
+              dateIn: null,
+            },
+          ],
+        ],
+      ]),
+    });
+  });
+
+  it("groups by matching product/configuration and prints BOTH numbers, netting neither", async () => {
+    const res = await readyStock([
+      { id: "l1", sku: "5539-2NA", qty: 4, cancelled_at: null },
+      /* A SECOND LINE OF THE SAME GOODS IS ONE SHELF QUESTION — the group is
+         the product, never the request line. 4 + 2 = 6 asked. */
+      { id: "l2", sku: "5539-2NA", qty: 2, cancelled_at: null },
+    ]);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      groups: Array<{
+        item: string;
+        skus: string[];
+        requestedQty: number;
+        freeQty: number;
+        units: Array<Record<string, unknown>>;
+      }>;
+    };
+    expect(body.groups).toHaveLength(1);
+    const [group] = body.groups;
+    expect(group.item).toBe("Ohana 2 Seater");
+    expect(group.skus).toEqual(["5539-2NA"]);
+    /* ⛔ THE ASK IS NOT REDUCED BY THE SHELF. 6 asked and 13 free stand side
+       by side; an additional replenishment quantity is never automatically
+       netted against existing inventory. */
+    expect(group.requestedQty).toBe(6);
+    expect(group.freeQty).toBe(13);
+    /* A COUNTED ROW IS SHOWN (0453 · 0368) — hiding the 12 would make a full
+       shelf read as an empty one — and it is not a Unit. */
+    expect(group.units.map((u) => u.identityScope)).toEqual(["unit", "quantity"]);
+    /* CONDITION IS A GRADE, carried raw for the ONE shared vocabulary to
+       spell; availability was already decided by the register view. */
+    expect(group.units[0].condition).toBe("exhibition");
+    expect(group.units[0].siteName).toBe("Carres Klang");
+  });
+
+  it("VIEWING WRITES NOTHING — the response carries no act, and no RPC runs", async () => {
+    const sb = readySb([{ id: "l1", sku: "5539-2NA", qty: 1, cancelled_at: null }]);
+    vi.mocked(userClient).mockReturnValue(sb);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(
+        `https://api.test/api/operation/purchasing/requests/${REQ}/ready-stock`,
+        { headers: { Authorization: `Bearer ${jwt}` } },
+      ),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    /* No reservation twin exists for this route, and reading it must never
+       reach one: an internal replenishment is owed by no Unit on the shelf. */
+    expect((sb as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc).not.toHaveBeenCalled();
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("picks");
+    expect(JSON.stringify(body)).not.toContain("blocked");
+  });
+
+  it("a line nobody is going ahead with asks for nothing", async () => {
+    const res = await readyStock([
+      { id: "l1", sku: "5539-2NA", qty: 4, cancelled_at: "2026-09-01T00:00:00Z" },
+    ]);
+    const body = (await res.json()) as { groups: unknown[] };
+    /* Offering shelf stock against a dead line would be an answer to a
+       question nobody is asking any more. */
+    expect(body.groups).toEqual([]);
+  });
+
+  it("refuses an id that is not a request id before it reads anything", async () => {
+    vi.mocked(userClient).mockReturnValue(readySb([]));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests/not-a-uuid/ready-stock", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE PURCHASING APPROVER RESOLVES THROUGH THE SHARED DUTY RESOLVER (0474)
+ *
+ * ⭐ The screen and the door must ask the SAME system. Staff & Duties writes
+ * `workspace_duty_assignments` and `workspace_resolve_duty` reads it;
+ * `org_position_duties` is the HR POSITION duty table and a different one.
+ * Reading the wrong table is what made an assignment made on the Staff &
+ * Duties screen invisible to Manual Purchase — measured on production
+ * 2026-09-11: 13 `po_duty` and 13 `grn_duty` assignments there, and zero
+ * `purchasing_approver`.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("GET /purchasing/requests — who the Register names as approver", () => {
+  const JESS = "11111111-1111-1111-1111-00000000ce55";
+  const YJ = "11111111-1111-1111-1111-00000000cd7a";
+
+  function registerSb(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(dutyHolders).mockResolvedValue(
+      Object.fromEntries(opsManagerHolders.map((id) => [id, ["ops_manager"]])),
+    );
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub([]);
+          case "app_users":
+            return tableStub([
+              { id: JESS, name: "Jess", email: "jess@carres.com" },
+              { id: YJ, name: "Yu Jun", email: "yujun@carres.com" },
+            ]);
+          case "purchasing_destinations":
+          case "suppliers":
+          case "service_cases":
+            return tableStub([]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string) => {
+        if (fn === "workspace_resolve_duty") {
+          return Promise.resolve({
+            data: {
+              duty_key: "purchasing_approver",
+              actor_user_id: resolved,
+              normal_user_id: resolved,
+              source: resolved ? "assignment" : "not_assigned",
+            },
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(userClient).mockReturnValue(registerSb(resolved, opsManagerHolders));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+  }
+
+  it("names TODAY'S RESOLVED holder — not whoever holds the ops_manager POSITION", async () => {
+    /* Yu Jun holds the Workspace duty; Jess holds the legacy position duty.
+       The approved target is the Workspace duty, so Yu Jun is the answer and
+       the legacy rung is over the moment somebody is assigned. */
+    const body = await register(YJ, [JESS]);
+    expect(body.approvers.map((a) => a.id)).toEqual([YJ]);
+  });
+
+  it("falls back to the ops_manager holder ONLY while the duty resolves to nobody", async () => {
+    const body = await register(null, [JESS]);
+    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
+  });
+
+  it("a resolver that cannot answer fails soft onto the same rung, never wider", async () => {
+    vi.mocked(dutyHolders).mockResolvedValue({ [JESS]: ["ops_manager"] });
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) =>
+        table === "app_users"
+          ? tableStub([{ id: JESS, name: "Jess", email: "jess@carres.com" }])
+          : tableStub([]),
+      ),
+      rpc: vi.fn(() =>
+        Promise.resolve({ data: null, error: { message: "resolver down" } }),
+      ),
+    } as unknown as ReturnType<typeof userClient>);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvers: Array<{ id: string }>; canApprove: boolean };
+    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
+    /* This account holds neither, so it is still offered no decision — a
+       failed read must never widen the gate. */
+    expect(body.canApprove).toBe(false);
   });
 });

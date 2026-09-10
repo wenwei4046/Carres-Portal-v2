@@ -4936,6 +4936,23 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /**
+   * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
+   * THAT document's own quantity and destination (settled design, owner
+   * ruling 2026-09-11: "each quantity must correspond to its actual
+   * goods/source allocation… never repeat the entire request quantity on
+   * every PO allocation").
+   *
+   * `po_ids` above is the SET of documents and says nothing about how much
+   * went onto each — which is why the expansion used to print the whole
+   * request quantity beside a comma-joined list of numbers. Empty means
+   * nothing has been issued for this line yet. Absent on an older API.
+   */
+  allocations?: Array<{
+    poId: string;
+    qty: number;
+    destinationId: string | null;
+  }>;
   /** Card 06 — the SERVER date projection (the browser performs no
    *  working-day arithmetic): the line's effective Delivery Date, its
    *  derived Order By (null is a real answer, never a guessed one), and the
@@ -4952,7 +4969,14 @@ export interface ManualPurchaseRegisterPayload {
   /** Every PO the lines' lineage names — id → the actual po_no — plus the
    *  Card 06 issuance-completion fact: whether the CURRENT version has
    *  confirmed-sent evidence (`po_sends`, 0378). */
-  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  pos: Array<{
+    id: string;
+    po_no: string;
+    sent?: boolean;
+    /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
+    official_delivery_date?: string | null;
+    supplier_id?: string | null;
+  }>;
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
@@ -4966,7 +4990,8 @@ export interface ManualPurchaseRegisterPayload {
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
-   *  `ops_manager` duty holder(s), by name. */
+   *  `purchasing_approver` Duty holder(s) by name, falling back to
+   *  `ops_manager` only while that duty has no active holder (0474). */
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
