@@ -177,17 +177,50 @@ function withDatePlan(
  *  and — like the door — honours no email list. */
 async function canApprove(c: Context<AppEnv>): Promise<boolean> {
   if (c.var.auth.role === "principal") return true;
-  const mine = await myDuties(c);
-  if (mine.includes("purchasing_approver")) return true;
-  if (!mine.includes("ops_manager")) return false;
+  const actor = await purchasingApproverActor(c);
+  if (actor.userId != null) return actor.userId === c.var.auth.id;
   /* The self-retiring rung: the operations manager keeps deciding only while
-     the Purchasing Approver duty is unassigned. The moment somebody holds it,
-     this returns false here and the SQL door refuses there — together. */
-  const holders = await dutyHolders(c);
-  const claimed = Object.values(holders).some((duties) =>
-    duties.includes("purchasing_approver"),
-  );
-  return !claimed;
+     the Purchasing Approver duty has no holder. The moment somebody is
+     assigned, this returns false here and the SQL door refuses there —
+     together, because both read the same resolver in the same order. */
+  return (await myDuties(c)).includes("ops_manager");
+}
+
+/**
+ * TODAY'S PURCHASING APPROVER, through the ONE Shared Duty Resolver (0425).
+ *
+ * ⭐ THE SCREEN AND THE DOOR MUST ASK THE SAME SYSTEM. Staff & Duties writes
+ * `workspace_duty_assignments` and `workspace_resolve_duty` reads it — that
+ * is the Constitution's GLOBAL DUTY LAW and it is what
+ * `workspace-duties.ts` has offered `Purchasing Approver` into all along.
+ * `org_position_duties` is a DIFFERENT system (the HR position duties:
+ * `ops_manager`, `stock_planner`), and reading it here is what made an
+ * assignment made on the Staff & Duties screen invisible to this module.
+ *
+ * `actor_user_id` is already `coalesce(today's cover, the assignment)`, so a
+ * buddy covering the approver decides while they cover and not after.
+ *
+ * FAILS SOFT: an unreachable resolver answers "nobody holds it", which lands
+ * on the same `ops_manager` rung the module used before 0474 — never on a
+ * wider gate, and never on a 500.
+ */
+async function purchasingApproverActor(
+  c: Context<AppEnv>,
+): Promise<{ userId: string | null; name: string | null }> {
+  try {
+    const sb = userClient(c.env, c.var.auth.jwt);
+    const { data, error } = await sb.rpc("workspace_resolve_duty", {
+      p_duty_key: "purchasing_approver",
+    });
+    if (error || data == null || typeof data !== "object") {
+      return { userId: null, name: null };
+    }
+    const raw = data as Record<string, unknown>;
+    const userId = typeof raw.actor_user_id === "string" ? raw.actor_user_id : null;
+    return { userId, name: null };
+  } catch {
+    return { userId: null, name: null };
+  }
 }
 
 /**
@@ -204,38 +237,40 @@ async function resolveApprovers(
   c: Context<AppEnv>,
   users: Array<{ id: string; name: string | null; email: string | null }>,
 ): Promise<Array<{ id: string; name: string | null }>> {
-  const holders = await dutyHolders(c);
   /**
-   * ⭐ THE PURCHASING APPROVER IS ASKED FOR FIRST (0474; owner instruction
-   * 2026-09-11, "verify Jess's Purchasing Approver route through the shared
-   * duty authority").
+   * ⭐ THE PURCHASING APPROVER IS ASKED FOR FIRST, THROUGH THE SHARED
+   * RESOLVER (0474; owner instruction 2026-09-11, "verify Jess's Purchasing
+   * Approver route through the shared duty authority").
    *
    * The Work Engine has named `purchasing_approver` as the owner of
-   * `manual_purchase.approve` since it was written, and the Staff & Duties
-   * catalogue offers it — but `org_duties` had no such row, so no position
-   * could hold it and this reader never asked for it. Measured on production
-   * 2026-09-11: zero holders, and `Approve purchase` therefore had no owner
-   * in Work while the Register printed one from `ops_manager`. Two answers to
-   * "who approves this", from two different keys.
+   * `manual_purchase.approve` since it was written, and Staff & Duties offers
+   * it — but Staff & Duties writes `workspace_duty_assignments`, and this
+   * reader asked `org_position_duties`, which is the HR POSITION duty table
+   * and a different system. Measured on production 2026-09-11: 13 `po_duty`
+   * and 13 `grn_duty` assignments exist there and zero `purchasing_approver`,
+   * so `Approve purchase` had no owner in Work while the Register printed one
+   * from `ops_manager`. Two answers to "who approves this", from two systems.
    *
-   * The ladder is the gate's own, in the same order, so the name the screen
-   * prints and the person the SQL door admits cannot disagree:
-   *   1. `purchasing_approver` — the approved target.
+   * The ladder is the SQL gate's own, in the same order, so the name the
+   * screen prints and the person the door admits cannot disagree:
+   *   1. today's resolved `purchasing_approver` — the approved target.
    *   2. `ops_manager` — ONLY while nobody holds the duty above. It retires
-   *      itself the moment Jess assigns the duty, in the gate and here.
-   *   3. the legacy email list — last, and only if neither duty resolves at
-   *      all, so a duty read that fails soft still names somebody.
+   *      itself the moment the duty is assigned, in the gate and here.
+   *   3. the legacy email list — last, and only if neither resolves at all,
+   *      so a duty read that fails soft still names somebody.
    */
-  let approvers = users.filter((u) =>
-    (holders[u.id] ?? []).includes("purchasing_approver"),
-  );
-  if (approvers.length === 0) {
+  const actor = await purchasingApproverActor(c);
+  let approvers = actor.userId
+    ? users.filter((u) => u.id === actor.userId)
+    : [];
+  if (approvers.length === 0 && actor.userId == null) {
+    const holders = await dutyHolders(c);
     approvers = users.filter((u) => (holders[u.id] ?? []).includes("ops_manager"));
-  }
-  if (approvers.length === 0) {
-    approvers = users.filter((u) =>
-      (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
-    );
+    if (approvers.length === 0) {
+      approvers = users.filter((u) =>
+        (LEGACY_OPS_MANAGER_EMAILS as readonly string[]).includes(u.email ?? ""),
+      );
+    }
   }
   const isSharedLogin = (email: string | null) =>
     (email ?? "").toLowerCase() === "operation@carres.com";

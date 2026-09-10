@@ -37,6 +37,7 @@ vi.mock("../../lib/purchasing-settings", () => ({
 }));
 
 import { stockMatchKey } from "@carres/shared";
+import { dutyHolders } from "../../lib/duties";
 import { readFreeStock } from "../../lib/purchase-demand-read";
 import { userClient } from "../../lib/supabase";
 
@@ -2126,5 +2127,114 @@ describe("GET /purchasing/requests/:id/ready-stock", () => {
       { waitUntil() {}, passThroughException() {} } as never,
     );
     expect(res.status).toBe(400);
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE PURCHASING APPROVER RESOLVES THROUGH THE SHARED DUTY RESOLVER (0474)
+ *
+ * ⭐ The screen and the door must ask the SAME system. Staff & Duties writes
+ * `workspace_duty_assignments` and `workspace_resolve_duty` reads it;
+ * `org_position_duties` is the HR POSITION duty table and a different one.
+ * Reading the wrong table is what made an assignment made on the Staff &
+ * Duties screen invisible to Manual Purchase — measured on production
+ * 2026-09-11: 13 `po_duty` and 13 `grn_duty` assignments there, and zero
+ * `purchasing_approver`.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("GET /purchasing/requests — who the Register names as approver", () => {
+  const JESS = "11111111-1111-1111-1111-00000000ce55";
+  const YJ = "11111111-1111-1111-1111-00000000cd7a";
+
+  function registerSb(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(dutyHolders).mockResolvedValue(
+      Object.fromEntries(opsManagerHolders.map((id) => [id, ["ops_manager"]])),
+    );
+    return {
+      from: vi.fn((table: string) => {
+        switch (table) {
+          case "purchase_requests":
+            return tableStub([]);
+          case "app_users":
+            return tableStub([
+              { id: JESS, name: "Jess", email: "jess@carres.com" },
+              { id: YJ, name: "Yu Jun", email: "yujun@carres.com" },
+            ]);
+          case "purchasing_destinations":
+          case "suppliers":
+          case "service_cases":
+            return tableStub([]);
+          default:
+            return tableStub([]);
+        }
+      }),
+      rpc: vi.fn((fn: string) => {
+        if (fn === "workspace_resolve_duty") {
+          return Promise.resolve({
+            data: {
+              duty_key: "purchasing_approver",
+              actor_user_id: resolved,
+              normal_user_id: resolved,
+              source: resolved ? "assignment" : "not_assigned",
+            },
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: null, error: null });
+      }),
+    } as unknown as ReturnType<typeof userClient>;
+  }
+
+  async function register(resolved: string | null, opsManagerHolders: string[]) {
+    vi.mocked(userClient).mockReturnValue(registerSb(resolved, opsManagerHolders));
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    return (await res.json()) as { approvers: Array<{ id: string; name: string | null }> };
+  }
+
+  it("names TODAY'S RESOLVED holder — not whoever holds the ops_manager POSITION", async () => {
+    /* Yu Jun holds the Workspace duty; Jess holds the legacy position duty.
+       The approved target is the Workspace duty, so Yu Jun is the answer and
+       the legacy rung is over the moment somebody is assigned. */
+    const body = await register(YJ, [JESS]);
+    expect(body.approvers.map((a) => a.id)).toEqual([YJ]);
+  });
+
+  it("falls back to the ops_manager holder ONLY while the duty resolves to nobody", async () => {
+    const body = await register(null, [JESS]);
+    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
+  });
+
+  it("a resolver that cannot answer fails soft onto the same rung, never wider", async () => {
+    vi.mocked(dutyHolders).mockResolvedValue({ [JESS]: ["ops_manager"] });
+    vi.mocked(userClient).mockReturnValue({
+      from: vi.fn((table: string) =>
+        table === "app_users"
+          ? tableStub([{ id: JESS, name: "Jess", email: "jess@carres.com" }])
+          : tableStub([]),
+      ),
+      rpc: vi.fn(() =>
+        Promise.resolve({ data: null, error: { message: "resolver down" } }),
+      ),
+    } as unknown as ReturnType<typeof userClient>);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { approvers: Array<{ id: string }>; canApprove: boolean };
+    expect(body.approvers.map((a) => a.id)).toEqual([JESS]);
+    /* This account holds neither, so it is still offered no decision — a
+       failed read must never widen the gate. */
+    expect(body.canApprove).toBe(false);
   });
 });

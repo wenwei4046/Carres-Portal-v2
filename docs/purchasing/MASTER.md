@@ -1305,25 +1305,32 @@ is created.
   prepares and submits; it does not approve and does not control price. Approved requests
   continue into the one governed PO Duty issuance door; Manual Purchase and SO Batch
   Purchase remain separate doors.
-- **THE PURCHASING APPROVER DUTY EXISTS AND IS THE ROUTE — 0474, verified 2026-09-11.**
-  The approved target was the resolved `Purchasing Approver` Duty, and the route did not
-  exist: measured on production 2026-09-11, `org_duties` held seven keys and
-  `purchasing_approver` was NOT one of them, so no position could ever hold it — while
-  `workspace-duties.ts` OFFERED it in Staff & Duties and the Work Engine already named it
-  as `manual_purchase.approve`'s `ownerDutyKey`. `Approve purchase` was therefore an
-  ownerless Work row, and Approve/Refuse worked only through the legacy `ops_manager`
-  check. **0474 adds the duty to `org_duties` so it is assignable**, and moves the decide
-  door onto its own `purchasing_approver_gate`: `principal`, or an active position holding
-  `purchasing_approver`, or the `ops_manager` holder **while that duty has no active
-  holder** — a fallback that retires itself the moment Jess assigns the duty, with no
+- **THE PURCHASING APPROVER DUTY NOW RESOLVES TO THE DOOR — 0474, verified 2026-09-11.**
+  The approved target was the resolved `Purchasing Approver` Duty, and the route never
+  reached the decision. Staff & Duties has OFFERED the key all along
+  (`workspace-duties.ts`) and writes every assignment to `workspace_duty_assignments`,
+  read by `workspace_resolve_duty` — the Shared Duty Resolver the Constitution's GLOBAL
+  DUTY LAW names — and the Work Engine already carried it as
+  `manual_purchase.approve`'s `ownerDutyKey`. **The door asked a different system
+  entirely:** `purchasing_decide_request` gated on `purchasing_settings_gate`, which reads
+  the HR POSITION table `org_position_duties` for `ops_manager`. Measured on production
+  2026-09-11: `workspace_duty_assignments` holds 13 `po_duty` and 13 `grn_duty` rows and
+  zero `purchasing_approver`, so `Approve purchase` was an ownerless Work row while the
+  Register printed an approver from `ops_manager`, and an assignment made on the Staff &
+  Duties screen could never have reached the decision. **0474 moves the decide door onto
+  its own `purchasing_approver_gate`:** `principal`, or whoever
+  `workspace_resolve_duty('purchasing_approver')` names as today's actor (the assignment,
+  or today's cover), or the `ops_manager` position holder **while that duty resolves to
+  nobody** — a fallback that retires itself the moment the duty is assigned, with no
   further migration. The gate is deliberately NOT `purchasing_settings_gate`: ten Settings
   doors call that one, and approving a purchase must not grant the production days, transit
   days and Deliver To numbers. `canApprove` (the Approve/Refuse controls AND the
-  approver-only money) walks the identical three rungs in the identical order, so the name
-  the screen prints and the person the SQL door admits cannot disagree; neither honours the
-  legacy email list. **OWNER ACTION OWED:** nobody holds `purchasing_approver` yet —
-  assign it in `Workspace → Staff & Duties`; until then the behaviour is exactly what it
-  was. Card 04's production walk measured the older disagreement
+  approver-only money) and the Register's approver name walk the identical three rungs in
+  the identical order, so the name the screen prints and the person the SQL door admits
+  cannot disagree; neither honours the legacy email list, and an unreachable resolver fails
+  soft onto the same `ops_manager` rung rather than a wider gate. **OWNER ACTION OWED:**
+  nobody holds `purchasing_approver` yet — assign it in `Workspace → Staff & Duties`;
+  until then the behaviour is exactly what it was. Card 04's production walk measured the older disagreement
   (`MPR-20260829-2779`: controls offered, door refused with the raw word `forbidden`); the
   door's 42501 leaves as the governed two lines (`not_purchase_approver`), naming the
   resolved approver.

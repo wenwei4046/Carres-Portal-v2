@@ -1,31 +1,43 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- 0474 · THE PURCHASING APPROVER DUTY ACTUALLY EXISTS
+-- 0474 · THE PURCHASING APPROVER DUTY ACTUALLY RESOLVES
 --
 -- Owner instruction 2026-09-11: "Verify Jess's Purchasing Approver route
 -- through the shared duty authority." Verified — and the route does not
--- exist.
+-- reach the door.
 --
 -- ── WHAT WAS MEASURED (production, 2026-09-11) ─────────────────────────────
 --
---   · `org_duties` holds seven keys. `purchasing_approver` is NOT one of
---     them, so `org_position_duties` can never carry it and no position can
---     ever hold it.
---   · The application catalogue OFFERS it —
---     `apps/api/src/routes/operation/workspace-duties.ts` lists
---     `{ key: "purchasing_approver", label: "Purchasing Approver" }` — so
---     Staff & Duties shows a duty the database cannot store.
---   · The Work Engine already NAMES it: `manual_purchase.approve` carries
---     `ownerRule` / `ownerDutyKey` = `purchasing_approver`
---     (`packages/shared/src/manual-purchase.ts`). It therefore resolves to
---     NOBODY, and `Approve purchase` has been an ownerless Work row.
---   · `Approve` / `Refuse` work today only through the LEGACY path: the
---     browser and `purchasing_decide_request` both ask for the `ops_manager`
---     duty, which Jess holds (the one active holder).
+--   · Staff & Duties ALREADY offers `Purchasing Approver`
+--     (`apps/api/src/routes/operation/workspace-duties.ts`) and writes every
+--     assignment to `workspace_duty_assignments`, resolved by
+--     `workspace_resolve_duty(duty_key, on_date)` — the Shared Duty Resolver
+--     the Constitution's GLOBAL DUTY LAW names. Today that table holds 13
+--     `po_duty` rows and 13 `grn_duty` rows, and none for
+--     `purchasing_approver`.
+--   · The Work Engine already NAMES the key: `manual_purchase.approve`
+--     carries `ownerRule` / `ownerDutyKey` = `purchasing_approver`.
+--   · The DOOR asks a different system entirely. `purchasing_decide_request`
+--     gates on `purchasing_settings_gate`, which reads the HR POSITION duty
+--     table `org_position_duties` for `ops_manager`. So an assignment made in
+--     Staff & Duties could never reach the decision, and Approve/Refuse
+--     worked only because Jess holds the legacy `ops_manager` position duty.
 --
--- `docs/purchasing/MASTER.md` §9.2 already rules the target: "The approved
--- target is the resolved `Purchasing Approver` Duty… legacy implementation
--- that must converge behind the Shared Duty Resolver." This migration makes
--- that target REACHABLE. It does not assign anybody: who holds the duty is
+-- ⚠️ THE FIRST DRAFT OF THIS MIGRATION GOT THAT WRONG and inserted the duty
+-- into `org_duties` — the HR position catalogue, which Staff & Duties never
+-- writes. It would have added a row nobody could reach from the screen that
+-- assigns duties. The two systems are:
+--
+--     org_duties / org_position_duties     POSITION duties (ops_manager,
+--                                          stock_planner). Written by
+--                                          `hr_set_position_duty`.
+--     workspace_duty_assignments/_covers   the SHARED DUTY RESOLVER (0425).
+--                                          Written by Staff & Duties, read by
+--                                          `workspace_resolve_duty`.
+--
+-- `docs/purchasing/MASTER.md` §9.2 rules the target: "The approved target is
+-- the resolved `Purchasing Approver` Duty… legacy implementation that must
+-- converge behind the Shared Duty Resolver." This migration performs that
+-- convergence for the decide door. It assigns nobody: who holds the duty is
 -- configuration Jess sets in Workspace → Staff & Duties, and this file has no
 -- business writing it.
 --
@@ -40,12 +52,13 @@
 --
 -- ── THE FALLBACK RETIRES ITSELF ────────────────────────────────────────────
 --
--- `ops_manager` still passes, but ONLY while `purchasing_approver` has no
--- active holder. So:
+-- The `ops_manager` position duty still passes, but ONLY while
+-- `purchasing_approver` resolves to nobody today. So:
 --   · today, with nobody assigned, the gate admits exactly who it admitted
 --     before this migration — Jess. Nothing changes and nothing breaks.
---   · the moment Jess assigns the duty, the approver is the assigned holder
---     and the legacy rung disappears without another migration.
+--   · the moment Jess assigns the duty in Staff & Duties, the approver is the
+--     resolved holder (or today's cover) and the legacy rung disappears
+--     without another migration.
 -- No email list is honoured here: `LEGACY_OPS_MANAGER_EMAILS` never reached
 -- this door and does not start now.
 --
@@ -54,14 +67,8 @@
 
 begin;
 
--- ── 1 · The duty joins the catalogue, so a position can hold it ────────────
-insert into public.org_duties (key, name, description, sort) values
-  ('purchasing_approver', 'Purchasing approver',
-   'Decide a Manual Purchase: approve (with the approved quantity per line) or refuse it. Approving a purchase is NOT configuring Purchasing — the Settings numbers stay behind ops_manager. While nobody holds this duty the ops_manager holder decides, and that fallback ends the moment this duty is assigned.',
-   62)
-on conflict (key) do nothing;
-
--- ── 2 · The approval gate, separate from the Settings gate ─────────────────
+-- ── 1 · The approval gate, on the SHARED DUTY RESOLVER ────────────────────
+-- Separate from `purchasing_settings_gate` on purpose: see the header.
 create or replace function public.purchasing_approver_gate()
 returns text
 language plpgsql
@@ -69,9 +76,9 @@ security definer
 set search_path to 'public', 'pg_temp'
 as $function$
 declare
-  v_role         text := (select public.app_role());
-  v_duties       text[];
-  v_duty_claimed boolean;
+  v_role   text := (select public.app_role());
+  v_actor  uuid;
+  v_duties text[];
 begin
   if v_role is null then
     raise exception 'forbidden' using errcode = '42501',
@@ -83,6 +90,26 @@ begin
     return v_role;
   end if;
 
+  -- ⭐ THE ONE SHARED RESOLVER (0425): today's assignment, and today's cover
+  -- if there is one. `actor_user_id` is already `coalesce(cover, normal)`, so
+  -- a buddy covering the approver decides while they cover and not after.
+  v_actor := nullif(
+    public.workspace_resolve_duty('purchasing_approver')->>'actor_user_id', ''
+  )::uuid;
+
+  if v_actor is not null then
+    if v_actor = auth.uid() then
+      return v_role;
+    end if;
+    -- SOMEBODY holds it and it is not this account. The legacy rung is over
+    -- the moment the duty is assigned — that is the convergence, and it
+    -- happens without another migration.
+    raise exception 'forbidden' using errcode = '42501',
+      detail = 'not_purchase_approver';
+  end if;
+
+  -- Nobody holds it yet. The operations manager keeps deciding exactly as
+  -- they did before 0474, so applying this changes nothing on the day.
   select coalesce(array_agg(pd.duty_key), '{}'::text[])
     into v_duties
     from app_users u
@@ -91,23 +118,7 @@ begin
      and u.role <> 'dealer'
      and u.status = 'active';
 
-  if 'purchasing_approver' = any(coalesce(v_duties, '{}'::text[])) then
-    return v_role;
-  end if;
-
-  -- Has ANYBODY active been given the duty? Until somebody has, the
-  -- operations manager keeps deciding exactly as they did before 0474.
-  select exists (
-    select 1
-      from org_position_duties pd
-      join app_users u on u.position_id = pd.position_id
-     where pd.duty_key = 'purchasing_approver'
-       and u.role <> 'dealer'
-       and u.status = 'active'
-  ) into v_duty_claimed;
-
-  if not v_duty_claimed
-     and 'ops_manager' = any(coalesce(v_duties, '{}'::text[])) then
+  if 'ops_manager' = any(coalesce(v_duties, '{}'::text[])) then
     return v_role;
   end if;
 
@@ -121,9 +132,9 @@ revoke all on function public.purchasing_approver_gate() from anon;
 grant execute on function public.purchasing_approver_gate() to authenticated;
 
 comment on function public.purchasing_approver_gate() is
-  'Who may decide a Manual Purchase (0474). principal, or an active position holding the purchasing_approver duty; while that duty has no active holder the ops_manager holder decides. Deliberately NOT purchasing_settings_gate: deciding a purchase does not grant the Purchasing Settings numbers.';
+  'Who may decide a Manual Purchase (0474). principal, or whoever workspace_resolve_duty(''purchasing_approver'') names as today''s actor (assignment, or today''s cover); while that duty has no holder the ops_manager position duty decides, and that rung ends the moment the duty is assigned in Staff & Duties. Deliberately NOT purchasing_settings_gate: deciding a purchase does not grant the Purchasing Settings numbers.';
 
--- ── 3 · The decide door asks the approval gate ─────────────────────────────
+-- ── 2 · The decide door asks the approval gate ─────────────────────────────
 -- Byte-identical to the live body except for the gate on its first line.
 create or replace function public.purchasing_decide_request(
   p_id uuid,

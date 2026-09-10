@@ -614,12 +614,14 @@ primitive fixes it in the same move.
 
 ## `purchasing-approver-duty-has-no-holder` — OWNER ACTION OWED, opened 2026-09-11
 
-**🟡 The Purchasing Approver duty now EXISTS and nobody holds it.** Migration `0474` adds
-`purchasing_approver` to `org_duties` and moves `purchasing_decide_request` onto
-`purchasing_approver_gate`, closing a gap measured on production the same day: the key was
+**🟡 The Purchasing Approver duty now REACHES the door, and nobody holds it.** Migration
+`0474` moves `purchasing_decide_request` onto `purchasing_approver_gate`, which resolves
+`purchasing_approver` through `workspace_resolve_duty` — the Shared Duty Resolver Staff &
+Duties actually writes. It closes a gap measured on production the same day: the key was
 offered in Staff & Duties and named by the Work Engine as `manual_purchase.approve`'s owner
-duty, but no `org_duties` row existed, so no position could ever hold it — `Approve purchase`
-had no owner in Work, and Approve/Refuse worked only through the legacy `ops_manager` check.
+duty, but the door gated on `org_position_duties` (`ops_manager`), a DIFFERENT system — so
+`Approve purchase` had no owner in Work, and an assignment made on the Staff & Duties screen
+could never have reached the decision.
 
 **Nothing changed on the day it landed, and that is deliberate.** The gate's third rung lets the
 `ops_manager` holder (Jess, the one active holder) keep deciding **while `purchasing_approver`
@@ -638,8 +640,7 @@ disappears by itself, in the gate and in the reader, with no further migration.
 
 **Falsifier / how to close this:**
 ```sql
-select u.name from org_position_duties pd
-  join app_users u on u.position_id = pd.position_id
- where pd.duty_key = 'purchasing_approver' and u.status = 'active';
+select public.workspace_resolve_duty('purchasing_approver');
 ```
-One or more rows = closed. Zero rows = the fallback is still carrying the approval.
+`source = 'assignment'` with a non-null `actor_user_id` = closed. `not_assigned` = the
+`ops_manager` fallback is still carrying the approval.
