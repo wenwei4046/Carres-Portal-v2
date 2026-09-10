@@ -103,6 +103,20 @@ const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } 
 const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
 const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
 
+/**
+ * ⭐ `PO No` — MANUAL PURCHASE'S OWN COLUMN (settled design, owner ruling
+ * 2026-09-11). Optional, exactly like the three above and for law ④'s reason.
+ *
+ * SO Batch answers *what covers this item line* with `Covered by`, because a
+ * customer line can be covered by Ready Stock OR a purchase order and the
+ * operator needs both in one cell. A Manual Purchase line has no Ready Stock
+ * coverage to state — an internal replenishment is not answered by the shelf
+ * — so the honest column is the DOCUMENT, and the owner ruled `Covered by`
+ * off this page for exactly that reason. It sits directly before
+ * `PO Delivery Date`: the two are one document's facts, read together.
+ */
+const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -143,6 +157,10 @@ export interface GoodsMiniLine {
   supplierAbsence?: string;
   poDeliveryDate?: string;
   poDeliveryDateAbsence?: string;
+  /** The purchase orders THIS row's quantity went onto. Read only when the
+   *  table is asked for `PO No`; empty prints the absence below. */
+  poNos?: string[];
+  poNoAbsence?: string;
   sku: string;
   qty: number;
   item: string;
@@ -240,9 +258,12 @@ export default function GoodsMiniTable({
   showCoveredBy = false,
   showSupplier = false,
   showPoDeliveryDate = false,
+  showPoNo = false,
+  showUnitId = true,
   oneRowPerUnit = false,
   onCoveredByClick,
   isCoveredByLinkable,
+  onPoClick,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
@@ -279,6 +300,23 @@ export default function GoodsMiniTable({
   /** Card 02-B — the exact-mapping columns the buying Register asks for. */
   showSupplier?: boolean;
   showPoDeliveryDate?: boolean;
+  /** Manual Purchase's document column — the PO each allocation went onto. */
+  showPoNo?: boolean;
+  /**
+   * ⭐ A PAGE MAY OMIT `Unit ID`, AND ONLY BECAUSE IT HAS NO SUCH FACT.
+   *
+   * Sales Orders, Delivery and SO Batch all reach a per-line Unit read, so
+   * they keep the ruled column and default to it. Manual Purchase has none:
+   * an internal purchase's goods become Units at RECEIVING, through the PO
+   * line, and no door maps a request line to them. Drawing the column anyway
+   * would print `Not allocated` on every row of every request forever — an
+   * absence that states nothing, in the width of a real answer. The honest
+   * move is to omit a column this page cannot answer, and to say so in the
+   * MASTER rather than fake a read.
+   */
+  showUnitId?: boolean;
+  /** Present only on a page whose `PO No` cell should navigate. */
+  onPoClick?: (poId: string) => void;
 }) {
   /* The six ruled columns, plus the buying page's own — `Covered by` after
      `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
@@ -286,15 +324,27 @@ export default function GoodsMiniTable({
   const columns: Column[] = showCoveredBy
     ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
     : [...CHILD_COLUMNS];
-  const itemAt = columns.length - 1;
-  if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
-  if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
+  const itemAt0 = columns.length - 1;
+  if (showPoDeliveryDate) columns.splice(itemAt0, 0, PO_DATE_COLUMN);
+  if (showPoNo) columns.splice(columns.length - 1 - (showPoDeliveryDate ? 1 : 0), 0, PO_NO_COLUMN);
+  if (showSupplier)
+    columns.splice(
+      columns.length - 1 - (showPoDeliveryDate ? 1 : 0) - (showPoNo ? 1 : 0),
+      0,
+      SUPPLIER_COLUMN,
+    );
+  if (!showUnitId) {
+    const unitAt = columns.findIndex((c) => c.key === "unit");
+    if (unitAt >= 0) columns.splice(unitAt, 1);
+  }
   const minWidth =
     FIXED_TOTAL +
     ITEM_FLOOR +
-    (selection ? SELECT_WIDTH : 0) +
+    (selection ? SELECT_WIDTH : 0) -
+    (showUnitId ? 0 : (CHILD_COLUMNS[1].width ?? 0)) +
     (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
     (showSupplier ? SUPPLIER_COLUMN.width : 0) +
+    (showPoNo ? PO_NO_COLUMN.width : 0) +
     (showPoDeliveryDate ? PO_DATE_COLUMN.width : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
@@ -387,13 +437,15 @@ export default function GoodsMiniTable({
                   mono face — the register engine itself aliases --font-mono
                   to Inter — so an identifier is plain body text here too. */}
               <td className="px-2 py-2">{line.category}</td>
-              <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
-                {line.unitIds.length ? (
-                  line.unitIds.map((id) => <div key={id}>{id}</div>)
-                ) : (
-                  <Absence>{line.unitAbsence}</Absence>
-                )}
-              </td>
+              {showUnitId ? (
+                <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
+                  {line.unitIds.length ? (
+                    line.unitIds.map((id) => <div key={id}>{id}</div>)
+                  ) : (
+                    <Absence>{line.unitAbsence}</Absence>
+                  )}
+                </td>
+              ) : null}
               {showCoveredBy ? (
                 <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
                   {line.coveredBy?.length ? (
@@ -441,6 +493,36 @@ export default function GoodsMiniTable({
                     line.supplier
                   ) : (
                     <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                  )}
+                </td>
+              ) : null}
+              {showPoNo ? (
+                <td className="px-2 py-2">
+                  {line.poNos?.length ? (
+                    line.poNos.map((po) =>
+                      /* A number is a DOOR only where the page can open one
+                         (the `Covered by` rule, same reason): a truth register
+                         that cannot navigate keeps the printed text. */
+                      onPoClick ? (
+                        <div key={po}>
+                          <button
+                            type="button"
+                            className="text-kit-blue-11 underline-offset-2 hover:underline"
+                            data-testid={`goods-po-no-${po}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPoClick(po);
+                            }}
+                          >
+                            {po}
+                          </button>
+                        </div>
+                      ) : (
+                        <div key={po}>{po}</div>
+                      ),
+                    )
+                  ) : (
+                    <Absence>{line.poNoAbsence ?? "—"}</Absence>
                   )}
                 </td>
               ) : null}

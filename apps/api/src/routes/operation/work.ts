@@ -736,10 +736,19 @@ export function projectManualPurchaseWork(input: {
         },
         problem: approval ? "Approval required" : "Purchase order required",
         recipient: request.recipient ?? null,
+        /* ⭐ THE ISSUE ACTION'S RESULT IS AN ISSUED PO (owner ruling
+           2026-09-11). It read "Current PO version sent to supplier" while
+           the rule kept the action open on a fully ordered request with no
+           confirmed-sent row — a confirmation chore. That rule is gone
+           (`manualPurchaseWorkItems`), so the result is the act itself. */
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Current PO version sent to supplier",
-        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}`,
+          : "Purchase order issued",
+        /* ⭐ THE APPROVER LANDS ON THE APPROVAL SECTION, not at the top of a
+           six-section object they then have to scroll (owner ruling
+           2026-09-11). `Issue PO` has no such section — its act is the
+           Register's selected action — so it opens the object plainly. */
+        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
       });
     }),

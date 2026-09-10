@@ -177,12 +177,46 @@ describe("operation Work response composition", () => {
     expect(approval[0]?.action).toBe("Approve purchase");
     expect(approval[0]?.owner.acting?.userId).toBe("jess");
     expect(approval[0]?.completionFact).toContain("stored approval or refusal");
+    /* ⭐ THE APPROVER LANDS ON THE DECISION (owner ruling 2026-09-11) — the
+       object is one six-section scroll, and hunting for the section is the
+       step this row exists to remove. */
+    expect(approval[0]?.destination).toBe(
+      "/operation?tab=manual-purchase&mp=request-1&section=approval",
+    );
     expect(issuance[0]?.action).toBe("Issue PO");
     expect(issuance[0]?.owner.normal?.userId).toBe("shasha");
     expect(issuance[0]?.owner.acting?.userId).toBe("yujun");
+    /* `Issue PO` has no section of its own — its act is the Register's
+       selected action — so it opens the object plainly. */
     expect(issuance[0]?.destination).toBe(
       "/operation?tab=manual-purchase&mp=request-1",
     );
+    expect(issuance[0]?.requiredResult).toBe("Purchase order issued");
+  });
+
+  it("an ISSUED Manual Purchase raises no work for a missing send confirmation", () => {
+    /* ⭐ Owner ruling 2026-09-11, measured on production the same day: 62
+       purchase orders exist and 3 carry confirmed-sent evidence. The old rule
+       therefore raised an `Issue PO` task against 59 already-issued
+       documents. An existing numbered PO is an existing commitment, and the
+       absence of proof of sending is not a reason to buy again. */
+    const items = projectManualPurchaseWork({
+      requests: [
+        {
+          requestId: "request-2",
+          context: "Manual Purchase · Ready Stock · Klang · Ohana",
+          status: "ordered",
+          remainingQty: 0,
+          orderBy: "2026-09-06",
+          hasPos: true,
+          posAllSent: false,
+        },
+      ],
+      approver: { userId: "jess", name: "Jess" },
+      poDuty: null,
+      today: "2026-09-06",
+    });
+    expect(items).toEqual([]);
   });
 
   it("projects separate Sales Order actions with their own owner rules", () => {

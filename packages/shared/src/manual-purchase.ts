@@ -78,25 +78,43 @@ export const MANUAL_PURCHASE_WORDS = {
   alreadyOnPo: "already on PO",
   stillNeeded: "still needed",
   /**
-   * THE PERMANENT REGISTER'S TEN COLUMNS — Card 08's owner correction
-   * (2026-09-04), exactly and in this order. A Manual Purchase has NO
-   * visible document number: before `Issue PO` there is nothing to show,
-   * after it the only purchasing document identity is the actual `PO No`.
-   * `Manual Purchase No` / `MPR` are retired words. Purpose and Order By
-   * are NOT parent columns: Purpose lives in the rail, the expansion
-   * context and the object; Order By drives timing/work and the quiet
-   * second line only. `Requested Date` and `Needed By` stay retired.
+   * THE PERMANENT REGISTER'S NINE COLUMNS — the settled design, owner
+   * ruling 2026-09-11, exactly and in this order:
+   *
+   * ```
+   * Approval · Requested By · Proceed Date · PO No · Purpose · Items ·
+   * Supplier · Deliver To · Delivery Date
+   * ```
+   *
+   * A Manual Purchase has NO visible document number: before `Issue PO`
+   * there is nothing to show, after it the only purchasing document
+   * identity is the actual `PO No`. `Manual Purchase No` / `MPR` are
+   * retired words.
+   *
+   * ⛔ THREE THINGS THAT LEFT THIS ROW AND MUST NOT RETURN.
+   *   · `Qty` — a request's total ask is not a buying decision on the
+   *     parent row; the exact quantities are the goods table's and the
+   *     object's, at the grain they were actually allocated.
+   *   · `For` — replaced by `Purpose`, the SIX governed purchase purposes
+   *     and the row's single-click entrance. The structured `For` fact
+   *     keeps its home on the object (`colFor` below).
+   *   · `Status` · `Partial` · `PO Sent` · `PO Created` · `Reason` · `MPR`
+   *     and any request-number column.
+   *
+   * Order By drives timing/work and the quiet second line only.
+   * `Requested Date` and `Needed By` stay retired.
    */
-  colProceedDate: "Proceed Date",
   colApproval: "Approval Status",
+  colRequestedBy: "Requested By",
+  colProceedDate: "Proceed Date",
   colPoNo: "PO No",
-  colDeliveryDate: "Delivery Date",
-  colFor: "For",
+  colPurpose: "Purpose",
   colItems: "Items",
-  colQty: "Qty",
   colSupplier: "Supplier",
   colDeliverTo: "Deliver To",
-  colRequestedBy: "Requested By",
+  colDeliveryDate: "Delivery Date",
+  /** The OBJECT's structured `For` fact — never a Register column again. */
+  colFor: "For",
   /** The PO lineage absence — the arithmetic ran and found no PO. The
    *  Register cell states the bare fact (Card 08 §3.2: `—` is a fact, not
    *  a button); the object's Purchase Orders section keeps the sentence. */
@@ -109,7 +127,22 @@ export const MANUAL_PURCHASE_WORDS = {
   workIssuePo: "Issue PO",
   /** Several destinations behind one request. */
   multiple: "Multiple",
-  /** The expansion's own child columns (read-only; Card 04). */
+  /**
+   * THE ROW EXPANSION IS THE SHARED GOODS TABLE — settled design, owner
+   * ruling 2026-09-11. Manual Purchase and SO Batch Purchase draw ONE
+   * `GoodsMiniTable`; Manual Purchase asks for
+   * `SKU · Qty · Supplier · Deliver To · PO No · PO Delivery Date · Item`
+   * and omits `Unit ID` (a Manual Purchase line has no per-line Unit read)
+   * and `Covered by` (its PO lineage has its own column here).
+   *
+   * ⛔ `Still To Order` LEFT THE EXPANSION. Every goods row is now at the
+   * grain the quantity was ACTUALLY allocated at — one row per purchase
+   * order the line went onto, carrying that document's own quantity, plus
+   * one row for what is still to buy. A remainder column beside a repeated
+   * whole-request quantity was the thing that made the two disagree.
+   * The original ask and the approver's number keep their authoritative
+   * home in the object's `Items Requested` and `Approval` sections.
+   */
   expSku: "SKU",
   expItem: "Item",
   expRequestedQty: "Requested Qty",
@@ -119,6 +152,16 @@ export const MANUAL_PURCHASE_WORDS = {
   expSupplier: "Supplier",
   expDeliverTo: "Deliver To",
   expPoNo: "PO No",
+  /** The goods row that is not on any purchase order yet. */
+  goodsToPurchase: "To purchase",
+  /**
+   * A quantity the store says was ISSUED, on a line whose purchase order it
+   * cannot name. Measured 2026-09-11: zero such rows exist, and the issue
+   * door always writes the document — but the arithmetic can produce the
+   * case, and `Not ordered yet` would be a lie about goods that were bought.
+   * An absence states what is missing; it never borrows the opposite fact.
+   */
+  poNotRecorded: "Purchase order not recorded",
   emptyRegister: "No Manual Purchase yet.",
   /**
    * THE OBJECT DETAIL (Card 05) — one full-width scroll, six sections in
@@ -1123,11 +1166,31 @@ export interface ManualPurchaseWorkInput {
   remainingQty: number;
   /** The request's earliest server-derived Order By, or null. */
   orderBy: string | null;
-  /** Any linked PO at all (real lineage, Card 04 §3.4). */
+  /**
+   * Any linked PO at all (real lineage, Card 04 §3.4).
+   *
+   * ⚠️ READ, BUT NO LONGER A REASON TO RAISE WORK — see `posAllSent`.
+   */
   hasPos: boolean;
-  /** Every linked PO's CURRENT version has confirmed-sent evidence
-   *  (`po_sends.kind = 'confirmed_sent'` at `coalesce(version, 1)`). A
-   *  numbered PO or an opened WhatsApp/email completes nothing. */
+  /**
+   * Every linked PO's CURRENT version has confirmed-sent evidence
+   * (`po_sends.kind = 'confirmed_sent'` at `coalesce(version, 1)`).
+   *
+   * ⛔ THIS NO LONGER OPENS `Issue PO` — owner ruling 2026-09-11.
+   *
+   * Card 06 §7 kept the issue action open on a FULLY ORDERED request whose
+   * purchase orders carried no confirmed-sent row. Measured on production
+   * 2026-09-11: 62 purchase orders exist and 3 carry that evidence, so the
+   * rule raised a `Issue PO` task against 59 documents that had already been
+   * issued — and whose only fault was that nobody ticked a confirmation.
+   *
+   * An existing numbered PO IS an existing commitment, evidence or not.
+   * Copying a PO into WhatsApp is not proof of sending, and the absence of
+   * proof is not a reason to issue a second purchase order or to invent a
+   * confirmation chore. The field stays because the evidence itself is real,
+   * is preserved, and is worth showing on the document; it simply may not
+   * manufacture work.
+   */
   posAllSent: boolean;
 }
 
@@ -1201,12 +1264,11 @@ export function manualPurchaseWorkItems(
       workingDaysLate: late(input.orderBy),
     });
   }
-  /* Approved remaining demand — or an issued document whose CURRENT version
-     the supplier has not provably received — keeps the issue action open.
-     Refused / fully-cancelled / arrived requests carry no issuance work. */
-  const issueOpen =
-    (input.status === "ready_to_order" && input.remainingQty > 0) ||
-    (input.status === "ordered" && input.hasPos && !input.posAllSent);
+  /* ⭐ APPROVED REMAINING DEMAND, AND NOTHING ELSE (owner ruling 2026-09-11).
+     Refused / fully-cancelled / ordered / arrived requests carry no issuance
+     work: there is nothing left to buy, and an absent send confirmation is
+     not a reason to say there is. */
+  const issueOpen = input.status === "ready_to_order" && input.remainingQty > 0;
   if (issueOpen) {
     const resolution = ctx.poDutyResolution;
     const legacy = ctx.poDuty
