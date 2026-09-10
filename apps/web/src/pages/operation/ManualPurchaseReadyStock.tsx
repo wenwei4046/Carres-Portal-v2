@@ -69,6 +69,27 @@ export default function ManualPurchaseReadyStock({ requestId }: { requestId: str
 
   const groups = q.data?.groups ?? [];
   const anyStock = groups.some((g) => g.units.length > 0);
+  /**
+   * ⭐ A GROUP HEADING THAT DOES NOT DISTINGUISH IS NOT A HEADING (production
+   * walk, 2026-09-11).
+   *
+   * Grouping is by CONFIGURATION, which is the whole point — a live request
+   * carries `5539-1A(LHF)` and `5539-1A(RHF)`, the left- and right-hand
+   * halves of one sofa, and they are correctly two groups. But the Catalog
+   * model name for both is `Booqit`, so the screen showed
+   * `Booqit · Asked for 1 · 0 on the shelf` TWICE and the operator could not
+   * tell which half was which — on exactly the pair that must never be
+   * confused.
+   *
+   * So the SKU joins the heading ONLY where the model name fails to separate
+   * two groups. Printing it on every group would be noise on the ordinary
+   * case, which is one group and one name.
+   */
+  const ambiguous = new Set(
+    groups
+      .map((g) => g.item)
+      .filter((item, i, all) => all.indexOf(item) !== i),
+  );
 
   return (
     <ReadyStockDisclosure
@@ -103,6 +124,9 @@ export default function ManualPurchaseReadyStock({ requestId }: { requestId: str
               {/* THE GROUP STATES BOTH NUMBERS AND NETS NEITHER. */}
               <div className="flex flex-wrap items-baseline gap-x-2 border-t border-base-200 bg-base-50/60 px-3 py-1.5">
                 <span className="text-body font-semibold text-base-900">{group.item}</span>
+                {ambiguous.has(group.item) && group.skus.length > 0 ? (
+                  <span className="text-meta text-base-600">{group.skus.join(" · ")}</span>
+                ) : null}
                 <span className="text-meta text-base-500">
                   {`Asked for ${group.requestedQty} · ${group.freeQty} on the shelf`}
                 </span>
