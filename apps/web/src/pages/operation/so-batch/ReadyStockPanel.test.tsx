@@ -324,25 +324,90 @@ describe("failure and retry", () => {
     expect(screen.queryByText("No stock on the shelf matches this order.")).toBeNull();
   });
 
-  it("prints the server's own refusal when a stale choice is refused", async () => {
+  /** A refused act: the read succeeds, the reserve door answers `body`. */
+  function drawRefusing(body: Record<string, unknown>, onReserved?: (o: string, l: readonly string[]) => void) {
     apiFetch.mockImplementation(async (path: string) => {
       if (String(path).endsWith("/ready-stock")) return response();
       const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-      throw new ApiError(409, "conflict", { code: "unit_no_longer_free" });
+      throw new ApiError(409, "conflict", body);
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
+    return render(
       <QueryClientProvider client={client}>
-        <ReadyStockPanel orderId={ORDER} so={1251} />
+        <ReadyStockPanel orderId={ORDER} so={1251} onReserved={onReserved} />
       </QueryClientProvider>,
     );
+  }
+
+  it("prints the server's own refusal when a stale choice is refused", async () => {
+    drawRefusing({ code: "unit_no_longer_free" });
     await open();
     const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
     fireEvent.click(within(row).getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Someone else took that Unit. Nothing was reserved."),
+      expect(toastError).toHaveBeenCalledWith("Someone else took that Unit."),
     );
+  });
+
+  it("names the Unit that stopped the act, and says nothing was reserved", async () => {
+    /* The door is atomic, so a refusal is the WHOLE act. What the operator
+       needs is which of their choices to fix — 0473 sends the Unit. */
+    drawRefusing({
+      code: "unit_no_longer_free",
+      itemId: "33333333-0000-0000-0000-000000000065",
+    });
+    await open();
+    for (const id of [
+      "33333333-0000-0000-0000-00000000000a",
+      "33333333-0000-0000-0000-000000000065",
+    ]) {
+      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(act).toHaveTextContent("Someone else took that Unit.");
+    expect(act).toHaveTextContent("Unit ID · U1-000-065");
+    expect(act).toHaveTextContent("No Unit was reserved.");
+  });
+
+  it("keeps the choice after a refusal — the operator unticks one, not all", async () => {
+    drawRefusing({
+      code: "unit_no_longer_free",
+      itemId: "33333333-0000-0000-0000-000000000065",
+    });
+    await open();
+    for (const id of [
+      "33333333-0000-0000-0000-00000000000a",
+      "33333333-0000-0000-0000-000000000065",
+    ]) {
+      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(screen.getByText("2 chosen")).toBeInTheDocument();
+  });
+
+  it("tells the Register NOTHING when the act was refused", async () => {
+    const onReserved = vi.fn();
+    drawRefusing({ code: "unit_no_longer_free" }, onReserved);
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(onReserved).not.toHaveBeenCalled();
+  });
+
+  it("drops last act's sentence the moment the choice moves", async () => {
+    drawRefusing({ code: "unit_no_longer_free" });
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    fireEvent.click(within(row).getByRole("checkbox"));
+    expect(screen.queryByTestId(`ready-stock-act-${ORDER}`)).toBeNull();
   });
 
   it("states an empty shelf as a fact", async () => {
@@ -351,6 +416,94 @@ describe("failure and retry", () => {
     expect(
       await screen.findByText("No stock on the shelf matches this order."),
     ).toBeInTheDocument();
+  });
+});
+
+/* ─── WHAT THE ACT DID, AND WHAT IT TOLD THE REGISTER ───────────────────── */
+
+describe("a successful act", () => {
+  /** The read succeeds and the door commits exactly what it names. */
+  function drawCommitting(
+    units: Array<{ itemId: string; orderLineId: string }>,
+    onReserved?: (o: string, l: readonly string[]) => void,
+  ) {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (String(path).endsWith("/ready-stock")) return response();
+      return { reserved: units.length, reference: "SO-1251", units };
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <ReadyStockPanel orderId={ORDER} so={1251} onReserved={onReserved} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("names every Unit that went in, not just how many", async () => {
+    drawCommitting([
+      { itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_A },
+      { itemId: "33333333-0000-0000-0000-000000000065", orderLineId: LINE_B },
+    ]);
+    await open();
+    for (const id of [
+      "33333333-0000-0000-0000-00000000000a",
+      "33333333-0000-0000-0000-000000000065",
+    ]) {
+      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(act).toHaveTextContent("Reserved 2 Units to SO-1251");
+    expect(act).toHaveTextContent("Unit ID · U1-000-001 · U1-000-065");
+  });
+
+  it("counts what the DOOR committed, never what the browser asked for", async () => {
+    /* The browser chose two; the door's answer is the only truth about what
+       is now reserved, and it is the answer that gets printed. */
+    drawCommitting([{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_A }]);
+    await open();
+    for (const id of [
+      "33333333-0000-0000-0000-00000000000a",
+      "33333333-0000-0000-0000-000000000065",
+    ]) {
+      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(act).toHaveTextContent("Reserved 1 Unit to SO-1251");
+    expect(act).toHaveTextContent("Unit ID · U1-000-001");
+    expect(act).not.toHaveTextContent("U1-000-065");
+  });
+
+  it("tells the Register which ITEM LINES were answered, once each", async () => {
+    const onReserved = vi.fn();
+    drawCommitting(
+      [
+        { itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_A },
+        { itemId: "33333333-0000-0000-0000-000000000065", orderLineId: LINE_A },
+      ],
+      onReserved,
+    );
+    await open();
+    for (const id of [
+      "33333333-0000-0000-0000-00000000000a",
+      "33333333-0000-0000-0000-000000000065",
+    ]) {
+      fireEvent.click(within(screen.getByTestId(`ready-stock-unit-${id}`)).getByRole("checkbox"));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(onReserved).toHaveBeenCalledWith(ORDER, [LINE_A]);
+  });
+
+  it("clears the stock choice, because those Units are no longer choosable", async () => {
+    drawCommitting([{ itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_A }]);
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(screen.getByText("No Unit chosen")).toBeInTheDocument();
   });
 });
 

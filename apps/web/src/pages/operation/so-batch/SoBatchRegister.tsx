@@ -155,6 +155,15 @@ function Absent({ children }: { children: string }) {
   return <span className="text-kit-slate-11">{children}</span>;
 }
 
+/**
+ * One ticked leaf: the arrangement, and the `To buy` it was arranged against.
+ *
+ * The second half is what makes a tick falsifiable. Without it the Register
+ * cannot tell an arrangement the operator still means from one the server has
+ * since recomputed underneath them.
+ */
+type LeafTick = { toBuy: number; allocations: DestinationAllocation[] };
+
 /** A parent cell over many values: `—` · the value · the compact summary. */
 function summaryText(
   s: SoBatchCellSummary,
@@ -319,15 +328,77 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
    *
    * A tick is dropped the moment its leaf stops being buyable — a refetch
    * that covers a line must not leave a stale tick able to order it. */
-  const [selected, setSelected] = useState<Map<string, DestinationAllocation[]>>(new Map());
+  /**
+   * ⭐ A TICK REMEMBERS THE NUMBER IT WAS TAKEN AGAINST (2026-09-10).
+   *
+   * A tick is an arrangement of `To buy` units across destinations, so it is
+   * only meaningful against the `To buy` the operator saw. That number MOVES
+   * under an open page: Ready Stock commits a Unit to one of the order's item
+   * lines, a colleague issues a purchase order, someone releases a reservation
+   * — and the very next read of this Register answers a smaller (or larger)
+   * remainder for the same leaf.
+   *
+   * Measured before the fix: ticking `To buy 3`, reserving 2 Units in the Ready
+   * Stock section below, then pressing `Issue PO` sent an arrangement of 3
+   * against a server remainder of 1. The door refused it (`allocation_mismatch`
+   * — the law held) and the operator was left with an error instead of the
+   * recalculated quantity. So the tick is DROPPED when its number moves: the
+   * operator ticks the new remainder, deliberately.
+   *
+   * It is not refreshed silently to the new number. A tick is a decision about
+   * a quantity, and a decision the system rewrites is not the operator's.
+   */
+  const [selected, setSelected] = useState<Map<string, LeafTick>>(new Map());
   const live = useMemo(() => {
     const out = new Map<string, DestinationAllocation[]>();
-    for (const [id, allocations] of selected) {
+    for (const [id, tick] of selected) {
       const row = leafById.get(id);
-      if (row && selectable(row)) out.set(id, allocations);
+      if (!row || !selectable(row)) continue;
+      if ((row.toBuy ?? 0) !== tick.toBuy) continue;
+      out.set(id, tick.allocations);
     }
     return out;
   }, [selected, leafById, selectable]);
+
+  /* A dropped tick leaves the map too, so a remainder that happens to return to
+     its old number cannot resurrect a decision nobody took twice. */
+  useEffect(() => {
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const [id, tick] of prev) {
+        const row = leafById.get(id);
+        if (row && selectable(row) && (row.toBuy ?? 0) === tick.toBuy) continue;
+        next.delete(id);
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [leafById, selectable]);
+
+  /**
+   * THE READY STOCK SECTION'S CONSEQUENCE, APPLIED AT ONCE.
+   *
+   * The refetch that recomputes `To buy` is a round trip away, and `Issue PO`
+   * is one click. So the moment a reservation succeeds, every tick standing on
+   * an item line it answered is dropped here — before the new numbers arrive,
+   * never after.
+   */
+  const dropTicksForLines = useCallback((orderId: string, orderLineIds: readonly string[]) => {
+    const answered = new Set(orderLineIds);
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of prev.keys()) {
+        const row = leafById.get(id);
+        if (!row || row.orderId !== orderId) continue;
+        if (!row.lineIds.some((lineId) => answered.has(lineId))) continue;
+        next.delete(id);
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [leafById]);
 
   const selections = useMemo<SoBatchSelection[]>(
     () => [...live].map(([demandId, allocations]) => ({ demandId, allocations })),
@@ -374,7 +445,10 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
         const next = new Map(prev);
         if (next.has(id)) next.delete(id);
         else if (tickDestinationId) {
-          next.set(id, defaultAllocations(row, tickDestinationId));
+          next.set(id, {
+            toBuy: row.toBuy ?? 0,
+            allocations: defaultAllocations(row, tickDestinationId),
+          });
         }
         return next;
       });
@@ -393,7 +467,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
           if (!on) next.delete(id);
           else if (!next.has(id) && tickDestinationId) {
             const row = leafById.get(id);
-            if (row) next.set(id, defaultAllocations(row, tickDestinationId));
+            if (row) {
+              next.set(id, {
+                toBuy: row.toBuy ?? 0,
+                allocations: defaultAllocations(row, tickDestinationId),
+              });
+            }
           }
         }
         return next;
@@ -404,9 +483,12 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
 
   const setLeafAllocations = useCallback(
     (id: string, allocations: DestinationAllocation[]) => {
-      setSelected((prev) => new Map(prev).set(id, allocations));
+      /* The arrangement is recorded against the remainder it was arranged for,
+         so a split made a minute ago is judged by the same rule a tick is. */
+      const toBuy = leafById.get(id)?.toBuy ?? 0;
+      setSelected((prev) => new Map(prev).set(id, { toBuy, allocations }));
     },
-    [],
+    [leafById],
   );
 
   /**
@@ -820,6 +902,7 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       destinations={data.destinations}
       destinationName={destinationName}
       safetyDays={data.safetyDays}
+      onReserved={dropTicksForLines}
     />
   );
 
@@ -1154,6 +1237,7 @@ function SoBatchOrderExpansion({
   destinations,
   destinationName,
   safetyDays,
+  onReserved,
 }: {
   order: SoBatchOrderRow;
   leafs: PurchaseDemandRow[];
@@ -1165,6 +1249,8 @@ function SoBatchOrderExpansion({
   destinations: SoBatchPurchaseResponse["destinations"];
   destinationName: (id: string | null) => string;
   safetyDays: number;
+  /** Ready Stock answered these item lines — every tick on them is now stale. */
+  onReserved: (orderId: string, orderLineIds: readonly string[]) => void;
 }) {
   /* Its own handle on the router: this box is a top-level component, not a
      closure inside the register, so the multi-PO door below cannot borrow the
@@ -1366,7 +1452,7 @@ function SoBatchOrderExpansion({
           goods table answers *what was ordered and what covers it*, this one
           answers *what is on the shelf for it*. Its selection is its own —
           choosing a Unit never touches the purchasing tick above. */}
-      <ReadyStockPanel orderId={order.orderId} so={order.so} />
+      <ReadyStockPanel orderId={order.orderId} so={order.so} onReserved={onReserved} />
     </div>
   );
 }

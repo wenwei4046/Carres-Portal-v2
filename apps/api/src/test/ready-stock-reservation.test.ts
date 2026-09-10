@@ -61,6 +61,20 @@ async function refusal(fn: () => Promise<unknown>): Promise<string | null> {
   }
 }
 
+/**
+ * The refusal's DETAIL — where 0473 writes the Unit the act stopped on. Read
+ * separately from the message because the message is the refusal WORD and the
+ * browser's sentence hangs off that; the Unit is the extra fact beside it.
+ */
+async function refusalDetail(fn: () => Promise<unknown>): Promise<string | null> {
+  try {
+    await fn();
+    return null;
+  } catch (e) {
+    return ((e as { detail?: string }).detail ?? null);
+  }
+}
+
 beforeEach(async () => {
   db = await readyStockDatabase();
   await db.exec(`
@@ -244,6 +258,59 @@ describe("two operators reaching for one Unit", () => {
       `select status from public.ops_stock_items where id = '33333333-0000-0000-0000-00000000000a'`,
     );
     expect(row.status).toBe("free");
+  });
+
+  it("names the Unit that stopped the act, so five choices are not five guesses", async () => {
+    /* Someone else took the SECOND of the two chosen Units. The operator must
+       be told WHICH, or the only way to find out is to untick one at a time —
+       four more races. 0473 puts the id in DETAIL; the refusal WORD is
+       untouched, so the browser still prints the governed sentence. */
+    await draw({ ref: "SO-1251", itemId: "33333333-0000-0000-0000-00000000000b", lineId: LINE_B });
+    const act = () =>
+      rows(`select public.so_batch_reserve_ready_units('SO-1251', 'used_instead_of_ordering', 'test',
+        '[{"itemId":"33333333-0000-0000-0000-00000000000a","orderLineId":"${LINE_A}"},
+          {"itemId":"33333333-0000-0000-0000-00000000000b","orderLineId":"${LINE_B}"}]'::jsonb)`);
+    expect(await refusal(act)).toContain("unit_no_longer_free");
+    expect(await refusalDetail(act)).toContain(
+      "unit_id=33333333-0000-0000-0000-00000000000b",
+    );
+  });
+
+  it("names the Unit for a refusal the DRAW door raised, keeping its own word", async () => {
+    /* Not a race: U1-000-003 is a King, and both of SO-1251's lines are Queen.
+       The word stays the draw door's; only the Unit is added. */
+    const act = () =>
+      rows(`select public.so_batch_reserve_ready_units('SO-1251', 'used_instead_of_ordering', 'test',
+        '[{"itemId":"33333333-0000-0000-0000-00000000000c","orderLineId":"${LINE_A}"}]'::jsonb)`);
+    expect(await refusal(act)).toContain("unit_does_not_match_line");
+    expect(await refusalDetail(act)).toContain(
+      "unit_id=33333333-0000-0000-0000-00000000000c",
+    );
+    /* And the draw door's own explanation survives beside it. */
+    expect(await refusalDetail(act)).toContain("not the goods this item line ordered");
+  });
+
+  it("writes NOTHING when it names a Unit — the refusal is still the whole act", async () => {
+    await draw({ ref: "SO-1251", itemId: "33333333-0000-0000-0000-00000000000b", lineId: LINE_B });
+    await refusal(() =>
+      rows(`select public.so_batch_reserve_ready_units('SO-1251', 'used_instead_of_ordering', 'test',
+        '[{"itemId":"33333333-0000-0000-0000-00000000000a","orderLineId":"${LINE_A}"},
+          {"itemId":"33333333-0000-0000-0000-00000000000b","orderLineId":"${LINE_B}"}]'::jsonb)`),
+    );
+    const [row] = await rows<{ status: string; reserved_order_line_id: string | null }>(
+      `select status, reserved_order_line_id from public.ops_stock_items
+        where id = '33333333-0000-0000-0000-00000000000a'`,
+    );
+    expect(row.status).toBe("free");
+    expect(row.reserved_order_line_id).toBeNull();
+    /* And the append-only ledger carries no row for the act that never was —
+       only the earlier draw that made the second Unit unavailable. */
+    const usage = await rows<{ item_id: string }>(
+      `select item_id from public.ops_stock_pool_usage where ref = 'SO-1251'`,
+    );
+    expect(usage.map((u) => u.item_id)).toEqual([
+      "33333333-0000-0000-0000-00000000000b",
+    ]);
   });
 
   it("commits every Unit of a batch that succeeds", async () => {

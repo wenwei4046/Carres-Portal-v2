@@ -96,13 +96,27 @@ each owner should take the one-line change with a test.
   so nothing here was blocked and **nothing here was touched.** **Falsifier / next step:** the
   Finance lane applies them through the governed path, or confirms their objects are live and
   inserts the tracker rows. Until then any reader of the tracker tail will under-count by nine.
-- `so-batch-ready-stock-delegator-awaits-0472` — **OPEN, 2026-09-10, THIS LANE'S, and it closes
-  the moment production reports the merge SHA.** `0471` deliberately left a 7-argument
-  `ops_stock_pool_draw` delegator so that neither the pre-deploy nor the post-deploy bundle ever
-  called a function that did not exist. Two doors for one act is exactly what ERP Architecture
-  Law C forbids, so it is debt with a same-day maturity: `0472` drops it and asserts the door is
-  one function again. **Falsifier / next step:** `0472` applied, and `pg_proc` shows exactly one
-  `ops_stock_pool_draw`, the one that names `p_order_line_id`.
+- `kit-blue-9-is-used-as-a-css-variable-and-never-defined` — **OPEN, 2026-09-11, NOT THIS LANE'S,
+  found in passing while fixing the same mistake inside `ReadyStockPanel.tsx`.** The kit palette is
+  a TAILWIND colour scale (`tailwind.config.ts` → `theme.extend.colors.kit`), not a set of CSS
+  custom properties: **no stylesheet anywhere defines `--kit-blue-9`**, measured against the built
+  bundle (`apps/web/dist/assets/*.css` carries three uses and zero definitions). An invalid value
+  invalidates the whole declaration, so three rules in
+  `apps/web/src/pages/operation/PurchasingRegister.module.css` currently draw nothing: the 2px left
+  accent bar on an expanded parent row (`background: var(--kit-blue-9)`), the focus outline on the
+  SO Batch / Manual Purchase / PO register selects (`outline: 2px solid var(--kit-blue-9)`) and the
+  `--c-orange` alias built from it. **Fix:** the same one used here — read the token from the theme
+  (`theme(colors.kit.blue.9)`) or define the custom property once beside `--kit-blue-3`, which that
+  file already does define locally. It is left alone here because it changes how three registers
+  LOOK on surfaces this lane did not walk, and a repair that turns invisible chrome visible deserves
+  its own before/after. **Falsifier / next step:** a lane that owns those registers defines or
+  replaces the variable and walks the three surfaces.
+- ~~`so-batch-ready-stock-delegator-awaits-0472`~~ — **CLOSED 2026-09-11 WITH ITS PROOF.** All three
+  production surfaces reported the merge SHA `dd7b6a0b`
+  (`erp` · `pos` · the Worker's `/health`, measured 2026-09-11), so the deploy window `0471`'s
+  7-argument `ops_stock_pool_draw` delegator existed for was over. `0472` is applied (tracker
+  `20260910105452`) and `pg_proc` now carries exactly ONE `ops_stock_pool_draw`, the 8-argument
+  door that names `p_order_line_id`. Law C is satisfied: one act, one door.
 - ~~`receiving-grn-card-01-awaits-merge-apply-and-production-proof`~~ — **CLOSED 2026-09-04 WITH
   ITS PRODUCTION PROOF.** 0425/0426 APPLIED via the governed MCP path (tracker 20260904125205 /
   20260904125800), PR #1099 merged `7a897494`, deployed, production-smoked with committed test

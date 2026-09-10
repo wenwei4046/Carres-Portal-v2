@@ -36,6 +36,8 @@ function statement(rawSql: string, start: string, end: string) {
 }
 
 export const RESERVATION_MIGRATION = "0471_a_reserved_unit_names_the_sales_order_line";
+/** 0473 redefines the batch door so a refusal names the Unit it is about. */
+export const REFUSAL_NAMING_MIGRATION = "0473_the_refusal_names_the_unit_that_stopped_it";
 
 export async function readyStockDatabase() {
   const db = new PGlite();
@@ -126,6 +128,19 @@ export async function readyStockDatabase() {
   ] as const) {
     await db.exec(statement(m, start, end));
   }
+
+  /* ── and the door as it stands TODAY ───────────────────────────────────
+   *
+   * 0473 redefines `so_batch_reserve_ready_units` so every refusal carries the
+   * Unit that stopped the act. Running 0471's body and stopping there would
+   * test SQL production has already replaced. */
+  await db.exec(
+    statement(
+      migration(REFUSAL_NAMING_MIGRATION),
+      "create or replace function public.so_batch_reserve_ready_units",
+      "$function$;",
+    ),
+  );
 
   return db;
 }
