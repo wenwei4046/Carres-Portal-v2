@@ -1948,13 +1948,13 @@ export default function SalesOrderWorkspace() {
         title="Customer"
         headerSlot={
           customerBuiltins["customerType"]?.enabled !== false ? (
-            <h2
-              className="font-mono text-label uppercase tracking-[0.08em] text-signature-700"
+            <span
+              className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
               data-pos-field="customerType"
               data-testid="customer-type-chip"
             >
               {customerTypeWord}
-            </h2>
+            </span>
           ) : undefined
         }
       >
@@ -2698,19 +2698,28 @@ export default function SalesOrderWorkspace() {
                         is in flight; this one did not, so a slow read printed
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
-                    <td className="py-1.5 pr-3 font-mono text-meta">
+                    <td className="py-1.5 pr-3">
                       {goodsTruthQ.isLoading && !truth ? (
-                        "Loading…"
+                        <span className="font-mono text-meta">Loading…</span>
                       ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
-                        truth.unitIds.join(" · ")
+                        <div className="flex max-w-[220px] flex-wrap gap-1">
+                          {truth.unitIds.map((id) => (
+                            <span
+                              key={id}
+                              className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700"
+                            >
+                              {id}
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         (() => {
                           const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
                           return (
-                            <>
+                            <div className="font-mono text-meta">
                               <div>{count}</div>
                               <div className="mt-0.5 text-base-600">{waiting}</div>
-                            </>
+                            </div>
                           );
                         })()
                       )}

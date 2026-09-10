@@ -308,16 +308,6 @@ export default function SalesOrderAddons({
           {error}
         </p>
       )}
-
-      {!inPlaceLane && (
-        /* Say WHERE the act moved, not merely that it is unavailable — an
-           operator told "no" with no next step rings the shop anyway, which is
-           the call this panel exists to stop. */
-        <p className="mt-1 text-meta text-base-500" data-testid="so-addons-locked">
-          Operations has this order — a service is added from the shop's order
-          screen now, and needs approval
-        </p>
-      )}
     </div>
   );
 }
