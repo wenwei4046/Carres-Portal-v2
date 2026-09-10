@@ -401,6 +401,11 @@ export {
   supplierCreateInput,
   supplierSlug,
   type SupplierCreateInput,
+  // 0477 — an other creditor (landlord, advertiser) is Finance's row in
+  // `suppliers`; every Purchasing, Catalog and Operation list drops it.
+  OTHER_CREDITOR_KIND,
+  isOtherCreditor,
+  purchasingSuppliersOnly,
   // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
   // that quoted it; the supplier_id slot stays the routing truth.
   skuSupplierOfferSchema,

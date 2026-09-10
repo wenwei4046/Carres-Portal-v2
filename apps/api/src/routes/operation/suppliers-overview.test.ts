@@ -87,11 +87,16 @@ const SUPPLIER = {
   slug: "ohana",
 };
 
-function mount(pos: unknown[], lines: unknown[], claims: unknown[]) {
+function mount(
+  pos: unknown[],
+  lines: unknown[],
+  claims: unknown[],
+  suppliers: unknown[] = [SUPPLIER],
+) {
   const selects: string[] = [];
   const sb = {
     from: vi.fn((t: string) => {
-      if (t === "suppliers") return builder([SUPPLIER], selects);
+      if (t === "suppliers") return builder(suppliers, selects);
       if (t === "purchase_orders") return builder(pos, selects);
       if (t === "purchase_order_lines") return builder(lines, selects);
       if (t === "supplier_claims") return builder(claims, selects);
@@ -254,6 +259,17 @@ describe("GET /api/operation/suppliers-overview — the R5 scorecard", () => {
     const lineSelect = selects.find((s) => s.includes("received_qty"));
     expect(lineSelect).toContain("damaged_qty");
     expect(lineSelect).toContain("wrong_item_qty");
+  });
+
+  /* 0477 — a landlord added by Finance is not a factory this roster oversees. */
+  it("leaves out Finance's other creditors", async () => {
+    mount([], [], [], [
+      SUPPLIER,
+      { ...SUPPLIER, id: "s9", name: "Bayview Properties", kind: "other_creditor", cat_covered: [], slug: "bayview-properties" },
+    ]);
+    const { res, body } = await get();
+    expect(res.status).toBe(200);
+    expect(body.suppliers.map((s: { name: string }) => s.name)).toEqual(["Ohana"]);
   });
 
   it("refuses a role that is not operation or principal", async () => {
