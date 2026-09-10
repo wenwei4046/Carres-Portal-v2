@@ -6,7 +6,10 @@
  * DatePicker pins it) rendered INLINE at the top of Monitor's 240px rail,
  * wearing the kit's own exported skin with only the rail's size overrides:
  *
- *   - the complete current month, month arrows moving exactly ONE month;
+ *   - TWO consecutive months stacked, current above next (owner ruling
+ *     2026-09-10), from the kit skin's own `months: flex flex-col`; ONE pair
+ *     of arrows moves BOTH by exactly one month (`pagedNavigation` stays off,
+ *     and the skin's `nav` is absolutely placed over the first caption);
  *   - the selected date in the governed blue selected state; today stays
  *     distinguishable (blue TEXT, never the filled selection);
  *   - Sundays — the non-operating day — visible but muted and not clickable;
@@ -88,6 +91,8 @@ export default function MonitorMonthCalendar({
       <DayPicker
         mode="single"
         required
+        /* Current month above next month. One arrow pair, one month per step. */
+        numberOfMonths={2}
         selected={selected}
         month={month}
         onMonthChange={setMonth}
