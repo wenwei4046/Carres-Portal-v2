@@ -11,6 +11,7 @@ import type {
   SoBatchPurchaseResponse,
 } from "@carres/shared";
 import { soBatchAction } from "@carres/shared";
+import type { SalesOrderExpansionResponse } from "@/lib/queries";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -24,8 +25,8 @@ vi.mock("../components/GlobalTopBar", () => ({ TopBarIcons: () => null }));
 const apiFetch = vi.fn(async (..._a: unknown[]) => ({
   defaultDeliverTo: null,
   place: [],
-  lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: unknown[] }[],
-}));
+  lines: [] as { lineId: string; sku: string; unitIds: string[]; deliverTo: Array<{ name: string; qty: number }> }[],
+} as SalesOrderExpansionResponse));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, apiFetch: (...a: unknown[]) => apiFetch(...a) };
@@ -1133,12 +1134,27 @@ describe("the expansion — the ONE shared child table", () => {
     apiFetch.mockResolvedValueOnce({
       defaultDeliverTo: null,
       place: [],
-      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-777"], deliverTo: [] }],
-    });
+      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-777", "U1-000-778"], deliverTo: [] as Array<{ name: string; qty: number }> }],
+      unitCoverage: { "U1-000-778": "PO-SECOND", "U1-000-777": "PO-FIRST" },
+    } as SalesOrderExpansionResponse);
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
     const box = await screen.findByTestId("so-batch-inspector-o6");
     expect(await within(box).findByText("U1-000-777")).toBeInTheDocument();
+    const firstUnit = within(box).getByText("U1-000-777");
+    const secondUnit = within(box).getByText("U1-000-778");
+    expect(firstUnit.closest("tr")).not.toBe(secondUnit.closest("tr"));
+    expect(within(firstUnit.closest("tr")!).getByRole("button", { name: "PO-FIRST" })).toBeInTheDocument();
+    expect(firstUnit.closest("tr")).not.toHaveTextContent("PO-SECOND");
+    expect(within(secondUnit.closest("tr")!).getByRole("button", { name: "PO-SECOND" })).toBeInTheDocument();
+    expect(secondUnit.closest("tr")).not.toHaveTextContent("PO-FIRST");
+    for (const unit of [firstUnit, secondUnit]) {
+      const row = unit.closest("tr")!;
+      expect(within(row).getByText("B1201S-Q")).toBeInTheDocument();
+      expect(within(row).getByText("1")).toBeInTheDocument();
+      expect(unit.closest("td")).toHaveClass("font-mono", "text-[13px]");
+      expect(row.parentElement).toHaveClass("divide-y", "divide-base-200");
+    }
     expect(String(apiFetch.mock.calls[0]![0])).toBe("/api/operation/orders/o6/expansion");
   });
 
@@ -1163,8 +1179,8 @@ describe("the expansion — the ONE shared child table", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
     const retry = await screen.findByRole("button", { name: "Unit IDs could not be loaded. Try again" });
     apiFetch.mockResolvedValueOnce({ defaultDeliverTo: null, place: [], lines: [
-      { lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-070"], deliverTo: [] },
-    ] });
+      { lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-070"], deliverTo: [] as Array<{ name: string; qty: number }> },
+    ] } as SalesOrderExpansionResponse);
     fireEvent.click(retry);
     expect(await screen.findByText("U1-000-070")).toBeInTheDocument();
   });

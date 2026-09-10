@@ -1211,6 +1211,7 @@ function SoBatchOrderExpansion({
       unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
       unitAbsence: expansion.isError ? "Unit IDs could not be loaded" : expansion.isPending ? "Loading…" : "Not allocated",
       coveredBy,
+      coveredByUnit: expansion.data?.unitCoverage,
       coveredByAbsence: "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
@@ -1328,6 +1329,7 @@ function SoBatchOrderExpansion({
       <GoodsMiniTable
         label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
         lines={lines}
+        oneRowPerUnit
         showCoveredBy
         showSupplier
         showPoDeliveryDate
@@ -1338,7 +1340,7 @@ function SoBatchOrderExpansion({
            Same navigation the single-PO cell already performs.
            `Ready Stock` is an answer, not a document, so `poById` — not a
            string test — decides what is a door. */
-        isCoveredByLinkable={(v) => poById.has(v)}
+        isCoveredByLinkable={(v) => poById.has(v) || Object.values(expansion.data?.unitCoverage ?? {}).includes(v)}
         onCoveredByClick={(poId) =>
           navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
         }

@@ -1067,6 +1067,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const sourceRows = (sources ?? []) as Array<{ po_line_id: string | null; order_line_id: string | null }>;
   const sourcePoLineIds = [...new Set(sourceRows.map((s) => s.po_line_id).filter((v): v is string => Boolean(v)))];
   const incomingByLine = new Map<string, string[]>();
+  const poLineByUnit = new Map<string, string>();
   if (sourcePoLineIds.length) {
     const { data: owners, error: ownerErr } = await sb.from("po_line_sources")
       .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
@@ -1084,6 +1085,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
         .eq("status", "incoming").eq("identity_scope", "unit");
       if (incomingErr) { const m = mapPgError(incomingErr); return c.json(m.body, m.status); }
       for (const unit of (incoming ?? []) as Array<{ unit_code: string; po_line_id: string }>) {
+        if (unit.unit_code) poLineByUnit.set(unit.unit_code, unit.po_line_id);
         const lineId = exclusive.get(unit.po_line_id);
         if (lineId && unit.unit_code) incomingByLine.set(lineId, [...(incomingByLine.get(lineId) ?? []), unit.unit_code]);
       }
@@ -1098,13 +1100,23 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const [{ data: pos, error: posErr }, { data: poLines, error: poLinesErr }, { data: units, error: unitsErr }] = await Promise.all([
     poIds.length ? sb.from("purchase_orders").select("id, destination_id").in("id", poIds) : Promise.resolve({ data: [], error: null }),
     poIds.length ? sb.from("purchase_order_lines").select("po_id, sku, qty, destination_id").in("po_id", poIds) : Promise.resolve({ data: [], error: null }),
-    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
+    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
   ]);
   const secondError = posErr ?? poLinesErr ?? unitsErr;
   if (secondError) { const m = mapPgError(secondError); return c.json(m.body, m.status); }
 
-  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null };
+  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null };
   const unitRows = (units ?? []) as UnitRow[];
+  for (const unit of unitRows) {
+    if (unit.unit_code && unit.po_line_id) poLineByUnit.set(unit.unit_code, unit.po_line_id);
+  }
+  const unitPoLineIds = [...new Set(poLineByUnit.values())];
+  const { data: unitPoLines, error: unitPoError } = unitPoLineIds.length
+    ? await sb.from("purchase_order_lines").select("id, po_id").in("id", unitPoLineIds)
+    : { data: [], error: null };
+  if (unitPoError) { const m = mapPgError(unitPoError); return c.json(m.body, m.status); }
+  const poByUnitLine = new Map(((unitPoLines ?? []) as Array<{ id: string; po_id: string }>).map((line) => [line.id, line.po_id]));
+  const unitCoverage = Object.fromEntries([...poLineByUnit].map(([unitId, lineId]) => [unitId, poByUnitLine.get(lineId) ?? null]));
   const warehouseIds = [...new Set(unitRows.map((u) => u.warehouse_id).filter((v): v is string => Boolean(v)))];
   const holderIds = [...new Set(unitRows.map((u) => u.holder_party_id).filter((v): v is string => Boolean(v)))];
   const [{ data: warehouseRows, error: whErr }, { data: holderRows, error: holderErr }] = await Promise.all([
@@ -1134,6 +1146,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const purchaseLines = (poLines ?? []) as Array<{ po_id: string; sku: string; qty: number; destination_id: string | null }>;
   return c.json({
     defaultDeliverTo,
+    unitCoverage,
     place,
     lines: ((lines ?? []) as Array<{ id: string; sku: string; qty: number }>).map((line) => {
       const poId = poByLine.get(line.id);
