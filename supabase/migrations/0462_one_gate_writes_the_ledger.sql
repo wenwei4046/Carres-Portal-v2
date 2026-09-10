@@ -1,9 +1,9 @@
 -- =============================================================================
--- 0466_one_gate_writes_the_ledger.sql
+-- 0462_one_gate_writes_the_ledger.sql
 -- FINANCE · GENERAL LEDGER — THE POSTING GATE
 -- (build contract .claude/LEDGER-CONTRACT.md; rulings J/K/L/M/N)
 --
--- 0465 gave the ledger a chart of accounts and a start line. This file gives it
+-- 0461 gave the ledger a chart of accounts and a start line. This file gives it
 -- the only door. From here on there is exactly ONE way a row reaches
 -- `gl_entries` / `gl_entry_lines`: `gl_post(...)`. Not a route, not a trigger,
 -- not a well-meaning UPDATE from a console. The tables themselves hold NO
@@ -678,12 +678,12 @@ begin
    where n.nspname = 'public'
      and p.proname in ('gl_post','gl_reverse','gl_manual_journal','gl_trial_balance_check');
   if v <> 4 then
-    raise exception '0466 sanity: expected the four ledger functions, got %', v;
+    raise exception '0462 sanity: expected the four ledger functions, got %', v;
   end if;
 
   if not exists (select 1 from pg_indexes
                   where schemaname = 'public' and indexname = 'gl_entries_one_active_per_source') then
-    raise exception '0466 sanity: the one-active-per-source index is missing';
+    raise exception '0462 sanity: the one-active-per-source index is missing';
   end if;
 
   if has_table_privilege('authenticated', 'public.gl_entries', 'insert')
@@ -692,20 +692,20 @@ begin
      or has_table_privilege('authenticated', 'public.gl_entry_lines', 'insert')
      or has_table_privilege('authenticated', 'public.gl_entry_lines', 'update')
      or has_table_privilege('authenticated', 'public.gl_entry_lines', 'delete') then
-    raise exception '0466 sanity: a direct write door to the ledger survived';
+    raise exception '0462 sanity: a direct write door to the ledger survived';
   end if;
 
   if exists (select 1 from pg_policy
               where polrelid in ('public.gl_entries'::regclass, 'public.gl_entry_lines'::regclass)
                 and polcmd <> 'r') then
-    raise exception '0466 sanity: a non-SELECT policy exists on a ledger table';
+    raise exception '0462 sanity: a non-SELECT policy exists on a ledger table';
   end if;
 
   if has_function_privilege('anon', 'public.gl_post(text,text,date,text,jsonb)', 'execute') then
-    raise exception '0466 sanity: gl_post is callable by anon';
+    raise exception '0462 sanity: gl_post is callable by anon';
   end if;
 
-  raise notice '0466 OK: one gate writes the ledger, and nothing else can';
+  raise notice '0462 OK: one gate writes the ledger, and nothing else can';
 end $sanity$;
 
 -- ── the chart stops being editable in the one way that could strand history ──

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0465_a_ledger_needs_a_chart_and_a_start_date.sql
+-- 0461_a_ledger_needs_a_chart_and_a_start_date.sql
 -- FINANCE · GENERAL LEDGER — CARD A · THE CHART, THE START LINE, THE NUMBERS
 -- (rulings J · K · L · N, .claude/LEDGER-CONTRACT.md).
 --
@@ -33,7 +33,7 @@
 --      number handed out and then rolled back is a number that was used.
 --
 -- WHAT THIS FILE DELIBERATELY DOES NOT DO: it does not create `gl_entries` or
--- `gl_entry_lines`, and it does not post anything. The gate (0466) owns those.
+-- `gl_entry_lines`, and it does not post anything. The gate (0462) owns those.
 -- `gl_set_go_live` therefore has to survive a world where `gl_entries` does not
 -- exist yet, and does so by asking `to_regclass` instead of assuming.
 --
@@ -89,7 +89,7 @@ create table public.gl_accounts (
 );
 
 comment on table public.gl_accounts is
-  'The Carres chart of accounts (0465). A HEADER is any account another row names as parent_code, active or retired — there is no is_header column, so retiring the last child never turns a header into a postable leaf.';
+  'The Carres chart of accounts (0461). A HEADER is any account another row names as parent_code, active or retired — there is no is_header column, so retiring the last child never turns a header into a postable leaf.';
 alter table public.gl_accounts
   add constraint gl_accounts_control_for_valid
   check (control_for is null or control_for in ('CUSTOMER','SUPPLIER'));
@@ -127,7 +127,7 @@ create table public.gl_config (
 );
 
 comment on table public.gl_config is
-  'Exactly one row, forever — the check on the boolean primary key is what makes a second row impossible (0465).';
+  'Exactly one row, forever — the check on the boolean primary key is what makes a second row impossible (0461).';
 comment on column public.gl_config.go_live_on is
   'Ruling L. The ledger refuses every date before this one, and every report that reads the ledger prints it. Moves forward only, and only while the ledger is empty.';
 
@@ -146,7 +146,7 @@ create table public.gl_doc_counters (
 );
 
 comment on table public.gl_doc_series is
-  'A prefix is claimed once, ever (0465). The primary key is the reason two document types can never share a sequence.';
+  'A prefix is claimed once, ever (0461). The primary key is the reason two document types can never share a sequence.';
 comment on table public.gl_doc_counters is
   'One counter per prefix per YYYYMM. next_value is the NEXT number to hand out, not the last one handed out.';
 
@@ -199,7 +199,7 @@ end;
 $fn$;
 
 comment on function public.gl_next_doc_no(text, date) is
-  'Allocates PREFIX-YYYYMM-NNNN (0465). Sequential per prefix per month, never reused; a rolled-back transaction leaves a permanent gap, which is correct.';
+  'Allocates PREFIX-YYYYMM-NNNN (0461). Sequential per prefix per month, never reused; a rolled-back transaction leaves a permanent gap, which is correct.';
 
 revoke all on function public.gl_next_doc_no(text, date) from public;
 revoke all on function public.gl_next_doc_no(text, date) from anon;
@@ -261,7 +261,7 @@ end;
 $fn$;
 
 comment on function public.gl_set_go_live(date) is
-  'Ruling L (0465). Principal only. Forward only, never backward, and refused outright once gl_entries holds a row.';
+  'Ruling L (0461). Principal only. Forward only, never backward, and refused outright once gl_entries holds a row.';
 
 revoke all on function public.gl_set_go_live(date) from public;
 revoke all on function public.gl_set_go_live(date) from anon;
@@ -371,7 +371,7 @@ declare
 begin
   select count(*) into v from public.gl_accounts;
   if v < 25 or v > 40 then
-    raise exception '0465 sanity: the chart seeded % accounts', v;
+    raise exception '0461 sanity: the chart seeded % accounts', v;
   end if;
 
   -- Every leaf hangs off a header, and every header groups a real kind.
@@ -380,54 +380,69 @@ begin
      where a.parent_code is not null
        and not exists (select 1 from public.gl_accounts p where p.code = a.parent_code)
   ) then
-    raise exception '0465 sanity: an account points at a parent that does not exist';
+    raise exception '0461 sanity: an account points at a parent that does not exist';
   end if;
   if exists (
     select 1 from public.gl_accounts a
       join public.gl_accounts p on p.code = a.parent_code
      where p.kind <> a.kind
   ) then
-    raise exception '0465 sanity: a child account disagrees with its parent about kind';
+    raise exception '0461 sanity: a child account disagrees with its parent about kind';
   end if;
 
   select count(*) into v from public.gl_accounts where is_control;
   if v <> 3 then
-    raise exception '0465 sanity: expected 3 control accounts, got %', v;
+    raise exception '0461 sanity: expected 3 control accounts, got %', v;
   end if;
 
   select go_live_on into v_date from public.gl_config where id;
   if v_date is distinct from date '2026-09-10' then
-    raise exception '0465 sanity: go-live is %, expected 2026-09-10', v_date;
+    raise exception '0461 sanity: go-live is %, expected 2026-09-10', v_date;
   end if;
 
   select count(*) into v from public.gl_doc_series where prefix in ('JE','SB','PV');
   if v <> 3 then
-    raise exception '0465 sanity: expected the three prefixes, got %', v;
+    raise exception '0461 sanity: expected the three prefixes, got %', v;
   end if;
 
   -- The allocator hands out 0001 then 0002, and refuses an unclaimed prefix.
-  t := public.gl_next_doc_no('JE', date '2026-10-15');
-  if t <> 'JE-202610-0001' then
-    raise exception '0465 sanity: first number was %, expected JE-202610-0001', t;
-  end if;
-  t := public.gl_next_doc_no('JE', date '2026-10-31');
-  if t <> 'JE-202610-0002' then
-    raise exception '0465 sanity: second number was %, expected JE-202610-0002', t;
-  end if;
+  --
+  -- The whole probe sits inside a block that always raises, so PostgreSQL rolls
+  -- the two counter rows back along with the subtransaction and the registry is
+  -- left exactly as the chart seeded it. A `delete` would clear the same two
+  -- rows, but a migration carrying one has to go down the governed manual
+  -- review path (scripts/check-migrations.mjs:169) -- correctly, because that
+  -- guard cannot tell a self-test's cleanup from data loss. Rolling back is
+  -- also the stronger cleanup: it holds even if the probe fails halfway.
   begin
-    t := public.gl_next_doc_no('ZZ', date '2026-10-15');
-    raise exception '0465 sanity: an unregistered prefix was allocated a number';
-  exception when sqlstate '22023' then
-    null;
+    t := public.gl_next_doc_no('JE', date '2026-10-15');
+    if t <> 'JE-202610-0001' then
+      raise exception '0461 sanity: first number was %, expected JE-202610-0001', t;
+    end if;
+    t := public.gl_next_doc_no('JE', date '2026-10-31');
+    if t <> 'JE-202610-0002' then
+      raise exception '0461 sanity: second number was %, expected JE-202610-0002', t;
+    end if;
+    begin
+      t := public.gl_next_doc_no('ZZ', date '2026-10-15');
+      raise exception '0461 sanity: an unregistered prefix was allocated a number';
+    exception when sqlstate '22023' then
+      null;
+    end;
+    -- Nothing is wrong. This is how the two counter rows are undone.
+    raise exception 'gl_numbering_probe_rollback';
+  exception when others then
+    -- A real failure keeps its own message and keeps travelling.
+    if sqlerrm <> 'gl_numbering_probe_rollback' then
+      raise;
+    end if;
   end;
-  -- The probe leaves no gap behind: nothing has posted yet, so reset the counter.
-  delete from public.gl_doc_counters where prefix = 'JE' and period = '202610';
 
   if has_table_privilege('authenticated', 'public.gl_accounts', 'insert') then
-    raise exception '0465 sanity: authenticated can INSERT the chart directly';
+    raise exception '0461 sanity: authenticated can INSERT the chart directly';
   end if;
   if has_table_privilege('anon', 'public.gl_config', 'select') then
-    raise exception '0465 sanity: anon can read the ledger config';
+    raise exception '0461 sanity: anon can read the ledger config';
   end if;
   if exists (
     select 1 from pg_policy
@@ -435,11 +450,11 @@ begin
                         'public.gl_doc_series'::regclass, 'public.gl_doc_counters'::regclass)
        and polcmd <> 'r'
   ) then
-    raise exception '0465 sanity: a write policy exists on a ledger table';
+    raise exception '0461 sanity: a write policy exists on a ledger table';
   end if;
   if has_function_privilege('anon', 'public.gl_set_go_live(date)', 'execute') then
-    raise exception '0465 sanity: gl_set_go_live callable by anon';
+    raise exception '0461 sanity: gl_set_go_live callable by anon';
   end if;
 
-  raise notice '0465 OK: the ledger has a chart, a start line of 2026-09-10, and one numbering registry';
+  raise notice '0461 OK: the ledger has a chart, a start line of 2026-09-10, and one numbering registry';
 end $sanity$;

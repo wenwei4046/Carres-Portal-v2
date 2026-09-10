@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0466_a_supplier_bill_is_a_document.sql
+-- 0464_a_supplier_bill_is_a_document.sql
 -- THE LEDGER · CARD D — ACCOUNTS PAYABLE
 -- (rulings J/K/L/M/N, .claude/LEDGER-CONTRACT.md; boundary from
 --  docs/purchasing/MASTER.md §1 line 37 and §13 line 1482.)
