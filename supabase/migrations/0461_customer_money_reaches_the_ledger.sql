@@ -80,18 +80,59 @@
 --
 -- THEREFORE: NOWHERE IN THIS FILE IS THERE AN `EXCEPTION WHEN OTHERS` AROUND
 -- A LEDGER CALL. That absence is the design. Do not add one.
+--
+-- ── ⛔ WHICH BODY THIS FILE REBUILDS FROM — READ BEFORE YOU `CREATE OR REPLACE`
+-- Two functions are re-created below with `create or replace`, which means this
+-- file carries a FULL COPY of each body and silently becomes the live one. The
+-- bodies here are copied from the LATEST definition of each, NOT from 0351:
+--
+--   `_customer_payment_post`  ← 0449, which is 0430's body plus the snapshot.
+--        0351  the original writer.
+--        0430  §3 widened the method dictionary with the governed manual
+--              methods `duitnow_qr` · `credit_card` · `debit_card`, and widened
+--              `order_payments_method_check` with them.
+--        0448  did NOT touch this function (it rewrote `payment_record`, the
+--              human door above it — left alone here, deliberately).
+--        0449  captures the immutable receipt `snapshot` and inserts it, so a
+--              reprint can never be rewritten by a later rename or correction.
+--
+--   `payment_void`            ← 0450, which is 0430's body with new arithmetic.
+--        0351  the original: principal only, reason optional, `orders.paid`
+--              reversed on the payment's OWN order_id.
+--        0430  §1 reason REQUIRED; §2 the gate is the Payment Approver duty
+--              (`workspace_resolve_duty('payment_approver', null)`, coalesced
+--              so an unassigned duty refuses) OR principal.
+--        0450  §3 the `orders.paid` reversal walks the LIVE ALLOCATIONS, so a
+--              payment whose allocation was corrected onto another SO is
+--              credited back where the money actually sits; a payment with no
+--              allocation row at all keeps the 0430 behaviour exactly.
+--
+-- An earlier draft of this file copied both bodies out of 0351. Because 0461
+-- sorts after 0450, that draft would have silently reverted 0430, 0449 and
+-- 0450 — duplicate-safe method words, receipt snapshots, void reasons, the
+-- approver gate and allocation-following reversal — under a migration whose
+-- stated subject is the general ledger. Nobody would have connected the
+-- regression to this file. The sanity block in §6 now pins both signatures so
+-- the next drift is loud instead of quiet. If you `create or replace` either
+-- function again, START FROM THE BODY BELOW and add this list to yours.
 -- =============================================================================
 
 
 -- ── 1 · the map — which account does this money land in ──────────────────────
--- `method` is `order_payments.method` — the canonical six ('cash','bank',
--- 'card','cheque','online','other'), NOT the older `payment_method` enum.
+-- `method` is `order_payments.method` — the NINE governed words the writer can
+-- store: the original six ('cash','bank','card','cheque','online','other') plus
+-- the manual methods 0430 added ('duitnow_qr','credit_card','debit_card'). NOT
+-- the older `payment_method` enum. This list must stay in step with
+-- `order_payments_method_check` (0430:82) and with the writer's `v_method`
+-- whitelist below: a word the writer can store but the map cannot hold is a
+-- payment that refuses to post AND cannot be rescued by Finance, which is the
+-- one failure this file's design promises will never happen.
 -- `source_channel` is `order_payments.source_channel` ('manual_payment',
 -- 'sales_top_up', 'finance_ar', 'stripe_checkout', 'legacy_finance'), or the
 -- wildcard '*' meaning "any channel". A channel-specific row wins over '*'.
 
 create table if not exists public.gl_payment_account_map (
-  method         text not null check (method in ('cash','bank','card','cheque','online','other')),
+  method         text not null,
   source_channel text not null default '*',
   account_code   text not null references public.gl_accounts(code),
   note           text,
@@ -99,6 +140,16 @@ create table if not exists public.gl_payment_account_map (
   updated_by     uuid references public.app_users(id),
   primary key (method, source_channel)
 );
+
+-- Named and re-applied rather than inline, so the dictionary can widen again
+-- without depending on whether the table already existed.
+alter table public.gl_payment_account_map
+  drop constraint if exists gl_payment_account_map_method_check;
+alter table public.gl_payment_account_map
+  add constraint gl_payment_account_map_method_check check (
+    method in ('cash','bank','card','cheque','online','other',
+               'duitnow_qr','credit_card','debit_card')
+  );
 
 comment on table public.gl_payment_account_map is
   'Payment method/channel -> the debit account customer money lands in (0461). A method with no row is UNMAPPED and its payments REFUSE to post; that is intentional. Never add a catch-all row.';
@@ -328,7 +379,10 @@ revoke all on function public._customer_payment_to_ledger(uuid) from public, ano
 
 
 -- ── 4 · the canonical writer, unchanged, plus the ledger step ────────────────
--- Every line below down to the audit_log insert is 0351's function verbatim.
+-- Every line below down to the audit_log insert is **0449's** function verbatim
+-- — that is 0351's writer with 0430's widened method dictionary and 0449's
+-- immutable receipt snapshot, which are the live behaviours today. Do NOT copy
+-- this body out of 0351; see the chain at the top of the file.
 -- The signature is identical, the behaviour is identical, the return shape is
 -- identical. The ONLY addition is the `_customer_payment_to_ledger` call after
 -- the audit row, and the `gl_entry_id` key it adds to the returned object —
@@ -360,7 +414,8 @@ declare
   v_receipt text;
   v_seq integer;
   v_method text;
-  v_entry uuid;
+  v_snapshot jsonb;   -- 0449
+  v_entry uuid;       -- 0461
 begin
   if p_order_id is null or p_amount is null or p_amount <= 0 or p_paid_on is null then
     raise exception 'order, positive amount and paid-on date are required'
@@ -408,7 +463,11 @@ begin
                               'payment_id', v_existing.id, 'orders_paid', v_order.paid);
   end if;
 
-  v_method := case when p_method in ('cash','bank','card','cheque','online','other')
+  -- 0430: the governed manual methods (payment/MASTER.md §16) join the
+  -- dictionary; an unknown word still coerces to 'other' and the original
+  -- stays in source_metadata.original_method, exactly as before.
+  v_method := case when p_method in ('cash','bank','card','cheque','online','other',
+                                     'duitnow_qr','credit_card','debit_card')
                    then p_method else 'other' end;
   v_receipt := nullif(btrim(coalesce(p_receipt_no, '')), '');
   if v_receipt is null then
@@ -421,16 +480,35 @@ begin
     end loop;
   end if;
 
+  -- 0449 — the receipt's own content, frozen here. The customer name and the
+  -- SO are read ONCE, at the moment the money was recorded, so a later rename
+  -- or correction can never rewrite a receipt that is already in a customer's
+  -- hands. The governed method WORD is stored, not the raw input.
+  v_snapshot := jsonb_build_object(
+    'receipt_no', v_receipt,
+    'paid_on', p_paid_on,
+    'recorded_at', now(),
+    'order_id', p_order_id,
+    'so', v_order.so,
+    'customer', jsonb_build_object('name', coalesce(v_order.customer_name, '')),
+    'amount', p_amount,
+    'method', v_method,
+    'kind', p_kind,
+    'reference', nullif(btrim(coalesce(p_reference, '')), ''),
+    'note', nullif(btrim(coalesce(p_note, '')), ''),
+    'currency', 'MYR');
+
   insert into order_payments
     (order_id, amount, paid_on, method, kind, reference, note, receipt_url,
      receipt_no, recorded_by, counted_in_paid, source_channel, source_reference,
-     idempotency_key, source_metadata)
+     idempotency_key, source_metadata, snapshot)
   values
     (p_order_id, p_amount, p_paid_on, v_method, p_kind, nullif(btrim(coalesce(p_reference,'')),''),
      nullif(btrim(coalesce(p_note,'')),''), nullif(btrim(coalesce(p_receipt_url,'')),''),
      v_receipt, auth.uid(), (p_kind <> 'storage' and p_counts_toward_paid),
      p_source_channel, nullif(btrim(coalesce(p_source_reference,'')),''), p_idempotency_key,
-     coalesce(p_source_metadata, '{}'::jsonb) || jsonb_build_object('original_method', p_method))
+     coalesce(p_source_metadata, '{}'::jsonb) || jsonb_build_object('original_method', p_method),
+     v_snapshot)
   returning * into v_row;
 
   if p_kind = 'storage' then
@@ -467,34 +545,67 @@ begin
                             'gl_entry_id', v_entry);
 end;
 $fn$;
+
+comment on function public._customer_payment_post(uuid,numeric,date,text,text,text,text,text,text,text,text,text,jsonb,boolean) is
+  'The ONE canonical customer-payment writer (0351; 0430 widened the method dictionary; 0449 captures the immutable receipt snapshot; 0461 posts the journal entry). Ledger row, allocation, orders.paid, the receipt number, the snapshot and the GL entry are one transaction — if the ledger refuses, the payment rolls back with it, by design.';
+
 revoke all on function public._customer_payment_post(uuid,numeric,date,text,text,text,text,text,text,text,text,text,jsonb,boolean) from public, anon, authenticated;
 
 
 -- ── 4b · a void contra-reverses the entry; it never deletes it ───────────────
--- 0351's `payment_void` verbatim, plus the `gl_reverse` step. Signature,
--- role gate, storage-gate behaviour, `orders.paid` arithmetic and return shape
--- are all unchanged; `gl_entry_id` is added to the return, additively.
+-- **0450's** `payment_void` verbatim, plus the `gl_reverse` step — that is
+-- 0430's required reason and Payment Approver gate, with 0450's reversal that
+-- walks the LIVE ALLOCATIONS. Do NOT copy this body out of 0351 or 0430; see
+-- the chain at the top of the file. Signature, gate, reason requirement,
+-- storage-gate behaviour, `orders.paid` arithmetic and return shape are all
+-- unchanged; `gl_entry_id` is added to the return, additively.
 create or replace function public.payment_void(p_payment_id uuid, p_reason text default null)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $fn$
 declare
   v_row order_payments; v_paid numeric; v_live_storage integer;
-  v_doc_no text; v_entry uuid; v_contra uuid;
+  v_uid uuid := auth.uid();
+  v_duty jsonb := public.workspace_resolve_duty('payment_approver', null);
+  v_alloc record;
+  v_any boolean := false;
+  v_doc_no text; v_entry uuid; v_contra uuid;   -- 0461
 begin
-  if public.app_role() is distinct from 'principal' then raise exception 'forbidden' using errcode='42501'; end if;
-  select * into v_row from order_payments where id=p_payment_id for update;
+  -- 0430 §1: a void with no reason is refused.
+  if nullif(btrim(coalesce(p_reason, '')), '') is null then
+    raise exception 'a reason is required to void a payment'
+      using errcode = '22023', detail = 'reason_required';
+  end if;
+  -- 0430 §2: Payment Approver duty, or principal. The duty answer is coalesced
+  -- — an unassigned duty must refuse, never NULL its way past the guard.
+  if not (coalesce(public.app_role() = 'principal', false)
+          or (v_uid is not null
+              and coalesce(nullif(v_duty->>'actor_user_id', '')::uuid = v_uid, false))) then
+    raise exception 'forbidden' using errcode = '42501', detail = 'not_payment_approver';
+  end if;
+  select * into v_row from order_payments where id = p_payment_id for update;
   if not found then raise exception 'payment not found' using errcode='42P01',detail='payment_not_found'; end if;
   if v_row.voided_at is not null then raise exception 'payment is already voided' using errcode='22023',detail='already_voided'; end if;
   update order_payments set voided_at=now(),voided_by=auth.uid(),void_reason=nullif(btrim(coalesce(p_reason,'')),'') where id=p_payment_id;
+
+  -- 0450 §3: reverse each LIVE allocation on the order that actually holds it.
+  for v_alloc in select a.order_id, a.amount from payment_allocations a
+                  where a.payment_id = p_payment_id and a.voided_at is null loop
+    v_any := true;
+    update orders set paid = greatest(0, coalesce(paid,0) - v_alloc.amount), updated_at = now()
+     where id = v_alloc.order_id;
+  end loop;
+
   update payment_allocations set voided_at=now(),voided_by=auth.uid(),void_reason=nullif(btrim(coalesce(p_reason,'')),'')
    where payment_id=p_payment_id and voided_at is null;
+
   if v_row.kind='storage' then
     select count(*) into v_live_storage from order_payments where order_id=v_row.order_id and kind='storage' and voided_at is null;
     if v_live_storage=0 then update ops_order_control set storage_collected_at=null,storage_paid=null,updated_by=auth.uid(),updated_at=now() where order_id=v_row.order_id; end if;
-    select paid into v_paid from orders where id=v_row.order_id;
-  elsif v_row.counted_in_paid then
-    update orders set paid=greatest(0,coalesce(paid,0)-v_row.amount),updated_at=now() where id=v_row.order_id returning paid into v_paid;
-  else select paid into v_paid from orders where id=v_row.order_id;
+  elsif v_row.counted_in_paid and not v_any then
+    -- No allocation row exists (a legacy record): the 0430 behaviour, unchanged.
+    update orders set paid=greatest(0,coalesce(paid,0)-v_row.amount),updated_at=now() where id=v_row.order_id;
   end if;
+  select paid into v_paid from orders where id=v_row.order_id;
+
   insert into ops_activity_log(order_id,action,actor_id,detail) values(v_row.order_id,'payment.voided',auth.uid(),jsonb_build_object('amount',v_row.amount,'payment_id',v_row.id,'reason',p_reason));
 
   -- ── 0461 · contra-reverse the journal entry, if this payment ever made one.
@@ -512,6 +623,10 @@ begin
   return jsonb_build_object('payment_id',p_payment_id,'orders_paid',v_paid,'gl_entry_id',v_contra);
 end;
 $fn$;
+
+comment on function public.payment_void(uuid, text) is
+  '0430 + 0450 + 0461: Payment Approver duty (Shared Duty Resolver) or principal voids a payment, with a REQUIRED reason. A void is a stamp, never a delete. 0450: the paid reversal follows the LIVE ALLOCATIONS, so a payment whose allocation was corrected onto another SO is credited back where the money actually sits; a payment with no allocation row keeps the 0430 behaviour. 0461: the journal entry is contra-reversed with gl_reverse, never deleted — a payment recorded before go-live has no entry and that is the quiet skip, not a failure.';
+
 revoke all on function public.payment_void(uuid,text) from public, anon;
 grant execute on function public.payment_void(uuid,text) to authenticated;
 
@@ -532,7 +647,9 @@ begin
     raise exception 'forbidden: only the principal can map a payment account'
       using errcode = '42501', detail = 'forbidden';
   end if;
-  if p_method not in ('cash','bank','card','cheque','online','other') then
+  -- The same nine words the writer can store (0430 §3 widened this list).
+  if p_method not in ('cash','bank','card','cheque','online','other',
+                      'duitnow_qr','credit_card','debit_card') then
     raise exception '% is not a payment method', coalesce(p_method,'null')
       using errcode = '22023', detail = 'bad_method';
   end if;
@@ -717,6 +834,10 @@ begin
     raise exception '0461 sanity: expected the five ledger-bridge functions, got %', v;
   end if;
 
+  -- ── the two re-created functions: signature, and the behaviour this file
+  -- rebuilt from. A `create or replace` that copies a stale body is silent by
+  -- nature, so it is caught HERE instead of at a month-end that does not tie.
+
   -- The canonical writer must still carry its exact 14-argument signature.
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -725,6 +846,56 @@ begin
            'uuid, numeric, date, text, text, text, text, text, text, text, text, text, jsonb, boolean'
   ) then
     raise exception '0461 sanity: _customer_payment_post lost its signature';
+  end if;
+
+  -- And exactly one copy of it, with 0430's dictionary and 0449's snapshot
+  -- still in the body this file installed.
+  select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = '_customer_payment_post';
+  if v <> 1 then
+    raise exception '0461 sanity: % copies of _customer_payment_post', v;
+  end if;
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = '_customer_payment_post'
+       and p.prosrc like '%duitnow_qr%'            -- 0430 §3
+       and p.prosrc like '%v_snapshot%'            -- 0449
+  ) then
+    raise exception '0461 sanity: the writer was rebuilt from a stale body — 0430''s method dictionary or 0449''s receipt snapshot is missing';
+  end if;
+
+  -- payment_void keeps its two-argument signature…
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'payment_void'
+       and pg_get_function_identity_arguments(p.oid) = 'uuid, text'
+  ) then
+    raise exception '0461 sanity: payment_void lost its signature';
+  end if;
+  select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'payment_void';
+  if v <> 1 then
+    raise exception '0461 sanity: % copies of payment_void', v;
+  end if;
+  -- …and 0430's approver gate plus 0450's allocation-following reversal.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'payment_void'
+       and p.prosrc like '%reason_required%'                -- 0430 §1
+       and p.prosrc like '%workspace_resolve_duty%'         -- 0430 §2
+       and p.prosrc like '%payment_allocations a%'          -- 0450 §3
+  ) then
+    raise exception '0461 sanity: payment_void was rebuilt from a stale body — 0430''s required reason/approver gate or 0450''s allocation-following reversal is missing';
+  end if;
+
+  -- 0448 rewrote payment_record, the human door ABOVE the writer. This file
+  -- must never have touched it; if it did, the duplicate gate is gone.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'payment_record'
+       and p.prosrc like '%possible_duplicate_payment%'      -- 0448 §2
+  ) then
+    raise exception '0461 sanity: payment_record lost 0448''s likely-duplicate gate';
   end if;
 
   if exists (select 1 from pg_policy where polrelid = 'public.payments'::regclass

@@ -118,6 +118,43 @@
 -- A pre-go-live invoice records exactly as it does today and is quietly NOT
 -- posted (ruling L), by the same mechanism 0461 uses for a pre-go-live payment.
 -- A void calls `gl_reverse`. Nothing here deletes anything.
+--
+-- ── ⑥ WHICH DEFINITION THIS FILE SITS ON TOP OF — READ THIS FIRST ───────────
+-- §6 below does `create or replace` on `issue_order_invoice`. Whoever replaces
+-- it NEXT must know what they are standing on, so the chain is written down:
+--
+--     0229_issue_order_invoice.sql:27   CREATE OR REPLACE ... (uuid, numeric)
+--     0230 .. 0463                      NOTHING. Verified, not assumed.
+--     0464 (this file)                  the 0229 body, verbatim, + the ledger
+--                                       call and the `gl_entry_id` return key.
+--
+-- HOW THAT WAS VERIFIED, so the next person can repeat it rather than trust it:
+-- every migration in the tree was searched, case-insensitively, for the name
+-- `issue_order_invoice` and for every writer of the `invoices` table or of
+-- `orders.invoice_no`. The name appears in exactly three files — 0229 (the sole
+-- definition), 0461:671 (a prose reference), and this one. No migration between
+-- 0230 and 0463 redefines it, drops it, or changes its `(uuid, numeric)`
+-- identity. §10's sanity block asserts that identity so a future drift stops
+-- the migration instead of leaving a stale overload beside a live one.
+--
+-- 🟡 BUT THE WORLD AROUND IT MOVED, AND §6's BODY DID NOT.
+-- 0429 gave `invoices` a lifecycle the 0229 body predates: `kind`, `status`
+-- (draft -> issued -> voided), `snapshot`, `replaces_invoice_id`, actor columns,
+-- a nullable `invoice_no` / `issued_at`, and the partial unique index
+-- `invoices_live_sales_per_order_uidx` (0429:80) — at most ONE live sales
+-- invoice per order. It also retired the `INV-YYYY-NNNNNN` number scheme in
+-- favour of the governed `INV-DDMMYY-NNNN` (0429:15, :190).
+--
+-- 0229's body still mints the retired number and still does a bare
+-- `insert into invoices ... on conflict (invoice_no) do nothing`, which does
+-- NOT cover 0429's partial index — so issuing from the Balance tab on an order
+-- that already carries a PREPARED DRAFT raises 23505. That collision is
+-- 0229-versus-0429 and it exists on `main` today, with or without this file.
+-- It is named here and deliberately NOT fixed here: a ledger card does not get
+-- to rewrite the numbering law of another module's document. Reconciling the
+-- issue doors is Payment's work (docs/payment/MASTER.md §4) and §9 below states
+-- what it would take. This file changes exactly one thing about §6 — it posts
+-- the journal entry — and leaves every other byte of 0229 alone on purpose.
 -- =============================================================================
 
 
@@ -516,6 +553,11 @@ revoke all on function public._sales_invoice_to_ledger(text) from public, anon, 
 
 
 -- ── 6 · the canonical issuer, unchanged, plus the ledger step ────────────────
+-- ⚠ BUILT ON 0229_issue_order_invoice.sql:27, WHICH IS STILL THE LIVE BODY.
+-- Nothing between 0230 and 0463 redefines this function — see the header, ⑥,
+-- for how that was checked. If you are the next migration to replace it, copy
+-- THIS body, not 0229's, and add your own line to that chain.
+--
 -- Every behaviour below is 0229's, unchanged (the keywords are lower-cased to
 -- match this series; nothing else moved): same signature
 -- `(uuid, numeric)`, same role gate, same `FOR UPDATE` lock, same idempotent
@@ -633,12 +675,34 @@ grant execute on function public.issue_order_invoice(uuid, numeric) to authentic
 
 
 -- ── 7 · a void contra-reverses the entry; it never deletes it ────────────────
--- There is no `void_order_invoice` function to append a step to: the Finance
--- void writes `invoices.voided_at` straight through PostgREST
--- (apps/api/src/routes/finance/invoices.ts:126-133, on the UPDATE-only policy
--- 0461 left it). A trigger is therefore the only thing that can catch it, and
--- it catches EVERY void, including invoices minted by the two other issue
--- doors — those simply have no entry and the trigger no-ops.
+-- A TRIGGER, BECAUSE THERE IS NO SINGLE VOID DOOR TO APPEND A STEP TO. Two
+-- paths void an invoice today and they do not share code:
+--
+--   · `payment_invoice_void_replace` (0429:225, called from
+--     apps/api/src/routes/finance/invoices.ts:677) — the governed door. It sets
+--     `status = 'voided'` AND `voided_at` in one UPDATE (0429:264) and drafts
+--     the linked replacement.
+--   · a bare PostgREST UPDATE that stamps `voided_at` alone
+--     (apps/api/src/routes/finance/invoices.ts:773), which is the older
+--     POST /:id/void route.
+--
+-- A trigger on `voided_at` is the only thing that sees BOTH, and it catches
+-- every void including invoices minted by the doors §9 lists as unwired —
+-- those simply have no entry and the trigger no-ops.
+--
+-- IT FIRES EXACTLY ONCE PER VOID, AND ONLY ONCE. `invoices` carries no other
+-- trigger: every migration in the tree was searched for a trigger on that table
+-- and this file's is the only one, so nothing can double-reverse. The
+-- `when (old.voided_at is null and new.voided_at is not null)` clause is what
+-- makes the two paths above idempotent with respect to each other — a second
+-- UPDATE that re-stamps an already-voided invoice does not re-enter, and
+-- `gl_reverse` never sees the same entry twice.
+--
+-- 🟡 KNOWN AND NOT FIXED HERE: the replacement draft that 0429:277 creates
+-- earns a NEW number at `payment_invoice_issue`, and that door is unwired
+-- (§9). So a correction reverses the revenue and the replacement never
+-- re-recognises it. `gl_receivables_reconcile` reports the replacement as an
+-- unposted invoice, loudly, until the door is wired.
 --
 -- Un-voiding is refused rather than silently re-posting: an invoice that was
 -- voided and is wanted again is re-issued, which mints a new number and a new
@@ -864,41 +928,61 @@ grant execute on function public.gl_receivables_reconcile() to authenticated;
 
 
 -- ── 9 · what this file knowingly does NOT wire, and why ──────────────────────
--- 🔴 THREE DOORS MINT AN INVOICE. Law C of docs/ERP-ARCHITECTURE.md — "a door,
+-- 🔴 FOUR DOORS MINT AN INVOICE. Law C of docs/ERP-ARCHITECTURE.md — "a door,
 -- never a duplicate" — is already broken here, and this file wires exactly one
--- of the three because wiring the other two would do harm:
+-- of the four because wiring the others would do harm. This inventory is stated
+-- as of 0429/0438, NOT as of 0229; that matters, because 0429 rewrote two of
+-- these doors and added a third since the ledger card was first sketched.
 --
---   1. `issue_order_invoice` (0229, called from apps/api/src/routes/orders.ts
---      :4519). The canonical door. WIRED above.
+--   1. `issue_order_invoice` (0229:27, called from apps/api/src/routes
+--      /orders.ts:4531 — the Balance tab's on-demand issue). The canonical
+--      operator door. WIRED above.
 --
---   2. `orders_auto_issue_on_dispatched` (0098, re-attached by 0167:114). A
---      BEFORE UPDATE trigger on `orders` that mints INV-YYYY-{so, 6-digit} at
---      dispatch. NOT WIRED: it runs as whoever moved the order to dispatched,
---      which is the LOGISTICS role, and `gl_post`'s role gate admits only
---      finance / operation / principal (0460:164). Appending a posting call
---      would make every logistics dispatch fail. The fix is a decision, not a
---      patch: either admit 'logistics' to gl_post, or retire the auto-issue
---      half of that trigger so 0229 is the one door. RECOMMENDED: retire it —
---      the trigger and 0229 already share a number formula precisely so they
---      cannot both mint, which is an admission that one of them is redundant.
+--   2. `orders_auto_issue_on_dispatched` (0098, re-attached by 0167:114,
+--      REWRITTEN BY 0429:301). A BEFORE UPDATE trigger on `orders` at dispatch.
+--      Since 0429 it ADOPTS an already-issued live sales invoice instead of
+--      minting a twin, and mints on the governed `INV-DDMMYY-NNNN` scheme
+--      (0429:351) only when no live invoice exists. NOT WIRED: it runs as
+--      whoever moved the order to dispatched, which is the LOGISTICS role, and
+--      `gl_post`'s role gate admits only finance / operation / principal
+--      (0460:164). Appending a posting call would make every logistics dispatch
+--      fail. The fix is a decision, not a patch: either admit 'logistics' to
+--      gl_post, or retire the minting half of the trigger now that 0429 gave it
+--      an adopt path and the prepare/issue doors exist.
 --
---   3. `invoice_issue` (0003_rpcs.sql:289, rewritten by 0126, called from
---      apps/api/src/routes/finance/invoices.ts:103). NOT WIRED, and this one is
---      worse than unposted: its number formula is
---      `to_char(dl, 'FM0000')` — FOUR digits — against the six-digit `lpad` the
---      other two use. Order 123 gets 'INV-2026-0123' here and 'INV-2026-000123'
---      there, so the two doors can mint TWO invoices for ONE order. Wiring it
---      would post that revenue TWICE. It must be reconciled with the other two
---      before it may post anything.
+--   3. `payment_invoice_issue` (0429:157, called from apps/api/src/routes
+--      /finance/invoices.ts:419, and again from `payment_storage_invoice`
+--      at 0438:103). THE MODULE'S OWN GOVERNED DOOR — draft -> issued, one
+--      number, one immutable snapshot. NOT WIRED, and it is the one that most
+--      needs to be: it issues sales invoices, storage invoices AND the
+--      replacement drafts that `payment_invoice_void_replace` creates after a
+--      correction (§7). Wiring it is not a copy of §6's call, because a
+--      `kind = 'storage'` / `'additional_storage'` invoice carries no order
+--      lines at all and would land entirely in `_sales_invoice_to_ledger`'s
+--      residual branch — correct only by accident, and only while
+--      `ops_order_control` happens to carry the storage evidence. It needs its
+--      own decomposition, which is a card, not a line.
 --
--- Until 2 and 3 are settled, `gl_receivables_reconcile().unposted_invoice_count`
+--   4. `invoice_issue` (0003_rpcs.sql:289, regex-rewritten by 0126, still
+--      called from apps/api/src/routes/finance/invoices.ts:746). NOT WIRED, and
+--      this one is worse than unposted: it predates 0429 entirely, writes
+--      `invoices` directly with its own four-digit number formula, and knows
+--      nothing about `status`, `kind` or the live-sales-invoice index. It can
+--      mint a SECOND document for an order that already has one. Wiring it
+--      would post that revenue TWICE. It must be retired into door 3 before it
+--      may post anything.
+--
+-- Until 2, 3 and 4 are settled, `gl_receivables_reconcile().unposted_invoice_count`
 -- counts everything they mint, and `comparable` is false the moment they do.
+-- That is the intended behaviour: the reconciliation is how the unwired doors
+-- stay visible instead of quietly draining revenue out of the P&L.
 
 
 -- ── 10 · sanity — schema shape only, never a production row count ────────────
 do $sanity$
 declare
-  v int;
+  v       int;
+  v_ident text;
 begin
   select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
@@ -909,15 +993,24 @@ begin
     raise exception '0464 sanity: expected the five functions, got %', v;
   end if;
 
-  -- 0229's signature is preserved exactly. A changed signature would leave the
-  -- old two-argument function standing beside the new one and the route would
-  -- keep calling whichever Postgres resolved first.
-  if not exists (
-    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname = 'issue_order_invoice'
-       and pg_get_function_identity_arguments(p.oid) = 'uuid, numeric'
-  ) then
-    raise exception '0464 sanity: issue_order_invoice lost its (uuid, numeric) signature';
+  -- THE SIGNATURE ASSERTION. `create or replace` cannot change a signature —
+  -- a different argument list silently creates an OVERLOAD and leaves the old
+  -- function standing beside the new one, with PostgREST calling whichever
+  -- Postgres resolves first. So the identity string is asserted literally, and
+  -- the overload count with it: either both hold, or this migration refuses.
+  -- If a future migration legitimately changes the signature, this line is the
+  -- thing that will stop it, and that is the point — it must be changed on
+  -- purpose, in the same commit, by someone who read the header's ⑥ chain.
+  select pg_get_function_identity_arguments(p.oid)
+    into v_ident
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'issue_order_invoice'
+   order by 1
+   limit 1;
+  if v_ident is distinct from 'uuid, numeric' then
+    raise exception '0464 sanity: issue_order_invoice has identity arguments (%), expected (uuid, numeric) — the chain in this file''s header ⑥ is broken',
+      coalesce(v_ident, 'the function does not exist');
   end if;
   select count(*) into v from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'issue_order_invoice';
@@ -925,6 +1018,32 @@ begin
     raise exception '0464 sanity: % overloads of issue_order_invoice exist, expected exactly 1', v;
   end if;
 
+  -- The two 0461 helpers §5 calls, asserted by identity for the same reason.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'gl_ar_control_account'
+       and pg_get_function_identity_arguments(p.oid) = ''
+  ) then
+    raise exception '0464 sanity: gl_ar_control_account() is missing or no longer takes no arguments';
+  end if;
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'gl_customer_party_for_order'
+       and pg_get_function_identity_arguments(p.oid) = 'uuid'
+  ) then
+    raise exception '0464 sanity: gl_customer_party_for_order(uuid) is missing or changed signature';
+  end if;
+
+  -- EXACTLY ONE void trigger, not merely at least one. Two triggers on
+  -- `voided_at` would call gl_reverse twice for one void and the second call
+  -- would either raise or reverse a reversal. See §7.
+  select count(*) into v from pg_trigger t
+   where t.tgrelid = 'public.invoices'::regclass
+     and not t.tgisinternal
+     and t.tgfoid = 'public.invoices_reverse_ledger_on_void()'::regprocedure;
+  if v <> 1 then
+    raise exception '0464 sanity: % triggers fire the invoice void reversal, expected exactly 1', v;
+  end if;
   if not exists (
     select 1 from pg_trigger t
      where t.tgrelid = 'public.invoices'::regclass
@@ -932,6 +1051,25 @@ begin
        and not t.tgisinternal
   ) then
     raise exception '0464 sanity: the invoice void reversal trigger is not attached';
+  end if;
+
+  -- The columns §5 decomposes an invoice with. 0429 gave `invoices` a
+  -- lifecycle after 0229 was written (header ⑥); if a later migration renames
+  -- or drops one of these, the decomposition goes wrong QUIETLY, so it is
+  -- asserted rather than trusted.
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'order_addons'
+                    and column_name = 'addon_key')
+     or not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'order_lines'
+                       and column_name = 'unit_price')
+     or not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'ops_order_control'
+                       and column_name = 'storage_from')
+     or not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'invoices'
+                       and column_name = 'issued_at') then
+    raise exception '0464 sanity: a column the invoice decomposition reads has moved';
   end if;
 
   -- The map must be seeded, and must NOT carry an add-on catch-all.
