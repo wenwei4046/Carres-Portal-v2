@@ -6,6 +6,7 @@ import {
   paymentTemplateKeyInput,
   paymentTemplateSaveInput,
 } from "@carres/shared/payment-templates";
+import { paymentMethodKeySchema, paymentMethodSaveInput } from "@carres/shared";
 import { mapPgError, parseJsonBody } from "../../lib/route-helpers";
 import { userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
@@ -74,8 +75,54 @@ paymentSettingsRouter.post("/bank-account", async (c) => {
   return c.json(data);
 });
 
+// ---------------------------------------------------------------------------
+// 0476 — the payment method registry. A method is a key a manager adds in
+// Settings → Payment; its money account is chosen in the same act, so the
+// ledger always knows where that money lands. Reads are for every internal
+// role (the forms offer the Active rows); the save door keeps the 0431
+// manager gate in SQL.
+// ---------------------------------------------------------------------------
+
+paymentSettingsRouter.get("/methods", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot view payment methods." });
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const [methods, accounts] = await Promise.all([
+    sb.rpc("payment_method_registry"),
+    sb.rpc("payment_method_money_accounts"),
+  ]);
+  if (methods.error || accounts.error || methods.data == null || accounts.data == null) {
+    throw new HTTPException(500, { message: "Payment methods could not be loaded. Try again." });
+  }
+  return c.json({ methods: methods.data, money_accounts: accounts.data });
+});
+
+paymentSettingsRouter.post("/method/save", async (c) => {
+  const auth = c.var.auth;
+  if (!INTERNAL.includes(auth.role as (typeof INTERNAL)[number])) {
+    throw new HTTPException(403, { message: "You cannot change Payment settings." });
+  }
+  const body = await parseJsonBody(c, paymentMethodSaveInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("payment_method_save", {
+    p_method: body.data.method ?? null,
+    p_label: body.data.label,
+    p_account_code: body.data.accountCode,
+    p_active: body.data.active,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json(data);
+});
+
+// The Active switch alone (0431's door). Any registered key, not six words.
 const methodInput = z.object({
-  method: z.enum(["bank", "duitnow_qr", "cheque", "cash", "credit_card", "debit_card"]),
+  method: paymentMethodKeySchema,
   active: z.boolean(),
 });
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentMethodKeySchema } from './order-payments';
 
 /**
  * Phase 5 — HQ Finance role inputs.
@@ -50,7 +51,11 @@ export type FinanceTopupApproveInput = z.infer<typeof financeTopupApproveInput>;
 export const financeRecordReceiptInput = z.object({
   orderId:    z.string().uuid(),
   amount:     z.number().positive().finite(),
-  method:     paymentMethodEnum,
+  /** 0476: a method KEY — a system word, an alias (`bank_transfer` → bank) or
+   *  a method from Settings → Payment. `finance_record_receipt` takes text and
+   *  the one writer decides; the old enum sent `bank_transfer`, which the
+   *  writer coerced to `other` and the ledger could not place. */
+  method:     paymentMethodKeySchema,
   reference:  z.string().min(1).max(255).nullable().optional(),
   idempotencyKey: z.string().uuid().optional(),
 }).strict();
