@@ -2684,6 +2684,54 @@ that repeats a guarantee the operator cannot verify is noise.
 
 ---
 
+## Finance ledger words — PROPOSAL, awaiting owner review
+
+**PROPOSAL / NOT LAW.** Words the finance ledger builds put on screen before the owner has
+ruled on them. Each block names its build and what would overturn it. Until a ruling, a
+word here may appear only on the page its block names.
+
+### Supplier bills and payment vouchers (migration 0477)
+
+Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP drawer's doors.
+
+| Where | Word on screen | Stored value it replaces | Note |
+|---|---|---|---|
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch |
+| Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
+| Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
+| Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
+| Pay method | **Bank transfer** · **Cheque** · **Cash** · **Other** | `BANK_TRANSFER` … | |
+| History | **Created** · **Changed** · **Confirmed** · **Prepared** · **Checked** · **Approved** · **Returned to draft** · **Cancelled** · **File added** | `created` … `file_added` | |
+| Creditor type | **Supplier** · **Other creditor** | `suppliers.kind` | an other creditor is a landlord, an advertiser, a lorry company on credit — its bills go to 2120 Other payables |
+| Money a SUPPLIER is still owed | **Unpaid** | — | `Outstanding` stays customer money only (§ Vocabulary); `Balance` stays banned for money |
+| Voucher form | **Left to pay** · **Pay now** · **Paid from** · **Payee** | — | the voucher **Total** is added up, never typed |
+| Price check | **Same as PO price** · **RM x above PO price** · **RM x below PO price** · **No PO price** · **`n` lines differ from PO** | — | a flag, never a block |
+| Line source | **Not from a GRN** | `warehouse_receipt_id is null` | |
+| No number yet | **Draft, no number yet** | `bill_no` / `voucher_no` null | numbers are drawn on confirm / prepare |
+| Ledger link | **Ledger entry** · **reversed by `JE-…`** | `gl_entries` | |
+| An unknown stored value | **Not known** | anything the word map lacks | never the raw value |
+| Buttons | **+ New Bill** · **Convert GRN to bill** · **Confirm bill** · **Cancel bill** · **+ New Payment Voucher** · **Prepare voucher** · **Check voucher** · **Approve payment** · **Return to draft** · **Cancel voucher** · **Add other creditor** · **Attach file** · **Use this GRN** | — | form buttons stay `Save` / `Cancel`; line lists stay `+ Add line` / `Remove` |
+
+**Three dictionary conflicts, reported rather than decided:**
+
+1. **`Prepare`** was retired with `Prepare PO` on 2026-07-30. The voucher's first step keeps
+   it (`Prepare voucher`) because the brief names the Houzs structure Draft → Prepared →
+   Checked → Approved, and the preparer is the person the separation-of-duties rule excludes
+   from the next two steps. *Overturned by:* an owner ruling for another word (e.g. `Submit
+   voucher`); only the word map and the button change.
+2. **`Check`** means establishing a missing fact. `Check voucher` fits loosely — the fact
+   established is "the bills, amounts and payee match the papers attached" — but the object is
+   a document, not an absent fact. *Overturned by:* the owner reading `Check` as the
+   Purchasing-only verb.
+3. **`Approve`** is ruled for a purchase nobody's customer ordered. `Approve payment` names what
+   is approved, as the rule demands, but widens the verb to money leaving Carres. *Overturned
+   by:* an owner ruling that money out takes its own verb (e.g. `Release payment`).
+
+The brief's `Reject` is shown as **`Return to draft`**: the voucher goes back to the person who
+prepared it, which is the dictionary's `Return` exactly.
+
+---
+
 ## Header rules (see UI-KIT for the shell)
 
 Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:
