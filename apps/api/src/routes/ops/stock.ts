@@ -773,6 +773,10 @@ opsStockRouter.post("/reserve", requireOperationOrPrincipal, async (c) => {
     p_sku: parsed.sku,
     p_condition: parsed.condition ?? null,
     p_wh: parsed.warehouseId ?? null,
+    /* 0469 — this door picks by SKU and names no line. For an `SO-`
+       reference the draw door resolves the item line itself and refuses when
+       more than one could be meant, so no reservation is stored without one. */
+    p_order_line_id: null,
   });
   if (error) throw mapErr(error);
   if (!data) {
@@ -801,6 +805,10 @@ opsStockRouter.post("/reserve-item", requireOperationOrPrincipal, async (c) => {
     p_sku: null,
     p_condition: null,
     p_wh: null,
+    /* 0469 — the order drawer's picker has never carried an item line, so it
+       may send none and the draw door resolves one from this order's lines
+       that still need these goods; several candidates is a named refusal. */
+    p_order_line_id: parsed.orderLineId ?? null,
   });
   if (error) throw mapErr(error);
   if (!data) {
