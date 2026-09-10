@@ -273,70 +273,140 @@ export function stockRefOf(
  * unreachable the FEATURE is unavailable and the workspace is exactly what it
  * was — no offer, no netting, nothing invented.
  */
+export type FreeStockUnit = {
+  id: string;
+  unitCode: string | null;
+  sku: string;
+  qty: number;
+  condition: string | null;
+  siteName: string | null;
+  holderName: string | null;
+  ownership: string;
+  supplier: string | null;
+  identityScope: string;
+  dateIn: string | null;
+};
+
 export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<{
   stockWarehouse: { id: string; name: string } | null;
   freeStock: Record<string, { id: string; qty: number }[]>;
   stockQtyById: Map<string, number>;
+  /** 0471 — the same units, with the facts a Ready Stock table has to print. */
+  freeUnitsByKey: Map<string, FreeStockUnit[]>;
 }> {
   let stockWarehouse: { id: string; name: string } | null = null;
   const freeStock: Record<string, { id: string; qty: number }[]> = {};
   const stockQtyById = new Map<string, number>();
+  const freeUnitsByKey = new Map<string, FreeStockUnit[]>();
   try {
+    /**
+     * ⚠️ `stockWarehouse` IS NOT A DISPLAY FACT. It is the warehouse a purchase
+     * order is RAISED AGAINST (`/issue-batch` refuses with `no_warehouse`
+     * without it and stamps `warehouse_id` from it). So it keeps its own rule —
+     * the own-kind shed, Klang preferred — and is read from `warehouses`, never
+     * inferred from wherever the offered units happen to be standing. The two
+     * questions only looked like one while there was a single shed.
+     */
     const { data: whRows } = await sb
       .from("warehouses")
       .select("id, name, kind")
       .eq("kind", "own");
     const own = whRows ?? [];
-    // The issue path's own rule, so the stock offered and the warehouse a
-    // purchase order is raised against can never be two different places.
     const wh = own.find((w) => /klang|klg/i.test((w.name as string) ?? "")) ?? own[0];
-    if (wh) {
-      stockWarehouse = { id: wh.id as string, name: (wh.name as string) ?? "" };
+    if (wh) stockWarehouse = { id: wh.id as string, name: (wh.name as string) ?? "" };
 
-      const { data: itemRows, error: itemErr } = await sb
-        .from("ops_stock_items")
-        .select("id, sku, qty, date_in, created_at")
-        .eq("status", "free")
-        .eq("needs_repair", false)
-        // READY STOCK'S OWN DEFINITION OF READY, mirrored rather than
-        // re-decided (`GET /api/ops/stock/ready`). Free and sound is not
-        // enough on its own: R4 releases a quarantined unit back to `free`,
-        // so the day a DAMAGED one is released this page would otherwise
-        // offer it to a customer's order. Live exposure today is zero
-        // (measured 2026-08-04: 54 `new` + 33 `exhibition`, nothing else) —
-        // which is exactly why it is closed now rather than after the first
-        // release. The list is that route's, verbatim, and its own header
-        // comment is stale: the CODE admits `old` and `refurbished` too and
-        // excludes only `damaged`.
-        .in("condition", ["new", "exhibition", "old", "refurbished"])
-        .eq("warehouse_id", stockWarehouse.id);
-      if (itemErr) throw new Error(itemErr.message);
+    /**
+     * ── THE AUTHORITATIVE INVENTORY READ (0471) ───────────────────────────
+     *
+     * `stock_unit_register_v` (0366 · 0371 · 0417 · 0453), not a hand-rolled
+     * query over `ops_stock_items`. Three things come free with it and each
+     * one was a defect in the old read:
+     *
+     *   · `availability` is the ONE availability arithmetic (0371). It already
+     *     excludes a released-but-damaged unit, anything `needs_repair` and
+     *     anything on hold. The old read restated a `condition` white-list
+     *     beside it, which is exactly the second arithmetic Law D forbids.
+     *   · `identity_scope` tells an exact Unit from a counted row. A bulk row
+     *     of 893 accessories has a `QTY-` key, not a Unit ID, and 0368 already
+     *     ruled it is not bindable to a Sales Order.
+     *   · `site_name` / `holder_name` / `ownership` are read rather than
+     *     assumed, so the page states WHERE a unit is instead of the page
+     *     guessing, and says when the goods belong to a supplier.
+     *
+     * NO WAREHOUSE FILTER ON THE OFFER. The old read narrowed the OFFER to the
+     * purchase-order warehouse, which is a different question: goods standing
+     * at a second site are still goods Carres owns and can commit to a
+     * customer. Production has exactly one own warehouse today (measured
+     * 2026-09-10) so nothing moves, but a second site would have been silently
+     * unsellable and the fix costs a removed `.eq()`.
+     */
+    const { data: itemRows, error: itemErr } = await sb
+      .from("stock_unit_register_v")
+      .select(
+        "id, unit_code, sku, qty, date_in, condition, site_name, holder_name, ownership, supplier, identity_scope, warehouse_id",
+      )
+      .eq("availability", "available");
+    if (itemErr) throw new Error(itemErr.message);
 
-      // FIFO — `ops_stock_pool_draw`'s own pick order (oldest first), so the
-      // records this page offers are the records it would have taken anyway.
-      const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
-        const ad = (a.date_in as string | null) ?? "9999-12-31";
-        const bd = (b.date_in as string | null) ?? "9999-12-31";
-        if (ad !== bd) return ad < bd ? -1 : 1;
-        const ac = (a.created_at as string | null) ?? "";
-        const bc = (b.created_at as string | null) ?? "";
-        return ac < bc ? -1 : ac > bc ? 1 : 0;
-      });
-      for (const it of items) {
-        // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies —
-        // the catalog code against the warehouse's own name. `stockMatchKey`
-        // is the portal's ONE rule for linking them, already read by the
-        // readiness badge and the drawer's picker.
-        const key = stockMatchKey(it.sku as string);
-        const qty = Math.max(1, Number(it.qty ?? 1));
-        (freeStock[key] ??= []).push({ id: it.id as string, qty });
-        stockQtyById.set(it.id as string, qty);
-      }
+    /**
+     * FIFO — oldest `date_in` first, which is `ops_stock_pool_draw`'s own
+     * primary pick order, so the page offers the goods that have waited
+     * longest.
+     *
+     * ⚠️ THE TIE-BREAK IS `unit_code`, NOT `created_at`, and that is a REAL
+     * difference from the draw door's `order by date_in, created_at`. The
+     * authoritative register view does not carry `created_at`, and a second
+     * read of the base table to recover it would put the whole offer back on
+     * the source this read exists to stop re-deciding. It costs nothing that
+     * matters: `date_in` already answers *which is older*, the order is
+     * deterministic and stable across refreshes, and no unit is ever offered
+     * twice — the three properties the allocation actually rests on. Where the
+     * take path needs an exact unit it names one (`freeStockItemIds`,
+     * `Choose Ready Unit`), so it never re-picks by this order at all.
+     */
+    const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
+      const ad = (a.date_in as string | null) ?? "9999-12-31";
+      const bd = (b.date_in as string | null) ?? "9999-12-31";
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      const ac = (a.unit_code as string | null) ?? "";
+      const bc = (b.unit_code as string | null) ?? "";
+      return ac < bc ? -1 : ac > bc ? 1 : 0;
+    });
+    for (const it of items) {
+      // `order_lines.sku` and `ops_stock_items.sku` are two vocabularies —
+      // the catalog code against the warehouse's own name. `stockMatchKey`
+      // is the portal's ONE rule for linking them, already read by the
+      // readiness badge and the drawer's picker, and pinned to its SQL twin
+      // by `stock-match-key.contract.test.ts`.
+      const key = stockMatchKey(it.sku as string);
+      const qty = Math.max(1, Number(it.qty ?? 1));
+      const id = it.id as string;
+      const scope = (it.identity_scope as string | null) ?? "unit";
+      const unit: FreeStockUnit = {
+        id,
+        unitCode: (it.unit_code as string | null) ?? null,
+        sku: it.sku as string,
+        qty,
+        condition: (it.condition as string | null) ?? null,
+        siteName: (it.site_name as string | null) ?? null,
+        holderName: (it.holder_name as string | null) ?? null,
+        ownership: (it.ownership as string | null) ?? "carres_owned",
+        supplier: (it.supplier as string | null) ?? null,
+        identityScope: scope,
+        dateIn: (it.date_in as string | null) ?? null,
+      };
+      freeUnitsByKey.set(key, [...(freeUnitsByKey.get(key) ?? []), unit]);
+      /* The netting offer stays EXACT UNITS ONLY: a counted row cannot be
+         committed to one customer's item line, so offering it would promise
+         something the reservation door refuses. */
+      if (scope !== "unit") continue;
+      (freeStock[key] ??= []).push({ id, qty });
+      stockQtyById.set(id, qty);
     }
   } catch (e) {
     console.error("ready stock unavailable — no offer made", (e as Error).message);
   }
-  return { stockWarehouse, freeStock, stockQtyById };
+  return { stockWarehouse, freeStock, stockQtyById, freeUnitsByKey };
 }
 
 /**
@@ -784,16 +854,61 @@ export async function loadToOrder(
    */
   const { stockWarehouse, freeStock, stockQtyById } = await readFreeStock(sb);
 
-  /** `{ref}::{stockKey}` → units already drawn for it. */
+  /**
+   * ── WHAT READY STOCK COVERS, 0471 ─────────────────────────────────────────
+   *
+   * TWO SOURCES, DISJOINT BY UNIT, and the split is the whole point:
+   *
+   *   BOUND      `ops_stock_items.reserved_order_line_id` — the exact item
+   *              line this unit answers. Live and REVERSIBLE: release and
+   *              reassign clear it, so a released unit gives the customer's
+   *              requirement straight back to this page. Reserved AND sold
+   *              both count, because the binding survives the sale — a
+   *              delivered requirement must not return as something to buy.
+   *
+   *   LEGACY     `ops_stock_pool_usage`, read for units that carry NO binding.
+   *              That ledger counts the DECISION and is append-only by law
+   *              (0292: "a later release does not unmake the decision"), which
+   *              is exactly why it cannot answer coverage on its own. It stays
+   *              as the answer for pre-0471 rows only, keyed as it always was.
+   *
+   * A unit is in one set or the other, never both, so nothing is counted twice
+   * and no NEW reservation ever falls back to the ambiguous `ref`+SKU reading.
+   */
+  const boundByLine = new Map<string, number>();
+  const boundUnitIds = new Set<string>();
+  const boundUnitCodesByLine = new Map<string, string[]>();
+  try {
+    const { data: boundRows, error: boundErr } = await sb
+      .from("ops_stock_items")
+      .select("id, unit_code, qty, reserved_order_line_id")
+      .not("reserved_order_line_id", "is", null)
+      .in("status", ["reserved", "sold"]);
+    if (boundErr) throw new Error(boundErr.message);
+    for (const r of (boundRows ?? []) as Record<string, unknown>[]) {
+      const lineId = r.reserved_order_line_id as string;
+      boundByLine.set(lineId, (boundByLine.get(lineId) ?? 0) + Math.max(1, Number(r.qty ?? 1)));
+      boundUnitIds.add(r.id as string);
+      const code = (r.unit_code as string | null) ?? null;
+      if (code) boundUnitCodesByLine.set(lineId, [...(boundUnitCodesByLine.get(lineId) ?? []), code]);
+    }
+  } catch (e) {
+    console.error("ready stock bindings unavailable — coverage not shown", (e as Error).message);
+  }
+
+  /** `{ref}::{stockKey}` → units already drawn for it, UNBOUND rows only. */
   const takenByRefKey = new Map<string, number>();
   try {
     const { data: usageRows, error: usageErr } = await sb
       .from("ops_stock_pool_usage")
-      .select("sku, qty, ref");
+      .select("item_id, sku, qty, ref");
     if (usageErr) throw new Error(usageErr.message);
     for (const u of (usageRows ?? []) as Record<string, unknown>[]) {
       const ref = (u.ref as string | null) ?? "";
       if (!ref) continue;
+      /* Bound units answer through their line; counting their ledger row too
+         would net the same goods twice. */
+      if (u.item_id && boundUnitIds.has(u.item_id as string)) continue;
       const k = `${ref}::${stockMatchKey(u.sku as string)}`;
       takenByRefKey.set(k, (takenByRefKey.get(k) ?? 0) + Math.max(0, Number(u.qty ?? 0)));
     }
@@ -818,19 +933,25 @@ export async function loadToOrder(
     const key = stockMatchKey(l.sku);
     l.stockKey = key;
     const ref = stockRefOf(l.readyStock, l.so, l.destinationName);
-    if (ref) {
+    // A demand may never be read as having taken more than it has ISSUED,
+    // and a customer line never more than it ORDERED — so an unrelated draw
+    // sharing a reference cannot make a requirement disappear.
+    const ceiling = l.readyStock ? (issuedByLine.get(l.lineId) ?? 0) : l.qty;
+    /* 0471 — the EXACT binding first. This line's own units, not a share of
+       whatever its Sales Order number happens to have drawn. */
+    let take = Math.max(0, Math.min(boundByLine.get(l.lineId) ?? 0, ceiling));
+    if (ref && take < ceiling) {
       const bk = `${ref}::${key}`;
-      // A demand may never be read as having taken more than it has ISSUED,
-      // and a customer line never more than it ORDERED — so an unrelated draw
-      // sharing a reference cannot make a requirement disappear.
-      const ceiling = l.readyStock ? (issuedByLine.get(l.lineId) ?? 0) : l.qty;
-      const take = Math.max(0, Math.min(budget.get(bk) ?? 0, ceiling));
-      if (take > 0) {
-        budget.set(bk, (budget.get(bk) ?? 0) - take);
-        l.takenFromStock = take;
-        // A typed demand's `qty` IS `remaining_qty` and is already net.
-        if (!l.readyStock) l.qty = Math.max(0, l.qty - take);
+      const legacy = Math.max(0, Math.min(budget.get(bk) ?? 0, ceiling - take));
+      if (legacy > 0) {
+        budget.set(bk, (budget.get(bk) ?? 0) - legacy);
+        take += legacy;
       }
+    }
+    if (take > 0) {
+      l.takenFromStock = take;
+      // A typed demand's `qty` IS `remaining_qty` and is already net.
+      if (!l.readyStock) l.qty = Math.max(0, l.qty - take);
     }
     // Nothing left to buy is not a row — the same rule an open purchase order
     // has always had.

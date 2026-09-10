@@ -46,6 +46,7 @@ import deliveryArrangementsRouter from "./routes/operation/delivery-arrangements
 import paymentApprovalsRouter from "./routes/operation/payment-approvals";
 import purchaseRouter from "./routes/operation/purchase";
 import toOrderRouter from "./routes/operation/to-order";
+import soBatchReadyStockRouter from "./routes/operation/so-batch-ready-stock";
 import purchaseDemandsRouter from "./routes/operation/purchase-demands";
 import manualPurchaseRouter from "./routes/operation/manual-purchase";
 import purchasingSettingsRouter from "./routes/operation/purchasing-settings";
@@ -219,6 +220,10 @@ api.route("/operation/purchase/to-order", toOrderRouter);
 // CARD-2026-08-20 — the read-only customer-demand Register. Mounted beside To
 // Order, on the same recomputation; it issues nothing.
 api.route("/operation/purchase/demands", purchaseDemandsRouter);
+// 0471 — SO Batch Purchase's Ready Stock: the offer for one Sales Order, and
+// the one act that commits an exact Unit to an exact item line. Mounted on the
+// same path so the page reads one base, not two.
+api.route("/operation/purchase/demands", soBatchReadyStockRouter);
 // Manual Purchase requests (0359) — the typed lane's header + lines + register.
 api.route("/operation/purchasing/requests", manualPurchaseRouter);
 // P1 (0303) — Purchasing → Settings: the numbers the ordering engine reads.
