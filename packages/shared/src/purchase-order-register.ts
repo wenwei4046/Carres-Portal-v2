@@ -5,6 +5,7 @@ import {
   type SupplierCallPo,
 } from "./purchasing-supplier-calls";
 import { myHolidaySet } from "./my-holidays";
+import { purchasingActionLine } from "./order-action-words";
 import type { WorkspaceDutyResolution } from "./workspace-duty";
 import type { WorkItem } from "./work-engine";
 
@@ -296,9 +297,13 @@ export function purchaseOrderArrivalCheckWorkItems(
     module: "purchasing",
     soRef: input.id,
     orderId: input.id,
-    /* The governed queue word, with the supplier's real name from the data —
-     * never a hard-coded carrier (COPY-STANDARD, purchasing queue words). */
-    action: `Call ${input.supplierName} — confirm tomorrow's delivery`,
+    /* The governed row line, from the ONE dictionary that owns it. Spelling
+     * this sentence here would be the second spelling the dictionary exists
+     * to prevent — and it would disagree with `party()` the moment a supplier
+     * name is missing. */
+    action: purchasingActionLine("confirm_tomorrows_delivery", {
+      supplier: input.supplierName,
+    }),
     ownerRule: "po_duty",
     ownerDutyKey: "po_duty",
     normalOwner: owner?.normalOwner ?? null,
