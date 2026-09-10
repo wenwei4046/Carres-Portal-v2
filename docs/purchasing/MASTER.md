@@ -1173,6 +1173,22 @@ is on the shelf for it*.
   impossible — the door recomputes and refuses — but the operator's next move is now the
   recalculated quantity rather than an error.
 
+**THE PRODUCTION PROOF (2026-09-11).** Migration `0473` applied through the governed path, and its
+live `md5(prosrc)` reconciles with the committed file body — production runs the SQL this repository
+carries, not a hand-retyped copy. A **rolled-back probe** as the operation actor refused a
+deliberately mismatched pick with `sqlstate=22023 · unit_does_not_match_line ·
+"that Unit is not the goods this item line ordered · unit_id=426067bf-…"`, and the same act through
+the DEPLOYED Worker, called AUTHENTICATED, answered `422 {code, itemId}`. Both wrote nothing: the
+Unit is still `free` and the append-only ledger gained no row. The read answered 200 on real data —
+SO-1322 states `JAGER-SS qty 1 · Ready Stock 1` (Unit `id-vyf051985`) `· To purchase 0`, and its
+three other available JAGER-SS Units say `No item line needs it`. **What could NOT be walked live:
+the reserve journey on a Register row.** Of the 26 proceeded Sales Orders the Register carries today,
+25 are offered no Unit at all and one (SO-1209) is offered three, every one already answered — so
+there is no live row where `Choose Ready Unit` is pressable, and inventing an order to make one is
+not evidence. The write path stands on the production SQL probe, the deployed Worker's refusal and
+the committed tests, which include the same-SKU, concurrent, whole-batch-refusal and
+already-covered cases against a real Postgres.
+
 **THE DOCUMENT PARTITION — ONE CONTRACT, BOTH SIDES.** A purchase order is one
 `Supplier × Deliver To × Category × (one-PO-per-order category ? Source Order : —)`. The browser and
 the server compute that key from the same facts (`documentPartitionKey`), so `Issue N POs`, `1 of N`,
