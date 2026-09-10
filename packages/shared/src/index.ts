@@ -604,6 +604,13 @@ export {
   type RefundApplyInput,
 } from "./schemas/finance";
 
+// The read-only Finance Ledger (Journal · Trial Balance · Self-check).
+export {
+  ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery,
+  type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
+} from "./schemas/finance";
+
 export {
   supplierMarkDeliveredInput,
   supplierPosListQuery,

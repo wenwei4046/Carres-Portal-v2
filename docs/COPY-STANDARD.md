@@ -2684,6 +2684,48 @@ that repeats a guarantee the operator cannot verify is noise.
 
 ---
 
+## Finance ledger words — PROPOSAL, awaiting owner review
+
+**PROPOSAL / NOT LAW.** Words the read-only Finance Ledger pages print. Each row is one word
+and what it means. Falsifier: a finance user reads a word here and cannot say what it means.
+The words live in `packages/shared/src/finance-ledger.ts`; a stored key never reaches the screen.
+
+### Journal · Trial Balance · Self-check (Build E)
+
+| Group | Word | Meaning |
+|---|---|---|
+| Destinations | **`Journal`** | Every ledger entry, newest first. |
+| | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
+| | **`Self-check`** | The books test themselves and name what is wrong. |
+| Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
+| Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
+| | **`{source} reversal`** | The entry that cancels one of those. |
+| | **`Other entry`** | A source this list does not name yet. Never the key. |
+| Reversed pairs | **`Not reversed`** · **`Reversed`** · **`Reversal`** | The entry stands · it was cancelled · it cancels another. |
+| | **`Reversed by {Entry No}`** · **`Reverses {Entry No}`** | Links each half of a pair to the other. |
+| Entry lines | **`Account`** · **`Debit`** · **`Credit`** · **`Party`** · **`Memo`** · **`Total`** | One line of an entry, and its totals. |
+| | **`Customer · {name}`** · **`Supplier · {name}`** · **`Other party`** · **`No party`** | Who the line belongs to. |
+| Entry page | **`Entry`** · **`Lines`** · **`Same document`** | The entry's facts · its lines · other entries on that document. |
+| Absent values | **`No document number`** · **`No narration`** · **`No memo`** · **`Name not available`** · **`Account name not available`** | The value is missing, said in words. |
+| Journal scope | **`All accounts`** · **`{code} {name} only`** · **`From {date}`** · **`Up to {date}`** · **`Show all entries`** | The account and dates the Journal is narrowed to, and the way out. |
+| Buttons | **`Show lines`** · **`Open entry`** · **`Back to Journal`** · **`Open Self-check`** · **`Check again`** | Row expand · open one entry · return · go to the checks · read the checks again. |
+| Trial Balance | **`Kind`** · **`Asset`** · **`Liability`** · **`Equity`** · **`Income`** · **`Expense`** · **`Other account`** | The account's kind, used to group the page. |
+| | **`As of`** | The day the balances are taken on. |
+| | **`Since {date} · No opening balances`** | Figures are movement since the ledger started, not a full position. |
+| | **`Difference {money}`** · **`Difference not checked`** | Debits less credits · the read failed, so no figure. |
+| Self-check verdicts | **`Clean`** · **`{n} findings`** · **`Finding`** · **`Not checked`** | Nothing wrong · how many problems · this check failed · the read failed. Never zero for a failed read. |
+| Self-check cards | **`Debits and credits`** · **`Customer receivables`** · **`Supplier payables`** · **`Rental months`** · **`Ledger checks`** · **`{code} {name}`** | One card per question; one per customer or supplier account. |
+| | **`Checked {date and time}`** | When the checks were read. |
+| | **`Ledger {money} · Bills {money}`** | One supplier's ledger figure beside its bills less payments. |
+
+Sentences these pages print follow the Empty-state and Error patterns above, for example
+`No entries yet. Invoices, payments and bills add entries here.` ·
+`The Journal could not be loaded. Try again.` · `No entry has that number. Check it and try again.`
+The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
+`finance-ledger.ts` from the row's own numbers.
+
+---
+
 ## Header rules (see UI-KIT for the shell)
 
 Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:

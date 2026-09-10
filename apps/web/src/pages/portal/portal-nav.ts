@@ -546,6 +546,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
       // other income or money against those invoices is an Other receipt.
       { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
       { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
+      // The Finance Ledger — three rows, not one row with tabs: the Journal,
+      // the Trial Balance and the Self-check are three different objects
+      // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
+      // for views of ONE object.
+      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
+      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
+      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },
       {
         key: "reports",
         label: "Reports",
