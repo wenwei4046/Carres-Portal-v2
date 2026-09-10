@@ -1,0 +1,64 @@
+/** Local PostgreSQL checks only. Never connects to production. */
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const { PGlite } = await import(process.env.PGLITE_MODULE || '@electric-sql/pglite');
+const db = new PGlite();
+const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+await db.exec(`
+create role authenticated; create role anon; create schema auth;
+create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+create function app_role() returns text language sql as $$select current_setting('test.role',true)$$;
+create function is_internal() returns boolean language sql as $$select app_role() in ('principal','operation')$$;
+create function is_operations_superuser(uuid) returns boolean language sql as $$select false$$;
+create table app_users(id uuid primary key,name text,status text,role text,position_id uuid);
+create table org_position_duties(position_id uuid,duty_key text);
+create table audit_log(id uuid default gen_random_uuid(),role text,actor_text text,action text,ref text);
+create table warehouses(id uuid primary key,name text,kind text);
+insert into app_users values('${id(1)}','Approver','active','principal',null),('${id(2)}','Holder A','active','showroom',null),('${id(3)}','Holder B','active','showroom',null),('${id(4)}','Cover','active','showroom',null);
+insert into warehouses values('${id(10)}','Site A','own'),('${id(11)}','Site B','own'),('${id(12)}','Partner','logistics_partner');
+select set_config('test.uid','${id(1)}',false),set_config('test.role','principal',false);
+`);
+await db.exec(await readFile(new URL('../supabase/migrations/0425_one_shared_duty_resolver_and_the_grn_gate.sql',import.meta.url),'utf8'));
+let draft = await readFile(new URL('../supabase/drafts/showroom_site_duties.sql',import.meta.url),'utf8');
+// Deliberately remove isolation in memory to prove the Site assertions detect leakage.
+if (process.env.SHOWROOM_NEGATIVE_CONTROL === '1') {
+  const scopedClause = 'and site_id is not distinct from p_site_id';
+  assert.equal(draft.split(scopedClause).length - 1, 2);
+  draft = draft.replaceAll(scopedClause, 'and true /* negative control: Site isolation removed */');
+  assert.ok(!draft.includes(scopedClause));
+}
+await db.exec(draft);
+const call=async(name,args)=>(await db.query(`select ${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
+const resolve=site=>call('workspace_resolve_scoped_duty',['showroom_duty','2026-09-08',site]);
+const assign=(site,holder)=>call('workspace_assign_scoped_duty',['showroom_duty',holder,'2026-09-01',null,null,site]);
+assert.equal((await resolve(id(10))).source,'not_assigned');
+await assign(id(10),id(2)); await assign(id(11),id(3));
+assert.equal((await resolve(id(10))).actor_user_id,id(2));
+assert.equal((await resolve(id(11))).actor_user_id,id(3));
+await call('workspace_cover_scoped_duty',['showroom_duty',id(4),'2026-09-08','2026-09-09','Leave',id(10)]);
+assert.equal((await resolve(id(10))).normal_user_id,id(2));
+assert.equal((await resolve(id(10))).actor_user_id,id(4));
+assert.equal((await resolve(id(11))).actor_user_id,id(3));
+assert.equal((await call('workspace_resolve_scoped_duty',['showroom_duty','2026-09-10',id(10)])).actor_user_id,id(2));
+await assert.rejects(()=>assign(null,id(2)),/Carres Site/);
+await assert.rejects(()=>assign(id(12),id(2)),/Carres Site/);
+await assert.rejects(()=>call('workspace_assign_scoped_duty',['po_duty',id(2),'2026-09-01',null,null,id(10)]),/Only Showroom Duty/);
+await assert.rejects(()=>call('workspace_cover_scoped_duty',['showroom_duty',id(3),'2026-09-08','2026-09-09',null,id(11)]),/different active/);
+await call('workspace_assign_duty',['po_duty',id(2),'2026-09-01',null,null]);
+assert.equal((await call('workspace_resolve_duty',['po_duty','2026-09-08'])).actor_user_id,id(2));
+assert.equal((await call('workspace_resolve_duty',['grn_duty','2026-09-08'])).source,'not_assigned');
+await db.exec(`update app_users set status='disabled' where id='${id(4)}';`);
+assert.equal((await resolve(id(10))).actor_user_id,id(2));
+await db.exec(`update app_users set status='disabled' where id='${id(2)}';`);
+assert.equal((await resolve(id(10))).source,'not_assigned');
+assert.equal((await resolve(id(11))).actor_user_id,id(3));
+await assert.rejects(()=>assign(id(11),id(2)),/active internal/);
+await db.exec(`select set_config('test.role','showroom',false),set_config('test.uid','${id(3)}',false);`);
+await assert.rejects(()=>assign(id(10),id(3)),/forbidden/);
+await db.exec('set role authenticated');
+await assert.rejects(()=>db.exec(`insert into workspace_duty_assignments(duty_key,holder_id,effective_from,site_id) values('showroom_duty','${id(3)}','2026-09-01','${id(10)}')`),/permission denied/);
+await db.exec('reset role');
+assert.equal((await db.query('select count(*)::int n from workspace_duty_assignments')).rows[0].n,3);
+assert.equal((await db.query("select count(*)::int n from audit_log where ref like 'showroom_duty:%'")).rows[0].n,3);
+console.log('PASS: Site isolation, cover window, global compatibility, active-holder checks, manager gate, RPC-only writes and immutable scoped history.');
+await db.close();

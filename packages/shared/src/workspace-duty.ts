@@ -27,6 +27,7 @@ export type WorkspaceDutyPerson = z.infer<typeof workspaceDutyPersonSchema>;
 export const workspaceDutyResolutionSchema = z
   .object({
     dutyKey: workspaceDutyKeySchema,
+    siteId: z.string().uuid().optional(),
     onDate: isoDateSchema,
     normalOwner: workspaceDutyPersonSchema.nullable(),
     buddy: workspaceDutyPersonSchema.nullable(),
@@ -83,6 +84,7 @@ export type WorkspaceDutyResolution = z.infer<typeof workspaceDutyResolutionSche
 export const workspaceActionActorEvidenceSchema = z
   .object({
     dutyKey: workspaceDutyKeySchema,
+    siteId: z.string().uuid().optional(),
     onDate: isoDateSchema,
     normalOwnerUserId: z.string().uuid().nullable(),
     activeCoverUserId: z.string().uuid().nullable(),
@@ -92,3 +94,10 @@ export const workspaceActionActorEvidenceSchema = z
   .strict();
 
 export type WorkspaceActionActorEvidence = z.infer<typeof workspaceActionActorEvidenceSchema>;
+
+/** Scoped duties use the same Workspace authority; module callers never derive owners. */
+export const WORKSPACE_SCOPED_RPCS = {
+  resolve: "workspace_resolve_scoped_duty",
+  assign: "workspace_assign_scoped_duty",
+  cover: "workspace_cover_scoped_duty",
+} as const;

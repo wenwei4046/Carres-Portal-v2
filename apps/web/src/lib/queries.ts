@@ -418,6 +418,7 @@ export const qk = {
   // `List*Query` zod-derived shapes from `@carres/shared` so a wrong key fails
   // typecheck at the call site rather than silently breaking cache reads.
   operation: {
+    workspaceDuties: (siteId?: string) => siteId ? ["operation", "workspace-duties", siteId] as const : ["operation", "workspace-duties"] as const,
     work:      () => ["operation", "work"] as const,
     /** 0136 — AutoCount-imported orders still in Inbox triage (no logistic
      *  assigned). Polled 15s while the page is open so newly-imported orders
@@ -4322,10 +4323,14 @@ export interface WorkspaceDutyCover {
   created_at: string;
 }
 export interface WorkspaceDutiesResponse {
+  sites?: Array<{ id: string; name: string }>;
+  site_staff?: Array<{ user_id: string; name: string | null; email: string }>;
   can_assign: boolean;
   duties: Array<{
     key: string;
     label: string;
+    site_id?: string | null;
+    site_name?: string | null;
     resolution: ReceivingDutyContext & {
       normal_user_name: string | null;
       acting_user_name: string | null;
@@ -4337,11 +4342,13 @@ export interface WorkspaceDutiesResponse {
 
 export function useWorkspaceDuties(
   opts?: Partial<UseQueryOptions<WorkspaceDutiesResponse>>,
+  siteId?: string,
 ) {
   return useQuery({
-    queryKey: ["operation", "workspace-duties"],
+    queryKey: qk.operation.workspaceDuties(siteId),
     queryFn: () =>
-      apiFetch<WorkspaceDutiesResponse>("/api/operation/workspace-duties"),
+      apiFetch<WorkspaceDutiesResponse>(`/api/operation/workspace-duties${siteId ? `?siteId=${encodeURIComponent(siteId)}` : ""}`),
+    placeholderData: (previous) => previous,
     staleTime: 30_000,
     ...opts,
   });
@@ -4367,6 +4374,7 @@ export function useWorkspaceAssignDutyMutation(
       ApiError,
       {
         dutyKey: string;
+        siteId?: string;
         holderId: string;
         effectiveFrom: string;
         effectiveUntil?: string;
@@ -4384,8 +4392,9 @@ export function useWorkspaceAssignDutyMutation(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.workspaceDuties() });
       await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -4398,6 +4407,7 @@ export function useWorkspaceCoverDutyMutation(
       ApiError,
       {
         dutyKey: string;
+        siteId?: string;
         actingUserId: string;
         startsOn: string;
         endsOn: string;
@@ -4415,8 +4425,9 @@ export function useWorkspaceCoverDutyMutation(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: ["operation", "workspace-duties"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.workspaceDuties() });
       await qc.invalidateQueries({ queryKey: qk.operation.receivingDuty() });
+      await qc.invalidateQueries({ queryKey: qk.operation.work() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

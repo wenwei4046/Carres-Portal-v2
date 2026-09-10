@@ -9,7 +9,7 @@ import {
   useWorkspaceDuties,
   type WorkspaceDutiesResponse,
 } from "@/lib/queries";
-import type { OpsStaffMember } from "@carres/shared";
+type DutyStaff = { user_id: string; name: string | null; email: string };
 
 /**
  * `Workspace → Staff & Duties` — the ONE company-wide duty assignment surface
@@ -41,7 +41,7 @@ function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function staffLabel(s: OpsStaffMember) {
+function staffLabel(s: DutyStaff) {
   return s.name ?? s.email;
 }
 
@@ -83,7 +83,7 @@ function Resolution({ duty, canAssign }: { duty: Duty; canAssign: boolean }) {
   );
 }
 
-function AssignForm({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
+function AssignForm({ duty, staff }: { duty: Duty; staff: DutyStaff[] }) {
   const [holderId, setHolderId] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(appTodayIso());
   const [effectiveUntil, setEffectiveUntil] = useState("");
@@ -147,6 +147,7 @@ function AssignForm({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
             assign.mutate(
               {
                 dutyKey: duty.key,
+                ...(duty.site_id ? { siteId: duty.site_id } : {}),
                 holderId,
                 effectiveFrom,
                 ...(effectiveUntil ? { effectiveUntil } : {}),
@@ -176,7 +177,7 @@ function AssignForm({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
   );
 }
 
-function CoverForm({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
+function CoverForm({ duty, staff }: { duty: Duty; staff: DutyStaff[] }) {
   const [actingUserId, setActingUserId] = useState("");
   const [startsOn, setStartsOn] = useState(appTodayIso());
   const [endsOn, setEndsOn] = useState(appTodayIso());
@@ -240,6 +241,7 @@ function CoverForm({ duty, staff }: { duty: Duty; staff: OpsStaffMember[] }) {
             cover.mutate(
               {
                 dutyKey: duty.key,
+                ...(duty.site_id ? { siteId: duty.site_id } : {}),
                 actingUserId,
                 startsOn,
                 endsOn,
@@ -343,11 +345,12 @@ function DutyBlock({
 }: {
   duty: Duty;
   canAssign: boolean;
-  staff: OpsStaffMember[];
+  staff: DutyStaff[];
 }) {
   return (
     <section className="mb-6" data-testid={`duty-${duty.key}`}>
       <h2 className="text-title text-kit-slate-12">{duty.label}</h2>
+      {duty.site_name ? <p className="text-body text-kit-slate-11">{duty.site_name}</p> : null}
       <div className="mt-1.5">
         <Resolution duty={duty} canAssign={canAssign} />
       </div>
@@ -367,7 +370,8 @@ function DutyBlock({
 }
 
 export default function StaffDuties() {
-  const dutiesQ = useWorkspaceDuties();
+  const [siteId, setSiteId] = useState("");
+  const dutiesQ = useWorkspaceDuties(undefined, siteId || undefined);
   const staffQ = useOperationStaff();
   const staff = staffQ.data?.staff ?? [];
 
@@ -384,6 +388,13 @@ export default function StaffDuties() {
         data-testid="staff-duties"
       >
         <div className="mx-auto max-w-[720px] px-6 py-4">
+          <FieldRow label="Showroom Duty">
+            <select aria-label="Showroom Duty Site" className={FIELD} value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}>
+              <option value="">Choose Site</option>
+              {(dutiesQ.data?.sites ?? []).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+            </select>
+          </FieldRow>
           {dutiesQ.isLoading ? (
             <p className="py-8 text-body text-kit-slate-9">
               Opening Staff &amp; Duties…
@@ -404,12 +415,12 @@ export default function StaffDuties() {
               </button>
             </div>
           ) : (
-            (dutiesQ.data?.duties ?? []).map((d) => (
+            (dutiesQ.data?.duties ?? []).filter((d) => !d.site_id || d.site_id === siteId).map((d) => (
               <DutyBlock
-                key={d.key}
+                key={`${d.key}:${d.site_id ?? "global"}`}
                 duty={d}
                 canAssign={dutiesQ.data?.can_assign === true}
-                staff={staff}
+                staff={d.site_id ? (dutiesQ.data?.site_staff ?? []) : staff}
               />
             ))
           )}

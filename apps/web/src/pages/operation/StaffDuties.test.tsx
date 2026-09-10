@@ -171,7 +171,9 @@ describe("the can_assign gate", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Assign holder")).toBeNull();
     expect(screen.queryByText("Add cover")).toBeNull();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Holder" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Acting staff" })).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Showroom Duty Site" })).toBeInTheDocument();
   });
 });
 
@@ -354,5 +356,22 @@ describe("loading and failure", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("Showroom Duty at a Site", () => {
+  it("sends Site with assignment and uses the eligible showroom staff, not the PO pool", () => {
+    state.duties = duties({ key: "showroom_duty", label: "Showroom Duty", site_id: "site-a", site_name: "Showroom A" });
+    state.duties.sites = [{ id: "site-a", name: "Showroom A" }];
+    state.duties.site_staff = [{ user_id: "floor-person", name: "Floor person", email: "floor@example.test" }];
+    render(<StaffDuties />);
+    fireEvent.change(screen.getByLabelText("Showroom Duty Site"), { target: { value: "site-a" } });
+    const block = within(screen.getByTestId("duty-showroom_duty"));
+    expect(block.getByText("Showroom A")).toBeInTheDocument();
+    expect(block.queryByRole("option", { name: "Aina" })).toBeNull();
+    fireEvent.change(block.getByLabelText("Holder"), { target: { value: "floor-person" } });
+    fireEvent.click(block.getByRole("button", { name: "Assign holder" }));
+    expect(assignMutate).toHaveBeenCalledWith(expect.objectContaining({ dutyKey: "showroom_duty", siteId: "site-a", holderId: "floor-person" }), expect.anything());
   });
 });

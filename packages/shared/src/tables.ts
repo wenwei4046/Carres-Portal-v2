@@ -204,3 +204,7 @@ export const RENTAL_UNIT_EVENTS   = "rental_unit_events" as const;
 // change-request approve / AutoCount import) is covered by construction.
 export const GUARANTEE_TERMS        = "guarantee_terms" as const;
 export const GUARANTEE_ENTITLEMENTS = "guarantee_entitlements" as const;
+
+// Shared Staff & Duties; Site is a scope of these same records.
+export const WORKSPACE_DUTY_ASSIGNMENTS = "workspace_duty_assignments" as const;
+export const WORKSPACE_DUTY_COVERS = "workspace_duty_covers" as const;

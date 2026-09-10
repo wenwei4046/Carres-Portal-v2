@@ -134,10 +134,11 @@ page or integration maintains another available quantity.
 | issue, inspection, repair, missing component or other control | Not available |
 | customer accepted or lifecycle ended | Delivered / history |
 
-Successful customer delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
+Successful customer sale delivery of an exact `Supplier Consignment` Unit emits the authoritative sold
 event Purchasing uses to create a Consignment Sale Notice. Stock records the ownership/history
 consequence once; it does not issue the notice, create supplier payable or settle money. A failed or
-refused delivery emits no sale event.
+refused delivery emits no sale event. Temporary loan handover emits no sale event under Purchasing
+§7.7; Delivery distinguishes sale from loan scope.
 
 Sales Order owns choosing, binding, changing and releasing the exact promised Unit. Stock validates
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
@@ -867,6 +868,24 @@ Every export prints generation time/person, applied filters, Stock/report date, 
 rows and source document numbers. It is a fixed snapshot, cannot be uploaded to overwrite Portal
 truth and never becomes a second authority.
 
+**Showroom report views — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Place the Showroom
+report in central Reports, reading the existing Stock, Sales Order and Purchasing records:
+
+| View | Required facts |
+|---|---|
+| At showroom | Exact Units by current physical Site, ownership and condition |
+| Sold, waiting for collection | Reserved Units still physically at the showroom |
+| On loan | Customer order, exact Unit, current holder and governed return date |
+| Waiting for supplier | Exact Units awaiting supplier collection, repair or replacement |
+| Requests not finished | Display Requests and remaining decision, arrival, installation or other required result |
+
+Each count opens its exact Units or requests; a customer-held loan Unit never counts as physically
+at the showroom. These are overlapping purpose-specific views, not quantities to add into one
+stock total. Supplier cost and settlement visibility follows Finance permissions. The report has
+no separate stock/status editor, and its request/loan/financial facts remain read-only projections
+of their owning modules. Complete Showroom Blueprint approval and handoff live in
+`purchasing/MASTER.md` §§9.8–9.12.
+
 Report visibility follows need: Sales receives Ready Stock and permitted showroom availability;
 NETS receives its authorised organisation/Site work/evidence; Purchasing receives Receiving,
 ownership, Consignment and supplier consequences; Finance receives Month-end/ownership/valuation
@@ -1370,6 +1389,31 @@ Outbound owns supplier/repair handover; Finance owns refund, Credit Note, write-
 supplier settlement.
 
 ### 12.9 Showroom Stock and Supplier Consignment
+
+**Display loan availability — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The existing Sales
+Order loan identifies the exact Unit. Stock keeps it unavailable for another sale or loan and
+records custody on outward handover and recovery. Inspect the returned sofa before availability;
+recovery alone never releases it. Purchasing §7.5 owns supplier permission/return terms; Sales
+Orders owns outstanding loan/supplier-return obligations. Loan handover does not change supplier
+ownership as if a sale occurred and never triggers a Consignment Sale Notice.
+
+**Showroom result ownership — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Site-scoped
+Showroom Duty confirms showroom arrival, condition, handover and installation result. The one
+assignment/cover authority is `workspace/MASTER.md` §4. Confirmation records the observed result
+and actual actor; when an outside installer performs installation, retain that provider separately
+and never claim the confirming showroom person performed it. Arrival and installation remain
+separate results. Physical custody continues to use Stock's existing event authority; the Display
+Request reads those results and never records a duplicate arrival. My Work opens the exact owning
+record and completes from the stored result, with Primary holder/cover/actual actor preserved.
+
+**Showroom physical-result timing — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Showroom
+Duty confirms arrival, handover and installation result on the actual working date of the event.
+Preserve the actual event time/date separately from the recording time; late entry never backdates
+the actor evidence. When a confirmed event date passes without a result, the system asks that
+Site's Showroom Duty to check what happened. Missing evidence alone is not supplier failure.
+Requested dates remain separate from confirmed appointments. Late work keeps the original date
+and any blocker in shared Team Work, with no separate reminder list. A permitted unknown date
+never creates an invented appointment or late physical event.
 
 **CURRENT CARRES →** display sofas can live in staff memory, a supplier list or separate showroom
 sheet; Carres-owned, Consignment, sold-awaiting-Delivery and repair/change/collection goods may be

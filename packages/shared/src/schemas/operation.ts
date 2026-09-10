@@ -426,24 +426,38 @@ export type ReceivingVoidInput = z.infer<typeof receivingVoidInput>;
 export const workspaceAssignDutyInput = z
   .object({
     dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    siteId: z.string().uuid().optional(),
     holderId: z.string().uuid(),
     effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     note: z.string().max(300).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if ((value.dutyKey === "showroom_duty") !== Boolean(value.siteId)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["siteId"],
+        message: "Choose a Site for Showroom Duty only." });
+    }
+  });
 export type WorkspaceAssignDutyInput = z.infer<typeof workspaceAssignDutyInput>;
 
 /** `Workspace → Staff & Duties` (0425) — a dated buddy cover. */
 export const workspaceCoverDutyInput = z
   .object({
     dutyKey: z.string().regex(/^[a-z][a-z0-9_]{2,39}$/),
+    siteId: z.string().uuid().optional(),
     actingUserId: z.string().uuid(),
     startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     reason: z.string().max(300).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if ((value.dutyKey === "showroom_duty") !== Boolean(value.siteId)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["siteId"],
+        message: "Choose a Site for Showroom Duty only." });
+    }
+  });
 export type WorkspaceCoverDutyInput = z.infer<typeof workspaceCoverDutyInput>;
 
 /**

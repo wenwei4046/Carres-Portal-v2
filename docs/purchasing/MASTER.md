@@ -705,6 +705,14 @@ Purchase/PO. When the model changes, the Unit returns to Carres custody, may go 
 repair and may later be resold. Stock ownership remains Carres unless an authorised consequence
 changes it.
 
+**Showroom loan controls — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Carres temporarily
+lends showroom display sofas to customers waiting for purchased sofas through the existing Sales
+Order loan and exact Unit ID. Before lending a supplier-owned Unit, Purchasing records supplier
+permission covering the Unit and return terms. Sales Orders owns the loan obligation, Delivery
+owns handover/collection and Stock owns custody, availability and inspection. Customer recovery
+and required supplier return remain separate; the latter stays open until actually completed.
+Loan handover creates no Consignment Sale Notice. Implementation remains a later BUILD/DELIVERY responsibility.
+
 ### 7.6 Supplier-consignment showroom display
 
 Other sofa suppliers such as Dorsettloft may own display stock.
@@ -716,7 +724,7 @@ Display Request approved for consignment
 → Goods Receipt accepts without payable
 → Stock places supplier-owned Unit at selected showroom
 → display swap/removal creates Consignment Return path
-→ successful customer delivery of exact Unit creates CSN
+→ successful customer sale delivery of exact Unit creates CSN
 → Purchasing sends CSN to supplier
 → Finance matches supplier invoice and settles
 ```
@@ -726,8 +734,10 @@ record is auto-linked; no duplicate supplier message. Document issue alone does 
 
 ### 7.7 Consignment sale notice trigger
 
-Only a successful/partially successful delivery attempt for an exact supplier-owned Unit creates a
-notice. SO creation, deposit, reservation and delivery planning do not.
+Only a successful/partially successful customer sale delivery attempt for an exact supplier-owned
+Unit creates a notice. SO creation, deposit, reservation, delivery planning and temporary loan
+handover do not. Delivery success must distinguish sale from loan scope before this trigger
+consumes it (owner-approved 2026-09-07).
 
 One notice is created idempotently per supplier × delivery attempt and contains only successfully
 delivered Units. It excludes customer identity/contact/address, customer selling price, discount and
@@ -2544,16 +2554,152 @@ replacement offered.
 
 ### 9.8 Display Requests
 
-**Purpose / source:** showroom staff request a new model, replacement, removal or display change;
+**COMPLETE SHOWROOM BLUEPRINT — OWNER-APPROVED / LOCKED 2026-09-07.** The owner explicitly
+approved the consolidated whole-domain review after the individual decisions. §§7.5–7.7,
+9.8–9.11 and 10 hold the commercial/request/document rules. Stock §12.9 and its Reports section
+own physical results and report composition; Orders owns loans; Delivery owns customer execution;
+Workspace §4 owns Showroom Duty assignment/cover. Each module retains its existing truth and
+permissions. There is no separate Showroom MASTER or duplicate stock/receipt/payment/work engine.
+This is approved target truth, not a statement that the pages are built or production-verified.
+
+
+**Purpose / source:** showroom staff request a new model, replacement, removal, display change,
+or movement and installation of an existing display Unit;
 Purchasing chooses the commercial path.
+**Optional remarks — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The Display Request form
+includes an optional Remarks field for additional explanation when needed. It supplements the
+request's structured facts and is not required for submission.
+
+**Question-led form and requester link — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+The requester chooses Showroom and New display / Move / Install / Swap / Remove, finds the Unit or
+model (or uses Not sure with photos/video), and supplies quantity. Movement reveals Collect from
+and Send to. Installation needed is Yes / No / Not sure; installation questions cover Floor,
+Access (Lift / Stairs / Not sure) and Installer arranged (Yes / No / Not sure). Install requests
+must expose their installation questions. Needed Date allows an actual date or Not decided.
+Known item/Site facts prefill; ask only missing questions. Photos/videos and optional Remarks sit
+below the questions, before Submit request. Uncertainty remains explicit and creates a specific
+check; it never silently becomes No or a confirmed arrangement.
+
+**Saved collection locations — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Collect from
+searches/selects a saved location and offers Add location inside the request. Add location asks
+for required Location name, Address, Collection contact name and Phone number; Map link is
+optional, with Floor/access choices. Save and use saves and selects the location immediately.
+Check similar existing locations before creating a duplicate. Saved locations are reusable and
+managed in central Settings; the in-request door uses that same authority, not a separate list.
+Prefill contact/access for confirmation. A different contact for this request does not change
+the saved default. A collection address may be supplier premises or another showroom; creating
+it never automatically creates a Carres Stock Site or grants access.
+
+**Destination selection — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Send to selects an
+existing Carres Site and fills its saved address automatically. Staff confirm floor, access and
+receiver for this request. If the destination is missing, link to the existing authorised Site
+setup; adding a delivery address alone must not create a Stock Site. This uses the existing Site
+authority, not a second destination editor or Site registry in Showroom.
+
+Operations may prepare a draft and use Request details to copy/send its link to the requester.
+The requester completes and submits that same record. Copy request link also opens an existing
+request for progress and missing information. Sign-in and record permissions apply; opening or
+sending the link neither submits nor approves the request. Preserve draft preparer, requester and
+actual actor separately. The initial door may be a simple page in the existing portal; future
+Sales Portal entry uses the same record and authority, not another form/store or status engine.
+
+**Changes after submission — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester may
+add missing information, photos/videos and Remarks directly to the same record, with History.
+Changes to item, quantity, collection/destination location or Needed Date use Request a change.
+Operations reviews the effect on existing commitments before applying the change; confirmed
+arrangements remain visible until replaced through their owning module. A proposed change is not
+an instruction to the supplier or transport team. Supporting-information entry must not bypass
+this boundary by overwriting an existing committed goods/location/date fact. The Display Request
+retains the request and review evidence; it never silently rewrites another module's instruction.
+
+**Cancellation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Before submission the requester
+may discard the draft. After submission, Request cancellation requires a reason. Operations
+checks existing supplier, transport and installation commitments before confirming the outcome.
+The requester can see whether cancellation is requested, confirmed or cannot fully proceed, with
+the explanation. A cancellation request never silently stops an instruction already sent;
+affected commitments are changed/cancelled through their owning module. Completed movements and
+any charges remain in History and their authoritative records. Discard/cancellation does not
+authorise physical deletion of records.
+
+**Contact and receiving person — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** The requester
+must supply who the team should contact and who will receive the goods. Capture contact name and
+phone number and receiving person's name and phone number; allow the same person to serve both
+without repeated entry. These are operational contact facts, not the Work action owner or an
+approval assignment. The intended receiver is not proof of receipt: actual receiving records
+retain who physically received the goods. Supplier decisions and approvals stay in Purchasing.
+
+**Review before submission — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Show a short
+Check your request review before Submit request. It summarises the requested work/item/quantity,
+collection and destination/floor where relevant, contact and receiver names/phone numbers,
+Needed Date, access, installer arrangement, photos/video previews and Remarks when entered.
+Provide Edit and Submit request. Missing required contact or receiver details block submission;
+permitted Not sure / Not decided answers stay explicit for Operations to check, not false No
+values. After successful submission show the request number and progress; PO Duty receives the
+decision work under the existing §9.8 deadline.
+**Existing display movement and installation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Show the requested result first, including collection place, destination and installation floor
+when relevant. PO Duty checks the exact Unit/model and existing source, verifies collection and
+destination Sites, confirms installation requirements from the available photos/videos, records
+who will transport and install, and records agreed charges and the required approval. These checks
+lead to the linked existing-goods movement/installation continuation, not a new purchase merely
+to arrange transport. Stock retains non-customer Transfer and physical custody authority; the
+Display Request reads and links those facts rather than becoming another movement writer.
+
+Supplier responsibility may remain under investigation while an authorised movement proceeds.
+Authority to arrange the movement/cost and the party ultimately bearing the cost are separate
+facts; Carres paying transport does not establish supplier liability or waive recovery. Purchasing
+and Finance retain their governed supplier/cost-recovery responsibilities. Show arrival and
+installation separately: arrival cannot complete a requested installation.
+**Photo and video evidence — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Display Requests
+must support uploading photos and videos when needed to explain the request. Both media types
+are optional supporting evidence; a video is not mandatory for every request.
+**Evidence viewing and future Sales Portal entry — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Staff preview photos and play videos within the request; permitted connected teams access the same
+evidence without requiring another upload. Attachments remain optional unless the particular work
+requires evidence to proceed. A future Sales Portal may create a Display Request through the same
+Purchasing-owned creation authority and link to that exact record. It is another entry point, not
+a second request store, status, attachment copy or approval workflow. Preserve the actual requester
+and Showroom context; access follows the governed permissions. Purchasing remains the record owner
+and its existing decision/approval boundaries apply. Sales Portal staff may view the request's
+progress and answer requests for missing information there, through the same Purchasing-owned
+record authority and governed permissions. Supplier decisions and approvals remain in Purchasing;
+the Sales Portal gains no second decision editor or independent progress status.
+The future Sales Portal entry is reserved; this PLAN does not commission a Sales Portal build.
+**Display decision ownership and clock — OWNER-APPROVED 2026-09-07:** PO Duty chooses the
+Display Request path through the Shared Duty Resolver, including governed Buddy cover. By the
+next Office working day after submission, PO Duty records the first decision and its linked
+continuation, or requests the specific missing facts. Requesting missing facts completes that
+initial response only; the unresolved display decision remains open. This is an action owner,
+not a universal owner of the Display Request. History preserves the normal Primary holder,
+dated cover and actual actor. Paid-buy approval and governed commercial exceptions remain with
+Purchasing Approver; choosing Buy does not approve the Manual Purchase or issue a PO.
 **Left rail:** `Purchasing decision missing`, `SKU missing`, `Supplier path missing`, `Ready to order`, `Ordered`, `At showroom`, `Not going ahead`.
-**Columns:** Request No., Outlet, Requested By, Current Unit/Model, Requested Model, Reason, Needed
-Date, Purchasing Decision, Source Order, Work.
-**Journey:** showroom logs in → records simple request/photo/current Unit → Purchasing decides Buy,
+**Columns:** Request No., Showroom, Requested By, Current Unit/Model, Requested Model, Reason, Needed
+Date, Purchasing Decision, linked document named by its actual type, Work.
+**Journey:** showroom logs in → records simple request/current Unit and photos/videos when needed → Purchasing decides Buy,
 Consignment, Swap, Remove or No Action → system creates the correct source-linked record.
-**Object/placement:** internal full-width object; no PDF preview.
+**Object/placement — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Internal full-width
+object; no PDF preview. Reading order is Request → Checks → Connected work → History. Request
+leads with the requested result, item/quantity, From/To and Needed Date where relevant, contact,
+receiver, photos/videos and Remarks. Checks cover exact Unit and ownership, collection/access,
+transport and installation arrangements, charges and required approval. PO Duty records the
+decision here. Connected work links Transfer/Purchase/Consignment/Return and shows actual arrival
+and installation results separately. Physical movement, supplier documents and money open their
+existing owning pages; this object never gains duplicate writers. History retains decisions,
+changes, messages and evidence. No generic Complete button: progress derives from required
+recorded results; arrival alone cannot complete a request requiring installation.
 **Exceptions:** Catalog SKU absent, unclear ownership, old Unit has no ID, supplier/model unavailable,
 duplicate request.
+**Showroom exceptions and failed actions — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:**
+Unknown item/Unit does not discard the request; Operations checks photos/video and identifies the
+Unit before movement. An unconfirmed appointment reads Not confirmed separately from Needed Date.
+Upload failure retains entered details, names the failed file and permits retry. Failed save or
+submission preserves the form; retry must not create a duplicate request. No eligible Duty holder
+appears as Not assigned to supervision with a Staff & Duties link. Damaged arrival or failed
+installation records the actual result/evidence and leaves the remaining work open under the
+owning problem/physical authorities. Failed loading shows the failure and retry, never zero goods
+or Completed. The requester sees specific missing information and permission-scoped progress
+through the same request link.
 **Connections:** Showroom, Catalog, Manual Purchase, CO/CRTN, Stock transfer/Unit.
 
 ### 9.9 Consignment Orders
@@ -2561,10 +2707,24 @@ duplicate request.
 **Purpose / source:** supplier-owned display placement or swap from approved Display Request/claim;
 no blank `+ New`.
 **Left rail:** `PDF not sent`, `Supplier date missing`, `Due at showroom`, `Part received`, `Swap return proof missing`, `Completed`.
-**Columns:** CO No., Supplier, Source Request, Coming In Units, Going Back Units, Showroom, Supplier
+**Columns:** CO No., Supplier, Display Request / Supplier Claim, Coming In Units, Going Back Units, Showroom, Supplier
 Date, Received, Return Handover, Work.
 **Journey:** verify supplier ownership → allocate exact Unit IDs → check coming-in/going-back lines →
 send one PDF → record promise → receive through Receiving → prove outgoing handover.
+**Clear origin wording — OWNER-APPROVED 2026-09-07:** Do not show Source Request in Showroom
+screens. Name the actual originating document, such as Display Request or Supplier Claim, with
+its linked number. Physical locations use Collect from and Send to; a document reference must
+not stand in for the location where goods will be collected or sent.
+**Consignment Order presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header shows
+Consignment Order and its number, Supplier, linked Display Request (or actual Supplier Claim),
+and Requested by when applicable. COMING IN shows Collect from, Send to, Expected arrival
+(actual date or Not confirmed), Unit ID, Model and Quantity. GOING BACK appears only for a swap
+and shows Collect from, Send to, Expected collection (actual date or Not confirmed), Unit ID,
+Model and Quantity. Contact person and phone appear with each location. Document and reply shows
+PDF version, Sent to, Sent date and Supplier reply. Results separates coming-in Received / Still
+waiting from going-back Collected / Still waiting, retaining exact outstanding Units and partial
+results. History follows. Purchasing sends one combined swap document; Receiving and Stock supply
+the authoritative arrival and departure results through their existing doors.
 **Object/placement:** full-width view; 50/50 while issuing/revising. Ownership is locked.
 **Exceptions:** supplier cannot label physical Unit, package-only label, missing Unit source, partial
 swap, supplier changes model/date.
@@ -2575,10 +2735,20 @@ swap, supplier changes model/date.
 **Purpose / source:** return an unsold supplier-owned Unit after approved removal, paired swap,
 supplier collection, overdelivery or claim outcome; no blank `+ New`.
 **Left rail:** `PDF not sent`, `Collection date missing`, `Handover proof missing`, `Part collected`, `Collected`.
-**Columns:** Return No., Supplier, Source, Exact Units, Collect From, Collection Date, Handover,
+**Columns:** Return No., Supplier, Display Request / Supplier Claim / Consignment Order, Exact Units, Collect From, Collection Date, Handover,
 Paired CO, Work.
 **Journey:** system creates source-linked return → standalone return sends PDF; paired swap uses the
 combined CO PDF → scan exact Unit and prove collection.
+**Consignment Return presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header shows
+Consignment Return and number, Supplier, the actual linked Display Request / Supplier Claim /
+Consignment Order, and recorded return reason. Collect from shows location and contact name/phone;
+Send to shows supplier location and receiving person's name/phone. Goods going back lists exact
+Unit ID, Model and Condition. Collection shows Expected collection (actual date or Not confirmed),
+Collected Units, exact Units Still waiting, and actual collector/time/handover proof. Document shows
+the standalone Return PDF/version/recipient/sent date, or the linked combined Consignment Order
+PDF for a swap. History follows. Issue alone moves no goods; partial collection leaves the exact
+remainder open. Existing Stock handover authority supplies physical results. Unsold consignment
+return creates no automatic refund or supplier credit.
 **Object/placement:** full-width view; 50/50 only for standalone issue/revision.
 **Exceptions:** supplier collects wrong/partial Unit, Unit condition disputed, date changed,
 unidentified legacy Unit.
@@ -2590,19 +2760,100 @@ value posting.
 **Purpose / source:** system report of exact supplier-owned Units successfully delivered to a
 customer; no `+ New`.
 **Left rail:** `Ready to issue`, `PDF not sent`, `Supplier contact missing`, `Correction must be sent`, `Sent`. Finance invoice/match facts are read-only links, not Purchasing work.
-**Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Source CO, Notice,
+**Columns:** Notice No., Supplier, Units Sold, Customer Received, Sales Ref, Consignment Order, Notice,
 Finance. Customer personal information and selling price are absent.
 **Journey:** Delivery success auto-creates → Current PO Duty checks exact Units → sends notice →
 Finance later reads the same object.
+**Consignment Sale Notice presentation — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Header
+shows Consignment Sale Notice and number, Supplier and linked Consignment Order. Units sold lists
+exact Unit ID, Model, Quantity and Customer received date. Delivery evidence provides internal,
+permission-scoped Sales Order / Delivery record / accepted-proof links. Send to supplier shows
+contact, phone/email, PDF version, sent date and sent evidence. Finance shows permission-scoped,
+read-only supplier invoice and matching information; History follows. System creation and PO Duty
+check/send follow §7.7, with no manual create. The supplier PDF excludes customer personal details,
+selling prices and settlement amounts. Failed Units are excluded and repeated delivery submission
+must not duplicate a notice. Internal evidence is not automatically included in the supplier PDF.
 **Object/placement:** full-width view; 50/50 check/preview during issue/correction.
 **Exceptions:** duplicate delivery retry returns same notice, source supplier missing, supplier
 disputes ownership, customer later returns Unit, authoritative Unit/delivery correction.
 **Connections:** Delivery attempt/proof, Stock Unit ownership, source CO/GRN, Sales reference, Finance
 invoice/settlement.
 
+### 9.12 Showroom plan closure and BUILD handoff
+
+**PLAN MISSION COMPLETE — 2026-09-07.** The complete owner review is approved and persisted.
+The locked model covers question-led request/review, shared requester links and future Sales Portal
+entry, saved collection locations, governed destination Sites, contacts/receiver, photos/video,
+Remarks, controlled changes/cancellation, four page presentations, purchased/consignment/existing-
+Unit movement, installation, swaps, removal/returns, problems, exact-Unit loans and sale notices,
+duties/cover, dates, result-based completion, document evidence/privacy/history and central reports.
+
+Existing authority remains binding: a paid display buy follows Manual Purchase/PO with purpose
+Showroom Display; Ready Stock replenishment is separate. Physical acts stay in Stock/Receiving;
+customer sale/delivery/payment remain with Orders/Delivery/Payments; supplier money stays Finance/AP.
+Supplier message/version evidence follows the one Purchasing document contract. Reports read the
+owning facts with permission-scoped drill-downs and no independent status editor.
+
+Intentional rejects: duplicate Showroom inventory/receipt/payment/work stores; universal document
+owners; hard-coded people; new PO merely for moving an existing Unit; temporary loan treated as
+sale; document issue treated as handover; arrival treated as completed installation; missing proof
+counted as supplier failure; address creation treated as Site creation; silent commitment changes.
+Future Sales Portal creation/progress/replies reuse the same record but do not commission that
+portal now. External partner onboarding/cutover remains separately authorised.
+
+**BUILD/DELIVERY authorised — 2026-09-07.** The owner approved starting implementation after
+the complete blueprint approval. No further business-rule reconfirmation is required. The first
+local change adds Site selection and Site-scoped assignment/dated cover in Workspace Staff &
+Duties, with the existing shared resolver and assignment history. The exact database draft is
+`supabase/drafts/showroom_site_duties.sql`; it remains unnumbered and unapplied pending the
+ENGINEERING §5 exact-file approval. Dependent code must not deploy before that database gate.
+This is only the shared-duty foundation: physical action admission/result evidence, Display
+Requests, requester links/media, consignment journeys, loans/sale notices and reports remain
+unimplemented by this slice. Local checks do not constitute production acceptance.
+
+**Acceptance boundaries for the authorised BUILD/DELIVERY takeover**, in
+recommended dependency order:
+
+- Site-scoped Showroom Duty, permission-scoped action routing and result evidence: one resolver,
+  dated cover, exact owning door, Primary/cover/actual actor and no fabricated completion.
+- Display Requests and requester links: approved conditional form, locations, contacts/media,
+  review, change/cancellation, decision clocks and existing-goods/paid-buy/consignment handoffs;
+  one request authority with no duplicate submission or stock writer.
+- Consignment placement, swap and return: current document/send/reply evidence, exact-Unit
+  Receiving and handover, independent partial incoming/outgoing outcomes, preserved ownership.
+- Display loan and customer sale continuation: exact Unit availability, supplier permission,
+  separate recovery/supplier return/inspection, sale-only idempotent CSN and Finance links.
+- Reports and end-to-end acceptance: source-owned counts/remaining work, permitted money data,
+  failed-source honesty, all partial/problem journeys and actual actor/version traceability.
+
+These are acceptance scopes, not Cards. Follow dependency order;
+each scope must connect its existing owning module rather than clone it. The preceding PLAN wrote
+no application code or migrations and performed no merge/deploy. BUILD must remeasure current main and
+prove each complete operator journey before claiming delivery. No new business interview is needed
+for these approved rules; real contradictions still follow the constitutional decision gate.
+
 ---
 
 ## 10 · Work, Quick Rail and Calendar
+
+**Showroom action ownership — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** PO Duty checks
+Display Requests, chooses the path, reviews changes/cancellation, sends supplier documents and
+obtains replies. Purchasing Approver retains spending and supplier-commercial-exception approval.
+GRN Duty posts formal Goods Receipts. Site-scoped Showroom Duty confirms showroom arrival,
+condition, handover and installation result under `workspace/MASTER.md` §4 and Stock §12.9.
+Finance/AP's governed rule owns supplier invoice matching and settlement. Each action opens the
+exact owning record in My Work and closes from its recorded result, preserving Primary holder,
+cover and actual actor. No business document gains a universal owner.
+
+**Showroom work timing — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** First display decision
+or request for missing facts remains due by the next Office working day under §9.8. PO Duty reviews
+a requested change or cancellation by the next Office working day after submission. First send of
+an approved, ready Consignment Order, Consignment Return or Consignment Sale Notice is due by the
+next Office working day after it becomes ready; paired returns use the combined CO instruction,
+not duplicate sends. Requested dates and confirmed appointments remain separate; Not decided
+never becomes a fabricated booking. Stock §12.9 governs physical-result recording/check timing.
+Late work retains its original due date and any blocker in shared Team Work; no separate reminder
+list or manual completion is introduced. Existing PO timing is unchanged.
 
 | Trigger | Owner rule | Action example | Completion fact |
 |---|---|---|---|
@@ -2615,7 +2866,8 @@ invoice/settlement.
 | PO/CO goods arrive | Normal GRN Duty/cover; Operations Superuser may act | `Receive PO-20260820-4827 from Hooka` | Exact Receiving Session records physical outcome and numbered GRN |
 | Supplier DO/evidence missing | Normal GRN Duty/cover; Operations Superuser may act | `Add the Supplier DO before you finish receiving` | Supplier DO reference/evidence and actual recorder exist on the Receiving Session |
 | Partial receipt leaves balance | Normal PO Duty/cover; Operations Superuser may act | `Ask Hooka for the balance delivery date` | Evidenced balance promise exists on the exact open PO line |
-| Showroom display change | Showroom role then Purchasing decision role | `Record the current Unit and requested model` | Required request facts exist |
+| Showroom display request facts missing | Requester under the shared owner rule | `Record the current Unit and requested model` | Required request facts exist |
+| Submitted Display Request needs a Purchasing decision | PO Duty / governed Buddy cover through the Shared Duty Resolver | Choose Buy, Consignment, Swap, Remove or No Action; initial response follows §9.8 | Recorded decision and linked continuation; a specific missing-facts request satisfies only the initial-response obligation |
 | Supplier claim reply missing | Current PO Duty | `Ask Hooka to reply to the supplier claim` | Supplier reply exists |
 | Return collection missing | Current PO Duty | `Ask Hooka for the collection date` | Collection date exists |
 | Repair date passed | Current PO Duty | `Ask Hooka when U1-000-001 will return` | New governed date/outcome exists |

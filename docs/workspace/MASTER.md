@@ -73,6 +73,16 @@ Distinct Duties include Payment Duty, Storage Waiver Approver, Payment Approver,
 Approver, Delivery Charge Approver, Stock Adjustment Approver and Service Case Approver. There is
 no fake `ERP Owner`.
 
+**Showroom Duty — OWNER-APPROVED 2026-09-07 / APPROVED TARGET:** Each Site has a shared
+Showroom Duty with one Primary holder and governed Buddy cover in Staff & Duties. It owns the
+actions to confirm showroom arrival, condition, handover and installation result. Resolve the
+Site and effective date through the Shared Duty Resolver; no module-local roster or hard-coded
+person is permitted. Actual actor remains distinct from Primary holder and cover. An outside
+installer may perform installation; Showroom Duty confirms the observed result and records who
+installed it without being represented as the installer. These actions open their exact owning
+record from My Work and complete from recorded results. This approves ownership, not a claim that
+Site-scoped Work routing is already built. Module records retain their own fact authority.
+
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
 
@@ -356,6 +366,18 @@ honest Work for admitted modules.
 - Dashboard must wait; totals built now would preserve incomplete and duplicate calculations.
 
 ## 11 · Next governed work
+
+**Showroom dependency — local BUILD progress, 2026-09-07.** Following the owner-approved
+Purchasing §9.12 takeover, Staff & Duties now has a local Site selector and Site-scoped assignment
+and dated cover forms. API validation requires a Carres Site for Showroom Duty and rejects a Site
+on global duties. The SQL draft extends the existing assignment/cover tables and delegates old
+global RPC signatures to one scoped resolver; it creates no assignments or separate roster.
+`supabase/drafts/showroom_site_duties.sql` is unnumbered, unapplied and awaits exact-file approval
+under ENGINEERING §5. No production or completed Showroom Work admission claim is made.
+Local verification covers two-Site isolation, cover expiry, active-holder eligibility, the existing
+manager gate, RPC-only writes and global compatibility. An in-memory negative control removes
+the scope filters and correctly fails the Site assertion. Physical source transitions, actual
+result evidence and Showroom Work feed admission remain subsequent work.
 
 1. Production-verify Staff & Duties and the Shared Duty Resolver.
 2. Require every core module to expose the section 2 projection.
