@@ -3050,6 +3050,8 @@ export interface operationOrderListRow {
 }
 
 export interface SalesOrderExpansionResponse {
+  /** Exact stock Unit -> originating PO, resolved through its PO line. */
+  unitCoverage?: Record<string, string | null>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has

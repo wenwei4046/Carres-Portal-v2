@@ -1097,6 +1097,11 @@ expansion door). Shared PO lines do not imply a physical Unit allocation to any 
 and read failures are shown separately from `Not allocated`. It also shows the exact supplier/`Deliver To`/`PO Delivery Date`
 mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
 duplicate demand editor and no second mini-table.
+SO Batch expands each existing Unit ID into its own bordered goods row, including repeated
+SKUs, with Qty 1. Unit ID and Covered by use 13px monospace text; PO numbers remain blue
+navigation links. Selection still targets the source demand. Each Unit row shows only its own
+PO, resolved through the stock Unit's existing PO-line reference by the expansion read API.
+Missing provenance prints an absence; line-level PO arrays are never copied onto Unit rows.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.

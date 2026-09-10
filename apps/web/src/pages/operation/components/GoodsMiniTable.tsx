@@ -135,6 +135,7 @@ export interface GoodsMiniLine {
   deliverToNode?: ReactNode;
   /** One printed line each. Read only when the table is asked for the column. */
   coveredBy?: string[];
+  coveredByUnit?: Record<string, string | null>;
   /** The governed word for a line nothing covers yet. */
   coveredByAbsence?: string;
   /** Card 02-B — read only when the table is asked for the column. */
@@ -239,12 +240,15 @@ export default function GoodsMiniTable({
   showCoveredBy = false,
   showSupplier = false,
   showPoDeliveryDate = false,
+  oneRowPerUnit = false,
   onCoveredByClick,
   isCoveredByLinkable,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
+  /** Disclose each physical Unit separately while retaining line selection. */
+  oneRowPerUnit?: boolean;
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
   /** A page that BUYS asks for `Covered by`; a truth register does not. */
@@ -346,9 +350,19 @@ export default function GoodsMiniTable({
         </thead>
         {/* LEVEL TWO — every value, 13px. */}
         <tbody className="divide-y divide-base-200 text-body">
-          {lines.map((line) => (
+          {lines.flatMap((line) => {
+            const units = oneRowPerUnit && line.unitIds.length ? line.unitIds : [null];
+            return units.map((unitId) => ({
+              ...line,
+              rowKey: unitId == null ? line.key : `${line.key}::${unitId}`,
+              unitIds: unitId == null ? line.unitIds : [unitId],
+              coveredBy: unitId == null ? line.coveredBy : (line.coveredByUnit?.[unitId] ? [line.coveredByUnit[unitId]!] : []),
+              coveredByAbsence: unitId == null ? line.coveredByAbsence : "—",
+              qty: unitId == null ? line.qty : 1,
+            }));
+          }).map((line) => (
             <tr
-              key={line.key}
+              key={line.rowKey}
               data-testid={line.testId}
               className="divide-x divide-base-200 align-top"
             >
@@ -373,7 +387,7 @@ export default function GoodsMiniTable({
                   mono face — the register engine itself aliases --font-mono
                   to Inter — so an identifier is plain body text here too. */}
               <td className="px-2 py-2">{line.category}</td>
-              <td className="px-2 py-2">
+              <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
                 {line.unitIds.length ? (
                   line.unitIds.map((id) => <div key={id}>{id}</div>)
                 ) : (
@@ -381,7 +395,7 @@ export default function GoodsMiniTable({
                 )}
               </td>
               {showCoveredBy ? (
-                <td className="px-2 py-2">
+                <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
                   {line.coveredBy?.length ? (
                     line.coveredBy.map((po) =>
                       /* `Ready Stock` and anything else that is not a

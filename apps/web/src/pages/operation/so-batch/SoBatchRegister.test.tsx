@@ -1133,12 +1133,27 @@ describe("the expansion — the ONE shared child table", () => {
     apiFetch.mockResolvedValueOnce({
       defaultDeliverTo: null,
       place: [],
-      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-777"], deliverTo: [] }],
+      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U1-000-777", "U1-000-778"], deliverTo: [] }],
+      unitCoverage: { "U1-000-778": "PO-SECOND", "U1-000-777": "PO-FIRST" },
     });
     renderRegister();
     fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
     const box = await screen.findByTestId("so-batch-inspector-o6");
     expect(await within(box).findByText("U1-000-777")).toBeInTheDocument();
+    const firstUnit = within(box).getByText("U1-000-777");
+    const secondUnit = within(box).getByText("U1-000-778");
+    expect(firstUnit.closest("tr")).not.toBe(secondUnit.closest("tr"));
+    expect(within(firstUnit.closest("tr")!).getByRole("button", { name: "PO-FIRST" })).toBeInTheDocument();
+    expect(firstUnit.closest("tr")).not.toHaveTextContent("PO-SECOND");
+    expect(within(secondUnit.closest("tr")!).getByRole("button", { name: "PO-SECOND" })).toBeInTheDocument();
+    expect(secondUnit.closest("tr")).not.toHaveTextContent("PO-FIRST");
+    for (const unit of [firstUnit, secondUnit]) {
+      const row = unit.closest("tr")!;
+      expect(within(row).getByText("B1201S-Q")).toBeInTheDocument();
+      expect(within(row).getByText("1")).toBeInTheDocument();
+      expect(unit.closest("td")).toHaveClass("font-mono", "text-[13px]");
+      expect(row.parentElement).toHaveClass("divide-y", "divide-base-200");
+    }
     expect(String(apiFetch.mock.calls[0]![0])).toBe("/api/operation/orders/o6/expansion");
   });
 
