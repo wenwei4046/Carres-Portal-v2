@@ -604,6 +604,20 @@ export function checkedInDone(received: number, ordered: number): string {
  * `Shipping tomorrow`, answered two days late, is a sentence about a day that
  * has already gone.
  *
+ * ⭐ THE VERB NAMES ARRIVAL, NOT SHIPPING (owner ruling 2026-09-10). The date
+ * these answers carry is `purchase_orders.eta_date` — OUR predicted ARRIVAL,
+ * `expectedArrivalOf`'s production-plus-transit result — and the call that
+ * asks the question is anchored on that same field. The retired spelling
+ * (`It ships on {date}`) put a shipping verb on an arrival date, which is the
+ * one reading that makes somebody add the transit leg a second time and move
+ * the arrival twice. A supplier answer that genuinely names a FACTORY-ready
+ * or dispatch day is a different fact with its own door (`Confirm ready
+ * date` → `expected_ready_date`), and it becomes an arrival only by going
+ * through `arrivalFromReadyDate`.
+ *
+ * `answer` keeps its stored spelling (`shipping`) because it is the ledger's
+ * value, not a word on a screen; only the sentence changed.
+ *
  * `date` is the caller's already-formatted string (`Wed, 5 Aug 26`): this
  * module owns WORDS and never dates.
  */
@@ -612,8 +626,8 @@ export function tomorrowDeliveryAnswerLabel(
   date: string,
 ): string {
   return answer === "shipping"
-    ? `It ships on ${date}`
-    : `It ships later than ${date}`;
+    ? `It arrives on ${date}`
+    : `It arrives later than ${date}`;
 }
 
 /** Every purchasing queue word, in §4's display order — for a banned-word

@@ -1409,6 +1409,18 @@ Sections + History template. No tabs, no drawer, no split preview, no PDF and no
   record stays distinct through its structured request UUID. Both deep-link the exact
   source (`?tab=manual-purchase&mp={uuid}`); the local
   `WORK TO DO` rail filters these same identities and never becomes a second queue or manual Done.
+- **THE ADVANCE ARRIVAL CHECK IS SHARED WORK (owner ruling 2026-09-10) — BUILT.**
+  `purchasing.confirm_tomorrows_delivery` opens ONE office working day before
+  `purchase_orders.eta_date`, is owned by the resolved **current PO Duty** through the shared
+  resolver, and closes only on a recorded answer ABOUT that exact date — a factory that moves
+  the day again makes the old answer an answer about nothing and the obligation reopens. The
+  trigger, the due and the reopen rule have exactly one home, `tomorrowDeliveryCallOf`; the
+  shared projection (`projectPurchaseOrderArrivalCheckWork`) adds the resolved owner and the
+  PO door and restates no arithmetic (Law D). Until this ruling the rule was defined and its
+  engine was read only by the Purchase Orders page, so the obligation reached nobody's Work
+  list. **It is derived at READ time like every sibling projection — no cron is involved, and
+  a missing cron was never what was wrong.** `eta_date` is OUR production-plus-transit
+  prediction (`expectedArrivalOf`), never a supplier-confirmed date and never a shipping date.
 
 **Journey:** `+ Manual Purchase` → choose plain-language purpose → name the purpose's
 structured For object → enter goods/quantity/destination → system previews Proceed Date and

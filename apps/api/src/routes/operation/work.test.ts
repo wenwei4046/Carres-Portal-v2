@@ -11,6 +11,7 @@ import {
   projectManualPurchaseWork,
   projectPaymentCollectionWork,
   projectPurchaseOrderReplyWork,
+  projectPurchaseOrderArrivalCheckWork,
   projectReceivingWork,
   projectSalesOrderWork,
   projectSalesOrdersFromModuleFacts,
@@ -500,6 +501,94 @@ describe("operation Work response composition", () => {
     });
     expect(item?.action).not.toContain("Yu Jun");
     expect(item?.completionFact).toContain("exact current PO version");
+  });
+
+  /* ── THE ADVANCE ARRIVAL CHECK reaches shared Work (owner ruling
+     2026-09-10). The rule and its engine both existed; the projection that
+     puts the obligation in front of the duty holder did not. ───────────── */
+  describe("purchasing.confirm_tomorrows_delivery in shared Work", () => {
+    const person = { userId: "po-duty", name: "Khor Yee" };
+    const poDuty = {
+      dutyKey: "po_duty" as const,
+      onDate: "2026-09-10",
+      normalOwner: person,
+      buddy: null,
+      activeCover: null,
+      actingPerson: person,
+      state: "primary" as const,
+      assignmentId: "assignment-1",
+    };
+    const po = (over: Record<string, unknown> = {}) => ({
+      id: "PO-3001",
+      supplier_id: "supplier-1",
+      status: "open" as const,
+      version: 1,
+      eta_date: "2026-09-11",
+      tomorrow_answer_about_date: null,
+      promises: [],
+      sends: [],
+      purchase_order_lines: [{ qty: 4, received_qty: 0 }],
+      ...over,
+    });
+    const project = (over: Record<string, unknown> = {}, today = "2026-09-10") =>
+      projectPurchaseOrderArrivalCheckWork({
+        pos: [po(over)],
+        suppliers: [{ id: "supplier-1", name: "Ohana" }],
+        poDuty,
+        today,
+      });
+
+    it("opens one office working day before the arrival, owned by the current PO Duty", () => {
+      const [item] = project();
+      expect(item).toMatchObject({
+        id: "purchasing:PO-3001:purchasing.confirm_tomorrows_delivery",
+        module: "purchasing",
+        object: { kind: "purchase_order", id: "PO-3001", label: "PO-3001" },
+        action: "Call Ohana — confirm tomorrow's delivery",
+        recipient: "Ohana",
+        owner: { dutyKey: "po_duty", normal: person, acting: person },
+        destination: "/operation?tab=purchase-orders&po=PO-3001",
+      });
+      /* Fri 11 Sep arrival − 1 OFFICE working day = Thu 10 Sep. */
+      expect(item?.timing).toMatchObject({ dueOn: "2026-09-10", workingDaysLate: 0 });
+      /* The owner is a resolved person, never spelled into the sentence. */
+      expect(item?.action).not.toContain("Khor Yee");
+    });
+
+    it("skips a public holiday when stepping back to the check day", () => {
+      /* Malaysia Day, Wed 16 Sep 2026, is in `MY_HOLIDAYS_2026`. Thu 17 Sep
+         arrival steps back over it to Tue 15 Sep — the shared calendar's
+         answer, not a second one. */
+      const [item] = project({ eta_date: "2026-09-17" }, "2026-09-15");
+      expect(item?.timing?.dueOn).toBe("2026-09-15");
+    });
+
+    it("stays silent with no anchor, on a settled PO, and before the window opens", () => {
+      expect(project({ eta_date: null })).toHaveLength(0);
+      expect(project({ purchase_order_lines: [{ qty: 4, received_qty: 4 }] })).toHaveLength(0);
+      expect(project({ status: "cancelled" })).toHaveLength(0);
+      /* Arrival still four days out — the check has not opened yet. */
+      expect(project({ eta_date: "2026-09-18" }, "2026-09-10")).toHaveLength(0);
+    });
+
+    it("closes on an answer about THIS date and reopens when the factory moves it", () => {
+      /* Answered about the arrival we hold → nothing left to ask. */
+      expect(project({ tomorrow_answer_about_date: "2026-09-11" })).toHaveLength(0);
+      /* The factory then moved the day: the old answer is about nothing, and
+         the obligation is open again against the new date. */
+      const [reopened] = project({
+        eta_date: "2026-09-14",
+        tomorrow_answer_about_date: "2026-09-11",
+      }, "2026-09-12");
+      expect(reopened?.timing?.dueOn).toBe("2026-09-11");
+    });
+
+    it("stays open and turns late once the check day has passed", () => {
+      const [late] = project({}, "2026-09-14");
+      expect(late).toBeTruthy();
+      expect(late?.timing?.bucket).toBe("overdue");
+      expect(late?.timing?.workingDaysLate).toBeGreaterThan(0);
+    });
   });
 
   it("admits due invoice collection under Payment Duty and closes only on money truth", () => {
