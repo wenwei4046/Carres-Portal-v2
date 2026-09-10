@@ -758,4 +758,58 @@ describe("POST /stripe/webhook", () => {
       expect(admin.calls.rpc).toHaveLength(1);
     });
   });
+
+  /**
+   * The subscription's FIRST invoice carries the one-time signup month, which
+   * the checkout-session branch already recorded as month 1. Recording the
+   * invoice as well marked month 2 paid with the same money (and, since 0473,
+   * posted it to the ledger twice).
+   */
+  describe("invoice.paid — the signup invoice is not a second month", () => {
+    const AG3 = "aaaaaaaa-0000-0000-0000-000000000003";
+    const signupInvoice = {
+      id: "in_signup_1",
+      number: "CARRES-0011",
+      billing_reason: "subscription_create",
+      amount_due: 5900,
+      amount_paid: 5900,
+      created: 1_800_000_000,
+      status_transitions: { paid_at: 1_800_000_100 },
+      subscription: "sub_signup",
+    };
+
+    function run(object: unknown) {
+      const admin = makeSb(
+        { rental_agreements: { maybeSingle: { data: { id: AG3, monthly_fee: 59 }, error: null } } },
+        { data: { seq: 2 }, error: null },
+      );
+      vi.mocked(adminClient).mockReturnValue(admin as never);
+      const stripe = makeStripe();
+      stripe.webhooks.constructEventAsync.mockResolvedValue({ id: "evt_signup", type: "invoice.paid", data: { object } });
+      vi.mocked(stripeClient).mockReturnValue(stripe);
+      return { admin, res: app.fetch(hook({}, "good"), env) };
+    }
+
+    it("records nothing when the signup invoice collected only the first month (trial case)", async () => {
+      const { admin, res } = run(signupInvoice);
+      const r = await res;
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ received: true, ignored: "signup_month_recorded_by_session" });
+      expect(admin.calls.rpc).toHaveLength(0);
+    });
+
+    it("records only the amount beyond the first month when Stripe also billed a period (no trial)", async () => {
+      const { admin, res } = run({ ...signupInvoice, amount_due: 11800, amount_paid: 11800 });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBe(59);
+    });
+
+    it("a regular monthly invoice still records its full amount", async () => {
+      const { admin, res } = run({ ...signupInvoice, billing_reason: "subscription_cycle" });
+      expect((await res).status).toBe(200);
+      expect(admin.calls.rpc).toHaveLength(1);
+      expect((admin.calls.rpc[0].args as Record<string, unknown>).p_amount).toBe(59);
+    });
+  });
 });
