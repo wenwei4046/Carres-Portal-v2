@@ -35,6 +35,8 @@ import {
   CircleAlert,
   Library,
   SlidersHorizontal,
+  Receipt,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -511,6 +513,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "AP · Payables",
         icon: ArrowUpRight,
         financePath: "/finance/ap",
+      },
+      // 0477 — a supplier's bill, and the voucher that pays it. Unpaid by
+      // Supplier is the Bills destination's third listing (toolbar switch).
+      {
+        key: "bills",
+        label: "Bills",
+        icon: Receipt,
+        financePath: "/finance/bills",
+      },
+      {
+        key: "payment-vouchers",
+        label: "Payment Vouchers",
+        icon: Banknote,
+        financePath: "/finance/payment-vouchers",
       },
       {
         key: "payments",

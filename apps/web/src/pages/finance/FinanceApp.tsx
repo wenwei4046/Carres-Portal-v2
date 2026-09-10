@@ -17,6 +17,9 @@ import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
 import LedgerJournal from "./ledger/LedgerJournal";
 import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
 import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
+import SupplierBills from "./payables/SupplierBills";
+import PaymentVouchers from "./payables/PaymentVouchers";
+import ApOutstanding from "./payables/ApOutstanding";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -50,6 +53,11 @@ export default function FinanceApp() {
           <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
           <Route path="ar"        element={financeOnly(<FinanceAR />)} />
           <Route path="ap"        element={financeOnly(<FinanceAP />)} />
+          {/* 0477 — supplier bills, payment vouchers, and what is unpaid per
+              supplier. A voucher is the one door money leaves by. */}
+          <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
+          <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
+          <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
           {/* Payment MASTER §16 — Finance → Payments is the canonical
               receipt Register; the Phase-5 bucket page is retired. */}
           <Route path="payments"  element={<PaymentRegister />} />

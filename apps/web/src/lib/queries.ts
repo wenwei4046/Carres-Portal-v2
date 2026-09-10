@@ -146,8 +146,6 @@ import {
   type BankStatementCreateInput,
   type FinanceInvoiceIssueInput,
   type FinanceInvoiceVoidInput,
-  type FinancePoPayInput,
-  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
@@ -8805,45 +8803,9 @@ export function useRefundPay(
   });
 }
 
-export function usePoPay(
-  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
-    mutationFn: (input) =>
-      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status='paid' + new outbound payments row. Ripples to
-      // ap-aging, dashboard summary, payments list.
-      await qc.invalidateQueries({ queryKey: ["finance"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function usePoSchedule(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/payments/po-schedule", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
-      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
-      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
+// routes answer 410 — a supplier is paid by a Payment Voucher
+// (lib/payables-queries.ts), the one door money leaves by.
 
 export function useCreateBankStatement(
   opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,
