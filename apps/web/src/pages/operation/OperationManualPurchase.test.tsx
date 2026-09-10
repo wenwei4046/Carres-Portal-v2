@@ -1871,6 +1871,35 @@ describe("the settled nine columns, in the settled order", () => {
     expect(screen.getByTestId(`mp-open-${REQ3}`)).toBeInTheDocument();
   });
 
+  it("an unrecoverable individual says so — never a blank cell (walk, 2026-09-11)", async () => {
+    /* `app_users` RLS does not show every account to every reader: the
+       `principal` seed row is hidden from an `operation` caller, so the name
+       lookup MISSES. Three of the four LIVE requests are raised by that
+       account, and this column is now the second one — a blank there reads as
+       a broken page. The object has always printed the governed sentence; the
+       Register now prints it too. */
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (
+        String(url).includes("/purchasing/requests") &&
+        !String(url).includes("/detail/") &&
+        !String(url).includes("/plan") &&
+        !String(url).includes("/ready-stock")
+      ) {
+        /* The request names a creator the reader cannot see. */
+        return Promise.resolve({ ...REGISTER, users: [] });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    const row = screen.getByTestId(`mp-open-${REQ1}`).closest("tr")!;
+    expect(row.textContent).toContain("Staff identity not recorded");
+    /* …and it is quiet: an absence keeps its word and loses its weight. */
+    expect(
+      within(row).getByText("Staff identity not recorded").className,
+    ).toContain("text-base-500");
+  });
+
   it("Requested By is the real staff name — never an email, role or (you)", async () => {
     await loaded();
     const grid = screen.getByTestId("register-column");
@@ -2087,6 +2116,109 @@ describe("the row expansion is the SHARED goods table (settled design)", () => {
     expect(panel.textContent).toContain("Asked for 3");
     expect(panel.textContent).toContain("1 on the shelf");
     expect(panel.textContent).not.toContain("Asked for 2");
+  });
+
+  it("two configurations of one model are told apart (walk, 2026-09-11)", async () => {
+    /* ⭐ Found on the production walk. A live request carries
+       `5539-1A(LHF)` and `5539-1A(RHF)` — the left- and right-hand halves of
+       one sofa. Grouping by configuration correctly makes them TWO groups,
+       and the Catalog model name for both is `Booqit`, so the screen showed
+       the identical heading twice on exactly the pair that must never be
+       confused. The SKU joins the heading only where the name fails. */
+    const unit = (itemId: string, sku: string) => ({
+      itemId,
+      unitCode: `U1-000-${itemId.slice(-3)}`,
+      identityScope: "unit" as const,
+      sku,
+      condition: "new",
+      siteName: "Carres Klang",
+      holderName: null,
+      ownership: "carres_owned" as const,
+      supplier: null,
+      qty: 1,
+      dateIn: "2026-08-01",
+    });
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/ready-stock")) {
+        return Promise.resolve({
+          requestId: REQ2,
+          groups: [
+            {
+              matchKey: "55391alhf",
+              item: "Booqit",
+              skus: ["5539-1A(LHF)"],
+              requestedQty: 1,
+              freeQty: 1,
+              units: [unit("11111111-1111-1111-1111-111111111101", "5539-1A(LHF)")],
+            },
+            {
+              matchKey: "55391arhf",
+              item: "Booqit",
+              skus: ["5539-1A(RHF)"],
+              requestedQty: 1,
+              freeQty: 1,
+              units: [unit("11111111-1111-1111-1111-111111111102", "5539-1A(RHF)")],
+            },
+          ],
+        });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
+    fireEvent.click(within(panel).getByRole("button", { name: /Ready Stock/ }));
+    const left = await within(panel).findByTestId("mp-ready-stock-group-55391alhf");
+    const right = within(panel).getByTestId("mp-ready-stock-group-55391arhf");
+    expect(left.textContent).toContain("5539-1A(LHF)");
+    expect(right.textContent).toContain("5539-1A(RHF)");
+  });
+
+  it("the ordinary one-name case stays quiet — no SKU beside a heading that works", async () => {
+    const base = apiFetch.getMockImplementation()!;
+    apiFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes("/ready-stock")) {
+        return Promise.resolve({
+          requestId: REQ2,
+          groups: [
+            {
+              matchKey: "only",
+              item: "Atlas K",
+              skus: ["BED-K-01"],
+              requestedQty: 2,
+              freeQty: 1,
+              units: [
+                {
+                  itemId: "11111111-1111-1111-1111-111111111103",
+                  unitCode: "U1-000-103",
+                  identityScope: "unit",
+                  sku: "BED-K-01",
+                  condition: "new",
+                  siteName: "Carres Klang",
+                  holderName: null,
+                  ownership: "carres_owned",
+                  supplier: null,
+                  qty: 1,
+                  dateIn: "2026-08-01",
+                },
+              ],
+            },
+          ],
+        });
+      }
+      return base(url, init);
+    });
+    await loaded();
+    fireEvent.click(screen.getByTestId(`mp-expand-${REQ2}`));
+    const panel = await screen.findByTestId(`mp-ready-stock-${REQ2}`);
+    fireEvent.click(within(panel).getByRole("button", { name: /Ready Stock/ }));
+    const group = await within(panel).findByTestId("mp-ready-stock-group-only");
+    /* The heading names the product and stops; the SKU still shows on the
+       Unit row below, where it belongs. */
+    const heading = group.firstElementChild!;
+    expect(heading.textContent).toContain("Atlas K");
+    expect(heading.textContent).not.toContain("BED-K-01");
   });
 });
 
