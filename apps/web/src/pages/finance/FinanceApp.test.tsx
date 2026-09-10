@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import FinanceApp from "./FinanceApp";
@@ -16,6 +16,17 @@ vi.mock("@/lib/queries", () => ({
     invoiceRegister: () => ["finance", "invoice-register"],
   } },
 }));
+// The Finance Ledger pages read through their own hooks file; an unanswered
+// read is enough to prove which destination a route opens.
+vi.mock("./ledger/ledger-queries", () => {
+  const waiting = { data: undefined, isLoading: true, isSuccess: false, isError: false,
+    isFetching: false, error: null, refetch: vi.fn() };
+  return {
+    JOURNAL_PAGE_SIZE: 1000, JOURNAL_MAX_PAGES: 10,
+    useLedgerEntries: () => waiting, useLedgerEntry: () => waiting, useLedgerChart: () => waiting,
+    useTrialBalance: () => waiting, useLedgerSelfCheck: () => waiting,
+  };
+});
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string; user: { id: string } | null }) => unknown) =>
@@ -53,6 +64,28 @@ describe("Finance routing", () => {
     auth.role = "operation";
     show("/finance/recon");
     expect(screen.getByTestId("payments-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
+  });
+  it("opens the three Finance Ledger destinations, each on its own route", () => {
+    show("/finance/ledger");
+    expect(screen.getByTestId("journal-destination-header")).toBeInTheDocument();
+    cleanup();
+    show("/finance/ledger/trial-balance");
+    expect(screen.getByTestId("trial-balance-destination-header")).toBeInTheDocument();
+    cleanup();
+    show("/finance/ledger/self-check");
+    expect(screen.getByTestId("self-check-destination-header")).toBeInTheDocument();
+  });
+  it("a pasted entry number opens that entry, not the list", () => {
+    show("/finance/ledger?entry=JE-202609-0003");
+    expect(screen.getByTestId("object-identity")).toHaveTextContent("JE-202609-0003");
+    expect(screen.queryByTestId("journal-destination-header")).not.toBeInTheDocument();
+  });
+  it("operation staff never reach the ledger", () => {
+    auth.role = "operation";
+    show("/finance/ledger/trial-balance");
+    expect(screen.getByTestId("payments-destination-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("trial-balance-destination-header")).not.toBeInTheDocument();
     auth.role = "finance";
   });
 });

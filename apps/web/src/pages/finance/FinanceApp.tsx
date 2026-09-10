@@ -11,6 +11,10 @@ import FinanceRefunds from "./FinanceRefunds";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
+// The read-only Finance Ledger — three destinations, three nav rows.
+import LedgerJournal from "./ledger/LedgerJournal";
+import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
+import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -60,6 +64,10 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
+          <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
+          <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>

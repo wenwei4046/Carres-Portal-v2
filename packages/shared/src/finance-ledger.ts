@@ -449,7 +449,7 @@ export function rentalsVerdict(r: RentalCheck, money: Money): SectionVerdict {
  * The eleven `gl_ledger_health` checks (0465, 0469), in plain words. The SQL
  * `detail` text names tables and columns, so it never reaches the screen;
  * each sentence is composed here from the row's own numbers. A key this map
- * does not know prints the function's own label.
+ * does not know prints `Other ledger check`, never its key or its label.
  */
 export function healthCheckWords(
   row: LedgerHealthRow,
