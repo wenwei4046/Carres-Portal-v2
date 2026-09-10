@@ -431,12 +431,13 @@ beforeEach(() => {
 async function getDemands(
   tables: Record<string, { data: unknown; error: unknown }> = TABLES() as unknown as Tbl,
   role = "operation",
+  path = "/api/operation/purchase/demands",
 ) {
   const sb = makeSb(tables);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(userClient).mockReturnValue(sb as any);
   const res = await app.fetch(
-    new Request("https://api.test/api/operation/purchase/demands", {
+    new Request(`https://api.test${path}`, {
       headers: { Authorization: `Bearer ${await makeJwt(role)}` },
     }),
     env,
@@ -481,6 +482,28 @@ describe("GET /api/operation/purchase/demands — one read, two projections", ()
       onPo: 0,
       readyStock: 0,
     });
+  });
+
+  it("scopes the reload read when a Sales Order opens SO Batch directly", async () => {
+    const { res } = await getDemands(
+      TABLES() as unknown as Tbl,
+      "operation",
+      "/api/operation/purchase/demands?so=1204",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as SoBatchPurchaseResponse;
+    expect(body.rows.map((row) => row.so)).toEqual([1204]);
+    expect(body.registerRows.map((row) => row.so)).toEqual([1204]);
+  });
+
+  it("refuses an invalid Sales Order scope instead of returning a misleading read", async () => {
+    const { res } = await getDemands(
+      TABLES() as unknown as Tbl,
+      "operation",
+      "/api/operation/purchase/demands?so=nope",
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ code: "invalid_param" });
   });
 });
 

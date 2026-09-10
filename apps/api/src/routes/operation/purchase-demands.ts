@@ -287,6 +287,12 @@ function ownerOf(
 }
 
 purchaseDemandsRouter.get("/", requireOperation, async (c) => {
+  const rawSo = c.req.query("so");
+  const scopeSo = rawSo == null || rawSo === "" ? null : Number(rawSo);
+  if (scopeSo != null && (!Number.isInteger(scopeSo) || scopeSo <= 0)) {
+    return c.json({ error: "invalid_so", code: "invalid_param" }, 400);
+  }
+
   const sb = userClient(c.env, c.var.auth.jwt);
   const me = c.var.auth.id;
 
@@ -709,10 +715,17 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
     console.error("so batch — procurement partners unavailable", (e as Error).message);
   }
 
+  const scopedRows =
+    scopeSo == null ? rows : rows.filter((row) => row.so === scopeSo);
+  const scopedRegisterRows =
+    scopeSo == null
+      ? registerRes.registerRows
+      : registerRes.registerRows.filter((row) => row.so === scopeSo);
+
   const body: SoBatchPurchaseResponse = {
     today,
-    rows,
-    registerRows: registerRes.registerRows,
+    rows: scopedRows,
+    registerRows: scopedRegisterRows,
     destinations,
     /* No default configured means NO default. Picking the first active one
        would silently make some warehouse the standing answer, and the standing

@@ -288,9 +288,9 @@ describe("Sales Order object template contract", () => {
   /* ⭐ THE STANDING FACT SITS BESIDE THE CARD'S NAME (Jess, 2026-08-26) —
      "add stuff to header part like the new/existing customer thingy". It stays
      a FACT, never a control: the phone probe derives it and MASTER.md:1038
-     rules it read-only on both surfaces. It now actually rides the header bar
-     (it only sat in the body before), sharing the card title's own font size
-     and face so the two labels read as one header. */
+     rules it read-only on both surfaces. It rides the header bar as a compact
+     pill (Jess, 2026-09-10 density pass) rather than matching the card
+     title's own shouting face — a badge reads as a fact, not a second title. */
   it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
     // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
@@ -300,9 +300,7 @@ describe("Sales Order object template contract", () => {
     expect(start).toBeGreaterThan(-1);
     expect(customer).toContain("headerSlot=");
     expect(customer).toContain('data-testid="customer-type-chip"');
-    expect(customer).toContain(
-      'className="font-mono text-label uppercase tracking-[0.08em] text-signature-700"',
-    );
+    expect(customer).toContain("rounded-full");
     expect(workspace).not.toContain('label="Customer type (auto)"');
     expect(workspace).toContain("customerTypeWord");
     /* The accent is spent once, on the tab underline — a chip may not take it. */

@@ -1137,7 +1137,7 @@ function DocumentView({ row, owner, units, receiving, claims, destinations, unit
                     : line.identity_mode === "quantity"
                       ? <Absence>—</Absence>
                     : unitsOf(line).length
-                      ? <ul className="m-0 list-none p-0">{unitsOf(line).map((unit) => <li key={unit.unit_code} className="whitespace-nowrap font-mono">{unit.unit_code}</li>)}</ul>
+                      ? <div className="flex max-w-[220px] flex-wrap gap-1">{unitsOf(line).map((unit) => <span key={unit.unit_code} className="rounded border border-kit-slate-5 bg-kit-slate-3 px-1.5 py-0.5 font-mono text-meta text-base-700">{unit.unit_code}</span>)}</div>
                     : line.identity_mode === "exact_unit" && po.status !== "cancelled"
                       ? <span role="alert" className="text-kit-red-11" data-testid={`po-line-units-missing-${line.id}`}>Unit IDs missing on this line — do not send this PO</span>
                       : <Absence>No Unit ID</Absence>
