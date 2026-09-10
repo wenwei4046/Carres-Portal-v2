@@ -348,8 +348,22 @@ export async function readFreeStock(sb: ReturnType<typeof userClient>): Promise<
       .eq("availability", "available");
     if (itemErr) throw new Error(itemErr.message);
 
-    // FIFO — `ops_stock_pool_draw`'s own pick order (oldest first), so the
-    // records this page offers are the records it would have taken anyway.
+    /**
+     * FIFO — oldest `date_in` first, which is `ops_stock_pool_draw`'s own
+     * primary pick order, so the page offers the goods that have waited
+     * longest.
+     *
+     * ⚠️ THE TIE-BREAK IS `unit_code`, NOT `created_at`, and that is a REAL
+     * difference from the draw door's `order by date_in, created_at`. The
+     * authoritative register view does not carry `created_at`, and a second
+     * read of the base table to recover it would put the whole offer back on
+     * the source this read exists to stop re-deciding. It costs nothing that
+     * matters: `date_in` already answers *which is older*, the order is
+     * deterministic and stable across refreshes, and no unit is ever offered
+     * twice — the three properties the allocation actually rests on. Where the
+     * take path needs an exact unit it names one (`freeStockItemIds`,
+     * `Choose Ready Unit`), so it never re-picks by this order at all.
+     */
     const items = [...((itemRows ?? []) as Record<string, unknown>[])].sort((a, b) => {
       const ad = (a.date_in as string | null) ?? "9999-12-31";
       const bd = (b.date_in as string | null) ?? "9999-12-31";

@@ -1207,7 +1207,7 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
        rule, so the mock cannot answer something the database would not. */
     const registerView = stock.map((r) => ({
       ...r,
-      unit_code: `U1-000-00${r.id.slice(1)}`,
+      unit_code: `U1-000-00${String(r.id).slice(1)}`,
       warehouse_id: WH,
       site_name: "Carres Klang",
       holder_name: null,

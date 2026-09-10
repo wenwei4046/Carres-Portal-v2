@@ -217,6 +217,25 @@ describe("two item lines of one SKU", () => {
     });
   });
 
+  /**
+   * WHICH LINE and WHETHER TO CHOOSE are two decisions, and the operator may
+   * make them in either order. Held in one map, changing the dropdown on an
+   * unticked row silently did nothing — a control that looks live and is not.
+   */
+  it("keeps the line the operator picked BEFORE ticking the box", async () => {
+    draw();
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.change(within(row).getByRole("combobox"), { target: { value: LINE_B } });
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    const post = apiFetch.mock.calls.find(([p]) => String(p).endsWith("/ready-stock/reserve"));
+    expect(JSON.parse(String((post![1] as RequestInit).body)).picks).toEqual([
+      { itemId: "33333333-0000-0000-0000-00000000000a", orderLineId: LINE_B },
+    ]);
+  });
+
   it("prints one line only when only one line can be meant", async () => {
     draw(
       response({

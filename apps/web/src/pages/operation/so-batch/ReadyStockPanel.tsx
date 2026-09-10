@@ -11,7 +11,6 @@ import {
   readyStockRefusalWord,
   readyStockResponseSchema,
   type ReadyStockResponse,
-  type ReadyStockUnit,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "@/lib/api";
 import { toast } from "sonner";
@@ -64,7 +63,15 @@ function conditionWord(c: string | null): string {
 
 export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: number | null }) {
   const [open, setOpen] = useState(false);
-  const [picks, setPicks] = useState<Map<string, string>>(new Map());
+  /**
+   * TWO STATES, because they are two decisions. `chosen` is whether this
+   * Unit is part of the act; `lineChoice` is which item line it answers.
+   * Held apart so an operator can set the line BEFORE ticking the box —
+   * folded into one map, changing the dropdown on an unticked row did
+   * nothing at all, which reads as a broken control.
+   */
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [lineChoice, setLineChoice] = useState<Map<string, string>>(new Map());
   const queryClient = useQueryClient();
 
   /**
@@ -99,7 +106,10 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
           method: "POST",
           body: JSON.stringify({
             orderId,
-            picks: [...picks].map(([itemId, orderLineId]) => ({ itemId, orderLineId })),
+            picks: [...chosen].map((itemId) => ({
+              itemId,
+              orderLineId: lineFor(itemId),
+            })),
           }),
         },
       ),
@@ -107,7 +117,7 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
       toast.success(
         `Reserved ${res.reserved} Unit${res.reserved === 1 ? "" : "s"}${so == null ? "" : ` to SO-${so}`}`,
       );
-      setPicks(new Map());
+      setChosen(new Set());
       /* The server's own recomputation decides what still needs buying — the
          Register is invalidated rather than edited in place. */
       void queryClient.invalidateQueries({ queryKey: ["so-batch-ready-stock", orderId] });
@@ -120,16 +130,24 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
     },
   });
 
-  function toggle(unit: ReadyStockUnit, lineId: string) {
-    setPicks((prev) => {
-      const next = new Map(prev);
-      if (next.get(unit.itemId) === lineId) next.delete(unit.itemId);
-      else next.set(unit.itemId, lineId);
+  /** The line this Unit answers: the operator's pick, else its only match. */
+  function lineFor(itemId: string): string {
+    const explicit = lineChoice.get(itemId);
+    if (explicit) return explicit;
+    const unit = (q.data?.units ?? []).find((u) => u.itemId === itemId);
+    return unit?.matchingLineIds[0] ?? "";
+  }
+
+  function toggle(itemId: string) {
+    setChosen((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       return next;
     });
   }
 
-  const chosen = picks.size;
+  const chosenCount = chosen.size;
 
   return (
     /* THE CARRES SECTION CONNECTOR — the light-grey rounded menu-style frame
@@ -210,9 +228,9 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                 </thead>
                 <tbody className="divide-y divide-base-200 text-body">
                   {q.data!.units.map((u) => {
-                    const pickedLine = picks.get(u.itemId) ?? null;
-                    const selected = pickedLine != null;
+                    const selected = chosen.has(u.itemId);
                     const defaultLine = u.matchingLineIds[0] ?? null;
+                    const pickedLine = lineChoice.get(u.itemId) ?? defaultLine;
                     return (
                       <tr
                         key={u.itemId}
@@ -234,7 +252,7 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                               type="checkbox"
                               aria-label={`Choose ${u.unitCode ?? "Unit"}`}
                               checked={selected}
-                              onChange={() => toggle(u, pickedLine ?? defaultLine)}
+                              onChange={() => toggle(u.itemId)}
                             />
                           ) : (
                             <Absence>—</Absence>
@@ -273,14 +291,10 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
                             <select
                               aria-label={`Item line for ${u.unitCode ?? "Unit"}`}
                               className="w-full rounded-control border border-base-300 bg-white px-1 py-0.5 text-body"
-                              value={pickedLine ?? defaultLine ?? ""}
+                              value={pickedLine ?? ""}
                               onChange={(e) => {
                                 const v = e.target.value;
-                                setPicks((prev) => {
-                                  const next = new Map(prev);
-                                  if (next.has(u.itemId)) next.set(u.itemId, v);
-                                  return next;
-                                });
+                                setLineChoice((prev) => new Map(prev).set(u.itemId, v));
                               }}
                             >
                               {u.matchingLineIds.map((id, i) => (
@@ -301,11 +315,11 @@ export default function ReadyStockPanel({ orderId, so }: { orderId: string; so: 
 
             <div className="flex items-center gap-3 border-t border-base-200 px-3 py-2">
               <span className="text-meta text-base-500">
-                {chosen === 0 ? "No Unit chosen" : `${chosen} chosen`}
+                {chosenCount === 0 ? "No Unit chosen" : `${chosenCount} chosen`}
               </span>
               <button
                 type="button"
-                disabled={chosen === 0 || reserve.isPending}
+                disabled={chosenCount === 0 || reserve.isPending}
                 onClick={() => reserve.mutate()}
                 className="rounded-control bg-kit-blue-9 px-3 py-1.5 text-body font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
               >
