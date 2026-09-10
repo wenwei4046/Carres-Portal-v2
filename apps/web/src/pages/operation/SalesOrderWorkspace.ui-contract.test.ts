@@ -293,6 +293,8 @@ describe("Sales Order object template contract", () => {
      title's own shouting face — a badge reads as a fact, not a second title. */
   it("answers new-or-existing inside the Customer card's own header bar, and still never lets it be typed", () => {
     expect(workspace).toContain('data-testid="customer-type-chip"');
+    // `\s+`, not a literal newline: a Windows checkout holds CRLF, CI's Linux
+    // checkout holds LF, and the same file must match on both.
     const start = workspace.search(/<Block\s+title="Customer"/);
     const customer = workspace.slice(start, workspace.indexOf('</Block>', start));
     expect(start).toBeGreaterThan(-1);
