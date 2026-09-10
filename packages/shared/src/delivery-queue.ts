@@ -12,8 +12,18 @@
  * date is late whether or not an operator opened the page that morning.
  *
  * Deadlines (L1, Jess): assign ≥3 working days before the promised date ·
- * confirm ≥1 working day before it · deliver ON the customer's confirmed date ·
- * photo same or next working day after delivery.
+ * **confirm ≥3 working days before it** · deliver ON the customer's confirmed
+ * date · photo same or next working day after delivery.
+ *
+ * ⚠️ THE CONFIRM LEAD WAS 1 AND THIS SENTENCE KEPT SAYING SO. SO V2 Card 3
+ * (owner ruling 2026-08-11) moved the customer-call window to THREE actual
+ * working days and migration 0342 moved the live
+ * `logistics_call_working_days` setting with it; `DELIVERY_QUEUES` below was
+ * updated and this header was not. A stale deadline in the one comment a
+ * reader opens first is worse than no comment: it was read as current law
+ * and reported as a conflict with the very ruling it predates. The queue
+ * DATA is the truth — and the confirm lead alone is a SETTING, so the number
+ * here is a seed, not the law.
  *
  * WORKING days, not calendar days — Carres runs Mon–Sat and pauses on Selangor
  * public holidays, so "3 days before Monday" is Wednesday, not Friday. The math
