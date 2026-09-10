@@ -1001,7 +1001,7 @@ begin
   -- If a future migration legitimately changes the signature, this line is the
   -- thing that will stop it, and that is the point — it must be changed on
   -- purpose, in the same commit, by someone who read the header's ⑥ chain.
-  select pg_get_function_identity_arguments(p.oid)
+  select oidvectortypes(p.proargtypes)
     into v_ident
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
@@ -1022,14 +1022,14 @@ begin
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'gl_ar_control_account'
-       and pg_get_function_identity_arguments(p.oid) = ''
+       and oidvectortypes(p.proargtypes) = ''
   ) then
     raise exception '0466 sanity: gl_ar_control_account() is missing or no longer takes no arguments';
   end if;
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'gl_customer_party_for_order'
-       and pg_get_function_identity_arguments(p.oid) = 'uuid'
+       and oidvectortypes(p.proargtypes) = 'uuid'
   ) then
     raise exception '0466 sanity: gl_customer_party_for_order(uuid) is missing or changed signature';
   end if;

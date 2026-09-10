@@ -842,7 +842,7 @@ begin
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = '_customer_payment_post'
-       and pg_get_function_identity_arguments(p.oid) =
+       and oidvectortypes(p.proargtypes) =
            'uuid, numeric, date, text, text, text, text, text, text, text, text, text, jsonb, boolean'
   ) then
     raise exception '0463 sanity: _customer_payment_post lost its signature';
@@ -868,7 +868,7 @@ begin
   if not exists (
     select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and p.proname = 'payment_void'
-       and pg_get_function_identity_arguments(p.oid) = 'uuid, text'
+       and oidvectortypes(p.proargtypes) = 'uuid, text'
   ) then
     raise exception '0463 sanity: payment_void lost its signature';
   end if;
