@@ -22,9 +22,22 @@ describe("recordPaymentInputSchema", () => {
     expect(recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "26/06/2026" }).success).toBe(false);
   });
 
-  it("rejects an unknown method/kind", () => {
+  // 0476 — a method is a KEY from Settings → Payment. The schema checks the
+  // key's shape; whether the method exists and has a money account is the SQL
+  // writer's to say (it refuses an unknown or unmapped method with nothing
+  // written).
+  it("accepts a method key a manager added; refuses a method that is not a key, and an unknown kind", () => {
     expect(
-      recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", method: "crypto" }).success,
+      recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", method: "probe_wallet" }).success,
+    ).toBe(true);
+    expect(
+      recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", method: "Grab Pay" }).success,
+    ).toBe(false);
+    expect(
+      recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", method: "9wallet" }).success,
+    ).toBe(false);
+    expect(
+      recordPaymentInputSchema.safeParse({ amount: 1, paidOn: "2026-06-26", kind: "refund" }).success,
     ).toBe(false);
   });
 });

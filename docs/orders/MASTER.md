@@ -2080,9 +2080,9 @@ it hard-DELETED the ledger row.
 ```
 payment_record   the ONE payment writer. Ledger row + orders.paid bump
                  (payment/deposit) or the storage gate stamp (storage) in ONE
-                 transaction. p_counts_toward_paid=false records the raw-create
-                 deposit MIRROR (already inside orders.paid at birth) —
-                 `counted_in_paid` on the row tells void what to reverse.
+                 transaction. `counted_in_paid` on the row tells void what to
+                 reverse. (The raw-create deposit MIRROR this once recorded is
+                 retired by 0476 — the deposit is now a counted payment.)
 payment_void     principal only. A STAMP (voided_at/by/reason), never a
                  delete; reverses exactly the contribution the record made;
                  a storage void closes the gate only when no live storage
@@ -4587,9 +4587,14 @@ three different questions and each pointed at a column nobody wrote.
 - **THERE IS ONE PAYMENT WRITER, and the ledger is not it.** `payment_record` (0343) writes the
   `order_payments` row AND moves `orders.paid` in one transaction; the direct write door is
   closed (`authenticated` has no INSERT/UPDATE/DELETE). **`orders.paid` stays the money truth
-  and the ledger is never summed into an outstanding** — the raw-create deposit is recorded as a
-  MIRROR row (`counted_in_paid = false`) because the create RPC already put it inside
-  `orders.paid`, and adding them would read a half-paid order as settled.
+  and the ledger is never summed into an outstanding.** **The deposit taken with a new order is
+  a payment like any other (0476):** `create_order_from_sales_portal` and `create_raw_order`
+  create the order at RM 0 and record the deposit through the one writer
+  (`_customer_payment_post`, via `_order_create_deposit`) in the SAME transaction — a counted
+  row, a receipt, the journal entry Dr money account / Cr 1210. A deposit the writer refuses
+  (no method, a method with no money account) fails the create; nothing is swallowed. The old
+  API-side MIRROR copy (`counted_in_paid = false`, written after the create and its error
+  ignored) is gone.
 - **A VOID IS A STAMP, NEVER A DELETE** (0343), so **a voided row is not money** (0347). Every
   reader asks the ONE predicate, `isLivePayment` — the SO document's payments block, the
   drawer's storage sum, its receipt list and the collections desk. A second spelling of
@@ -5293,7 +5298,7 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | **Gap** | RESERVED, not built. The upgrade trigger is written into the model. |
 | **The drawer through `DetailShell`** | Approved as the destination; blocked because L4's persistent-facts tuple does not exist on the drawer yet. **Not a gap — a ruling.** |
 | **The delivery-appointment task moving to Logistics** | Approved the day the partner portal covers appointments. Today only NETS has a login and that portal has no appointment screen. |
-| **`order_payments` gaining a real reader** | The Record-payment button writes a ledger nothing reads. The fix is one audited RPC that writes `orders.paid` too — **never by summing the ledger**, because the raw-create door double-writes. |
+| **`order_payments` gaining a real reader** | The Record-payment button writes a ledger nothing reads. The fix is one audited RPC that writes `orders.paid` too — **never by summing the ledger**: `orders.paid` stays the money truth. |
 
 # §12 · Implementation debt found by the 2026-08-06 audit
 

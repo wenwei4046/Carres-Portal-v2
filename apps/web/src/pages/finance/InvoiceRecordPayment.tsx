@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { soRemaining } from "@carres/shared/payment-invoice-register";
 import { likelyDuplicatePayments } from "@carres/shared/payment-duplicate";
-import type { OrderPaymentMethod } from "@carres/shared";
 import { SectionCard } from "@/components/SectionPanel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk, useRecordPayment } from "@/lib/queries";
@@ -13,30 +12,13 @@ import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
 import { fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
+import { useManualMethods } from "@/lib/payment-methods";
 import { toast } from "sonner";
 
-/** The §16 manual methods and their required evidence words. `online` is
- *  provider-recorded and never manually selectable — a link cannot be
- *  pretended into a success. */
-const MANUAL_METHODS: Array<{
-  value: OrderPaymentMethod;
-  label: string;
-  evidence: string;
-  reference: { label: string; required: boolean } | null;
-}> = [
-  { value: "bank", label: "Bank transfer", evidence: "Transfer slip",
-    reference: { label: "Reference", required: false } },
-  { value: "duitnow_qr", label: "DuitNow QR", evidence: "Payment screenshot",
-    reference: null },
-  { value: "cheque", label: "Cheque", evidence: "Cheque photo",
-    reference: { label: "Cheque number", required: true } },
-  { value: "cash", label: "Cash", evidence: "Cash collection proof",
-    reference: null },
-  { value: "credit_card", label: "Credit card", evidence: "Card terminal receipt",
-    reference: { label: "Approval code", required: true } },
-  { value: "debit_card", label: "Debit card", evidence: "Card terminal receipt",
-    reference: { label: "Approval code", required: true } },
-];
+/* The manual methods and their required evidence words come from Settings →
+ * Payment → Payment methods (0476, lib/payment-methods). `online` is
+ * provider-recorded and never manually selectable — a link cannot be
+ * pretended into a success. */
 
 function todayIso() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kuala_Lumpur" });
@@ -62,7 +44,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const [amount, setAmount] = useState(
     money.known && money.outstanding > 0 ? String(money.outstanding) : "");
   const [paidOn, setPaidOn] = useState(todayIso());
-  const [method, setMethod] = useState<OrderPaymentMethod>("bank");
+  const [chosenMethod, setMethod] = useState<string>("bank");
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<"edit" | "review" | "done">("edit");
@@ -80,23 +62,16 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
   const record = useRecordPayment(orderId, {
     onError: (e) => toast.error(`Payment was not recorded — ${e.message}`),
   });
-  // §16 — only Active manual methods are selectable. Until the settings read
-  // answers (or if it fails), the full governed six stand in: a settings
+  // §16 — only Active manual methods are selectable, and since 0476 that list
+  // is the registry, so a method a manager added is offered here too. Until
+  // the read answers (or if it fails), the governed six stand in: a settings
   // hiccup must not stop money from being recorded.
-  const settings = useQuery<{ manual_methods: Array<{ method: string; active: boolean }> }>({
-    queryKey: ["finance", "payment-settings"],
-    queryFn: () => apiFetch("/api/finance/payment-settings"),
-    staleTime: 60_000,
-  });
-  const methods = useMemo(() => {
-    const rows = settings.data?.manual_methods;
-    if (!rows?.length) return MANUAL_METHODS;
-    const active = new Set(rows.filter((r) => r.active).map((r) => r.method));
-    const filtered = MANUAL_METHODS.filter((m) => active.has(m.value));
-    return filtered.length ? filtered : MANUAL_METHODS;
-  }, [settings.data]);
-
-  const spec = useMemo(() => MANUAL_METHODS.find((m) => m.value === method)!, [method]);
+  const { methods, spec: specOf } = useManualMethods();
+  // A method switched off since this form opened falls back to the first
+  // Active one, so the select and the posted value never disagree.
+  const method = methods.some((m) => m.value === chosenMethod)
+    ? chosenMethod : methods[0]?.value ?? chosenMethod;
+  const spec = specOf(method);
   const amt = Number(amount);
   const amtOk = amount.trim() !== "" && Number.isFinite(amt) && amt > 0;
   const refOk = !spec.reference?.required || reference.trim() !== "";
@@ -239,7 +214,7 @@ export default function InvoiceRecordPayment({ invoice, rows, onClose }: {
           <label className="block">
             <span className="text-label">Method</span>
             <select value={method}
-              onChange={(e) => { setMethod(e.target.value as OrderPaymentMethod); setFile(null); }}
+              onChange={(e) => { setMethod(e.target.value); setFile(null); }}
               aria-label="Payment method" className={inputCls}>
               {methods.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>

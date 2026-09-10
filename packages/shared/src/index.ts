@@ -1598,6 +1598,14 @@ export * from "./order-activity";
 export {
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  // 0476 — a payment method is a key; the registry lives in Settings → Payment.
+  PAYMENT_METHOD_KEY_RE,
+  paymentMethodKeySchema,
+  paymentMethodSaveInput,
+  type PaymentMethodKey,
+  type PaymentMethodRegistryRow,
+  type PaymentMoneyAccount,
+  type PaymentMethodSaveInput,
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,

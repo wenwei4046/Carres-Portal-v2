@@ -382,6 +382,57 @@ describe("POST /api/finance/payments/order-receipt", () => {
     expect(sb.rpc).not.toHaveBeenCalled();
   });
 
+  it.each(["bank_transfer", "probe_wallet"])(
+    "passes the method key %s through untouched — the SQL writer folds and checks it (0476)",
+    async (method) => {
+      const sb = { rpc: vi.fn().mockResolvedValue({ data: { already: false }, error: null }) };
+      vi.mocked(userClient).mockReturnValue(sb as never);
+      const res = await app.fetch(
+        new Request("http://t/api/finance/payments/order-receipt", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(sb.rpc).toHaveBeenCalledWith("finance_record_receipt", expect.objectContaining({ p_method: method }));
+    },
+  );
+
+  it("a method that is not a key shape is refused before SQL", async () => {
+    const sb = { rpc: vi.fn() };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method: "Grab Pay!" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("an unmapped method's SQL refusal reaches the caller as 422 with its sentence", async () => {
+    const sb = { rpc: vi.fn().mockResolvedValue({ data: null, error: {
+      code: "22023", details: "payment_account_unmapped",
+      message: 'payment method "grab_pay" has no money account — add it in Settings → Payment → Payment methods, then record this payment',
+    } }) };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await app.fetch(
+      new Request("http://t/api/finance/payments/order-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await makeJwt("finance")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: ORDER_ID, amount: 500, method: "grab_pay" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain("has no money account");
+  });
+
   it("rejects operation role with 403", async () => {
     const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

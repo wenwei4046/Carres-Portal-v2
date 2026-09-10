@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +24,7 @@ vi.mock("@/lib/api", () => ({
     return {};
   }),
 }));
+import { apiFetch } from "@/lib/api";
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string }) => unknown) => selector({ role: auth.role }),
@@ -161,6 +162,36 @@ describe("Invoices Register", () => {
     fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
     fireEvent.click(screen.getByText("Open invoice"));
     expect(screen.queryByRole("button", { name: "Record payment" })).not.toBeInTheDocument();
+  });
+  it("Void and replace sits on an issued invoice for the principal only, and needs a reason (0476)", async () => {
+    auth.role = "finance";
+    const first = show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.queryByRole("button", { name: "Void and replace" })).not.toBeInTheDocument();
+    first.unmount();
+
+    auth.role = "principal";
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[1]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    fireEvent.click(screen.getByRole("button", { name: "Void and replace" }));
+    expect(screen.getByRole("button", { name: "Void and replace — say why this invoice is wrong" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Why is this invoice wrong?"), { target: { value: "Wrong sofa colour on the lines" } });
+    fireEvent.click(screen.getByRole("button", { name: "Void and replace" }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
+      "/api/finance/invoices/i2/void-replace",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ reason: "Wrong sofa colour on the lines" }) }),
+    ));
+    auth.role = "finance";
+  });
+  it("a draft or a voided invoice offers no Void and replace", () => {
+    auth.role = "principal";
+    show();
+    fireEvent.click(screen.getAllByTitle("Inspect invoice")[0]);
+    fireEvent.click(screen.getByText("Open invoice"));
+    expect(screen.queryByRole("button", { name: "Void and replace" })).not.toBeInTheDocument();
+    auth.role = "finance";
   });
   it("the chase door never opens on a waiting invoice (催钱前先看货)", () => {
     auth.role = "operation";
