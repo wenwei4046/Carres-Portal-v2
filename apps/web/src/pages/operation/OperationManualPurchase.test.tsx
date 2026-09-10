@@ -1790,6 +1790,10 @@ describe("Card 04 · the read-only expansion", () => {
     await loaded();
     fireEvent.click(screen.getByTestId(`mp-expand-${REQ3}`));
     const box = await screen.findByTestId(`mp-expansion-${REQ3}`);
+    const expansionCell = box.closest("td")!;
+    expect(expansionCell).toHaveStyle({ padding: "0px" });
+    expect(expansionCell.parentElement!.children).toHaveLength(3);
+    expect(expansionCell.colSpan).toBe(expansionCell.parentElement!.previousElementSibling!.children.length - 2);
     const heads = [...box.querySelectorAll("th")].map((th) => th.textContent?.trim());
     expect(heads).toEqual([
       "SKU",

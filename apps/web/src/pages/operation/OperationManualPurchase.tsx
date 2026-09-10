@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./manual-purchase-create.css";
-import registerStyles from "./PurchasingRegister.module.css";
+import registerStyles from "./ManualPurchaseRegister.module.css";
 import {
   DEMAND_PURPOSES,
   DEMAND_PURPOSE_DEFAULT,
@@ -1041,6 +1041,7 @@ export default function OperationManualPurchase() {
                number). */
             stickyIdentity={{ columnKey: "for" }}
             expandable={{
+              flush: true,
               renderExpansion: (r) => <RequestExpansion row={r} />,
               testId: (r) => `mp-expand-${r.id}`,
             }}
