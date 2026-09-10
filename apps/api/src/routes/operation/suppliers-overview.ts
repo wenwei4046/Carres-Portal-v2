@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   computeSupplierScorecard,
+  purchasingSuppliersOnly,
   type ScorecardClaim,
   type ScorecardLine,
   type ScorecardPo,
@@ -208,7 +209,9 @@ operationSuppliersOverviewRouter.get("/", async (c) => {
     }
   }
 
-  const suppliers = (suppliersRes.data ?? []).map((s) => {
+  // 0477 — a landlord or an advertiser is Finance's creditor, not a factory
+  // this roster oversees.
+  const suppliers = purchasingSuppliersOnly(suppliersRes.data ?? []).map((s) => {
     const t = tally.get(s.id) ?? { open: 0, received: 0, total: 0 };
     return {
       id: s.id,

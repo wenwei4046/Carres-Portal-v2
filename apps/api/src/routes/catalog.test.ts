@@ -4126,6 +4126,32 @@ describe("POST /api/catalog/import-skus", () => {
     expect(sent(sb).rows.map((r) => r.sku)).toEqual(["BOOQIT-2S"]);
   });
 
+  /* 0477 — Finance's landlord is a row in `suppliers`, but a file that names
+     it (by name or slug) must not put it in a catalog slot. */
+  it("fails a row that names Finance's other creditor, by name or by slug", async () => {
+    const LANDLORD = {
+      id: "sup-landlord",
+      slug: "bayview-properties",
+      name: "Bayview Properties",
+      kind: "other_creditor",
+      cat_covered: [],
+    };
+    const { res, sb } = await importAs(
+      "principal",
+      [
+        baseRow({ supplier: "Bayview Properties" }),
+        baseRow({ variant: "2S", supplier: "bayview-properties" }),
+        baseRow({ variant: "3S" }),
+      ],
+      importSb({ suppliers: [{ ...OHANA, kind: "factory_pickup" }, LANDLORD] }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as ImportResult;
+    expect(body.failed).toBe(2);
+    expect(body.failures.map((f) => f.key)).toEqual(["BOOQIT-1S", "BOOQIT-2S"]);
+    expect(sent(sb).rows.map((r) => r.supplier_id)).toEqual(["sup-ohana"]);
+  });
+
   it("zips a per-row error from the batch back to the right FILE row", async () => {
     const { res } = await importAs(
       "principal",
