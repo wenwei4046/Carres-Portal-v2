@@ -1368,6 +1368,29 @@ rail). The default population is the COMPLETE permanent history, ordered records
 newest `Proceed Date` (`created_at`) first. A work/timing lens sorts earliest calculated
 `Order By` first, then newest Proceed Date.
 
+**PRODUCTION-VERIFIED on `64a16a9e` 2026-09-11** (PR #1217; migration 0474 applied through
+the governed MCP path after all four canonical surfaces reported the SHA — Worker
+`api.carresofficial.com/health`, `erp.carresofficial.com`, `pos.carresofficial.com`,
+`carres-portal.pages.dev`). Walked authenticated against the four live requests: the nine
+columns in the settled order, the sticky `Purpose` cell (`position: sticky; left: 62px`)
+surviving horizontal scroll with the rail held at 240px and the body not scrolling, ZERO
+clipped data cells, the shared goods table printing the real allocation
+(`Mattress · Carres Klang · ALL-AASNDA-K · 1 · Nice Future · PO-20260908-2503 · Mon, 21 Sep`),
+Ready Stock reading 200 on all four requests with honest zero shelves, and the SUPPLIER
+dropdown narrowing to `1 of 4 requests` with its counts (`Nice Future · 1`, `Ohana · 3`) in
+the option text. **The approver read is live through 0474:** `workspace_resolve_duty
+('purchasing_approver')` answers `not_assigned`, the ladder falls to the `ops_manager` rung
+and the payload names `Jess` — the fallback carrying the approval exactly as designed.
+
+**The walk found two defects, both fixed on `main` the same day.** ① `Requested By` printed
+an EMPTY cell on three of the four live requests: `app_users` RLS hides the `principal` seed
+account from an `operation` caller, so the name lookup missed and fell to `""`. Survivable as
+the tenth column; unreadable as the SECOND. It now prints the governed
+`Staff identity not recorded` the object has always printed, quietly. ② Ready Stock grouped
+`5539-1A(LHF)` and `5539-1A(RHF)` — the left- and right-hand halves of one sofa — correctly as
+two groups, and headed BOTH `Booqit`, because that is the Catalog model name for each. The SKU
+now joins the heading only where the model name fails to separate two groups.
+
 **Columns, exactly and in this order — THE SETTLED DESIGN, owner ruling 2026-09-11
 (superseding Card 08's ten; the date contract stays as verified on `87ef0e28`
 2026-08-30 — the issued PO's `eta_date` IS the approved Manual Delivery Date, and the
