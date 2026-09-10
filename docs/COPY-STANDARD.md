@@ -2686,11 +2686,12 @@ that repeats a guarantee the operator cannot verify is noise.
 
 ## Finance ledger words — PROPOSAL, awaiting owner review
 
-**PROPOSAL / NOT LAW.** Words the read-only Finance Ledger pages print. Each row is one word
-and what it means. Falsifier: a finance user reads a word here and cannot say what it means.
-The words live in `packages/shared/src/finance-ledger.ts`; a stored key never reaches the screen.
+**PROPOSAL / NOT LAW.** Words the finance ledger builds (migrations 0475–0479) put on screen
+before the owner has ruled on them. Each block names its build and pages; until a ruling, a word
+here may appear only on the page its block names. Falsifier: a finance user reads a word here and
+cannot say what it means or does. A stored key never reaches the screen.
 
-### Journal · Trial Balance · Self-check (Build E)
+### Journal · Trial Balance · Self-check (migration 0479)
 
 | Group | Word | Meaning |
 |---|---|---|
@@ -2698,7 +2699,7 @@ The words live in `packages/shared/src/finance-ledger.ts`; a stored key never re
 | | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
 | | **`Self-check`** | The books test themselves and name what is wrong. |
 | Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
-| Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
+| Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Payment voucher`** · **`Other debtor invoice`** · **`Other receipt`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
 | | **`{source} reversal`** | The entry that cancels one of those. |
 | | **`Other entry`** | A source this list does not name yet. Never the key. |
 | Reversed pairs | **`Not reversed`** · **`Reversed`** · **`Reversal`** | The entry stands · it was cancelled · it cancels another. |
@@ -2723,9 +2724,7 @@ Sentences these pages print follow the Empty-state and Error patterns above, for
 `The Journal could not be loaded. Try again.` · `No entry has that number. Check it and try again.`
 The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
 `finance-ledger.ts` from the row's own numbers.
-**PROPOSAL / NOT LAW.** Words the finance ledger builds put on screen before the owner has
-ruled on them. Each block names its build and what would overturn it. Until a ruling, a
-word here may appear only on the page its block names.
+
 
 ### Supplier bills and payment vouchers (migration 0477)
 
@@ -2769,7 +2768,7 @@ prepared it, which is the dictionary's `Return` exactly.
 **NOT LAW.** Words the finance ledger builds put on screen that this dictionary did not have.
 Each carries its meaning; the owner accepts, renames or strikes it.
 
-### Build A — invoice doors and payment methods (0476)
+### Invoice doors and payment methods (migration 0476)
 
 | Meaning | Proposed words | Do NOT use |
 |---|---|---|
@@ -2787,36 +2786,6 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | Its reason field | **`Why is this invoice wrong?`** | Void reason · Remarks |
 | What it will do, said before the act | **`{INV No} is voided and keeps its paper. A replacement draft with the same lines is created; issue it from the order with Generate invoice. It gets a new number.`** | Are you sure? |
 | After the act | **`{INV No} voided — the replacement draft is ready. Issue it from the order: Generate invoice.`** | Done · Voided successfully |
-
----
-
-## Header rules (see UI-KIT for the shell)
-
-Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:
-the current page word once at 24px, no leading page icon and no `Purchasing ·` prefix. Search,
-help and Settings stay in their governed header positions. See `ui/MASTER.md` §4.2.
-
----
-
-## Review checklist (paste into every UI PR)
-
-Before merging a UI change:
-
-- [ ] Every button label starts with a verb.
-- [ ] Every list row ends with a ≤10-word action-line.
-- [ ] Every empty state teaches what to do next.
-- [ ] Every error gives the fix.
-- [ ] No new synonyms — checked against the vocabulary table above.
-- [ ] Zero jargon (rule 9).
-- [ ] Tooltips do not repeat the label.
-- [ ] Dates go through `fmtDate()`.
-
----
-
-## Finance ledger words — PROPOSAL, awaiting owner review
-
-*PROPOSAL / NOT LAW. Each word is what the build put on screen; the owner may replace any of them.
-Falsifier: a Finance user reads one of these and does not know what it means or does.*
 
 ### Money in that is not a sale — Other debtors and Other receipts (migration 0478)
 
@@ -2842,3 +2811,26 @@ Falsifier: a Finance user reads one of these and does not know what it means or 
 | `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
 | `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
 | `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
+
+---
+
+## Header rules (see UI-KIT for the shell)
+
+Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:
+the current page word once at 24px, no leading page icon and no `Purchasing ·` prefix. Search,
+help and Settings stay in their governed header positions. See `ui/MASTER.md` §4.2.
+
+---
+
+## Review checklist (paste into every UI PR)
+
+Before merging a UI change:
+
+- [ ] Every button label starts with a verb.
+- [ ] Every list row ends with a ≤10-word action-line.
+- [ ] Every empty state teaches what to do next.
+- [ ] Every error gives the fix.
+- [ ] No new synonyms — checked against the vocabulary table above.
+- [ ] Zero jargon (rule 9).
+- [ ] Tooltips do not repeat the label.
+- [ ] Dates go through `fmtDate()`.
