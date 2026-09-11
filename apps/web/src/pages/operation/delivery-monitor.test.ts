@@ -54,6 +54,7 @@ import {
   callToConfirmDeliveryDate,
   sortByRequestedDeliveryDate,
   needsProof,
+  overdueContactCards,
   deliveriesFooter,
   selectedSentence,
   MONITOR_DAYS,
@@ -71,6 +72,7 @@ import {
   contactWeekOf,
   siteAccessOf,
   type DeliveryMonitorCard,
+  type MonitorWorkView,
   type DeliveryMonitorFilters,
 } from "./delivery-monitor";
 
@@ -531,8 +533,15 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     leg: null,
     deliveryOrderId: null,
     doNumber: null,
+    /* A DATED fixture is a FINISHED arrangement — a day AND a window. The
+       half-finished case is its own fixture below, because it is its own
+       fact (owner ruling 2026-09-11). */
     confirmedDate: "2026-09-04",
-    confirmedTime: null,
+    confirmedTime: "09:00–11:00",
+    booked: true,
+    /* Nothing has been delivered in a fixture unless it says so: `settled`
+       is the trip having already RUN, not the arrangement being complete. */
+    settled: false,
     customerName: "Kong Chai Yin",
     locality: "Klang, Selangor",
     goodsSummary: "Mattress ×1",
@@ -557,7 +566,7 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
 const SET = [
   datedCard({ scopeId: "in-window" }),
   datedCard({ scopeId: "sunday", confirmedDate: "2026-09-06" }),
-  datedCard({ scopeId: "dateless", confirmedDate: null }),
+  datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
   datedCard({ scopeId: "overdue", confirmedDate: "2026-09-01" }),
   datedCard({ scopeId: "failed", statusKey: "failed", statusLabel: "Failed Delivery" }),
   datedCard({
@@ -582,7 +591,7 @@ describe("filterMonitorCalendarCards", () => {
 });
 
 describe("filterMonitorListRows", () => {
-  it("No confirmed date keeps only dateless rows", () => {
+  it("Call customer keeps every row whose arrangement is not finished", () => {
     const out = filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date" });
     expect(out.map((c) => c.scopeId)).toEqual(["dateless"]);
   });
@@ -736,7 +745,7 @@ describe("monthDayCounts", () => {
         logisticsPartnerId: "p-nets",
         missingProof: { photo: true, signedDo: true },
       }),
-      datedCard({ scopeId: "dateless", confirmedDate: null }),
+      datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
     ];
     const counts = monthDayCounts(set, TODAY);
     expect(counts.get("2026-09-04")).toEqual({ deliveries: 3, exceptions: 1, noLogistics: 2 });
@@ -834,7 +843,7 @@ describe("activeFilterLabels", () => {
 describe("buildMonitorRails", () => {
   const set = [
     datedCard({ scopeId: "in-window" }),
-    datedCard({ scopeId: "dateless", confirmedDate: null }),
+    datedCard({ scopeId: "dateless", confirmedDate: null, confirmedTime: null, booked: false }),
     datedCard({ scopeId: "overdue", confirmedDate: "2026-09-01" }),
     datedCard({ scopeId: "failed", statusKey: "failed", statusLabel: "Failed Delivery" }),
     datedCard({
@@ -858,6 +867,9 @@ describe("buildMonitorRails", () => {
     expect(rails.work.all).toBe(8);
     // Every card but the NETS one is unassigned — the primary queue's count.
     expect(rails.work.no_logistics).toBe(7);
+    /* One fixture carries no date at all; every other DATED fixture is a
+       finished arrangement (a day AND a window), so the contact queue holds
+       exactly the unfinished one. */
     expect(rails.work.no_confirmed_date).toBe(1);
     expect(rails.work.overdue).toBe(1);
     expect(rails.work.failed).toBe(1);
@@ -1074,9 +1086,16 @@ describe("monitorRowAction — one row, one next act", () => {
     );
   });
 
-  it("a carrier AND an agreed date → the one Delivery-owned editor", () => {
+  it("a carrier AND a FINISHED arrangement → the one Delivery-owned editor", () => {
     const action = monitorRowAction(
-      chase({ partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-11" }),
+      chase({
+        partner_id: "p-nets",
+        partner_name: "NETS",
+        confirmed_date: "2026-09-11",
+        /* A day alone is not a booking (owner ruling 2026-09-11) — the window
+           is what tells the customer when to be home. */
+        confirmed_time: "09:00–11:00",
+      }),
     );
     expect(action).toEqual({ kind: "edit_delivery", label: "Edit Delivery" });
   });
@@ -1236,8 +1255,10 @@ describe("Expected arrival — recorded dates only", () => {
     });
   });
 
-  it("an open purchase order with NO date states the gap, never a guess", () => {
-    expect(arrivalOf({})).toMatchObject({ kind: "no_date" });
+  it("an open purchase order with NO date states WHOSE gap it is, never a guess", () => {
+    /* Nobody asked and nobody could compute: the gap is OURS, and saying the
+       factory failed to answer would blame a supplier nobody contacted. */
+    expect(arrivalOf({})).toMatchObject({ kind: "no_calculation" });
   });
 
   it("a date behind us with no goods is the supplier exception", () => {
@@ -1296,11 +1317,27 @@ describe("the contact deadline — three working days, counted once", () => {
     expect(card.contactOverdue).toBe(true);
   });
 
-  it("an agreed date closes the deadline — a booking is not a late call", () => {
-    const card = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
+  it("⭐ a DAY with no WINDOW does not close the deadline", () => {
+    /* The customer has not been told when to be home, so the conversation is
+       not finished and the missed deadline is still missed. */
+    const halfway = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
       arrangements: [arrangement({ order_id: "a", confirmed_date: "2026-09-10" })],
     })[0]!;
-    expect(card.contactOverdue).toBe(false);
+    expect(halfway.booked).toBe(false);
+    expect(halfway.contactOverdue).toBe(true);
+
+    /* BOTH halves agreed — now there is no call left to be late for. */
+    const booked = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
+      arrangements: [
+        arrangement({
+          order_id: "a",
+          confirmed_date: "2026-09-10",
+          confirmed_time: "09:00–11:00",
+        }),
+      ],
+    })[0]!;
+    expect(booked.booked).toBe(true);
+    expect(booked.contactOverdue).toBe(false);
   });
 
   it("the contact week is Mon–Sat and counts CONTACT deadlines, not deliveries", () => {
@@ -1325,8 +1362,8 @@ describe("the contact deadline — three working days, counted once", () => {
 
   it("the contact-week pick narrows the chase and NOTHING else", () => {
     const set = [
-      datedCard({ scopeId: "a", confirmedDate: null, contactDueIso: "2026-09-01" }),
-      datedCard({ scopeId: "b", confirmedDate: null, contactDueIso: "2026-09-02" }),
+      datedCard({ scopeId: "a", confirmedDate: null, booked: false, contactDueIso: "2026-09-01" }),
+      datedCard({ scopeId: "b", confirmedDate: null, booked: false, contactDueIso: "2026-09-02" }),
     ];
     const picked: DeliveryMonitorFilters = {
       ...noFilters,
@@ -1344,8 +1381,8 @@ describe("the contact deadline — three working days, counted once", () => {
 
   it("the Overdue chip answers across every date", () => {
     const set = [
-      datedCard({ scopeId: "late", confirmedDate: null, contactOverdue: true }),
-      datedCard({ scopeId: "fine", confirmedDate: null, contactDueIso: "2026-09-30" }),
+      datedCard({ scopeId: "late", confirmedDate: null, booked: false, contactOverdue: true }),
+      datedCard({ scopeId: "fine", confirmedDate: null, booked: false, contactDueIso: "2026-09-30" }),
     ];
     expect(
       filterMonitorListRows(set, {
@@ -1359,5 +1396,62 @@ describe("the contact deadline — three working days, counted once", () => {
   it("the queue is named after the JOB and the cell keeps the FACT", () => {
     expect(MONITOR_VIEW_LABEL.no_confirmed_date).toBe("Call customer");
     expect(MONITOR_COPY.noConfirmedDate).toBe("No confirmed date");
+  });
+});
+
+/**
+ * ⭐ TWO DEFECTS THE RENDERED WALK FOUND on 2026-09-11, held so they cannot
+ * come back. Both are the same mistake in two places: a delivery that has
+ * ALREADY HAPPENED was still being treated as a conversation to finish.
+ */
+describe("a trip that has already run has no contact work left", () => {
+  const settledCard = (over: Partial<DeliveryMonitorCard> = {}) =>
+    datedCard({
+      scopeId: "done",
+      confirmedDate: "2026-09-01",
+      /* The half-finished arrangement that used to keep it in the queue: a
+         day was agreed and nobody ever recorded a window. */
+      confirmedTime: null,
+      booked: false,
+      settled: true,
+      contactDueIso: "2026-08-27",
+      contactOverdue: false,
+      ...over,
+    });
+
+  const inQueue = (cards: DeliveryMonitorCard[], view: MonitorWorkView) =>
+    filterMonitorListRows(cards, { ...noFilters, view }).map((c) => c.scopeId);
+
+  it("⭐ never appears in Call customer, whatever the arrangement recorded", () => {
+    /* The failure this prevents: an operator is sent to phone a customer whose
+       furniture is already in the house, because a time window was missing. */
+    expect(inQueue([settledCard()], "no_confirmed_date")).toEqual([]);
+    /* And the same row with NO result is still the queue's own work. */
+    expect(inQueue([settledCard({ settled: false })], "no_confirmed_date")).toEqual(["done"]);
+  });
+
+  it("its remaining work is proof, and the proof queue still claims it", () => {
+    const card = settledCard({
+      statusKey: "delivered",
+      missingProof: { photo: true, signedDo: false },
+    });
+    expect(inQueue([card], "upload_proof")).toEqual(["done"]);
+  });
+
+  it("⭐ its ACTION is not a chase either", () => {
+    /* The same mistake in the one cell that tells the operator what to DO:
+       a delivered trip whose window was never written down used to print
+       `Call {partner} — confirm delivery date`. */
+    const card = settledCard({ logisticsPartnerId: "p-1", logisticsPartnerName: "NETS" });
+    expect(monitorRowAction(card).kind).not.toBe("confirm_date");
+    /* The same row with NO result still chases — the branch is intact. */
+    expect(monitorRowAction({ ...card, settled: false }).kind).toBe("confirm_date");
+  });
+
+  it("⭐ a missed contact deadline is not overdue once the van has been", () => {
+    /* An `Overdue contact` count that includes delivered trips is a number
+       nobody can clear by doing the work it names. */
+    const card = settledCard({ contactOverdue: false });
+    expect(overdueContactCards([card])).toEqual([]);
   });
 });

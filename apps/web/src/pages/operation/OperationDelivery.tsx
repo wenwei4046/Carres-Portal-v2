@@ -62,6 +62,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  HelpCircle,
   PanelLeftOpen,
   Phone,
 } from "lucide-react";
@@ -69,6 +70,7 @@ import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
 import {
   ARRIVAL_COPY,
   arrivalNoteOf,
+  arrivalSentenceOf,
   deliveryQueueLeads,
   isArrivalException,
   myHolidaySet,
@@ -259,11 +261,11 @@ function arrivalDateIso(r: DeliveryMonitorCard): string | null {
   return "dateIso" in r.arrival ? r.arrival.dateIso : null;
 }
 
-/** The arrival cell as ONE string, for the search, the filter and the sheet. */
+/** The arrival cell as ONE string, for the search, the filter and the sheet —
+ *  the SAME sentence the tooltip and the screen reader get, so an Excel reader
+ *  and an operator are never told two different things. */
 function arrivalText(r: DeliveryMonitorCard): string {
-  const iso = arrivalDateIso(r);
-  const note = arrivalNoteOf(r.arrival);
-  return iso ? `${fmtDate(iso)} · ${note}` : note;
+  return arrivalSentenceOf(r.arrival, fmtDate);
 }
 
 /**
@@ -284,61 +286,61 @@ function arrivalText(r: DeliveryMonitorCard): string {
  */
 function ArrivalCell({ card }: { card: DeliveryMonitorCard }) {
   const state = card.arrival;
-  const note = arrivalNoteOf(state);
+  /* The WHOLE meaning, in one sentence — the tooltip and the accessible name
+     read it, and it is the module's own (Law D), never assembled here. */
+  const sentence = arrivalSentenceOf(state, fmtDate);
   const exception = isArrivalException(state);
   const iso = arrivalDateIso(card);
   const moved = state.kind === "moved" ? state : null;
-  const passedOriginal = state.kind === "passed" ? state.originalIso : null;
-  const original = moved?.originalIso ?? passedOriginal;
-  const Icon =
-    exception ? AlertTriangle : state.kind === "confirmed" ? CheckCircle2 : moved ? CalendarClock : null;
+  const original =
+    moved?.originalIso ??
+    (state.kind === "passed" || state.kind === "late_no_date" ? state.originalIso : null);
+  /* ONE icon per meaning. `awaiting_reply` wears the question, not the warning:
+     an unanswered enquiry is a normal Tuesday, and spending amber on it would
+     teach the operator to ignore amber on the day it matters. */
+  const Icon = exception
+    ? AlertTriangle
+    : state.kind === "confirmed"
+      ? CheckCircle2
+      : state.kind === "awaiting_reply"
+        ? HelpCircle
+        : moved
+          ? CalendarClock
+          : null;
+  const tone = exception ? "text-kit-amber-11" : "text-kit-slate-11";
   return (
-    <span className="block min-w-0" data-testid={`delivery-monitor-arrival-${state.kind}`}>
-      {iso ? (
-        <span className="flex min-w-0 items-center gap-1">
-          {Icon ? (
-            <Icon
-              size={13}
-              strokeWidth={2}
-              aria-label={note}
-              className={`shrink-0 ${exception ? "text-kit-amber-11" : "text-kit-slate-11"}`}
-            >
-              <title>{note}</title>
-            </Icon>
-          ) : null}
+    /* ⭐ ONE accessible name for the whole cell, and the icons inside it are
+       DECORATIVE. Giving the icon its own label repeated the sentence a screen
+       reader had already read from the text beside it. */
+    <span
+      className="block min-w-0"
+      data-testid={`delivery-monitor-arrival-${state.kind}`}
+      role="group"
+      aria-label={sentence}
+      title={sentence}
+    >
+      <span className="flex min-w-0 items-center gap-1">
+        {Icon ? <Icon size={13} strokeWidth={2} aria-hidden className={`shrink-0 ${tone}`} /> : null}
+        {iso ? (
+          /* ⭐ THE DATE IS THE CELL (owner ruling 2026-09-11). `Delayed`,
+             `Same as PO` and `Not confirmed` under every row turned a column
+             of dates into a column of four repeated phrases; the icon and the
+             tooltip carry the meaning now. */
           <span className={`truncate ${exception ? "text-kit-amber-11" : "text-kit-slate-12"}`}>
             {fmtDate(iso)}
           </span>
-        </span>
-      ) : (
-        <span className="flex min-w-0 items-center gap-1" title={note}>
-          {Icon ? (
-            <Icon
-              size={13}
-              strokeWidth={2}
-              aria-label={note}
-              className="shrink-0 text-kit-amber-11"
-            >
-              <title>{note}</title>
-            </Icon>
-          ) : null}
-          <span className="truncate text-kit-slate-9" data-absence="true">
-            {note}
+        ) : (
+          /* With NO date there is nothing to be compact about: the governed
+             absence IS the content, and the three absences are three words. */
+          <span className={`truncate ${exception ? "text-kit-amber-11" : "text-kit-slate-9"}`}>
+            {arrivalNoteOf(state)}
           </span>
-        </span>
-      )}
-      {iso ? (
-        <span
-          className={`block truncate text-label ${exception ? "text-kit-amber-11" : "text-kit-slate-11"}`}
-          title={note}
-        >
-          {note}
-        </span>
-      ) : null}
+        )}
+      </span>
       {original ? (
         /* The ORIGINAL stays as context — never deleted, never the headline. */
         <span className="block truncate text-label text-kit-slate-9">
-          {ARRIVAL_COPY.original} {fmtDate(original)}
+          {fmtDate(original)}
         </span>
       ) : null}
     </span>
@@ -357,9 +359,15 @@ function ArrivalCell({ card }: { card: DeliveryMonitorCard }) {
  * so: a step with no anchor can never be late (`delivery-queue.ts`).
  */
 function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
-  /* The deadline answers the CHASE and nothing else — an agreed delivery has
-     no call left to be late for. */
-  if (card.confirmedDate !== null) return null;
+  /* The deadline answers the CHASE and nothing else — a delivery with BOTH a
+     day and a window agreed has no call left to be late for. A day without a
+     window is not a booking, so its conversation is still open (owner ruling
+     2026-09-11). */
+  /* ⭐ AND A TRIP THAT HAS ALREADY RUN HAS NO CALL LEFT EITHER (owner
+     correction 2026-09-11). A delivered row used to print `No contact
+     deadline` under an upload action — a grey line about a conversation
+     nobody owes, beside work somebody does. */
+  if (card.booked || card.settled) return null;
   if (!card.contactDueIso) {
     return (
       <span className="block truncate text-label">
@@ -367,20 +375,25 @@ function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
       </span>
     );
   }
-  const label = card.contactOverdue
-    ? MONITOR_COPY.lateWasDue(fmtDate(card.contactDueIso))
-    : MONITOR_COPY.callBy(fmtDate(card.contactDueIso));
+  const date = fmtDate(card.contactDueIso);
+  /* ⭐ THE COMPACT CELL IS A PHONE AND A DATE (owner ruling 2026-09-11). The
+     full sentence — including that the deadline is overdue and does NOT move —
+     is the cell's accessible name and its tooltip; the icon is decorative, so
+     a screen reader reads the sentence once, not twice. */
+  const sentence = card.contactOverdue
+    ? MONITOR_COPY.contactLateSentence(date)
+    : MONITOR_COPY.contactDueSentence(date);
   return (
     <span
       className={`flex min-w-0 items-center gap-1 text-label ${
         card.contactOverdue ? "font-medium text-kit-red-11" : "text-kit-slate-11"
       }`}
       data-testid={card.contactOverdue ? "delivery-monitor-contact-late" : "delivery-monitor-contact-due"}
+      aria-label={sentence}
+      title={sentence}
     >
-      <Phone size={12} strokeWidth={2} aria-label={label} className="shrink-0">
-        <title>{label}</title>
-      </Phone>
-      <span className="truncate">{label}</span>
+      <Phone size={12} strokeWidth={2} aria-hidden className="shrink-0" />
+      <span className="truncate">{date}</span>
     </span>
   );
 }
@@ -404,7 +417,15 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
       <div className="flex flex-col gap-0.5 px-2 py-1.5 text-body">
         {card.confirmedTime ? (
           <div className="font-medium text-kit-slate-12">{card.confirmedTime}</div>
-        ) : null}
+        ) : (
+          /* ⭐ A DAY WITH NO WINDOW IS VISIBLY INCOMPLETE (owner ruling
+             2026-09-11). The customer has not been told when to be home, so
+             the card must not read as a settled appointment — and the row is
+             still in the contact queue, which is where the window is agreed. */
+          <div className="text-kit-slate-9" data-absence="true">
+            {MONITOR_COPY.noTimeAgreed}
+          </div>
+        )}
         {card.doNumber ? (
           <div className="font-mono font-medium text-blue-700">{card.doNumber}</div>
         ) : (
@@ -1151,7 +1172,23 @@ export default function OperationDelivery() {
             {r.confirmedDate ? (
               <span className="block truncate text-label text-kit-slate-11">
                 {fmtDate(r.confirmedDate)}
-                {r.confirmedTime ? ` · ${r.confirmedTime}` : ""}
+                {r.confirmedTime ? (
+                  ` · ${r.confirmedTime}`
+                ) : (
+                  /* ⭐ A DAY IS NOT AN APPOINTMENT (owner correction
+                     2026-09-11). Printing the day alone made a half-answered
+                     booking look exactly like a finished one — the only
+                     difference being a missing fragment an operator reads as
+                     formatting. The absence is STATED, in the same governed
+                     words the calendar card uses, and the row keeps its
+                     follow-up work. */
+                  <>
+                    {" · "}
+                    <span className="text-kit-slate-9" data-absence="true">
+                      {MONITOR_COPY.noTimeAgreed}
+                    </span>
+                  </>
+                )}
               </span>
             ) : (
               <span className="block truncate text-label" data-absence="true">
@@ -1699,7 +1736,10 @@ export default function OperationDelivery() {
           }`}
           onClick={toggleContactOverdue}
         >
-          {MONITOR_COPY.overdue}
+          {/* ⭐ NOT just `Overdue` (owner ruling 2026-09-11): the rail already
+              counts overdue DELIVERIES, and two bare `Overdue` numbers on one
+              screen read as one number disagreeing with itself. */}
+          {MONITOR_COPY.overdueContact}
           <span className="tabular-nums">{contactOverdueCount}</span>
         </button>
         <div className="flex flex-1 items-stretch gap-1">

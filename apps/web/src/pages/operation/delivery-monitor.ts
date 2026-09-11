@@ -66,6 +66,7 @@ import {
   DOR_COPY,
   driverSubmissionOf,
   missingDeliveryProofOf,
+  tripLinesOf,
   UNKNOWN_SUBMISSION,
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
@@ -105,7 +106,18 @@ export const MONITOR_COPY = {
    */
   callCustomer: "Call customer",
   noConfirmedDate: "No confirmed date",
-  overdue: "Overdue",
+  /** A day agreed with no window on it — the arrangement's own half-state. */
+  noTimeAgreed: "No time agreed",
+  /**
+   * ⭐ TWO DIFFERENT OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner ruling
+   * 2026-09-11). The rail's `Overdue delivery` is a confirmed trip whose day
+   * has passed with no result; the contact strip's `Overdue contact` is a
+   * customer conversation that missed its T−3 deadline. They answer different
+   * questions, they are worked by different people, and two bare `Overdue`
+   * counts on one screen read as one number that disagrees with itself.
+   */
+  overdue: "Overdue delivery",
+  overdueContact: "Overdue contact",
   failed: "Failed Delivery",
   /** Owner correction 2026-09-07 — the queue names the JOB; each row then
    *  names the exact missing file (`DOR_COPY.uploadPhoto` / `uploadSignedDo`). */
@@ -142,8 +154,11 @@ export const MONITOR_COPY = {
   tabs: "Monitor views",
   /** The calendar's own boundary, stated ON the calendar rather than learned
    *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
-   *  never enters a date cell). */
-  calendarScope: "Only deliveries with a confirmed date and time appear here.",
+   *  never enters a date cell). A day WITHOUT an agreed window does enter,
+   *  because the operator must see the day — and its card says `No time
+   *  agreed` rather than passing as a finished booking (owner ruling
+   *  2026-09-11). */
+  calendarScope: "Only deliveries with a confirmed date appear here.",
   /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
   /** The strip's own caption — these dates are CONTACT deadlines, and a reader
    *  who mistakes them for delivery appointments will call on the wrong day. */
@@ -155,9 +170,20 @@ export const MONITOR_COPY = {
    *  named a day, so nothing about this row is late (delivery-queue's own
    *  "a step with no anchor is never late"). */
   noContactDeadline: "No contact deadline",
-  /** The governed late spelling, unchanged from every other late step. */
+  /**
+   * ⭐ THE COMPACT DEADLINE IS A PHONE AND A DATE (owner ruling 2026-09-11).
+   * `Call by` and `Late — was due` repeated the same two phrases down an
+   * entire column, and the icon plus its colour already carry both. The WORDS
+   * do not disappear: they move into the tooltip and the accessible name,
+   * where a hover and a screen reader both find them.
+   */
   lateWasDue: (date: string) => `Late — was due ${date}`,
   callBy: (date: string) => `Call by ${date}`,
+  /** The compact cell's own accessible sentence — who to call, by when, and
+   *  whether that day has already gone. */
+  contactDueSentence: (date: string) => `Contact deadline ${date}`,
+  contactLateSentence: (date: string) =>
+    `Contact deadline ${date} — overdue, the deadline does not move`,
   /* ── THE GOODS COLUMNS (owner ruling 2026-09-10) ───────────────────────── */
   items: "Items",
   extras: "Accessories & services",
@@ -450,9 +476,23 @@ export interface DeliveryMonitorCard {
    * anything went wrong.
    */
   contactDueIso: string | null;
-  /** The deadline is behind us and no date has been agreed. A RECORDED fact
-   *  about a RECORDED absence — never an inference about the customer. */
+  /** The deadline is behind us and the arrangement is still not complete. A
+   *  RECORDED fact about a RECORDED absence — never an inference about the
+   *  customer. */
   contactOverdue: boolean;
+  /**
+   * ⭐ BOTH HALVES AGREED — a confirmed day AND a confirmed time (owner ruling
+   * 2026-09-11). A day with no window is a half-finished arrangement: the
+   * customer does not know when to be home, so the delivery is not booked, the
+   * contact work stays open, and the calendar does not print it as settled.
+   */
+  booked: boolean;
+  /**
+   * ⭐ The trip has a RECORDED OUTCOME — delivered, an exception, or cancelled.
+   * Nothing about the appointment is still open, whatever the arrangement
+   * recorded, so no contact work survives it (owner correction 2026-09-11).
+   */
+  settled: boolean;
   /** The full row behind the card — the work list's own columns and the
    *  governed `Assign logistics` door read it; the calendar card never does. */
   scope: DeliveryScopeRow;
@@ -586,7 +626,14 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        allocated. The predicate is the ENTRY RULE's own (`lineKind !==
        "service"`), so what makes an order delivery work and what makes it
        ready are decided by one test. */
-    const lines = row.o.order_lines ?? [];
+    /* ⭐ READINESS FOLLOWS THE SHIPMENT, NOT THE WHOLE SALES ORDER (owner
+       ruling 2026-09-11). A split trip carries only its own groups, and
+       counting the order's OTHER trip as this one's shortage told the operator
+       a van was short of goods it was never going to carry. The scoping is the
+       DO's own `trip_groups` derivation — the SAME `tripLinesOf` the register,
+       the document page and the print path run (Law D), and a row with no
+       document yet is the whole order by that function's own rule. */
+    const lines = tripLinesOf(row.o.order_lines ?? [], doc?.trip_groups);
     const physical = lines
       .map((l, index) => ({ index, sku: l.sku, qty: l.qty }))
       .filter((l) => lineKind(l.sku) !== "service");
@@ -632,6 +679,19 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       { holidays },
       input.queueLeads,
     );
+    /* The arrangement is COMPLETE only with a day AND a window on it. */
+    const booked = row.confirmedIso !== null && row.confirmedTime !== null;
+    /* ⭐ THE VAN HAS ALREADY BEEN (owner correction 2026-09-11, found in the
+       rendered walk). Contact work is about arranging a delivery that has not
+       happened. Once a RESULT is recorded — `Delivered`, or the one
+       `Failed Delivery` rung that carries both a failure and a partial —
+       there is nothing left to agree with the customer on this trip, and its
+       remaining work is proof or a rebooking, which are the
+       `Upload delivery proof` and `Failed Delivery` queues' own rows. A
+       delivered trip sitting in `Call customer` because nobody recorded a
+       time window sends an operator to phone a customer whose furniture is
+       already in the house. */
+    const settled = row.status.kind === "delivered" || row.status.kind === "failed";
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -640,6 +700,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       doNumber: row.doNumber,
       confirmedDate: row.confirmedIso,
       confirmedTime: row.confirmedTime,
+      booked,
+      settled,
       customerName: row.customer,
       locality: row.location || null,
       goodsSummary: row.goods,
@@ -657,14 +719,23 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         arrivals: row.o.po_arrivals ?? [],
         readiness,
         todayIso: input.todayIso,
+        /* The arrival-check clock counts on the same holidays as every other
+           Carres clock — handed in, never read from a second source. */
+        holidays,
       }),
       contactDueIso,
-      /* Late is a question about a RECORDED absence: a deadline behind us with
-         no agreed date. It is never an inference about what the customer said
-         — a contact ATTEMPT is not a confirmed booking, and neither is
-         silence. */
+      /* ⭐ A DATE WITHOUT AN AGREED TIME IS NOT A BOOKING (owner ruling
+         2026-09-11). A customer who has been given a day but no window has not
+         been told when to be home, and the old reading — `confirmedIso !==
+         null` — closed the follow-up on exactly that half-finished
+         arrangement. The conversation stays open until BOTH facts are
+         recorded.
+
+         Late is still a question about a RECORDED absence, never an inference
+         about what the customer said: a contact ATTEMPT is not a confirmed
+         booking, and neither is silence. */
       contactOverdue:
-        contactDueIso !== null && contactDueIso < input.todayIso && row.confirmedIso === null,
+        contactDueIso !== null && contactDueIso < input.todayIso && !booked && !settled,
       scope: row,
     };
   });
@@ -816,7 +887,14 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
   if (card.logisticsPartnerId === null) {
     return { kind: "assign_logistics", label: MONITOR_COPY.assignLogistics };
   }
-  if (card.confirmedDate === null) {
+  /* ⭐ AND A TRIP THAT HAS ALREADY RUN IS NOT A CHASE (owner correction
+     2026-09-11). `Call {partner} — confirm delivery date` is about arranging
+     a delivery that has not happened. A DELIVERED trip whose time window was
+     never written down is `booked: false` and used to print that line — the
+     same mistake the `Call customer` queue made, in the one cell that tells
+     the operator what to DO. A recorded result outranks it, exactly as it
+     already outranks an unassigned partner. */
+  if (!card.booked && !card.settled) {
     return {
       kind: "confirm_date",
       /* The partner's own name, from the row — never a hard-coded company.
@@ -848,7 +926,12 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
          dates, with or without a DO or a confirmed date. */
       return card.logisticsPartnerId === null;
     case "no_confirmed_date":
-      return card.confirmedDate === null;
+      /* ⭐ A DAY WITHOUT A WINDOW IS STILL CONTACT WORK (owner ruling
+         2026-09-11): the customer has not been told when to be home, so the
+         conversation is not finished and the row does not leave the queue.
+         A trip that has already RUN is the one exception — there is nothing
+         left to arrange, and its remaining work is a different queue's. */
+      return !card.booked && !card.settled;
     case "overdue":
       /* A confirmed date behind us with no delivered result. A recorded
          delivery is never overdue — its remaining work is proof, below. */

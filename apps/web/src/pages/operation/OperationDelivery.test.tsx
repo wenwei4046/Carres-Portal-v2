@@ -324,7 +324,10 @@ describe("the shape", () => {
       "No logistics picked",
       /* The queue is named after the JOB (owner ruling 2026-09-10). */
       "Call customer",
-      "Overdue",
+      /* ⭐ NOT a bare `Overdue` (owner ruling 2026-09-11): the contact strip
+         counts a DIFFERENT overdue population, and two identical words on one
+         screen read as one number that disagrees with itself. */
+      "Overdue delivery",
       "Failed Delivery",
       "Upload delivery proof",
       "Waiting for warehouse",
@@ -645,11 +648,41 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(screen.getByTestId("delivery-monitor-day-2026-09-04")).toBeTruthy();
     expect(screen.getByTestId("location-probe").textContent).toContain("view=week");
     expect(screen.getByTestId("delivery-monitor-calendar-scope").textContent).toBe(
-      "Only deliveries with a confirmed date and time appear here.",
+      /* A day with no agreed window DOES enter the calendar — the operator
+         must see the day — and its card says `No time agreed` rather than
+         passing as a settled booking (owner ruling 2026-09-11). */
+      "Only deliveries with a confirmed date appear here.",
     );
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-work"));
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.getByTestId("location-probe").textContent).toContain("view=all");
+  });
+
+  it("⭐ a day with NO AGREED TIME is visibly incomplete in the row", () => {
+    /* The defect the 2026-09-11 render walk found: the cell printed the day
+       twice — `Mon, 14 Sep / Mon, 14 Sep` — so a half-answered booking was
+       distinguishable from a finished one only by a missing fragment an
+       operator reads as formatting. The absence is now STATED. */
+    /* The DAY is agreed on the document; the WINDOW never was. */
+    docsState.data = {
+      deliveryOrders: [
+        doc({
+          id: "do-row-1",
+          do_number: "DO-040926-0001",
+          delivery_date: "2026-09-04",
+          time_slot: null,
+        }),
+      ],
+      attempts: [],
+      handoverEvents: [],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const cell = screen.getByText("No time agreed");
+    expect(cell.getAttribute("data-absence")).toBe("true");
+    /* And the row KEEPS ITS WORK: the conversation is not finished, so the
+       document still sits in the queue that finishes it. */
+    fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
+    expect(screen.getByText("SO-1322")).toBeTruthy();
   });
 
   it("the work list prints the ruled columns, with the sheet's own selection and ▸", () => {
@@ -1162,7 +1195,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(url).toContain("region%3DSelangor");
   });
 
-  it("a row whose date IS confirmed leaves the queue and joins the calendar", () => {
+  it("a row whose arrangement is FINISHED leaves the queue and joins the calendar", () => {
     ordersState.data = { orders: [order({ id: "early", so: 1501, delivery_date: "2026-09-10" })] };
     arrangementsState.data = {
       arrangements: [
@@ -1171,6 +1204,9 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
           partner_id: "p-nets",
           partner_name: "NETS",
           confirmed_date: "2026-09-04",
+          /* BOTH halves — a day AND a window. A day alone keeps the row in the
+             contact queue (owner ruling 2026-09-11). */
+          confirmed_time: "09:00–11:00",
         }),
       ],
     };
@@ -1368,9 +1404,18 @@ describe("Call customer — the contact week", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&late=1");
     const late = screen.getByTestId("delivery-monitor-contact-late");
-    /* The portal's own late spelling, and the ORIGINAL deadline — a rolled
-       forward date would erase the evidence that anything went wrong. */
-    expect(late.textContent).toContain("Late — was due Mon, 24 Aug");
+    /* ⭐ THE COMPACT CELL IS A PHONE AND A DATE (owner ruling 2026-09-11) —
+       `Call by` and `Late — was due` repeated the same two phrases down a
+       whole column, and the icon plus its colour already carry both. */
+    expect(late.textContent).toBe("Mon, 24 Aug");
+    /* The WORDS did not disappear: the tooltip and the accessible name say
+       what the date means AND that the deadline does not move. */
+    const sentence = "Contact deadline Mon, 24 Aug — overdue, the deadline does not move";
+    expect(late.getAttribute("title")).toBe(sentence);
+    expect(late.getAttribute("aria-label")).toBe(sentence);
+    /* ONE accessible name for the cell — the icon inside it is decorative, so
+       a screen reader never reads the same sentence twice. */
+    expect(late.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("an order with NO confirmed delivery date stays in the queue", () => {
@@ -1448,11 +1493,16 @@ describe("the row's goods, arrival and stock cells", () => {
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const cell = screen.getByTestId("delivery-monitor-arrival-moved");
-    /* The NEW date is the headline; the original is context beside it. A
-       delay icon with no date is exactly what this cell exists to prevent. */
-    expect(cell.textContent).toContain("Mon, 28 Sep");
-    expect(cell.textContent).toContain("Delayed");
-    expect(cell.textContent).toContain("PO Delivery Date Sun, 20 Sep");
+    /* ⭐ THE DATE IS THE CELL (owner ruling 2026-09-11). The NEW date leads,
+       the original sits under it as context, and `Delayed` no longer repeats
+       under every row — the icon and the tooltip carry the meaning. */
+    expect(cell.textContent).toBe("Mon, 28 SepSun, 20 Sep");
+    expect(cell.textContent).not.toContain("Delayed");
+    const sentence = "Expected arrival Mon, 28 Sep · Delayed · PO Delivery Date Sun, 20 Sep";
+    expect(cell.getAttribute("title")).toBe(sentence);
+    expect(cell.getAttribute("aria-label")).toBe(sentence);
+    /* A revision ALWAYS shows the new date — never a lone delay symbol. */
+    expect(cell.querySelector("svg")).toBeTruthy();
   });
 
   it("no revised date states the truthful unresolved gap and invents nothing", () => {
@@ -1469,10 +1519,38 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
-    const cell = screen.getByTestId("delivery-monitor-arrival-no_date");
-    expect(cell.textContent).toContain("The factory has not given a date");
+    /* ⭐ THREE DIFFERENT ABSENCES, NEVER ONE (owner ruling 2026-09-11). Nobody
+       asked and nobody could compute a date: the gap is OURS, and blaming a
+       factory nobody contacted is the lie the single old state used to tell. */
+    const cell = screen.getByTestId("delivery-monitor-arrival-no_calculation");
+    expect(cell.textContent).toBe("No expected arrival calculated");
+    expect(cell.textContent).not.toContain("The factory has not given a date");
     /* Nothing that looks like a date is printed beside the absence. */
     expect(cell.textContent).not.toMatch(/\d{1,2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/);
+  });
+
+  it("a supplier who ANSWERED with no new day is the factory's own absence", () => {
+    seedGoods({
+      po_arrivals: [
+        {
+          poId: "PO-1",
+          status: "open",
+          owedSkus: ["mattress:M1401F-K"],
+          plannedIso: null,
+          originalIso: null,
+          reply: {
+            answer: "delayed",
+            aboutIso: null,
+            previousIso: null,
+            newIso: null,
+            recordedAt: "2026-09-05T00:00:00Z",
+          },
+        },
+      ],
+    });
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    const cell = screen.getByTestId("delivery-monitor-arrival-late_no_date");
+    expect(cell.textContent).toBe("The factory has not given a date");
   });
 
   it("a supplier date behind us wears AMBER, and red stays on the late CALL", () => {
@@ -1490,9 +1568,14 @@ describe("the row's goods, arrival and stock cells", () => {
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const cell = screen.getByTestId("delivery-monitor-arrival-passed");
-    expect(cell.textContent).toContain("Supplier delivery date passed");
+    /* Compact: the amber icon and the date. The fact is in the sentence. */
+    expect(cell.textContent).toBe("Sat, 1 Aug");
+    expect(cell.getAttribute("title")).toBe(
+      "Expected arrival Sat, 1 Aug · Supplier delivery date passed",
+    );
     expect(cell.innerHTML).toContain("kit-amber-11");
-    /* The supplier exception is LOCAL — it never paints the row or the page. */
+    /* The supplier exception is LOCAL — it never paints the row or the page,
+       and RED belongs to the overdue customer call. */
     expect(cell.innerHTML).not.toContain("kit-red-");
   });
 
@@ -1520,6 +1603,12 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
-    expect(screen.getAllByLabelText("Supplier delivery date passed").length).toBeGreaterThan(0);
+    /* ⭐ ONE accessible name per cell, not one per glyph. The icon is
+       decorative; the CELL carries the sentence, so a screen reader reads the
+       meaning once instead of hearing it twice. */
+    const cell = screen.getByTestId("delivery-monitor-arrival-passed");
+    expect(cell.getAttribute("aria-label")).toContain("Supplier delivery date passed");
+    expect(cell.querySelectorAll("svg[aria-label]").length).toBe(0);
+    expect(cell.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 });
