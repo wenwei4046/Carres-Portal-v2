@@ -5,6 +5,7 @@ import {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchOrderRow,
@@ -362,6 +363,82 @@ describe("the rail model — unique-SO counts that cross-update between sections
     expect(m.timingCounts.can_order_early).toBe(1);
     expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
     expect(m).not.toHaveProperty("notOrderedCount");
+  });
+
+  /**
+   * ⭐ TWO CALCULATIONS, TWO SCOPES — recorded 2026-09-11 after the owner's
+   * `Qty 1 · On PO 14 · To buy 1` report.
+   *
+   * These assertions pin what `On PO` COUNTS, so nobody later "fixes" it into
+   * agreeing with the engine's number by netting deliveries out of it. It is
+   * the HISTORICAL document quantity and it is meant to be.
+   */
+  describe("the historical document quantity is not the effective remainder", () => {
+    it("counts a DELIVERED document's units — history is not netted by what arrived", () => {
+      /* The engine's pool reads `purchase_orders.status = 'open'` lines net of
+         `received_qty`, so a delivered document supplies it nothing. This
+         number is a different question — *what did this line's documents ever
+         carry* — and a received document answers it in full. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "delivered", qty: 3, stockTaken: 0, pos: [{ poId: "PO-1", qty: 3 }] }),
+        ),
+      ).toBe(0);
+    });
+
+    it("never lets exact lineage go negative, however many documents name the line", () => {
+      /* Fourteen documents naming a one-unit line is over-coverage, and the
+         screen must print it as it stands. What it may not do is turn it into
+         a negative requirement that would read as demand. */
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({
+            orderLineId: "fourteen",
+            qty: 1,
+            stockTaken: 0,
+            pos: Array.from({ length: 14 }, (_, i) => ({ poId: `PO-${i}`, qty: 1 })),
+          }),
+        ),
+      ).toBe(0);
+    });
+
+    it("nets Ready Stock BEFORE lineage, and never below zero", () => {
+      expect(
+        soBatchOrderLineOutstandingQty(
+          line({ orderLineId: "mixed", qty: 4, stockTaken: 1, pos: [{ poId: "PO-1", qty: 1 }] }),
+        ),
+      ).toBe(2);
+    });
+  });
+
+  /**
+   * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY.
+   *
+   * It is what makes the two scopes legible on screen: fourteen `Completed`
+   * documents and fourteen `Not sent to supplier` ones are opposite
+   * situations wearing the same `On PO 14`.
+   */
+  describe("soBatchPoDocumentState", () => {
+    it("speaks the governed words, and never the raw database value", () => {
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: true }))
+        .toBe("Completed");
+      /* Delivered goods with no send record stay honestly Completed — the
+         document is finished; missing send evidence is a different fact. */
+      expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: false }))
+        .toBe("Completed");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: true }))
+        .toBe("Issued");
+      expect(soBatchPoDocumentState({ status: "open", sentCurrentVersion: false }))
+        .toBe("Not sent to supplier");
+    });
+
+    it("⛔ never says the raw word — COPY-STANDARD bans the bare word as a PO status", () => {
+      for (const status of ["open", "received"] as const) {
+        for (const sent of [true, false]) {
+          expect(soBatchPoDocumentState({ status, sentCurrentVersion: sent })).not.toMatch(/open/i);
+        }
+      }
+    });
   });
 
   /* THE ROW WENT; THE ARITHMETIC DID NOT. `All not ordered` was retired as a

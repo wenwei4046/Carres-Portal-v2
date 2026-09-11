@@ -2361,6 +2361,7 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,

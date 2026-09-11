@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isOnePoPerOrder } from "./to-order";
 import type { ProductCategory } from "./db-types";
 import type { IsoDate } from "./working-days";
+import type { PurchaseOrderRegisterFacts } from "./purchase-order-register";
 import {
   PURCHASE_DEMAND_TIMING_STATES,
   isPurchaseDemandTimingState,
@@ -110,6 +111,35 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * makes the number and the section read as the same thing).
    */
   poDetails: "Purchase order details",
+
+  /**
+   * ⭐ WHAT `To buy` MEANS WHEN IT IS NOT A REMAINDER (owner correction
+   * 2026-09-11).
+   *
+   * The engine prints the covering document's quantity under `To buy` on a
+   * build every unit of which is already on an OPEN purchase order, because
+   * the row stays buyable: that pool has no customer attribution, so the
+   * covering document routinely belongs to another customer and refusing here
+   * would block a FIRST purchase for this one (YH, 2026-09-03). But the same
+   * figure then means two opposite things, and the operator is the one who has
+   * to tell them apart. This sentence is what tells them.
+   *
+   * It states a fact, never an instruction: buying again may be exactly right.
+   *
+   * ⛔ NOT `Open PO …`. That spelling is a RETIRED column head
+   * (`COPY-STANDARD.md` — `PO` is already the dictionary's word for the
+   * document), and the suite greps the whole dictionary for it.
+   *
+   * FIFTEEN CHARACTERS, measured against the cell it lives in. The governed
+   * long form — `Demand is already covered by an open Purchase Order.` — wraps
+   * to THREE lines under the figure and makes the item row 91px tall, which is
+   * the same defect as a stack of documents deciding a row's height, only
+   * spelt out in words. It rides as the cell's title; the visible line states
+   * the fact, and the record below names the documents and their states.
+   */
+  toBuyAlreadyOnPo: "Already on a PO",
+  /** The governed long form, carried as the qualifying cell's own title. */
+  toBuyAlreadyOnPoWhy: "Demand is already covered by an open Purchase Order.",
 
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
@@ -467,6 +497,38 @@ export function soBatchOrderStatusOf(f: {
   return "partial";
 }
 
+/**
+ * ⭐ THE DOCUMENT'S OWN STATE, IN THE ONE PURCHASING VOCABULARY — 2026-09-11.
+ *
+ * `SoBatchOrderPoFact.status` is a RAW DATABASE VALUE (`open` / `received`)
+ * and may never reach a screen: `COPY-STANDARD.md` rules that **`Open` is
+ * never a Purchase Order status**. This narrows the two facts this register
+ * actually carries onto the SAME union the Purchase Orders register prints,
+ * in the same precedence, so one document can never be described two ways.
+ *
+ * It is a NARROWED view, not a second implementation:
+ * `purchaseOrderRegisterFacts` decides between `Issued`, `In Production` and
+ * `Receiving` from lines, sends and supplier dates this read does not carry,
+ * and this register does not claim any of those three — it answers only the
+ * question its own screen asks: *has this document been sent, and are its
+ * goods already in?* A cancelled purchase order never reaches this register at
+ * all, so `Cancelled` is unreachable here by construction.
+ *
+ * WHY THE REGISTER NEEDS IT AT ALL. `On PO` is the HISTORICAL document
+ * quantity — every non-cancelled `po_line_sources` row, received documents
+ * included, never netted by `received_qty`. `To buy` is the ENGINE's
+ * effective remainder, drawn from a pool of OPEN purchase-order lines net of
+ * what has already arrived. Without the document's state on screen, a reader
+ * cannot tell a line whose fourteen documents have all been received from one
+ * whose fourteen are still outstanding — and those are opposite situations.
+ */
+export function soBatchPoDocumentState(
+  po: Pick<SoBatchOrderPoFact, "status" | "sentCurrentVersion">,
+): PurchaseOrderRegisterFacts["documentState"] {
+  if (po.status === "received") return "Completed";
+  return po.sentCurrentVersion ? "Issued" : "Not sent to supplier";
+}
+
 /** One linked purchase order, through `po_line_sources` lineage ONLY. */
 export interface SoBatchOrderPoFact {
   /** The PO number — `purchase_orders.id`. */
@@ -508,8 +570,22 @@ export interface SoBatchOrderLineFact {
   item: string;
   variant: string | null;
   category: ProductCategory | null;
-  /** Exact lineage: which POs cover this line, and how many units each. */
-  pos: Array<{ poId: string; qty: number }>;
+  /**
+    * Exact lineage: which purchase-order LINES cover this item line, how many
+    * units each, and where that LINE sends them.
+    *
+    * ⭐ KEYED BY THE DOCUMENT LINE, not the document (owner correction
+    * 2026-09-11). One purchase order may carry a SKU to two destinations
+    * through two lines and source both to the same customer item line; merging
+    * them by `po_id` left only the parent document's `Deliver To` to print,
+    * which is a different fact from the line's own recorded one.
+    *
+    * `destinationId` is the LINE's, falling back to the document's ONLY when
+    * the line has none — the same rule the Sales Order expansion door uses,
+    * and the only case in which a parent summary may stand for a line.
+    * `poLineId` is optional so an older Worker's payload still parses.
+    */
+  pos: Array<{ poId: string; poLineId?: string | null; qty: number; destinationId?: string | null }>;
 }
 
 /** One right-Register row: one proceeded physical-goods Sales Order. */
@@ -563,7 +639,14 @@ export const soBatchOrderRowSchema = z.object({
       category: z
         .enum(["mattress", "bedframe", "sofa", "accessory", "service", "guarantee"])
         .nullable(),
-      pos: z.array(z.object({ poId: z.string(), qty: z.number() })),
+      pos: z.array(
+        z.object({
+          poId: z.string(),
+          poLineId: z.string().nullable().optional(),
+          qty: z.number(),
+          destinationId: z.string().nullable().optional(),
+        }),
+      ),
     }),
   ),
   outstandingSuppliers: z.array(z.string()),

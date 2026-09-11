@@ -240,6 +240,26 @@ export interface PurchaseDemandRow {
   readyStock: number | null;
   takenFromStock: number | null;
   onPo: number | null;
+  /**
+   * ⭐ THE ENGINE'S OWN ANSWER TO *IS THERE ANYTHING LEFT TO BUY* — carried
+   * 2026-09-11, computed since T6. It is READ here, never derived.
+   *
+   * TRUE means every unit of this build was drawn from the open-purchase-order
+   * pool, so `toBuy` below is NOT a remainder: it is the quantity the covering
+   * document carries, and ticking the row raises a SECOND purchase order. That
+   * is DELIBERATELY still allowed (YH, 2026-09-03) — the pool has no customer
+   * attribution, so the covering document routinely belongs to somebody else
+   * and refusing here would block a first purchase for this customer. But the
+   * two cases print the same number, and a screen that cannot tell them apart
+   * invites a buy the operator did not mean to make.
+   *
+   * It cannot be inferred from the numbers: `toBuy === onPo` is also true of a
+   * genuine remainder that happens to equal the coverage.
+   *
+   * Optional, so a browser on this build against an older Worker reads it as
+   * absent and says nothing rather than guessing.
+   */
+  fullyOnPo?: boolean;
   poNumbers: string[];
   toBuy: number | null;
   /**
@@ -511,6 +531,10 @@ export function purchaseDemandQuantities(build: {
   takenFromStock: number;
   onPo: number;
   toBuy: number;
+  /** The engine's own flag, passed through so a screen can say which kind of
+   *  number `toBuy` is. Never derived from the numbers — see the field's own
+   *  note on `PurchaseDemandRow`. */
+  fullyOnPo: boolean;
 } {
   const modular = isOnePoPerOrder(category) && build.lines.length > 1;
   const fully = build.fullyOnPo === true;
@@ -543,6 +567,7 @@ export function purchaseDemandQuantities(build: {
     takenFromStock: build.takenFromStock,
     onPo: build.coveredByOpenPo,
     toBuy,
+    fullyOnPo: fully,
   };
 }
 
@@ -597,6 +622,26 @@ export function purchaseDemandCoverageLine(row: {
   readyStock: number | null;
   takenFromStock: number | null;
   onPo: number | null;
+  /**
+   * ⭐ THE ENGINE'S OWN ANSWER TO *IS THERE ANYTHING LEFT TO BUY* — carried
+   * 2026-09-11, computed since T6. It is READ here, never derived.
+   *
+   * TRUE means every unit of this build was drawn from the open-purchase-order
+   * pool, so `toBuy` below is NOT a remainder: it is the quantity the covering
+   * document carries, and ticking the row raises a SECOND purchase order. That
+   * is DELIBERATELY still allowed (YH, 2026-09-03) — the pool has no customer
+   * attribution, so the covering document routinely belongs to somebody else
+   * and refusing here would block a first purchase for this customer. But the
+   * two cases print the same number, and a screen that cannot tell them apart
+   * invites a buy the operator did not mean to make.
+   *
+   * It cannot be inferred from the numbers: `toBuy === onPo` is also true of a
+   * genuine remainder that happens to equal the coverage.
+   *
+   * Optional, so a browser on this build against an older Worker reads it as
+   * absent and says nothing rather than guessing.
+   */
+  fullyOnPo?: boolean;
   poNumbers: readonly string[];
 }): string {
   if (row.onPo == null) return PURCHASE_DEMAND_WORDS.coverageUnknown;
@@ -792,6 +837,9 @@ export const purchaseDemandRowSchema = z.object({
   readyStock: z.number().nullable(),
   takenFromStock: z.number().nullable(),
   onPo: z.number().nullable(),
+  /* Optional on the wire: an older Worker sends none and the screen says
+     nothing rather than guessing which kind of number `toBuy` is. */
+  fullyOnPo: z.boolean().optional(),
   poNumbers: z.array(z.string()),
   toBuy: z.number().nullable(),
   goodsMustArrive: z.string().nullable(),

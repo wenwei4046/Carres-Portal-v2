@@ -111,7 +111,10 @@ const FROM_STOCK_COLUMN = { key: "fromStock", label: "Ready Stock", width: 96 } 
    a list of documents deciding it, only smaller. Measured on the rendered
    preview, 2026-09-11. */
 const ON_PO_COLUMN = { key: "onPo", label: "On PO", width: 116 } as const;
-const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 74 } as const;
+/* 132, not 74: `To buy` may carry a qualifying sentence under its figure when
+   the number is the coverage a tick would buy AGAIN rather than a remainder —
+   and a note that wraps to three lines is a note nobody reads. */
+const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 132 } as const;
 
 /**
  * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
@@ -172,6 +175,24 @@ export interface GoodsMiniLine {
   fromStock?: number | null;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
+  /**
+   * ⭐ THE SENTENCE UNDER `To buy`, when that number is NOT a remainder
+   * (owner correction 2026-09-11).
+   *
+   * The engine prints the covering document's quantity under `To buy` when
+   * every unit of a build is already on an open purchase order, because the
+   * row stays buyable — the pool has no customer attribution, so the covering
+   * document routinely belongs to somebody else. But a remainder and a re-buy
+   * offer are opposite situations wearing the same number, and a screen that
+   * cannot tell them apart invites a purchase nobody meant to make.
+   *
+   * The page supplies the words; this box only prints them, quietly, under the
+   * figure they qualify. `toBuyNoteWhy` is the longer governed explanation,
+   * carried as the cell's title — a sentence that wraps to three lines under a
+   * one-digit number is a row-height defect wearing words.
+   */
+  toBuyNote?: string;
+  toBuyNoteWhy?: string;
   /**
    * How many units of this line purchase orders already carry. A NUMBER — the
    * documents themselves are named once, in the read-only details table the
@@ -529,7 +550,14 @@ export default function GoodsMiniTable({
                   return line.toBuy == null || line.toBuy <= 0 ? (
                     <Absence>—</Absence>
                   ) : (
-                    <span className="tabular-nums font-medium">{line.toBuy}</span>
+                    <span title={line.toBuyNoteWhy}>
+                      <span className="tabular-nums font-medium">{line.toBuy}</span>
+                      {line.toBuyNote ? (
+                        <div className="mt-0.5">
+                          <Absence>{line.toBuyNote}</Absence>
+                        </div>
+                      ) : null}
+                    </span>
                   );
                 case "onPo": {
                   /* A QUANTITY, AND A DOOR TO THE DOCUMENTS. The purchase

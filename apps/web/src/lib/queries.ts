@@ -3061,6 +3061,13 @@ export interface SalesOrderExpansionResponse {
    * than inventing one.
    */
   unitLines?: Record<string, string | null>;
+  /**
+   * Unit -> `unit` | `quantity` (0453). A COUNTED row has no identity at all,
+   * and its technical `QTY-` key must never reach a `Unit ID` heading
+   * (`unit-identity.ts`). Optional: absent, the shared rule falls back to the
+   * stored code's own shape, which is the same backstop it has always used.
+   */
+  unitScopes?: Record<string, string>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has

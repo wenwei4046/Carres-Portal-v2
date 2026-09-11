@@ -1166,6 +1166,10 @@ before the record, which is the section that grows without limit.
 ☐  JAG…  Jager · SS · Fab 1      1        —        14      1     ▾ + Split    Ohana     Bedframe
 ```
 
+- **`To buy` says WHICH KIND of number it is.** A figure qualified by `Already on a PO` is the
+  coverage a tick would buy a second time, not a remainder — see the traced table below. An
+  unqualified figure is a remainder. An older Worker that carries no `fullyOnPo` prints no
+  qualifier: UNKNOWN accuses nothing and claims nothing.
 - **⭐ `On PO` IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
   purchase order inside the cell, so a line fourteen documents touch drew a fourteen-line-tall item
   row that filled the screen — and the same fourteen numbers were repeated underneath it. **A
@@ -1206,6 +1210,14 @@ PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres
 PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres Klang  Ohana     Not recorded
 ```
 
+- **ONE ROW PER DOCUMENT *LINE*, NOT PER DOCUMENT.** A purchase order may carry one SKU to two
+  destinations through two lines and source both to the same customer item line (the governed
+  `Deliver To` split). Keyed by `po_id` alone the two collapsed and only the PARENT document's
+  destination was left to print — **a parent summary standing in for a line's own recorded fact**,
+  which is exactly what this correction removed from the row above. `po_line_sources.po_line_id`
+  now rides through, and each entry carries **the LINE's `destination_id`, falling back to the
+  document's ONLY where the line records none** — the same rule the Sales Order expansion door uses,
+  and the only case in which a parent summary may speak for a line.
 - **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
   the two identifiers a person copies, and a reader who must look across four columns to pair a
   document with its goods pairs them wrongly. Both print in FULL and stay selectable.
@@ -1237,26 +1249,81 @@ has answered that question since 0471 and the read simply did not ask it. It ask
   SKU reading — evidence is never dropped to tidy a screen — and the row says
   **`Item line matched by SKU`**, so an INFERENCE stays inspectable and can never be read as
   evidence.
-- a read that carries no binding map at all (an older Worker) says **`Item line unknown`**. A gap in
+- a read that carries no binding for that Unit at all says **`Item line unknown`**. A gap in
   the READ is not a gap in the RECORD, and it may not borrow the other sentence: that one would be a
   claim about this browser wearing the clothes of a fact about the goods.
+- **⭐ ABSENCE PROVES NOTHING — owner correction 2026-09-11.** A Unit MISSING from the binding map
+  was read as EXACT, on the true-but-fragile ground that only incoming goods are absent and those
+  are evidenced by a purchase-order line sourced exclusively to the item line. That let a gap in the
+  DATA prove a fact about the GOODS: any later read that stopped populating the map, or populated it
+  partially, would silently begin certifying inferences. **The server now WRITES the
+  incoming-exclusive binding into the map**, so the fact is declared rather than inferred from its
+  own absence, and absence means `unresolved` — never exact. A purchase-order line SHARED with
+  another Sales Order evidences nothing and names no line, exactly as before.
+- **⭐ AN INFERENCE IS NEVER COUNTED AS COVERAGE.** The same physical Unit is offered by the SKU
+  reading to EVERY item line of that SKU on the order, so an inferred Unit row carries **no
+  quantity** and does **not** draw the document line's remainder down. Only an exact Unit does.
+  Without that rule one Unit accounted for two item lines' quantities at once and the section's own
+  numbers stopped adding up; with it, `Σ(exact rows) + remainder = the document line's quantity`.
+- **⭐ A COUNTED ROW IS NOT A UNIT (0453).** `identity_scope` rides the wire as `unitScopes`, and
+  every Unit ID on this table is resolved through the ONE shared rule (`unitIdOf`), which answers
+  `null` for counted goods and keeps its `QTY-` shape backstop. Such a row prints
+  **`Not unit-tracked`** — there is no Unit ID and there never will be — and its quantity is still
+  stated. The technical key never reaches a `Unit ID` heading.
 - The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
   this build against an older Worker reads it as absent and says the association is unknown rather
   than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.
 
-**⭐ UNKNOWN, LOADING AND CONFIRMED-ABSENT ARE THREE ANSWERS.** `Loading…` while the Unit read is in
-flight, `Could not be loaded` when it failed (with the existing retry), and `Not allocated` only
-when the read ANSWERED and no Unit is tied to the line. Printing the first two as the third is how a
-reader concludes goods do not exist because a request was slow.
+**⭐ FIVE ANSWERS FOR AN EMPTY UNIT CELL, AND NONE OF THEM IS A SPARE.** `Loading…` while the Unit
+read is in flight · `Could not be loaded` when it failed (with the existing retry) · **`Not read`**
+when the read answered for the ORDER and carried no entry for THIS item line — Carres did not look
+here, which is not the same as looking and finding nothing · `Not unit-tracked` when the goods are
+counted rather than individually tracked · and `Not allocated` ONLY when the read answered for this
+line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
+concludes goods do not exist because a request was slow.
 
-**⭐ WHAT THE TWO QUANTITIES MEAN, AND WHY THEY MAY DISAGREE — recorded 2026-09-11.** `On PO` is the
-EXACT `po_line_sources` quantity for that item line. `To buy` is the ENGINE's remainder, drained
-from a per-SKU Open-PO pool with no customer attribution (T6, `to-order.ts`) — it is the number the
-tick is arranged against and the number `issue-batch` recomputes and refuses against, so it is the
-only number that may drive a purchase. **They are two different reads and the screen prints both.**
-An order can therefore show `Qty 1 · On PO 14 · To buy 1`: fourteen documents name that exact line
-while the pooled remainder still says one unit is unbought. That is not proof of duplicate buying
-and it is not proof of coverage; it is a disagreement, and the buyer judges it (YH, 2026-09-03).
+**⭐ THE TWO QUANTITIES, TRACED — APPROVED / LOCKED, owner correction 2026-09-11.**
+
+`Qty 1 · On PO 14 · To buy 1` was reported as possible duplicate buying. It is not one situation; it
+is four, and the screen could not tell them apart. The two numbers come from different reads with
+**different scopes**, and both are correct:
+
+| | `On PO` — the goods table | `To buy` — the tick's quantity |
+|---|---|---|
+| Source | `po_line_sources` rows whose `order_line_id` is THIS item line | `computeNetRequirements` (`net-requirements.ts`) |
+| Customer attribution | **exact** — the document names this order line | **none** — a per-SKU pool |
+| Documents counted | every **non-cancelled** one, `Completed` included | only `purchase_orders.status = 'open'` lines |
+| Delivered goods | **not netted** — the quantity as recorded | **netted** — `qty − received_qty` |
+| Allocation | none; it is a record | greedy, **earliest deadline first** — another order may drain the pool first |
+| What it IS | the **historical document quantity** | the **effective remaining demand** |
+
+**IS ANOTHER PURCHASE LEGITIMATELY ALLOWED? The guard is `isSelectableForOrder`, and it reads
+lineage, never the pool.** When this order's OWN `po_line_sources` covers `qty − stockTaken` on
+purchase orders whose CURRENT version has confirmed-sent evidence, the order is `ordered` and **the
+checkbox is not offered at all** — a fourteen-document row where any document is confirmed-sent
+cannot be bought again from this page. Otherwise the tick stands, and `validateIssuePlan`
+deliberately allows it (2026-09-03): the pool has no customer attribution, so the covering document
+routinely belongs to another customer and refusing would block a FIRST purchase for this one. Four
+representative fixtures pin all four outcomes — sent · unsent · delivered · pool-covered.
+
+**⭐ `To buy` IS NOT ALWAYS A REMAINDER, AND THE ROW NOW SAYS SO.** On a build every unit of which
+was drawn from the open-PO pool (the engine's own `fullyOnPo`), the engine prints **what the
+covering document carries** under `To buy`, not `0` — the row stays buyable and a `0` would be an
+answer nobody asked for (T6). So one figure meant two opposite things: a genuine remainder, and a
+re-buy offer. It **cannot be told from the numbers** (`toBuy === onPo` is also true of a genuine
+remainder that happens to equal its coverage), so the engine's flag is carried onto the leaf and the
+cell prints **`Already on a PO`** under the figure, with the governed explanation
+`Demand is already covered by an open Purchase Order.` as its title. The figure itself is untouched:
+it is the number the tick allocates and the number `issue-batch` recomputes and refuses against, and
+a display that disagreed with its own control would be worse than the ambiguity it replaced.
+
+**`PO Status` is the column that reconciles the two scopes** — `Completed` · `Issued` ·
+`Not sent to supplier`, the same `documentState` vocabulary the Purchase Orders register prints
+(`soBatchPoDocumentState`, narrowed to the two facts this register carries). Fourteen `Completed`
+documents beside `To buy 1` and fourteen `Not sent to supplier` ones beside the same figure are
+opposite situations, and before this column a reader could not see which they were looking at.
+**`Open` is never a Purchase Order status** and the raw database value never reaches the screen.
+
 **Neither number is re-derived to make the other agree, no third arithmetic is invented, the
 customer's ordered `Qty` is never rewritten, and nothing on this page cancels or edits an existing
 purchase order.**

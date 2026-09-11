@@ -299,6 +299,9 @@ describe("purchaseDemandQuantities — the engine's numbers, never a second coun
       takenFromStock: 1,
       onPo: 2,
       toBuy: 1,
+      /* The engine's own flag, passed through. FALSE here: there is a genuine
+         remainder, so `toBuy` means what a reader assumes it means. */
+      fullyOnPo: false,
     });
   });
 
@@ -318,6 +321,11 @@ describe("purchaseDemandQuantities — the engine's numbers, never a second coun
        belong to another order and can move on the next refresh. The buyer
        decides, and needs both numbers to decide with. */
     expect(q.toBuy).toBe(3);
+    /* ⭐ AND THE SCREEN IS TOLD WHICH KIND OF NUMBER THAT IS. `toBuy` here is
+       NOT a remainder — it is the coverage a tick would buy a second time, and
+       `toBuy === onPo` cannot be used to spot it (a genuine remainder may
+       equal its coverage too). The engine's own flag rides through. */
+    expect(q.fullyOnPo).toBe(true);
     expect(q.onPo).toBe(3);
     /* NOT 6. `qty` on a covered build is already what the purchase order
        carries, so the coverage must not be added back on top of it. */

@@ -91,6 +91,10 @@ const BUYING_LINES: GoodsMiniLine[] = [
     onPoQty: 14,
     onPoAbsence: "Not ordered yet",
     toBuy: 1,
+    /* The engine says every unit is already on an OPEN purchase order, so this
+       figure is the coverage a tick would buy AGAIN — not a remainder. */
+    toBuyNote: "Already on a PO",
+    toBuyNoteWhy: "Demand is already covered by an open Purchase Order.",
     deliverTo: [],
     deliverToAbsence: "Not chosen",
     supplier: "Ohana",
@@ -124,6 +128,7 @@ const PO_ROWS: PoDetailRow[] = [
   {
     key: "buy-1::PO-20260820-4827::U1-000-078",
     poNo: "PO-20260820-4827",
+    poStatus: "Issued",
     unitId: "U1-000-078",
     unitAbsence: "Not allocated",
     association: "exact" as const,
@@ -138,16 +143,18 @@ const PO_ROWS: PoDetailRow[] = [
   {
     key: "buy-1::PO-20260820-4827::U1-000-079",
     poNo: "PO-20260820-4827",
+    poStatus: "Completed",
     unitId: "U1-000-079",
     unitAbsence: "Not allocated",
     /* The Unit is on this Sales Order; the record binds it to no item line, so
        it got here by matching its SKU. An inference stays inspectable AND says
-       what kind of claim it is. */
+       what kind of claim it is — and it carries NO quantity, because the same
+       physical Unit is offered to every item line of its SKU. */
     association: "inferred" as const,
     sku: "L1201S-K",
     item: "Laveo",
     itemDetail: "King · Fabric 3",
-    qty: 1,
+    qty: null,
     deliverTo: "Carres Klang",
     supplier: "Nice Future",
     poDeliveryDate: "Thu, 17 Sep",
@@ -155,6 +162,7 @@ const PO_ROWS: PoDetailRow[] = [
   ...FOURTEEN.map((poNo) => ({
     key: `buy-2::${poNo}::rest`,
     poNo,
+    poStatus: "Not sent to supplier",
     unitId: null,
     unitAbsence: "Not allocated",
     association: "exact" as const,

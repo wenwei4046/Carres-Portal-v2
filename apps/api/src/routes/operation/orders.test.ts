@@ -2827,12 +2827,70 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       headers: { Authorization: `Bearer ${jwt}` },
     }), env);
     expect(res.status).toBe(200);
-    const body = await res.json() as { lines: Array<{ unitIds: string[] }>; place: unknown[]; unitCoverage: Record<string, string> };
+    const body = await res.json() as {
+      lines: Array<{ unitIds: string[] }>;
+      place: unknown[];
+      unitCoverage: Record<string, string>;
+      unitLines: Record<string, string | null>;
+    };
     expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070", "U1-000-071"]);
     expect(body.unitCoverage).toEqual(shared ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
     expect(body.lines[1].unitIds).toEqual([]);
+    /**
+     * ⭐ THE INVARIANT A READER IS ALLOWED TO STAND ON (owner correction
+     * 2026-09-11): an incoming Unit DECLARES the item line it answers, it does
+     * not leave the map and let a reader infer one from its own absence.
+     *
+     * The evidence is the same one `exclusive` above establishes — every
+     * `po_line_sources` row on that purchase-order line names THIS order and
+     * THIS item line — but it is now WRITTEN DOWN, so `unitLines` can carry
+     * the whole rule: what is in it is evidenced, and what is not, is not.
+     * Without this, a gap in the data proved a fact about the goods.
+     */
+    expect(body.unitLines).toEqual(
+      shared ? {} : { "U1-000-070": "line-1", "U1-000-071": "line-1" },
+    );
     // Incoming goods are not reported as physical allocated stock for Delivery.
     expect(body.place).toEqual([]);
+  });
+
+  /**
+   * A purchase-order line SHARED with another Sales Order evidences nothing
+   * about which SO's Unit is which, so it names no line at all — and the map
+   * stays empty rather than pointing somewhere convenient. The `shared=true`
+   * case above proves exactly that, and this states why it matters: a reader
+   * that finds nothing in `unitLines` must read `unresolved`, never `exact`.
+   */
+  it("names no item line for a Unit on a SHARED purchase-order line", async () => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const mine = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const theirs = { po_line_id: "pol-1", order_id: "other-order", order_line_id: "other-line" };
+    const from = vi.fn((table: string) => ({
+      select: vi.fn((columns: string) => {
+        let data: unknown = [];
+        if (table === "orders") data = { so: 1340 };
+        if (table === "order_lines") data = [{ id: "line-1", sku: "H1401F-K", qty: 1 }];
+        if (table === "po_line_sources") data = columns.includes("order_id") ? [mine, theirs] : [mine];
+        if (table === "ops_stock_items" && !columns.includes("sku")) {
+          data = [{ unit_code: "U1-000-070", po_line_id: "pol-1" }];
+        }
+        if (table === "purchase_order_lines") data = [{ id: "pol-1", po_id: "PO-1" }];
+        const chain: Record<string, unknown> = {};
+        for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+        chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+        return chain;
+      }),
+    }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { unitLines: Record<string, string | null>; lines: Array<{ unitIds: string[] }> };
+    expect(body.unitLines).toEqual({});
+    expect(body.lines[0].unitIds).toEqual([]);
   });
 
   it("projects Stock Unit IDs and Purchasing line destinations without a Sales Order destination field", async () => {
@@ -2881,6 +2939,9 @@ describe("GET /api/operation/orders/:id/expansion", () => {
          one, and `null` is the honest answer for that: the Unit is on this
          Sales Order and WHICH item line it answers was never recorded. */
       unitLines: { "id-001": null, "id-002": null },
+      /* 0453 — a counted row has no identity, so the scope rides the wire and
+         no reader has to guess a `QTY-` key from its shape. */
+      unitScopes: { "id-001": "unit", "id-002": "unit" },
       /* WHERE each Unit is and WHO has it — the SAME Units the lines already
          name, resolved to Stock's own names. Delivery Work reads this block;
          the Sales Orders register ignores it. */

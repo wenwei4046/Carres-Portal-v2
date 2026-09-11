@@ -1162,15 +1162,19 @@ describe("the expansion — the ONE shared child table", () => {
 
     /* And the record says everything, once, under its own heading. */
     const details = within(box).getByTestId("po-details-table");
-    const first = within(details).getByTestId("po-detail-l51::PO-20260820-1111::rest");
-    expect(first).toHaveTextContent("PO-20260820-1111");
+    const rowFor = (poNo: string) =>
+      within(details).getByRole("button", { name: poNo }).closest("tr")!;
+    const first = rowFor("PO-20260820-1111");
     expect(first).toHaveTextContent("Hooka");
     expect(first).toHaveTextContent("Carres Klang");
     expect(first).toHaveTextContent("10 Sep");
-    const second = within(details).getByTestId("po-detail-l52::PO-20260821-2222::rest");
-    expect(second).toHaveTextContent("PO-20260821-2222");
+    /* The document's own state, in the one Purchasing vocabulary — the fact
+       that tells fourteen delivered documents from fourteen outstanding ones. */
+    expect(first).toHaveTextContent("Completed");
+    const second = rowFor("PO-20260821-2222");
     expect(second).toHaveTextContent("Ohana");
     expect(second).toHaveTextContent("AL Sungai Buloh");
+    expect(second).toHaveTextContent("Issued");
     /* ⛔ A RECORD CARRIES NO CONTROL. Not a tick, not a destination editor. */
     expect(within(details).queryByRole("checkbox")).toBeNull();
     expect(within(details).queryByRole("combobox")).toBeNull();
@@ -1603,6 +1607,192 @@ describe("a demand with several Unit records", () => {
     const first = (await within(box).findByText("U1-000-101")).closest("tr")!;
     expect(within(first).getByRole("button", { name: "PO-20260820-4827" })).toBeInTheDocument();
     expect(first).not.toHaveTextContent("PO-20260821-1190");
+  });
+});
+
+/* ─── FOURTEEN DOCUMENTS ON A QTY-1 LINE ─────────────────────────────────── */
+
+/**
+ * ⭐ THE OWNER'S SCREENSHOT, TURNED INTO FIXTURES (2026-09-11).
+ *
+ * `Qty 1 · On PO 14 · To buy 1` was reported as possible duplicate buying. It
+ * is not ONE situation, it is four, and only the documents' own recorded state
+ * tells them apart — which is exactly why `PO Status` is now a column.
+ *
+ * ── THE TWO NUMBERS, AND THEIR DIFFERENT SCOPES ─────────────────────────────
+ *
+ *   `On PO`   the HISTORICAL document quantity. Every non-cancelled
+ *             `po_line_sources` row whose `order_line_id` is THIS line —
+ *             `Completed` documents included, never netted by `received_qty`.
+ *             Customer-attributed and exact.
+ *
+ *   `To buy`  the ENGINE's EFFECTIVE remainder. Drawn from a per-SKU pool of
+ *             `purchase_orders.status = 'open'` lines only, net of
+ *             `received_qty`, allocated greedily earliest-deadline-first with
+ *             NO customer attribution — so another order may drain it first.
+ *
+ * They are allowed to disagree, and the fixtures below state what each
+ * disagreement MEANS. No third formula is derived from them anywhere.
+ */
+describe("fourteen documents on a one-unit line", () => {
+  const FOURTEEN = Array.from({ length: 14 }, (_, i) => `PO-2026090${(i % 9) + 1}-${4665 + i}`);
+
+  const documents = (sent: boolean, status: "open" | "received" = "open") =>
+    FOURTEEN.map((poId) => ({
+      poId,
+      status,
+      supplierId: "s-ohana",
+      supplierName: "Ohana",
+      destinationId: KLANG,
+      officialDeliveryDate: null,
+      sentCurrentVersion: sent,
+    }));
+
+  const order = (over: {
+    sent: boolean;
+    status: "open" | "received";
+    orderStatus: "blank" | "partial" | "ordered";
+  }) =>
+    orderRow({
+      orderId: "o14",
+      so: 1442,
+      customer: "FOURTEEN DOCUMENTS",
+      status: over.orderStatus,
+      pos: documents(over.sent, over.status),
+      lines: [
+        {
+          orderLineId: "l14",
+          sku: "B1201S-K",
+          qty: 1,
+          stockTaken: 0,
+          item: "Booqit",
+          variant: "King",
+          category: "mattress",
+          pos: FOURTEEN.map((poId) => ({ poId, qty: 1 })),
+        },
+      ],
+      outstandingSuppliers: ["Ohana"],
+    });
+
+  const leaf14 = (over: Partial<PurchaseDemandRow> = {}) =>
+    leaf({
+      id: "build::o14::b",
+      orderId: "o14",
+      so: 1442,
+      customer: "FOURTEEN DOCUMENTS",
+      lineIds: ["l14"],
+      skus: ["B1201S-K"],
+      qtyNeeded: 1,
+      toBuy: 1,
+      parts: [{ sku: "B1201S-K", qty: 1, unitCost: 100 }],
+      ...over,
+    });
+
+  /**
+   * FIXTURE A — the documents were SENT and they cover what the line required.
+   * Another purchase is NOT allowed: `isSelectableForOrder` reads the order's
+   * OWN lineage on confirmed-sent documents, and there is no checkbox at all.
+   */
+  it("refuses a second purchase when the order's own sent documents cover it", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: true, status: "open", orderStatus: "ordered" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(within(box).getByTestId("goods-mini-table")).queryByRole("checkbox")).toBeNull();
+    /* And the record says WHY: fourteen documents, every one of them Issued. */
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Issued")).toHaveLength(14);
+  });
+
+  /**
+   * FIXTURE B — the documents are NUMBERED and none has been sent. Nothing has
+   * reached a supplier, so status stays `blank` and buying is legitimate. The
+   * record says so: fourteen rows, every one `Not sent to supplier`.
+   */
+  it("allows the purchase when not one of the fourteen has been sent", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Not sent to supplier")).toHaveLength(14);
+    /* Fourteen document rows, one unit each — the whole evidence, not a sample. */
+    expect(within(details).getAllByRole("row").filter((r) => r.dataset.row === "record"))
+      .toHaveLength(14);
+  });
+
+  /**
+   * FIXTURE C — the goods already ARRIVED. `On PO 14` counts them because they
+   * are this line's history; the engine's pool counts none of them, because a
+   * `Completed` document supplies nothing future. Two different scopes, one
+   * screen, and the column that reconciles them is `PO Status`.
+   */
+  it("still counts delivered documents under On PO, and says they are Completed", async () => {
+    renderRegister({
+      rows: [leaf14()],
+      registerRows: [order({ sent: true, status: "received", orderStatus: "ordered" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    /* The HISTORICAL quantity, undiminished. */
+    expect(within(box).getByTestId("goods-on-po-l14")).toHaveTextContent("14");
+    const details = within(box).getByTestId("po-details-table");
+    expect(within(details).getAllByText("Completed")).toHaveLength(14);
+    /* ⛔ And the raw database word never reaches the screen. */
+    expect(details.textContent).not.toMatch(/\bopen\b/);
+  });
+
+  /**
+   * FIXTURE D — the ENGINE's own `fullyOnPo`. Every unit of the build was
+   * drawn from the OPEN-purchase-order pool, so `To buy` is NOT a remainder:
+   * it is the quantity the covering document carries, and ticking buys a
+   * SECOND time. That stays ALLOWED (YH, 2026-09-03) — the pool has no
+   * customer attribution, so the covering document routinely belongs to
+   * somebody else and refusing would block a first purchase for this one — but
+   * the operator is now told which kind of number they are looking at.
+   */
+  it("says when To buy is the coverage a tick would buy again, not a remainder", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: true })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    const demand = within(box).getByTestId("so-batch-part-B1201S-K");
+    expect(demand).toHaveTextContent("Already on a PO");
+    /* The row is still buyable, and the figure is still the one the tick
+       allocates — a display that disagreed with its control would be worse. */
+    expect(within(demand).getByRole("checkbox")).toBeEnabled();
+  });
+
+  it("says nothing of the kind when the remainder is genuine", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 0, fullyOnPo: false })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(box).getByTestId("so-batch-part-B1201S-K"))
+      .not.toHaveTextContent("Already on a PO");
+  });
+
+  /* An older Worker sends no `fullyOnPo`. UNKNOWN accuses nothing and claims
+     nothing: the sentence simply does not appear. */
+  it("says nothing when the Worker did not carry the engine's flag", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: undefined })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(within(box).getByTestId("so-batch-part-B1201S-K"))
+      .not.toHaveTextContent("Already on a PO");
   });
 });
 

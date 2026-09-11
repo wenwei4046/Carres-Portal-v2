@@ -1271,6 +1271,16 @@ function SoBatchOrderExpansion({
     : expansion.isPending
       ? "loading"
       : "ready";
+  /**
+   * ⭐ AN ANSWER THAT DID NOT COVER THIS LINE IS NOT AN ANSWER ABOUT IT
+   * (2026-09-11). The read answers for the ORDER; a line it carries no entry
+   * for has not been looked at, and `Not allocated` — which claims Carres
+   * looked and found nothing — would be a fact the read never established.
+   */
+  const linesAnswered = useMemo(
+    () => new Set((expansion.data?.lines ?? []).map((l) => l.lineId)),
+    [expansion.data],
+  );
   const leafByLineId = useMemo(() => {
     const m = new Map<string, PurchaseDemandRow>();
     for (const leaf of leafs) for (const id of leaf.lineIds) m.set(id, leaf);
@@ -1313,8 +1323,11 @@ function SoBatchOrderExpansion({
     if (drawEditor) editorDrawn.add(leaf.id);
     const setSize = leaf ? (linesPerLeaf.get(leaf.id) ?? 1) : 1;
     const arranged = eligible ? leafAllocations(leaf) : [];
+    /* ⭐ THE DOCUMENT LINE'S OWN `Deliver To`, never the parent document's
+       (owner correction 2026-09-11). The server resolves it per lineage entry
+       and falls back to the document only where the LINE records none. */
     const issuedDest = soBatchCellSummary(
-      linePos.map((p) => destinationName(p!.destinationId)),
+      l.pos.map((p) => destinationName(p.destinationId ?? poById.get(p.poId)?.destinationId ?? null)),
     );
     const supplier = soBatchCellSummary([
       ...(leaf ? [leaf.supplier] : []),
@@ -1333,6 +1346,15 @@ function SoBatchOrderExpansion({
          a count of the order's documents and not a per-SKU pool. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
       toBuy: drawEditor ? (leaf!.toBuy ?? 0) : null,
+      /* ⭐ WHICH KIND OF NUMBER `To buy` IS. The engine's own `fullyOnPo`
+         says every unit of this build is already on an OPEN purchase order, so
+         the figure is the coverage a tick would buy a SECOND time, not a
+         remainder. The row stays buyable by owner ruling (2026-09-03) — the
+         pool has no customer attribution — but the operator is told. */
+      toBuyNote:
+        drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPo : undefined,
+      toBuyNoteWhy:
+        drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPoWhy : undefined,
       onPoQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
       onPoAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
@@ -1431,8 +1453,10 @@ function SoBatchOrderExpansion({
       unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
       unitCoverage: expansion.data?.unitCoverage ?? {},
       unitLines: expansion.data?.unitLines,
+      unitScopes: expansion.data?.unitScopes,
       orderLineId: l.orderLineId,
       unitRead,
+      lineRead: linesAnswered.has(l.orderLineId) ? "answered" : "absent",
       po: (poId) => poById.get(poId),
       destinationName,
     }),

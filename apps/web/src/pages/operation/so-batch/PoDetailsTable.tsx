@@ -8,8 +8,8 @@
  * ⭐ PURCHASE ORDER DETAILS — the read-only record, under its own heading
  * (owner correction 2026-09-11; `docs/purchasing/MASTER.md` §9.1).
  *
- * ONE QUESTION: *which document, and which Unit, already answers this Sales
- * Order — and how much of it?*
+ * ONE QUESTION: *which document line, and which Unit, already answers this
+ * Sales Order — and how much of it?*
  *
  * ── WHY IT IS A TABLE OF ITS OWN, AND NOT MORE ROWS UPSTAIRS ────────────────
  *
@@ -25,44 +25,68 @@
  * The defect it closes: fourteen purchase orders were stacked inside ONE cell
  * of the item row — so a single item filled the screen — and then repeated
  * underneath it. The references are not truncated to tidy the screen; they are
- * all here, one document per row, full number, selectable text.
+ * all here, one document LINE per row, full number, selectable text.
  *
- * ── THE THREE ANSWERS A UNIT CELL CAN GIVE, AND THEY ARE NOT THE SAME ───────
+ * ── ONE ROW PER DOCUMENT **LINE**, NOT PER DOCUMENT ─────────────────────────
  *
- *   A UNIT ID           the goods exist and the record says which line they
- *                       answer — `ops_stock_items.reserved_order_line_id`, the
- *                       stored binding, or a purchase-order line sourced
- *                       EXCLUSIVELY to this item line. Evidence.
- *   `Not allocated`     the document carries the quantity and no Unit has been
- *                       tied to this line yet. A CONFIRMED absence.
- *   `Loading…` ·        the Unit read has not answered, or failed. An UNKNOWN,
- *   `Could not be       and it must never be printed as a confirmed absence —
- *   loaded`             that is how a reader concludes goods do not exist
- *                       because a request was slow.
+ * A purchase order may carry one SKU to two destinations through two lines and
+ * source both to the same customer item line (the governed `Deliver To`
+ * split). Keyed by the document alone, the two collapse and the register has
+ * only the PARENT document's destination left to print — **a parent summary
+ * standing in for a line's own recorded fact**, which is the thing this page
+ * spent the whole correction removing from the row above. `destinationId`
+ * arrives per lineage entry: the LINE's, and the document's only where the
+ * line has none, which is how the paper itself works.
  *
- * ── AND THREE ANSWERS FOR *WHICH LINE DOES THIS UNIT ANSWER* ────────────────
+ * ── THE ANSWERS A UNIT CELL CAN GIVE, AND NONE OF THEM IS A SPARE ───────────
  *
- *   EXACT      the record binds it to this line, or a purchase-order line
- *              sourced exclusively to this line carries it. Evidence, and the
- *              row says nothing extra.
- *   INFERRED   the record carries no binding, so the Unit reached this line by
- *              matching its SKU — a pre-0471 reservation. The row says
- *              `Item line matched by SKU`, because an inference that looks like
- *              evidence is the defect this whole section exists to end.
- *   UNRESOLVED this browser's read does not carry the binding at all (an older
- *              Worker). `Item line unknown` — which is a different sentence
- *              from "the record does not say", and must not borrow it.
+ *   A UNIT ID              exact goods, and the record says they answer THIS
+ *                          line. Evidence. It carries `Qty 1` and draws the
+ *                          document line's remainder down by one.
+ *   `Not unit-tracked`     the goods covering this document line are COUNTED
+ *                          (`identity_scope = 'quantity'`, 0453). There is no
+ *                          Unit ID and there never will be — the technical
+ *                          `QTY-` key is a database fact that must not reach an
+ *                          operator (`unit-identity.ts`).
+ *   `Not allocated`        the read ANSWERED for this line and no Unit is tied
+ *                          to this quantity yet. A CONFIRMED absence.
+ *   `Not read`             the read answered for the ORDER but carried no entry
+ *                          for this item line. Carres did not look here — a
+ *                          different fact from having looked and found nothing.
+ *   `Loading…`             the Unit read has not come back.
+ *   `Could not be loaded`  it failed.
  *
- * The Unit is SHOWN in all three cases. Evidence is never dropped to tidy a
- * screen; what changes is what the screen CLAIMS about it.
+ * ── AND AN INFERENCE IS NEVER COUNTED AS COVERAGE ───────────────────────────
+ *
+ * A Unit reaches this line either because the record BINDS it here
+ * (`ops_stock_items.reserved_order_line_id`, 0471) or because a purchase-order
+ * line sourced EXCLUSIVELY to this item line carries it — both exact. A Unit
+ * that got here by matching its SKU is an INFERENCE, and the same physical Unit
+ * is offered to every item line of that SKU on the order. So an inferred row:
+ *
+ *   · is SHOWN — evidence is never dropped to tidy a screen;
+ *   · says `Item line matched by SKU`;
+ *   · carries NO quantity, and does NOT draw the remainder down.
+ *
+ * That last clause is the arithmetic. Counting it would let one physical Unit
+ * account for two different item lines' quantities at once, and the screen's
+ * own numbers would stop adding up. Its quantity stays inside the remainder
+ * row, where it is honestly described as not yet allocated.
  */
+import {
+  soBatchPoDocumentState,
+  unitIdOf,
+  type SoBatchOrderPoFact,
+} from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
-import type { SoBatchOrderPoFact } from "@carres/shared";
 
-/** What the Unit read is currently able to say about this order. */
+/** What the Unit read is currently able to say about this ORDER. */
 export type UnitReadState = "ready" | "loading" | "error";
 
-/** How a Unit came to be on an item line — see the three answers above. */
+/** Whether that read carried an entry for this particular ITEM LINE. */
+export type LineReadState = "answered" | "absent";
+
+/** How a Unit came to be on an item line — see the note above. */
 export type UnitAssociation = "exact" | "inferred" | "unresolved";
 
 /** The sentence each non-exact association prints under its Unit ID. */
@@ -72,12 +96,17 @@ const ASSOCIATION_WORD: Record<UnitAssociation, string | null> = {
   unresolved: "Item line unknown",
 };
 
+/** Goods that are counted, not individually tracked — they have no Unit ID. */
+const NOT_UNIT_TRACKED = "Not unit-tracked";
+
 export interface PoDetailRow {
   /** Stable identity for React and for the test that counts these rows. */
   key: string;
   /** The document. Full number, never shortened. */
   poNo: string;
-  /** The exact Unit, when one is evidenced for this document and line. */
+  /** The document's own state, in the one Purchasing vocabulary. */
+  poStatus: string;
+  /** The exact Unit, when one is evidenced for this document line. */
   unitId: string | null;
   /** Printed when `unitId` is null — and it says WHICH kind of nothing. */
   unitAbsence: string;
@@ -90,72 +119,108 @@ export interface PoDetailRow {
   sku: string;
   item: string;
   itemDetail: string | null;
-  qty: number;
+  /**
+   * `null` where this row's quantity is accounted for by the remainder row
+   * below it — an inferred or unresolved Unit is evidence, not coverage, and
+   * counting it here would state the same units twice.
+   */
+  qty: number | null;
   deliverTo: string | null;
   supplier: string | null;
   poDeliveryDate: string | null;
 }
 
+/** One `po_line_sources` fact: the document LINE, its units and where it sends them. */
+export interface PoLineage {
+  poId: string;
+  poLineId?: string | null;
+  qty: number;
+  /** The LINE's destination, already resolved by the server. */
+  destinationId?: string | null;
+}
+
 /**
  * The lineage of ONE item line, resolved into rows.
  *
- * Every `po_line_sources` entry for the line becomes at least one row: the
- * Units the read can EVIDENCE for that document, and — when the document
- * carries more than those Units account for — one row for the remainder, which
- * is the honest way to say "this much is on that paper and no Unit is tied to
- * it yet". Nothing is invented and nothing is dropped: a Unit naming a document
- * this line's lineage does not contain still gets a row, because a disagreement
- * between two authoritative reads is exactly the thing an audit register must
- * not hide.
+ * Every `po_line_sources` entry becomes at least one row: the Units the read
+ * can EVIDENCE for that document line, and — when the line carries more than
+ * those Units account for — one row for the remainder, which is the honest way
+ * to say "this much is on that paper and no Unit is tied to it yet". Nothing is
+ * invented and nothing is dropped: a Unit naming a document this item line's
+ * lineage does not contain still gets a row, because a disagreement between two
+ * authoritative reads is exactly the thing an audit register must not hide.
  */
 export function poDetailRowsForLine(input: {
   lineKey: string;
   sku: string;
   item: string;
   itemDetail: string | null;
-  /** `po_line_sources` for this line: the document, and the units it carries. */
-  lineage: ReadonlyArray<{ poId: string; qty: number }>;
+  lineage: readonly PoLineage[];
   /** Unit IDs this line holds, from the Sales Order expansion door. */
   unitIds: readonly string[];
   /** Unit → the purchase order it came in on, where one can be evidenced. */
   unitCoverage: Readonly<Record<string, string | null>>;
   /** Unit → the item line the RECORD binds it to; `null` = never recorded. */
   unitLines: Readonly<Record<string, string | null>> | undefined;
+  /** Unit → `unit` | `quantity` (0453). Absent falls back to the code's shape. */
+  unitScopes: Readonly<Record<string, string>> | undefined;
   /** This line's own id, to test a binding against. */
   orderLineId: string;
   unitRead: UnitReadState;
+  /** Did that read carry an entry for THIS item line? */
+  lineRead: LineReadState;
   po: (poId: string) => SoBatchOrderPoFact | undefined;
   destinationName: (id: string | null) => string;
 }): PoDetailRow[] {
   const {
     lineKey, sku, item, itemDetail, lineage, unitIds, unitCoverage, unitLines,
-    orderLineId, unitRead, po, destinationName,
+    unitScopes, orderLineId, unitRead, lineRead, po, destinationName,
   } = input;
 
+  /* ⛔ FIVE ANSWERS, NEVER ONE. `Not allocated` is the only one of them that
+     claims Carres looked at this line and found nothing. */
   const absence =
     unitRead === "loading"
       ? "Loading…"
       : unitRead === "error"
         ? "Could not be loaded"
-        : "Not allocated";
+        : lineRead === "absent"
+          ? "Not read"
+          : "Not allocated";
 
-  /* A binding that names ANOTHER line is not this line's Unit, whatever SKU it
-     wears. A Unit ABSENT from the map is incoming on a purchase-order line
-     sourced exclusively to this item line — the document evidences it, and
-     reserved/sold Units are the only ones the map carries. */
+  /* THE ONE UNIT IDENTITY (`unit-identity.ts`). A counted row answers `null`
+     here, whatever its technical key looks like, so a `QTY-` key can never
+     reach a `Unit ID` heading. */
+  const idOf = (code: string): string | null =>
+    unitIdOf({ unitCode: code, identityScope: unitScopes?.[code] ?? null });
+
+  /**
+   * ⭐ ABSENCE PROVES NOTHING (owner correction 2026-09-11).
+   *
+   * This used to read a Unit MISSING from `unitLines` as exact, on the ground
+   * that only incoming goods are absent from the map and those are evidenced by
+   * a purchase-order line sourced exclusively to this item line. The premise
+   * was true and the rule was still wrong: it made a gap in the DATA prove a
+   * fact about the GOODS, so any future read that stopped populating the map —
+   * or populated it partially — would silently start certifying inferences.
+   *
+   * The server now writes the incoming-exclusive binding INTO the map, so the
+   * fact is DECLARED. Absence therefore means nothing evidenced it, and says so.
+   */
   const association = (unitId: string): UnitAssociation => {
-    if (!unitLines) return "unresolved";
-    if (!(unitId in unitLines)) return "exact"; // incoming, exclusive by document
-    if (unitLines[unitId] === orderLineId) return "exact";
-    /* No binding at all, or a binding naming another line: either way this row
-       got here by SKU, and the screen says which kind of claim that is. */
-    return "inferred";
+    if (!unitLines || !(unitId in unitLines)) return "unresolved";
+    return unitLines[unitId] === orderLineId ? "exact" : "inferred";
   };
 
-  const facts = (poNo: string) => {
+  const facts = (poNo: string, destinationId: string | null | undefined) => {
     const p = po(poNo);
+    /* The LINE's destination. The document's own is the fallback the SERVER
+       already applied where the line had none; it is never substituted for a
+       destination the line actually records. */
+    const destination = destinationId !== undefined ? destinationId : (p?.destinationId ?? null);
     return {
-      deliverTo: p ? destinationName(p.destinationId) || null : null,
+      poStatus: p ? soBatchPoDocumentState(p) : "Not recorded",
+      deliverTo: destinationName(destination) || null,
       supplier: p?.supplierName ?? null,
       poDeliveryDate: p?.officialDeliveryDate ? fmtDate(p.officialDeliveryDate) : null,
     };
@@ -164,32 +229,45 @@ export function poDetailRowsForLine(input: {
   const rows: PoDetailRow[] = [];
   const used = new Set<string>();
 
-  for (const { poId, qty } of lineage) {
-    const units = unitIds.filter((u) => unitCoverage[u] === poId);
+  for (const entry of lineage) {
+    const { poId, qty } = entry;
+    const onThisDocument = unitIds.filter((u) => unitCoverage[u] === poId);
+    /* A counted row is not a Unit and never becomes one. Its presence changes
+       the WORD on the remainder — these goods will never carry a Unit ID — and
+       nothing else. */
+    const counted = onThisDocument.filter((u) => idOf(u) === null);
+    const units = onThisDocument.filter((u) => idOf(u) !== null);
+    let exact = 0;
     for (const unitId of units) {
       used.add(unitId);
+      const how = association(unitId);
+      if (how === "exact") exact += 1;
       rows.push({
-        key: `${lineKey}::${poId}::${unitId}`,
+        key: `${lineKey}::${poId}::${entry.poLineId ?? ""}::${unitId}`,
         poNo: poId,
-        unitId,
+        unitId: idOf(unitId),
         unitAbsence: absence,
-        association: association(unitId),
+        association: how,
         sku, item, itemDetail,
-        qty: 1,
-        ...facts(poId),
+        /* ⛔ ONLY EVIDENCE CARRIES A QUANTITY. An inferred Unit is offered to
+           every item line of its SKU, so counting it here would let one
+           physical Unit answer two lines at once. Its quantity stays in the
+           remainder row, honestly described. */
+        qty: how === "exact" ? 1 : null,
+        ...facts(poId, entry.destinationId),
       });
     }
-    const remaining = qty - units.length;
+    const remaining = qty - exact;
     if (remaining > 0) {
       rows.push({
-        key: `${lineKey}::${poId}::rest`,
+        key: `${lineKey}::${poId}::${entry.poLineId ?? ""}::rest`,
         poNo: poId,
         unitId: null,
-        unitAbsence: absence,
+        unitAbsence: counted.length > 0 && units.length === 0 ? NOT_UNIT_TRACKED : absence,
         association: "exact",
         sku, item, itemDetail,
         qty: remaining,
-        ...facts(poId),
+        ...facts(poId, entry.destinationId),
       });
     }
   }
@@ -200,15 +278,17 @@ export function poDetailRowsForLine(input: {
     if (used.has(unitId)) continue;
     const poNo = unitCoverage[unitId];
     if (!poNo) continue; // no document behind it — that is Ready Stock's answer
+    if (idOf(unitId) === null) continue; // counted goods are not a Unit record
     rows.push({
       key: `${lineKey}::${poNo}::${unitId}::extra`,
       poNo,
-      unitId,
+      unitId: idOf(unitId),
       unitAbsence: absence,
       association: association(unitId),
       sku, item, itemDetail,
-      qty: 1,
-      ...facts(poNo),
+      /* It is outside this line's lineage, so it answers none of its quantity. */
+      qty: null,
+      ...facts(poNo, undefined),
     });
   }
 
@@ -232,6 +312,12 @@ function Absence({ children }: { children: string }) {
  * document's number and shortening it would name a document that does not
  * exist.
  *
+ * `PO Status` is the DOCUMENT's own recorded state, and it is what makes the
+ * arithmetic legible: `On PO` upstairs counts every non-cancelled document,
+ * `Completed` ones included, while `To buy` is netted against OPEN documents
+ * only. Without this column a reader cannot tell fourteen delivered documents
+ * from fourteen outstanding ones.
+ *
  * `Ready Stock`, `To buy` and the tick column are deliberately ABSENT. They
  * would print a dash on every row of this table forever, and a column of
  * dashes is a column that states nothing in the width of a real answer.
@@ -244,6 +330,7 @@ const COLUMNS = [
   { key: "qty", label: "Qty", width: 64 },
   { key: "deliverTo", label: "Deliver To", width: 150 },
   { key: "supplier", label: "Supplier", width: 140 },
+  { key: "poStatus", label: "PO Status", width: 160 },
   { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 },
 ] as const;
 
@@ -338,13 +425,16 @@ export default function PoDetailsTable({
                 <div className="font-medium text-base-900">{r.item}</div>
                 {r.itemDetail ? <div className="mt-0.5 text-base-600">{r.itemDetail}</div> : null}
               </td>
-              <td className="px-2 py-2 tabular-nums">{r.qty}</td>
+              <td className="px-2 py-2 tabular-nums">
+                {r.qty == null ? <Absence>—</Absence> : r.qty}
+              </td>
               <td className="px-2 py-2">
                 {r.deliverTo ? r.deliverTo : <Absence>Not recorded</Absence>}
               </td>
               <td className="px-2 py-2">
                 {r.supplier ? r.supplier : <Absence>Not recorded</Absence>}
               </td>
+              <td className="px-2 py-2">{r.poStatus}</td>
               <td className="px-2 py-2">
                 {r.poDeliveryDate ? (
                   r.poDeliveryDate
