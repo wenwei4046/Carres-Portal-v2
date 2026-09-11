@@ -332,10 +332,7 @@ export default function GoodsMiniTable({
   showPoDeliveryDate = false,
   showPoNo = false,
   showUnitId = true,
-  oneRowPerUnit = false,
   salesOrderLayout = false,
-  onCoveredByClick,
-  isCoveredByLinkable,
   onPoClick,
   onOpenPoDetails,
 }: {
@@ -366,29 +363,6 @@ export default function GoodsMiniTable({
    * byte-identically to what they rendered before.
    */
   identityFirst?: boolean;
-  /**
-   * ⭐ THE EXACT MAPPING IS ALSO A DOOR (YH, 2026-09-01).
-   *
-   * The register's `PO No` cell links only when an order has exactly ONE
-   * purchase order; with several it prints "2 POs" and points the reader at
-   * this expansion, which the blueprint names as the place the exact numbers
-   * live. Those numbers were bare text, so the MORE work an order generated
-   * the FEWER doors it had — the operator copied a PO number by eye and went
-   * to look for it in Purchase Orders.
-   *
-   * Optional on purpose: a truth register that only STATES coverage passes
-   * nothing and keeps the printed strings. Only a page that can navigate
-   * supplies this.
-   */
-  onCoveredByClick?: (poId: string) => void;
-  /**
-   * Which `Covered by` entries are documents, decided by the page that built
-   * the list. The column mixes real purchase orders with `Ready Stock` — an
-   * answer, not a document — and only the caller knows which is which. This
-   * box does not learn what a PO number looks like; a predicate that never
-   * answers true simply leaves every entry as text.
-   */
-  isCoveredByLinkable?: (value: string) => boolean;
   /** Card 02-B — the exact-mapping columns the buying Register asks for. */
   showSupplier?: boolean;
   showPoDeliveryDate?: boolean;
@@ -409,8 +383,6 @@ export default function GoodsMiniTable({
   showUnitId?: boolean;
   /** Trial nested-card presentation for the Sales Orders register only. */
   salesOrderLayout?: boolean;
-  /** Disclose each physical Unit separately while retaining line selection. */
-  oneRowPerUnit?: boolean;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
