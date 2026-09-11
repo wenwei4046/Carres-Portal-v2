@@ -6,6 +6,7 @@ import {
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
   soBatchPoDocumentState,
+  soBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchOrderRow,
@@ -79,6 +80,9 @@ function row(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean, and `false` — nothing
+       of this build sits on an open purchase order — is the ordinary case. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -418,6 +422,65 @@ describe("the rail model — unique-SO counts that cross-update between sections
    * documents and fourteen `Not sent to supplier` ones are opposite
    * situations wearing the same `On PO 14`.
    */
+  /**
+   * ⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY.
+   *
+   * The engine prints the COVERING document's quantity under `To buy` when the
+   * open-PO pool covers every unit (T6), and the Register drew it on a row it
+   * does not offer — a covering quantity wearing a purchasing heading. These
+   * four cases are the only four, and three of them print no figure at all.
+   */
+  describe("soBatchToBuyState", () => {
+    const buyable = (over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow =>
+      row({ toBuy: 3, fullyOnPo: false, ...over });
+
+    it("states the remainder ONLY when the engine verified it is uncovered", () => {
+      expect(soBatchToBuyState(buyable(), "blank")).toEqual({ kind: "buy", qty: 3 });
+    });
+
+    it("states no purchasing quantity for a covered build", () => {
+      /* `issue-batch` refuses this by name (`already_on_po`), so the figure is
+         the coverage, not a remainder — and it is not this column's to print. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: true }), "blank")).toEqual({
+        kind: "covered",
+      });
+    });
+
+    it("states no purchasing quantity when it could not check", () => {
+      /* UNKNOWN IS NOT YES. An older Worker sends no flag; the page says so
+         rather than reading the gap as permission. */
+      expect(soBatchToBuyState(buyable({ fullyOnPo: undefined }), "blank")).toEqual({
+        kind: "unchecked",
+      });
+    });
+
+    it("says nothing at all on an order that has finished buying", () => {
+      expect(soBatchToBuyState(buyable(), "ordered")).toEqual({ kind: "none" });
+    });
+
+    it("says nothing at all on a line this page cannot buy", () => {
+      expect(soBatchToBuyState(buyable({ toBuy: 0 }), "blank")).toEqual({ kind: "none" });
+      expect(soBatchToBuyState(buyable({ issueRef: null }), "blank")).toEqual({ kind: "none" });
+    });
+
+    /* THE TICK AND THE FIGURE AGREE, ALWAYS. A row that states a purchasing
+       quantity is exactly a row the page offers, and the reverse. */
+    it("prints a figure on exactly the rows the register offers", () => {
+      for (const row of [
+        buyable(),
+        buyable({ fullyOnPo: true }),
+        buyable({ fullyOnPo: undefined }),
+        buyable({ toBuy: 0 }),
+      ]) {
+        for (const status of ["blank", "partial", "ordered"] as const) {
+          expect(soBatchToBuyState(row, status).kind === "buy").toBe(
+            isSelectableForOrder(row, status),
+          );
+        }
+      }
+    });
+  });
+
   describe("soBatchPoDocumentState", () => {
     it("speaks the governed words, and never the raw database value", () => {
       expect(soBatchPoDocumentState({ status: "received", sentCurrentVersion: true }))

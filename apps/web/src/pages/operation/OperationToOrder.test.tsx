@@ -81,6 +81,10 @@ function payload(over: Partial<SoBatchPurchaseResponse> = {}): SoBatchPurchaseRe
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean; `false` — nothing of
+       this build sits on an open purchase order — is the ordinary case, and it
+       is what makes the row offerable. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",

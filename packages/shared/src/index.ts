@@ -2362,6 +2362,8 @@ export {
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
   soBatchPoDocumentState,
+  soBatchToBuyState,
+  type SoBatchToBuyState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,

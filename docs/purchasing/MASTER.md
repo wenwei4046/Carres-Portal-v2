@@ -1168,10 +1168,23 @@ before the record, which is the section that grows without limit.
                                                                  Issue PO buys again
 ```
 
-- **`To buy` says WHICH KIND of number it is AND WHAT TICKING IT DOES.** A figure qualified by
-  `Already on a PO` · `Issue PO buys again` is the coverage a tick would buy a second time, not a
-  remainder — see the traced table below. An unqualified figure is a remainder. An older Worker that
-  carries no `fullyOnPo` prints no qualifier: UNKNOWN accuses nothing and claims nothing.
+- **⭐ `To buy` STATES A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY — owner correction
+  2026-09-11.** The engine prints the COVERING document's quantity under `To buy` when the open-PO
+  pool covers every unit of a build (T6 — a receipt states what it bought, and `0` would answer a
+  question nobody asked). Drawing that figure on a row nobody may tick presented **a covering
+  quantity as a purchasing quantity**, under a heading that means *what is left to buy*. So the cell
+  prints its existing governed absence in every non-actionable state and the row says which state it
+  is in — `soBatchToBuyState` gives the four, and a figure appears on exactly the rows
+  `isSelectableForOrder` offers:
+  | State | `To buy` | Tick |
+  |---|---|---|
+  | verified uncovered (`fullyOnPo === false`) | the remainder | offered |
+  | covered (`fullyOnPo === true`) | `—` · `Already on a PO` · `Nothing to buy here` | none |
+  | not checked (no flag in the payload) | `—` · `Coverage not checked` | none |
+  | nothing to buy / order finished | `—` | none |
+  **No arithmetic is invented and no server number is changed.** The customer's original `Qty` and
+  the historical `Ordered Qty` are two columns away and untouched, and the documents themselves are
+  one section below — nothing is hidden, only nothing is claimed.
 - **⭐ THE COLUMN IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.** `On PO` is the
   dictionary's head for *how many of this item an **open** purchase order already covers* — the
   engine's pooled, netted, still-outstanding coverage. The figure this cell prints is a different
@@ -1361,13 +1374,22 @@ fixtures and the rendered components, not against live rows.
 *a row that cannot become a purchase order is not offered a tick-box, because the Register refuses
 it here and the API refuses it again* — and the covered shape was the one case where the page
 offered an act the door then refused. The engine's own `fullyOnPo` rides the wire, so
-`isSelectableForOrder` closes the same gate, and the row states the refusal's own words beside the
-figure that raised the question: `To buy 1` · `Already on a PO` · `Nothing to buy here`, titled with
+`isSelectableForOrder` closes the same gate, and the row states the refusal's own words in place of
+the figure: `To buy —` · `Already on a PO` · `Nothing to buy here`, titled with
 `purchasingRefusal("already_on_po")`. **This is not a new buying rule and it disables no workflow** —
 the workflow was already dead at the door; the operator now learns it before arranging a destination
-instead of after pressing a button. **It fails OPEN:** `fullyOnPo` is optional, so an older Worker's
-payload leaves the tick exactly where it is and the API still refuses by name. A missing fact never
-hides demand.
+instead of after pressing a button.
+
+**⭐ AND UNKNOWN IS NOT YES.** `isSelectableForOrder` requires `fullyOnPo === false` — verified
+uncovered — not merely "not known to be covered". A payload without the flag cannot distinguish an
+uncovered line from one nobody checked, and reading that gap as permission is what put the tick on a
+covered row in the first place. **The carried build path always sends the boolean**
+(`purchase-demands.ts`), and a refused line carries no `toBuy`/`issueRef` and fails
+`isSelectableForBuying` anyway — so the only payload that reaches this gate without it is an older
+Worker's, during a deploy in which the Pages bundle leads the Worker. There the row states
+`Coverage not checked`, offers no tick and prints no purchasing quantity, and **the issue door's own
+refusal is untouched underneath**. The demand itself is never hidden: `Qty`, `Ready Stock` and
+`Ordered Qty` all still print.
 
 The other duplication — an order whose own lineage already covers what it required — is refused by
 the `ordered` half of `isSelectableForOrder`, and that is untouched.
