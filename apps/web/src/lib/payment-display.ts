@@ -47,7 +47,7 @@ export async function viewSlip(p: Pick<OrderPaymentRow, "receipt_url">) {
 
 /** POS capture codes have different meanings from operational ledger codes. */
 export function atSalePaymentWord(method: string | null | undefined, months: number | null | undefined): string | null {
-  const word = method ? (DEFAULT_PAYMENT_METHODS.find((m) => m.key === method)?.label ?? payMethodWord(method)) : null;
+  const word = method ? (DEFAULT_PAYMENT_METHODS.find((m) => m.key === method)?.label ?? method) : null;
   const plan = months != null && Number.isInteger(Number(months)) && Number(months) > 0
     ? `${Number(months)}-month instalment` : null;
   return plan && word && method !== "installment" ? `${plan} · ${word}` : plan ?? word;

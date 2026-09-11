@@ -1507,11 +1507,13 @@ the amendment machinery, the goods truth and the Order Route architecture are un
     creation history also says 0% deposit. The authenticated Sales Portal My orders drawer
     confirms `Paid so far RM 0 / 2,874` and `0% collected`; its additional-payment input
     pre-fills 2,874 but is not a submitted payment. The attachment cannot establish a paid
-    amount. No business rows were changed. The Sales Portal create route
-    does not post its initial deposit to the canonical writer; the raw create route alone has
-    a best-effort mirror. Payment ownership confirmed this is outside its active UI change.
-    Historical money reconciliation needs verified source amounts and the governed Payments
-    correction path; displaying captured evidence does not claim that writer gap is repaired.
+    amount. No business rows were changed. At the initial investigation the Sales Portal create
+    did not post its deposit through the canonical writer and raw create used a best-effort
+    mirror. PR #1219, subsequently merged into this delivery base, supplies migration 0476:
+    both create wrappers use `_order_create_deposit` in the order transaction. That writer
+    correction belongs to Finance; this read-only change does not apply migrations or backfill
+    historical payments. Historical reconciliation still needs verified source amounts and
+    the governed Payments correction path; the saved zero is never replaced with a guess.
   - **Old revisions use their own lines and services.** SKU/configuration and service amounts
     cannot be paired with current rows by position. Current Unit IDs/destinations do not prove
     historical allocation. Current partially allocated lines preserve all recorded Unit IDs,

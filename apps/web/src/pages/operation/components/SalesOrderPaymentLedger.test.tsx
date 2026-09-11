@@ -153,7 +153,7 @@ describe("the Sales Order payment ledger", () => {
 });
 
 describe("saved POS payment details", () => {
-  it("does not reinterpret the POS online-transfer code as the ledger e-wallet code", () => {
+  it("preserves the POS online-transfer meaning independently of transaction labels", () => {
     expect(atSalePaymentWord("online", null)).toBe("Online transfer");
     expect(atSalePaymentWord("installment", 12)).toBe("12-month instalment");
   });
