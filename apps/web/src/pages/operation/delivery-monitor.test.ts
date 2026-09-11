@@ -363,11 +363,39 @@ describe("buildDeliveryMonitorCards", () => {
     it("a photo on file leaves only the signed Delivery Order owed", () => {
       const c = delivered({
         ops_order_control: {
-          delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }],
+          delivery_photos: [
+            { path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" },
+          ],
         },
       });
       expect(c.missingProof).toEqual({ photo: false, signedDo: true });
       expect(missingProofLabels(c)).toEqual(["Upload signed Delivery Order"]);
+    });
+
+    /**
+     * ⭐ THE PHOTO MUST BE THIS TRIP'S (owner ruling 2026-09-11). The ledger
+     * belongs to the Sales Order; before the stamp, a photo from ANOTHER
+     * delivery order closed this one's work.
+     */
+    it("another document's photo does not clear this delivery's photo work", () => {
+      const c = delivered({
+        ops_order_control: {
+          delivery_photos: [
+            { path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-OTHER", kind: "photo" },
+          ],
+        },
+      });
+      expect(c.missingProof.photo).toBe(true);
+      expect(missingProofLabels(c)).toContain("Upload delivery photo");
+    });
+
+    it("a file that names no document belongs to no delivery's evidence", () => {
+      const c = delivered({
+        ops_order_control: {
+          delivery_photos: [{ path: "legacy.jpg", at: "2026-09-03T11:00:00Z", by: null }],
+        },
+      });
+      expect(c.missingProof.photo).toBe(true);
     });
 
     it("the signed document on file (`orders.do_file_path`) clears that half", () => {
@@ -381,7 +409,13 @@ describe("buildDeliveryMonitorCards", () => {
 
     it("both on file — nothing owed, the row leaves the queue", () => {
       const c = delivered(
-        { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }] } },
+        {
+          ops_order_control: {
+            delivery_photos: [
+              { path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" },
+            ],
+          },
+        },
         { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf" } },
       );
       expect(needsProof(c)).toBe(false);

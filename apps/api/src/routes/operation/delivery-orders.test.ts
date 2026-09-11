@@ -471,6 +471,68 @@ describe("POST /:id/outbound-prep — scan / check / pack exact Units (0424)", (
   });
 });
 
+/**
+ * ⭐ THE SIGNED DELIVERY ORDER'S VIEWING DOOR (owner ruling 2026-09-11).
+ *
+ * The register's `Driver submission` column offers a link to the paper the
+ * customer signed, and no reader existed for it: `orders.do_file_path` lives
+ * in a PRIVATE bucket, so the Worker signs it after its own role gate — the
+ * same 0280 pattern the photo ledger already uses. Signed ON DEMAND, because
+ * a list that pre-signed every row would hand out hundreds of one-hour links
+ * nobody clicks.
+ */
+describe("GET /:id/signed-document — the paper the customer signed", () => {
+  const DO_ID = "00000000-0000-0000-0000-0000000d0001";
+
+  it("signs the order's document for viewing, resolved by the DO number", async () => {
+    mockSb([
+      {
+        data: {
+          id: DO_ID,
+          do_number: "DO-180826-3035",
+          orders: { id: "a", do_file_path: "order-a/signed.pdf", do_uploaded_at: "2026-08-20T10:00:00Z" },
+        },
+      },
+    ]);
+    const createSignedUrl = vi
+      .fn()
+      .mockResolvedValue({ data: { signedUrl: "https://signed/do.pdf" }, error: null });
+    const bucket = vi.fn().mockReturnValue({ createSignedUrl });
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: bucket } } as never);
+
+    const res = await call("/DO-180826-3035/signed-document", "operation");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      url: "https://signed/do.pdf",
+      uploadedAt: "2026-08-20T10:00:00Z",
+    });
+    /* The customer-facing DO lives in the delivery-orders bucket, not the
+       proof-of-delivery one the photos use. */
+    expect(bucket).toHaveBeenCalledWith("delivery-orders");
+  });
+
+  it("a document with no signed paper answers an ABSENCE, never a 500", async () => {
+    mockSb([
+      { data: { id: DO_ID, do_number: "DO-1", orders: { id: "a", do_file_path: null, do_uploaded_at: null } } },
+    ]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: null, uploadedAt: null });
+  });
+
+  it("404s a document that does not exist", async () => {
+    mockSb([{ data: null }]);
+    const res = await call(`/${DO_ID}/signed-document`, "operation");
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a role outside operation/principal", async () => {
+    mockSb([]);
+    const res = await call(`/${DO_ID}/signed-document`, "supplier");
+    expect([401, 403]).toContain(res.status);
+  });
+});
+
 describe("POST /:id/handover-proof/sign-upload", () => {
   const DO_ID = "00000000-0000-0000-0000-0000000d0001";
 

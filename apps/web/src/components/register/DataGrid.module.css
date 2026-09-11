@@ -840,3 +840,74 @@ div:first-child > .columnsMenuGroup {
   gap: 1px;
   justify-content: center;
 }
+
+/* ── THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) ───────────────
+   A register can be narrowed from two places at once — the page's own
+   filter rail and the grid's per-column funnels — and until now neither
+   said what the other had done. An operator looking at four rows could
+   not see WHY there were four. This strip states every live condition in
+   one line, each one removable on its own, with one `Clear filters` that
+   removes them all.
+
+   Opt-in: a grid given no page conditions and carrying no column filter
+   renders nothing at all, so no existing register gains a band. */
+.conditionBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px var(--space-3);
+  background: var(--c-paper);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  color: var(--fg-muted);
+}
+.conditionBarLabel {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.conditionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 4px 1px 8px;
+  font-size: var(--fs-11);
+  color: var(--c-ink);
+}
+.conditionChipText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conditionChipRemove {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.conditionChipRemove:hover {
+  color: var(--c-festive-b, #dc2626);
+}
+.conditionClear {
+  background: transparent;
+  border: 0;
+  padding: 0 2px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--c-burnt, #c44d2b);
+  cursor: pointer;
+}
+.conditionClear:hover {
+  text-decoration: underline;
+}

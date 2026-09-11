@@ -7,6 +7,7 @@ import {
   delayDecisionInput,
   signDeliveryPhotoUploadInput,
   attachDeliveryPhotoInput,
+  DELIVERY_PROOF_EXTENSION,
   type DeliveryPhoto,
   deliveryAttemptRecordInputSchema,
   isSundayIso,
@@ -1002,11 +1003,23 @@ orderControlRouter.get("/:id/booking/partner-check", async (c) => {
 // ops were never a working path for HQ here (same admin-signing pattern as
 // partner/pod.ts's 2026-05-13 path + the 0279 rental signature upload).
 
-/** The T6 gate: a delivery photo proves a delivery that HAPPENED — the order
- *  must read delivered before anything may be signed or attached. Same two
- *  signals the drawer's own delivered chip folds (orders.operation_stage /
- *  orders.status). Returns a Response to send, or null when the gate passes. */
-async function refuseUnlessDelivered(
+/**
+ * The T6 gate: a delivery photo proves a delivery that HAPPENED.
+ *
+ * ⭐ THE GATE FOLLOWS THE RECORDED RESULT, NOT ONLY THE ORDER STAGE (defect
+ * found while wiring the 2026-09-11 driver-submission ruling). It used to ask
+ * one question — is the ORDER delivered? — and `delivery_attempt_record`
+ * never touches `orders.operation_stage`, so a **Partially Delivered** trip
+ * sat in the register's own `Upload delivery photo` queue behind a door that
+ * refused every file. A queue nobody can empty is worse than no queue.
+ *
+ * The gate now asks what `missingDeliveryProofOf` asks: did goods REACH the
+ * customer? That is the order reading delivered, OR a recorded
+ * `delivered`/`partial` result. A failed trip still owes no delivery photo
+ * and is still refused here. Returns a Response to send, or null when the gate
+ * passes.
+ */
+async function refuseUnlessReachedCustomer(
   c: Context<AppEnv>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sb: any,
@@ -1022,20 +1035,56 @@ async function refuseUnlessDelivered(
     return c.json(m.body, m.status);
   }
   if (!order) throw new HTTPException(404, { message: "Order not found" });
-  const delivered =
-    order.operation_stage === "delivered" || order.status === "delivered";
-  if (!delivered) {
-    return c.json(
-      {
-        error: "not_delivered",
-        code: "not_delivered",
-        message:
-          "A delivery photo can only be attached once the order is delivered",
-      },
-      422,
-    );
+  if (order.operation_stage === "delivered" || order.status === "delivered") {
+    return null;
   }
-  return null;
+  const attempts = await sb
+    .from("delivery_attempts")
+    .select("result")
+    .eq("order_id", orderId)
+    .in("result", ["delivered", "partial"])
+    .limit(1);
+  if (attempts.error) {
+    const m = mapPgError(attempts.error);
+    return c.json(m.body, m.status);
+  }
+  if ((attempts.data ?? []).length > 0) return null;
+  return c.json(
+    {
+      error: "not_delivered",
+      code: "not_delivered",
+      message:
+        "A delivery photo can only be attached once the goods have reached the customer",
+    },
+    422,
+  );
+}
+
+/**
+ * ⭐ THE SUBMISSION NAMES ITS DOCUMENT, AND THE SERVER CHECKS THE NAME
+ * (owner ruling 2026-09-11).
+ *
+ * A client may say which Delivery Order a file came back from; it may not
+ * INVENT one. The number must be a document of THIS order — so a photo can
+ * never be stamped onto another order's trip, and a register counting per
+ * document counts recorded facts only. `null` = the caller named no
+ * document, which stays a legal (and pre-ruling) state.
+ */
+async function verifiedDoNumberOf(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  orderId: string,
+  doNumber: string | undefined,
+): Promise<{ value: string | null } | { refusal: "unknown_do" }> {
+  if (!doNumber) return { value: null };
+  const { data, error } = await sb
+    .from("ops_delivery_orders")
+    .select("do_number")
+    .eq("order_id", orderId)
+    .eq("do_number", doNumber)
+    .maybeSingle();
+  if (error || !data) return { refusal: "unknown_do" };
+  return { value: (data as { do_number: string }).do_number };
 }
 
 // POST /:id/delivery-photo/sign-upload — short-lived signed upload URL into
@@ -1069,15 +1118,11 @@ orderControlRouter.post("/:id/delivery-photo/sign-upload", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
 
-  const ext =
-    parsed.data.mimeType === "image/png"
-      ? "png"
-      : parsed.data.mimeType === "image/webp"
-        ? "webp"
-        : "jpg";
+  /* ONE mime → extension map, shared with the handover door (Law D). */
+  const ext = DELIVERY_PROOF_EXTENSION[parsed.data.mimeType] ?? "jpg";
   const path = `order/${idCheck.data}/${crypto.randomUUID()}-delivery.${ext}`;
   const admin = adminClient(c.env);
   const { data, error } = await admin.storage
@@ -1131,8 +1176,22 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
   }
 
   const sb = userClient(c.env, auth.jwt);
-  const refusal = await refuseUnlessDelivered(c, sb, idCheck.data);
+  const refusal = await refuseUnlessReachedCustomer(c, sb, idCheck.data);
   if (refusal) return refusal;
+
+  /* The named document must be one of THIS order's own (2026-09-11). */
+  const doCheck = await verifiedDoNumberOf(sb, idCheck.data, parsed.data.doNumber);
+  if ("refusal" in doCheck) {
+    return c.json(
+      {
+        error: "invalid_input",
+        code: "invalid_param",
+        message: "That delivery order does not belong to this order",
+        field: "doNumber",
+      },
+      422,
+    );
+  }
 
   const { data: ctrl, error: ctrlErr } = await sb
     .from("ops_order_control")
@@ -1150,6 +1209,8 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     path: parsed.data.path,
     at: new Date().toISOString(),
     by: auth.id,
+    doNumber: doCheck.value,
+    kind: parsed.data.kind ?? "photo",
   };
 
   const { data, error } = await sb
@@ -1175,7 +1236,14 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
   // never undo a recorded photo), same as the T4 postpone write.
   await sb.rpc("operation_add_annotation", {
     p_order_id: idCheck.data,
-    p_content: "Delivery photo uploaded",
+    /* The activity line names the file's kind and its trip — an audit reader
+       must be able to tell a video of DO-A from a photo of DO-B. */
+    p_content: [
+      entry.kind === "video" ? "Delivery video uploaded" : "Delivery photo uploaded",
+      doCheck.value ? `· ${doCheck.value}` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     p_tag: null,
   });
 

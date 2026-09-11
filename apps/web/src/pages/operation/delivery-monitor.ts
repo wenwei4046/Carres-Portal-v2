@@ -64,7 +64,9 @@ import {
 } from "./delivery-work";
 import {
   DOR_COPY,
+  driverSubmissionOf,
   missingDeliveryProofOf,
+  UNKNOWN_SUBMISSION,
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
 import { lineName } from "./sales-order-facts";
@@ -561,9 +563,15 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
     const control =
       overlayOf(row.o.ops_order_control) ?? overlayOf(doc?.orders.ops_order_control ?? null);
     const photos = control?.delivery_photos;
+    /* ⭐ SCOPED TO THE DOCUMENT (owner ruling 2026-09-11). The ledger belongs
+       to the Sales Order; the question is whether THIS trip came back with a
+       photo. Reading the whole order's ledger closed one document's work on
+       another document's file. driverSubmissionOf is the ONE reader of the
+       stamp (Law D) - no card computes the scope itself. */
+    const submission = doc ? driverSubmissionOf(photos, doc.do_number) : UNKNOWN_SUBMISSION;
     const missingProof = missingDeliveryProofOf({
       latestResult: doc ? latestByDo.get(doc.do_number)?.result ?? null : null,
-      photosPresent: photos === undefined || photos === null ? null : photos.length > 0,
+      photosPresent: submission.known ? submission.photos > 0 : null,
       signedDoPresent: Boolean(doc?.orders.do_file_path),
     });
     /* ── THE GOODS, THE STOCK AND THE ARRIVAL (owner ruling 2026-09-10) ────

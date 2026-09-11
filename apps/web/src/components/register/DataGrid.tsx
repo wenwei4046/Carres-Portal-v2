@@ -50,7 +50,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer } from "lucide-react";
+import { Search, Columns3, RotateCcw, Filter, Download, ChevronDown, Printer, X } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { SkeletonRows } from "./Skeleton";
@@ -348,6 +348,22 @@ export type DataGridProps<T> = {
    */
   chooserGroupOrder?: readonly string[];
   /**
+   * ⭐ THE PAGE'S OWN LIVE CONDITIONS (owner ruling 2026-09-11).
+   *
+   * A register is narrowed from TWO places - the page's filter rail and this
+   * grid's per-column funnels - and neither used to say what the other had
+   * done, so an operator reading four rows could not see why there were four.
+   * A page hands its conditions in here and they appear in ONE strip with the
+   * column filters, each removable on its own, under one `Clear filters`.
+   *
+   * Absent = no strip at all: no existing register gains a band it did not ask
+   * for (every optional power stays optional).
+   */
+  activeConditions?: Array<{ key: string; label: string; onClear: () => void }>;
+  /** Called by `Clear filters` after the grid clears its own column filters,
+   *  so one click really does clear everything the strip listed. */
+  onClearConditions?: () => void;
+  /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
    * "N of M rows / Reset layout" status line — both read as heavy chrome
@@ -495,6 +511,8 @@ function DataGridInner<T>({
   expandable,
   selectable,
   chooserGroupOrder,
+  activeConditions,
+  onClearConditions,
   embedded = false,
 }: DataGridProps<T>) {
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
@@ -2001,6 +2019,95 @@ function DataGridInner<T>({
             ))}
         </div>
       )}
+
+      {/* ⭐ THE ACTIVE CONDITION BAR (owner ruling 2026-09-11) - every live
+          narrowing in ONE line, whoever applied it, each removable on its own
+          and all of them under one `Clear filters`. Renders nothing when
+          nothing is narrowed, and nothing at all for a grid whose page hands
+          in no conditions and carries no column filter. */}
+      {(() => {
+        const columnChips = [
+          ...Object.entries(filters)
+            .filter(([, v]) => v.length > 0)
+            .map(([key, values]) => ({
+              key: `col:${key}`,
+              label: `${columns.find((c) => c.key === key)?.label ?? key}: ${values.join(", ")}`,
+              onClear: () =>
+                setFilters((prev) => {
+                  const next = { ...prev };
+                  delete next[key];
+                  return next;
+                }),
+            })),
+          ...Object.keys(dateFilters).map((key) => ({
+            key: `date:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateFilters[key]}`,
+            onClear: () =>
+              setDateFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(dateRangeFilters).map((key) => ({
+            key: `range:${key}`,
+            label: `${columns.find((c) => c.key === key)?.label ?? key}: ${dateRangeFilters[key]?.from ?? ""} - ${dateRangeFilters[key]?.to ?? ""}`,
+            onClear: () =>
+              setDateRangeFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+          ...Object.keys(numberFilters).map((key) => ({
+            key: `num:${key}`,
+            label: columns.find((c) => c.key === key)?.label ?? key,
+            onClear: () =>
+              setNumberFilters((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              }),
+          })),
+        ];
+        const chips = [...(activeConditions ?? []), ...columnChips];
+        if (chips.length === 0) return null;
+        return (
+          <div className={styles.conditionBar} data-testid="active-conditions">
+            <span className={styles.conditionBarLabel}>Showing only:</span>
+            {chips.map((chip) => (
+              <span key={chip.key} className={styles.conditionChip}>
+                <span className={styles.conditionChipText} title={chip.label}>
+                  {chip.label}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conditionChipRemove}
+                  aria-label={`Remove ${chip.label}`}
+                  title={`Remove ${chip.label}`}
+                  onClick={chip.onClear}
+                >
+                  <X size={12} strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              className={styles.conditionClear}
+              data-testid="clear-filters"
+              onClick={() => {
+                setFilters({});
+                setDateFilters({});
+                setNumberFilters({});
+                setDateRangeFilters({});
+                onClearConditions?.();
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Group-by zone */}
       {groupBanner && (

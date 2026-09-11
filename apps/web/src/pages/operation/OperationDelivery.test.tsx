@@ -756,7 +756,15 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
         so: 1326,
         do_number: "DO-E",
         customer_name: "ng siew lan",
-        ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null }] },
+        /* ⭐ The photo names the trip it came back from (owner ruling
+           2026-09-11). An unstamped file belongs to no document's evidence,
+           so this fixture states the document, exactly as the upload door
+           now does. */
+        ops_order_control: {
+          delivery_photos: [
+            { path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-E", kind: "photo" },
+          ],
+        },
       }),
     );
     docsState.data!.deliveryOrders.push(

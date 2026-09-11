@@ -52,16 +52,37 @@ export const DOR_COPY = {
   uploadSignedDo: "Upload signed Delivery Order",
   loadFailed: "The register could not be loaded",
   tryAgain: "Try again",
+  /** The register's own column words (owner ruling 2026-09-11). */
+  driverSubmission: "Driver submission",
+  photos: "Photos",
+  videos: "Videos",
+  signedDo: "Signed Delivery Order",
+  openPhotos: "Open delivery photos",
+  openVideos: "Open delivery videos",
+  openSignedDo: "Open the signed Delivery Order",
   /** Governed absences — muted, never a dash (COPY-STANDARD 2026-08-15). */
   noConfirmedDate: "No confirmed date",
   noTime: "No time agreed",
   noLogistics: "No logistics picked",
   notDelivered: "Not delivered yet",
   noPhoto: "No delivery photo yet",
+  /** A video is never automatically required (owner ruling 2026-09-11), so
+   *  this absence is only ever stated inside the player a person opened. */
+  noVideo: "No delivery video",
   photoSaved: "Delivery photo saved",
   noSignedDo: "No signed document yet",
   signedDoOnFile: "Signed document on file",
+  notRecorded: "Not recorded",
   noGoods: "No items on this trip",
+  /** An upload is an upload — never a verdict (owner ruling 2026-09-11). */
+  submissionMeaning:
+    "An uploaded file records what the driver sent. It is not proof accepted and not a successful delivery.",
+  unboundNote:
+    "delivery files on this Sales Order name no delivery order, so they are counted for none of them. Open the Sales Order to see them.",
+  signedDoMissing: "This delivery order has no signed document on file.",
+  signedDoFailed: "The signed Delivery Order could not be opened",
+  mediaFailed: "The driver submission could not be loaded",
+  loading: "Loading…",
   emptyRegister:
     "No delivery orders yet — the system issues one when a trip's goods, logistics and date are ready. The Order Route on each Sales Order shows what is still open.",
   emptyFiltered: "No matching delivery orders.",
@@ -73,6 +94,87 @@ export const DELIVERY_RESULT_LABEL: Record<"delivered" | "partial" | "failed", s
   partial: "Partially Delivered",
   failed: "Failed Delivery",
 };
+
+/**
+ * ⭐ DRIVER SUBMISSION — WHAT CAME BACK FROM **THIS** TRIP (owner ruling
+ * 2026-09-11, replacing the default `Proof Status` column).
+ *
+ * THE DEFECT THIS EXISTS TO KILL. The register's media source is the SALES
+ * ORDER's ledger (`ops_order_control.delivery_photos`). An order with two
+ * Delivery Orders has ONE ledger, so counting it per row would have told an
+ * operator that DO-A carried three photos when all three came back from DO-B —
+ * and the warehouse's own handover evidence (`delivery_handover_evidence`)
+ * describes a load leaving the warehouse, not goods reaching a customer. The
+ * attach door now stamps the verified DO number on every new entry, and this
+ * is the ONE place that reads the stamp.
+ *
+ * THE THREE ANSWERS ARE DIFFERENT, AND STAY DIFFERENT:
+ *
+ *   known === false   the ledger never reached this screen — UNKNOWN.
+ *                     An unknown is printed as an unknown, never as `0`.
+ *   photos/videos     files that name THIS document. A real count.
+ *   unbound           files this order holds that name NO document. They
+ *                     belong to no row's count — the Sales Order still shows
+ *                     them, because that is the scope they actually prove.
+ */
+export interface DriverSubmissionFile {
+  path: string;
+  at: string;
+  by?: string | null;
+  doNumber?: string | null;
+  kind?: "photo" | "video" | null;
+  url?: string | null;
+}
+
+export interface DriverSubmission {
+  known: boolean;
+  photos: number;
+  videos: number;
+  unbound: number;
+}
+
+export const UNKNOWN_SUBMISSION: DriverSubmission = {
+  known: false,
+  photos: 0,
+  videos: 0,
+  unbound: 0,
+};
+
+export function driverSubmissionOf(
+  ledger: readonly DriverSubmissionFile[] | null | undefined,
+  doNumber: string,
+): DriverSubmission {
+  if (ledger == null) return UNKNOWN_SUBMISSION;
+  let photos = 0;
+  let videos = 0;
+  let unbound = 0;
+  for (const entry of ledger) {
+    const named = (entry.doNumber ?? "").trim();
+    if (!named) {
+      unbound += 1;
+      continue;
+    }
+    if (named !== doNumber) continue;
+    /* The ledger was photo-only until videos existed, so a stamped entry with
+       no kind is the photo it could only have been — never a guessed video. */
+    if (entry.kind === "video") videos += 1;
+    else photos += 1;
+  }
+  return { known: true, photos, videos, unbound };
+}
+
+/** This document's own files, in the order they were recorded. The gallery and
+ *  the player read the SAME predicate the count does (Law D). */
+export function submissionFilesOf<T extends DriverSubmissionFile>(
+  ledger: readonly T[] | null | undefined,
+  doNumber: string,
+  kind: "photo" | "video",
+): T[] {
+  return (ledger ?? []).filter((entry) => {
+    if ((entry.doNumber ?? "").trim() !== doNumber) return false;
+    return (entry.kind === "video" ? "video" : "photo") === kind;
+  });
+}
 
 export type DoWorkQueue = "record_result" | "upload_photo" | "upload_signed_do";
 
@@ -116,7 +218,12 @@ export interface DoRegisterRow {
   issuedAt: string;
   /** The LATEST recorded result, or null while none exists. */
   latestResult: "delivered" | "partial" | "failed" | null;
-  /** The T6 photo ledger: null = unknown (older payload); else its length>0. */
+  /** What the driver sent back from THIS document's trip. */
+  submission: DriverSubmission;
+  /** Every ledger entry of the owning Sales Order, so a viewer opened from
+   *  this row can show THIS document's files without a second read. */
+  submissionLedger: readonly DriverSubmissionFile[] | null;
+  /** The T6 photo ledger, scoped to THIS document: null = unknown. */
   photosPresent: boolean | null;
   /** `orders.do_file_path` — the signed document on file. */
   signedDoPresent: boolean;
@@ -221,10 +328,15 @@ export function buildDoRegisterRow(
   const control = overlayOf(r.orders.ops_order_control);
   const photos = control?.delivery_photos;
   const lines = tripLinesOf(r.orders.order_lines ?? [], r.trip_groups);
+  /* ⭐ Scoped to THIS document (owner ruling 2026-09-11): the ledger belongs
+     to the Sales Order, the count belongs to the trip. */
+  const submission = driverSubmissionOf(photos, r.do_number);
   const base = {
     status,
     latestResult: (latest?.result ?? null) as DoRegisterRow["latestResult"],
-    photosPresent: photos === undefined || photos === null ? null : photos.length > 0,
+    submission,
+    submissionLedger: (photos ?? null) as readonly DriverSubmissionFile[] | null,
+    photosPresent: submission.known ? submission.photos > 0 : null,
     signedDoPresent: Boolean(r.orders.do_file_path),
   };
   return {
