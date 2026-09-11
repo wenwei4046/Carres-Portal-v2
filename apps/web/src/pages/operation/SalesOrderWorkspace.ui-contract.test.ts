@@ -96,7 +96,12 @@ describe("Sales Order object template contract", () => {
     expect(workspace).toContain('data-testid="object-two-panes"');
     expect(workspace).toContain("flex h-full min-h-0 flex-col lg:flex-row");
     expect(workspace).toContain("lg:w-1/2 lg:overflow-hidden");
-    expect(workspace).toContain("lg:w-1/2 lg:border-l lg:border-t-0 lg:overflow-auto");
+    /* ⭐ THE DOCUMENT PANE SCROLLS AT EVERY WIDTH (2026-09-11). It was
+       `lg:overflow-auto`, so below the split breakpoint — where the panes
+       STACK and the document is at its narrowest — the pane clipped nothing
+       and a page wider than it pushed the PAGE sideways. The 50/50 split and
+       the stacking rule below 1024px are unchanged; only the clipping is. */
+    expect(workspace).toContain("overflow-auto border-t border-kit-slate-5 bg-kit-slate-3 px-4 py-4 lg:w-1/2 lg:border-l lg:border-t-0");
     /* The PAGE does not scroll at desktop widths; the panes do. */
     expect(workspace).toContain("min-h-0 flex-1 overflow-auto bg-kit-slate-3 lg:overflow-hidden");
   });
@@ -218,15 +223,25 @@ describe("Sales Order object template contract", () => {
      merged card held two topics rather than one fuller one. `Delivery address`
      is untouched: it is the same party's fact as the customer above it, which
      is why that half of the merge still reads as one card. */
-  it("merges the address into Customer, and gives ownership its own card again", () => {
+  it("puts ownership inside Customer and gives Delivery a card of its own", () => {
+    /* ⭐ 2026-09-11. The two halves swapped homes, and each one moved TOWARD
+       the fact it belongs with: three salesperson names joined the customer
+       they sold to; the address joined the access conditions that decide
+       whether the lorry can reach it. Both keep their locked words — `Block`
+       and `SubHead` render the same string in a different rank. */
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    expect(workspace).not.toContain('<Block title="Sales ownership">');
+    expect(workspace).toContain('<Block title="Delivery">');
     expect(workspace).toContain("<SubHead>Delivery address</SubHead>");
-    expect(workspace).toContain('<Block title="Sales ownership">');
-    expect(workspace).not.toContain("<SubHead>Sales ownership</SubHead>");
     expect(workspace).not.toContain('<Block title="Delivery address">');
-    /* Every field of both merged sections still renders. */
+    /* Every field of both sections still renders. */
     expect(workspace).toContain('data-pos-field="address"');
     expect(workspace).toContain('data-pos-field="billing"');
     expect(workspace).toContain("<SalesOrderAttribution");
+    /* Emergency contact keeps its own heading AND gains the divider that makes
+       it read as a section rather than three more customer boxes. */
+    expect(workspace).toContain("<SubHead>Emergency contact</SubHead>");
+    expect(workspace).toMatch(/border-t border-kit-slate-5 pt-3">\s*\n\s*<SubHead>Emergency contact<\/SubHead>/);
   });
 
   /* ⭐ THE THIRD MERGE PASS — YH, 2026-08-27. Seven cards became FOUR (plus
@@ -251,10 +266,16 @@ describe("Sales Order object template contract", () => {
        produces it, and this card answers the collections question underneath
        it — so a reader goes value → what came in → what is still out in one
        downward sweep instead of meeting the money before the goods. */
+    /* ⭐ RE-PINNED 2026-09-11 — the approved Sales Order detail organisation.
+       `Sales ownership` folded INTO `Customer` (who sold it is part of who
+       bought it) and `Delivery` came out as a card of its own, holding the
+       address, the billing relationship and the access conditions that were
+       split across two cards before. The page now reads as five questions:
+       who · when · where · what · money. */
     expect(cards).toEqual([
       "Customer",
       "Order info",
-      "Sales ownership",
+      "Delivery",
       "Goods",
       "Money",
       "What this change started elsewhere",
@@ -388,7 +409,7 @@ describe("Sales Order object template contract", () => {
        honest boundary. */
     const field = workspace.slice(
       workspace.indexOf('data-pos-field="proceedDate"'),
-      workspace.indexOf('<Block title="Sales ownership">'),
+      workspace.indexOf('<Block title="Delivery">'),
     );
     /* A recorded date is a photograph, on every mode that is not create. */
     expect(field).toContain('<Fact label="Proceed date"');
@@ -627,7 +648,9 @@ describe("Sales Order object template contract", () => {
        merged subsection, and a card again. It is the SAME STRING through all
        three — `Block` uppercases every title, so becoming a card title moved
        the border and never the name. */
-    expect(workspace).toContain('<Block title="Sales ownership">');
+    expect(workspace).toContain("<SubHead>Sales ownership</SubHead>");
+    /* ⛔ THE PERMISSION LANE IS UNTOUCHED BY THE MOVE. The component and its
+       gates are the same file; only the heading above it changed rank. */
     expect(attribution).toContain("Change salesperson — needs approval");
     expect(attribution).toContain('role === "principal" || role === "hr"');
     expect(attribution).toContain("Request ownership change");
@@ -999,26 +1022,30 @@ describe("Sales Order object page — one form grammar", () => {
      Four moves, each of which puts a fact beside the fact it belongs with.
      ───────────────────────────────────────────────────────────────────────── */
 
-  it("keeps delivery ACCESS with the address it describes, not on Order info", () => {
+  it("keeps delivery ACCESS in the Delivery card with the address it describes", () => {
     /* Floor / lift / stair carry qualify ONE address. They sat on `Order info`,
        a card away from it. The whole `stairCarry` group moved under the
        `Delivery address` subsection — the clamps, the POS-parity tag and the
        working line unchanged. */
     expect(workspace).toContain("<SubHead>Delivery access</SubHead>");
-    const customerCard = workspace.slice(
-      workspace.indexOf('title="Customer"'),
-      workspace.indexOf('<Block title="Order info">'),
+    const deliveryCard = workspace.slice(
+      workspace.indexOf('<Block title="Delivery">'),
+      workspace.indexOf('<Block title="Goods">'),
     );
-    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"']) {
-      expect(customerCard, `${id} sits with the address`).toContain(id);
+    for (const id of ['id="so-floor"', 'id="so-stair-items"', 'id="so-lift"', 'id="so-building-type"']) {
+      expect(deliveryCard, `${id} sits with the address`).toContain(id);
     }
-    /* …and the working line came with them, so the fee is explained where the
-       three fields that produce it are read. */
-    expect(customerCard).toContain('data-testid="so-stair-working"');
+    /* The billing relationship and the billing address are the same card's
+       question — where the paperwork goes, beside where the goods go. */
+    expect(deliveryCard).toContain('data-pos-field="billing"');
+    /* …and the working line came with them, so the charge is explained where
+       the three fields that produce it are read. It is a WORKING, not a second
+       fee: the money is the stamped STAIR_CARRY addon, charged once in Goods. */
+    expect(deliveryCard).toContain('data-testid="so-stair-working"');
     /* Order info is left with what the CUSTOMER asked for: dates. */
     const orderInfo = workspace.slice(
       workspace.indexOf('<Block title="Order info">'),
-      workspace.indexOf('<Block title="Sales ownership">'),
+      workspace.indexOf('<Block title="Delivery">'),
     );
     expect(orderInfo).not.toContain('id="so-floor"');
   });
@@ -1029,7 +1056,7 @@ describe("Sales Order object page — one form grammar", () => {
        writer. It was a grey meta line floating above the cards. */
     const orderInfo = workspace.slice(
       workspace.indexOf('<Block title="Order info">'),
-      workspace.indexOf('<Block title="Sales ownership">'),
+      workspace.indexOf('<Block title="Delivery">'),
     );
     expect(orderInfo).toContain('<Fact label="Customer reference"');
     expect(orderInfo).toContain('(order?.source_ref ?? []).join(" · ")');
@@ -1093,6 +1120,72 @@ describe("Sales Order object page — one form grammar", () => {
     expect(ledger).toContain("fmtMoney(Number(p.amount ?? 0))");
     /* The method word and the slip door are the drawer's own, imported. */
     expect(ledger).toContain('from "@/lib/payment-display"');
+  });
+
+  it("re-cuts the document when its pane changes width, and never clips it", () => {
+    /* ⭐ THE ORIGINAL CLIPPING HAD TWO CAUSES, and both are asserted here
+       because either one alone brings it back.
+       ① The pages were scaled to `pane.clientWidth`, which INCLUDES the pane's
+          own padding — so every page was drawn wider than the box it had to
+          sit in, at every width, not only narrow ones.
+       ② The render effect depended on `[data, paneEpoch]` only. Nothing
+          watched the pane, so a width change (drag the window, open a side
+          panel) left a bitmap cut for the old width hanging over the new one. */
+    expect(workspace).toContain("function contentWidthOf(");
+    expect(workspace).toContain("paddingLeft");
+    expect(workspace).toContain("new ResizeObserver(");
+    expect(workspace).toContain("}, [data, paneEpoch, paneWidth]);");
+    /* ⛔ COALESCED ON A TIMER, NOT A FRAME. `requestAnimationFrame` does not
+       run in a hidden or background tab (measured: in a hidden tab neither rAF
+       nor ResizeObserver delivery ran at all), so a width change that happened
+       while the tab was away would never be applied and the operator would
+       return to a page cut for the old width — the original bug through a
+       different door. */
+    expect(workspace).toContain("setTimeout(() => setPaneWidth(contentWidthOf(node)), 120)");
+    expect(workspace).not.toContain("requestAnimationFrame(() => setPaneWidth");
+    expect(workspace).toContain("clearTimeout(timer)");
+    /* ⛔ AND NO `max-width: 100%` ON THE PAGE. Below `MIN_PDF_WIDTH` the page
+       must stay readable and SCROLL inside the pane; capping it would squash
+       it back to a smear, and on a zero-width pane collapse it to nothing.
+       The pane scrolls at EVERY width, not only at `lg`. */
+    expect(workspace).not.toContain('canvas.style.maxWidth');
+    expect(workspace).toContain("min-h-0 min-w-0 overflow-auto border-t");
+    /* ⛔ THE SPLIT IS NOT REMOVED. Replacing the permanent 50/50 preview with
+       an on-demand comparison is NOT an approved layout change; the pane and
+       its Print path stay exactly where they are. */
+    expect(workspace).toContain('aria-label="Sales Order document"');
+    expect(workspace).toContain("Print ▾");
+  });
+
+  it("states a recorded instalment plan, and invents nothing when there is none", () => {
+    /* `orders.installment_months` + `orders.payment_method` are the at-sale
+       capture — an ORDER fact, so it is stated above the ledger, never as a
+       column on rows that do not carry it. */
+    expect(workspace).toContain('data-testid="money-instalment"');
+    expect(workspace).toContain("installment_months");
+    expect(workspace).toContain("{!isNew && instalmentWord && (");
+    /* ⛔ NO DERIVED MONTHLY FIGURE. A number this screen computed would be
+       read as one Carres agreed to, and a month count plus a total does not
+       say what the customer's bank actually charges. */
+    expect(workspace).not.toMatch(/instalment[\s\S]{0,200}money\.total\s*\//);
+    expect(workspace).not.toContain("perMonth");
+  });
+
+  it("keeps the commercial table free of cost and margin", () => {
+    /* The 2990 reference prints REVENUE · COST · MARGIN · MARGIN % above its
+       payments block. That is a management view, and this is the page an
+       operator reads a customer's order from; a cost column here is a number
+       the customer must never be shown over the counter. */
+    const goods = workspace.slice(
+      workspace.indexOf('<Block title="Goods">'),
+      workspace.indexOf('data-testid="goods-total"'),
+    );
+    for (const word of ["Margin", "margin", "Cost", "cost", "Revenue"]) {
+      expect(goods, `no ${word} in the commercial table`).not.toContain(`>${word}<`);
+    }
+    /* …while the Unit and fulfilment links that DO belong stay. */
+    expect(goods).toContain(">Unit ID</th>");
+    expect(goods).toContain(">Deliver To</th>");
   });
 
   it("keeps the card title's mono/uppercase/flame treatment off ordinary subsection headings", () => {

@@ -47,6 +47,7 @@ const ORDER = {
   paid: 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
   dealers: { name: "Carres HQ" }, outlets: { name: "PJ Showroom" },
   salespersons: { name: "Bernard" },
+  installment_months: 12, payment_method: "credit_card",
   do_number: null, invoice_no: null, invoiced_at: null, delivered_at: null,
   dispatched_at: null, warehouse_id: null, delivery_partner_id: null,
 };
