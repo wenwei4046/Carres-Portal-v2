@@ -32,7 +32,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PanelLeftOpen } from "lucide-react";
+import { ExternalLink, Image as ImageIcon, PanelLeftOpen, Video } from "lucide-react";
 import { toast } from "sonner";
 import type { DeliveryHandoverKind, DeliveryOrderStatus, OrderActionTone } from "@carres/shared";
 import { fmtDate } from "@/lib/fmt-date";
@@ -50,7 +50,14 @@ import {
   type DataGridColumn,
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
+import Select from "@/components/kit/Select";
 import ModuleHeader from "./components/ModuleHeader";
+import DeliveryResultAction from "./components/DeliveryResultAction";
+import {
+  DeliveryProofUploadButton,
+  DriverSubmissionViewer,
+  SignedDeliveryDocumentLink,
+} from "./components/DriverSubmission";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import { lineName } from "./sales-order-facts";
@@ -72,6 +79,38 @@ import {
   type DoWorkQueue,
 } from "./delivery-orders-register";
 
+/**
+ * ⭐ ONE STATUS COLUMN, AND ITS SECOND LINE SAYS WHAT ACTUALLY HAPPENED
+ * (owner ruling 2026-09-11, retiring the default `Delivery Result` column).
+ *
+ * The register used to print the outcome TWICE: a `Delivery exception` pill
+ * in one column and `Partially Delivered` / `Failed Delivery` in another,
+ * three columns apart, so the operator had to join them by eye. The pill keeps
+ * the DOCUMENT's word; line 2 carries the RESULT that document actually
+ * recorded, with its reason.
+ *
+ * THE ARITHMETIC DID NOT MOVE. `deliveryOrderStatusOf` still derives the kind
+ * and the reason from the void stamp, the attempts and the handover facts; the
+ * recorded result still comes from the attempt history. This function only
+ * decides what the SECOND LINE reads - combining a display never rewrites the
+ * facts underneath it, and the DO detail still holds every recorded result and
+ * its whole history.
+ */
+export function statusDetailOf(row: {
+  status: DoRegisterRow["status"];
+  latestResult: DoRegisterRow["latestResult"];
+}): string | null {
+  const reason = row.status.reasonLabel;
+  /* A partial or failed trip: name the outcome first, then why. */
+  if (row.status.kind === "exception") {
+    const outcome = row.latestResult ? DELIVERY_RESULT_LABEL[row.latestResult] : null;
+    return [outcome, reason].filter(Boolean).join(" · ") || null;
+  }
+  /* Cancelled carries its void reason; Delivered, Out for delivery and
+     Created need no second line - the pill already is the whole fact. */
+  return reason;
+}
+
 /** Owner column ruling 2026-08-18: Created GREY · Out for delivery BLUE ·
  *  Delivered GREEN · Delivery exception AMBER (+ its reason, small line 2). */
 const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
@@ -91,6 +130,13 @@ const STATUS_LABEL: Record<DeliveryOrderStatus["kind"], string> = {
 };
 
 const FILTER_RAIL_STORAGE_KEY = "carres.deliveryOrders.filterRail";
+
+/** Below this the 240px rail costs more sheet than it earns (owner ruling
+ *  2026-09-11, validated at the observed 949px viewport). */
+const NARROW_VIEWPORT_PX = 1100;
+
+/** The dropdown's own value for "no status condition". Never a status. */
+const ALL_STATUS = "__all__";
 
 /** ⭐ AN ABSENCE IS QUIETER THAN A FACT — owner ruling 2026-08-15. */
 function Absent({ children }: { children: string }) {
@@ -170,6 +216,222 @@ function requestedText(r: DoRegisterRow): string {
   return requestedDeliveryText({ iso: r.requestedDelivery, tbd: r.requestedTbd });
 }
 
+/** Which viewer a click opened, and over which document. */
+type ViewerPick = { row: DoRegisterRow; kind: "photo" | "video" } | null;
+
+/**
+ * ⭐ A VOIDED DOCUMENT IS OWED NOTHING (walk finding, 2026-09-11).
+ *
+ * The retired `Proof Status` column printed `Not delivered yet` and
+ * `No signed document yet` against a CANCELLED row, which reads as two
+ * outstanding jobs on a trip that will never happen — and the pill beside it
+ * already says `Cancelled`. There is no governed word for "this document was
+ * voided before anything came back", and inventing one to fill a cell is how a
+ * dictionary rots, so the cell simply says nothing.
+ *
+ * It is NOT silent when files exist: a document voided AFTER a driver sent
+ * something still shows what was sent. Those are recorded facts and a void
+ * never erases them.
+ */
+function voidedWithNothingSubmitted(r: DoRegisterRow): boolean {
+  return (
+    r.status.kind === "cancelled" &&
+    r.submission.photos === 0 &&
+    r.submission.videos === 0 &&
+    !r.signedDoPresent
+  );
+}
+
+/**
+ * ⭐ ONE SPELLING for the cell, the search, the per-column filter and the
+ * Excel export - the same law the `Requested Delivery Date` column already
+ * obeys. A sheet that said "2 photos" where the screen said "Not recorded"
+ * would be a second arithmetic (Law D).
+ */
+function submissionSearchText(r: DoRegisterRow): string {
+  if (voidedWithNothingSubmitted(r)) return "";
+  const reached = r.latestResult === "delivered" || r.latestResult === "partial";
+  const media = !r.submission.known
+    ? DOR_COPY.notRecorded
+    : r.submission.photos === 0 && r.submission.videos === 0
+      ? reached
+        ? DOR_COPY.noPhoto
+        : DOR_COPY.notDelivered
+      : [
+          r.submission.photos > 0 ? `${DOR_COPY.photos} ${r.submission.photos}` : "",
+          r.submission.videos > 0 ? `${DOR_COPY.videos} ${r.submission.videos}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+  const paper = r.signedDoPresent ? DOR_COPY.signedDoOnFile : DOR_COPY.noSignedDo;
+  return `${media} · ${paper}`;
+}
+
+/** A count button: the number is the ledger's own, never a placeholder. */
+function CountButton({
+  icon,
+  label,
+  count,
+  title,
+  testId,
+  onClick,
+}: {
+  icon: typeof ImageIcon;
+  label: string;
+  count: number;
+  title: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  const Glyph = icon;
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      title={title}
+      className="inline-flex h-[22px] items-center gap-1 rounded-control border border-kit-slate-6 bg-white px-1.5 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      <Glyph size={12} strokeWidth={1.75} aria-hidden />
+      <span>{label}</span>
+      <span className="tabular-nums font-semibold">{count}</span>
+    </button>
+  );
+}
+
+/**
+ * THE CELL. Line 1 is what the driver sent back from THIS trip; line 2 is the
+ * signed paper. Three different absences stay three different absences:
+ *
+ *   ledger unknown            `Not recorded` - the answer never arrived
+ *   nothing recorded yet      `Not delivered yet` - nothing is due
+ *   reached, no photo         `No delivery photo yet` - work is open
+ *
+ * A missing VIDEO is none of them: video is not required (owner ruling
+ * 2026-09-11), so a trip with no video says nothing about one.
+ */
+function DriverSubmissionCell({
+  row,
+  onOpen,
+}: {
+  row: DoRegisterRow;
+  onOpen: (pick: ViewerPick) => void;
+}) {
+  const reached = row.latestResult === "delivered" || row.latestResult === "partial";
+  const { known, photos, videos, unbound } = row.submission;
+  const unboundTitle =
+    unbound > 0 ? `${unbound} ${DOR_COPY.unboundNote}` : undefined;
+
+  /* Nothing was ever due and nothing ever came — the pill already said why. */
+  if (voidedWithNothingSubmitted(row)) return null;
+
+  return (
+    <span className="block min-w-0">
+      <span className="flex items-center gap-1 truncate">
+        {!known ? (
+          <Absent>{DOR_COPY.notRecorded}</Absent>
+        ) : photos === 0 && videos === 0 ? (
+          <span title={unboundTitle}>
+            <Absent>{reached ? DOR_COPY.noPhoto : DOR_COPY.notDelivered}</Absent>
+          </span>
+        ) : (
+          <>
+            {photos > 0 ? (
+              <CountButton
+                icon={ImageIcon}
+                label={DOR_COPY.photos}
+                count={photos}
+                title={DOR_COPY.openPhotos}
+                testId="do-submission-photos"
+                onClick={() => onOpen({ row, kind: "photo" })}
+              />
+            ) : null}
+            {videos > 0 ? (
+              <CountButton
+                icon={Video}
+                label={DOR_COPY.videos}
+                count={videos}
+                title={DOR_COPY.openVideos}
+                testId="do-submission-videos"
+                onClick={() => onOpen({ row, kind: "video" })}
+              />
+            ) : null}
+          </>
+        )}
+      </span>
+      <span className="block truncate text-label font-normal">
+        <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * ⭐ THE WORK QUEUE'S OWN DOOR, ON THE ROW (owner ruling 2026-09-11).
+ *
+ * Picking `Record delivery result` used to leave the operator with a list and
+ * no way to do the thing the list is named after - open each document, find
+ * the button, come back. This column appears ONLY while a queue is picked and
+ * renders THE EXISTING OPERATION, never a second form:
+ *
+ *   Record delivery result        `DeliveryResultAction` - the DO object
+ *                                 page's own component, rendered here
+ *   Upload delivery photo         `DeliveryProofUploadButton` - the same
+ *                                 uploader the Sales Order drawer renders,
+ *                                 stamped with THIS document's number
+ *   Upload signed Delivery Order  a door to the Sales Order, which owns the
+ *                                 order's documents. The one existing writer
+ *                                 (`operation_attach_do_and_deliver`) also
+ *                                 marks the whole order delivered, so it is
+ *                                 NOT offered against a partial trip: a button
+ *                                 that would record a falsehood is worse than
+ *                                 a link. The gap is named in the MASTER.
+ */
+function QueueAction({
+  row,
+  queue,
+  onOpenOrder,
+}: {
+  row: DoRegisterRow;
+  queue: DoWorkQueue;
+  onOpenOrder: (row: DoRegisterRow) => void;
+}) {
+  if (queue === "record_result") {
+    return (
+      <DeliveryResultAction
+        order={{ id: row.orderId, so: row.so, do_number: row.doNumber }}
+        lines={row.lines}
+      />
+    );
+  }
+  if (queue === "upload_photo") {
+    return (
+      <DeliveryProofUploadButton
+        orderId={row.orderId}
+        doNumber={row.doNumber}
+        testId="do-queue-upload-photo"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-testid="do-queue-open-order"
+      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenOrder(row);
+      }}
+    >
+      <ExternalLink size={13} strokeWidth={1.75} aria-hidden />
+      <span className="truncate">Open SO-{row.so}</span>
+    </button>
+  );
+}
+
 export default function DeliveryOrdersRegister() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -198,18 +460,38 @@ export default function DeliveryOrdersRegister() {
     else next.set(key, value);
     setSearchParams(next, { replace: false });
   };
+  const setParam = (key: "work" | "status", value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set(key, value);
+    setSearchParams(next, { replace: false });
+  };
   const clearParam = (key: "work" | "status") => {
     const next = new URLSearchParams(searchParams);
     next.delete(key);
     setSearchParams(next, { replace: false });
   };
 
+  /**
+   * ⭐ THE RAIL STARTS COLLAPSED WHERE THERE IS NO ROOM FOR IT (owner ruling
+   * 2026-09-11). At the observed 949px viewport a 240px rail spends a quarter
+   * of the sheet on filters nobody has picked yet, and the dates the register
+   * exists to answer scroll off the right edge. Below 1100px the rail starts
+   * hidden and its `Show filters` button stays in the toolbar - collapsed is
+   * not gone. A REMEMBERED choice still wins at any width: the operator who
+   * opened it meant it.
+   */
   const [filterRailOpen, setFilterRailOpen] = useState(() => {
+    let stored: string | null = null;
     try {
-      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
+      stored = localStorage.getItem(FILTER_RAIL_STORAGE_KEY);
     } catch {
-      return true;
+      /* Storage may be unavailable; the width rule still answers. */
     }
+    if (stored === "0") return false;
+    if (stored === "1") return true;
+    return typeof window === "undefined"
+      ? true
+      : window.innerWidth >= NARROW_VIEWPORT_PX;
   });
   const setFilterRailVisible = (open: boolean) => {
     setFilterRailOpen(open);
@@ -219,6 +501,9 @@ export default function DeliveryOrdersRegister() {
       /* Storage may be unavailable; the live state still works. */
     }
   };
+
+  /* Which attachment viewer is open, over which document. */
+  const [viewer, setViewer] = useState<ViewerPick>(null);
 
   const allRows = useMemo<DoRegisterRow[]>(() => {
     const attemptsByDo = new Map<string, DeliveryOrderAttemptRow[]>();
@@ -274,6 +559,11 @@ export default function DeliveryOrdersRegister() {
       navigate(`/operation/delivery-orders/${encodeURIComponent(r.doNumber)}`),
     [navigate],
   );
+  const openSalesOrder = useCallback(
+    (r: DoRegisterRow) =>
+      navigate(`/operation/orders/so/${encodeURIComponent(r.orderId)}`),
+    [navigate],
+  );
 
   const columns = useMemo<DataGridColumn<DoRegisterRow>[]>(
     () => [
@@ -299,6 +589,26 @@ export default function DeliveryOrdersRegister() {
         ),
         searchValue: (r) => r.doNumber,
         filterValue: (r) => r.doNumber,
+      },
+      {
+        /* `DO date` = the day the system issued this document (owner column
+           ruling 2026-08-18). ⭐ VISIBLE BY DEFAULT, IMMEDIATELY AFTER THE
+           NUMBER (owner ruling 2026-09-11, overwriting the 2026-09-09 "falls
+           to the end"): a document register must be able to say when its
+           documents were made, and the answer belongs beside the document's
+           own identity, not seven columns away. It is still neither delivery
+           date - those are the two adjacent Dates columns below. */
+        key: "do_date",
+        label: "DO date",
+        width: 113,
+        sortable: true,
+        chooserGroup: "Document",
+        filterType: "date",
+        dateValue: (r) => r.issuedAt,
+        accessor: (r) => fmtDate(r.issuedAt),
+        searchValue: (r) => fmtDate(r.issuedAt),
+        filterValue: (r) => fmtDate(r.issuedAt),
+        sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
       },
       {
         /* The fact cell stays focused on identity (owner correction
@@ -339,6 +649,55 @@ export default function DeliveryOrdersRegister() {
         ),
         searchValue: (r) => r.customer,
         filterValue: (r) => r.customer,
+      },
+      {
+        /* ⭐ ONE STATUS COLUMN, MOVED TO THE FRONT (owner ruling 2026-09-11):
+           the register's first question after *which document, whose order*
+           is *where is it now* - and the answer used to sit past the dates,
+           past logistics, past the location. The two-line 13/11 grammar (ui
+           MASTER §5) carries the DOCUMENT's pill on line 1 and the recorded
+           RESULT plus its reason on line 2 (`statusDetailOf`), which is what
+           the retired default `Delivery Result` column used to print alone.
+           A register still shows no action sentence - the result is a FACT. */
+        key: "status",
+        label: "Status",
+        width: 190,
+        sortable: true,
+        filterType: "enum",
+        chooserGroup: "Document",
+        accessor: (r) => {
+          const detail = statusDetailOf(r);
+          return (
+            <span className="block min-w-0">
+              <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
+              {detail ? (
+                <span
+                  className="block truncate text-label font-normal text-base-600"
+                  title={detail}
+                  data-testid="do-status-detail"
+                >
+                  {detail}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
+        /* The sheet and the search say what the screen says: a reader looking
+           for `Partially Delivered` must find the row that recorded it, even
+           though the pill spells `Delivery exception`. */
+        searchValue: (r) =>
+          [
+            r.status.label,
+            statusDetailOf(r),
+            r.latestResult ? DELIVERY_RESULT_LABEL[r.latestResult] : DOR_COPY.notDelivered,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        exportValue: (r) => {
+          const detail = statusDetailOf(r);
+          return detail ? `${r.status.label} · ${detail}` : r.status.label;
+        },
+        filterValue: (r) => r.status.label,
       },
       {
         /* `Requested Delivery Date` = the date the CUSTOMER asked Carres to
@@ -415,7 +774,11 @@ export default function DeliveryOrdersRegister() {
       {
         /* The partner named on the document — a snapshot fact of THIS trip. */
         key: "logistics",
-        label: "Logistics Partner",
+        /* Shortened to `Logistics` (owner ruling 2026-09-11) so the register
+           spends its width on facts rather than on a heading. The Logistics
+           word law keeps the s; the full role word `Logistics Partner` stays
+           the vocabulary everywhere the role itself is being named. */
+        label: "Logistics",
         width: 140,
         sortable: true,
         filterType: "enum",
@@ -440,117 +803,33 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => r.location,
       },
       {
-        /* The LATEST recorded result — a fact somebody recorded, never a
-           clock inference. */
-        key: "delivery_result",
-        label: "Delivery Result",
-        width: 150,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Delivery",
-        accessor: (r) =>
-          r.latestResult ? (
-            DELIVERY_RESULT_LABEL[r.latestResult]
-          ) : (
-            <Absent>{DOR_COPY.notDelivered}</Absent>
-          ),
-        searchValue: (r) =>
-          r.latestResult ? DELIVERY_RESULT_LABEL[r.latestResult] : DOR_COPY.notDelivered,
-        filterValue: (r) =>
-          r.latestResult ? DELIVERY_RESULT_LABEL[r.latestResult] : DOR_COPY.notDelivered,
-      },
-      {
-        /* Proof facts, stated — the T6 photo ledger and the signed document on
-           file. An UNKNOWN ledger (older payload) prints nothing rather than a
-           false absence; a document nobody delivered is not due proof yet. */
-        key: "proof_status",
-        label: "Proof Status",
-        width: 170,
+        /* ⭐ DRIVER SUBMISSION - the DOORS, not a verdict (owner ruling
+           2026-09-11, replacing the default `Proof Status` column).
+           `Proof Status` stated two facts an operator then had to go and
+           verify somewhere else; this column OPENS them: this trip's photos,
+           this trip's videos, and the signed paper the customer put a name on.
+           Every count is real - files stamped with THIS document's number -
+           and an unknown ledger prints an unknown, never a reassuring zero.
+           An upload is evidence of an upload; it is not proof accepted and
+           not a successful delivery, and no tick here says otherwise. */
+        key: "driver_submission",
+        label: DOR_COPY.driverSubmission,
+        width: 214,
         sortable: true,
         chooserGroup: "Delivery",
-        accessor: (r) => {
-          const reached = r.latestResult === "delivered" || r.latestResult === "partial";
-          if (!reached) return <Absent>{DOR_COPY.notDelivered}</Absent>;
-          return (
-            <span className="block min-w-0">
-              {r.photosPresent === null ? null : (
-                <span className="block truncate">
-                  {r.photosPresent ? (
-                    DOR_COPY.photoSaved
-                  ) : (
-                    <Absent>{DOR_COPY.noPhoto}</Absent>
-                  )}
-                </span>
-              )}
-              <span className="block truncate text-label font-normal">
-                {r.signedDoPresent ? (
-                  <span className="text-base-600">{DOR_COPY.signedDoOnFile}</span>
-                ) : (
-                  <Absent>{DOR_COPY.noSignedDo}</Absent>
-                )}
-              </span>
-            </span>
-          );
-        },
-        searchValue: (r) => {
-          const reached = r.latestResult === "delivered" || r.latestResult === "partial";
-          if (!reached) return DOR_COPY.notDelivered;
-          return [
-            r.photosPresent === null
-              ? ""
-              : r.photosPresent
-                ? DOR_COPY.photoSaved
-                : DOR_COPY.noPhoto,
-            r.signedDoPresent ? DOR_COPY.signedDoOnFile : DOR_COPY.noSignedDo,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-        },
+        accessor: (r) => <DriverSubmissionCell row={r} onOpen={setViewer} />,
+        searchValue: (r) => submissionSearchText(r),
+        exportValue: (r) => submissionSearchText(r),
         filterValue: (r) => {
           const reached = r.latestResult === "delivered" || r.latestResult === "partial";
           if (!reached) return DOR_COPY.notDelivered;
-          if (r.photosPresent === false || !r.signedDoPresent) return "Proof required";
+          if (!r.submission.known) return DOR_COPY.notRecorded;
+          if (r.submission.photos === 0 || !r.signedDoPresent) return "Proof required";
           return "Proof on file";
         },
-      },
-      {
-        key: "status",
-        label: "Status",
-        width: 190,
-        sortable: true,
-        filterType: "enum",
-        chooserGroup: "Document",
-        /* Two-line 13/11 grammar (ui MASTER §5): the pill is the document
-           status; an exception's ONE reason rides line 2 in the quieter rank.
-           A register still shows no action sentence — the reason is a FACT. */
-        accessor: (r) => (
-          <span className="block min-w-0">
-            <StatusPill tone={STATUS_TONE[r.status.kind]}>{r.status.label}</StatusPill>
-            {r.status.reasonLabel ? (
-              <span className="block truncate text-label font-normal text-base-600">
-                {r.status.reasonLabel}
-              </span>
-            ) : null}
-          </span>
-        ),
-        searchValue: (r) =>
-          r.status.reasonLabel ? `${r.status.label} ${r.status.reasonLabel}` : r.status.label,
-        filterValue: (r) => r.status.label,
-      },
-      {
-        /* `DO date` = the day the system issued this document (owner column
-           ruling 2026-08-18). */
-        key: "do_date",
-        label: "DO date",
-        width: 113,
-        sortable: true,
-        chooserGroup: "Dates",
-        filterType: "date",
-        dateValue: (r) => r.issuedAt,
-        accessor: (r) => fmtDate(r.issuedAt),
-        searchValue: (r) => fmtDate(r.issuedAt),
-        filterValue: (r) => fmtDate(r.issuedAt),
-        sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
+        sortFn: (a, b) =>
+          a.submission.photos + a.submission.videos -
+          (b.submission.photos + b.submission.videos),
       },
       {
         key: "goods",
@@ -583,8 +862,33 @@ export default function DeliveryOrdersRegister() {
         filterValue: (r) => fmtDate(r.issuedAt),
         sortFn: (a, b) => a.issuedAt.localeCompare(b.issuedAt),
       },
+      /* ⭐ THE PICKED QUEUE'S OWN DOOR - present only while a queue is
+         picked, so an unfiltered register gains no column and no width.
+         It sits LAST: the row is read left to right and the act is what the
+         reading ends in. */
+      ...(filters.queue
+        ? [
+            {
+              key: "queue_action",
+              label: DO_QUEUE_LABEL[filters.queue],
+              width: 210,
+              chooserGroup: "Delivery",
+              accessor: (r: DoRegisterRow) => (
+                <QueueAction
+                  row={r}
+                  queue={filters.queue as DoWorkQueue}
+                  onOpenOrder={openSalesOrder}
+                />
+              ),
+              /* A door is not a fact: it never joins the search, the export or
+                 a per-column filter. */
+              searchValue: () => "",
+              exportValue: () => "",
+            } satisfies DataGridColumn<DoRegisterRow>,
+          ]
+        : []),
     ],
-    [navigate, openDeliveryOrder],
+    [navigate, openDeliveryOrder, openSalesOrder, filters.queue],
   );
 
   const contextMenu = useCallback(
@@ -642,24 +946,34 @@ export default function DeliveryOrdersRegister() {
                 />
               ))}
             </FilterRailGroup>
+            {/* ⭐ DOCUMENT STATUS IS THE KIT'S OWN DROPDOWN (owner ruling
+                2026-09-11). Six stacked rows spent a third of the rail on a
+                choice that is one value at a time; the kit Select states the
+                current pick in one line and hands the rail's height back to
+                WORK TO DO, which is where the day actually starts. Each row
+                still carries its live count - the number is why an operator
+                picks it. `All` clears the status condition ONLY; a picked
+                work queue survives, because they are two questions. */}
             <FilterRailGroup title={DOR_COPY.railStatus}>
-              <FilterRailRow
-                label={DOR_COPY.allDocuments}
-                count={rails.total}
-                active={filters.status === null}
-                onClick={() => clearParam("status")}
-                testId="delivery-orders-status-all"
+              <Select
+                id="delivery-orders-status"
+                value={filters.status ?? ALL_STATUS}
+                onValueChange={(value) =>
+                  value === ALL_STATUS
+                    ? clearParam("status")
+                    : setParam("status", value)
+                }
+                options={[
+                  {
+                    value: ALL_STATUS,
+                    label: `${DOR_COPY.allDocuments} (${rails.total})`,
+                  },
+                  ...DO_STATUS_KEYS.map((key) => ({
+                    value: key,
+                    label: `${STATUS_LABEL[key]} (${rails.status[key]})`,
+                  })),
+                ]}
               />
-              {DO_STATUS_KEYS.map((key) => (
-                <FilterRailRow
-                  key={key}
-                  label={STATUS_LABEL[key]}
-                  count={rails.status[key]}
-                  active={filters.status === key}
-                  onClick={() => toggleParam("status", key)}
-                  testId={`delivery-orders-status-${key}`}
-                />
-              ))}
             </FilterRailGroup>
           </FilterRail>
         ) : null}
@@ -721,6 +1035,38 @@ export default function DeliveryOrdersRegister() {
                   },
                 },
               ]}
+              /* ⭐ EVERY LIVE NARROWING IN ONE LINE (owner ruling
+                 2026-09-11). The rail's picks and the grid's own column
+                 funnels now share one strip above the table, each removable
+                 on its own, under one `Clear filters`. Without it the rail
+                 could be collapsed at 949px while still hiding rows, and the
+                 operator would have no way to see why. */
+              activeConditions={[
+                ...(filters.queue
+                  ? [
+                      {
+                        key: "work",
+                        label: DO_QUEUE_LABEL[filters.queue],
+                        onClear: () => clearParam("work"),
+                      },
+                    ]
+                  : []),
+                ...(filters.status
+                  ? [
+                      {
+                        key: "status",
+                        label: STATUS_LABEL[filters.status],
+                        onClear: () => clearParam("status"),
+                      },
+                    ]
+                  : []),
+              ]}
+              onClearConditions={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("work");
+                next.delete("status");
+                setSearchParams(next, { replace: false });
+              }}
               toolbarStart={!filterRailOpen ? showFiltersButton : undefined}
               statusSummary={(filtered) => {
                 /* Narrowed-versus-total stays explicit against the WHOLE
@@ -737,6 +1083,16 @@ export default function DeliveryOrdersRegister() {
           )}
         </div>
       </div>
+      {/* The gallery and the player - opened from a count, showing exactly
+          the files that count counted. */}
+      {viewer ? (
+        <DriverSubmissionViewer
+          orderId={viewer.row.orderId}
+          doNumber={viewer.row.doNumber}
+          kind={viewer.kind}
+          onClose={() => setViewer(null)}
+        />
+      ) : null}
     </div>
   );
 }

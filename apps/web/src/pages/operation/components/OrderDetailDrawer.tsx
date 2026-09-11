@@ -2,7 +2,6 @@ import {
   type ReactNode,
   Fragment,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -104,7 +103,6 @@ import {
   usePartnerBookingCheck,
   useSetPartnerDeliveryRules,
   useDeliveryPhotos,
-  useUploadDeliveryPhoto,
   useOrderServiceCases,
   useOrderGuarantees,
   type OrderPaymentRow,
@@ -166,6 +164,7 @@ import DownloadInvoiceButton from "@/components/DownloadInvoiceButton";
 import { displayStageOf, type OperationStage } from "./StageChip";
 import DispatchModal from "./DispatchModal";
 import DOAttachModal from "./DOAttachModal";
+import { DeliveryProofUploadButton } from "./DriverSubmission";
 import AbandonOrderModal from "./AbandonOrderModal";
 import ConfirmProceedDialog from "./ConfirmProceedDialog";
 import TransferReadyDialog from "./TransferReadyDialog";
@@ -4395,7 +4394,10 @@ function DrawerBody({
                           not-yet-delivered order; this row simply doesn't
                           render until then. */}
                       {deliveredDone && (
-                        <DeliveryPhotoRow orderId={order.id} />
+                        <DeliveryPhotoRow
+                          orderId={order.id}
+                          doNumber={order.do_number ?? null}
+                        />
                       )}
                       {/* The fields nobody fills (ETA 1.6% · chase-day 0.5%) —
                           tucked behind a fold, opened only when needed (Jess
@@ -5507,21 +5509,26 @@ function PartnerRulesEditor({
   );
 }
 
-/** T6 (0280) — the delivery-photo row inside the delivery card, shown only
- *  once the order is delivered. Existing photos open in a new tab via
- *  short-lived signed urls (the bucket is private); Upload shrinks the file
- *  browser-side, then runs the sign-upload → attach flow. The SERVER is the
- *  gate (delivered-only + own-order path prefix) — this row is assistance. */
-function DeliveryPhotoRow({ orderId }: { orderId: string }) {
+/**
+ * T6 (0280) — the delivery-photo row inside the delivery card, shown only once
+ * the order is delivered. Existing files open in a new tab via short-lived
+ * signed urls (the bucket is private).
+ *
+ * ⭐ ONE UPLOADER, AND IT NAMES THE TRIP (owner ruling 2026-09-11). The
+ * picker is the shared `DeliveryProofUploadButton` the Delivery Orders
+ * register renders - a second picker here would be a second form for one act
+ * (Law C) - and it passes the order's own DO number so the file belongs to a
+ * document instead of floating at order level. An order with no DO number yet
+ * uploads UNBOUND, which is the honest answer, not a guessed one.
+ */
+function DeliveryPhotoRow({
+  orderId,
+  doNumber,
+}: {
+  orderId: string;
+  doNumber: string | null;
+}) {
   const photosQ = useDeliveryPhotos(orderId);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const upload = useUploadDeliveryPhoto(orderId, {
-    onSuccess: () => toast.success("Delivery photo uploaded"),
-    onError: (e) =>
-      toast.error(
-        e instanceof ApiError ? e.message : "Couldn't upload the delivery photo",
-      ),
-  });
   const photos = photosQ.data?.photos ?? [];
   return (
     <DRow k="Delivery photo">
@@ -5550,27 +5557,7 @@ function DeliveryPhotoRow({ orderId }: { orderId: string }) {
             ),
           )
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          aria-label="Delivery photo file"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) upload.mutate(f);
-            e.target.value = "";
-          }}
-        />
-        <Btn
-          variant="box"
-          size="sm"
-          icon={Upload}
-          disabled={upload.isPending}
-          onClick={() => inputRef.current?.click()}
-        >
-          {upload.isPending ? "Uploading…" : "Upload delivery photo"}
-        </Btn>
+        <DeliveryProofUploadButton orderId={orderId} doNumber={doNumber} />
       </span>
     </DRow>
   );

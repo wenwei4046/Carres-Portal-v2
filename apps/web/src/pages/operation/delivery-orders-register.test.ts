@@ -21,7 +21,9 @@ import {
   buildDoRegisterRow,
   doRegisterFooter,
   doWorkQueueOf,
+  driverSubmissionOf,
   matchesDoFilters,
+  submissionFilesOf,
   tripLinesOf,
   type DoRegisterRow,
 } from "./delivery-orders-register";
@@ -116,7 +118,7 @@ describe("the row's facts", () => {
     expect(row.latestResult).toBe("delivered");
   });
 
-  it("the photo ledger: absent = UNKNOWN (null), [] = known-empty, rows = present", () => {
+  it("the photo ledger: absent = UNKNOWN (null), [] = known-empty, THIS document's rows = present", () => {
     expect(build().photosPresent).toBeNull();
     expect(
       build({ orders: { ...doRow().orders, ops_order_control: { delivery_photos: [] } } })
@@ -126,10 +128,90 @@ describe("the row's facts", () => {
       build({
         orders: {
           ...doRow().orders,
-          ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "t", by: null }] },
+          ops_order_control: {
+            delivery_photos: [
+              { path: "p.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" },
+            ],
+          },
         },
       }).photosPresent,
     ).toBe(true);
+  });
+
+  it("a file stamped with ANOTHER document is not this document's photo", () => {
+    const row = build({
+      orders: {
+        ...doRow().orders,
+        ops_order_control: {
+          delivery_photos: [
+            { path: "p.jpg", at: "t", by: null, doNumber: "DO-OTHER", kind: "photo" },
+          ],
+        },
+      },
+    });
+    expect(row.photosPresent).toBe(false);
+    expect(row.submission).toEqual({ known: true, photos: 0, videos: 0, unbound: 0 });
+  });
+});
+
+/**
+ * ⭐ THE BINDING (owner ruling 2026-09-11). The defect these tests exist to
+ * keep dead: one Sales Order, two Delivery Orders, ONE ledger - and a register
+ * that counted the ledger told both rows the same number.
+ */
+describe("driverSubmissionOf - what came back from THIS trip", () => {
+  const ledger = [
+    { path: "a.jpg", at: "1", by: null, doNumber: "DO-A", kind: "photo" as const },
+    { path: "b.jpg", at: "2", by: null, doNumber: "DO-A", kind: "photo" as const },
+    { path: "c.mp4", at: "3", by: null, doNumber: "DO-A", kind: "video" as const },
+    { path: "d.jpg", at: "4", by: null, doNumber: "DO-B", kind: "photo" as const },
+    { path: "legacy.jpg", at: "5", by: null },
+  ];
+
+  it("counts only the files stamped with this document", () => {
+    expect(driverSubmissionOf(ledger, "DO-A")).toEqual({
+      known: true,
+      photos: 2,
+      videos: 1,
+      unbound: 1,
+    });
+    expect(driverSubmissionOf(ledger, "DO-B")).toEqual({
+      known: true,
+      photos: 1,
+      videos: 0,
+      unbound: 1,
+    });
+  });
+
+  it("an ABSENT ledger is UNKNOWN, never a fabricated zero", () => {
+    expect(driverSubmissionOf(undefined, "DO-A").known).toBe(false);
+    expect(driverSubmissionOf(null, "DO-A").known).toBe(false);
+    /* A ledger that arrived and holds nothing is a real zero. */
+    expect(driverSubmissionOf([], "DO-A")).toEqual({
+      known: true,
+      photos: 0,
+      videos: 0,
+      unbound: 0,
+    });
+  });
+
+  it("a stamped entry with no kind is the photo it could only have been", () => {
+    expect(
+      driverSubmissionOf([{ path: "x.jpg", at: "1", doNumber: "DO-A" }], "DO-A"),
+    ).toEqual({ known: true, photos: 1, videos: 0, unbound: 0 });
+  });
+
+  it("the viewer opens exactly what the count counted (Law D)", () => {
+    expect(submissionFilesOf(ledger, "DO-A", "photo").map((f) => f.path)).toEqual([
+      "a.jpg",
+      "b.jpg",
+    ]);
+    expect(submissionFilesOf(ledger, "DO-A", "video").map((f) => f.path)).toEqual(["c.mp4"]);
+    expect(submissionFilesOf(ledger, "DO-B", "video")).toEqual([]);
+    /* An unstamped file belongs to NO document's viewer. */
+    expect(
+      submissionFilesOf(ledger, "DO-A", "photo").some((f) => f.path === "legacy.jpg"),
+    ).toBe(false);
   });
 });
 
@@ -160,13 +242,35 @@ describe("doWorkQueueOf — one primary queue, canonical facts only", () => {
         orders: {
           ...doRow().orders,
           do_file_path: "do/signed.pdf",
-          ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "t", by: null }] },
+          ops_order_control: {
+            delivery_photos: [
+              { path: "p.jpg", at: "t", by: null, doNumber: "DO-180826-3035", kind: "photo" },
+            ],
+          },
         },
       },
       [DELIVERED],
     );
     expect(row.queue).toBeNull();
     expect(row.status.kind).toBe("delivered");
+  });
+
+  it("ANOTHER document's photo never closes this document's upload work", () => {
+    const row = build(
+      {
+        orders: {
+          ...doRow().orders,
+          do_file_path: "do/signed.pdf",
+          ops_order_control: {
+            delivery_photos: [
+              { path: "p.jpg", at: "t", by: null, doNumber: "DO-OTHER", kind: "photo" },
+            ],
+          },
+        },
+      },
+      [DELIVERED],
+    );
+    expect(row.queue).toBe("upload_photo");
   });
 
   it("a created document queues nowhere — nothing is due yet", () => {

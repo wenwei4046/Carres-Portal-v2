@@ -2471,7 +2471,27 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Record delivery result` · `Upload delivery photo` · `Upload signed Delivery Order` | the register's WORK TO DO queues (`Check delivery proof` joins only when a proof-review record exists) | **RULED 2026-09-06** |
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
 | `DELIVERY STATUS` | Monitor's operational-status filter group; `Waiting for warehouse` lives here, never in WORK TO DO | **RULED 2026-09-07** |
-| `DOCUMENT STATUS` | the register rail's status group | **RULED 2026-09-06** |
+| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's five words, each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `Driver submission` | the Delivery Orders register's column for what came back from THIS delivery order's trip. It replaces the default `Proof Status` column (retired 2026-09-11) | **RULED 2026-09-11** |
+| `Photos {n}` · `Videos {n}` | the two count buttons inside `Driver submission`. The number is the ledger's own count of files stamped with THIS document; a count is NEVER printed when the answer is unknown, and no button is offered for a kind with no files. **No video is not a shortage** — video is not required, so an absent video prints nothing at all | **RULED 2026-09-11** |
+| `Signed Delivery Order` | the viewing link to the signed paper on file, on the second line of `Driver submission`. Already the governed proof name; here it is a door | **REUSED 2026-09-11** |
+| `An uploaded file records what the driver sent. It is not proof accepted and not a successful delivery.` | the one sentence at the top of every attachment viewer. An upload is evidence of an upload — the portal never lets a count read as a verdict | **RULED 2026-09-11** |
+| `Not recorded` | `Driver submission` when the ledger never reached the screen. An UNKNOWN is printed as an unknown, never as a reassuring `0` | **REUSED 2026-09-11** |
+| `Showing only:` | the label opening the register's active-condition strip above the table; each live condition is a removable chip and `Clear filters` removes them all | **RULED 2026-09-11** |
+| `Logistics` | the Delivery Orders register's COLUMN HEADING for the partner named on the document. The role word stays `Logistics Partner` everywhere the role itself is named; the heading spends its width on the fact | **RULED 2026-09-11** |
+| A CANCELLED document's `Driver submission` | **nothing at all** when no file was ever sent. The pill already says `Cancelled`; two absences beside it read as two outstanding jobs on a trip that will never happen. Files sent before the void are still shown — a void never erases a recorded fact | **RULED 2026-09-11** |
+
+**ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
+Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own pill word
+(`Created` · `Out for delivery` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
+`Delivery exception` carries the RESULT that was actually recorded and its reason —
+`Partially Delivered · {reason}` or `Failed Delivery · {reason}` — which is what the retired
+default `Delivery Result` column used to print three columns away. `Cancelled` keeps its void
+reason on line 2. **The search, the per-column filter and the Excel export print the same
+spelling as the cell**, so a reader looking for `Partially Delivered` finds the row that recorded
+it even though its pill spells `Delivery exception`. Combining a DISPLAY never changes the status
+arithmetic and never removes a recorded result: the Delivery Order's own page still holds every
+result and its whole history.
 | `Search deliveries…` | the toolbar search placeholder | kept |
 | `Previous days` · `Next days` | the range arrows' accessible labels | kept |
 

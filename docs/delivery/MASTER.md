@@ -753,20 +753,61 @@ header select-all over the visible filtered rows · the in-place same-height sel
 page and the print path already run) · sticky `DO No` identity with real horizontal scrolling ·
 search · governed per-column filters · Export · Columns · the fixed 32px result footer.
 
-- **Default columns, in order (owner correction 2026-09-09, overwriting the 2026-09-06 order and
-  its `Requested Delivery Date` chooser default):** `DO No` · `SO No` · `Customer` ·
-  **`Requested Delivery Date`** · **`Confirmed Delivery`** · **`Confirmed Time`** ·
-  `Logistics Partner` · `Delivery Location` · `Delivery Result` · `Proof Status` · `Status` ·
-  `DO date`. In the chooser, off by default: `Goods` · `Created`.
+- **Default columns, in order — owner ruling 2026-09-11, BUILT
+  (overwriting the 2026-09-09 order completely):** `DO No` · **`DO date`** · `SO No` ·
+  `Customer` · **`Status`** · **`Requested Delivery Date`** · **`Confirmed Delivery`** ·
+  **`Confirmed Time`** · **`Logistics`** · `Delivery Location` · **`Driver submission`**.
+  In the chooser, off by default: `Goods` · `Created`.
   **`Requested Delivery Date` and `Confirmed Delivery` are ADJACENT** — the register answers *what
   did the customer ask for, and has anyone agreed a day?* in one glance, and a column hidden in the
-  chooser answers nobody. **`DO date` falls to the end**: it is the day the paper issued and is
-  neither delivery date; it stays available because a document register must be able to say when
-  its documents were made. The ambiguous `Delivery date` label stays retired for
+  chooser answers nobody. **`DO date` follows `DO No`**: it is the day the paper issued, it is
+  neither delivery date, and the answer belongs beside the document's own identity rather than at
+  the far end of a sheet that scrolls. The ambiguous `Delivery date` label stays retired for
   **`Confirmed Delivery`**, `Confirmed Time` is its own column, and the customer date keeps its
   governed word `Requested Delivery Date`. `Requested Delivery Date` opens no editor here —
   Sales Orders owns it; `SO No` opens the Sales Order and `DO No` the formal Delivery Order, and
-  **`Assign logistics` still never appears on this register**.
+  **`Assign logistics` still never appears on this register**. `Logistics Partner` is shortened
+  to **`Logistics`** as a COLUMN HEADING only; the role word is unchanged everywhere the role
+  itself is named.
+- **ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED (2026-09-11).** The register
+  used to print the outcome TWICE — a `Delivery exception` pill in one column and
+  `Partially Delivered` / `Failed Delivery` in another, three columns apart, joined by eye. The
+  pill keeps the DOCUMENT's word; line 2 of an exception carries the RESULT actually recorded and
+  its reason (`Partially Delivered · {reason}`, `Failed Delivery · {reason}`), and `Cancelled`
+  keeps its void reason. The default `Delivery Result` column is RETIRED. **The status arithmetic
+  did not move**: `deliveryOrderStatusOf` still derives the kind and the reason from the void
+  stamp, the attempts and the handover facts, and the recorded results and their full history
+  remain on the Delivery Order's own page. Search, per-column filter and Excel export print the
+  same spelling as the cell, so `Partially Delivered` still finds its row.
+- **`Driver submission` REPLACES the default `Proof Status` column (2026-09-11)** — doors, not a
+  verdict. `Photos {n}` opens THIS delivery's gallery, `Videos {n}` opens THIS delivery's player,
+  and `Signed Delivery Order` opens the paper the customer signed in ONE click (the url is signed
+  on demand — a register that pre-signed every row would hand out hundreds of one-hour links
+  nobody opens). **Every count is real**, a kind with no files offers no button, an unknown ledger
+  prints `Not recorded` rather than a fabricated `0`, **no video is automatically a shortage**,
+  and every viewer states in words that an upload is evidence of an upload — not proof accepted
+  and not a successful delivery. A CANCELLED document with nothing sent prints nothing here; files
+  sent before a void are still shown, because a void never erases a recorded fact. Missing
+  required evidence stays visible and keeps its existing work open.
+- **⭐ THE EVIDENCE BINDING — the defect this ruling had to kill first, BUILT 2026-09-11.**
+  The media source is the SALES ORDER's ledger (`ops_order_control.delivery_photos`). An order
+  carrying two Delivery Orders has ONE ledger, so counting it per row would have told an operator
+  that DO-A carried three photos when all three came back from DO-B — and the warehouse's
+  `delivery_handover_evidence` describes a load LEAVING the warehouse, not goods reaching a
+  customer. **The attach door now stamps a SERVER-VERIFIED `doNumber` and the file's `kind` on
+  every new ledger entry** (`POST /orders/:id/delivery-photo/attach`; a number that is not one of
+  THIS order's own documents is refused at 422), the sign-upload door admits videos beside photos,
+  and `driverSubmissionOf` is the ONE reader of that stamp — the register, the viewers AND
+  Monitor's `Upload delivery proof` queue all count through it (Law D). A file recorded before
+  this ruling names no document and is therefore counted for NONE of them; it stays visible on the
+  Sales Order, which is the scope it actually proves. **No migration was needed** — the ledger is
+  `jsonb`, so the shape extended without DDL.
+- **The proof GATE follows the recorded result, not the order stage (defect fixed 2026-09-11).**
+  `delivery_attempt_record` never touches `orders.operation_stage`, so a **Partially Delivered**
+  trip sat in this register's own `Upload delivery photo` queue behind a door that refused every
+  file. The gate now asks what `missingDeliveryProofOf` asks — did goods REACH the customer? —
+  which is the order reading delivered OR a recorded `delivered`/`partial` result. A failed trip
+  still owes no delivery photo and is still refused.
 - **The cell, the search, the per-column filter and the Excel export print ONE spelling** of the
   requested date (`requestedDeliveryText`): the day · `To be confirmed` · `No delivery date`. The
   export used to flatten the middle into the last, telling a sheet's reader that a customer had
@@ -783,8 +824,35 @@ search · governed per-column filters · Export · Columns · the fixed 32px res
   queue, in that priority; finished work leaves the queue and the document stays in the status
   views forever. **`Check delivery proof` is deliberately NOT a queue yet** — no canonical
   proof-review record exists (§6's Proof Accepted / More Proof Required / Proof Rejected is
-  approved target, not built), and a queue is never faked. `DOCUMENT STATUS` lists `All` plus
-  the ladder's own five words.
+  approved target, not built), and a queue is never faked. **`DOCUMENT STATUS` is the kit's own
+  governed dropdown** (2026-09-11) offering `All` plus the ladder's five words, each with its live
+  count: six stacked rows spent a third of the rail on a choice that is one value at a time, and
+  the height went back to `WORK TO DO`, where the day starts. `All` clears the status condition
+  ONLY — a picked work queue survives, because they are two questions.
+- **WHEN A WORK QUEUE IS PICKED, THE ROW CARRIES THAT QUEUE'S OWN DOOR (2026-09-11)** — and it is
+  THE EXISTING OPERATION, never a second form. `Record delivery result` renders the Delivery
+  Order page's own `DeliveryResultAction`; `Upload delivery photo` renders the one
+  `DeliveryProofUploadButton` the Sales Order drawer also renders, stamped with THIS document's
+  number. The column exists only while a queue is picked, so an unfiltered register gains no
+  width. **`Upload signed Delivery Order` offers a door to the Sales Order instead of a writer**:
+  the one existing writer (`operation_attach_do_and_deliver`) requires a `dispatched` order and
+  also marks the whole order delivered, so pressing it against a partial trip would record a
+  falsehood. **REAL GAP, named not faked:** no door attaches a signed Delivery Order to an
+  already-delivered or partially-delivered order. It needs a governed writer of its own.
+- **EVERY LIVE NARROWING SAYS ITSELF, IN ONE LINE (2026-09-11).** The register is narrowed from
+  two places — this rail and the grid's own per-column funnels — and neither used to say what the
+  other had done, so an operator reading four rows could not see why there were four. A
+  `Showing only:` strip above the table now lists every live condition as a removable chip under
+  one `Clear filters`. It renders nothing when nothing is narrowed, and the power is opt-in on the
+  shared engine, so no other register gained a band.
+- **AT NARROW WIDTHS THE RAIL STARTS COLLAPSED, ITS DOOR STILL VISIBLE (2026-09-11).** Below
+  1100px the 240px rail spends a quarter of the sheet on filters nobody has picked yet, and the
+  dates this register exists to answer scroll off the right edge. It starts hidden and
+  `Show filters` stays in the toolbar — collapsed is not gone. A REMEMBERED choice wins at any
+  width. **Validated at the observed 949px viewport**: `DO No` · `DO date` · `SO No` ·
+  `Customer` · `Status` and the customer's requested date are all reachable without scrolling,
+  the sticky identity pins cleanly with no overlap, and ordinary parent rows measure exactly
+  **38px** while a two-line status stays fully readable inside them.
 - **Selection is document-oriented output only:** `{N} delivery orders selected · Clear ·
   Print {N} delivery orders` (each document's governed single-DO page, assembled server-side
   under RLS, one file) plus the shared selected-row Excel export. **`Assign logistics` never

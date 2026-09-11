@@ -50,6 +50,13 @@ function outboundActorOf(c: Context<AppEnv>):
  *   POST /:id/handover-proof/sign-upload
  *                    — short-lived signed upload URL for the proof the §6 law
  *                      binds to the exact event it proves.
+ *   GET  /:id/signed-document
+ *                    — a short-lived signed VIEW url for the signed Delivery
+ *                      Order on file (`orders.do_file_path`), so the
+ *                      register's Driver submission column can open the paper
+ *                      the customer signed. READ-ONLY, signed on demand: a
+ *                      list that pre-signed every row would hand out hundreds
+ *                      of expiring urls nobody clicks.
  *
  * A register finds documents; work lives in My Work / Team Work — so nothing
  * here computes an owner, an action or a due date. Status is NOT computed
@@ -350,6 +357,51 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     scopeUnits,
     handoverEventUnits,
   });
+});
+
+/**
+ * GET /:id/signed-document — the signed Delivery Order on file, signed for
+ * VIEWING (the 0280 pattern: private bucket, Worker signs after its own role
+ * gate). The artefact is the ORDER's (`orders.do_file_path`, migration 0087),
+ * which is a fact this route states rather than hides: one signed paper per
+ * order today, reached through whichever of its documents the operator opened.
+ * A document with no paper answers `{ url: null }` — an absence, never a 500.
+ */
+deliveryOrdersRouter.get("/:id/signed-document", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+
+  let query = sb
+    .from("ops_delivery_orders")
+    .select("id, do_number, orders!inner(id, do_file_path, do_uploaded_at)");
+  query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
+  const { data: row, error } = await query.maybeSingle();
+  if (error) {
+    return c.json({ error: "delivery_order_read_failed", message: error.message }, 500);
+  }
+  if (!row) {
+    return c.json({ error: "not_found", message: "Delivery order not found" }, 404);
+  }
+  /* PostgREST may hand a to-one embed back as an object OR a one-row array,
+     depending on how it reads the relationship - the register's own reader
+     carries the same guard. */
+  const embedded = (row as unknown as {
+    orders:
+      | { do_file_path: string | null; do_uploaded_at: string | null }
+      | Array<{ do_file_path: string | null; do_uploaded_at: string | null }>
+      | null;
+  }).orders;
+  const order = Array.isArray(embedded) ? embedded[0] ?? null : embedded;
+  if (!order?.do_file_path) return c.json({ url: null, uploadedAt: null });
+
+  const admin = adminClient(c.env);
+  const { data: signed, error: signErr } = await admin.storage
+    .from("delivery-orders")
+    .createSignedUrl(order.do_file_path, 3600);
+  if (signErr) {
+    return c.json({ error: "sign_failed", message: signErr.message }, 500);
+  }
+  return c.json({ url: signed?.signedUrl ?? null, uploadedAt: order.do_uploaded_at ?? null });
 });
 
 /** THIS TRIP's goods, derived exactly as the DO page and the print path derive

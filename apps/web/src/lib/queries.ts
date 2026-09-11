@@ -310,7 +310,7 @@ import {
   type OperationWorkResponse,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
-import { uploadCompartmentPhoto, uploadDeliveryPhoto, uploadModelPhoto } from "./photo-upload";
+import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
 
 export const qk = {
   dealers:      () => ["dealers"] as const,
@@ -440,6 +440,11 @@ export const qk = {
      *  urls. Nested under the order id, same blunt-invalidate family. */
     deliveryPhotos: (id: string) =>
       ["operation", "orders", id, "delivery-photos"] as const,
+    /** The signed Delivery Order on file, signed for VIEWING on demand (owner
+     *  ruling 2026-09-11). Keyed by the DOCUMENT, because that is the door the
+     *  operator opened, even though the artefact is the order's. */
+    signedDeliveryDocument: (idOrNumber: string) =>
+      ["operation", "delivery-orders", idOrNumber, "signed-document"] as const,
     /** T9 (migration 0283) — what the order's carrier says about ONE candidate
      *  delivery date. Keyed by the date so picking another day is a fresh
      *  question, not a stale answer. */
@@ -3120,6 +3125,23 @@ export function useSalesOrderExpansion(orderId: string | null) {
     staleTime: 30_000,
   });
 }
+/**
+ * ONE raw entry of `ops_order_control.delivery_photos` as PostgREST returns
+ * it — the ledger a driver's submission lands in (0280).
+ *
+ * `doNumber` and `kind` are ABSENT on every entry recorded before the
+ * 2026-09-11 driver-submission ruling, which is why both are optional here and
+ * why an absent `doNumber` is read as *names no delivery order* rather than
+ * *belongs to all of them* (`driverSubmissionOf`).
+ */
+export interface DeliveryLedgerEntry {
+  path: string;
+  at: string;
+  by: string | null;
+  doNumber?: string | null;
+  kind?: "photo" | "video" | null;
+}
+
 export interface opsRemarkEmbed {
   // Optional (C2): the list no longer renders these remark fields in-row, and
   // test fixtures build partial overlays (e.g. just `balance`), so they're not
@@ -3172,7 +3194,7 @@ export interface opsRemarkEmbed {
    *  older Worker that doesn't select the column, or no overlay row at all), and
    *  the queue stays silent; an explicit `[]` is the real "no photo yet". Only
    *  paths ride the list — a signed view URL is minted per click in the drawer. */
-  delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+  delivery_photos?: DeliveryLedgerEntry[] | null;
   /** T8 delivery groups (migration 0282) — what the LIVE booking covers.
    *  `null`/absent = the trip carries the whole order (T8's own definition, so
    *  there is nothing to backfill); T11's detail pane reads it to name the
@@ -3423,7 +3445,7 @@ export interface operationOrderDetailResponse {
    *  needs. Deliberately NOT folded into `order`: the workspace EDIT form
    *  seeds its draft from that object. `null` = no overlay row (UNKNOWN). */
   control?: {
-    delivery_photos?: { path: string; at: string; by: string | null }[] | null;
+    delivery_photos?: DeliveryLedgerEntry[] | null;
   } | null;
 }
 
@@ -6955,8 +6977,8 @@ export interface DeliveryOrderRow {
     /** T6 (0280) — the delivery-photo ledger; PostgREST may embed the overlay
      *  as an object or a one-row array. null/absent = UNKNOWN, never empty. */
     ops_order_control?:
-      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }
-      | { delivery_photos?: { path: string; at: string; by: string | null }[] | null }[]
+      | { delivery_photos?: DeliveryLedgerEntry[] | null }
+      | { delivery_photos?: DeliveryLedgerEntry[] | null }[]
       | null;
   };
 }
@@ -7180,6 +7202,28 @@ export interface DeliveryHandoverEventRow {
   recorded_by_name: string | null;
   recorded_at: string;
   proofUrl: string | null;
+}
+
+/**
+ * The signed Delivery Order, signed for VIEWING (owner ruling 2026-09-11).
+ *
+ * ON DEMAND, never with the list: a signed url lives one hour, so minting one
+ * per register row would hand out hundreds of expiring links nobody clicks.
+ * `{ url: null }` is a truthful answer — this document has no signed paper —
+ * and is NOT an error.
+ */
+export function useSignedDeliveryDocument(idOrNumber: string | null, enabled: boolean) {
+  return useQuery<{ url: string | null; uploadedAt: string | null }, ApiError>({
+    queryKey: qk.operation.signedDeliveryDocument(idOrNumber ?? ""),
+    queryFn: () =>
+      apiFetch<{ url: string | null; uploadedAt: string | null }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(idOrNumber ?? "")}/signed-document`,
+      ),
+    enabled: Boolean(idOrNumber) && enabled,
+    /* Signed urls live 1h; refresh well inside that. */
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
 }
 
 export function useDeliveryOrder(idOrNumber: string | null) {
@@ -7410,16 +7454,25 @@ export function useDeliveryPhotos(
  *  tree. */
 export function useUploadDeliveryPhoto(
   orderId: string,
-  opts?: Partial<UseMutationOptions<OpsOrderControl, Error, Blob>>,
+  opts?: Partial<UseMutationOptions<OpsOrderControl, Error, Blob>> & {
+    /** The Delivery Order the file came back from (owner ruling 2026-09-11).
+     *  The SERVER verifies it belongs to this order. Omitted = the submission
+     *  names no trip — an honest unknown, never a guess. */
+    doNumber?: string | null;
+  },
 ) {
   const qc = useQueryClient();
+  const doNumber = opts?.doNumber ?? null;
   return useMutation<OpsOrderControl, Error, Blob>({
-    mutationFn: (file) => uploadDeliveryPhoto(orderId, file),
+    mutationFn: (file) => uploadDeliveryProof(orderId, file, { doNumber }),
     ...opts,
     onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: qk.operation.orderControl(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: qk.operation.deliveryPhotos(orderId), exact: true });
       await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      /* The register's own read carries the ledger, so a new submission must
+         refresh it too or the count stays a version behind. */
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
