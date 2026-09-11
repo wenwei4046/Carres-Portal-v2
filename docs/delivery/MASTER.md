@@ -532,21 +532,47 @@ Where is the confirmed date recorded? Edit Delivery, the one Delivery-owned edit
 - **The rows did not change; the NAME did.** `No confirmed date` stays the CELL's absence word — it
   is the fact — and the retired `?view=no_confirmed_date` still opens this queue beside its new
   `call_customer` spelling.
+- **A DAY IS NOT AN APPOINTMENT (owner ruling 2026-09-11).** A delivery is BOOKED only when a day
+  AND a window are both recorded. A day with no window means the customer has not been told when
+  to be home, so the row stays in `Call customer`, keeps its deadline and is never counted as a
+  confirmed appointment. **The cell SAYS SO** — `Mon, 14 Sep · No time agreed`, the absence in
+  the governed word and the governed absence styling, the same words the calendar card uses.
+  Printing the day alone made a half-answered booking differ from a finished one only by a missing
+  fragment an operator reads as formatting.
 - **THE CONTACT DEADLINE IS THE SHARED `chase` STEP AND NOTHING NEW** (`deliveryStepDueIso`, lead
   `logistics_call_working_days` = 3 since 0342, on the Mon–Sat delivery week with the injected
   Malaysian holidays). The Orders list, the booking brief and Monitor read the ONE arithmetic, so
   they cannot name two different days. A customer who has named no day has NO deadline and is
-  never late — a step with no anchor cannot be. **A late contact KEEPS the deadline it missed**
-  (`Late — was due {date}`, the portal's own late spelling): rolling it forward would erase the
-  only evidence that anything went wrong.
+  never late — a step with no anchor cannot be. **A late contact KEEPS the deadline it missed**:
+  rolling it forward would erase the only evidence that anything went wrong.
+- **THE COMPACT DEADLINE (owner correction 2026-09-11, overwriting the `Call by {date}` /
+  `Late — was due {date}` cell).** The row prints a phone glyph and the date —
+  `[phone] Thu, 22 Oct`, red when it is late — and nothing else. The FULL sentence, including
+  that an overdue deadline does not move, is the cell's accessible name AND its tooltip; the icon
+  is decorative, so a screen reader announces the sentence once rather than twice. The words are
+  unchanged and the arithmetic is unchanged: what is removed is a label repeating in every row of
+  a column that already says what it is.
+- **A TRIP THAT HAS ALREADY RUN CARRIES NO CONTACT WORK (owner correction 2026-09-11).** Once a
+  result is recorded — `Delivered`, or the one `Failed Delivery` rung that carries a failure and
+  a partial alike — the row leaves `Call customer`, loses its deadline cell and cannot be counted
+  overdue, whatever the arrangement recorded, **and `Actions` never prints the chase line for it**
+  — a recorded result outranks the chase exactly as it already outranks an unassigned partner. Its
+  remaining work is `Upload delivery proof` or `Failed Delivery`. Without this, a delivery whose
+  time window was never written down sent an operator to phone a customer whose furniture was
+  already in the house.
 - **THE CONTACT WEEK (owner ruling 2026-09-10).** Under `Call customer` — and under no other
   queue — a Monday-to-Saturday strip lists the six operating days with the COUNT of calls due on
   each, its own previous/next arrows, and the caption `Contact deadlines — not supplier or
   delivery dates`. Picking a day narrows the list to that deadline; picking it again unpicks. **An
-  `Overdue` chip stands beside the six days with its own live count and answers across every
-  date**, so navigating to a quiet Thursday can never hide calls that are already late. The strip
-  never appears on another queue: a hidden second narrowing would make a complete-looking list
-  incomplete.
+  `Overdue contact` chip stands beside the six days with its own live count and answers across
+  every date**, so navigating to a quiet Thursday can never hide calls that are already late. The
+  strip never appears on another queue: a hidden second narrowing would make a complete-looking
+  list incomplete.
+- **TWO OVERDUE POPULATIONS, TWO DIFFERENT WORDS (owner correction 2026-09-11).**
+  `Overdue delivery` is the rail's queue — a confirmed trip whose day has passed with no result.
+  `Overdue contact` is the strip's chip — a customer conversation that missed its T−3 deadline.
+  They are different rows, worked by different people, and two bare `Overdue` counts on one
+  screen read as one number disagreeing with itself.
 - **A CONTACT ATTEMPT IS NOT A CONFIRMED BOOKING, AND SILENCE IS NOT AN ANSWER.** Nothing on this
   surface infers `Waiting for customer reply` — or any other customer answer — from a missing
   confirmed date. The row states the recorded absence and the recorded deadline; the outcome of a
@@ -608,14 +634,43 @@ different questions that one `Goods` summary answered badly.
   redefined as main-items-only readiness. **A SERVICE is not part of what the register can be
   short of**: it moves no Unit, and the test that excludes it is the ENTRY RULE's own, so what
   makes an order delivery work and what makes it ready are decided once.
-- **THE DATE IS THE PRIMARY INFORMATION.** `Expected arrival` prints the effective supplier date
-  first and names whose date it is underneath (`Not confirmed` · `Same as PO` ·
-  `Earlier than the PO date` · `Delayed` · `Date reported`). **When a supplier revises the date,
-  the ORIGINAL stays beside the new one** (`PO Delivery Date {date}`) — a delay icon with no new
-  date tells the operator that something is wrong and nothing about when the goods now come.
-  **When no revised date has been given, the truthful unresolved state prints**
-  (`The factory has not given a date` · `Supplier delivery date passed`) and the responsible work
-  stays open on Purchasing's own screen. Nothing is invented and nothing implies a confirmation.
+  **READINESS FOLLOWS THIS SHIPMENT, NOT THE WHOLE SALES ORDER (owner ruling 2026-09-11).** A
+  split trip carries only its own groups, and counting the order's OTHER trip as this one's
+  shortage told an operator a van was short of goods it was never going to carry. The scoping is
+  the document's own `trip_groups` derivation — the SAME `tripLinesOf` the register, the DO page
+  and the print path run (Law D) — and a scope with no document reads the whole order, because
+  that is what it is.
+- **THE DATE IS THE PRIMARY INFORMATION, AND IT IS PRINTED ONCE (owner correction 2026-09-11,
+  overwriting the "name whose date it is underneath" rendering).** `Expected arrival` prints the
+  effective supplier date and, when the supplier revised it, the ORIGINAL as a bare second date
+  (`PO Delivery Date {date}`). The state's own word — `Not confirmed` · `Same as PO` ·
+  `Earlier than the PO date` · `Delayed` · `Date reported` · `Supplier delivery date passed` —
+  rides the cell's accessible name and tooltip, alongside the icon that already carries it.
+  Repeating those words in grey under every date in the column spent a line per row restating what
+  the icon meant.
+- **⭐ THREE FACTS THAT MAY NOT SHARE ONE WORD (owner correction 2026-09-11).** A missing date has
+  three different causes and three different owners, and one `no date` state used to tell the
+  operator the factory had failed to answer when nobody had asked:
+
+  ```
+  No expected arrival calculated    nobody could compute a date, and nobody has asked.
+                                    The gap is OURS — Purchasing has not raised or dated it.
+  Waiting supplier reply            a date exists and the advance arrival check is OPEN: the
+                                    supplier has been asked and has not answered. The cell also
+                                    says by when (`asked by {date}`).
+  The factory has not given a date   the supplier ANSWERED — the evidence is recorded — and the
+                                    answer named no day.
+  ```
+
+  The third **outranks every dated purchase order still owing the goods, and never degrades into
+  `Supplier delivery date passed`**: a supplier who says *late, and I cannot tell you when* has
+  told us the date we were holding is dead, so reporting that date — and then blaming the calendar
+  when it goes by — states a fact nobody stands behind. Whether a reply names a date is
+  `poReplyDateOf`, the Purchase Orders workspace's own arithmetic (Law D): a legacy `shipping`
+  answer means the date it was asked ABOUT, and every 0430 answer (`confirmed` · `earlier` ·
+  `delayed` · `reported`) names its date in `new_date` or names none. Whether anybody has ASKED
+  is `tomorrowDeliveryCallOf`, Purchasing's own advance-arrival-check clock. Delivery computes
+  neither. The responsible work stays open on Purchasing's own screen.
 - **ONE ARITHMETIC, AND IT IS NOT A NEW ONE** (Law D). The dates are `purchase_orders.eta_date` —
   `expectedArrivalOf`'s production-plus-transit result on the factory's own week and the office
   week — the immutable `official_delivery_date` (0428) and the latest `po_supplier_promises`
@@ -1400,7 +1455,11 @@ is the truth of a year of imported orders and exactly the fact the strip exists 
 (`?due=2026-09-07`, matching the strip's own count), and `Clear filters` returned `88 deliveries`
 on `?view=all` WITHOUT leaving the work list. Rows print `Call by Thu, 22 Oct` ahead of time, the
 red `Late — was due Thu, 16 Jul` once past — keeping the day it missed — and `No contact deadline`
-on SO-1254, whose customer named no day.
+on SO-1254, whose customer named no day. ⚠️ **The cell renderings quoted in this
+paragraph — `Call by {date}`, `Late — was due {date}`, a bare `Overdue` chip, and the calendar
+sentence naming a confirmed *date and time* — are what shipped THAT DAY and are OVERWRITTEN by the
+2026-09-11 corrections in §8 above.** The counts and the URLs are unchanged evidence; the words
+are not current law.
 
 `Confirmed deliveries` opened the Mon 7 – Sat 12 Sep week with `Day · Week · Month`, the boundary
 sentence `Only deliveries with a confirmed date and time appear here.` and — that week being

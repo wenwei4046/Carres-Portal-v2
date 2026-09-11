@@ -37,13 +37,16 @@ export default function Modal({
   footer?: ReactNode;
   /**
    * `"wide"` for a surface carrying a LINE LIST rather than a question — P19,
-   * 2026-08-05. Omit it and the modal is 512px, byte for byte as before.
+   * 2026-08-05. `"viewer"` for a surface carrying a PICTURE, whose binding
+   * constraint is the height cap rather than a column of text (2026-09-11).
+   * Omit it and the modal is 512px, byte for byte as before.
    *
-   * There is no `"narrow"`, no number and no `style`: the set is closed at two
-   * and both values live in `tailwind.config.ts`. A third width is a decision
-   * for §8's width table, not for a caller.
+   * There is no `"narrow"`, no number and no `style`: the set is CLOSED at
+   * three, every value lives in `tailwind.config.ts`, and each one carries the
+   * measurement that produced it. A fourth width is a decision for §8's width
+   * table, not for a caller.
    */
-  width?: "wide";
+  width?: "wide" | "viewer";
   children: ReactNode;
 }) {
   return (

@@ -365,6 +365,31 @@ DetailShell · DialogFrame · FieldFrame · GridToolbar · SectionHeader
 - **Widths and radii that have no home in a standard live as named config keys**, never as
   numbers inside a component.
 
+**⭐ THE CENTRED SURFACE'S WIDTH TABLE — closed at three, and every value carries its
+measurement (2026-09-11, adding the third).**
+
+| `width` | Config key | Value | The measurement that produced it |
+|---|---|---|---|
+| *(omitted)* | `max-w-modal` | 512px | The default: a question, a short form, a confirmation |
+| `"wide"` | `max-w-modal-wide` | 600px | P19, 2026-08-05 — a surface carrying a LINE LIST rather than a question |
+| `"viewer"` | `max-w-modal-viewer` | 880px | 2026-09-11 — a surface whose binding constraint is a PICTURE's height, not a column of text. The dialog caps at `85vh`; its chrome (header, footer, the caption line) takes 136px, leaving 629px of image. A 4:3 delivery photo 629px tall is 839px wide, so 880px shows it whole with 9px of headroom either side. Below this the photo is letterboxed and the operator zooms to read a door number |
+
+**A FOURTH WIDTH IS A DECISION FOR THIS TABLE, NOT FOR A CALLER.** `width` stays a union of
+literals with no number and no `style`, so what a page can express is one of these three. A page
+that needs a surface this table does not describe brings the gap here — it does not draw its own
+overlay.
+
+**⭐ RETURNING FOCUS IS `DialogFrame`'s JOB, AND IT WAS NOT BEING DONE (defect found and fixed
+2026-09-11).** The kit documented *"focus returned to the trigger"* as Radix behaviour it
+inherited. It was not: Radix restores focus to `Dialog.Trigger`, and the kit deliberately has
+none, because `open` is CONTROLLED and what opens a surface is an ordinary page button, a row
+action or a keyboard shortcut. Radix's modal content therefore called `preventDefault()` on its
+own close-focus event and then focused a trigger that was `null` — so **every modal and drawer in
+the portal dropped a keyboard user onto `<body>`**, with no way back to the row they opened.
+`DialogFrame` now remembers the element that had focus when it opened and restores it on close,
+skipping an opener the close itself removed from the document. One fix, every surface — which is
+the whole reason the two components share a frame.
+
 # §4 · Shells and grids
 
 ### FROZEN RULES
