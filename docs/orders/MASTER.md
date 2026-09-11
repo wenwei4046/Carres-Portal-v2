@@ -234,7 +234,9 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
-**Register correction — owner approved 2026-09-11; locally verified, not deployed.**
+**Register correction — owner approved 2026-09-11; implemented in [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227).**
+The delivery PR carries the exact release SHA, check results and authenticated read-only closure;
+implementation or a sample browser walk alone is not deployment proof.
 Unit IDs with an exclusive PO-source-to-order-line relationship are shown as line evidence.
 Order/SKU-only links remain inspectable but say `Unit ID link not verified`; matching a SKU
 does not assign an exact Unit to a configured line. Proven IDs exceeding the order-line Qty
@@ -267,11 +269,12 @@ and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing s
 each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
 sections left THIS TAB because `Order Route` already owns them.**
 
-**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11. PR #1222 `a27d2896`,
-production-verified 2026-09-11.** All five canonical surfaces (`carres-portal` and `carres-pos`
-Pages, the ERP and POS canonical hosts, and the API Worker) report that SHA, and the served ERP
-bundle carries `Delivery access`, `Sales ownership`, `Recorded by` and `Line total` — the SHA
-alone has been wrong before, so the asset was read too.
+**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11.** PR #1222 `a27d2896` shipped
+the composition; [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227) preserves it
+and corrects payment evidence, line provenance and visible item prices. The baseline deployment
+was verified on all five canonical surfaces (`carres-portal` and `carres-pos` Pages, ERP, POS
+and the API Worker), including served bundle content. The current delivery PR records its exact
+release SHA and authenticated read-only verification; no live version is inferred from a merge alone.
 
 ⚠️ **What that original record did not cover:** an authenticated page walk was not performed;
 owner-only acceptance does not prohibit engineering from read-only verification. The takeover
@@ -279,8 +282,11 @@ walk found SO-1319's positive Paid with an empty transaction list and SO-1357's 
 and slip with zero Paid. These findings require the capture/evidence states described below; the **re-cut-on-resize** path was not observed end to
 end (a hidden tab delivers neither `ResizeObserver` callbacks nor `requestAnimationFrame` —
 measured — so the padding arithmetic is unit-tested and the wiring pinned by the contract suite
-instead); browser coverage is **macOS + Chromium only**; and a **pre-existing** 120px page
-overflow at 390px comes from the shell header chrome, not from these cards.
+instead). The takeover checked the actual 574px detail content pane: both prices, all payment
+columns, saved-only/zero evidence, failed reads, keyboard Unit evidence and PDF amount parity.
+The in-app viewport override did not change the measured 1280px window, and another browser
+was unavailable; a 390px mobile pass is therefore not claimed. The prior composition report
+identified 120px of shell overflow at 390px, but this takeover has not independently verified it.
 
 This
 OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
