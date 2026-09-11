@@ -1815,16 +1815,22 @@ object page** — nothing announces permission to type into a field that is alre
 Register's context menu keeps the word `Edit` only because it names a destination, and that
 destination is the same one `View` opens.
 
-#### Its section names — owner ruling 2026-08-26 (Jess)
+#### Its section names — owner ruling 2026-08-26 (Jess), re-paired 2026-09-11
 
 Jess ruled the Order tab MERGED: fewer, fuller cards. A merged section keeps its exact word as
-an in-card heading — the merge moves a border, never a name — so this table governs FIVE
-surviving names and retires two.
+an in-card heading — the merge moves a border, never a name.
+
+**RE-PAIRED 2026-09-11, and no word changed.** The approved detail organisation moved two
+headings to the card each belongs with: `Sales ownership` joined `Customer` (who sold it is part
+of who bought it) and `Delivery address` became a heading of the new `Delivery` card, beside the
+access conditions that decide whether the lorry can reach the address. The WORDS below are the
+same words; only which card carries them moved.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The customer and everywhere their goods go | **`Customer`**, with **`Delivery address`** as its in-card heading | Customer details · Buyer · Client · Contact · Ship to |
-| The order's own administrative facts | **`Order info`**, with **`Sales ownership`** as its in-card heading | Order details · Dates · Dates / Access · Admin · Meta |
+| The customer, who sold to them, and who to ring | **`Customer`**, with **`Sales ownership`** and **`Emergency contact`** as its in-card headings | Customer details · Buyer · Client · Contact · Ship to |
+| The order's own administrative facts | **`Order info`** | Order details · Dates · Dates / Access · Admin · Meta |
+| Where the goods go and what the lorry meets there | **`Delivery`**, with **`Delivery address`** and **`Delivery access`** as its in-card headings — registered 2026-09-11 with the re-pairing; the card holds the address, the billing relationship, the building type and the floor/stair/lift answers | Ship to · Address · Logistics · Delivery details · Access (alone, which names the conditions and loses the address) |
 | Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`** | New/Returning · First-time · Repeat · a coloured status dot with no word |
 | ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
 | ⛔ RETIRED — the index of every linked document | nothing. **`Order Route` carries a door to each owner** | `Related Documents` · Linked documents · Attachments · Files |

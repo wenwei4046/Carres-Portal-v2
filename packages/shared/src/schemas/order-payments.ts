@@ -128,6 +128,10 @@ export interface OrderPaymentRow {
   receipt_url: string | null;
   note: string | null;
   recorded_by: string | null;
+  /** `app_users.name` of `recorded_by`, resolved fail-soft by the reading
+   *  endpoint. Null when the id is absent or the row is unreadable — a screen
+   *  prints `Not recorded` rather than a uuid. */
+  recorded_by_name?: string | null;
   created_at: string;
   /** 0343 — did this row bump `orders.paid`? False on a HISTORY MIRROR of a
    *  deposit the create door already put inside `orders.paid`, and on every
