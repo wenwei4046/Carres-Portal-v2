@@ -1502,7 +1502,9 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   - **Old revisions use their own lines and services.** SKU/configuration and service amounts
     cannot be paired with current rows by position. Current Unit IDs/destinations do not prove
     historical allocation. Current partially allocated lines preserve all recorded Unit IDs,
-    including explicitly unverified links, while still showing the short quantity.
+    including explicitly unverified links, while still showing the short quantity. Stock's saved
+    `reserved_order_line_id` takes precedence over the original PO source after reassignment;
+    an unknown explicit line is never replaced with a same-SKU or PO guess.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired

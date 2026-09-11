@@ -1300,10 +1300,11 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const unitLines: Record<string, string | null> = {};
   const verifiedByLine = new Map<string, string[]>();
   const unverifiedBySku = new Map<string, string[]>();
+  const orderLineIds = new Set(((lines ?? []) as Array<{ id: string }>).map((line) => line.id));
   for (const unit of unitRows) {
     if (!unit.unit_code) continue;
-    const lineId = unit.reserved_order_line_id ?? null;
-    unitLines[unit.unit_code] = lineId;
+    unitLines[unit.unit_code] = unit.reserved_order_line_id ?? null;
+    const lineId = unit.reserved_order_line_id && orderLineIds.has(unit.reserved_order_line_id) ? unit.reserved_order_line_id : undefined;
     if (lineId) {
       verifiedByLine.set(lineId, [...(verifiedByLine.get(lineId) ?? []), unit.unit_code]);
       continue;

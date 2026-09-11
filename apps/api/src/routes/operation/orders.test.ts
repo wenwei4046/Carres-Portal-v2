@@ -2811,6 +2811,34 @@ describe("GET /api/operation/orders/:id/commitment", () => {
 });
 
 describe("GET /api/operation/orders/:id/expansion", () => {
+  it("uses an explicit reserved line before the PO source and never spreads it across same-SKU lines", async () => {
+    const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+    const from = vi.fn((table: string) => ({ select: (columns: string) => {
+      let data: unknown = [];
+      if (table === "orders") data = { so: 1340 };
+      if (table === "order_lines") data = [{ id: "l1", sku: "SAME", qty: 1 }, { id: "l2", sku: "SAME", qty: 1 }];
+      if (table === "po_line_sources") data = [{ po_line_id: "p1", po_id: "po1", order_id: ORDER_ID, order_line_id: "l1", qty: 1 }];
+      if (table === "ops_stock_items" && columns.includes("warehouse_id")) {
+        expect(columns).toContain("reserved_order_line_id");
+        data = [{ unit_code: "EXACT", sku: "SAME", po_line_id: "p1", reserved_order_line_id: "l2" },
+          { unit_code: "UNKNOWN", sku: "SAME", po_line_id: "p1", reserved_order_line_id: "other-order-line" }];
+      }
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = () => chain;
+      chain.maybeSingle = () => Promise.resolve({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return chain;
+    } }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; unverifiedUnitIds: string[] }> };
+    expect(body.lines[0].unitIds).toEqual([]);
+    expect(body.lines[1].unitIds).toEqual(["EXACT"]);
+    expect(body.lines[0].unverifiedUnitIds).toEqual(["UNKNOWN"]);
+  });
+
   it.each([false, true])("never launders excess or unverified IDs into an ordinary Qty 1 row (verified=%s)", async (verified) => {
     const orderId = "00000000-0000-0000-0000-000000000a01";
     const ids = Array.from({ length: 14 }, (_, i) => `U1-${i}`);
