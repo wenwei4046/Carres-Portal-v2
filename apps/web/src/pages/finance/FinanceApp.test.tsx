@@ -49,6 +49,12 @@ describe("Finance routing", () => {
     expect(screen.getByTestId("payments-destination-header")).toBeInTheDocument();
     auth.role = "finance";
   });
+  it("operation staff entering Finance land on invoices that need collection", () => {
+    auth.role = "operation";
+    show("/finance");
+    expect(screen.getByTestId("invoices-destination-header")).toBeInTheDocument();
+    auth.role = "finance";
+  });
   it("operation staff bounce off the finance-only pages to Payments", () => {
     auth.role = "operation";
     show("/finance/recon");
