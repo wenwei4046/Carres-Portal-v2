@@ -1272,6 +1272,65 @@ risk here is nil rather than unchecked — this PR added no query, no column, no
 route, so an Operation account exercises exactly the reads it exercised before 2026-09-09. Jess
 can confirm in a minute by opening the same two URLs as `operation@`.
 
+**DEPLOYED 2026-09-11 — Monitor's two named views, the row that says what to do, and the
+contact week, PR #1235, main SHA `016475d7e2811d863b21c08716746fb77fca286b`, all five canonical
+surfaces converged (erp · pos · both pages.dev `/__carres_deploy.json` and the Worker
+`/health` each report that exact SHA).** The 2026-09-10 owner ruling is LIVE and was verified
+through an AUTHENTICATED OPERATION session on production (`operation-test@x.com`, role
+`operation` — an Operation account, not a principal), against 88 real delivery rows.
+
+`/operation?tab=delivery` lands on **`Work to do` 88** beside **`Confirmed deliveries` 1**, with
+the rail reading `All delivery work 88 · No logistics picked 5 · Call customer 87 · Overdue 1 ·
+Failed Delivery 0 · Upload delivery proof 0` and the ruled columns in order — `SO No · Customer ·
+State · Requested Delivery Date · Items · Accessories & services · Expected arrival · Stock ·
+Actions · Edit Delivery`. The landing prints no filter summary, because its queue narrows nothing.
+
+**Every arrival state is exercised by REAL production data** — measured across the 88 rows:
+`No purchase order raised yet` 56 · `Not confirmed` 24 (our production-plus-transit date, no
+supplier reply) · `The factory has not given a date` 4 · `Same as PO` 2 · `Supplier delivery date
+passed` 2. SO-1319 and SO-1328 print `Same as PO` over Tue 15 Sep and Mon 14 Sep from evidenced
+`po_supplier_promises` replies; SO-1210 and SO-1204 wear the amber `Supplier delivery date passed`
+over Thu 13 Aug and Wed 19 Aug; SO-1287 · SO-1213 · SO-1212 · SO-1207 state the gap rather than
+guess. The goods split reads as ruled — `Trion · Queen × 1 — 1 short`, `Service · Dispose old sofa
+(big size)`, `Floor 3 · No lift` — and `Stock` carries the whole shipment's shortage beside it.
+
+**The contact week answers on real deadlines.** `Call customer` shows Mon 7 – Sat 12 Sep with live
+per-day counts and an `Overdue 70` chip: 70 of the 87 chases are already past their T−3 day, which
+is the truth of a year of imported orders and exactly the fact the strip exists to surface. The
+`Overdue` chip narrowed to `70 deliveries` (`?late=1`), `Mon, 7 Sep` narrowed to `1 delivery`
+(`?due=2026-09-07`, matching the strip's own count), and `Clear filters` returned `88 deliveries`
+on `?view=all` WITHOUT leaving the work list. Rows print `Call by Thu, 22 Oct` ahead of time, the
+red `Late — was due Thu, 16 Jul` once past — keeping the day it missed — and `No contact deadline`
+on SO-1254, whose customer named no day.
+
+`Confirmed deliveries` opened the Mon 7 – Sat 12 Sep week with `Day · Week · Month`, the boundary
+sentence `Only deliveries with a confirmed date and time appear here.` and — that week being
+genuinely empty — the ONE spanning state with the REAL `87 deliveries need a confirmed date.` count
+and its `Open Call customer` door. Paging to Mon 24 – Sat 29 Aug showed the single real
+appointment under its confirmed date with its confirmed time: `Thu, 27 Aug · Afternoon (12pm–3pm) ·
+No delivery order yet · Ah Mei · Likas, Sabah · Sonic · Queen ×1 · HOUZS · Delivery confirmed`.
+The phone (390px) showed the tabs, the scrolling contact strip with its `Overdue` chip and the card
+list carrying the red deadline; 1280px proved real horizontal scrolling with the sticky `SO No`
+identity column clipping cleanly and `Actions` + `Edit Delivery` reachable.
+
+**Two defects were found and fixed on the way.** A delivered row still owing evidence offered
+`Assign logistics` as its next act — booking a carrier for goods the customer was already sitting
+on; a recorded result now outranks an unassigned partner. And a service line was counted as a piece
+the register could be short of, leaving every order that books a disposal permanently `Not ready`.
+
+Typecheck clean across all three packages; **4,381 web · 3,093 api · 3,168 shared tests green**
+(181 in the two Monitor suites, 12 new API, 19 new shared); design-standard clean;
+`ci:migrations` 487 filenames and 0 changes. **No migration, no RLS change, no new writer, no new
+route.** `GET /api/operation/orders` gained two batched reads on the query it already made
+(`po_arrivals` and `allocated_units`), each probed under the Operation account's own RLS before
+the change was written, and batched for the Worker's subrequest budget rather than per order.
+
+⚠️ **Named limitation, not an accident:** production holds ONE confirmed delivery date and TWO
+reserved Units across 88 delivery rows, so `Confirmed deliveries` is nearly empty and almost every
+row reads `Not ready`. That is the DATA, not the page — and per the Constitution §6 every row
+today is test data. The calendar's population will only be exercised at volume once operators
+start recording confirmed dates.
+
 **DEPLOYED 2026-09-07 — Monitor Day · Week · Month and rail correction, PR #1157, main SHA
 `4f35842c87acea49cd0fcc0716d6acc0a3e31ce6`, all four canonical surfaces converged (erp ·
 pos · pages.dev `/__carres_deploy.json` and the Worker `/health` each report that exact SHA;
