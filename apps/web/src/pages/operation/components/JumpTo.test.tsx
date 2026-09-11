@@ -271,7 +271,12 @@ describe("navigate-only", () => {
     renderJump();
     fireEvent.change(openSurface(), { target: { value: "Payments" } });
     fireEvent.click(screen.getByTestId("jump-to-destination"));
-    expect(screen.getByTestId("here")).toHaveTextContent("/finance/payments");
+    /* The `Payments` destination's own path is `/finance/invoices` since
+       #1228 ("open daily collection work first"); the row stays lit on both
+       listings because the toolbar switches between them (`portal-nav.ts`).
+       This assertion still followed the destination's OLD path, so `main` was
+       red when this branch rebased onto it. */
+    expect(screen.getByTestId("here")).toHaveTextContent("/finance/invoices");
     expect(JSON.parse(localStorage.getItem("carres-jump-recent") ?? "[]")).toEqual([
       "operation:payments",
     ]);
