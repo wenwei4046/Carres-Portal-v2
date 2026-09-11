@@ -247,12 +247,13 @@ const HANDOVER_EVENTS = [
   { delivery_order_id: "do-e", kind: "received_by_logistics" },
 ];
 
-/** A 1×1 PNG and a tiny MP4-ish blob so the gallery and the player render
- *  real elements rather than broken icons. */
+/** A placeholder image so the gallery renders real elements rather than broken
+ *  icons. DEV FIXTURE ONLY - it stands in for a driver's photo and is not a
+ *  design surface, so it carries no kit token and no brand colour. */
 const PIXEL =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="#d9d4c7"/><text x="50%" y="50%" font-family="sans-serif" font-size="22" fill="#5a5347" text-anchor="middle">delivery photo</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" fill="rgb(217,212,199)"/><text x="50%" y="50%" font-family="sans-serif" font-size="22" fill="rgb(90,83,71)" text-anchor="middle">delivery photo</text></svg>`,
   );
 
 function signedLedger(orderId: string) {
