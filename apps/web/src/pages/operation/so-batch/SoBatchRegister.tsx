@@ -1351,19 +1351,20 @@ function SoBatchOrderExpansion({
          coverage; printing this figure under that head said "still on order"
          about goods that may already be in the warehouse. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
-      toBuy: drawEditor ? (leaf!.toBuy ?? 0) : null,
-      /* ⭐ WHICH KIND OF NUMBER `To buy` IS, AND WHAT TICKING IT DOES.
+      /* A covered build is not tickable, but its figure still explains the
+         row — so it prints, with the refusal beside it. */
+      toBuy: drawEditor || leaf?.fullyOnPo === true ? (leaf!.toBuy ?? 0) : null,
+      /* ⭐ WHICH KIND OF NUMBER `To buy` IS, AND WHAT WOULD HAPPEN.
          The engine's own `fullyOnPo` says every unit of this build is already
-         on an OPEN purchase order, so the figure is not a remainder. Traced
-         through the one issue door: `issue-batch` → `purchasing_issue_pos_batch`
-         → `purchasing_mint_po` INSERTS a new purchase order with its own lines,
-         lineage and Unit IDs, and touches no existing document — so the act
-         ADDS SUPPLY. The row stays buyable by owner ruling (2026-09-03), and
-         now says both halves. */
-      toBuyNote:
-        drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPo : undefined,
-      toBuyNoteWhy:
-        drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPoWhy : undefined,
+         on an OPEN purchase order, so the figure is not a remainder — and since
+         0430 `issue-batch` REFUSES such a selection by name (`already_on_po`,
+         422, naming the covering document) and creates nothing. The row is not
+         tickable (`isSelectableForOrder`) and says the door's own words, so the
+         operator is not invited into an act that fails. Printed on the line
+         whatever its tick state, because the number is what raised the
+         question. */
+      toBuyNote: leaf?.fullyOnPo === true ? W.toBuyAlreadyOnPo : undefined,
+      toBuyNoteWhy: leaf?.fullyOnPo === true ? W.toBuyAlreadyOnPoWhy : undefined,
       orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
       orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered

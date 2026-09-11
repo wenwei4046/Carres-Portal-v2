@@ -1749,26 +1749,52 @@ describe("fourteen documents on a one-unit line", () => {
   });
 
   /**
-   * FIXTURE D — the ENGINE's own `fullyOnPo`. Every unit of the build was
-   * drawn from the OPEN-purchase-order pool, so `To buy` is NOT a remainder:
-   * it is the quantity the covering document carries, and ticking buys a
-   * SECOND time. That stays ALLOWED (YH, 2026-09-03) — the pool has no
-   * customer attribution, so the covering document routinely belongs to
-   * somebody else and refusing would block a first purchase for this one — but
-   * the operator is now told which kind of number they are looking at.
+   * ⭐ FIXTURE D — the ENGINE's own `fullyOnPo`, and THE SCREEN AGREES WITH THE
+   * DOOR.
+   *
+   * Every unit of the build was drawn from the OPEN-purchase-order pool, so
+   * `To buy` is not a remainder. Since 0430 `POST /issue-batch` REFUSES such a
+   * selection by name — `already_on_po`, 422, naming the covering document —
+   * and creates nothing; production had minted SIX open purchase orders
+   * against one 1-unit line of SO-1340 because nothing downstream of the
+   * receipt refused it.
+   *
+   * The register offered the tick anyway, which is the trap shape
+   * `isSelectableForBuying`'s own contract exists to prevent: *offering a
+   * tick-box would be offering an act that fails*. So the row is not tickable
+   * and states the door's own refusal beside the figure that raised the
+   * question.
    */
-  it("says when To buy is the coverage a tick would buy again, not a remainder", async () => {
+  it("refuses the tick the issue door would refuse, and says so in its words", async () => {
     renderRegister({
       rows: [leaf14({ onPo: 1, fullyOnPo: true })],
       registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
     });
+    /* No parent tick either: the order's only eligible demand has gone. */
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     const demand = within(box).getByTestId("so-batch-part-B1201S-K");
+    expect(within(demand).queryByRole("checkbox")).toBeNull();
+    /* And the row SAYS why, in the refusal's own words. */
     expect(demand).toHaveTextContent("Already on a PO");
-    /* The row is still buyable, and the figure is still the one the tick
-       allocates — a display that disagreed with its control would be worse. */
-    expect(within(demand).getByRole("checkbox")).toBeEnabled();
+    expect(demand).toHaveTextContent("Nothing to buy here");
+  });
+
+  /* ⛔ IT FAILS OPEN. An older Worker carries no `fullyOnPo`, so the gate does
+     not close and the row stays exactly as tickable as it is today — the API
+     still refuses it by name. A missing fact never hides demand. */
+  it("keeps the tick when the Worker did not carry the engine's flag", async () => {
+    renderRegister({
+      rows: [leaf14({ onPo: 1, fullyOnPo: undefined })],
+      registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
+    });
+    expect(screen.getByTestId("so-batch-select-o14")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
+    const box = await screen.findByTestId("so-batch-inspector-o14");
+    expect(
+      within(within(box).getByTestId("so-batch-part-B1201S-K")).getByRole("checkbox"),
+    ).toBeEnabled();
   });
 
   it("says nothing of the kind when the remainder is genuine", async () => {

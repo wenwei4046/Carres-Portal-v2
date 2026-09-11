@@ -1200,8 +1200,8 @@ before the record, which is the section that grows without limit.
   the shelf, documents already carrying quantity, and `Not ordered yet` — so a half-bought line
   read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
   front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
-  already answered · **`On PO`** how many units documents carry · **`To buy`** the remainder this
-  page may still act on.
+  already answered · **`Ordered Qty`** how many units documents have ordered for this line ·
+  **`To buy`** the remainder this page may still act on.
 - **Identity leads.** `SKU` then the item and its recorded configuration come first, so two lines of
   one model are told apart by the goods rather than by position. The configuration is the line's own
   recorded variant, never re-derived from the SKU text. Exactly one column is flexible, so two
@@ -1333,22 +1333,44 @@ it is the number the tick allocates and the number `issue-batch` recomputes and 
 a display that disagreed with its own control would be worse than the ambiguity it replaced.
 
 **⭐ WHAT ISSUING A COVERED SELECTION ACTUALLY DOES — TRACED THROUGH THE ONE DOOR, 2026-09-11.**
-`POST /issue-batch` → `purchasing_issue_pos_batch` → `purchasing_mint_po`. Every write in that
-transaction is an INSERT scoped to the purchase order it is creating: `purchase_orders`, its
-`purchase_order_lines`, its `po_line_sources` lineage, its `ops_stock_items` Unit IDs, `po_history`
-and `audit_log`. The only UPDATEs are to the row just minted (its `eta_date`/`purpose`), to the
-`po_cost_approvals` row being consumed, and to the new PO's own incoming Units. **No existing
-purchase order is amended, replaced, reassigned or cancelled, and no existing lineage row is
-touched.**
 
-So the act **ADDS SUPPLY**: a second purchase order carrying that quantity, alongside the document
-the pool was covering. That is the already-approved behaviour, not a new rule — `validateIssuePlan`
-deliberately stopped refusing it on 2026-09-03, because the pool has no customer attribution and
-refusing would block a FIRST purchase for this customer. **Nothing here disables it.** What changed
-is that the row now states the quantity, the action and the consequence together:
-`To buy 1` · `Already on a PO` · `Issue PO buys again`, with the full sentence on the cell's title.
-The duplication that IS real — an order whose own lineage already covers what it required — is
-refused by `isSelectableForOrder` before the tick exists, and that is untouched.
+It is **REFUSED**, and nothing is created. `POST /issue-batch` checks every selection against the
+engine's own recomputation before a single document is composed, and answers **`already_on_po`
+(422)** — naming the covering purchase order — for any build the open-PO pool fully covers (0430).
+That guard exists because production had already minted **six open purchase orders against one
+1-unit order line of SO-1340** (2026-09-04/05) when nothing downstream of the receipt refused it.
+
+Had it not refused, the act would have ADDED SUPPLY rather than changed anything: the creation path
+`purchasing_issue_pos_batch` → `purchasing_mint_po` is INSERT-only — `purchase_orders`, its
+`purchase_order_lines`, its `po_line_sources` lineage, its `ops_stock_items` Unit IDs, `po_history`,
+`audit_log` — and its only UPDATEs touch the row just minted, the `po_cost_approvals` row consumed
+and the new PO's own incoming Units. **No existing purchase order is ever amended, replaced,
+reassigned or cancelled by this door, and no existing lineage row is touched.**
+
+**THE PRODUCTION WALK THAT FOUND IT — recorded from PR #1233 (merge `9ed63009`), not re-measured
+here.** That lane walked the real page AUTHENTICATED on `fc9034c7` and reported: one demand row with
+fourteen read-only Unit records, ONE checkbox, ONE `Deliver To` editor, ONE `Split`; the parent
+holding no control; `PO No` reading `14 POs` and `PO-20260907-1874`; the footer `26 Sales Orders`;
+and `REGION` as the third compact dropdown (Klang Valley · 12, Johor · 1, Kedah · 2). **It also found
+what no fixture had: one LIVE item line carries fourteen purchase orders** — the historical
+duplicate-PO shape `already_on_po` now refuses — **and that is the shape in the owner's screenshot.**
+This MASTER records it as that walk's measurement. The layout work below was verified against
+fixtures and the rendered components, not against live rows.
+
+**THE SCREEN NOW AGREES WITH THE DOOR.** `isSelectableForBuying` states this register's contract —
+*a row that cannot become a purchase order is not offered a tick-box, because the Register refuses
+it here and the API refuses it again* — and the covered shape was the one case where the page
+offered an act the door then refused. The engine's own `fullyOnPo` rides the wire, so
+`isSelectableForOrder` closes the same gate, and the row states the refusal's own words beside the
+figure that raised the question: `To buy 1` · `Already on a PO` · `Nothing to buy here`, titled with
+`purchasingRefusal("already_on_po")`. **This is not a new buying rule and it disables no workflow** —
+the workflow was already dead at the door; the operator now learns it before arranging a destination
+instead of after pressing a button. **It fails OPEN:** `fullyOnPo` is optional, so an older Worker's
+payload leaves the tick exactly where it is and the API still refuses by name. A missing fact never
+hides demand.
+
+The other duplication — an order whose own lineage already covers what it required — is refused by
+the `ordered` half of `isSelectableForOrder`, and that is untouched.
 
 **`PO Status` is the column that reconciles the two scopes** — `Completed` · `Issued` ·
 `Not sent to supplier`, the same `documentState` vocabulary the Purchase Orders register prints

@@ -93,9 +93,9 @@ const BUYING_LINES: GoodsMiniLine[] = [
     toBuy: 1,
     /* The engine says every unit is already on an OPEN purchase order, so this
        figure is the coverage a tick would buy AGAIN — not a remainder. */
-    toBuyNote: ["Already on a PO", "Issue PO buys again"],
+    toBuyNote: ["Already on a PO", "Nothing to buy here"],
     toBuyNoteWhy:
-      "Demand is already covered by an open Purchase Order. Issue PO creates a NEW purchase order for this quantity — it does not change, replace or reassign the existing one.",
+      "An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.",
     deliverTo: [],
     deliverToAbsence: "Not chosen",
     supplier: "Ohana",

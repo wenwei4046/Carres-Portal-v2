@@ -131,29 +131,36 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * document), and the suite greps the whole dictionary for it.
    *
    * ⭐ AND IT STATES THE CONSEQUENCE, NOT ONLY THE STATE (owner correction
-   * 2026-09-11). The existing coverage is half the answer; what the operator
-   * is about to DO is the other half, and it was missing. Traced through the
-   * one issue door: `issue-batch` → `purchasing_issue_pos_batch` →
-   * `purchasing_mint_po` INSERTS a new `purchase_orders` row, its lines, its
-   * `po_line_sources` lineage and its own Unit IDs. Every write in that
-   * transaction is scoped to the purchase order it just created; **no existing
-   * document is amended, reassigned or cancelled**. So the act ADDS SUPPLY,
-   * and the row says so in the operator's own verb.
+   * 2026-09-11). The existing coverage is half the answer; what happens if the
+   * operator acts is the other half, and it was missing.
+   *
+   * TRACED THROUGH THE ONE DOOR, on current `main`: `POST /issue-batch`
+   * refuses any selection whose engine build is `fullyOnPo` with
+   * **`already_on_po` (422)**, naming the covering purchase order, and creates
+   * nothing (0430 — production had minted six open purchase orders against one
+   * 1-unit line of SO-1340 because nothing downstream of the receipt refused
+   * it). So the consequence is not "it buys again": **it is refused**, and the
+   * row now says the same thing the door would.
+   *
+   * THE WORDS ARE THE DOOR'S OWN. `purchasingRefusal("already_on_po")` reads
+   * `An open purchase order (…) already covers this line.` / `Nothing to buy
+   * here. Check the covering purchase order instead.` These two lines are that
+   * refusal at cell width, so an operator meets one sentence, not two.
    *
    * TWO SHORT LINES, not one long one. The governed sentence wraps to three
    * lines under a one-digit figure and takes the item row to 91px — a stack of
    * documents deciding a row's height again, spelt out in words. The lines are
-   * written at the width they are read at; the full explanation rides as the
-   * cell's title.
+   * written at the width they are read at; the full refusal rides as the cell's
+   * title.
    */
-  toBuyAlreadyOnPo: ["Already on a PO", "Issue PO buys again"] as readonly string[],
+  toBuyAlreadyOnPo: ["Already on a PO", "Nothing to buy here"] as readonly string[],
   /**
-   * The governed long form plus the traced consequence, carried as the
-   * qualifying cell's own title. It never contradicts the two visible lines;
-   * it says the same thing with room to be exact.
+   * The door's own refusal, carried as the qualifying cell's own title. It
+   * never contradicts the two visible lines; it says the same thing with room
+   * to be exact, in the words the API would have answered with.
    */
   toBuyAlreadyOnPoWhy:
-    "Demand is already covered by an open Purchase Order. Issue PO creates a NEW purchase order for this quantity — it does not change, replace or reassign the existing one.",
+    "An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.",
 
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
@@ -848,12 +855,40 @@ export function isSelectableForBuying(row: PurchaseDemandRow): boolean {
  * which is right: nothing has PROVEN those units were bought for this
  * customer. This gate can therefore never hide genuine demand; it only refuses
  * a buy the order's own documents already account for.
+ *
+ * ── ⭐ AND THE SCREEN AGREES WITH THE DOOR (owner correction 2026-09-11) ─────
+ *
+ * `isSelectableForBuying` above states the contract this register lives by:
+ * *"a row missing any of them cannot be turned into a purchase order, so
+ * offering a tick-box would be offering an act that fails — the Register
+ * refuses it here and the API refuses it again."*
+ *
+ * On 0430 the API started refusing one more shape, and the Register had no way
+ * to know. `POST /issue-batch` now answers **`already_on_po` (422)** for any
+ * selection whose engine build is `fullyOnPo`, naming the covering document —
+ * production had minted SIX open purchase orders against one 1-unit line of
+ * SO-1340 because nothing downstream of the receipt refused it. The tick was
+ * still offered, so the page invited an act the door then refused: the exact
+ * trap shape the contract above exists to prevent.
+ *
+ * The engine's own flag now rides the wire, so the gate closes here too. This
+ * is NOT a new buying rule and it disables no workflow — the workflow was
+ * already dead at the door; what changes is that the operator finds out before
+ * they arrange a destination and press a button, and the row says why.
+ *
+ * IT ALSO FAILS OPEN. `fullyOnPo` is optional: an older Worker sends none,
+ * `=== true` is false, and the row stays tickable exactly as it does today —
+ * the API still refuses it by name. A missing fact never hides demand.
  */
 export function isSelectableForOrder(
   row: PurchaseDemandRow,
   orderStatus: SoBatchOrderStatus,
 ): boolean {
-  return orderStatus !== "ordered" && isSelectableForBuying(row);
+  return (
+    orderStatus !== "ordered" &&
+    row.fullyOnPo !== true &&
+    isSelectableForBuying(row)
+  );
 }
 
 /** Everything to Carres Klang — the standing Purchasing default (MASTER §5.4). */
