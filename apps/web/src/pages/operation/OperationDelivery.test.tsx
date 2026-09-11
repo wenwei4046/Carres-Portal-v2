@@ -626,6 +626,19 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(within(tabs).getByText("Confirmed deliveries")).toBeTruthy();
   });
 
+  it("the landing offers nothing to CLEAR — its queue narrows nothing", () => {
+    wrap(<OperationDelivery />, "/operation?tab=delivery");
+    expect(screen.queryByTestId("delivery-monitor-filter-summary")).toBeNull();
+    /* A real narrowing brings the bar back, naming only what it narrowed. */
+    fireEvent.click(screen.getByTestId("delivery-monitor-region-Selangor"));
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
+      "Selangor",
+    );
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).not.toContain(
+      "All delivery work",
+    );
+  });
+
   it("switching to Confirmed deliveries opens the Mon–Sat week, and back again", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     fireEvent.click(screen.getByTestId("delivery-monitor-tab-calendar"));

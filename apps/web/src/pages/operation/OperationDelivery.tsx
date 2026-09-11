@@ -1893,7 +1893,13 @@ export default function OperationDelivery() {
      and nothing on the calendar, so naming it above a calendar would claim a
      narrowing the cards never took. ─────────────────────────────────────── */
   const filterLabels = activeFilterLabels(
-    calendarMode ? { ...filters, view: null } : filters,
+    {
+      ...filters,
+      /* The landing's own queue narrows nothing, and the calendar's cards take
+         no queue at all — printing `All delivery work · Clear filters` over an
+         unfiltered list offers to clear something that is not there. */
+      view: calendarMode || view === DEFAULT_WORK_VIEW ? null : view,
+    },
     (id) => partnerNameById.get(id) ?? null,
   );
   const filterSummary =
