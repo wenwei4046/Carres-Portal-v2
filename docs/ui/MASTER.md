@@ -1517,6 +1517,13 @@ READ-ONLY record rows, and every sibling that does not ask gets the ruled layout
 - **`Covered by` is retired from the component.** It answered three questions in one heading. The
   page now asks for `Ready Stock`, `On PO` and `To buy`, so the arithmetic adds up on screen
   instead of hiding inside one word.
+- **`toBuyNote` / `toBuyNoteWhy` — a figure may say WHICH KIND of number it is.** SO Batch's
+  engine prints the covering document's quantity under `To buy` on a build the open-PO pool fully
+  covers, so one figure means both a remainder and a re-buy offer. The page supplies the words; the
+  box prints the short one under the figure and carries the governed long one as the cell's title.
+  **A sentence that wraps to three lines under a one-digit number is the same row-height defect as a
+  stack of documents, spelt out in words** — measured at 91px on the rendered preview before the
+  short form replaced it. Siblings pass neither and render byte-identically.
 - **A page may omit a column it cannot answer.** `showUnitId={false}` is how Manual Purchase and now
   SO Batch's ACTIONABLE table decline a column that would print an absence on every row forever — an
   absence in the width of a real answer states nothing.
