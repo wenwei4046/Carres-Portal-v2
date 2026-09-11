@@ -295,7 +295,7 @@ ORDER INFO              SO Date · Requested Delivery Date · Proceed date · Cu
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 DELIVERY                the MY cascade · building type · billing relationship · billing address
   └ Delivery access     floor · items needing stair carry · lift + the stair working line
-GOODS                   the six ruled columns · Unit price · Line total, and ONE Total beneath
+GOODS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
 MONEY                   the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
@@ -1344,8 +1344,10 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   only; removing them would lose governed truth the card does not name.
 
   **THE OBJECT PAGE'S GOODS TABLE ALSO STATES THE MONEY — APPROVED + IMPLEMENTED 2026-09-11.**
-  `Unit price` and `Line total` are APPENDED to the right of those six; the six keep their ruled
-  order and alignment. This is the OBJECT page only. **The register's `▸` child mini-table stays
+  `Unit price` and `Line total` share a two-line money column to the right of those six;
+  the unit price is above the emphasized line total. The six keep their ruled order and alignment.
+  The earlier separate money columns clipped the line total in a measured 574px content pane;
+  grouping the two figures preserves both without changing the permanent PDF split. This is the OBJECT page only. **The register's `▸` child mini-table stays
   at exactly six** (§ the goods expander, and `GoodsMiniTable.tsx`) — a register answers *what
   records exist*, and a price column there would re-open the sheet the register deliberately is
   not. The reason the object page earns them: an operator could not read what the customer agreed

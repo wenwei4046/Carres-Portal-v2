@@ -50,5 +50,5 @@ export function atSalePaymentWord(method: string | null | undefined, months: num
   const word = method ? (DEFAULT_PAYMENT_METHODS.find((m) => m.key === method)?.label ?? payMethodWord(method)) : null;
   const plan = months != null && Number.isInteger(Number(months)) && Number(months) > 0
     ? `${Number(months)}-month instalment` : null;
-  return plan && word ? `${plan} · ${word}` : plan ?? word;
+  return plan && word && method !== "installment" ? `${plan} · ${word}` : plan ?? word;
 }

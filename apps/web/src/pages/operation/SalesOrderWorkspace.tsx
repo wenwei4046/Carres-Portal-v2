@@ -2694,8 +2694,9 @@ export default function SalesOrderWorkspace() {
                       read the commitment without opening the PDF beside it.
                       A free gift is a line at RM 0.00: visible as goods,
                       charged nothing, counted nowhere twice. */}
-                  <th className="py-1 pr-3 text-right font-medium">Unit price</th>
-                  <th className="py-1 text-right font-medium">Line total</th>
+                  <th className="py-1 text-right font-medium">
+                    <div>Unit price</div><div>Line total</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -2753,8 +2754,10 @@ export default function SalesOrderWorkspace() {
                       )}
                     </td>
                     <td className="py-1.5 pr-3">{mode === "oldrev" ? "Not recorded in this revision" : goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(r.unitPrice)}</div>
+                      <div className="font-medium">{fmtMoney(r.total)}</div>
+                    </td>
                   </tr>
                   );
                 })}
@@ -2815,8 +2818,10 @@ export default function SalesOrderWorkspace() {
                       )}
                     </td>
                     <td className="py-1.5 pr-3">Not recorded</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0))}</td>
-                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</td>
+                    <td className="py-1.5 text-right tabular-nums whitespace-nowrap">
+                      <div className="text-meta text-base-600">{fmtMoney(Number(a.unit_price ?? 0))}</div>
+                      <div className="font-medium">{fmtMoney(Number(a.unit_price ?? 0) * Number(a.qty ?? 0))}</div>
+                    </td>
                   </tr>
                   );
                 })}

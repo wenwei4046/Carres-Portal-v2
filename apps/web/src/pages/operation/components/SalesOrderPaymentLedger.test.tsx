@@ -155,7 +155,7 @@ describe("the Sales Order payment ledger", () => {
 describe("saved POS payment details", () => {
   it("does not reinterpret the POS online-transfer code as the ledger e-wallet code", () => {
     expect(atSalePaymentWord("online", null)).toBe("Online transfer");
-    expect(atSalePaymentWord("installment", 12)).toBe("12-month instalment · Installment");
+    expect(atSalePaymentWord("installment", 12)).toBe("12-month instalment");
   });
   it("preserves a recorded custom method and never invents a missing plan", () => {
     expect(atSalePaymentWord("CUSTOM_BANK", null)).toBe("CUSTOM_BANK");
