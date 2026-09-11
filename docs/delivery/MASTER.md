@@ -605,7 +605,9 @@ different questions that one `Goods` summary answered badly.
   and *are they here?* are two answers and one cell blurred them. `Stock` reads `Ready` /
   `Not ready` over the WHOLE committed shipment with its total shortage — a delivery that arrives
   without the pillows the customer paid for was not ready, and whole-order readiness is never
-  redefined as main-items-only readiness.
+  redefined as main-items-only readiness. **A SERVICE is not part of what the register can be
+  short of**: it moves no Unit, and the test that excludes it is the ENTRY RULE's own, so what
+  makes an order delivery work and what makes it ready are decided once.
 - **THE DATE IS THE PRIMARY INFORMATION.** `Expected arrival` prints the effective supplier date
   first and names whose date it is underneath (`Not confirmed` · `Same as PO` ·
   `Earlier than the PO date` · `Delayed` · `Date reported`). **When a supplier revises the date,

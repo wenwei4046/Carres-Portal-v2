@@ -572,23 +572,32 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
        rows the list read carries, the readiness is the same function's
        whole-order answer, and the arrival state is `deliveryArrivalStateOf`
        over the purchase orders' own recorded dates. */
-    const committed = (row.o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: l.qty }));
+    /* ⭐ A SERVICE MOVES NO UNIT, so it is not part of what the register can be
+       short of — counting a `Disposal` line would leave every order that books
+       one permanently `Not ready` over goods that were never going to be
+       allocated. The predicate is the ENTRY RULE's own (`lineKind !==
+       "service"`), so what makes an order delivery work and what makes it
+       ready are decided by one test. */
+    const lines = row.o.order_lines ?? [];
+    const physical = lines
+      .map((l, index) => ({ index, sku: l.sku, qty: l.qty }))
+      .filter((l) => lineKind(l.sku) !== "service");
     const units = row.o.allocated_units ?? [];
-    const readiness = deliveryStockReadinessOf(committed, units);
-    const shortBySku = new Map<string, number>();
-    lineShortagesOf(committed, units).forEach((s, index) => {
-      shortBySku.set(`${index}`, s.shortQty);
+    const readiness = deliveryStockReadinessOf(physical, units);
+    const shortByLineIndex = new Map<number, number>();
+    lineShortagesOf(physical, units).forEach((s, i) => {
+      shortByLineIndex.set(physical[i]!.index, s.shortQty);
     });
     const items: MonitorGoodsLine[] = [];
     const extras: MonitorExtraLine[] = [];
-    (row.o.order_lines ?? []).forEach((line, index) => {
+    lines.forEach((line, index) => {
       const kind = lineKind(line.sku);
       const entry: MonitorGoodsLine = {
         key: line.id ?? `${line.sku}-${index}`,
         name: lineName(line),
         category: goodsCategoryWordOf(line),
         qty: line.qty,
-        shortQty: shortBySku.get(`${index}`) ?? 0,
+        shortQty: shortByLineIndex.get(index) ?? 0,
       };
       /* `unknown` is a physical thing nobody recognised — it travels on the
          truck, so it belongs with the MAIN goods, never buried under the

@@ -1096,12 +1096,33 @@ describe("the row's goods, kept in two cells", () => {
     expect(card.items[0]!.qty).toBe(2);
     expect(card.items[0]!.shortQty).toBe(1);
     expect(card.readiness.ready).toBe(false);
-    expect(card.readiness.shortQty).toBe(4);
+    /* One mattress and two pillows — the SERVICE line is not counted. */
+    expect(card.readiness.shortQty).toBe(3);
   });
 
   it("a service carries no shortage — it moves no Unit", () => {
     const services = withGoods().extras.filter((l) => l.kind === "service");
     expect(services.every((l) => l.shortQty === 0)).toBe(true);
+  });
+
+  it("⭐ a service line can never make an order `Not ready` on its own", () => {
+    /* Every physical piece is in and the order books a disposal: the register
+       holds everything it can hold, so the delivery IS ready. Counting the
+       service would have left it short of goods nobody was going to allocate. */
+    const card = cards([
+      order({
+        id: "a",
+        so: 1302,
+        order_lines: [
+          { id: "l-1", sku: "mattress:M1401F-K", qty: 1 },
+          { id: "l-2", sku: "Disposal old mattress", qty: 1 },
+        ],
+        allocated_units: [{ sku: "mattress:M1401F-K", status: "reserved", qty: 1 }],
+      }),
+    ])[0]!;
+    expect(card.readiness.ready).toBe(true);
+    expect(card.readiness.shortQty).toBe(0);
+    expect(card.arrival).toEqual({ kind: "on_hand" });
   });
 
   it("the add-on prints its CATALOG name, never its key", () => {

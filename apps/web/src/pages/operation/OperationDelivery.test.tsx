@@ -1494,7 +1494,7 @@ describe("the row's goods, arrival and stock cells", () => {
     const list = screen.getByTestId("delivery-monitor-work-list");
     expect(within(list).getByText("Not ready")).toBeTruthy();
     /* The whole delivery is three pieces short — the shipment scope, never
-       the main goods alone. */
+       the main goods alone, and never a service that moves no Unit. */
     expect(within(list).getByText("3 short")).toBeTruthy();
   });
 
