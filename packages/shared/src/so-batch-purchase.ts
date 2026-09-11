@@ -130,16 +130,30 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * (`COPY-STANDARD.md` — `PO` is already the dictionary's word for the
    * document), and the suite greps the whole dictionary for it.
    *
-   * FIFTEEN CHARACTERS, measured against the cell it lives in. The governed
-   * long form — `Demand is already covered by an open Purchase Order.` — wraps
-   * to THREE lines under the figure and makes the item row 91px tall, which is
-   * the same defect as a stack of documents deciding a row's height, only
-   * spelt out in words. It rides as the cell's title; the visible line states
-   * the fact, and the record below names the documents and their states.
+   * ⭐ AND IT STATES THE CONSEQUENCE, NOT ONLY THE STATE (owner correction
+   * 2026-09-11). The existing coverage is half the answer; what the operator
+   * is about to DO is the other half, and it was missing. Traced through the
+   * one issue door: `issue-batch` → `purchasing_issue_pos_batch` →
+   * `purchasing_mint_po` INSERTS a new `purchase_orders` row, its lines, its
+   * `po_line_sources` lineage and its own Unit IDs. Every write in that
+   * transaction is scoped to the purchase order it just created; **no existing
+   * document is amended, reassigned or cancelled**. So the act ADDS SUPPLY,
+   * and the row says so in the operator's own verb.
+   *
+   * TWO SHORT LINES, not one long one. The governed sentence wraps to three
+   * lines under a one-digit figure and takes the item row to 91px — a stack of
+   * documents deciding a row's height again, spelt out in words. The lines are
+   * written at the width they are read at; the full explanation rides as the
+   * cell's title.
    */
-  toBuyAlreadyOnPo: "Already on a PO",
-  /** The governed long form, carried as the qualifying cell's own title. */
-  toBuyAlreadyOnPoWhy: "Demand is already covered by an open Purchase Order.",
+  toBuyAlreadyOnPo: ["Already on a PO", "Issue PO buys again"] as readonly string[],
+  /**
+   * The governed long form plus the traced consequence, carried as the
+   * qualifying cell's own title. It never contradicts the two visible lines;
+   * it says the same thing with room to be exact.
+   */
+  toBuyAlreadyOnPoWhy:
+    "Demand is already covered by an open Purchase Order. Issue PO creates a NEW purchase order for this quantity — it does not change, replace or reassign the existing one.",
 
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,

@@ -1161,22 +1161,34 @@ before the record, which is the section that grows without limit.
 **THE ACTIONABLE TABLE (`GoodsMiniTable`), and why it is compact.**
 
 ```text
-☑  SKU   Item / configuration   Qty  Ready Stock  On PO  To buy  Deliver To   Supplier  Category
-☑  L12…  Laveo · King · Fab 3    4        1         2      1     ▾ + Split    Nice F…   Mattress
-☐  JAG…  Jager · SS · Fab 1      1        —        14      1     ▾ + Split    Ohana     Bedframe
+☑  SKU   Item / configuration   Qty  Ready Stock  Ordered Qty  To buy               Deliver To   Supplier  Category
+☑  L12…  Laveo · King · Fab 3    4        1            2         1                 ▾ + Split    Nice F…   Mattress
+☐  JAG…  Jager · SS · Fab 1      1        —           14         1                 ▾ + Split    Ohana     Bedframe
+                                                                 Already on a PO
+                                                                 Issue PO buys again
 ```
 
-- **`To buy` says WHICH KIND of number it is.** A figure qualified by `Already on a PO` is the
-  coverage a tick would buy a second time, not a remainder — see the traced table below. An
-  unqualified figure is a remainder. An older Worker that carries no `fullyOnPo` prints no
-  qualifier: UNKNOWN accuses nothing and claims nothing.
-- **⭐ `On PO` IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
+- **`To buy` says WHICH KIND of number it is AND WHAT TICKING IT DOES.** A figure qualified by
+  `Already on a PO` · `Issue PO buys again` is the coverage a tick would buy a second time, not a
+  remainder — see the traced table below. An unqualified figure is a remainder. An older Worker that
+  carries no `fullyOnPo` prints no qualifier: UNKNOWN accuses nothing and claims nothing.
+- **⭐ THE COLUMN IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.** `On PO` is the
+  dictionary's head for *how many of this item an **open** purchase order already covers* — the
+  engine's pooled, netted, still-outstanding coverage. The figure this cell prints is a different
+  number: the exact `po_line_sources` lineage for the item line, which counts every **non-cancelled**
+  document, `Completed` ones included, and is never netted by what has already arrived. Printing it
+  under `On PO` said *still on order* about goods that may be in the warehouse. **`Ordered Qty` is
+  the approved word for exactly that**, already in the dictionary and already used by Manual
+  Purchase's own purchase-order lineage table for the same relationship — beside `Already On PO`,
+  the head for the effective coverage it deliberately is not. One figure, one head, the same door;
+  no second number was added to explain the first.
+- **⭐ IT IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
   purchase order inside the cell, so a line fourteen documents touch drew a fourteen-line-tall item
   row that filled the screen — and the same fourteen numbers were repeated underneath it. **A
   collection of documents may never decide how tall an item row is.** The cell states the units
-  documents already carry, which is the number the arithmetic needs, and pressing it opens the
-  details below. **Nothing is truncated to tidy the screen**: every reference is still on the page,
-  in the section that is about references. An item description may wrap; a PO collection may not.
+  documents have ordered, and pressing it opens the details below. **Nothing is truncated to tidy
+  the screen**: every reference is still on the page, in the section that is about references. An
+  item description may wrap; a PO collection may not.
 - **Exactly one checkbox and one arrangement editor per real purchasing demand**, on the item table
   and nowhere else. A ticked demand row carries the register's own selected fill — the selected
   styling belongs to the compact row, never to a block that also holds history.
@@ -1265,21 +1277,24 @@ has answered that question since 0471 and the read simply did not ask it. It ask
   quantity** and does **not** draw the document line's remainder down. Only an exact Unit does.
   Without that rule one Unit accounted for two item lines' quantities at once and the section's own
   numbers stopped adding up; with it, `Σ(exact rows) + remainder = the document line's quantity`.
+  **The section renders no total row at all**, so no footer can silently sum a `—`, and the table
+  feeds no export: the Register above exports the ORDER's own columns, none of which is a per-Unit
+  quantity.
 - **⭐ A COUNTED ROW IS NOT A UNIT (0453).** `identity_scope` rides the wire as `unitScopes`, and
   every Unit ID on this table is resolved through the ONE shared rule (`unitIdOf`), which answers
   `null` for counted goods and keeps its `QTY-` shape backstop. Such a row prints
-  **`Not unit-tracked`** — there is no Unit ID and there never will be — and its quantity is still
+  **`Counted stock`** — there is no Unit ID and there never will be — and its quantity is still
   stated. The technical key never reaches a `Unit ID` heading.
 - The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
   this build against an older Worker reads it as absent and says the association is unknown rather
   than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.
 
 **⭐ FIVE ANSWERS FOR AN EMPTY UNIT CELL, AND NONE OF THEM IS A SPARE.** `Loading…` while the Unit
-read is in flight · `Could not be loaded` when it failed (with the existing retry) · **`Not read`**
-when the read answered for the ORDER and carried no entry for THIS item line — Carres did not look
-here, which is not the same as looking and finding nothing · `Not unit-tracked` when the goods are
-counted rather than individually tracked · and `Not allocated` ONLY when the read answered for this
-line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
+read is in flight · `Could not be loaded` when it failed (with the existing retry) ·
+**`Not checked`** when the read answered for the ORDER and carried no entry for THIS item line —
+Carres did not look here, which is not the same as looking and finding nothing · **`Counted stock`**
+when the goods are counted rather than individually tracked · and `Not allocated` ONLY when the read
+answered for this line and no Unit is tied to the quantity. Printing any of the first four as the last is how a reader
 concludes goods do not exist because a request was slow.
 
 **⭐ THE TWO QUANTITIES, TRACED — APPROVED / LOCKED, owner correction 2026-09-11.**
@@ -1316,6 +1331,24 @@ cell prints **`Already on a PO`** under the figure, with the governed explanatio
 `Demand is already covered by an open Purchase Order.` as its title. The figure itself is untouched:
 it is the number the tick allocates and the number `issue-batch` recomputes and refuses against, and
 a display that disagreed with its own control would be worse than the ambiguity it replaced.
+
+**⭐ WHAT ISSUING A COVERED SELECTION ACTUALLY DOES — TRACED THROUGH THE ONE DOOR, 2026-09-11.**
+`POST /issue-batch` → `purchasing_issue_pos_batch` → `purchasing_mint_po`. Every write in that
+transaction is an INSERT scoped to the purchase order it is creating: `purchase_orders`, its
+`purchase_order_lines`, its `po_line_sources` lineage, its `ops_stock_items` Unit IDs, `po_history`
+and `audit_log`. The only UPDATEs are to the row just minted (its `eta_date`/`purpose`), to the
+`po_cost_approvals` row being consumed, and to the new PO's own incoming Units. **No existing
+purchase order is amended, replaced, reassigned or cancelled, and no existing lineage row is
+touched.**
+
+So the act **ADDS SUPPLY**: a second purchase order carrying that quantity, alongside the document
+the pool was covering. That is the already-approved behaviour, not a new rule — `validateIssuePlan`
+deliberately stopped refusing it on 2026-09-03, because the pool has no customer attribution and
+refusing would block a FIRST purchase for this customer. **Nothing here disables it.** What changed
+is that the row now states the quantity, the action and the consequence together:
+`To buy 1` · `Already on a PO` · `Issue PO buys again`, with the full sentence on the cell's title.
+The duplication that IS real — an order whose own lineage already covers what it required — is
+refused by `isSelectableForOrder` before the tick exists, and that is untouched.
 
 **`PO Status` is the column that reconciles the two scopes** — `Completed` · `Issued` ·
 `Not sent to supplier`, the same `documentState` vocabulary the Purchase Orders register prints

@@ -70,8 +70,8 @@ const BUYING_LINES: GoodsMiniLine[] = [
     unitIds: [],
     unitAbsence: "—",
     fromStock: 1,
-    onPoQty: 2,
-    onPoAbsence: "Not ordered yet",
+    orderedQty: 2,
+    orderedQtyAbsence: "Not ordered yet",
     toBuy: 1,
     deliverTo: [],
     deliverToAbsence: "Not chosen",
@@ -88,13 +88,14 @@ const BUYING_LINES: GoodsMiniLine[] = [
     category: "Mattress",
     unitIds: [],
     unitAbsence: "—",
-    onPoQty: 14,
-    onPoAbsence: "Not ordered yet",
+    orderedQty: 14,
+    orderedQtyAbsence: "Not ordered yet",
     toBuy: 1,
     /* The engine says every unit is already on an OPEN purchase order, so this
        figure is the coverage a tick would buy AGAIN — not a remainder. */
-    toBuyNote: "Already on a PO",
-    toBuyNoteWhy: "Demand is already covered by an open Purchase Order.",
+    toBuyNote: ["Already on a PO", "Issue PO buys again"],
+    toBuyNoteWhy:
+      "Demand is already covered by an open Purchase Order. Issue PO creates a NEW purchase order for this quantity — it does not change, replace or reassign the existing one.",
     deliverTo: [],
     deliverToAbsence: "Not chosen",
     supplier: "Ohana",
@@ -110,8 +111,8 @@ const BUYING_LINES: GoodsMiniLine[] = [
     category: "Mattress protector",
     unitIds: [],
     unitAbsence: "—",
-    onPoQty: 0,
-    onPoAbsence: "Not ordered yet",
+    orderedQty: 0,
+    orderedQtyAbsence: "Not ordered yet",
     toBuy: null,
     deliverTo: [],
     deliverToAbsence: "—",
@@ -229,7 +230,7 @@ function Expansion() {
           lines={BUYING_LINES}
           identityFirst
           showFromStock
-          showOnPo
+          showOrderedQty
           showToBuy
           showSupplier
           showUnitId={false}

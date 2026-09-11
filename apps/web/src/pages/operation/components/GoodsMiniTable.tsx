@@ -86,22 +86,37 @@ const CHILD_COLUMNS = [
  * not tell how MUCH of the line that document covers, and a line that was half
  * bought looked exactly like a line that was wholly bought.
  *
- * The facts did not go away; they went to explicit places. `On PO` states HOW
- * MANY units documents already carry, `To buy` states the remainder this page
- * can still act on, and `Qty` stays the customer's original order — three
- * numbers that add up in front of the operator instead of one word that hid the
- * arithmetic. Ready-Stock coverage is stated by the `Ready Stock` section
- * below, which owns that fact and can name the exact Units.
+ * The facts did not go away; they went to explicit places. `Ordered Qty` states
+ * how many units documents have carried for this line, `To buy` states the
+ * remainder this page can still act on, and `Qty` stays the customer's original
+ * order. Ready-Stock coverage is stated by the `Ready Stock` section below,
+ * which owns that fact and can name the exact Units.
  *
- * ⭐ AND `On PO` IS A NUMBER, NOT A LIST — owner correction 2026-09-11.
+ * ⭐ IT IS A NUMBER, NOT A LIST — owner correction 2026-09-11.
  *
  * It printed every purchase order covering the line, stacked inside the cell.
  * On a line fourteen documents touch, ONE item row became fourteen lines tall
  * and filled the screen — and the same fourteen numbers were then repeated in
  * the rows below it. A collection must never decide how tall an item row is.
- * The cell states the quantity, which is the number the arithmetic needs, and
- * is a DOOR to the read-only details where each document is its own row. The
- * evidence is not truncated; it is moved to the table that is about documents.
+ * The cell states the quantity, and is a DOOR to the read-only details where
+ * each document is its own row. The evidence is not truncated; it is moved to
+ * the table that is about documents.
+ *
+ * ⭐ AND IT IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.
+ *
+ * `On PO` is the dictionary's head for *how many of this item an OPEN purchase
+ * order already covers* — the engine's pooled, netted, EFFECTIVE coverage. The
+ * number this cell prints is a different one: the exact `po_line_sources`
+ * lineage for this item line, which counts every NON-CANCELLED document,
+ * `Completed` ones included, and is never netted by what has already arrived.
+ * It is the HISTORICAL ordered quantity, and printing it under `On PO` said
+ * "still on order" about goods that may be in the warehouse.
+ *
+ * `Ordered Qty` is the approved word for exactly that, already in the
+ * dictionary and already used by Manual Purchase's own purchase-order lineage
+ * table for the same relationship — beside `Already On PO` for the effective
+ * coverage it is deliberately NOT. Nothing else moves: one figure, one head,
+ * the same door.
  */
 const FROM_STOCK_COLUMN = { key: "fromStock", label: "Ready Stock", width: 96 } as const;
 /* 112, not 176 and not 88. The cell holds a QUANTITY, so it needs almost
@@ -110,11 +125,14 @@ const FROM_STOCK_COLUMN = { key: "fromStock", label: "Ready Stock", width: 96 } 
    it to two lines. A WORD deciding an item row's height is the same defect as
    a list of documents deciding it, only smaller. Measured on the rendered
    preview, 2026-09-11. */
-const ON_PO_COLUMN = { key: "onPo", label: "On PO", width: 116 } as const;
-/* 132, not 74: `To buy` may carry a qualifying sentence under its figure when
-   the number is the coverage a tick would buy AGAIN rather than a remainder —
-   and a note that wraps to three lines is a note nobody reads. */
-const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 132 } as const;
+const ORDERED_QTY_COLUMN = { key: "orderedQty", label: "Ordered Qty", width: 116 } as const;
+/* 148, not 74. `To buy` carries two written lines under its figure when the
+   number is the coverage a tick would buy AGAIN rather than a remainder, and
+   the longer of them — `Issue PO buys again` — measures 118px at the box's
+   13px. Below 148 (132 of content) it wrapped, which took the item row to 91px
+   and made a note nobody reads out of the one sentence that says what the act
+   DOES. Measured on the rendered preview, 2026-09-11. */
+const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 148 } as const;
 
 /**
  * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
@@ -191,16 +209,17 @@ export interface GoodsMiniLine {
    * carried as the cell's title — a sentence that wraps to three lines under a
    * one-digit number is a row-height defect wearing words.
    */
-  toBuyNote?: string;
+  toBuyNote?: readonly string[];
   toBuyNoteWhy?: string;
   /**
-   * How many units of this line purchase orders already carry. A NUMBER — the
-   * documents themselves are named once, in the read-only details table the
-   * page draws beneath this one. Read with `showOnPo`.
+   * How many units of this line purchase orders have carried — the HISTORICAL
+   * ordered quantity, not open-PO coverage. A NUMBER: the documents themselves
+   * are named once, in the read-only details table the page draws beneath this
+   * one. Read with `showOrderedQty`.
    */
-  onPoQty?: number | null;
-  /** The governed word for a line no document carries yet. */
-  onPoAbsence?: string;
+  orderedQty?: number | null;
+  /** The governed word for a line no document has ever carried. */
+  orderedQtyAbsence?: string;
   /** Card 02-B — read only when the table is asked for the column. */
   supplier?: string;
   supplierAbsence?: string;
@@ -305,7 +324,7 @@ export default function GoodsMiniTable({
   lines,
   selection,
   showFromStock = false,
-  showOnPo = false,
+  showOrderedQty = false,
   showToBuy = false,
   identityFirst = false,
   showSupplier = false,
@@ -321,12 +340,12 @@ export default function GoodsMiniTable({
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
   /**
-   * A page that BUYS asks for `On PO` and `To buy`; a truth register does not.
-   * Together they state the arithmetic `Covered by` used to hide: what the
-   * customer ordered, what documents already carry, what is left.
+   * A page that BUYS asks for `Ordered Qty` and `To buy`; a truth register does
+   * not. Together they state what `Covered by` used to hide: what the customer
+   * ordered, what documents have ordered for the line, and what is left.
    */
   showFromStock?: boolean;
-  showOnPo?: boolean;
+  showOrderedQty?: boolean;
   showToBuy?: boolean;
   /**
    * ⭐ IDENTITY FIRST — owner correction 2026-09-11, the buying page only.
@@ -387,8 +406,8 @@ export default function GoodsMiniTable({
   onPoClick?: (poId: string) => void;
   /**
    * Opens the read-only details where every document covering a line is its
-   * own row. Absent = `On PO` prints its number as plain text, which is what a
-   * page with nowhere to send the reader should do.
+   * own row. Absent = `Ordered Qty` prints its number as plain text, which is
+   * what a page with nowhere to send the reader should do.
    */
   onOpenPoDetails?: () => void;
 }) {
@@ -414,19 +433,19 @@ export default function GoodsMiniTable({
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
     fromStock: { ...FROM_STOCK_COLUMN },
-    onPo: { ...ON_PO_COLUMN },
+    orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
   };
   const order = identityFirst
-    ? ["sku", "item", "qty", "fromStock", "onPo", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
-    : ["category", "unit", "onPo", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
+    ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
+    : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     unit: showUnitId,
     supplier: showSupplier,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
     fromStock: showFromStock,
-    onPo: showOnPo,
+    orderedQty: showOrderedQty,
     toBuy: showToBuy,
   };
   const columns: Column[] = order
@@ -552,25 +571,32 @@ export default function GoodsMiniTable({
                   ) : (
                     <span title={line.toBuyNoteWhy}>
                       <span className="tabular-nums font-medium">{line.toBuy}</span>
-                      {line.toBuyNote ? (
+                      {line.toBuyNote?.length ? (
                         <div className="mt-0.5">
-                          <Absence>{line.toBuyNote}</Absence>
+                          {/* Written AT the width it is read at — a sentence
+                              left to wrap under a one-digit figure is a
+                              row-height defect in words. */}
+                          {line.toBuyNote.map((l) => (
+                            <div key={l}>
+                              <Absence>{l}</Absence>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
                     </span>
                   );
-                case "onPo": {
+                case "orderedQty": {
                   /* A QUANTITY, AND A DOOR TO THE DOCUMENTS. The purchase
                      orders are named once, in the read-only details table
                      below; a collection of them never sets this row's height. */
-                  const qty = line.onPoQty ?? 0;
-                  if (qty <= 0) return <Absence>{line.onPoAbsence ?? "—"}</Absence>;
+                  const qty = line.orderedQty ?? 0;
+                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? "—"}</Absence>;
                   return onOpenPoDetails ? (
                     <button
                       type="button"
                       className="tabular-nums text-kit-blue-11 underline-offset-2 hover:underline"
-                      data-testid={`goods-on-po-${line.key}`}
-                      title={`${qty} on purchase orders — show the details`}
+                      data-testid={`goods-ordered-qty-${line.key}`}
+                      title={`${qty} ordered on purchase orders — show the details`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onOpenPoDetails();
@@ -649,7 +675,7 @@ export default function GoodsMiniTable({
                   <td
                     key={c.key}
                     className={
-                      c.key === "unit" || c.key === "onPo" || c.key === "poNo"
+                      c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }

@@ -212,7 +212,7 @@ describe("what an empty Unit cell means", () => {
     /* The read answered for the ORDER and carried no entry for this line —
        Carres did not look here, which is not the same as looking and finding
        nothing. */
-    expect(base({ unitRead: "ready", lineRead: "absent" })[0]!.unitAbsence).toBe("Not read");
+    expect(base({ unitRead: "ready", lineRead: "absent" })[0]!.unitAbsence).toBe("Not checked");
   });
 
   /**
@@ -228,7 +228,7 @@ describe("what an empty Unit cell means", () => {
     });
     expect(rows).toHaveLength(1);
     expect(rows[0]!.unitId).toBeNull();
-    expect(rows[0]!.unitAbsence).toBe("Not unit-tracked");
+    expect(rows[0]!.unitAbsence).toBe("Counted stock");
     /* And the quantity is still stated — the goods exist, they simply have no
        identity to print. */
     expect(rows[0]!.qty).toBe(1);
@@ -244,7 +244,35 @@ describe("what an empty Unit cell means", () => {
       unitScopes: undefined,
     });
     expect(rows[0]!.unitId).toBeNull();
-    expect(rows[0]!.unitAbsence).toBe("Not unit-tracked");
+    expect(rows[0]!.unitAbsence).toBe("Counted stock");
+  });
+});
+
+/* ─── NOTHING SUMS AN INFERENCE ──────────────────────────────────────────── */
+
+describe("an inferred row is excluded from every total", () => {
+  const rows = base({
+    lineage: [{ poId: PO_A.poId, poLineId: "pol-1", qty: 2, destinationId: KLANG }],
+    unitIds: ["U1-000-078", "U1-000-079"],
+    unitCoverage: { "U1-000-078": PO_A.poId, "U1-000-079": PO_A.poId },
+    unitLines: { "U1-000-078": "l1", "U1-000-079": null },
+  });
+
+  it("sums to the document line's own quantity, never more", () => {
+    /* One exact Unit (1) + the remainder (1) = the document line's 2. The
+       inferred row contributes NOTHING, because its quantity is already inside
+       the remainder — counting it would state 3 units on a 2-unit line. */
+    expect(rows.reduce((s, r) => s + (r.qty ?? 0), 0)).toBe(2);
+    expect(rows.filter((r) => r.qty == null)).toHaveLength(1);
+  });
+
+  it("⛔ renders no total row, so no footer can silently include a dash", () => {
+    render(<PoDetailsTable label="Purchase order details" rows={rows} />);
+    const table = screen.getByTestId("po-details-table").querySelector("table")!;
+    expect(table.querySelector("tfoot")).toBeNull();
+    /* And the register above exports the ORDER's own columns, none of which is
+       a per-Unit quantity — this table feeds no export at all. */
+    expect(screen.queryByRole("button", { name: /export/i })).toBeNull();
   });
 });
 

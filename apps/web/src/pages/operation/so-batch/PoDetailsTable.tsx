@@ -43,14 +43,14 @@
  *   A UNIT ID              exact goods, and the record says they answer THIS
  *                          line. Evidence. It carries `Qty 1` and draws the
  *                          document line's remainder down by one.
- *   `Not unit-tracked`     the goods covering this document line are COUNTED
+ *   `Counted stock`        the goods covering this document line are COUNTED
  *                          (`identity_scope = 'quantity'`, 0453). There is no
  *                          Unit ID and there never will be — the technical
  *                          `QTY-` key is a database fact that must not reach an
  *                          operator (`unit-identity.ts`).
  *   `Not allocated`        the read ANSWERED for this line and no Unit is tied
  *                          to this quantity yet. A CONFIRMED absence.
- *   `Not read`             the read answered for the ORDER but carried no entry
+ *   `Not checked`          the read answered for the ORDER but carried no entry
  *                          for this item line. Carres did not look here — a
  *                          different fact from having looked and found nothing.
  *   `Loading…`             the Unit read has not come back.
@@ -96,8 +96,13 @@ const ASSOCIATION_WORD: Record<UnitAssociation, string | null> = {
   unresolved: "Item line unknown",
 };
 
-/** Goods that are counted, not individually tracked — they have no Unit ID. */
-const NOT_UNIT_TRACKED = "Not unit-tracked";
+/**
+  * Goods that are counted, not individually tracked — they have no Unit ID.
+  * The repo's own noun for them (`a counted row`, `counted goods`), because
+  * `Not unit-tracked` names a database column to an operator who has never
+  * seen one.
+  */
+const COUNTED_STOCK = "Counted stock";
 
 export interface PoDetailRow {
   /** Stable identity for React and for the test that counts these rows. */
@@ -185,7 +190,10 @@ export function poDetailRowsForLine(input: {
       : unitRead === "error"
         ? "Could not be loaded"
         : lineRead === "absent"
-          ? "Not read"
+          ? /* Carres did not look at this line — plainer than `Not read`,
+               which reads as an unopened message rather than an unasked
+               question. */
+            "Not checked"
           : "Not allocated";
 
   /* THE ONE UNIT IDENTITY (`unit-identity.ts`). A counted row answers `null`
@@ -263,7 +271,7 @@ export function poDetailRowsForLine(input: {
         key: `${lineKey}::${poId}::${entry.poLineId ?? ""}::rest`,
         poNo: poId,
         unitId: null,
-        unitAbsence: counted.length > 0 && units.length === 0 ? NOT_UNIT_TRACKED : absence,
+        unitAbsence: counted.length > 0 && units.length === 0 ? COUNTED_STOCK : absence,
         association: "exact",
         sku, item, itemDetail,
         qty: remaining,
@@ -313,14 +321,20 @@ function Absence({ children }: { children: string }) {
  * exist.
  *
  * `PO Status` is the DOCUMENT's own recorded state, and it is what makes the
- * arithmetic legible: `On PO` upstairs counts every non-cancelled document,
- * `Completed` ones included, while `To buy` is netted against OPEN documents
- * only. Without this column a reader cannot tell fourteen delivered documents
- * from fourteen outstanding ones.
+ * arithmetic legible: `Ordered Qty` upstairs counts every non-cancelled
+ * document, `Completed` ones included, while `To buy` is netted against OPEN
+ * documents only. Without this column a reader cannot tell fourteen delivered
+ * documents from fourteen outstanding ones.
  *
  * `Ready Stock`, `To buy` and the tick column are deliberately ABSENT. They
  * would print a dash on every row of this table forever, and a column of
  * dashes is a column that states nothing in the width of a real answer.
+ *
+ * ⛔ AND THERE IS NO TOTAL ROW, deliberately. A `Qty` of `—` marks a row whose
+ * quantity is already counted by the remainder beneath it — an inferred Unit is
+ * evidence, not coverage — so any footer summing this column would have to know
+ * that, and a total that can be read two ways is worse than no total. The
+ * arithmetic the operator needs is one section up, on the demand row.
  */
 const COLUMNS = [
   { key: "poNo", label: "PO No", width: 168 },

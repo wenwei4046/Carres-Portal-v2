@@ -179,21 +179,25 @@ describe("goodsCategoryOf — one answer, three sources in falling authority", (
  * arithmetic needs and points at the read-only details, where each document is
  * its own row. A truth register still asks for none of it.
  */
-describe("the optional On PO column", () => {
+describe("the optional Ordered Qty column", () => {
   it("is absent unless the page asks for it", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
-    expect(screen.queryByRole("columnheader", { name: "On PO" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Ordered Qty" })).not.toBeInTheDocument();
   });
 
-  it("states HOW MANY units documents carry — never the documents themselves", () => {
+  it("states HOW MANY units documents have ORDERED — never the documents themselves", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showOnPo
-        lines={[{ ...goodsLine(), onPoQty: 3, onPoAbsence: "Not ordered yet" }]}
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 3, orderedQtyAbsence: "Not ordered yet" }]}
       />,
     );
-    expect(screen.getByRole("columnheader", { name: "On PO" })).toBeInTheDocument();
+    /* ⭐ `Ordered Qty`, not `On PO`: this figure is the HISTORICAL lineage,
+       delivered documents included, while `On PO` is the dictionary's head for
+       the engine's still-outstanding coverage. */
+    expect(screen.getByRole("columnheader", { name: "Ordered Qty" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "On PO" })).toBeNull();
     expect(screen.getByText("3")).toBeInTheDocument();
     /* THE ROW'S HEIGHT IS ITS OWN. No PO number reaches this table at all. */
     expect(screen.queryByText(/PO-d/)).toBeNull();
@@ -205,9 +209,9 @@ describe("the optional On PO column", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showOnPo
+        showOrderedQty
         onOpenPoDetails={onOpenPoDetails}
-        lines={[{ ...goodsLine(), onPoQty: 14 }]}
+        lines={[{ ...goodsLine(), orderedQty: 14 }]}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "14" }));
@@ -218,8 +222,8 @@ describe("the optional On PO column", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showOnPo
-        lines={[{ ...goodsLine(), onPoQty: 0, onPoAbsence: "Not ordered yet" }]}
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 0, orderedQtyAbsence: "Not ordered yet" }]}
       />,
     );
     const absence = screen.getByText("Not ordered yet");
@@ -231,13 +235,13 @@ describe("the optional On PO column", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showOnPo
-        lines={[{ ...goodsLine(), onPoQty: 1 }]}
+        showOrderedQty
+        lines={[{ ...goodsLine(), orderedQty: 1 }]}
       />,
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers[headers.length - 1]).toBe("Item");
-    expect(headers).toEqual(["Category", "Unit ID", "On PO", "Deliver To", "SKU", "Qty", "Item"]);
+    expect(headers).toEqual(["Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty", "Item"]);
   });
 });
 
@@ -258,14 +262,14 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showOnPo
+        showOrderedQty
         showSupplier
         showPoDeliveryDate
         lines={[
           {
             ...goodsLine(),
-            onPoQty: 1,
-            onPoAbsence: "Not ordered yet",
+            orderedQty: 1,
+            orderedQtyAbsence: "Not ordered yet",
             supplier: "Nice Future",
             poDeliveryDate: "Fri, 18 Sep",
           },
@@ -273,8 +277,8 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
             ...goodsLine(),
             key: "second",
             sku: "B1201S-Q",
-            onPoQty: 0,
-            onPoAbsence: "Not ordered yet",
+            orderedQty: 0,
+            orderedQtyAbsence: "Not ordered yet",
             supplierAbsence: "—",
             poDeliveryDateAbsence: "—",
           },
@@ -283,7 +287,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
-      "Category", "Unit ID", "On PO", "Deliver To", "SKU", "Qty",
+      "Category", "Unit ID", "Ordered Qty", "Deliver To", "SKU", "Qty",
       "Supplier", "PO Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();

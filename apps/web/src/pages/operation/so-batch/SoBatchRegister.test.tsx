@@ -1158,7 +1158,7 @@ describe("the expansion — the ONE shared child table", () => {
     const goods = within(box).getByTestId("goods-mini-table");
     expect(goods).not.toHaveTextContent("PO-20260820-1111");
     expect(goods).not.toHaveTextContent("PO-20260821-2222");
-    expect(within(goods).getByTestId("goods-on-po-l51")).toHaveTextContent("1");
+    expect(within(goods).getByTestId("goods-ordered-qty-l51")).toHaveTextContent("1");
 
     /* And the record says everything, once, under its own heading. */
     const details = within(box).getByTestId("po-details-table");
@@ -1741,7 +1741,7 @@ describe("fourteen documents on a one-unit line", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
     /* The HISTORICAL quantity, undiminished. */
-    expect(within(box).getByTestId("goods-on-po-l14")).toHaveTextContent("14");
+    expect(within(box).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
     const details = within(box).getByTestId("po-details-table");
     expect(within(details).getAllByText("Completed")).toHaveLength(14);
     /* ⛔ And the raw database word never reaches the screen. */

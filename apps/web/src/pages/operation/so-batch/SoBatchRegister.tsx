@@ -1339,24 +1339,33 @@ function SoBatchOrderExpansion({
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
       unitAbsence: "—",
-      /* The four numbers that used to hide inside `Covered by` — and they add
-         up in front of the operator: what the customer ordered, what the shelf
-         already answered, how much documents already carry, what is left.
-         `On PO` is the EXACT `po_line_sources` quantity for THIS item line, not
-         a count of the order's documents and not a per-SKU pool. */
+      /* The four numbers that used to hide inside `Covered by`: what the
+         customer ordered, what the shelf already answered, how much documents
+         have ORDERED for this line, and what is left.
+
+         ⭐ `Ordered Qty` is HISTORY, and its head says so (owner correction
+         2026-09-11). It is the exact `po_line_sources` quantity for THIS item
+         line — every non-cancelled document, `Completed` ones included, never
+         netted by what has arrived. It is NOT `On PO`, which is the
+         dictionary's head for the engine's pooled, netted, still-outstanding
+         coverage; printing this figure under that head said "still on order"
+         about goods that may already be in the warehouse. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
       toBuy: drawEditor ? (leaf!.toBuy ?? 0) : null,
-      /* ⭐ WHICH KIND OF NUMBER `To buy` IS. The engine's own `fullyOnPo`
-         says every unit of this build is already on an OPEN purchase order, so
-         the figure is the coverage a tick would buy a SECOND time, not a
-         remainder. The row stays buyable by owner ruling (2026-09-03) — the
-         pool has no customer attribution — but the operator is told. */
+      /* ⭐ WHICH KIND OF NUMBER `To buy` IS, AND WHAT TICKING IT DOES.
+         The engine's own `fullyOnPo` says every unit of this build is already
+         on an OPEN purchase order, so the figure is not a remainder. Traced
+         through the one issue door: `issue-batch` → `purchasing_issue_pos_batch`
+         → `purchasing_mint_po` INSERTS a new purchase order with its own lines,
+         lineage and Unit IDs, and touches no existing document — so the act
+         ADDS SUPPLY. The row stays buyable by owner ruling (2026-09-03), and
+         now says both halves. */
       toBuyNote:
         drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPo : undefined,
       toBuyNoteWhy:
         drawEditor && leaf!.fullyOnPo === true ? W.toBuyAlreadyOnPoWhy : undefined,
-      onPoQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
-      onPoAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
+      orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
+      orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
       ...(drawEditor
@@ -1422,7 +1431,7 @@ function SoBatchOrderExpansion({
         category: leaf.category ? categoryWord(leaf.category) : "Other goods",
         unitIds: [],
         unitAbsence: "—",
-        onPoAbsence: "Not ordered yet",
+        orderedQtyAbsence: "Not ordered yet",
         deliverTo: [],
         deliverToAbsence: "—",
         supplierAbsence: "—",
@@ -1484,12 +1493,13 @@ function SoBatchOrderExpansion({
       label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
       lines={lines}
       /* ⭐ THE GOODS IDENTIFY THEMSELVES FIRST (owner correction 2026-09-11),
-         and the arithmetic is explicit: `Qty` the customer's order, `Ready
-         Stock` what the shelf answered, `On PO` how much documents already
-         carry, and `To buy` the remainder this page can still act on. */
+         and the numbers are explicit: `Qty` the customer's order, `Ready
+         Stock` what the shelf answered, `Ordered Qty` how much documents have
+         ordered for this line (history, delivered included), and `To buy` the
+         remainder this page can still act on. */
       identityFirst
       showFromStock
-      showOnPo
+      showOrderedQty
       showToBuy
       showSupplier
       /* ⛔ NO `Unit ID` COLUMN, and no `PO Delivery Date` (owner correction
