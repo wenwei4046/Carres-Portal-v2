@@ -200,11 +200,31 @@ describe("the optional Covered by column", () => {
       />,
     );
     expect(screen.getByRole("columnheader", { name: "On PO" })).toBeInTheDocument();
+    /* SEVERAL documents summarise in the page's own grammar and keep the
+       quantity — found on the production walk, where one live item line
+       carried FOURTEEN purchase orders and listed every one of them in a cell
+       fourteen lines tall. The exact documents are on the Unit rows below. */
+    expect(screen.getByText("2 POs ×3")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Covered by" })).toBeNull();
+  });
+
+  it("one document prints in full, with how much of the line it carries", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on SO-1303"
+        showOnPo
+        lines={[
+          {
+            ...goodsLine(),
+            poAllocations: [{ poId: "PO-20260820-4827", qty: 2 }],
+            onPoAbsence: "Not ordered yet",
+          },
+        ]}
+      />,
+    );
     /* `Covered by` said WHICH document and never HOW MUCH, so a half-bought
        line read exactly like a wholly bought one. */
     expect(screen.getByText("PO-20260820-4827").closest("div")).toHaveTextContent("×2");
-    expect(screen.getByText("PO-20260821-1190").closest("div")).toHaveTextContent("×1");
-    expect(screen.queryByRole("columnheader", { name: "Covered by" })).toBeNull();
   });
 
   it("prints the governed absence, quietly, when nothing covers the line", () => {

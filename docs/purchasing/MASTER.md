@@ -1148,7 +1148,11 @@ turned a display defect into a double purchase.
   read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
   front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
   already answered · **`On PO`** each document and the quantity it carries (`PO-… ×2`) ·
-  **`To buy`** the remainder this page may still act on.
+  **`To buy`** the remainder this page may still act on. **Several documents on one line
+  summarise** — `{n} POs ×{total}`, the page's own grammar — because a live item line carries
+  fourteen purchase orders today (the historical duplicate-PO shape `already_on_po` now refuses)
+  and listing every one of them made a single cell fourteen lines tall. The exact documents are
+  one row below, each against the Unit it brought in.
 - **Identity leads.** `SKU` then the item and its recorded configuration come before `Category` and
   `Unit ID`, so two lines of one model are told apart by the goods rather than by position. The
   configuration is the line's own recorded variant, never re-derived from the SKU text. Exactly one
