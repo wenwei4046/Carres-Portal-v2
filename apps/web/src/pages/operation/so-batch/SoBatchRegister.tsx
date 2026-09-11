@@ -17,6 +17,7 @@ import {
   soBatchOrderSupplierNames,
   soBatchRailFacts,
   soBatchRailModel,
+  soBatchToBuyState,
   soBatchSelectionSummary,
   type DestinationAllocation,
   type PurchaseDemandRow,
@@ -1351,20 +1352,26 @@ function SoBatchOrderExpansion({
          coverage; printing this figure under that head said "still on order"
          about goods that may already be in the warehouse. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
-      /* A covered build is not tickable, but its figure still explains the
-         row — so it prints, with the refusal beside it. */
-      toBuy: drawEditor || leaf?.fullyOnPo === true ? (leaf!.toBuy ?? 0) : null,
-      /* ⭐ WHICH KIND OF NUMBER `To buy` IS, AND WHAT WOULD HAPPEN.
-         The engine's own `fullyOnPo` says every unit of this build is already
-         on an OPEN purchase order, so the figure is not a remainder — and since
-         0430 `issue-batch` REFUSES such a selection by name (`already_on_po`,
-         422, naming the covering document) and creates nothing. The row is not
-         tickable (`isSelectableForOrder`) and says the door's own words, so the
-         operator is not invited into an act that fails. Printed on the line
-         whatever its tick state, because the number is what raised the
-         question. */
-      toBuyNote: leaf?.fullyOnPo === true ? W.toBuyAlreadyOnPo : undefined,
-      toBuyNoteWhy: leaf?.fullyOnPo === true ? W.toBuyAlreadyOnPoWhy : undefined,
+      /* ⭐ A NUMBER ONLY WHERE THE PAGE IS OFFERING THE BUY (owner correction
+         2026-09-11). `To buy` means *what is left to buy*, so printing the
+         engine's covering quantity there on a row nobody may tick presented a
+         COVERING quantity as a PURCHASING one. The shared reading of the
+         engine's own flag decides; the cell prints its existing governed
+         absence in every non-actionable state, and the row says which state it
+         is in. The customer's `Qty` and the historical `Ordered Qty` are two
+         columns away and untouched, and the documents are one section below —
+         nothing is hidden and no arithmetic is invented. */
+      ...(() => {
+        const state = leaf ? soBatchToBuyState(leaf, order.status) : { kind: "none" as const };
+        if (state.kind === "buy" && drawEditor) return { toBuy: state.qty };
+        if (state.kind === "covered") {
+          return { toBuy: null, toBuyNote: W.toBuyAlreadyOnPo, toBuyNoteWhy: W.toBuyAlreadyOnPoWhy };
+        }
+        if (state.kind === "unchecked") {
+          return { toBuy: null, toBuyNote: W.toBuyNotChecked, toBuyNoteWhy: W.toBuyNotCheckedWhy };
+        }
+        return { toBuy: null };
+      })(),
       orderedQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
       orderedQtyAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered

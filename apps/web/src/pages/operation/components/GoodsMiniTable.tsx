@@ -566,11 +566,19 @@ export default function GoodsMiniTable({
                     <span className="tabular-nums">{line.fromStock}</span>
                   );
                 case "toBuy":
-                  return line.toBuy == null || line.toBuy <= 0 ? (
-                    <Absence>—</Absence>
-                  ) : (
+                  /* ⭐ A NUMBER ONLY WHERE THERE IS ONE TO ACT ON, and the note
+                     belongs to BOTH branches (owner correction 2026-09-11).
+                     The absence used to return early, so a row whose figure had
+                     deliberately been withheld printed a bare `—` with nothing
+                     saying why — which is the same silence the page spent this
+                     whole card removing. */
+                  return (
                     <span title={line.toBuyNoteWhy}>
-                      <span className="tabular-nums font-medium">{line.toBuy}</span>
+                      {line.toBuy == null || line.toBuy <= 0 ? (
+                        <Absence>—</Absence>
+                      ) : (
+                        <span className="tabular-nums font-medium">{line.toBuy}</span>
+                      )}
                       {line.toBuyNote?.length ? (
                         <div className="mt-0.5">
                           {/* Written AT the width it is read at — a sentence

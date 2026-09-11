@@ -90,9 +90,11 @@ const BUYING_LINES: GoodsMiniLine[] = [
     unitAbsence: "—",
     orderedQty: 14,
     orderedQtyAbsence: "Not ordered yet",
-    toBuy: 1,
-    /* The engine says every unit is already on an OPEN purchase order, so this
-       figure is the coverage a tick would buy AGAIN — not a remainder. */
+    /* ⛔ NO PURCHASING QUANTITY on a covered row: the engine figure here is
+       the COVERING document's, and `To buy` means what is left to buy. */
+    toBuy: null,
+    /* The row is NOT tickable: `issue-batch` refuses it by name, and the row
+       says the door's own words. */
     toBuyNote: ["Already on a PO", "Nothing to buy here"],
     toBuyNoteWhy:
       "An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.",
@@ -104,7 +106,8 @@ const BUYING_LINES: GoodsMiniLine[] = [
     qty: 1,
     item: "Jager",
     itemDetail: "Super Single · Fabric 1",
-    selectable: true,
+    /* NOT offered: the issue door refuses a covered line by name. */
+    selectable: false,
   },
   {
     key: "buy-3",

@@ -154,6 +154,17 @@ export const SO_BATCH_PURCHASE_WORDS = {
    * title.
    */
   toBuyAlreadyOnPo: ["Already on a PO", "Nothing to buy here"] as readonly string[],
+
+  /**
+   * ⭐ UNKNOWN IS NOT YES (owner correction 2026-09-11). The engine's
+   * `fullyOnPo` decides whether this line may be bought at all, and a payload
+   * without it leaves the page unable to say. It prints neither a purchasing
+   * quantity nor a tick, because both would describe an eligibility nobody
+   * verified — and the issue door's own refusal is preserved underneath.
+   */
+  toBuyNotChecked: ["Coverage not checked"] as readonly string[],
+  toBuyNotCheckedWhy:
+    "Whether an open Purchase Order already covers this line could not be checked, so it is not offered for buying. Reopen the page to check again.",
   /**
    * The door's own refusal, carried as the qualifying cell's own title. It
    * never contradicts the two visible lines; it says the same thing with room
@@ -886,9 +897,59 @@ export function isSelectableForOrder(
 ): boolean {
   return (
     orderStatus !== "ordered" &&
-    row.fullyOnPo !== true &&
+    /* ⭐ VERIFIED NOT COVERED, not merely "not known to be covered" (owner
+       correction 2026-09-11). `!== true` treated a MISSING flag as a licence:
+       the page could not tell an uncovered line from one it had no answer
+       about, and offered the tick for both. The carried build path always
+       sends the boolean (`purchase-demands.ts`), and a refused line carries
+       no `toBuy`/`issueRef` and fails the test below anyway — so the only
+       payload reaching this line without it is an older Worker's, and the
+       honest answer there is "could not be checked", not "go ahead".
+       soBatchToBuyState() prints that answer beside the row. */
+    row.fullyOnPo === false &&
     isSelectableForBuying(row)
   );
+}
+
+/**
+ * ⭐ WHAT THE `To buy` CELL IS ENTITLED TO SAY — owner correction 2026-09-11.
+ *
+ * THE CONTRADICTION THIS ENDS. The engine prints the covering document's
+ * quantity under `To buy` when the open-PO pool covers every unit of a build
+ * (T6 — a receipt states what it bought, and `0` would answer a question
+ * nobody asked). The Register then drew that figure on a row it does not offer
+ * for buying: **a covering quantity presented as a purchasing quantity**,
+ * under a heading that means *what is left to buy*.
+ *
+ * So a number appears only where the page is actually offering the buy.
+ * Everywhere else the cell prints its existing governed absence and the row
+ * says which non-actionable state it is in. **No arithmetic is invented, no
+ * server number is changed, and nothing is hidden**: the customer's original
+ * `Qty` and the historical `Ordered Qty` are untouched two columns away, and
+ * the documents themselves are one section below.
+ *
+ * The three answers are the three readings of the engine's own flag, which is
+ * why this lives beside `isSelectableForOrder` and reads it the same way.
+ */
+export type SoBatchToBuyState =
+  /** Verified uncovered: the remainder, and the quantity a tick allocates. */
+  | { kind: "buy"; qty: number }
+  /** `fullyOnPo` — the issue door refuses this by name (`already_on_po`). */
+  | { kind: "covered" }
+  /** No flag in this payload: eligibility is UNKNOWN, and unknown is not yes. */
+  | { kind: "unchecked" }
+  /** Nothing to say — a line with no remainder, or one this page cannot buy. */
+  | { kind: "none" };
+
+export function soBatchToBuyState(
+  row: PurchaseDemandRow,
+  orderStatus: SoBatchOrderStatus,
+): SoBatchToBuyState {
+  if (orderStatus === "ordered") return { kind: "none" };
+  if (!isSelectableForBuying(row)) return { kind: "none" };
+  if (row.fullyOnPo === true) return { kind: "covered" };
+  if (row.fullyOnPo !== false) return { kind: "unchecked" };
+  return { kind: "buy", qty: row.toBuy ?? 0 };
 }
 
 /** Everything to Carres Klang — the standing Purchasing default (MASTER §5.4). */

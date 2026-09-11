@@ -1519,11 +1519,13 @@ READ-ONLY record rows, and every sibling that does not ask gets the ruled layout
 - **`Covered by` is retired from the component.** It answered three questions in one heading. The
   page now asks for `Ready Stock`, `On PO` and `To buy`, so the arithmetic adds up on screen
   instead of hiding inside one word.
-- **`toBuyNote` / `toBuyNoteWhy` — a figure may say WHICH KIND of number it is, and what acting on
-  it does.** SO Batch's engine prints the covering document's quantity under `To buy` on a build the
-  open-PO pool fully covers, so one figure means both a remainder and a re-buy offer. The page
-  supplies the words as an ARRAY OF LINES, written at the width they are read at; the box prints
-  them under the figure and carries the long governed explanation as the cell's title. **A sentence
+- **`toBuyNote` / `toBuyNoteWhy` — a cell may say why it is stating no number.** SO Batch withholds
+  the figure on every row it does not offer for buying (the engine's covering quantity is not a
+  purchasing quantity), so the absence needs a reason beside it. The page supplies the words as an
+  ARRAY OF LINES, written at the width they are read at; **the box prints them in BOTH branches** —
+  beside the figure and beside the `—` — and carries the long governed explanation as the cell's
+  title. The absence branch used to return early, so a deliberately withheld figure printed a bare
+  dash with nothing saying why, which is the silence the whole card exists to remove. **A sentence
   left to wrap under a one-digit number is the same row-height defect as a stack of documents,
   spelt out in words** — measured at 91px on the rendered preview before the written lines replaced
   it. Siblings pass neither and render byte-identically.

@@ -68,6 +68,11 @@ function leaf(over: Partial<PurchaseDemandRow> = {}): PurchaseDemandRow {
     readyStock: 0,
     takenFromStock: 0,
     onPo: 0,
+    /* The carried build path ALWAYS sends this boolean, and `false` — nothing
+       of this build sits on an open purchase order — is the ordinary case. A
+       leaf without it is an older Worker's, which the register now reads as
+       "could not be checked" rather than as permission. */
+    fullyOnPo: false,
     poNumbers: [],
     toBuy: 2,
     goodsMustArrive: "2026-08-19",
@@ -1779,22 +1784,48 @@ describe("fourteen documents on a one-unit line", () => {
     /* And the row SAYS why, in the refusal's own words. */
     expect(demand).toHaveTextContent("Already on a PO");
     expect(demand).toHaveTextContent("Nothing to buy here");
+    /* ⛔ AND `To buy` STATES NO PURCHASING QUANTITY. The engine's figure here
+       is the COVERING document's quantity (T6), and printing it under a head
+       that means *what is left to buy*, on a row nobody may tick, presented a
+       covering quantity as a purchasing one. The customer's `Qty 1` and the
+       historical `Ordered Qty 14` are untouched two columns away. */
+    const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
+    expect(cells).toContain("1");
+    expect(within(demand).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
+    expect(demand.textContent).not.toMatch(/To buy/);
+    const toBuyCell = [...demand.querySelectorAll("td")].find((c) =>
+      /Already on a PO/.test(c.textContent ?? ""),
+    )!;
+    expect(toBuyCell.textContent).toBe("—Already on a PONothing to buy here");
   });
 
-  /* ⛔ IT FAILS OPEN. An older Worker carries no `fullyOnPo`, so the gate does
-     not close and the row stays exactly as tickable as it is today — the API
-     still refuses it by name. A missing fact never hides demand. */
-  it("keeps the tick when the Worker did not carry the engine's flag", async () => {
+  /**
+   * ⭐ UNKNOWN IS NOT YES (owner correction 2026-09-11).
+   *
+   * An older Worker carries no `fullyOnPo`, so the page cannot tell an
+   * uncovered line from one it has no answer about. It used to read the gap as
+   * permission and offer the tick. It now says it could not check — no
+   * purchasing quantity and no tick, because both would describe an
+   * eligibility nobody verified. The issue door's own refusal is untouched
+   * underneath; nothing about the backend rule changed.
+   */
+  it("neither offers nor prices a line whose coverage it could not check", async () => {
     renderRegister({
       rows: [leaf14({ onPo: 1, fullyOnPo: undefined })],
       registerRows: [order({ sent: false, status: "open", orderStatus: "blank" })],
     });
-    expect(screen.getByTestId("so-batch-select-o14")).toBeEnabled();
+    expect(screen.getByTestId("so-batch-select-o14")).toBeDisabled();
     fireEvent.click(screen.getByTestId("so-batch-expand-o14"));
     const box = await screen.findByTestId("so-batch-inspector-o14");
-    expect(
-      within(within(box).getByTestId("so-batch-part-B1201S-K")).getByRole("checkbox"),
-    ).toBeEnabled();
+    const demand = within(box).getByTestId("so-batch-part-B1201S-K");
+    expect(within(demand).queryByRole("checkbox")).toBeNull();
+    expect(demand).toHaveTextContent("Coverage not checked");
+    /* ⛔ AND NO PURCHASING FIGURE. The demand is still fully visible — `Qty 1`
+       and `Ordered Qty 14` are two columns away — but `To buy` states nothing
+       it cannot stand behind. */
+    const cells = [...demand.querySelectorAll("td")].map((c) => c.textContent);
+    expect(cells).toContain("1");
+    expect(within(demand).getByTestId("goods-ordered-qty-l14")).toHaveTextContent("14");
   });
 
   it("says nothing of the kind when the remainder is genuine", async () => {
