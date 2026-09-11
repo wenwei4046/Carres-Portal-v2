@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   READY_STOCK_BLOCKED_WORDS,
+  READY_STOCK_REFUSAL_WORDS,
   readyStockRefusalWord,
   readyStockReserveResultSchema,
   readyStockResponseSchema,
@@ -66,8 +67,23 @@ import ReadyStockTable, {
  * find out which, and every attempt is another race.
  */
 type ActResult =
-  | { ok: true; count: number; unitCodes: string[] }
-  | { ok: false; sentence: string; unitId: string | null; unitCode: string | null };
+  | { kind: "ok"; count: number; unitCodes: string[] }
+  | { kind: "refused"; sentence: string; unitId: string | null; unitCode: string | null }
+  /**
+   * ⭐ THE THIRD OUTCOME — added 2026-09-11, and it is the dangerous one.
+   *
+   * A CONFIRMED refusal is the server saying no: the transaction rolled back
+   * and nothing was reserved. A request that never came back — a timeout, a
+   * dropped connection, a 502 from in front of the Worker — says nothing at
+   * all about the transaction, which may well have COMMITTED. Printing
+   * `No Unit was reserved.` there is a guess wearing the clothes of a fact,
+   * and the operator's next move is to press again and reserve a second Unit.
+   *
+   * So the uncertain case states that it is uncertain, re-reads the
+   * authoritative record, and lets the refreshed table answer what actually
+   * happened before anything can be pressed again.
+   */
+  | { kind: "unknown"; sentence: string };
 
 export default function ReadyStockPanel({
   orderId,
@@ -152,7 +168,7 @@ export default function ReadyStockPanel({
         `Reserved ${count} Unit${count === 1 ? "" : "s"}${so == null ? "" : ` to SO-${so}`}`,
       );
       setAct({
-        ok: true,
+        kind: "ok",
         count,
         unitCodes: committed
           .map((u) => codeOf(u.itemId))
@@ -170,13 +186,31 @@ export default function ReadyStockPanel({
     },
     onError: (e: Error) => {
       const body = e instanceof ApiError ? (e.body as { code?: string; itemId?: string } | null) : null;
-      const sentence = readyStockRefusalWord(body?.code ?? null);
+      const code = body?.code ?? null;
+      /* A CONFIRMED refusal is one the door named. Anything else — no
+         response, no body, or a body that carries no governed code — leaves
+         the outcome unknown, and the only honest next step is to re-read. */
+      if (code == null || !(code in READY_STOCK_REFUSAL_WORDS)) {
+        const sentence = "Ready Stock could not confirm the result. It has been read again.";
+        toast.error(sentence);
+        setAct({ kind: "unknown", sentence });
+        void queryClient.invalidateQueries({ queryKey: ["so-batch-ready-stock", orderId] });
+        void queryClient.invalidateQueries({ queryKey: ["so-batch-purchase"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["operation", "orders", orderId, "expansion"],
+        });
+        /* The choice is dropped: pressing the same button again on an unknown
+           outcome is exactly how a Unit gets reserved twice. */
+        setChosen(new Set());
+        return;
+      }
+      const sentence = readyStockRefusalWord(code);
       toast.error(sentence);
       /* 0473 names the Unit the act stopped on. The choice is LEFT ALONE, so
          the operator unticks that one and presses again rather than rebuilding
          a selection the refusal never touched. */
       setAct({
-        ok: false,
+        kind: "refused",
         sentence,
         unitId: body?.itemId ?? null,
         unitCode: body?.itemId ? codeOf(body.itemId) : null,
@@ -246,7 +280,7 @@ export default function ReadyStockPanel({
               onToggle: toggle,
               /* A Unit the door refuses keeps its checkbox and its choice —
                  the operator unticks that one and presses again. */
-              isRefused: (itemId) => act != null && !act.ok && act.unitId === itemId,
+              isRefused: (itemId) => act?.kind === "refused" && act.unitId === itemId,
               blockedWord: (row) => {
                 const unit = unitById.get(row.itemId);
                 if (unit?.blocked) return READY_STOCK_BLOCKED_WORDS[unit.blocked];
@@ -311,10 +345,10 @@ export default function ReadyStockPanel({
               <div
                 data-testid={`ready-stock-act-${orderId}`}
                 className={`border-t border-base-200 px-3 py-2 text-body ${
-                  act.ok ? "bg-kit-blue-3" : "bg-kit-amber-3"
+                  act.kind === "ok" ? "bg-kit-blue-3" : "bg-kit-amber-3"
                 }`}
               >
-                {act.ok ? (
+                {act.kind === "ok" ? (
                   <>
                     <div>
                       {`Reserved ${act.count} Unit${act.count === 1 ? "" : "s"}`}
@@ -325,6 +359,13 @@ export default function ReadyStockPanel({
                         {`Unit ID · ${act.unitCodes.join(" · ")}`}
                       </div>
                     ) : null}
+                  </>
+                ) : act.kind === "unknown" ? (
+                  <>
+                    <div>{act.sentence}</div>
+                    <div className="text-meta text-base-600">
+                      Check the Unit IDs below before choosing again.
+                    </div>
                   </>
                 ) : (
                   <>

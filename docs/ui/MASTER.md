@@ -1488,6 +1488,32 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
   confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
   than filled with an `Add stock` control the Unit authority removed.
 
+## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
+
+**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY. Sales Orders, Delivery and Manual Purchase
+render byte-identically to what they rendered before.**
+
+The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
+That law holds. What changed is that the buying page may now ask for a second READING ORDER and for
+READ-ONLY record rows, and every sibling that does not ask gets the ruled layout unchanged.
+
+- **`identityFirst`** puts `SKU` and the item's configuration ahead of `Category` and `Unit ID`. The
+  ruled order opened with the two least identifying facts, so a buying page read `Mattress` ·
+  `Not allocated` before it read what the goods were. Law ① is kept: exactly ONE column is flexible
+  and every other width is fixed, so two expansions opened together still line up column for
+  column. What moved is WHICH column is flexible and where it sits, not how many.
+- **A line's `units` render as read-only rows beneath it.** The demand row owns the checkbox, the
+  arrangement editor and the customer's quantity; each Unit row is a record — its own Unit ID, its
+  own document, that document's destination — and carries no control at all. The previous version
+  copied the line's key, selection state and editor into every Unit row, which drew N ticked boxes
+  for one ticked demand and put a destination editor beside purchase orders that were already sent.
+  A record wears the table header's own grey; a ticked demand wears the register's selected blue.
+- **`Covered by` is retired from the component.** It answered three questions in one heading. The
+  page now asks for `Ready Stock`, `On PO` (each document with the quantity it carries) and
+  `To buy`, so the arithmetic adds up on screen instead of hiding inside one word.
+- **A number is a door only where the page can open one.** `onPoClick` makes every PO number
+  navigable; a truth register that passes nothing keeps the printed text.
+
 # §7 · Approved Evolution
 
 | What | Why it is not built |

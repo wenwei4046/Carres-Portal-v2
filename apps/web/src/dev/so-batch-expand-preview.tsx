@@ -31,20 +31,64 @@ const SALES_ORDER_LINES: GoodsMiniLine[] = [
   },
 ];
 
-/** What SO Batch Purchase passes — a buying page: Covered by, nothing minted. */
+/**
+ * What SO Batch Purchase passes — the buying page, as it now renders:
+ * identity first, the arithmetic explicit, and the exact Unit records as
+ * READ-ONLY rows under the one demand they belong to.
+ */
 const BUYING_LINES: GoodsMiniLine[] = [
   {
     key: "buy-1",
     category: "Mattress",
     unitIds: [],
-    unitAbsence: "Not allocated",
-    coveredBy: ["PO-20260820-4827"],
-    coveredByAbsence: "Not ordered yet",
-    deliverTo: ["Carres Klang"],
+    unitAbsence: "—",
+    fromStock: 1,
+    poAllocations: [{ poId: "PO-20260820-4827", qty: 2 }],
+    onPoAbsence: "Not ordered yet",
+    toBuy: 1,
+    units: [
+      {
+        unitId: "U1-000-078",
+        poNo: "PO-20260820-4827",
+        deliverTo: "Carres Klang",
+        supplier: "Nice Future",
+        poDeliveryDate: "Thu, 17 Sep",
+      },
+      {
+        unitId: "U1-000-079",
+        poNo: "PO-20260820-4827",
+        deliverTo: "Carres Klang",
+        supplier: "Nice Future",
+        poDeliveryDate: "Thu, 17 Sep",
+      },
+    ],
+    deliverTo: [],
     deliverToAbsence: "Not chosen",
+    supplier: "Nice Future",
+    supplierAbsence: "—",
+    poDeliveryDate: "Thu, 17 Sep",
+    poDeliveryDateAbsence: "—",
     sku: "L1201S-K",
-    qty: 1,
+    qty: 4,
     item: "Laveo",
+    itemDetail: "King · Fabric 3",
+    selectable: true,
+  },
+  {
+    key: "buy-2",
+    category: "Mattress protector",
+    unitIds: [],
+    unitAbsence: "Not allocated",
+    poAllocations: [],
+    onPoAbsence: "Not ordered yet",
+    toBuy: null,
+    deliverTo: [],
+    deliverToAbsence: "—",
+    supplierAbsence: "—",
+    poDeliveryDateAbsence: "—",
+    sku: "MP-K",
+    qty: 1,
+    item: "Microfiber Waterproof",
     itemDetail: "King",
     selectable: false,
   },
@@ -60,8 +104,8 @@ const SET_LINES: GoodsMiniLine[] = [
   category: "Sofa",
   unitIds: [],
   unitAbsence: "Not allocated",
-  coveredBy: [],
-  coveredByAbsence: "Not ordered yet",
+  poAllocations: [],
+  onPoAbsence: "Not ordered yet",
   deliverTo: ["Carres Klang ×3", "AL Sungai Buloh ×1"],
   deliverToAbsence: "Not chosen",
   sku: sku as string,
@@ -122,15 +166,32 @@ createRoot(document.getElementById("root")!).render(
       </section>
       <section className="flex flex-col gap-1">
         <span className="text-label uppercase tracking-wide text-kit-slate-11">
-          AFTER — SO Batch Purchase, one part already on a purchase order
+          AFTER — SO Batch Purchase: one demand, its two Unit records read-only
         </span>
-        <GoodsMiniTable label="Goods on SO-1203" lines={BUYING_LINES} showCoveredBy />
+        <GoodsMiniTable
+          label="Goods on SO-1203"
+          lines={BUYING_LINES}
+          identityFirst
+          showFromStock
+          showOnPo
+          showToBuy
+          showSupplier
+          showPoDeliveryDate
+          selection={{ selectedKeys: new Set(["buy-1"]), onToggle: () => {} }}
+        />
       </section>
       <section className="flex flex-col gap-1">
         <span className="text-label uppercase tracking-wide text-kit-slate-11">
           AFTER — a matched set the row can only name
         </span>
-        <GoodsMiniTable label="Goods on SO-1330" lines={SET_LINES} showCoveredBy />
+        <GoodsMiniTable
+          label="Goods on SO-1330"
+          lines={SET_LINES}
+          identityFirst
+          showFromStock
+          showOnPo
+          showToBuy
+        />
       </section>
     </div>
   </StrictMode>,

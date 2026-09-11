@@ -182,31 +182,37 @@ describe("the optional Covered by column", () => {
     expect(screen.queryByRole("columnheader", { name: "Covered by" })).not.toBeInTheDocument();
   });
 
-  it("appears for a buying page, and prints every covering document", () => {
+  it("names every covering document AND how much of the line it carries", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
+        showOnPo
         lines={[
           {
             ...goodsLine(),
-            coveredBy: ["PO-20260820-4827", "PO-20260821-1190"],
-            coveredByAbsence: "Not ordered yet",
+            poAllocations: [
+              { poId: "PO-20260820-4827", qty: 2 },
+              { poId: "PO-20260821-1190", qty: 1 },
+            ],
+            onPoAbsence: "Not ordered yet",
           },
         ]}
       />,
     );
-    expect(screen.getByRole("columnheader", { name: "Covered by" })).toBeInTheDocument();
-    expect(screen.getByText("PO-20260820-4827")).toBeInTheDocument();
-    expect(screen.getByText("PO-20260821-1190")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "On PO" })).toBeInTheDocument();
+    /* `Covered by` said WHICH document and never HOW MUCH, so a half-bought
+       line read exactly like a wholly bought one. */
+    expect(screen.getByText("PO-20260820-4827").closest("div")).toHaveTextContent("×2");
+    expect(screen.getByText("PO-20260821-1190").closest("div")).toHaveTextContent("×1");
+    expect(screen.queryByRole("columnheader", { name: "Covered by" })).toBeNull();
   });
 
   it("prints the governed absence, quietly, when nothing covers the line", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
-        lines={[{ ...goodsLine(), coveredBy: [], coveredByAbsence: "Not ordered yet" }]}
+        showOnPo
+        lines={[{ ...goodsLine(), poAllocations: [], onPoAbsence: "Not ordered yet" }]}
       />,
     );
     const absence = screen.getByText("Not ordered yet");
@@ -214,18 +220,17 @@ describe("the optional Covered by column", () => {
     expect(absence).toHaveAttribute("data-absence", "true");
   });
 
-  it("keeps Item last — the flexible column never moves (law ①)", () => {
+  it("keeps Item last for every sibling — the ruled order is untouched (law ①)", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
-        lines={[{ ...goodsLine(), coveredBy: ["PO-1"], coveredByAbsence: "—" }]}
+        showOnPo
+        lines={[{ ...goodsLine(), poAllocations: [{ poId: "PO-1", qty: 1 }] }]}
       />,
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers[headers.length - 1]).toBe("Item");
-    /* And it sits beside `Unit ID`: both answer "what exists for this line". */
-    expect(headers).toEqual(["Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty", "Item"]);
+    expect(headers).toEqual(["Category", "Unit ID", "On PO", "Deliver To", "SKU", "Qty", "Item"]);
   });
 });
 
@@ -246,14 +251,14 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
-        showCoveredBy
+        showOnPo
         showSupplier
         showPoDeliveryDate
         lines={[
           {
             ...goodsLine(),
-            coveredBy: ["PO-20260820-1111"],
-            coveredByAbsence: "Not ordered yet",
+            poAllocations: [{ poId: "PO-20260820-1111", qty: 1 }],
+            onPoAbsence: "Not ordered yet",
             supplier: "Nice Future",
             poDeliveryDate: "Fri, 18 Sep",
           },
@@ -261,8 +266,8 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
             ...goodsLine(),
             key: "second",
             sku: "B1201S-Q",
-            coveredBy: [],
-            coveredByAbsence: "Not ordered yet",
+            poAllocations: [],
+            onPoAbsence: "Not ordered yet",
             supplierAbsence: "—",
             poDeliveryDateAbsence: "—",
           },
@@ -271,7 +276,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
-      "Category", "Unit ID", "Covered by", "Deliver To", "SKU", "Qty",
+      "Category", "Unit ID", "On PO", "Deliver To", "SKU", "Qty",
       "Supplier", "PO Delivery Date", "Item",
     ]);
     expect(screen.getByText("Nice Future")).toBeInTheDocument();

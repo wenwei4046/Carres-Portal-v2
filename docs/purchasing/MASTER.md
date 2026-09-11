@@ -860,7 +860,7 @@ SUPPLIER                  ▾ compact fact dropdown (owner ruling 2026-09-11)
   All suppliers
   [actual supplier names, alphabetical — never hardcoded]
 
-REGION
+REGION                    ▾ compact fact dropdown (owner correction 2026-09-11)
   All regions
   Klang Valley
   [actual outstation Delivery State names, alphabetical]
@@ -870,12 +870,16 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   Production days not set
 ```
 
-- **`PRODUCT` and `SUPPLIER` are compact fact dropdowns** (owner ruling 2026-09-11 — the
-  shared purchasing rail grammar; Manual Purchase collapses the same two plus
-  `PURCHASE PURPOSE`, and §9.2 carries the reasoning). Each control writes the same
-  single-slot section value the rows wrote, keeps the counts in its option text and wears
-  the rail's own blue active treatment when narrowed. `TO ORDER`, `ORDER TIMING`, `REGION`
-  and `SETUP TO FIX` keep their visible rows.
+- **`PRODUCT`, `SUPPLIER` and `REGION` are compact fact dropdowns** (owner ruling
+  2026-09-11, completed for `REGION` by the owner correction of the same day — the shared
+  purchasing rail grammar; Manual Purchase collapses the same shape plus `PURCHASE PURPOSE`,
+  and §9.2 carries the reasoning). All three are FACT lists that grow with the business:
+  every supplier Carres buys from and every outstation state it delivers to earns a row, and
+  as rows they pushed `SETUP TO FIX` — and on a short window `ORDER TIMING`, *what to buy
+  today* — below the fold of a 240px rail. Each control writes the same single-slot section
+  value the rows wrote, keeps the counts in its option text and wears the rail's own blue
+  active treatment when narrowed. `TO ORDER`, `ORDER TIMING` and `SETUP TO FIX` keep their
+  visible rows: they are the daily worklist, not a fact list.
 - **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
   governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
   `Issue PO` selection. One filter may be selected per section; filters from different
@@ -1044,24 +1048,28 @@ creating and reserving nothing. Every rail count — timing, Product, Supplier �
 proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a timing facet shows
 only rows satisfying both.
 
-**Columns, exactly and in this order:** Status · Proceed Date · PO No · SO No · Customer ·
-Delivery Location · Requested Delivery Date · Supplier · Deliver To · PO Delivery Date.
-`Delivery Location` sits immediately after `Customer`; `SO No` is the identity and stays sticky
-during horizontal scrolling. `Proceed Date` reads `orders.proceeded_at`: the actual date Sales
-handed the complete order to Operations. It never reads `orders.proceed_date`, the planned
-production-start date. Retired as Register columns, never to return: `Source SO` ·
-`Required For` · `SKU / configuration` · `Required` · `Stock` · `Open PO` · `Buy` ·
-`Goods Must Arrive` · `Work` · `Action` — their FACTS survive off-screen (`goodsMustArrive`
-keeps feeding the rail and Work Engine; structured actions keep feeding central Work).
+**Columns, exactly and in this reading order — owner correction 2026-09-11:** SO No · Customer ·
+Proceed Date · Requested Delivery Date · Delivery Location · Supplier · Deliver To · PO No ·
+PO Delivery Date. The row is read the way the work is read — which order, whose, when it arrived,
+when the customer wants it, where it goes, who supplies it, where the goods land, and finally the
+documents. `SO No` is the identity and stays sticky during horizontal scrolling. `Proceed Date`
+reads `orders.proceeded_at`: the actual date Sales handed the complete order to Operations. It
+never reads `orders.proceed_date`, the planned production-start date. The saved column layout key
+was bumped to `…register.v3` in the same change, because a stored arrangement would otherwise pin
+a returning operator to the retired order.
 
-- **Status is derived, never stored:** blank · `Partial` · `Ordered`, from the quantity that
-  genuinely requires purchasing (demanded minus Ready-Stock coverage) against the quantity
-  covered by a NON-CANCELLED purchase order whose CURRENT PDF version has confirmed-sent
-  evidence (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`).
-  `external_open` never counts; supplier silence changes nothing; a numbered but unsent PO shows
-  under `PO No` with blank Status; a new unsent revision invalidates older-version completeness;
-  received lineage with valid evidence stays `Ordered`; a fully Ready-Stock-covered order stays
-  visible, blank and unselectable.
+- **`Status` IS RETIRED AS A COLUMN, and the Partial/Ordered footer tallies with it.** blank ·
+  `Partial` · `Ordered` was a generic word for an arithmetic the row already showed under `PO No`
+  and in the expansion, and an operator could act on none of the three. **The derivation is
+  untouched and still governs the tick:** from the quantity that genuinely requires purchasing
+  (demanded minus Ready-Stock coverage) against the quantity covered by a NON-CANCELLED purchase
+  order whose CURRENT PDF version has confirmed-sent evidence
+  (`po_sends.kind = 'confirmed_sent'` at `COALESCE(purchase_orders.version, 1)`). `external_open`
+  never counts; supplier silence changes nothing; a numbered but unsent PO shows under `PO No`; a
+  new unsent revision invalidates older-version completeness; received lineage with valid evidence
+  refuses the tick; a fully Ready-Stock-covered order stays visible and unselectable. What the
+  word used to say, the row now says with facts: the document under `PO No`, and a checkbox that
+  is simply not offered.
 - **Visible PO attribution comes ONLY from `po_line_sources`** — never `purchase_orders.so`,
   `so_refs`, or a global SKU/supplier/customer match. `PO Delivery Date` is
   `purchase_orders.official_delivery_date`, the ORIGINAL supplier-facing date stamped at birth and
@@ -1082,8 +1090,24 @@ keeps feeding the rail and Work Engine; structured actions keep feeding central 
   guard is kept because it is the only thing standing between a future unevidenced original and a
   cell that would silently read as *nothing ordered* — but it is currently unreachable here, and
   this MASTER does not claim otherwise.
-- **Deterministic summaries:** one value prints itself; several print `2 POs` · `2 suppliers` ·
-  `Multiple`, with the exact item-to-PO/supplier/destination/date mapping in the expansion.
+- **⭐ A PARENT SUMMARY SAYS ONE THING, AND NEVER EDITS — owner correction 2026-09-11.** One
+  value prints itself; several print `2 POs` · `2 suppliers` · `Multiple`, with the exact
+  item-to-PO/supplier/destination/date mapping in the expansion. **The measured
+  first-value-plus-`+N more` presentation is retired**: it measured its own text against its own
+  width, so the visible text, the exported text and the accessible name were three different
+  answers and a narrower window silently changed what the screen said. `2 POs` opens the row's
+  own expansion, where every number is a door beside the item line it covers; a single PO still
+  links straight to Purchase Orders.
+- **`Deliver To` on the parent is READ-ONLY for every row, and it states the ISSUED document's
+  destination.** It used to BE the arrangement control — one eligible demand drew the full
+  editor, several drew a `<select>` whose own text was made transparent so a summary could be
+  painted over it. That was a summary that writes (Architecture Law B), a control whose visible,
+  keyboard and accessible values disagreed, and a PLAN presented in the same cell as a FACT. The
+  one place an unissued demand is arranged is its own row in the expansion, beside `Split`.
+- **A row with no purchase order says so ONCE, under `PO No` (`Not ordered yet`).** `Deliver To`
+  and `PO Delivery Date` describe a document; on a row that has none they stay blank rather than
+  printing the same sentence three times across one row. `Not recorded` under `PO Delivery Date`
+  keeps its own separate meaning: the document exists and its original date is not on file.
 - **Selection:** the parent checkbox is ALL of the order's eligible uncovered child demand;
   a Partial order selects only its uncovered remainder; Ordered and fully Ready-Stock rows refuse
   the tick; part-selected children render the checkbox indeterminate; the header checkbox covers
@@ -1093,21 +1117,53 @@ keeps feeding the rail and Work Engine; structured actions keep feeding central 
 exceptional → 50/50 check grouped POs → send PDFs.
 **Object/placement:** the row expand is **`GoodsMiniTable`**, the ONE child table Sales Orders,
 Delivery and Manual Purchase draw (owner ruling 2026-08-15; corrected onto this page 2026-08-24;
-widened with the optional `Covered by` · `Supplier` · `PO Delivery Date` columns 2026-08-27, and
-with an optional `PO No` column plus an optional `Unit ID` 2026-09-11 for the settled Manual
-Purchase design — a page asks for the columns it can actually answer, and siblings that do not ask
-render byte-identically). It says only what the ROW cannot: per item line, what covers it
-(`Ready Stock` · the exact PO numbers · `Not ordered yet`), existing Unit IDs allocated to the SO
-or incoming on a PO line sourced exclusively to that SO item line (read through the Sales Order
-expansion door). Shared PO lines do not imply a physical Unit allocation to any one SO. Loading
-and read failures are shown separately from `Not allocated`. It also shows the exact supplier/`Deliver To`/`PO Delivery Date`
-mapping, and the arrangement editor for lines still being bought. Batch Purchase owns no
-duplicate demand editor and no second mini-table.
-SO Batch expands each existing Unit ID into its own bordered goods row, including repeated
-SKUs, with Qty 1. Unit ID and Covered by use 13px monospace text; PO numbers remain blue
-navigation links. Selection still targets the source demand. Each Unit row shows only its own
-PO, resolved through the stock Unit's existing PO-line reference by the expansion read API.
-Missing provenance prints an absence; line-level PO arrays are never copied onto Unit rows.
+widened with the optional mapping columns 2026-08-27, and with an optional `PO No` plus an optional
+`Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
+actually answer, and siblings that do not ask render byte-identically).
+
+**⭐ ONE DEMAND ROW, THEN ITS READ-ONLY RECORDS — owner correction 2026-09-11.** The box used to
+expand one item line into N Unit rows and carry the SAME line key, selection state and destination
+editor into every one of them. A single ticked demand therefore drew N ticked boxes, and the
+`Deliver To` / `Split` editor appeared again beside each historical purchase order — a control
+offering to re-arrange a document that had already been sent. The toolbar said `1 selected` while
+the screen showed four, and the obvious "fix" — counting the visible rows as demand — would have
+turned a display defect into a double purchase.
+
+```text
+☑  SKU   Item / configuration   Qty  Ready Stock  On PO         To buy  Deliver To  Unit ID
+☑  L12…  Laveo · King · Fab 3    4        1        PO-…4827 ×2    1     ▾ + Split   —
+—   ↳                            1        —        PO-…4827       —     Carres Klang  U1-000-078
+—   ↳                            1        —        PO-…4827       —     Carres Klang  U1-000-079
+```
+
+- **Exactly one checkbox and one arrangement editor per real purchasing demand.** A Unit row is a
+  RECORD: no checkbox, no editor, its own document's destination — never the plan for whatever is
+  still to buy. A ticked demand row carries the register's own selected fill.
+- **A matched set is ONE demand across several of the customer's item lines.** It is ticked once
+  and arranged once, on the first of its lines, which names what the tick covers
+  (`With {n} more lines in this set`); its other lines are listed with their own goods and print
+  the absence in the tick column. The issue contract is unchanged — the leaf `SoBatchSelection[]`.
+- **⭐ `Covered by` IS RETIRED.** One heading answered three different questions — units drawn from
+  the shelf, documents already carrying quantity, and `Not ordered yet` — so a half-bought line
+  read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
+  front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
+  already answered · **`On PO`** each document and the quantity it carries (`PO-… ×2`) ·
+  **`To buy`** the remainder this page may still act on.
+- **Identity leads.** `SKU` then the item and its recorded configuration come before `Category` and
+  `Unit ID`, so two lines of one model are told apart by the goods rather than by position. The
+  configuration is the line's own recorded variant, never re-derived from the SKU text. Exactly one
+  column is flexible, so two expansions opened together still line up column for column.
+- Existing Unit IDs are those allocated to the SO or incoming on a PO line sourced exclusively to
+  that SO item line, read through the Sales Order expansion door. Shared PO lines do not imply a
+  physical Unit allocation to any one SO. Each Unit row shows only its own PO; missing provenance
+  prints an absence, and line-level PO arrays are never copied onto Unit rows. Loading and read
+  failures are shown separately from `Not allocated`.
+- Batch Purchase owns no duplicate demand editor and no second mini-table.
+
+**Footer — owner correction 2026-09-11.** The footer answers SCOPE: `{n} of {total} Sales Orders`,
+and the bare total when nothing is filtered. The retired `{n} Partial · {n} Ordered` tally came
+from the retired Status presentation and, inside a filtered view, read as a claim about the whole
+business. Selection is summarised once, in the toolbar, and never repeated at the bottom.
 **Exceptions:** cancelled/changed SO, stock becomes available, supplier missing, supplier date too
 late, price changed, split destination.
 **Connections:** Sales Orders, Stock, Delivery calendar, Catalog, PO.
@@ -1164,6 +1220,14 @@ is on the shelf for it*.
   Unit and presses again instead of rebuilding a selection nothing touched. Before this, an operator
   who chose five Units and read *"someone else took that Unit"* had to untick them one at a time to
   find out which — four more races.
+- **⭐ A TIMEOUT IS NOT A REFUSAL — LOCKED 2026-09-11.** A CONFIRMED refusal is the door saying
+  no: the transaction rolled back and nothing was reserved, and the section says so by name. A
+  request that never came back — a timeout, a dropped connection, a gateway error in front of the
+  Worker — says nothing at all about the transaction, which may well have COMMITTED. The section
+  must not print `No Unit was reserved.` there: it states that the result could not be confirmed,
+  RE-READS the authoritative record at once, drops the chosen set so the same button cannot be
+  pressed blind, and points the operator at the refreshed Unit IDs. Pressing again on an unknown
+  outcome is exactly how one Unit gets reserved twice.
 - **⭐ A PURCHASING TICK DIES WITH THE NUMBER IT WAS TAKEN AGAINST — LOCKED 2026-09-11.** A tick in
   the Register above is an arrangement of `To buy` units across destinations, so it is only
   meaningful against the `To buy` the operator saw. That number MOVES under an open page: this

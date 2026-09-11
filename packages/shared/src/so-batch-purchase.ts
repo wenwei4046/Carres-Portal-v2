@@ -55,15 +55,21 @@ export const SO_BATCH_PURCHASE_WORDS = {
   footerUnit: "Sales Orders",
 
   /**
-   * Column heads, in the approved order (Card 02-B, owner ruling 2026-08-27;
-   * `docs/purchasing/MASTER.md` §9.1). One row per proceeded Sales Order —
-   * `Delivery Location` sits immediately after `Customer`, and the retired
-   * heads (`Source SO` · `Required For` · `SKU / configuration` · `Required` ·
-   * `Stock` · `Open PO` · `Buy` · `Goods Must Arrive` · `Work`) never return
-   * as Register columns. Their FACTS survive off-screen: `goodsMustArrive`
-   * keeps feeding the left rail and the Work Engine.
+   * Column heads, in the approved reading order (owner correction 2026-09-11;
+   * `docs/purchasing/MASTER.md` §9.1). One row per proceeded Sales Order, read
+   * the way the work is read: which order, whose, when it arrived, when the
+   * customer wants it, where it goes, who supplies it, where the goods land,
+   * and finally the documents.
+   *
+   * `Status` is RETIRED as a column. blank · `Partial` · `Ordered` was a
+   * generic word for an arithmetic the row already showed under `PO No` and in
+   * the expansion, and an operator could act on none of the three. The
+   * ELIGIBILITY it was derived from is untouched — `soBatchOrderStatusOf` still
+   * decides which rows may be ticked — it simply stopped being a column. The
+   * other retired heads (`Source SO` · `Required For` · `SKU / configuration` ·
+   * `Required` · `Stock` · `Open PO` · `Buy` · `Goods Must Arrive` · `Work`)
+   * never return either; their FACTS survive off-screen.
    */
-  colStatus: "Status",
   colProceedDate: "Proceed Date",
   colPoNo: "PO No",
   colSoNo: "SO No",
