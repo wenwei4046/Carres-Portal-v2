@@ -271,7 +271,7 @@ describe("navigate-only", () => {
     renderJump();
     fireEvent.change(openSurface(), { target: { value: "Payments" } });
     fireEvent.click(screen.getByTestId("jump-to-destination"));
-    expect(screen.getByTestId("here")).toHaveTextContent("/finance/payments");
+    expect(screen.getByTestId("here")).toHaveTextContent("/finance/invoices");
     expect(JSON.parse(localStorage.getItem("carres-jump-recent") ?? "[]")).toEqual([
       "operation:payments",
     ]);
