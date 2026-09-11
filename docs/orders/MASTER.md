@@ -279,14 +279,19 @@ release SHA and authenticated read-only verification; no live version is inferre
 ⚠️ **What that original record did not cover:** an authenticated page walk was not performed;
 owner-only acceptance does not prohibit engineering from read-only verification. The takeover
 walk found SO-1319's positive Paid with an empty transaction list and SO-1357's saved reference
-and slip with zero Paid. These findings require the capture/evidence states described below; the **re-cut-on-resize** path was not observed end to
-end (a hidden tab delivers neither `ResizeObserver` callbacks nor `requestAnimationFrame` —
-measured — so the padding arithmetic is unit-tested and the wiring pinned by the contract suite
-instead). The takeover checked the actual 574px detail content pane: both prices, all payment
-columns, saved-only/zero evidence, failed reads, keyboard Unit evidence and PDF amount parity.
-The in-app viewport override did not change the measured 1280px window, and another browser
-was unavailable; a 390px mobile pass is therefore not claimed. The prior composition report
-identified 120px of shell overflow at 390px, but this takeover has not independently verified it.
+and slip with zero Paid. These findings require the capture/evidence states described below.
+The takeover checked the actual 574px detail content pane: both prices, all payment columns,
+saved-only/zero evidence, failed reads, keyboard Unit evidence and PDF amount parity.
+
+**Responsive evidence:** the browser viewport override was ineffective, so a temporary same-origin
+preview frame rendered the real workspace at measured 390/768/1180px widths. At 390px the
+324px goods container scrolls its 542px table internally; the saved payment facts and Paid /
+Outstanding remain visible. The PDF canvas changed from 358px to 700px to 557px and back to
+358px as the frame changed 390 → 768 → 1180 → 390, directly observing the resize/re-cut path.
+The complete 390px PDF, including its balance and signature area, was visible. Body widths
+768/1180 had no document overflow. The existing shell header still produces 120px overflow
+at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
+clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
 This
 OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
