@@ -873,6 +873,10 @@ export default function DeliveryOrdersRegister() {
               label: DO_QUEUE_LABEL[filters.queue],
               width: 210,
               chooserGroup: "Delivery",
+              /* A door states nothing, so it carries no funnel: the walk found
+                 one offering a single `(blank)` option, whose only possible
+                 effect was to hide the row the operator came to act on. */
+              filterable: false,
               accessor: (r: DoRegisterRow) => (
                 <QueueAction
                   row={r}

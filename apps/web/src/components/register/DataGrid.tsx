@@ -91,6 +91,18 @@ export type DataGridColumn<T> = {
       value the operator sees in the cell. Falls back to groupValue, then the
       cell text — never to searchValue. */
   filterValue?: (row: T) => string;
+  /**
+   * ⭐ A DOOR IS NOT A FACT (walk finding, 2026-09-11).
+   *
+   * Every data column gets a funnel, which is right for a column that STATES
+   * something. A column that carries an ACTION states nothing, so its funnel
+   * opened on a single `(blank)` option — a control whose only possible
+   * effect was to hide the row the operator had come to act on. Setting this
+   * false removes the funnel and nothing else.
+   *
+   * Default (absent) is filterable, so no existing column changes.
+   */
+  filterable?: boolean;
   /** Per-column filter UX (Commander 2026-06-18 — one unified filter spec):
       - 'date'      → quick presets (Today/This week/This month/…) + a custom
                       from→to range. `dateValue` returns the row's RAW ISO date.
@@ -2218,7 +2230,7 @@ function DataGridInner<T>({
                       ) : (
                         col.label
                       )}
-                      {col.key !== "__expand__" && col.key !== "__select__" && (
+                      {col.key !== "__expand__" && col.key !== "__select__" && col.filterable !== false && (
                         <button
                           type="button"
                           title="Filter this column"
