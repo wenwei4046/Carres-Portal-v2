@@ -401,6 +401,11 @@ export {
   supplierCreateInput,
   supplierSlug,
   type SupplierCreateInput,
+  // 0477 — an other creditor (landlord, advertiser) is Finance's row in
+  // `suppliers`; every Purchasing, Catalog and Operation list drops it.
+  OTHER_CREDITOR_KIND,
+  isOtherCreditor,
+  purchasingSuppliersOnly,
   // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
   // that quoted it; the supplier_id slot stays the routing truth.
   skuSupplierOfferSchema,
@@ -602,6 +607,13 @@ export {
   type MonthlyPlQuery,
   type TopSkusQuery,
   type RefundApplyInput,
+} from "./schemas/finance";
+
+// The read-only Finance Ledger (Journal · Trial Balance · Self-check).
+export {
+  ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery,
+  type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
 export {
@@ -1591,6 +1603,14 @@ export * from "./order-activity";
 export {
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  // 0476 — a payment method is a key; the registry lives in Settings → Payment.
+  PAYMENT_METHOD_KEY_RE,
+  paymentMethodKeySchema,
+  paymentMethodSaveInput,
+  type PaymentMethodKey,
+  type PaymentMethodRegistryRow,
+  type PaymentMoneyAccount,
+  type PaymentMethodSaveInput,
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,
@@ -2341,6 +2361,7 @@ export {
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
   soBatchOrderLineOutstandingQty,
+  soBatchPoDocumentState,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchProductCategory,
@@ -2384,6 +2405,32 @@ export {
   type SoBatchSelectionSummary,
   type AllocationCheck,
 } from "./so-batch-purchase";
+export {
+  READY_STOCK_BLOCKED_WORDS,
+  READY_STOCK_CONDITION_ABSENT,
+  READY_STOCK_CONDITION_WORDS,
+  READY_STOCK_REFUSAL_WORDS,
+  manualPurchaseReadyStockGroupSchema,
+  manualPurchaseReadyStockResponseSchema,
+  readyStockConditionWord,
+  readyStockIdentityScopeSchema,
+  readyStockLineSchema,
+  readyStockOwnershipSchema,
+  readyStockPickSchema,
+  readyStockRefusalWord,
+  readyStockReserveInputSchema,
+  readyStockReserveResultSchema,
+  readyStockResponseSchema,
+  readyStockUnitSchema,
+  type ManualPurchaseReadyStockGroup,
+  type ManualPurchaseReadyStockResponse,
+  type ReadyStockLine,
+  type ReadyStockPick,
+  type ReadyStockReserveInput,
+  type ReadyStockReserveResult,
+  type ReadyStockResponse,
+  type ReadyStockUnit,
+} from "./so-batch-ready-stock";
 export {
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
@@ -3002,6 +3049,11 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
+// surface must read it: the recorded purchase-order dates, the latest supplier
+// reply, the exact per-line shortage, and ONE arrival state over them. It
+// computes no arrival date — `expectedArrivalOf` already did, once.
+export * from "./delivery-arrival";
 
 /**
  * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,
@@ -3039,7 +3091,10 @@ export * from "./purchase-order-register";
 
 export { recordSupplierReplyInput } from "./schemas/operation";
 
-export { purchaseOrderReplyWorkItems } from "./purchase-order-register";
+export {
+  purchaseOrderReplyWorkItems,
+  purchaseOrderArrivalCheckWorkItems,
+} from "./purchase-order-register";
 
 export * from "./warehouse-inbound";
 

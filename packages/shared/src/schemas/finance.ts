@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paymentMethodKeySchema } from './order-payments';
 
 /**
  * Phase 5 — HQ Finance role inputs.
@@ -50,7 +51,11 @@ export type FinanceTopupApproveInput = z.infer<typeof financeTopupApproveInput>;
 export const financeRecordReceiptInput = z.object({
   orderId:    z.string().uuid(),
   amount:     z.number().positive().finite(),
-  method:     paymentMethodEnum,
+  /** 0476: a method KEY — a system word, an alias (`bank_transfer` → bank) or
+   *  a method from Settings → Payment. `finance_record_receipt` takes text and
+   *  the one writer decides; the old enum sent `bank_transfer`, which the
+   *  writer coerced to `other` and the ledger could not place. */
+  method:     paymentMethodKeySchema,
   reference:  z.string().min(1).max(255).nullable().optional(),
   idempotencyKey: z.string().uuid().optional(),
 }).strict();
@@ -302,3 +307,70 @@ export const refundApplyInput = z.object({
   targetOrderId: z.string().uuid(),
 }).strict();
 export type RefundApplyInput = z.infer<typeof refundApplyInput>;
+
+// ── Finance Ledger reads — GET /api/finance/ledger/* ─────────────────────────
+/**
+ * The read-only Ledger surface: Journal, Trial Balance and Self-check. Nothing
+ * here posts — the ledger is written only by `gl_post` / `gl_reverse`. Dates
+ * are the ledger's own `entry_date`, a plain `YYYY-MM-DD` day.
+ *
+ * Account codes, source keys and the search text are held to small character
+ * sets on purpose: they travel inside PostgREST filters, and inside an
+ * `or=(…)` filter a comma, a bracket or a quote would change what the filter
+ * means instead of what it looks for.
+ */
+const ledgerIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-09-10');
+
+export const ledgerAccountCode = z.string()
+  .regex(/^[0-9A-Za-z][0-9A-Za-z._-]{0,19}$/, 'Choose an account from the chart');
+
+export const ledgerSourceType = z.string()
+  .regex(/^[A-Z][A-Z0-9_]{1,63}$/, 'Choose a source from the list');
+
+export const ledgerEntriesQuery = z.object({
+  from:    ledgerIsoDate.optional(),
+  to:      ledgerIsoDate.optional(),
+  account: ledgerAccountCode.optional(),
+  source:  ledgerSourceType.optional(),
+  /** A document number or an entry number, or part of one. */
+  q:       z.string().trim().min(1).max(60)
+             .regex(/^[0-9A-Za-z _/-]+$/, 'Search by a document number or an entry number')
+             .optional(),
+  offset:  z.coerce.number().int().min(0).default(0),
+  limit:   z.coerce.number().int().min(1).max(1000).default(500),
+}).strict().refine((v) => !v.from || !v.to || v.from <= v.to, {
+  message: 'The start date is after the end date', path: ['to'],
+});
+export type LedgerEntriesQuery = z.infer<typeof ledgerEntriesQuery>;
+
+/** One entry, by its id or by its number (`JE-202609-0003`, any case). */
+export const ledgerEntryRef = z.union([
+  z.string().uuid(),
+  z.string().trim().regex(/^[0-9A-Za-z][0-9A-Za-z-]{1,39}$/, 'Use an entry number like JE-202609-0003'),
+]);
+
+/** A trial balance or a balance sheet as it stood at the end of one day.
+ *  Omitted = today in Malaysia. */
+export const ledgerAsOfQuery = z.object({
+  asOf: ledgerIsoDate.optional(),
+}).strict();
+export type LedgerAsOfQuery = z.infer<typeof ledgerAsOfQuery>;
+
+/** A profit and loss for a period, both days included. */
+export const ledgerPeriodQuery = z.object({
+  from: ledgerIsoDate,
+  to:   ledgerIsoDate,
+}).strict().refine((v) => v.from <= v.to, {
+  message: 'The start date is after the end date', path: ['to'],
+});
+export type LedgerPeriodQuery = z.infer<typeof ledgerPeriodQuery>;
+
+/** One account, line by line, with its opening and closing balance. */
+export const ledgerAccountLedgerQuery = z.object({
+  account: ledgerAccountCode,
+  from:    ledgerIsoDate,
+  to:      ledgerIsoDate,
+}).strict().refine((v) => v.from <= v.to, {
+  message: 'The start date is after the end date', path: ['to'],
+});
+export type LedgerAccountLedgerQuery = z.infer<typeof ledgerAccountLedgerQuery>;

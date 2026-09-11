@@ -410,49 +410,99 @@ governed Delivery settings door.
 There is no separate Delivery dashboard, Fleet, Trips, Regions or Delivery Returns destination.
 KPI cards do not precede the work/Register.
 
-**MONITOR — calendar first, with operational queues that open the selectable work list (owner UI
-correction 2026-09-07, overwriting the earlier `Calendar` rail row and work-list-default landing).** Monitor answers
-the operator's morning question — *what customer deliveries are planned, and which record do I
-open or act on?* — through **two projections of the SAME canonical scope rows**:
+**MONITOR — TWO NAMED VIEWS: `Work to do` leads, `Confirmed deliveries` is the calendar (owner
+ruling 2026-09-10, OVERWRITING the 2026-09-07 "calendar first" landing and the projection rule
+under it).** Monitor answers the operator's morning question — *what do I owe today, and which
+record do I open?* — and a calendar of appointments the customer has already agreed cannot answer
+it: a delivery nobody has agreed a day for is not on that calendar at all. So the page has two
+TABS, each the page's own first control, and the work list is the landing:
 
 ```
 one 50px Destination Header  ·  Monitor (no page-owned control ever enters this row)
-page-owned 240px FilterRail  ·  the COMPLETE MONTH CALENDAR fixed on top, then
-                                WORK TO DO + STATE + LOGISTICS PARTNER + DELIVERY STATUS
-                                scrolling below it
-Calendar (DEFAULT)           ·  Day / Week / Month in the page toolbar; Week is the desktop default
-                                and its six Mon–Sat columns fit without horizontal date scrolling
-Operational queue selected  ·  the standard selectable Register work list (shared DataGrid):
-                                selection ☐ · ▸ expansion · SO No · Customer · State ·
-                                Requested Delivery Date · Logistics Partner ·
-                                Confirmed Delivery · Confirmed Time · DO No ·
-                                Delivery Location · Goods · Delivery Status ·
-                                Actions — sticky identity, real horizontal scrolling
+the two top-level tabs       ·  Work to do  (DEFAULT)  ·  Confirmed deliveries
+                                each carrying its own live count
+page-owned 240px FilterRail  ·  the COMPLETE CURRENT MONTH above the COMPLETE NEXT MONTH,
+                                fixed on top, then the filter groups scrolling below it
+Work to do (DEFAULT)         ·  the standard selectable Register work list (shared DataGrid)
+                                over the picked WORK TO DO queue — `All delivery work` when
+                                the URL names none
+Confirmed deliveries         ·  Day / Week / Month in the page toolbar; Week is the desktop
+                                default and its six Mon–Sat columns fit without horizontal
+                                date scrolling
 ```
 
-**Calendar is a VIEW, never a `WORK TO DO` row.** `Day · Week · Month` stays in the page toolbar
-on BOTH projections (nothing lit while the work list shows, never on a phone). Choosing any of the
-three clears the selected work queue and every STATE / LOGISTICS PARTNER / DELIVERY STATUS pick and
-returns the right workspace to the Calendar. Choosing `All delivery work` or another work queue replaces the Calendar with the
-selectable DataGrid. `All delivery work` still contains every delivery-eligible Sales Order row,
-including rows with **no formal DO yet, no confirmed delivery date, and no Logistics Partner yet**.
-The governed entry rule below still gates the population (no cancelled orders, no orders that need
-no delivery, no row missing its minimum facts). Calendar continues to show only rows with a
-confirmed date and never places undated work into date columns.
+**THE RULED WORK-ROW ORDER (owner ruling 2026-09-10), overwriting the 2026-09-09 twelve-column
+spelling:**
 
-**THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
-region is the complete current month — never a one-week strip, never the Portal sidebar:
-month arrows move exactly one month; the selected date wears the governed blue selected
+```
+☐ · ▸ · SO No · Customer · State · Requested Delivery Date · Items ·
+Accessories & services · Expected arrival · Stock · Actions · Edit Delivery
+                                        — sticky identity, real horizontal scrolling
+```
+
+- **`Customer` carries the Logistics Partner as its inline second line** — the Constitution's one
+  permitted second line. Who carries a delivery is the operator's second question about a row and
+  it may not cost a Columns chooser.
+- **`Requested Delivery Date` carries the confirmed answer as its own second line** — the day and
+  its time, or the governed `No confirmed date`. The 2026-09-09 adjacency ruling is kept, not
+  retired: *what did the customer ask for, and has anybody agreed a day?* is still one glance.
+- **`Logistics Partner` · `Confirmed Delivery` · `Confirmed Time` · `DO No` · `Delivery
+  Location` · `Delivery Status` · `Building` · `Phone` remain REAL columns in the chooser** —
+  sortable, filterable and exported. They are not deleted; they are off the default sheet because
+  the row already answers them. **`Goods` IS retired**: its content is now two honest columns.
+- The layout storage key is bumped with the order (`workList.v3 → v4`), because a persisted
+  `order` array outranks the default and would hide the new sheet from every operator who had
+  opened this page before.
+
+**THE PROJECTION RULE IS DELETED (owner ruling 2026-09-10).** It made the view a SIDE EFFECT of the
+rail: picking `Selangor` silently replaced the calendar with a sheet, and the operator's way back
+was to notice `Clear filters`. Now:
+
+- **`Day · Week · Month` belongs to the calendar** and appears only there (never on a phone).
+- **A STATE / LOGISTICS PARTNER / DELIVERY STATUS pick NARROWS whichever view is open** and never
+  switches it; `Clear filters` clears the narrowings and stays on the view.
+- **A WORK TO DO queue belongs to `Work to do`** and opens it. The group is not drawn on the
+  calendar tab, because a queue answers a question the calendar does not ask, and picking one
+  there would change the tab out from under the operator.
+- **The URL still names the whole view in ONE param.** `?view=` holds a calendar word
+  (`day · week · month`) or a WORK TO DO queue; absent means the landing (`Work to do`,
+  `All delivery work`). Every retired spelling still answers — `calendar` · `?start=` · `?day=`
+  open the week, `delivered_proof_required` opens `Upload delivery proof`, `waiting_warehouse`
+  opens the DELIVERY STATUS filter, `?schedule=`/`?checking=` open their queue, and
+  `no_confirmed_date` and `call_customer` both open the contact queue. A URL that arrived in a
+  retired spelling is normalised to the current one on the first interaction, so an arrow press
+  cannot drop the view along with the retired param it was riding on.
+- **A tab's count is its view's whole population**, narrowed by the picks that apply to both views
+  and by neither the queue nor the visible week: a badge that changed with the queue would repeat
+  the footer and stop answering *how much is there?* from the other tab.
+
+`All delivery work` still contains every delivery-eligible Sales Order row, including rows with
+**no formal DO yet, no confirmed delivery date, and no Logistics Partner yet**. The governed entry
+rule below still gates the population (no cancelled orders, no orders that need no delivery, no row
+missing its minimum facts). `Confirmed deliveries` shows only rows with a confirmed date, says so
+on the view (`Only deliveries with a confirmed date and time appear here.`) and never places
+undated work into date columns.
+
+**THE RAIL'S TWO-MONTH CALENDAR (owner correction 2026-09-06, extended to two months by
+the owner ruling of 2026-09-10 — the single-month spelling is retired).** The rail's first,
+FIXED region is **the complete current month above the complete next month** — never a
+one-week strip, never the Portal sidebar. **ONE pair of arrows moves BOTH months by exactly
+one month**, so the pair always reads as *this month and the one after it*; there is no second
+arrow pair and no per-month navigation. The selected date wears the governed blue selected
 state; today stays distinguishable from the selection; Sundays — the non-operating day —
 stay visible in the governed muted treatment and take no click; a date holding confirmed
 deliveries carries a dot mark (shape, never colour alone); the arithmetic is real and
 locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
-pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
-independently BELOW it; scrolling them never removes the month from view. **Clicking a date opens
-that date's Day view in the right workspace** and clears the selected work queue. Clicking a day
-in the right-side Month view does the same.
+pins (`react-day-picker`, the DatePicker's own exported skin) — two months is that
+primitive's own `numberOfMonths`, never a second calendar. The filter groups scroll
+independently BELOW it; scrolling them never removes the months from view. **Clicking a date
+opens that date's Day view on `Confirmed deliveries`** (owner correction 2026-09-10 — it opens
+the calendar tab and KEEPS every STATE / LOGISTICS PARTNER / DELIVERY STATUS narrowing, because a
+pick applies to whichever view is open and dropping it would answer a question nobody asked).
+Clicking a day in the right-side Month view does the same. There is no instructional caption above
+the months: two calendars with a selected date need no sentence telling the operator to pick one.
 
-A work queue (`All delivery work` · `No logistics picked` · `No confirmed date` · `Overdue` ·
+A work queue (`All delivery work` · `No logistics picked` · `Call customer` · `Overdue` ·
 `Failed Delivery` · `Upload delivery proof`), a STATE row, a LOGISTICS PARTNER row or a DELIVERY
 STATUS row is an operational question, and its answer is the Register grammar every other module
 answers with — **never a full-width card wall**. The ▸ expansion has exactly one job: the row's
@@ -463,44 +513,122 @@ list says `No deliveries` / `No matching deliveries.`, the assignment door count
 and a Journey row prints its own route (`Klang WH → JB transit`) with no `Leg` prefix — the leg
 number rides only the Edit Delivery URL.
 
-**THE CHASE — `Requested Delivery Date` vs `Confirmed Delivery` (owner correction 2026-09-09),
-overwriting the column order above's earlier `Delivery Location`-first spelling and the Delivery
-Orders register's `Requested Delivery Date` chooser default.** A delivery with no confirmed date is
-a customer waiting for an answer, and the operator's four questions have four answers ON THE ROW:
+**THE CHASE IS `Call customer` — the contact work, with its own deadline (owner ruling
+2026-09-10, renaming the 2026-09-09 `No confirmed date` QUEUE and keeping every rule under it).**
+A delivery with no confirmed date is a customer waiting for an answer, and waiting is not a
+schedule: **Logistics contacts the customer at least THREE WORKING DAYS before the
+customer-requested delivery date, whether or not the goods are in.** So the queue is named after
+the job, and the job carries a date.
 
 ```
 What date did the customer request?   Requested Delivery Date — Sales Orders' fact, READ-ONLY here
-Has anyone confirmed a date?          Confirmed Delivery + Confirmed Time — Delivery's own facts
-Who must be contacted?                Logistics Partner, and the Actions cell's call line
+Has anyone confirmed a date?          the same cell's second line, or `No confirmed date`
+When is the conversation DUE?         Call by {date} — T−3, the shared `chase` step
+Who must be contacted?                Logistics Partner (the Customer cell's second line) and
+                                      the Actions cell's call line
 Where is the confirmed date recorded? Edit Delivery, the one Delivery-owned editor
 ```
 
-- The two dates are **never the same column and never two names for one fact**. `DO date` is the
-  day the document issued and is neither of them.
-- **`No confirmed date` lists earliest `Requested Delivery Date` first**; a row with no requested
+- **The rows did not change; the NAME did.** `No confirmed date` stays the CELL's absence word — it
+  is the fact — and the retired `?view=no_confirmed_date` still opens this queue beside its new
+  `call_customer` spelling.
+- **THE CONTACT DEADLINE IS THE SHARED `chase` STEP AND NOTHING NEW** (`deliveryStepDueIso`, lead
+  `logistics_call_working_days` = 3 since 0342, on the Mon–Sat delivery week with the injected
+  Malaysian holidays). The Orders list, the booking brief and Monitor read the ONE arithmetic, so
+  they cannot name two different days. A customer who has named no day has NO deadline and is
+  never late — a step with no anchor cannot be. **A late contact KEEPS the deadline it missed**
+  (`Late — was due {date}`, the portal's own late spelling): rolling it forward would erase the
+  only evidence that anything went wrong.
+- **THE CONTACT WEEK (owner ruling 2026-09-10).** Under `Call customer` — and under no other
+  queue — a Monday-to-Saturday strip lists the six operating days with the COUNT of calls due on
+  each, its own previous/next arrows, and the caption `Contact deadlines — not supplier or
+  delivery dates`. Picking a day narrows the list to that deadline; picking it again unpicks. **An
+  `Overdue` chip stands beside the six days with its own live count and answers across every
+  date**, so navigating to a quiet Thursday can never hide calls that are already late. The strip
+  never appears on another queue: a hidden second narrowing would make a complete-looking list
+  incomplete.
+- **A CONTACT ATTEMPT IS NOT A CONFIRMED BOOKING, AND SILENCE IS NOT AN ANSWER.** Nothing on this
+  surface infers `Waiting for customer reply` — or any other customer answer — from a missing
+  confirmed date. The row states the recorded absence and the recorded deadline; the outcome of a
+  call is recorded in Edit Delivery. **The supplier T−1 arrival check stays Purchasing's own work**
+  (`purchasing.confirm_tomorrows_delivery`, PO Duty's Work row) and never merges into this queue.
+- **`Call customer` lists earliest `Requested Delivery Date` first**; a row with no requested
   date — including `To be confirmed` — sorts LAST and prints the governed absence, never a
   substitute date. Every other queue keeps the canonical row order: re-ranking work that is not a
   chase by a Sales date would move rows for a reason the queue does not mean.
-- **`Actions` is the row's one next act**, derived from recorded facts only:
-  `no Logistics Partner → Assign logistics` (the same governed door as the bulk journey, for ONE
-  delivery) · `partner but no confirmed date → Call {Logistics Partner} — confirm delivery date`
-  (the COPY-STANDARD row line, the name always from the data) then `Edit Delivery` · `everything
-  agreed → Edit Delivery`. **No carrier and no employee name is ever hard-coded**; staff identity,
-  where a Delivery surface needs one, comes from the shared Staff & Duties resolver.
-- **`Edit Delivery` carries the workspace back.** The editor opens with the queue and every active
-  narrowing on its URL and returns to exactly that list after `Save Delivery`, so the operator
-  watches the row leave `No confirmed date` and reappear on the Calendar day the partner agreed —
-  it is not merely told that it did. Only a portal path is honoured.
+- **`Actions` is the row's one next act**, derived from recorded facts only, in this precedence:
+  `evidence still owed on a recorded delivery → Upload delivery photo and/or Upload signed
+  Delivery Order` · `no Logistics Partner → Assign logistics` (the same governed door as the bulk
+  journey, for ONE delivery) · `partner but no confirmed date → Call {Logistics Partner} — confirm
+  delivery date` · `everything agreed → the row's status`. **A RECORDED RESULT OUTRANKS AN
+  UNASSIGNED PARTNER** (correction 2026-09-10): a trip that already happened cannot have
+  `Assign logistics` as its next act, and the old order asked an operator to book a carrier for
+  goods the customer was already sitting on. **The QUEUE is named after the customer conversation
+  that must happen; the ROW names who the operator actually dials** — §2's operating model is that
+  the Logistics Partner arranges the day with the customer, so the governed dictionary line
+  `Call {logistics} — confirm delivery date` is unchanged. **No carrier and no employee name is
+  ever hard-coded**; staff identity, where a Delivery surface needs one, comes from the shared
+  Staff & Duties resolver.
+- **`Edit Delivery` is the row's LAST cell and its own column**, so the one Delivery-owned write
+  door is always in the same place, and it **carries the workspace back**: the editor opens with
+  the queue and every active narrowing on its URL and returns to exactly that list after
+  `Save Delivery`, so the operator watches the row leave `Call customer` and reappear on the
+  calendar day the partner agreed — it is not merely told that it did. Only a portal path is
+  honoured.
 - **The phone's work list is a LIST, not the sheet squeezed.** Below the phone breakpoint a work
   queue renders one card per delivery carrying `SO No · Customer · Requested Delivery Date ·
-  Confirmed Delivery · Logistics Partner` and the same Actions act, with its own visible search
-  box and the sheet's `{n} of {m} deliveries` footer — **none of those three facts may require a
-  Columns chooser to see**. Bulk selection stays a desk act: a phone assigns one delivery at a
-  time, through the same governed door.
-- **The Calendar boundary is unchanged.** An unconfirmed delivery never enters a Day, Week or
-  Month date cell, cards stay read-only, and the chase happens in `No confirmed date`. The empty
-  week keeps its real `{n} deliveries need a confirmed date.` count and its `Open No confirmed
-  date` door.
+  Confirmed Delivery · Logistics Partner`, the same Actions act **and the same contact deadline**,
+  with its own visible search box and the sheet's `{n} of {m} deliveries` footer — **none of those
+  facts may require a Columns chooser to see**. The contact week keeps readable day chips and
+  scrolls rather than squeezing six dates to nothing; its caption drops, because the strip's own
+  accessible label carries the same fact. Bulk selection stays a desk act: a phone assigns one
+  delivery at a time, through the same governed door.
+- **The calendar boundary is unchanged.** An unconfirmed delivery never enters a Day, Week or
+  Month date cell, cards stay read-only, and the chase happens in `Call customer`. The empty week
+  keeps its real `{n} deliveries need a confirmed date.` count and its `Open No confirmed date`
+  door.
+
+**THE ROW'S GOODS ARE TWO CELLS, AND THE ARRIVAL IS A DATE (owner ruling 2026-09-10).** A
+logistics operator plans a truck, and *what is on it* and *what the crew must do there* are two
+different questions that one `Goods` summary answered badly.
+
+- **`Items`** prints the MAIN goods — the catalog's own resolved name, which already carries the
+  size (`Trion · Queen`), then `× {qty}` — one line per goods line. A line the register cannot
+  cover names the EXACT missing pieces (`— 2 short`). An UNRECOGNISED line travels with the main
+  goods, never under the pillows: it is a physical thing that has to be on the truck.
+- **`Accessories & services`** is its own cell: recognised accessories with their own shortage,
+  then each service (`Service · Dispose old mattress`) by its **catalog name, never its key**, and
+  finally the site the crew meets — `Floor 3 · No lift`, from Sales Orders' own answers. A lift
+  nobody was asked about prints nothing: it is a three-state fact. `None` when the order has
+  neither.
+- **`Expected arrival`** and **`Stock`** are SEPARATE columns, because *when do the goods come?*
+  and *are they here?* are two answers and one cell blurred them. `Stock` reads `Ready` /
+  `Not ready` over the WHOLE committed shipment with its total shortage — a delivery that arrives
+  without the pillows the customer paid for was not ready, and whole-order readiness is never
+  redefined as main-items-only readiness. **A SERVICE is not part of what the register can be
+  short of**: it moves no Unit, and the test that excludes it is the ENTRY RULE's own, so what
+  makes an order delivery work and what makes it ready are decided once.
+- **THE DATE IS THE PRIMARY INFORMATION.** `Expected arrival` prints the effective supplier date
+  first and names whose date it is underneath (`Not confirmed` · `Same as PO` ·
+  `Earlier than the PO date` · `Delayed` · `Date reported`). **When a supplier revises the date,
+  the ORIGINAL stays beside the new one** (`PO Delivery Date {date}`) — a delay icon with no new
+  date tells the operator that something is wrong and nothing about when the goods now come.
+  **When no revised date has been given, the truthful unresolved state prints**
+  (`The factory has not given a date` · `Supplier delivery date passed`) and the responsible work
+  stays open on Purchasing's own screen. Nothing is invented and nothing implies a confirmation.
+- **ONE ARITHMETIC, AND IT IS NOT A NEW ONE** (Law D). The dates are `purchase_orders.eta_date` —
+  `expectedArrivalOf`'s production-plus-transit result on the factory's own week and the office
+  week — the immutable `official_delivery_date` (0428) and the latest `po_supplier_promises`
+  reply, read through the shared `deliveryArrivalStateOf`. The precedence
+  (`reply → original → prediction`, then the LATEST across the purchase orders still owing the
+  order's goods) is exactly migration 0432's own `purchasing_project_line_etas`, so Purchasing's
+  projection and Delivery's reading cannot drift. The shortage is `deliveryStockReadinessOf` over
+  the register rows, matched under the same `normalizeSkuKey` the unit allocator applies.
+- **COLOUR IS RESTRAINED AND LOCAL.** Exactly two supplier states wear amber — a date gone by
+  without goods, and an open purchase order owing goods with no date at all. **Red is reserved for
+  overdue LOGISTICS work** — the late customer conversation — and is applied to that line, never to
+  a row or a page. A supplier who answers EARLY is doing the right thing and is not painted. Every
+  icon carries a real accessible label and a tooltip: colour is never the only communication.
 
 `Upload delivery proof` contains recorded delivered results whose required evidence is incomplete
 — the Delivery Orders register's OWN missing-evidence arithmetic (`missingDeliveryProofOf`: the
@@ -531,7 +659,9 @@ row is unassigned**; a selected row that already carries a partner turns the act
 governed **`Change logistics`** (reason + append-only history), one row at a time — an
 uncontrolled batch replacement of assigned partners does not exist. `Edit Delivery` is offered
 for exactly ONE selected row, never many. Every combined narrowing prints above the work list
-(`No confirmed date · No logistics picked`) with `Clear filters`, and every pick rides the URL.
+(`Call customer · No logistics picked`) with `Clear filters`, and every pick rides the URL. The
+summary names only the picks that are ACTUALLY narrowing the view in front of the operator, so a
+WORK TO DO queue is never printed above a calendar it does not narrow.
 
 **The CALENDAR still writes nothing** — no inline edit, upload, result, proof review, selection
 or drag/drop reschedule. Every card is ONE accessible link: an issued DO opens the formal
@@ -539,8 +669,8 @@ Delivery Order object; a scope without one says `No delivery order yet` and open
 Delivery. There is no `New DO`, `Issue`, `Release` or `Approve` — §3's ruling stands: **the
 SYSTEM issues the Delivery Order** when the governed gate becomes true. A fully empty visible
 range shows ONE spanning state — `No deliveries are scheduled from {first} to {last}.`, the
-REAL `{n} deliveries need a confirmed date.` count when true, and the `Open No confirmed date`
-door — never the same absence repeated in every column; an individually empty day says
+REAL `{n} deliveries need a confirmed date.` count when true, and its door into the contact
+queue — never the same absence repeated in every column; an individually empty day says
 `No deliveries`.
 
 - **DAY / WEEK / MONTH (owner correction 2026-09-07).** Desktop defaults to `Week` and may switch
@@ -551,7 +681,8 @@ door — never the same absence repeated in every column; an individually empty 
   delivery proof` queues would list, one arithmetic) and `No logistics picked {n}` (only when
   > 0) — never full delivery cards; a date with nothing prints only its number; Sunday stays
   visible, muted and unclickable; a Sunday-recorded delivery is still counted; the toolbar's
-  `Previous month` / `Next month` replace the whole month; clicking a date opens `Day`. A month
+  `Previous month` / `Next month` replace the whole month; clicking a date opens `Day`. The
+  three controls belong to this tab and appear nowhere else (owner ruling 2026-09-10). A month
   holding nothing shows the same ONE spanning state as an empty week. `Week` shows the week-aligned Mon–Sat containing
   the selected date, fitting its
   available width — no unlimited horizontal date scrolling; previous/next REPLACES the whole
@@ -597,8 +728,11 @@ cards the other groups already narrowed (Architecture Law D):
   **`All delivery work`** (every open row, the unfiltered selectable
   listing) · **`No logistics picked`** (a PRIMARY work queue, visible without scrolling past
   STATE and the partner rows — never buried in, or duplicated under, LOGISTICS PARTNER) ·
-  `No confirmed date` · **`Overdue`** · `Failed Delivery` · `Upload delivery proof` — never
-  `Calendar`, `Today` or `Tomorrow`; every queue comes from recorded facts, never a clock inference.
+  **`Call customer`** (the T−3 contact work — the 2026-09-10 rename of `No confirmed date`,
+  whose rows and URL are unchanged) · **`Overdue`** · `Failed Delivery` ·
+  `Upload delivery proof` — never `Calendar`, `Today` or `Tomorrow`; every queue comes from
+  recorded facts, never a clock inference. **The group belongs to the `Work to do` tab and is not
+  drawn on `Confirmed deliveries`** (owner ruling 2026-09-10).
 - **`STATE`** (owner correction 2026-09-07, the heading formerly `REGION`) — the direct state
   names ruled below, straight from the data, no `All …` row: picking again unpicks, and `Clear
   filters` above the list clears everything. A STATE pick combines with a work queue

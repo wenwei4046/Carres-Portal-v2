@@ -85,6 +85,96 @@ describe("GET /api/finance/payment-settings", () => {
   });
 });
 
+describe("the payment method registry (0476)", () => {
+  const REGISTRY = [
+    { method: "bank", label: "Bank transfer", account_code: "1120", account_name: "Bank", active: true, sort: 1 },
+  ];
+  const ACCOUNTS = [
+    { code: "1110", name: "Cash in hand" },
+    { code: "1120", name: "Bank" },
+    { code: "1130", name: "Card and online settlement" },
+  ];
+  async function get(role: string) {
+    return app.fetch(new Request("http://t/api/finance/payment-settings/methods", {
+      headers: { Authorization: `Bearer ${await makeJwt(role)}` },
+    }), env);
+  }
+  async function save(role: string, body: unknown) {
+    return app.fetch(new Request("http://t/api/finance/payment-settings/method/save", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt(role)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }), env);
+  }
+
+  it.each(["operation", "finance", "principal"])("lists methods and money accounts for %s", async (role) => {
+    const rpc = vi.fn().mockImplementation(async (name: string) => ({
+      data: name === "payment_method_registry" ? REGISTRY : ACCOUNTS, error: null,
+    }));
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await get(role);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ methods: REGISTRY, money_accounts: ACCOUNTS });
+    expect(rpc).toHaveBeenCalledWith("payment_method_registry");
+    expect(rpc).toHaveBeenCalledWith("payment_method_money_accounts");
+  });
+  it("refuses a dealer before any read", async () => {
+    expect((await get("dealer")).status).toBe(403);
+    expect(userClient).not.toHaveBeenCalled();
+  });
+  it("a failed read is an error, never an empty list", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "down" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    expect((await get("finance")).status).toBe(500);
+  });
+  it("adding a method sends a null key, the name and the money account", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { method: "grab_pay", label: "Grab Pay" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await save("principal", { method: null, label: " Grab Pay ", accountCode: "1130" });
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("payment_method_save", {
+      p_method: null, p_label: "Grab Pay", p_account_code: "1130", p_active: true,
+    });
+  });
+  it("renaming and switching off keeps the key", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { method: "grab_pay" }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    await save("principal", { method: "grab_pay", label: "GrabPay", accountCode: "1120", active: false });
+    expect(rpc).toHaveBeenCalledWith("payment_method_save", {
+      p_method: "grab_pay", p_label: "GrabPay", p_account_code: "1120", p_active: false,
+    });
+  });
+  it("an empty name is refused before SQL", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await save("principal", { label: "  ", accountCode: "1130" });
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("the SQL refusals map: manager gate → 403, not a money account → 422", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { code: "42501", message: "forbidden" } })
+      .mockResolvedValueOnce({ data: null, error: { code: "22023", details: "account_not_money",
+        message: "account 4100 is not a money account — choose cash, a bank account or card and online settlement" } });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    expect((await save("operation", { label: "Grab Pay", accountCode: "1130" })).status).toBe(403);
+    const res = await save("principal", { label: "Grab Pay", accountCode: "4100" });
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { message: string }).message).toContain("not a money account");
+  });
+  it("the Active switch accepts any registered key, not six words", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { method: "grab_pay", active: false }, error: null });
+    vi.mocked(userClient).mockReturnValue({ rpc } as never);
+    const res = await app.fetch(new Request("http://t/api/finance/payment-settings/method", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await makeJwt("principal")}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ method: "grab_pay", active: false }),
+    }), env);
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("payment_set_method_active", { p_method: "grab_pay", p_active: false });
+  });
+});
+
 describe("payment templates (0435)", () => {
   it("save maps to the manager-gated versioning door", async () => {
     const sb = { rpc: vi.fn().mockResolvedValue({ data: { version: 2 }, error: null }) };

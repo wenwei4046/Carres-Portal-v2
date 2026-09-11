@@ -30,6 +30,9 @@ import {
   transferReadyInputSchema,
   warehousePickInput,
   type AllocationUnit,
+  type PoArrival as OrderPoArrival,
+  type PoArrivalReply as OrderPoArrivalReply,
+  type AllocatedUnit as OrderAllocatedUnit,
   type CommitmentBundle,
   normalizeSkuKey,
 } from "@carres/shared";
@@ -42,6 +45,7 @@ import { storageBlock } from "../../lib/storage-gate";
 import { userClient } from "../../lib/supabase";
 
 import { skuCategories, storageSkuCategories } from "../../lib/sku-categories";
+import { chunk } from "../../lib/purchase-demand-read";
 import type { AppEnv } from "../../types";
 
 /**
@@ -418,11 +422,24 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
   ];
   const poSkusBySo = new Map<number, Set<string>>();
   const poNumbersBySo = new Map<number, Set<string>>();
+  /* DELIVERY MONITOR (2026-09-11) — one entry per purchase order serving this
+     sales order, carrying only RECORDED dates. `plannedIso` is our own
+     production-plus-transit prediction, `originalIso` the immutable date the
+     supplier was given, `reply` the latest recorded supplier answer. The
+     browser decides what that means; this route never says "delayed". */
+  const poArrivalsBySo = new Map<number, OrderPoArrival[]>();
   if (soNumbers.length > 0) {
     const inList = soNumbers.join(",");
     const { data: pos, error: e_pos } = await sb
       .from("purchase_orders")
-      .select("id, so, so_refs")
+      // DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts the delivery work
+      // list needs, and no derived word: the PO's own status, OUR
+      // production-plus-transit prediction (`eta_date` — `expectedArrivalOf`'s
+      // persisted result) and the immutable original the supplier was actually
+      // given (`official_delivery_date`, 0428). The latest supplier REPLY is
+      // read below. Nothing is CLASSIFIED here: the states and their words
+      // belong to ONE shared module the browser reads (Law D).
+      .select("id, so, so_refs, status, eta_date, official_delivery_date")
       .or(`so.in.(${inList}),so_refs.ov.{${inList}}`);
     if (e_pos) {
       const m = mapPgError(e_pos);
@@ -432,7 +449,10 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
     if (poRows.length > 0) {
       const { data: poLines, error: e_lines } = await sb
         .from("purchase_order_lines")
-        .select("po_id, sku")
+        /* `qty`/`received_qty` say whether the PO still OWES units: a fully
+           received purchase order has no arrival left to report, and an
+           arrival date on one would be history dressed as a plan. */
+        .select("po_id, sku, qty, received_qty")
         .in(
           "po_id",
           poRows.map((p: { id: string }) => p.id),
@@ -442,15 +462,75 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
         return c.json(m.body, m.status);
       }
       const skusByPo = new Map<string, string[]>();
+      /* The SKUs this PO still owes — the only ones an arrival date is about. */
+      const owedSkusByPo = new Map<string, Set<string>>();
       for (const l of poLines ?? []) {
-        const row = l as { po_id: string; sku: string | null };
+        const row = l as {
+          po_id: string;
+          sku: string | null;
+          qty?: number | null;
+          received_qty?: number | null;
+        };
         if (!row.sku) continue;
         const arr = skusByPo.get(row.po_id);
         if (arr) arr.push(row.sku);
         else skusByPo.set(row.po_id, [row.sku]);
+        if (Number(row.qty ?? 0) > Number(row.received_qty ?? 0)) {
+          const owed = owedSkusByPo.get(row.po_id) ?? new Set<string>();
+          owed.add(row.sku);
+          owedSkusByPo.set(row.po_id, owed);
+        }
+      }
+
+      /* ── THE LATEST SUPPLIER REPLY, PER PURCHASE ORDER ────────────────────
+         `po_supplier_promises` is append-only and has no "latest" an embed
+         could traverse, so it is read the same way the Purchase Orders
+         register reads it: one chunked query, newest first, first row wins.
+         Only `tomorrow_delivery` — the answer about the ARRIVAL date. A
+         per-line balance promise belongs to Purchasing's own screen. */
+      const latestReplyByPo = new Map<string, OrderPoArrivalReply>();
+      /* A purchase order id is a short document number, so the batch is sized
+       * for the WORKER's subrequest budget rather than for URL length — a
+       * 500-row page must not spend dozens of round trips on one column. */
+      for (const batch of chunk(poRows.map((p: { id: string }) => p.id), 100)) {
+        const { data: promises, error: e_promise } = await sb
+          .from("po_supplier_promises")
+          .select("po_id, answer, about_date, previous_date, new_date, recorded_at")
+          .eq("kind", "tomorrow_delivery")
+          .in("po_id", batch)
+          .order("recorded_at", { ascending: false });
+        if (e_promise) {
+          const m = mapPgError(e_promise);
+          return c.json(m.body, m.status);
+        }
+        for (const p of promises ?? []) {
+          const row = p as {
+            po_id: string;
+            answer: string;
+            about_date: string | null;
+            previous_date: string | null;
+            new_date: string | null;
+            recorded_at: string;
+          };
+          if (latestReplyByPo.has(row.po_id)) continue;
+          latestReplyByPo.set(row.po_id, {
+            answer: row.answer,
+            aboutIso: row.about_date,
+            previousIso: row.previous_date,
+            newIso: row.new_date,
+            recordedAt: row.recorded_at,
+          });
+        }
       }
       for (const p of poRows) {
-        const po = p as { id: string; so: number | null; so_refs: number[] | null };
+        const po = p as {
+          id: string;
+          so: number | null;
+          so_refs: number[] | null;
+          status?: string | null;
+          eta_date?: string | null;
+          official_delivery_date?: string | null;
+        };
         const skus = skusByPo.get(po.id) ?? [];
         if (skus.length === 0) continue;
         // ONE purchase order may serve several sales orders (the consolidated
@@ -465,16 +545,96 @@ operationOrdersRouter.get("/", requireOperation, async (c) => {
           const set = poSkusBySo.get(so) ?? new Set<string>();
           for (const s of skus) set.add(s);
           poSkusBySo.set(so, set);
+          const arrivals = poArrivalsBySo.get(so) ?? [];
+          arrivals.push({
+            poId: po.id,
+            status: po.status ?? null,
+            owedSkus: [...(owedSkusByPo.get(po.id) ?? [])],
+            plannedIso: po.eta_date ?? null,
+            originalIso: po.official_delivery_date ?? null,
+            reply: latestReplyByPo.get(po.id) ?? null,
+          });
+          poArrivalsBySo.set(so, arrivals);
         }
       }
     }
   }
 
+  // ── DELIVERY MONITOR (2026-09-11) · WHAT IS PHYSICALLY ALLOCATED ──────────
+  //
+  // The delivery work list must say whether a delivery's goods are IN and, when
+  // they are not, exactly how many pieces are missing. That is Stock's own
+  // per-Unit register, and the ONE arithmetic over it is `resolveUnitAllocation`
+  // (Card 2) — the same function the order detail, the completion reader and
+  // the booking brief already call. This block only READS the units in one
+  // batched page-wide query so the list does not ask per order; the counting is
+  // the shared resolver's, in the browser, over the very same input shape.
+  //
+  // Two queries rather than one `or`: a reserved unit is matched by its
+  // `reserved_ref` (`SO-1234`) and a sold one by `sold_order_id`, and chunked
+  // `.in()` keeps both URLs inside the proxy's limit (the 78-value lesson in
+  // `purchase-demand-read`).
+  const allocatedUnitsByOrder = new Map<string, OrderAllocatedUnit[]>();
+  {
+    const orderIds = orders
+      .map((o: { id?: string }) => o.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+    const soRefByNumber = new Map<string, string>();
+    for (const o of orders as { id?: string; so?: number | null }[]) {
+      if (typeof o.so === "number" && o.id) soRefByNumber.set(`SO-${o.so}`, o.id);
+    }
+    const push = (orderId: string, unit: OrderAllocatedUnit) => {
+      const rows = allocatedUnitsByOrder.get(orderId) ?? [];
+      rows.push(unit);
+      allocatedUnitsByOrder.set(orderId, rows);
+    };
+    /* `SO-1234` is nine characters; 200 of them is a 2KB URL, well inside the
+     * proxy limit, and it keeps a 500-row page to three round trips. */
+    for (const batch of chunk([...soRefByNumber.keys()], 200)) {
+      if (batch.length === 0) continue;
+      const { data: reserved, error: e_reserved } = await sb
+        .from("ops_stock_items")
+        .select("sku, qty, reserved_ref")
+        .eq("status", "reserved")
+        .in("reserved_ref", batch);
+      if (e_reserved) {
+        const m = mapPgError(e_reserved);
+        return c.json(m.body, m.status);
+      }
+      for (const u of reserved ?? []) {
+        const row = u as { sku: string | null; qty: number | null; reserved_ref: string | null };
+        const orderId = row.reserved_ref ? soRefByNumber.get(row.reserved_ref) : undefined;
+        if (!orderId || !row.sku) continue;
+        push(orderId, { sku: row.sku, status: "reserved", qty: row.qty ?? 1 });
+      }
+    }
+    /* An order id is a 36-character UUID; 100 of them is a 4KB URL. */
+    for (const batch of chunk(orderIds, 100)) {
+      if (batch.length === 0) continue;
+      const { data: sold, error: e_sold } = await sb
+        .from("ops_stock_items")
+        .select("sku, qty, sold_order_id")
+        .eq("status", "sold")
+        .in("sold_order_id", batch);
+      if (e_sold) {
+        const m = mapPgError(e_sold);
+        return c.json(m.body, m.status);
+      }
+      for (const u of sold ?? []) {
+        const row = u as { sku: string | null; qty: number | null; sold_order_id: string | null };
+        if (!row.sold_order_id || !row.sku) continue;
+        push(row.sold_order_id, { sku: row.sku, status: "sold", qty: row.qty ?? 1 });
+      }
+    }
+  }
+
   return c.json({
-    orders: orders.map((o: { so?: number | null }) => ({
+    orders: orders.map((o: { id?: string; so?: number | null }) => ({
       ...o,
       po_skus: [...(poSkusBySo.get(o.so ?? -1) ?? [])],
       po_numbers: [...(poNumbersBySo.get(o.so ?? -1) ?? [])],
+      po_arrivals: poArrivalsBySo.get(o.so ?? -1) ?? [],
+      allocated_units: allocatedUnitsByOrder.get(o.id ?? "") ?? [],
     })),
   });
 });
@@ -1100,12 +1260,12 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const [{ data: pos, error: posErr }, { data: poLines, error: poLinesErr }, { data: units, error: unitsErr }] = await Promise.all([
     poIds.length ? sb.from("purchase_orders").select("id, destination_id").in("id", poIds) : Promise.resolve({ data: [], error: null }),
     poIds.length ? sb.from("purchase_order_lines").select("po_id, sku, qty, destination_id").in("po_id", poIds) : Promise.resolve({ data: [], error: null }),
-    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
+    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id, reserved_order_line_id, identity_scope").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
   ]);
   const secondError = posErr ?? poLinesErr ?? unitsErr;
   if (secondError) { const m = mapPgError(secondError); return c.json(m.body, m.status); }
 
-  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null };
+  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null; reserved_order_line_id?: string | null; identity_scope?: string | null };
   const unitRows = (units ?? []) as UnitRow[];
   for (const unit of unitRows) {
     if (unit.unit_code && unit.po_line_id) poLineByUnit.set(unit.unit_code, unit.po_line_id);
@@ -1137,16 +1297,62 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
 
   const poDestination = new Map(((pos ?? []) as Array<{ id: string; destination_id: string }>).map((p) => [p.id, p.destination_id]));
   const poByLine = new Map(threadRows.map((t) => [t.order_line_id, t.po_id]));
+  // ⭐ THE STORED BINDING FIRST — 0471, applied to this read 2026-09-11.
+  //
+  // `ops_stock_items.reserved_order_line_id` is the exact item line a Unit
+  // answers, and the Ready Stock door has written it since 0471. This fan-in
+  // ignored it and grouped every reserved/sold Unit of the order by NORMALIZED
+  // SKU, so a Sales Order with two lines of one SKU — SO-1251, SO-1207 and
+  // SO-1246 carry exactly that — printed the SAME Unit IDs under BOTH lines.
+  // That is a row position answering a question the database already answers.
+  //
+  // A bound Unit now appears under its OWN line and nowhere else. A Unit with
+  // no binding (a pre-0471 reservation) keeps the SKU reading, so nothing is
+  // lost — but it is reported as such through `unitLines`, which carries the
+  // stored value and `null` where there is none. A screen may then say
+  // "this Unit answers this line" and "this Unit belongs to the order, and
+  // which line it answers is not recorded" as the two different facts they are,
+  // instead of printing an inference as evidence.
+  const unitLines: Record<string, string | null> = {};
+  const boundUnitsByLine = new Map<string, string[]>();
   const unitIdsBySku = new Map<string, string[]>();
   for (const unit of unitRows) {
     if (!unit.unit_code) continue;
+    const boundLine = unit.reserved_order_line_id ?? null;
+    unitLines[unit.unit_code] = boundLine;
+    if (boundLine) {
+      boundUnitsByLine.set(boundLine, [...(boundUnitsByLine.get(boundLine) ?? []), unit.unit_code]);
+      continue;
+    }
     const key = normalizeSkuKey(unit.sku) || unit.sku;
     unitIdsBySku.set(key, [...(unitIdsBySku.get(key) ?? []), unit.unit_code]);
+  }
+  // ⭐ AN INCOMING UNIT DECLARES ITS LINE — it does not leave the map and let a
+  // reader infer one from its own absence (owner correction 2026-09-11).
+  //
+  // `exclusive` above already proved the fact: every `po_line_sources` row on
+  // that purchase-order line names THIS order and THIS item line, so the
+  // document evidences the binding even though `reserved_order_line_id` is
+  // still null on goods that have not arrived. Writing it into `unitLines` is
+  // what makes the reader's rule safe: a Unit that is ABSENT from this map is
+  // a Unit nothing evidenced, and absence can no longer be read as proof.
+  for (const [lineId, codes] of incomingByLine) {
+    for (const code of codes) unitLines[code] = lineId;
+  }
+  // ⛔ A COUNTED ROW IS NOT A UNIT (0453, `unit-identity.ts`). The reserved/sold
+  // read is not scoped, so a bulk row's technical `QTY-` key can reach
+  // `unitIds` — where a `Unit ID` heading would present a database key as an
+  // identity. The scope rides the wire so no reader has to guess from a shape.
+  const unitScopes: Record<string, string> = {};
+  for (const unit of unitRows) {
+    if (unit.unit_code) unitScopes[unit.unit_code] = unit.identity_scope ?? "unit";
   }
   const purchaseLines = (poLines ?? []) as Array<{ po_id: string; sku: string; qty: number; destination_id: string | null }>;
   return c.json({
     defaultDeliverTo,
     unitCoverage,
+    unitLines,
+    unitScopes,
     place,
     lines: ((lines ?? []) as Array<{ id: string; sku: string; qty: number }>).map((line) => {
       const poId = poByLine.get(line.id);
@@ -1169,6 +1375,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
         lineId: line.id,
         sku: line.sku,
         unitIds: [...new Set([
+          ...(boundUnitsByLine.get(line.id) ?? []),
           ...(unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? []),
           ...(incomingByLine.get(line.id) ?? []),
         ])].sort(),

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
@@ -11,6 +12,15 @@ import FinanceRefunds from "./FinanceRefunds";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
+import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
+import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
+// The read-only Finance Ledger — three destinations, three nav rows.
+import LedgerJournal from "./ledger/LedgerJournal";
+import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
+import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
+import SupplierBills from "./payables/SupplierBills";
+import PaymentVouchers from "./payables/PaymentVouchers";
+import ApOutstanding from "./payables/ApOutstanding";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -32,6 +42,12 @@ export default function FinanceApp() {
   // reach ONLY the Payments and Invoices destinations here; every finance-only
   // page bounces them to Payments instead of rendering finance controls.
   const role = useAuth((s) => s.role);
+  // Finance figures read with a plain zero (index.css `.finance-surface`).
+  // Set on <body> so drawers portalled outside this tree get it too.
+  useEffect(() => {
+    document.body.classList.add("finance-surface");
+    return () => document.body.classList.remove("finance-surface");
+  }, []);
   const financeOnly = (page: React.ReactNode) =>
     role === "operation" ? <Navigate to="/finance/payments" replace /> : page;
   return (
@@ -40,10 +56,15 @@ export default function FinanceApp() {
       <main className="flex-1 min-w-0">
         <Routes>
           <Route index element={role === "operation"
-            ? <Navigate to="payments" replace /> : <Navigate to="dashboard" replace />} />
+            ? <Navigate to="invoices" replace /> : <Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
           <Route path="ar"        element={financeOnly(<FinanceAR />)} />
           <Route path="ap"        element={financeOnly(<FinanceAP />)} />
+          {/* 0477 — supplier bills, payment vouchers, and what is unpaid per
+              supplier. A voucher is the one door money leaves by. */}
+          <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
+          <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
+          <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
           {/* Payment MASTER §16 — Finance → Payments is the canonical
               receipt Register; the Phase-5 bucket page is retired. */}
           <Route path="payments"  element={<PaymentRegister />} />
@@ -60,6 +81,14 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          {/* 0478 — money in that is not a sale: other debtor invoices and
+              other receipts. Finance only; customer money stays in Payments. */}
+          <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />
+          <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
+          {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
+          <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
+          <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>

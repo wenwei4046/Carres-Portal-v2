@@ -144,10 +144,6 @@ import {
   type RawCreateOrderInput,
   type DealerSelf,
   type BankStatementCreateInput,
-  type FinanceInvoiceIssueInput,
-  type FinanceInvoiceVoidInput,
-  type FinancePoPayInput,
-  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
@@ -293,6 +289,11 @@ import {
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
   type BookingBrief,
+  // DELIVERY MONITOR (2026-09-11) — the arrival + allocation facts the orders
+  // list now carries, defined ONCE in shared so the Worker and the browser
+  // cannot describe the same wire two different ways.
+  type PoArrival,
+  type AllocatedUnit,
   type SupplierClaimMove,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
@@ -2946,6 +2947,27 @@ export interface operationOrderListRow {
   po_skus?: string[];
   /** Purchase-order identities linked by purchase_orders.so / so_refs. */
   po_numbers?: string[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts, one entry per purchase
+   * order serving this order: its status, the SKUs it still owes, OUR
+   * production-plus-transit prediction (`eta_date`), the immutable
+   * supplier-facing original (`official_delivery_date`) and the latest recorded
+   * supplier reply. RECORDED DATES ONLY — the state and every word come from
+   * the ONE shared reader (`deliveryArrivalStateOf`).
+   *
+   * OPTIONAL, and `undefined` must behave as "we do not know", never as "there
+   * is no purchase order": a browser on this build against an older Worker
+   * prints the governed absence instead of accusing a supplier.
+   */
+  po_arrivals?: PoArrival[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the register rows physically reserved or
+   * sold to THIS order, batched once for the whole page. The counting is
+   * `deliveryStockReadinessOf`'s, matched under `normalizeSkuKey` — the same
+   * rule `resolveUnitAllocation` applies. Optional for the same
+   * degrade-do-not-crash reason as `po_arrivals`.
+   */
+  allocated_units?: AllocatedUnit[];
   delivery_partner_id: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey
@@ -3052,6 +3074,26 @@ export interface operationOrderListRow {
 export interface SalesOrderExpansionResponse {
   /** Exact stock Unit -> originating PO, resolved through its PO line. */
   unitCoverage?: Record<string, string | null>;
+  /**
+   * ⭐ WHICH ITEM LINE A UNIT ANSWERS, AS STORED (0471; carried 2026-09-11).
+   *
+   * `ops_stock_items.reserved_order_line_id` for every Unit this order holds,
+   * and `null` for a Unit that carries no binding — a pre-0471 reservation
+   * whose line was never recorded. The two are DIFFERENT facts and a screen
+   * must be able to tell them apart: an exact association is evidence, an
+   * unrecorded one is an unresolved association, and neither is a guess to be
+   * printed as the other. Optional, so a browser on this build against an
+   * older Worker reads it as absent and says the association is unknown rather
+   * than inventing one.
+   */
+  unitLines?: Record<string, string | null>;
+  /**
+   * Unit -> `unit` | `quantity` (0453). A COUNTED row has no identity at all,
+   * and its technical `QTY-` key must never reach a `Unit ID` heading
+   * (`unit-identity.ts`). Optional: absent, the shared rule falls back to the
+   * stored code's own shape, which is the same backstop it has always used.
+   */
+  unitScopes?: Record<string, string>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has
@@ -4940,6 +4982,23 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /**
+   * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
+   * THAT document's own quantity and destination (settled design, owner
+   * ruling 2026-09-11: "each quantity must correspond to its actual
+   * goods/source allocation… never repeat the entire request quantity on
+   * every PO allocation").
+   *
+   * `po_ids` above is the SET of documents and says nothing about how much
+   * went onto each — which is why the expansion used to print the whole
+   * request quantity beside a comma-joined list of numbers. Empty means
+   * nothing has been issued for this line yet. Absent on an older API.
+   */
+  allocations?: Array<{
+    poId: string;
+    qty: number;
+    destinationId: string | null;
+  }>;
   /** Card 06 — the SERVER date projection (the browser performs no
    *  working-day arithmetic): the line's effective Delivery Date, its
    *  derived Order By (null is a real answer, never a guessed one), and the
@@ -4956,7 +5015,14 @@ export interface ManualPurchaseRegisterPayload {
   /** Every PO the lines' lineage names — id → the actual po_no — plus the
    *  Card 06 issuance-completion fact: whether the CURRENT version has
    *  confirmed-sent evidence (`po_sends`, 0378). */
-  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  pos: Array<{
+    id: string;
+    po_no: string;
+    sent?: boolean;
+    /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
+    official_delivery_date?: string | null;
+    supplier_id?: string | null;
+  }>;
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
@@ -4970,7 +5036,8 @@ export interface ManualPurchaseRegisterPayload {
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
-   *  `ops_manager` duty holder(s), by name. */
+   *  `purchasing_approver` Duty holder(s) by name, falling back to
+   *  `ops_manager` only while that duty has no active holder (0474). */
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
@@ -7444,17 +7511,22 @@ export function useAssignOrderStaff(
 // ===========================================================================
 // Balance job (migration 0184) — payment ledger + storage collect / waiver.
 // ===========================================================================
+/** The ledger as the endpoint returns it. */
+export interface OrderPaymentsResponse {
+  payments: OrderPaymentRow[];
+}
+
 /** Read the order's payment ledger (newest first). `null` id disables. */
 export function useOrderPayments(
   orderId: string | null,
-  opts?: Partial<UseQueryOptions<{ payments: OrderPaymentRow[] }>>,
+  opts?: Partial<UseQueryOptions<OrderPaymentsResponse>>,
 ) {
   return useQuery({
     queryKey: orderId
       ? qk.operation.orderPayments(orderId)
       : (["operation", "orders", "null", "payments"] as const),
     queryFn: () =>
-      apiFetch<{ payments: OrderPaymentRow[] }>(
+      apiFetch<OrderPaymentsResponse>(
         `/api/operation/orders/${orderId}/payments`,
       ),
     enabled: !!orderId,
@@ -8424,8 +8496,6 @@ export function useReassignPoWarehouseMutation(
 //   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
-//   POST  /api/finance/invoices/issue             mutation -> invoices row
-//   POST  /api/finance/invoices/:id/void          mutation -> invoices row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
 //   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
 //
@@ -8724,45 +8794,10 @@ export function useRecordReceipt(
   });
 }
 
-export function useIssueInvoice(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceIssueInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceIssueInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/invoices/issue", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // orders.invoice_no + invoiced_at set; new invoices row.
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
-      await qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useVoidInvoice(
-  invoiceId: string,
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceVoidInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceVoidInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>(`/api/finance/invoices/${invoiceId}/void`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0476 — useIssueInvoice / useVoidInvoice are gone with their doors. POST
+// /api/finance/invoices/issue and /:id/void answer 410: a Sales Invoice is
+// issued from the order (Generate invoice) or at dispatch, and corrected by
+// void and replace (/api/finance/invoices/:id/void-replace).
 
 export function useCreateRefund(
   opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
@@ -8805,45 +8840,9 @@ export function useRefundPay(
   });
 }
 
-export function usePoPay(
-  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
-    mutationFn: (input) =>
-      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status='paid' + new outbound payments row. Ripples to
-      // ap-aging, dashboard summary, payments list.
-      await qc.invalidateQueries({ queryKey: ["finance"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function usePoSchedule(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/payments/po-schedule", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
-      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
-      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
+// routes answer 410 — a supplier is paid by a Payment Voucher
+// (lib/payables-queries.ts), the one door money leaves by.
 
 export function useCreateBankStatement(
   opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,

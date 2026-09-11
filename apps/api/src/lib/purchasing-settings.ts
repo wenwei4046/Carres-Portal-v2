@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  isOtherCreditor,
   isPurchasingCategory,
   type PurchasingCategory,
   type PurchasingProductionDays,
@@ -185,12 +186,18 @@ export async function loadPurchasingSettings(
 
   const nameById = new Map<string, string>();
   const factoryPickupSupplierIds: string[] = [];
+  /* 0477 — Finance's other creditors (a landlord, an advertiser) share the
+     table. They make nothing, so they never get a Settings row, even if a
+     catalog slot was pointed at one by mistake. */
+  const otherCreditorIds = new Set<string>();
   for (const row of (suppliersR.data ?? []) as Array<Record<string, unknown>>) {
     nameById.set(row.id as string, (row.name as string | null) ?? "");
     if (row.kind === "factory_pickup") factoryPickupSupplierIds.push(row.id as string);
+    if (isOtherCreditor(row)) otherCreditorIds.add(row.id as string);
   }
 
   const suppliers: PurchasingSupplierRow[] = [...catsBySupplier.entries()]
+    .filter(([id]) => !otherCreditorIds.has(id))
     .map(([id, cats]) => ({
       id,
       name: nameById.get(id) ?? "",

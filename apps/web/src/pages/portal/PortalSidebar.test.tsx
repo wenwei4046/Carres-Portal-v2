@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -213,10 +216,10 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
      for the whole time the approved Register lived at `/finance/payments`.
      This is the assertion that failed to exist: the rail was tested for its
      SHAPE and never for its DESTINATION. */
-  it("Payments opens the canonical Register, never the retired desk", () => {
+  it("Payments opens the collection listing first, never the retired desk", () => {
     renderAt("/operation");
     const row = child("payments");
-    expect(row).toHaveAttribute("href", "/finance/payments");
+    expect(row).toHaveAttribute("href", "/finance/invoices");
     expect(row.getAttribute("href")).not.toContain("tab=payments");
   });
 
@@ -358,6 +361,34 @@ describe("the elbow connectors", () => {
     expect(
       screen.getByTestId("nav-elbow-old-orders").getAttribute("aria-hidden"),
     ).toBe("true");
+  });
+
+  /**
+   * ⭐ ONE DRAWING, TWO SURFACES — 2026-09-11.
+   *
+   * The owner asked for THIS line between the sections of an expanded SO Batch
+   * Purchase row, so the two spans that paint it moved to
+   * `components/tree-connector` and both surfaces call it. Every assertion
+   * above still measures the RENDERED geometry, which is what proves the
+   * extraction changed nothing. This one guards the other direction: neither
+   * surface may quietly grow a second copy and start drifting.
+   */
+  it("draws from the ONE shared connector — neither surface hand-rolls a second", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const sidebar = readFileSync(join(here, "PortalSidebar.tsx"), "utf8");
+    expect(sidebar).toContain('from "@/components/tree-connector"');
+    expect(sidebar).toContain("<ConnectorElbow");
+    expect(sidebar).toContain("<ConnectorTrunk");
+    /* The radius is the drawing's, not the caller's — a literal here would be
+       the beginning of the second copy. */
+    expect(sidebar).not.toContain("borderBottomLeftRadius");
+
+    const sections = readFileSync(
+      join(here, "..", "operation", "components", "ConnectedSections.tsx"),
+      "utf8",
+    );
+    expect(sections).toContain('from "@/components/tree-connector"');
+    expect(sections).not.toContain("borderBottomLeftRadius");
   });
 });
 

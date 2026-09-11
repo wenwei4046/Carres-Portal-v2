@@ -1,0 +1,9 @@
+[
+  "0149_rename_ohana_hookka.sql",
+  "0317_the_record_stops_claiming_a_send.sql",
+  "0339_one_purchase_order_creation_authority.sql",
+  "0398a_the_five_purposes_a_purchase_may_serve.sql",
+  "0453_a_quantity_row_is_keyed_not_identified.sql",
+  "0463_customer_money_reaches_the_ledger.sql",
+  "0466_an_invoice_is_where_revenue_is_recognised.sql"
+]

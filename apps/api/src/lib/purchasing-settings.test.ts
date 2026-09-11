@@ -133,3 +133,18 @@ it("keeps selected Supplier setup categories maintainable before any SKU exists"
   }));
   expect(settings.suppliers).toEqual([expect.objectContaining({ id: "supplier-1", categories: ["mattress", "sofa"], offDays: [0, 6] })]);
 });
+
+/* 0477 — Finance's landlord shares the suppliers table. It makes nothing, so
+   Purchasing Settings never gives it a row — not even when a catalog slot was
+   pointed at it by mistake. */
+it("gives Finance's other creditor no Settings row", async () => {
+  const settings = await loadPurchasingSettings(fakeClient({
+    purchasing_settings: [{ order_by_buffer_days: 7, earliest_sell_days: 21, logistics_call_working_days: 1, po_days: [1, 3, 5] }],
+    suppliers: [
+      { id: "supplier-1", name: "Factory", kind: "own_logistics", cat_covered: ["sofa"] },
+      { id: "landlord-1", name: "Bayview Properties", kind: "other_creditor", cat_covered: [] },
+    ],
+    product_skus: [{ supplier_id: "landlord-1", product_models: { category: "sofa" } }],
+  }));
+  expect(settings.suppliers.map((s) => s.id)).toEqual(["supplier-1"]);
+});

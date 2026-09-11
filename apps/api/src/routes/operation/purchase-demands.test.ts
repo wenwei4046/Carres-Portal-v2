@@ -257,14 +257,23 @@ const TABLES = () => ({
     ],
     error: null,
   },
+  /* Two reads share this table: the open-PO POOL read (`po_id, sku, qty,
+     received_qty, status`) and the register's per-LINE `destination_id` read.
+     The ids and destinations below feed the second; the first ignores them. */
   purchase_order_lines: {
     data: [
-      { po_id: "PO-2051", sku: "COV-K", qty: 3, received_qty: 0,
-        purchase_orders: { status: "open" } },
-      { po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
-        purchase_orders: { status: "open" } },
-      { po_id: "PO-2053", sku: "COV2-K", qty: 1, received_qty: 0,
-        purchase_orders: { status: "open" } },
+      { id: "pol-2051", po_id: "PO-2051", sku: "COV-K", qty: 3, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      { id: "pol-2052", po_id: "PO-2052", sku: "PART-K", qty: 2, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      { id: "pol-2053", po_id: "PO-2053", sku: "COV2-K", qty: 1, received_qty: 0,
+        destination_id: null, purchase_orders: { status: "open" } },
+      /* ⭐ ONE DOCUMENT, TWO LINES, TWO DESTINATIONS — the governed Split. The
+         document itself is addressed to Carres Klang; this line is not. */
+      { id: "pol-split-a", po_id: "PO-9001", sku: "SPLIT-K", qty: 1, received_qty: 0,
+        destination_id: KLANG_DEST, purchase_orders: { status: "open" } },
+      { id: "pol-split-b", po_id: "PO-9001", sku: "SPLIT-K", qty: 2, received_qty: 0,
+        destination_id: BULOH_DEST, purchase_orders: { status: "open" } },
     ],
     error: null,
   },
@@ -543,6 +552,23 @@ describe("the derived states — blockers and order timing", () => {
       customerDelivery: "2026-09-20",
       supplier: null,
     });
+  });
+
+  /* 0477 — a catalog slot pointed at Finance's other creditor (a landlord) has
+     no supplier Purchasing may buy from. It reads as `Supplier not assigned`,
+     is never proposed, and its kind never reaches the wire enum that the SO
+     Batch page parses. */
+  it("a slot on Finance's other creditor reads as `Supplier not assigned`, and the wire still parses", async () => {
+    const t = TABLES();
+    (t.suppliers.data as Record<string, unknown>[])[1]!.kind = "other_creditor";
+    const { res } = await getDemands(t as unknown as Tbl);
+    expect(res.status).toBe(200);
+    const parsed = (await import("@carres/shared")).soBatchPurchaseResponseSchema.parse(
+      await res.json(),
+    );
+    const onLandlord = bySku(parsed.rows, "H1401S-K");
+    expect(onLandlord).toMatchObject({ state: "no_supplier", supplierId: null, supplier: null });
+    expect(parsed.rows.some((r) => r.supplierId === OHANA)).toBe(false);
   });
 
   it("a dateless Sales Order stays visible and is not ready to buy", async () => {
@@ -1144,12 +1170,18 @@ function registerTables() {
   };
   t.po_line_sources = {
     data: [
-      { id: "src1", po_id: "PO-9001", order_id: "o8", order_line_id: "l13", qty: 2 },
-      { id: "src2", po_id: "PO-9002", order_id: "o9", order_line_id: "l14", qty: 1 },
-      { id: "src3", po_id: "PO-9003", order_id: "o10", order_line_id: "l15", qty: 1 },
-      { id: "src4", po_id: "PO-9004", order_id: "o11", order_line_id: "l16", qty: 1 },
-      { id: "src5", po_id: "PO-2051", order_id: "o4", order_line_id: "l7", qty: 3 },
-      { id: "src6", po_id: "PO-2052", order_id: "o4", order_line_id: "l8", qty: 2 },
+      /* ⭐ ONE ITEM LINE, ONE DOCUMENT, TWO DOCUMENT LINES to two destinations.
+         Keyed by `po_id` alone these collapse into one fact and the register
+         is left with only the PARENT document's destination to print. */
+      { id: "src1a", po_id: "PO-9001", po_line_id: "pol-split-a", order_id: "o8",
+        order_line_id: "l13", qty: 1 },
+      { id: "src1b", po_id: "PO-9001", po_line_id: "pol-split-b", order_id: "o8",
+        order_line_id: "l13", qty: 1 },
+      { id: "src2", po_id: "PO-9002", po_line_id: null, order_id: "o9", order_line_id: "l14", qty: 1 },
+      { id: "src3", po_id: "PO-9003", po_line_id: null, order_id: "o10", order_line_id: "l15", qty: 1 },
+      { id: "src4", po_id: "PO-9004", po_line_id: null, order_id: "o11", order_line_id: "l16", qty: 1 },
+      { id: "src5", po_id: "PO-2051", po_line_id: "pol-2051", order_id: "o4", order_line_id: "l7", qty: 3 },
+      { id: "src6", po_id: "PO-2052", po_line_id: "pol-2052", order_id: "o4", order_line_id: "l8", qty: 2 },
     ],
     error: null,
   };
@@ -1252,7 +1284,40 @@ describe("Card 02-B · one permanent row per proceeded Sales Order", () => {
     expect(o4.pos.map((p) => p.poId)).toEqual(["PO-2051", "PO-2052"]);
     const part = o4.lines.find((l) => l.sku === "PART-K")!;
     expect(part.qty).toBe(3);
-    expect(part.pos).toEqual([{ poId: "PO-2052", qty: 2 }]);
+    expect(part.pos).toEqual([
+      { poId: "PO-2052", poLineId: "pol-2052", qty: 2, destinationId: KLANG_DEST },
+    ]);
+  });
+
+  /**
+   * ⭐ THE DOCUMENT LINE'S OWN `Deliver To` — owner correction 2026-09-11.
+   *
+   * A purchase order may carry one SKU to two destinations through two lines
+   * and source both to the same customer item line. Aggregated by `po_id` the
+   * two collapsed, and the only destination left to print was the PARENT
+   * document's — a summary standing in for a line's own recorded fact, which
+   * is precisely what this page spent the correction removing from the row
+   * above.
+   */
+  it("keeps a split document's two LINES apart, each with its own Deliver To", async () => {
+    const { body } = await rowsOf(registerTables());
+    const line = registerRow(body, "o8")!.lines.find((l) => l.orderLineId === "l13")!;
+    expect(line.pos).toHaveLength(2);
+    expect(line.pos.map((p) => [p.poId, p.poLineId, p.qty, p.destinationId])).toEqual([
+      ["PO-9001", "pol-split-a", 1, KLANG_DEST],
+      ["PO-9001", "pol-split-b", 1, BULOH_DEST],
+    ]);
+    /* The HISTORICAL quantity is unchanged by the split: two units, two facts. */
+    expect(line.pos.reduce((s, p) => s + p.qty, 0)).toBe(2);
+  });
+
+  it("falls back to the DOCUMENT's destination only where the line records none", async () => {
+    const { body } = await rowsOf(registerTables());
+    const line = registerRow(body, "o4")!.lines.find((l) => l.orderLineId === "l7")!;
+    /* `pol-2051` carries no destination of its own, so the document's stands —
+       which is how the paper itself works, and the ONLY case in which a parent
+       summary may speak for a line. */
+    expect(line.pos[0]!.destinationId).toBe(KLANG_DEST);
   });
 
   it("visible PO attribution comes ONLY from po_line_sources — a document with no lineage never appears", async () => {

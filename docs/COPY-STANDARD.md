@@ -572,7 +572,7 @@ question, the answers are locked strings like any other:
 | Action | The question | The answers | The queue tooltip |
 |---|---|---|---|
 | `Delay planning` | can the promised date still be met? | `We can still make the promised date` · `We cannot make the promised date` | `Supplier date lands after the promised date — decide before anyone calls (Delay planning)` |
-| `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It ships on {date}` · `It ships later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
+| `Confirm tomorrow's delivery` | is it coming on the day we expect it? | `It arrives on {date}` · `It arrives later than {date}` | — (none: the tile's own label is already the whole instruction, and this file's tooltip rule says delete a tooltip that would restate the label) |
 
 Both answers name **the promised date** rather than "yes" and "no", because the reader must
 not have to remember what was asked.
@@ -583,6 +583,16 @@ when the user opens the action."* The action opens the working day before the go
 stays open until somebody answers it — so a relative word is only true on the first day.
 `Shipping tomorrow`, answered two days late, is a sentence about a day that has already passed.
 `{date}` is the PO's expected arrival, and it is right whenever it is read.
+
+**AND THE VERB NAMES ARRIVAL (owner ruling 2026-09-10, replacing the retired `It ships on
+{date}` · `It ships later than {date}`).** `{date}` was always the expected arrival — the line
+above already said so — while the sentence said `ships`, and a shipping verb on an arrival date
+is the one reading that makes a reader add the transit leg a second time and move the arrival
+twice. The answers now read **`It arrives on {date}`** · **`It arrives later than {date}`**.
+A supplier answer that genuinely names a factory-ready or dispatch day is a DIFFERENT fact with
+its own door (`Confirm ready date` → `expected_ready_date`) and becomes an arrival only through
+the governed transit calculation. The stored `shipping` answer value is unchanged: it is a
+ledger value, never a word on a screen.
 
 **The answer words are not sufficient completion evidence** (Owner-approved Purchasing → Receiving
 model, 2026-08-29). `Confirm supplier delivery`, `Supplier has not confirmed the PO date`,
@@ -788,16 +798,26 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The SO Batch Purchase rail — latest owner ruling 2026-08-30.** Six purchasing fact sections,
-in this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
-one affected Sales Order exists:
+**The SO Batch Purchase rail — owner correction 2026-09-11.** FIVE purchasing fact sections, in
+this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
+one affected Sales Order exists. **`TO ORDER` / `All not ordered` is RETIRED from this rail**: it
+named the page's own default — what an operator already sees with nothing selected — rather than a
+fact about a Sales Order, and it sat above the section that answers what to buy today. The
+outstanding arithmetic behind it is untouched and still governs the tick and the Ready Stock door;
+Manual Purchase keeps its own `All not ordered`, which is a different object and a different
+arithmetic.
 
 | Heading | Rail rows |
 |---|---|
-| `TO ORDER` | `All not ordered` |
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
+
+`PURCHASE PURPOSE`, `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
+2026-09-11; `PRODUCT`, `SUPPLIER` and `REGION` on SO Batch Purchase too). The `All …` word is the
+control's first option and its clear; every governed value stays present as an option; the
+count rides in the option text (`Ohana · 4`). `WORK TO DO` (Manual Purchase), `ORDER TIMING` and
+`SETUP TO FIX` keep their visible rows.
 | `REGION` | `All regions` · `Klang Valley` first · actual outstation Delivery State names, alphabetical · `Others` last and only when Delivery State is not recorded |
 | `SETUP TO FIX` | `Production days not set` |
 
@@ -809,11 +829,10 @@ fact rows print their live count, zero included; a supplier or region row exists
 matches — except the selected row, which stays visible with `0`. Region reads the server's
 recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
 outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
-shows every proceeded record; `All not ordered` is a real outstanding-only filter that
-reads customer quantity less Ready Stock already taken and less exact, non-cancelled PO lineage.
-A generic Open PO SKU pool is not proof that this SO was ordered; without exact
-`po_line_sources`, the SO remains in `All not ordered`. The issue leaf is not the count
-authority. One filter per section; sections combine; a second click on
+shows every proceeded record. The outstanding arithmetic reads customer quantity less Ready Stock
+already taken and less exact, non-cancelled PO lineage. A generic Open PO SKU pool is not proof
+that this SO was ordered; without exact `po_line_sources` the units stay outstanding. The issue
+leaf is not the coverage authority. One filter per section; sections combine; a second click on
 the selected timing row clears it; `All products`, `All suppliers` and `All regions` clear
 their sections.
 The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page
@@ -852,8 +871,25 @@ found nothing). The last two are DIFFERENT answers and may not be merged.
 `Follow up` · `Pending` · `Waiting` · `Priority` · `Buffer` · a generic `Next action` column. A
 word that tells the operator a row is important without telling them what is wrong with it is not
 a word this Register may use. **Retired from the SO Batch Purchase rail, never to return:**
+`TO ORDER` · `All not ordered` ·
 `Ready to buy` · `Covered` · `No customer date` · `No SKU` · `No supplier` · `No production days` ·
 `BUYING RECORDS` · `All lines` · `No buying needed` · `Cannot buy`.
+
+**THE SO BATCH EXPANSION'S THREE SECTIONS — owner correction 2026-09-11.** An expanded Sales Order
+holds `Goods on SO-{n}` (the actionable demand), `Ready Stock` (the shelf) and
+**`Purchase order details`** (the read-only record), in that order, joined by the navigation's own
+connector line.
+
+| Where | The words |
+|---|---|
+| The actionable goods table | `SKU` · `Item` · `Qty` · `Ready Stock` · **`Ordered Qty`** · `To buy` · `Deliver To` · `Supplier` · `Category`. **`Ordered Qty`, NOT `On PO`** — that head means *how many an OPEN purchase order still covers*, and this figure is the exact `po_line_sources` lineage: every non-cancelled document, `Completed` ones included, never netted by what has arrived. It is the HISTORICAL ordered quantity, and `On PO` would have said *still on order* about goods already in the warehouse. `Ordered Qty` is the dictionary's own word for it, used by Manual Purchase's purchase-order lineage table for the same relationship — beside `Already On PO` for the effective coverage it is not. **It is a QUANTITY**, and a door to the details — never a stack of PO numbers, which made one item row fourteen lines tall. A line no document has ever carried reads `Not ordered yet`; a line the shelf fully answered reads `—`. **`Unit ID` and `PO Delivery Date` are absent here** — both describe a document's goods, and on an unbought row they printed an absence in the width of a real answer. **`Deliver To` on a covered line states the document LINE's own destination**, never the parent document's where the line records one. |
+| The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
+| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
+| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Issued`** · **`Not sent to supplier`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
+| A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
+| HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
+| `To buy` when it is not a remainder | TWO short lines under the figure: **`Already on a PO`** then **`Nothing to buy here`**, with `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` as the cell's title. The engine prints the covering document's quantity under `To buy` on a build every unit of which is already on an OPEN purchase order, and since 0430 `issue-batch` **refuses** such a selection by name (`already_on_po`, 422, naming the document) and creates nothing. **The words are the door's own** — `purchasingRefusal("already_on_po")` at cell width — so the operator meets ONE sentence, not two, and the row is not tickable. **The quantity, the action and the consequence are read together or not at all.** Written as two lines, never left to wrap: the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
+| A document fact that is not on file | `Not recorded` — the same word Purchase Orders uses, never back-filled from a planning date. |
 
 **MANUAL PURCHASE — the internal buy's own words.**
 
@@ -865,12 +901,13 @@ a word this Register may use. **Retired from the SO Batch Purchase rail, never t
 | The disabled Send NAMES its gap (the Receiving button law; first missing header fact wins, top-to-bottom) | `Send — lead days are not set` · `Send — pick a date` · `Send — pick the Service Case` · `Send — pick the staff member` · `Send — name the subsidiary` · `Send — say what it is for` |
 | The form's fields | `Need for` · `Proceed Date` (read-only server preview before Send; actual server hand-off after Send) · `Delivery Date` · `Deliver to` · `Raised by` · `Items` · `Qty` · `Note` · `Supplier` · `+ Add line` · `Remove` — plus the per-purpose For field: `Service Case` · `Staff member` · `Subsidiary` · `What is this for?` (Other Purchase only; routine purposes ask no duplicate `Why` — the historical `Why` label survives on pre-Card-04 objects only) |
 | The already-have block | `WHAT WE ALREADY HAVE` — `free stock` · `already on PO` · `still needed` (the arithmetic is PRINTED, never left to the reader) |
-| The register columns — Card 08 owner correction (2026-09-04), exactly and in this order | `Proceed Date` · `Approval Status` · `PO No` · `Delivery Date` · `For` · `Items` · `Qty` · `Supplier` · `Deliver To` · `Requested By` — no number column; `For` is the single-click entrance and the sticky business column; Purpose and Order By are NOT parent columns |
+| The register columns — THE SETTLED DESIGN, owner ruling 2026-09-11, exactly and in this order | `Approval Status` · `Requested By` · `Proceed Date` · `PO No` · `Purpose` · `Items` · `Supplier` · `Deliver To` · `Delivery Date` — no number column; `Purpose` prints the six governed purposes and is the single-click entrance and the sticky business column; Order By is NOT a parent column. **Retired from the row, never to return:** `Qty` · `For` · `Status` · `Partial` · `PO Sent` · `PO Created` · `Reason` · `MPR` or any request-number column. Search, filters and export keep the accurate source values the cells summarise. |
 | Manual date planning | `Proceed Date` is the actual request hand-off. `Delivery Date` defaults from the slowest selected line's Supplier × Category production days + supplier transit days. `Order by {date}` is derived by walking the same lead days backwards; the earliest line governs the request. Never apply SO Safety days. |
 | Missing lead facts | `Production days are not set` → `Add production days for {supplier} · {category} in Settings`; `Transit days are not set` → `Add transit days for {supplier} in Settings`; disabled Send: `Send — lead days are not set`. |
-| The Approval Status facts | `Need approval` · `Approved` · `Refused` · `No approval needed` — with the quiet `{name} approves` second line only while approval is needed |
+| The Approval Status facts | `Need approval` · `Approved` · `Refused` · `No approval needed` — the FACT alone on the Register row (owner ruling 2026-09-11): no stacked approver name and no Approve/Refuse button. The quiet `{name} approves` line belongs to the object's `Approval` section. A row's own selectability explanation may still appear, computed from the same two facts the tick reads. |
 | The deterministic summaries | `—` (no PO yet — a fact, not a button) · the one PO number · `{n} POs` (opens the object's exact linked PO list) — `{first item} + {n} more` — `{n} suppliers` — `Multiple` (several destinations) |
-| The expansion's child columns (read-only) | `SKU` · `Item` · `Requested Qty` · `Approved Qty` · `Ordered Qty` · `Still To Order` · `Supplier` · `Deliver To` · `PO No` |
+| The expansion's goods table — THE SHARED `GoodsMiniTable`, owner ruling 2026-09-11 (read-only) | `Category` · `Deliver To` · `SKU` · `Qty` · `Supplier` · `PO No` · `PO Delivery Date` · `Item` — the owner's target reconciled with the ruled positions (`Category` first, `Deliver To` before `SKU`, `Item` always last). ONE ROW IS ONE ALLOCATION: each `Qty` is the quantity that document actually carries, never the whole request repeated per PO. What is still to buy is its own row and reads `Not ordered yet`. **Retired from this table:** `Still To Order` · `Covered by` · `Requested Qty` · `Approved Qty` · `Ordered Qty` (the ask and the approver's number keep their home in the object's `Items Requested` and `Approval`). `Unit ID` is absent because this page has no per-line Unit read — never `Not allocated` on every row. |
+| The Ready Stock section — owner ruling 2026-09-11 | `Ready Stock` collapsible handle, closed by default · the grouped heading `{item}` + `Asked for {n} · {m} on the shelf` · the shared table heads `Unit ID` · `Condition` · `Qty` · `Where` · `Owner` · `Item` · `What is already on the shelf. Viewing does not reserve, and it does not reduce what this purchase asks for.` · `No stock on the shelf matches this purchase.` · `Reading the stock register…` · `Ready Stock could not be read. Try again`. **Banned here:** `Choose Ready Unit`, any checkbox, and any netting of the ask against the shelf. Condition words are the ONE shared vocabulary: `New` · `Display` · `Fair (used)` · `Refurbished` · `Damaged` · `Not recorded` — a grade, never availability. |
 | The selection bar | `{n} selected · {u} unit(s) · Issue {p} PO(s)` beside the resolved PO Duty person and `Issue PO` — PO Duty renders NOWHERE without a selection; `Select at most 20 requests for one issue.` |
 | The states | `Waiting for approval` · `Waiting for the SKU` · `Ready to order` · `Ordered` · `Arrived` · `Not going ahead` — `Waiting` always names what it waits ON; `Arrived` is a FACT the system observes, never a button |
 | The purpose choices — owner rulings 2026-08-28 (Card 03) / 2026-08-29 (Card 04), exactly and in this order | `Ready Stock` · `Showroom Display` · `Service Case` · `Internal Staff Purchase` · `Subsidiary Purchase` · `Other Purchase` — Management is included under `Internal Staff Purchase`; there is no `Management Purchase`; only `Other Purchase` asks `What is this for?` |
@@ -922,11 +959,12 @@ by Operation. **Banned from this rail, never to return:** `Supplier not selected
 missing SKU or supplier is named inside the affected request and fixed at
 its owning Catalog boundary — never a rail facet. Price is not a rail state or filter.
 
-**The approval owner (Card 03 §3).** The rail says `Approve purchase`; the Register row and the
-object print the REAL action owner beside `Waiting for approval` as `{name} approves` — the
-resolved `ops_manager` duty holder(s); several print `{name} or {name} approves`; a robot or
+**The approval owner (Card 03 §3, corrected 2026-09-11).** The rail says `Approve purchase`;
+the OBJECT prints the REAL action owner beside `Waiting for approval` as `{name} approves` —
+the resolved `Purchasing Approver` duty holder(s), falling back to `ops_manager` only while
+that duty has no active holder (0474); several print `{name} or {name} approves`; a robot or
 shared-password login never prints while a named person holds the duty; nothing resolved
-prints nothing.
+prints nothing. The REGISTER row carries the approval fact alone.
 
 **PO REVISIONS — the sent document's version** (CARD-2026-08-19-po-revisions, executing
 purchasing/MASTER.md §4's revision rule, Jess 2026-08-18 — *a sent PO is not overwritten, it is
@@ -1797,16 +1835,22 @@ object page** — nothing announces permission to type into a field that is alre
 Register's context menu keeps the word `Edit` only because it names a destination, and that
 destination is the same one `View` opens.
 
-#### Its section names — owner ruling 2026-08-26 (Jess)
+#### Its section names — owner ruling 2026-08-26 (Jess), re-paired 2026-09-11
 
 Jess ruled the Order tab MERGED: fewer, fuller cards. A merged section keeps its exact word as
-an in-card heading — the merge moves a border, never a name — so this table governs FIVE
-surviving names and retires two.
+an in-card heading — the merge moves a border, never a name.
+
+**RE-PAIRED 2026-09-11, and no word changed.** The approved detail organisation moved two
+headings to the card each belongs with: `Sales ownership` joined `Customer` (who sold it is part
+of who bought it) and `Delivery address` became a heading of the new `Delivery` card, beside the
+access conditions that decide whether the lorry can reach the address. The WORDS below are the
+same words; only which card carries them moved.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
-| The customer and everywhere their goods go | **`Customer`**, with **`Delivery address`** as its in-card heading | Customer details · Buyer · Client · Contact · Ship to |
-| The order's own administrative facts | **`Order info`**, with **`Sales ownership`** as its in-card heading | Order details · Dates · Dates / Access · Admin · Meta |
+| The customer, who sold to them, and who to ring | **`Customer`**, with **`Sales ownership`** and **`Emergency contact`** as its in-card headings | Customer details · Buyer · Client · Contact · Ship to |
+| The order's own administrative facts | **`Order info`** | Order details · Dates · Dates / Access · Admin · Meta |
+| Where the goods go and what the lorry meets there | **`Delivery`**, with **`Delivery address`** and **`Delivery access`** as its in-card headings — registered 2026-09-11 with the re-pairing; the card holds the address, the billing relationship, the building type and the floor/stair/lift answers | Ship to · Address · Logistics · Delivery details · Access (alone, which names the conditions and loses the address) |
 | Whether we already have this customer, beside the card's name | **`New customer`** · **`Existing customer`** · **`Checking…`** · **`Not known yet`** | New/Returning · First-time · Repeat · a coloured status dot with no word |
 | ⛔ RETIRED — the delivery legs, holder, partner and appointment | nothing. **`Order Route` owns them** and always did; the Order tab printed a read-only copy | `Delivery Journey` — and `Journey` was already banned two sections below, against `Order Route` |
 | ⛔ RETIRED — the index of every linked document | nothing. **`Order Route` carries a door to each owner** | `Related Documents` · Linked documents · Attachments · Files |
@@ -2671,6 +2715,136 @@ The one Warehouse configuration surface (`stock/MASTER.md` §11). Two words here
 does a standing warning such as *"Changes apply to future work and never rewrite recorded
 history"* — the rule is enforced by there being no writer, and by the audit trail; a sentence
 that repeats a guarantee the operator cannot verify is noise.
+
+---
+
+## Finance ledger words — PROPOSAL, awaiting owner review
+
+**PROPOSAL / NOT LAW.** Words the finance ledger builds (migrations 0475–0479) put on screen
+before the owner has ruled on them. Each block names its build and pages; until a ruling, a word
+here may appear only on the page its block names. Falsifier: a finance user reads a word here and
+cannot say what it means or does. A stored key never reaches the screen.
+
+### Journal · Trial Balance · Self-check (migration 0479)
+
+| Group | Word | Meaning |
+|---|---|---|
+| Destinations | **`Journal`** | Every ledger entry, newest first. |
+| | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
+| | **`Self-check`** | The books test themselves and name what is wrong. |
+| Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
+| Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Payment voucher`** · **`Other debtor invoice`** · **`Other receipt`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
+| | **`{source} reversal`** | The entry that cancels one of those. |
+| | **`Other entry`** | A source this list does not name yet. Never the key. |
+| Reversed pairs | **`Not reversed`** · **`Reversed`** · **`Reversal`** | The entry stands · it was cancelled · it cancels another. |
+| | **`Reversed by {Entry No}`** · **`Reverses {Entry No}`** | Links each half of a pair to the other. |
+| Entry lines | **`Account`** · **`Debit`** · **`Credit`** · **`Party`** · **`Memo`** · **`Total`** | One line of an entry, and its totals. |
+| | **`Customer · {name}`** · **`Supplier · {name}`** · **`Other party`** · **`No party`** | Who the line belongs to. |
+| Entry page | **`Entry`** · **`Lines`** · **`Same document`** | The entry's facts · its lines · other entries on that document. |
+| Absent values | **`No document number`** · **`No narration`** · **`No memo`** · **`Name not available`** · **`Account name not available`** | The value is missing, said in words. |
+| Journal scope | **`All accounts`** · **`{code} {name} only`** · **`From {date}`** · **`Up to {date}`** · **`Show all entries`** | The account and dates the Journal is narrowed to, and the way out. |
+| Buttons | **`Show lines`** · **`Open entry`** · **`Back to Journal`** · **`Open Self-check`** · **`Check again`** | Row expand · open one entry · return · go to the checks · read the checks again. |
+| Trial Balance | **`Kind`** · **`Asset`** · **`Liability`** · **`Equity`** · **`Income`** · **`Expense`** · **`Other account`** | The account's kind, used to group the page. |
+| | **`As of`** | The day the balances are taken on. |
+| | **`Since {date} · No opening balances`** | Figures are movement since the ledger started, not a full position. |
+| | **`Difference {money}`** · **`Difference not checked`** | Debits less credits · the read failed, so no figure. |
+| Self-check verdicts | **`Clean`** · **`{n} findings`** · **`Finding`** · **`Not checked`** | Nothing wrong · how many problems · this check failed · the read failed. Never zero for a failed read. |
+| Self-check cards | **`Debits and credits`** · **`Customer receivables`** · **`Supplier payables`** · **`Rental months`** · **`Ledger checks`** · **`{code} {name}`** | One card per question; one per customer or supplier account. |
+| | **`Checked {date and time}`** | When the checks were read. |
+| | **`Ledger {money} · Bills {money}`** | One supplier's ledger figure beside its bills less payments. |
+
+Sentences these pages print follow the Empty-state and Error patterns above, for example
+`No entries yet. Invoices, payments and bills add entries here.` ·
+`The Journal could not be loaded. Try again.` · `No entry has that number. Check it and try again.`
+The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
+`finance-ledger.ts` from the row's own numbers.
+
+
+### Supplier bills and payment vouchers (migration 0477)
+
+Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP drawer's doors.
+
+| Where | Word on screen | Stored value it replaces | Note |
+|---|---|---|---|
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch |
+| Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
+| Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
+| Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
+| Pay method | **Bank transfer** · **Cheque** · **Cash** · **Other** | `BANK_TRANSFER` … | |
+| History | **Created** · **Changed** · **Confirmed** · **Prepared** · **Checked** · **Approved** · **Returned to draft** · **Cancelled** · **File added** | `created` … `file_added` | |
+| Creditor type | **Supplier** · **Other creditor** | `suppliers.kind` | an other creditor is a landlord, an advertiser, a lorry company on credit — its bills go to 2120 Other payables |
+| Money a SUPPLIER is still owed | **Unpaid** | — | `Outstanding` stays customer money only (§ Vocabulary); `Balance` stays banned for money |
+| Voucher form | **Left to pay** · **Pay now** · **Paid from** · **Payee** | — | the voucher **Total** is added up, never typed |
+| Price check | **Same as PO price** · **RM x above PO price** · **RM x below PO price** · **No PO price** · **`n` lines differ from PO** | — | a flag, never a block |
+| Line source | **Not from a GRN** | `warehouse_receipt_id is null` | |
+| No number yet | **Draft, no number yet** | `bill_no` / `voucher_no` null | numbers are drawn on confirm / prepare |
+| Ledger link | **Ledger entry** · **reversed by `JE-…`** | `gl_entries` | |
+| An unknown stored value | **Not known** | anything the word map lacks | never the raw value |
+| Buttons | **+ New Bill** · **Convert GRN to bill** · **Confirm bill** · **Cancel bill** · **+ New Payment Voucher** · **Prepare voucher** · **Check voucher** · **Approve payment** · **Return to draft** · **Cancel voucher** · **Add other creditor** · **Attach file** · **Use this GRN** | — | form buttons stay `Save` / `Cancel`; line lists stay `+ Add line` / `Remove` |
+
+**Three dictionary conflicts, reported rather than decided:**
+
+1. **`Prepare`** was retired with `Prepare PO` on 2026-07-30. The voucher's first step keeps
+   it (`Prepare voucher`) because the brief names the Houzs structure Draft → Prepared →
+   Checked → Approved, and the preparer is the person the separation-of-duties rule excludes
+   from the next two steps. *Overturned by:* an owner ruling for another word (e.g. `Submit
+   voucher`); only the word map and the button change.
+2. **`Check`** means establishing a missing fact. `Check voucher` fits loosely — the fact
+   established is "the bills, amounts and payee match the papers attached" — but the object is
+   a document, not an absent fact. *Overturned by:* the owner reading `Check` as the
+   Purchasing-only verb.
+3. **`Approve`** is ruled for a purchase nobody's customer ordered. `Approve payment` names what
+   is approved, as the rule demands, but widens the verb to money leaving Carres. *Overturned
+   by:* an owner ruling that money out takes its own verb (e.g. `Release payment`).
+
+The brief's `Reject` is shown as **`Return to draft`**: the voucher goes back to the person who
+prepared it, which is the dictionary's `Return` exactly.
+**NOT LAW.** Words the finance ledger builds put on screen that this dictionary did not have.
+Each carries its meaning; the owner accepts, renames or strikes it.
+
+### Invoice doors and payment methods (migration 0476)
+
+| Meaning | Proposed words | Do NOT use |
+|---|---|---|
+| The ledger account a payment method's money lands in (Settings → Payment → Payment methods) | **`Money account`** · `Money account: {code} · {name}` | GL account · Posting account · Clearing |
+| A method with no money account yet (reuses the Warehouse Settings word for an unrecorded setting) | **`Money account: Not configured`** | Not set · None · a blank |
+| The door that adds a method | **`Add a payment method`** | New method · + Method · Create |
+| The method form's Save, naming its gap while disabled | **`Save method`** · `Save method — type a name` · `Save method — choose a money account` | Save changes · Submit |
+| The account picker's empty state | **`Choose a money account`** | Select · Pick one |
+| The saved toast / the failed read | **`Payment method saved`** · `Payment methods could not be loaded. Try again.` | Success! · Error |
+| The proof a manager-added method asks for (the six governed methods keep their §16 words) | **`Payment proof`** | Attachment · Upload · Evidence file |
+| The method the provider records (a receipt row, never a manual choice) | **`Online payment`** | e-wallet · Stripe · Online |
+| An invoice before the issue draws its number (Generate invoice header · PDF preview stamp) | **`Draft`** · **`DRAFT`** on the preview paper | a predicted `INV-YYYY-…` number · Pending |
+| Where a Sales Invoice is issued (the old AR drawer door is gone) | **`To issue a Sales Invoice, open the order and choose Generate invoice.`** | Issue invoice (AR drawer) |
+| The correction door on an issued invoice | **`Void and replace`** · `Void and replace — say why this invoice is wrong` | Void invoice · Cancel invoice · Edit invoice |
+| Its reason field | **`Why is this invoice wrong?`** | Void reason · Remarks |
+| What it will do, said before the act | **`{INV No} is voided and keeps its paper. A replacement draft with the same lines is created; issue it from the order with Generate invoice. It gets a new number.`** | Are you sure? |
+| After the act | **`{INV No} voided — the replacement draft is ready. Issue it from the order: Generate invoice.`** | Done · Voided successfully |
+
+### Money in that is not a sale — Other debtors and Other receipts (migration 0478)
+
+| Word | Meaning |
+|---|---|
+| `Other debtors` | Finance destination: parties that are not customers and owe Carres money, and the invoices raised to them. |
+| `Other receipts` | Finance destination: money into our bank or cash that is not customer order money (loan in, director's money, other income, or payment of an other debtor invoice). |
+| `Party` / `Parties` | Someone Carres bills or receives money from who is neither a customer nor a supplier — a sister company, a lender, a director. |
+| `Company or person` · `SSM or IC number` | The party's kind and its registration number. |
+| `New invoice` · `New party` · `New receipt` | The one create action on each register (Row 2). |
+| `Issue invoice` | Gives the draft its ARI number and adds its total to what the party owes. Asks first. |
+| `Save draft` | Keeps the invoice without a number; it owes nothing yet. |
+| `Cancel invoice` | A draft simply stops. An issued invoice is reversed on its own date by the finance approver. |
+| `Record receipt` | Records money received; it gets its RV number at once. Asks first. Same verb as `Record payment`. |
+| `Cancel receipt` | The finance approver reverses a receipt; the invoices it paid owe that money again. |
+| `Draft` · `Issued` · `Cancelled` | An other debtor invoice's status. |
+| `Recorded` · `Cancelled` | An other receipt's status (the database words `posted` / `voided` never reach the screen). |
+| `Draft — no number yet` | The Invoice No cell of a draft. |
+| `Not issued yet` · `Paid in full` | The Outstanding cell of a draft, and of an issued invoice with nothing left to pay. |
+| `Outstanding` | Extended here: what a party that is not a customer still owes on issued invoices. `Balance` stays banned. |
+| `What for` | The column saying what an invoice or receipt was for, in the chart's own account names. |
+| `Received from` · `Received into` · `Payer name` | Who paid; which bank or cash account the money went into; the payer when there is no party. |
+| `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
+| `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
+| `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
 
 ---
 

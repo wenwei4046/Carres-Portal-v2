@@ -94,12 +94,15 @@ export default function PaymentRegister() {
     // payment may cover several invoices (§4), so the invoice cell is a list
     // and says so honestly when there is none.
     { key: "invoice", label: "Invoice", width: 200,
+      defaultHidden: true,
       accessor: (r) => paymentInvoiceNumbers(r).join(", ") || "Not allocated to an invoice",
       searchValue: (r) => paymentInvoiceNumbers(r).join(" ") },
     { key: "actor", label: "Recorded by", width: 160,
+      defaultHidden: true,
       accessor: (r) => r.recorded_by_name ?? "Recorder name not available",
       searchValue: (r) => r.recorded_by_name ?? "", filterType: "enum" },
     { key: "exception", label: "Exception", width: 160,
+      defaultHidden: true,
       accessor: (r) => paymentExceptionWord(r),
       searchValue: (r) => paymentExceptionWord(r), filterType: "enum" },
   ], []);
@@ -149,7 +152,7 @@ export default function PaymentRegister() {
       <button className="btn-secondary mt-3" onClick={close}>Back to Payments</button></div>
     : <ListPageShell register>
       <DataGrid rows={rows} columns={columns} rowKey={(r) => r.id}
-        storageKey="carres.payment.register.v1" appearance="reference" exportName="Payments"
+        storageKey="carres.payment.register.v2" appearance="reference" exportName="Payments"
         /* No confirmed answer is not an empty list — see the note on the
            Invoices Register. A PAUSED query leaves `isLoading` false and
            `data` undefined, and the grid would assert `No payments yet`. */

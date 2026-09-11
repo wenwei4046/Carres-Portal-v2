@@ -7,6 +7,7 @@ import {
   operationWorkResponseSchema,
   poSupplierDeliveryDateOf,
   purchaseOrderReplyWorkItems,
+  purchaseOrderArrivalCheckWorkItems,
   demandPurposeLabelOf,
   manualPurchaseForOf,
   manualPurchaseLineRemainingOf,
@@ -265,11 +266,20 @@ interface ManualPurchaseRegisterSource {
   pos: Array<{ id: string; sent: boolean }>;
 }
 
+/** The advance arrival check's own extra facts, both already returned by the
+ *  internal `/pos` read — no new query, no second arithmetic. */
+interface PurchaseOrderArrivalSource extends PurchaseOrderWorkSource {
+  tomorrow_answer_about_date?: string | null;
+}
+
 interface PurchaseOrderWorkSource {
   id: string;
   supplier_id: string;
   status: "open" | "received" | "cancelled";
   version?: number | null;
+  /** OUR predicted arrival (production + transit) — the advance check's one
+   *  anchor. Already selected by the internal `/pos` read. */
+  eta_date?: string | null;
   expected_ready_date?: string | null;
   promises?: Parameters<typeof poSupplierDeliveryDateOf>[0];
   sends?: Array<{
@@ -327,6 +337,48 @@ export function projectPurchaseOrderReplyWork(input: {
       requiredResult: item.ruleKey === "purchasing.supplier_date_passed"
         ? "New evidenced supplier delivery date recorded"
         : "Evidenced supplier delivery date recorded",
+      destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
+      today: input.today,
+    }));
+  });
+}
+
+/**
+ * THE ADVANCE ARRIVAL CHECK, one working day before the planned arrival.
+ *
+ * Read-time, like every projection beside it: the obligation is DERIVED from
+ * `purchase_orders.eta_date` plus the promise ledger's latest answer, so no
+ * cron has to have run for the duty holder to see it. The trigger, due and
+ * reopen rules stay in `tomorrowDeliveryCallOf`; this only resolves the owner
+ * and gives the row its destination.
+ */
+export function projectPurchaseOrderArrivalCheckWork(input: {
+  pos: readonly PurchaseOrderArrivalSource[];
+  suppliers: readonly { id: string; name: string | null }[];
+  poDuty: WorkspaceDutyResolution | null;
+  today: string;
+}): OperationWorkItem[] {
+  const supplierById = new Map(input.suppliers.map((row) => [row.id, row.name]));
+  const holidays = myHolidaySet();
+  return input.pos.flatMap((po) => {
+    const supplierName = supplierById.get(po.supplier_id) || "Supplier";
+    const items = purchaseOrderArrivalCheckWorkItems({
+      id: po.id,
+      supplierId: po.supplier_id,
+      supplierName,
+      status: po.status,
+      etaDateIso: po.eta_date ?? null,
+      tomorrowAnswerAboutDateIso: po.tomorrow_answer_about_date ?? null,
+      lines: po.purchase_order_lines.map((line) => ({
+        qty: line.qty,
+        receivedQty: line.received_qty,
+      })),
+    }, input.poDuty, input.today, holidays);
+    return items.map((item) => operationWorkItemFromProjection(item, {
+      object: { kind: "purchase_order", id: po.id, label: po.id },
+      problem: "The goods are expected and the supplier has not confirmed the day",
+      recipient: supplierName,
+      requiredResult: "Supplier answer recorded about this arrival date",
       destination: `/operation?tab=purchase-orders&po=${encodeURIComponent(po.id)}`,
       today: input.today,
     }));
@@ -684,10 +736,19 @@ export function projectManualPurchaseWork(input: {
         },
         problem: approval ? "Approval required" : "Purchase order required",
         recipient: request.recipient ?? null,
+        /* ⭐ THE ISSUE ACTION'S RESULT IS AN ISSUED PO (owner ruling
+           2026-09-11). It read "Current PO version sent to supplier" while
+           the rule kept the action open on a fully ordered request with no
+           confirmed-sent row — a confirmation chore. That rule is gone
+           (`manualPurchaseWorkItems`), so the result is the act itself. */
         requiredResult: approval
           ? "Purchase decision recorded"
-          : "Current PO version sent to supplier",
-        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}`,
+          : "Purchase order issued",
+        /* ⭐ THE APPROVER LANDS ON THE APPROVAL SECTION, not at the top of a
+           six-section object they then have to scroll (owner ruling
+           2026-09-11). `Issue PO` has no such section — its act is the
+           Register's selected action — so it opens the object plainly. */
+        destination: `/operation?tab=manual-purchase&mp=${encodeURIComponent(request.requestId)}${approval ? "&section=approval" : ""}`,
         today: input.today,
       });
     }),
@@ -1129,6 +1190,12 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
+  const arrivalCheckItems = projectPurchaseOrderArrivalCheckWork({
+    pos: pos.pos as PurchaseOrderArrivalSource[],
+    suppliers: suppliers.suppliers,
+    poDuty,
+    today,
+  });
   const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
@@ -1144,7 +1211,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     receivingItems, paymentItems, overpaymentItems, storageCheckItems, issueItems],
+     arrivalCheckItems, receivingItems, paymentItems, overpaymentItems, storageCheckItems,
+     issueItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

@@ -97,8 +97,8 @@ function buildSb(opts: { rpcError?: RpcError; fetchedRow?: unknown } = {}) {
   const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
   const sb = {
     rpc: async (name: string, args: { payload?: Record<string, unknown> } & Record<string, unknown>) => {
-      // The create RPC nests its input under `payload`; flat-arg RPCs
-      // (payment_record, CARD 4) pass their args directly.
+      // The create RPC nests its input under `payload`; a flat-arg RPC
+      // would pass its args directly.
       rpcCalls.push({ name, payload: (args?.payload ?? args) as Record<string, unknown> });
       if (opts.rpcError) return { data: null, error: opts.rpcError };
       return {
@@ -369,7 +369,7 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
     ]);
   });
 
-  it("paid > 0 posts BACK into the order_payments ledger (deposit, mapped method, approval ref)", async () => {
+  it("paid > 0 rides INSIDE create_raw_order — the route writes no second payment (0476)", async () => {
     const sb = buildSb();
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(await makeJwt("principal"), {
@@ -379,49 +379,37 @@ describe("POST /api/orders/raw — internal raw creation (POS-parity)", () => {
       approvalCode: "472019",
     });
     expect(res.status).toBe(201);
-    // CARD 4 (0343): the mirror rides the ONE writer — payment_record with
-    // p_counts_toward_paid=false (the create RPC already put the deposit in
-    // orders.paid, so counting it again would double the money).
+    // The create RPC receives the deposit facts and records them through the
+    // one customer-payment writer in its own transaction (0476 §12).
+    expect(sb._rpcCalls.map((r: { name: string }) => r.name)).toEqual(["create_raw_order"]);
+    expect(sb._rpcCalls[0].payload).toMatchObject({
+      paid: 2000,
+      payment_method: "credit",
+      approval_code: "472019",
+    });
+    // No best-effort mirror, no direct ledger insert.
     expect(
       sb._inserts.filter((i: { table: string }) => i.table === "order_payments").length,
     ).toBe(0);
-    const mirror = sb._rpcCalls.filter(
-      (r: { name: string }) => r.name === "payment_record",
-    );
-    expect(mirror.length).toBe(1);
-    expect(mirror[0].payload).toMatchObject({
-      p_order_id: "11111111-1111-1111-1111-111111111111",
-      p_amount: 2000,
-      p_method: "card", // credit → the ledger's card bucket
-      p_kind: "deposit",
-      p_reference: "472019",
-      p_counts_toward_paid: false,
-    });
-    expect(typeof mirror[0].payload.p_paid_on).toBe("string");
-    expect(String(mirror[0].payload.p_receipt_no)).toMatch(/^RC-\d{6}-\d{4}$/);
   });
 
-  it("paid = 0 (or absent) writes NO ledger row; unknown method maps to 'other'", async () => {
-    const sb = buildSb();
+  it("a deposit the ledger cannot place fails the create loudly (400 with the SQL sentence)", async () => {
+    const sb = buildSb({
+      rpcError: {
+        code: "22023",
+        message: 'payment method "my-custom-method" has no money account — add it in Settings → Payment → Payment methods, then record this payment',
+        details: "payment_account_unmapped",
+      },
+    });
     vi.mocked(userClient).mockReturnValue(sb);
-    const res = await post(await makeJwt("principal"), validBody); // no paid
-    expect(res.status).toBe(201);
-    expect(
-      sb._rpcCalls.filter((r: { name: string }) => r.name === "payment_record").length,
-    ).toBe(0);
-
-    const sb2 = buildSb();
-    vi.mocked(userClient).mockReturnValue(sb2);
-    await post(await makeJwt("operation"), {
+    const res = await post(await makeJwt("operation"), {
       ...validBody,
       paid: 100,
       paymentMethod: "my-custom-method",
     });
-    const ledger2 = sb2._rpcCalls.filter(
-      (r: { name: string }) => r.name === "payment_record",
-    );
-    expect(ledger2[0].payload.p_method).toBe("other");
-    expect(ledger2[0].payload.p_reference).toBeNull();
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("has no money account");
+    expect(sb._rpcCalls.filter((r: { name: string }) => r.name === "payment_record").length).toBe(0);
   });
 
   it("422 rule_violation when the RPC rejects a sofa + mattress/bed-frame mix", async () => {

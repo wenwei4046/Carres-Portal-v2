@@ -35,6 +35,8 @@ import {
   CircleAlert,
   Library,
   SlidersHorizontal,
+  Receipt,
+  Banknote,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@carres/shared/domain";
@@ -432,14 +434,13 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         tab: "warehouse-outbound",
         section: "Warehouse",
       },
-      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER — the
-       * entry-point correction, 2026-09-09.
+      /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE COLLECTION LISTING FIRST.
        *
        * This row used to link to `/operation?tab=payments`, the Master-Sheet
        * "Balance" collections desk: its own Summary band, its own queue chips
        * and its own EDITABLE balance / storage-fee fields. Payment MASTER §16
-       * approved a different destination — the read-only Payments Register,
-       * its `Payments · Invoices` toolbar, the Invoice object that owns the
+       * approved one destination with a `Payments · Invoices` toolbar. The
+       * Invoice listing says what money is still needed and its object owns the
        * writing, and the §17 Calendar behind the Invoice date cells — and
        * every one of those shipped at `/finance/*` while this row still
        * pointed at the old desk. Two forms for one act make two records
@@ -456,7 +457,7 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         key: "payments",
         label: "Payments",
         icon: Wallet,
-        path: "/finance/payments",
+        path: "/finance/invoices",
         // The Invoices Register is the same destination's second listing (its
         // toolbar switches between the two), so the row stays lit there.
         activeFor: ["path:/finance/payments", "path:/finance/invoices"],
@@ -512,6 +513,20 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ArrowUpRight,
         financePath: "/finance/ap",
       },
+      // 0477 — a supplier's bill, and the voucher that pays it. Unpaid by
+      // Supplier is the Bills destination's third listing (toolbar switch).
+      {
+        key: "bills",
+        label: "Bills",
+        icon: Receipt,
+        financePath: "/finance/bills",
+      },
+      {
+        key: "payment-vouchers",
+        label: "Payment Vouchers",
+        icon: Banknote,
+        financePath: "/finance/payment-vouchers",
+      },
       {
         key: "payments",
         // Payment MASTER §16 — the destination word is `Payments`; the row
@@ -541,6 +556,18 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: UserCheck,
         financePath: "/finance/rental-approver",
       },
+      // 0478 — money in that is not a sale. A party that is not a customer
+      // (a sister company, a lender) is billed on Other debtors; a loan in,
+      // other income or money against those invoices is an Other receipt.
+      { key: "other-debtors", label: "Other debtors", icon: Users, financePath: "/finance/other-debtors" },
+      { key: "other-receipts", label: "Other receipts", icon: HandCoins, financePath: "/finance/other-receipts" },
+      // The Finance Ledger — three rows, not one row with tabs: the Journal,
+      // the Trial Balance and the Self-check are three different objects
+      // (entries · account balances · checks), and UI MASTER §6.5 keeps tabs
+      // for views of ONE object.
+      { key: "ledger", label: "Journal", icon: BookOpen, financePath: "/finance/ledger" },
+      { key: "trial-balance", label: "Trial Balance", icon: Scale, financePath: "/finance/ledger/trial-balance" },
+      { key: "self-check", label: "Self-check", icon: BadgeCheck, financePath: "/finance/ledger/self-check" },
       {
         key: "reports",
         label: "Reports",

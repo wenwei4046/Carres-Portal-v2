@@ -22,7 +22,6 @@ import {
   ordersListResponseSchema,
   orderStatusSchema,
   parseOrderEntryConfigRow,
-  docNumber,
   resolvePaymentMethods,
   STRIPE_METHOD_KEY,
   STRIPE_PAYMENT_METHOD,
@@ -1255,39 +1254,13 @@ ordersRouter.post("/raw", async (c) => {
   const { id } = (created ?? {}) as { id?: string };
   if (!id) throw new HTTPException(500, { message: "Order create returned no id" });
 
-  // Loo 2026-07-18 — the at-creation payment posts BACK into the order_payments
-  // ledger, same as an operation-recorded payment. CARD 4 (0343): through the
-  // ONE writer, as a HISTORY MIRROR (`p_counts_toward_paid: false`) — the
-  // create RPC already put this deposit inside `orders.paid`, so counting it
-  // again would double the money. BEST-EFFORT after the committed create — a
-  // ledger miss must not fail the order (the PDF falls back to orders.paid).
-  if (input.paid > 0) {
-    const LEDGER_METHOD: Record<string, string> = {
-      cash: "cash",
-      bank: "bank",
-      online: "online",
-      credit: "card",
-      card: "card",
-      installment: "card",
-      cheque: "cheque",
-    };
-    const paidOn = new Date().toISOString().slice(0, 10);
-    const { error: ledgerErr } = await sb.rpc("payment_record", {
-      p_order_id: id,
-      p_amount: input.paid,
-      p_paid_on: paidOn,
-      p_method: LEDGER_METHOD[input.paymentMethod ?? ""] ?? "other",
-      p_kind: "deposit",
-      p_reference: input.approvalCode || null,
-      p_note: "Recorded at New Order (raw) creation",
-      p_receipt_url: null,
-      p_receipt_no: docNumber({ prefix: "RC", date: paidOn, seed: `${id}:1`, digits: 4 }),
-      p_counts_toward_paid: false,
-    });
-    if (ledgerErr) {
-      console.error("raw create: order_payments ledger insert failed (non-fatal):", ledgerErr.message);
-    }
-  }
+  // 0476 — the money paid with the new order is recorded INSIDE create_raw_order,
+  // through the one customer-payment writer: a counted deposit with a receipt,
+  // an allocation and a journal entry, in the create transaction. The
+  // best-effort history mirror that used to follow here (payment_record with
+  // p_counts_toward_paid false, its failure logged and swallowed) is gone: a
+  // deposit the ledger cannot place now fails the create with a 400 naming the
+  // method, instead of leaving orders.paid with no receipt behind it.
 
   // Same response contract as POST / — the full order, so the client can show
   // the SO number + land on the standard order shape without a second GET.
@@ -4504,12 +4477,19 @@ ordersRouter.get("/:id/invoice-pdf-data", async (c) => {
  * POST /api/orders/:id/issue-invoice — Balance tab §10 "Generate invoice"
  * (Jess 2026-07-18).
  *
- * Issues the Sales Invoice ON DEMAND (before dispatch) via the 0229
- * `issue_order_invoice` RPC — idempotent, same INV-YYYY-{so} formula as the
- * 0098 dispatch auto-issue, so the two paths can never mint two numbers for
- * one order. Body carries the Balance tab's invoice total (goods + storage)
- * because AutoCount-imported orders have no per-line prices; a native order
- * may omit it and the RPC falls back to the line+addon sum.
+ * Issues the Sales Invoice ON DEMAND (before dispatch) via the
+ * `issue_order_invoice` RPC — idempotent. Since 0476 it issues the order's
+ * prepared draft (or a new one) through `payment_invoice_issue`, the ONE
+ * numbering authority: the number is the governed INV-DDMMYY-NNNN, given at
+ * issue and never reused after a void, and the journal entry posts in the same
+ * transaction (Dr 1210 / Cr 4100 · 4300 · 4400). Body carries the Balance
+ * tab's invoice total (goods + storage) because AutoCount-imported orders have
+ * no per-line prices; a native order may omit it and the RPC uses the prepared
+ * draft's amount, else the line+addon sum.
+ *
+ * A ledger refusal (a storage fee already on a Storage Invoice, a figure the
+ * lines cannot explain) is 22023 and reaches the operator as a 422 with the
+ * ledger's own sentence — nothing was issued.
  *
  * Roles: operation / finance / principal (same internal-doc gate as
  * invoice-pdf-data; RPC re-checks server-side).
@@ -4538,6 +4518,13 @@ ordersRouter.post("/:id/issue-invoice", async (c) => {
     }
     if (error.code === "P0002") {
       throw new HTTPException(404, { message: "Order not found" });
+    }
+    if (error.code === "22023" || error.code === "P0001") {
+      return c.json({
+        error: "rule_violation",
+        code: (error as { details?: string }).details || "invalid_param",
+        message: error.message ?? "The invoice could not be issued.",
+      }, 422);
     }
     throw new HTTPException(500, { message: error.message });
   }

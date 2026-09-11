@@ -14,7 +14,6 @@ import {
   defaultStorageStart,
   DELIVERY_TIME_SLOTS,
   PAYMENT_STATUSES,
-  PAYMENT_METHODS,
   PAYMENT_KINDS,
   DELIVERY_REASONS,
   DELIVERY_REASON_CATEGORY_LABEL,
@@ -26,7 +25,6 @@ import {
   type OpsOrderControl,
   type LineStockStatus,
   type OrderPaymentRow,
-  type OrderPaymentMethod,
   type PaymentKind,
 } from "@carres/shared";
 import {
@@ -44,6 +42,7 @@ import {
   useExtendStorage,
 } from "@/lib/queries";
 import { useAuth } from "@/lib/auth";
+import { methodLabel, useManualMethods } from "@/lib/payment-methods";
 import { renderReceiptPdf, renderExtensionAgreementPdf } from "@/lib/pdf/render";
 import { areaForAddress, suggestCarrier } from "@/lib/region";
 
@@ -883,7 +882,7 @@ function LedgerRow({
         {RM(Number(row.amount))}
       </span>
       <span className="text-base-600 capitalize flex-1 truncate">
-        {KIND_LABEL[row.kind]} · {row.method}
+        {KIND_LABEL[row.kind]} · {methodLabel(row.method)}
         {row.receipt_no ? ` · ${row.receipt_no}` : ""}
         {voided ? " · Voided" : ""}
       </span>
@@ -926,13 +925,16 @@ function AddPaymentForm({
   onSubmit: (input: {
     amount: number;
     paidOn: string;
-    method: OrderPaymentMethod;
+    method: string;
     kind: PaymentKind;
   }) => void;
 }) {
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(todayIso());
-  const [method, setMethod] = useState<OrderPaymentMethod>("cash");
+  // 0476 — the Active methods in Settings → Payment, never a fixed list.
+  const { methods } = useManualMethods();
+  const [chosenMethod, setMethod] = useState<string>("cash");
+  const method = methods.some((m) => m.value === chosenMethod) ? chosenMethod : methods[0].value;
   const [kind, setKind] = useState<PaymentKind>("payment");
   const amt = Number(amount);
   const valid = amount.trim() !== "" && Number.isFinite(amt) && amt > 0 && !pending;
@@ -958,13 +960,13 @@ function AddPaymentForm({
         />
         <select
           value={method}
-          onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+          onChange={(e) => setMethod(e.target.value)}
           aria-label="Payment method"
           className={CELL}
         >
-          {PAYMENT_METHODS.map((m) => (
-            <option key={m} value={m}>
-              {m}
+          {methods.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
             </option>
           ))}
         </select>
@@ -1560,7 +1562,9 @@ export function StorageCollectWaiver({
   const [requesting, setRequesting] = useState(false);
   const [reason, setReason] = useState("");
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<OrderPaymentMethod>("cash");
+  const [chosenMethod, setMethod] = useState<string>("cash");
+  const { methods } = useManualMethods();
+  const method = methods.some((m) => m.value === chosenMethod) ? chosenMethod : methods[0].value;
 
   // Already cleared → just confirm the gate is open.
   if (collectedAt) {
@@ -1609,13 +1613,13 @@ export function StorageCollectWaiver({
               />
               <select
                 value={method}
-                onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+                onChange={(e) => setMethod(e.target.value)}
                 aria-label="Storage payment method"
                 className={CELL}
               >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                {methods.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
                   </option>
                 ))}
               </select>

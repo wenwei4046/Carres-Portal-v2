@@ -153,6 +153,12 @@ export type DataGridProps<T> = {
   columns: DataGridColumn<T>[];
   /** localStorage key for column layout persistence */
   storageKey: string;
+  /** The grouping a register opens with when this browser has no saved
+      layout for `storageKey` yet (Finance Ledger, 2026-09-10: the Trial
+      Balance opens grouped by account kind). A saved layout always wins, so
+      the operator's own grouping is never overridden. Omitted = no grouping,
+      exactly as before. */
+  initialGroupBy?: string[];
   /** row id accessor — required for selection + key */
   rowKey: (row: T) => string;
   searchPlaceholder?: string;
@@ -458,6 +464,7 @@ function DataGridInner<T>({
   rows,
   columns,
   storageKey,
+  initialGroupBy,
   rowKey,
   searchPlaceholder = "Search…",
   exportName,
@@ -508,7 +515,13 @@ function DataGridInner<T>({
       return n;
     });
   }, []);
-  const [layout, setLayoutRaw] = useState<Layout>(() => readLayout(storageKey));
+  const [layout, setLayoutRaw] = useState<Layout>(() => {
+    const saved = readLayout(storageKey);
+    // `readLayout` hands back DEFAULT_LAYOUT itself only when nothing is saved.
+    return saved === DEFAULT_LAYOUT && initialGroupBy?.length
+      ? { ...DEFAULT_LAYOUT, groupBy: [...initialGroupBy] }
+      : saved;
+  });
   const setLayout = useCallback(
     (updater: (l: Layout) => Layout) => {
       setLayoutRaw((prev) => {

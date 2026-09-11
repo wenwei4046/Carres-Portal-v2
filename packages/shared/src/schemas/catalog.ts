@@ -1473,6 +1473,27 @@ export function supplierSlug(name: string): string {
 }
 
 /**
+ * 0477 — a landlord, an advertiser or a lorry company on credit is a row in
+ * `suppliers` with `kind = 'other_creditor'`, so Finance can enter its bills
+ * and pay it with a voucher. Purchasing never buys from one: no PO, no manual
+ * purchase, no catalog slot, no supplier claim.
+ *
+ * Every Purchasing, Catalog and Operation list passes its supplier rows
+ * through this, and Finance payables does not. `suppliers.kind` is NOT NULL
+ * (0001), so a row either is an other creditor or is not.
+ */
+export const OTHER_CREDITOR_KIND = "other_creditor";
+
+export function isOtherCreditor(row: { kind?: unknown } | null | undefined): boolean {
+  return row?.kind === OTHER_CREDITOR_KIND;
+}
+
+/** The supplier rows Purchasing may offer: every row except an other creditor. */
+export function purchasingSuppliersOnly<T extends { kind?: unknown }>(rows: readonly T[]): T[] {
+  return rows.filter((row) => !isOtherCreditor(row));
+}
+
+/**
  * ⭐ DUAL-SOURCING, THE RECORDING HALF (0388 · YH, 2026-08-26).
  *
  * One row per (sku, supplier): that supplier's OWN code and quoted prices for

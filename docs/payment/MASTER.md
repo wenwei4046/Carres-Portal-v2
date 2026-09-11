@@ -1514,8 +1514,14 @@ Use the UI MASTER Register Shell: 50px destination header `Payments` with global
 The footer names visible record count and money total. The first data identity remains sticky.
 At 390px and 200% zoom preserve one semantic Register with governed horizontal scrolling.
 
+The everyday Operation `Payments` rail door opens the `Invoices` listing first because it says
+which customer money is still needed and opens the collection action. `Payments` remains the same
+destination's toolbar listing for money already recorded. Finance may open either listing directly.
+This does not create a Payment Monitor or put Work actions into the read-only Register.
+
 Payments defaults, in order: `Receipt No · Paid Date · Customer · SO No · Amount · Method`.
 Do not repeat `Recorded`; show factual `VOIDED` or `RM {amount} needs review` only when true.
+Invoice, Recorded by and Exception remain available through Columns but are hidden by default.
 Invoices defaults: `Invoice No · Customer · SO No · Needed · Goods · Expected arrival ·
 Customer Delivery · Payment Timing`. Goods copy: `Goods ready`, `Arriving Monday, 7 Sep`,
 `Arrival not confirmed`.
@@ -1535,7 +1541,10 @@ Invoice order: Money → Goods and Delivery → Storage → What to do → Invoi
 History. Check money, goods readiness/arrival and customer Delivery before creating collection Work.
 When goods are not ready and arrival is unknown, show `Wait`; never create a blind payment chase.
 Draft may be edited and issued. Issued Invoice has no ordinary Edit; correction voids the old
-Invoice and creates a linked replacement.
+Invoice and creates a linked replacement. (0476 · BUILT: `Void and replace` sits in the Invoice
+section of an issued invoice, shown to the principal — the SQL also admits the Payment Approver
+duty, which the screen cannot yet resolve. The void reverses the invoice's journal entry; the
+replacement draft is issued from the order's `Generate invoice`, which draws a new number.)
 
 50/50 is used only while editing a customer-facing message/Invoice, recording Payment, or sending
 Invoice/Receipt. Narrow widths stack action/form first, customer document/message preview second.
@@ -1596,6 +1605,17 @@ Selectable Active manual methods and required evidence: Bank transfer — transf
 DuitNow QR — payment screenshot; Cheque — cheque photo and cheque number; Cash — cash collection
 proof; Credit card / Debit card — terminal receipt and approval code. Online payment is provider-
 recorded and is never a manual method. Cash never bypasses the paid-before-delivery gate.
+
+**Payment methods is the one list of methods (0476 · BUILT, awaiting production proof).** A
+manager adds a method, renames it, switches it off and chooses the one money account it lands
+in (cash, a bank account or card and online settlement — never a control or header account).
+Every form that records customer money (the Invoice's Record payment, the order's Record
+payment and storage collection, Finance's Record receipt) offers the Active rows and sends the
+method's key; a method a manager adds asks for `Payment proof` and an optional Reference. The
+ledger resolves the account from the same list, so a new method posts Dr its money account /
+Cr 1210 with no code change, and a renamed method keeps its old receipts' history. A method
+with no money account is refused by the writer from go-live. The Sales Portal's own sale-time
+method list (SO Maintenance) stays its own setting; its keys reach the same writer.
 
 Settings groups: Receiving bank accounts; Which bank to use; Payment methods; WhatsApp templates;
 Invoice and Receipt numbers; Storage charges. Default View uses readable summaries and focused
