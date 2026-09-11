@@ -2035,6 +2035,15 @@ describe("choosing a Ready Unit", () => {
     expect(screen.getByTestId("so-batch-issue")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("so-batch-expand-o1"));
+    /* ⭐ THE SAFEGUARD SURVIVED THE SECTION STACK (2026-09-11). Ready Stock is
+       now a CONNECTED SECTION rather than a box appended to the expansion, so
+       the path its act travels back to the Register is worth pinning: the
+       panel sits inside its own section, and pressing its button still reaches
+       `onReserved` and still drops the tick BEFORE the recomputed numbers
+       arrive. Nothing about the reservation door itself changed. */
+    const shelf = within(await screen.findByTestId("so-batch-inspector-o1"))
+      .getByTestId("connected-section-ready-stock");
+    expect(within(shelf).getByRole("button", { name: /Ready Stock/ })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Ready Stock/ }));
     const row = await screen.findByTestId(
       "ready-stock-unit-33333333-0000-0000-0000-00000000000a",
