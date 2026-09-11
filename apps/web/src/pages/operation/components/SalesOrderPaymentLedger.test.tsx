@@ -99,6 +99,26 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.queryByTestId("so-payments")).toBeNull();
   });
 
+  it("shows the saved customer payment evidence when the transaction list is empty", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" saved={{ paid: 1250, method: "online", reference: "BANK-1319", slip: "orders-attachments/slip.jpg" }} />);
+    expect(screen.getByText("Online transfer")).toBeTruthy();
+    expect(screen.getByText("BANK-1319")).toBeTruthy();
+    expect(screen.getByText("View slip")).toBeTruthy();
+    expect(screen.getByText(/The order records a paid amount/)).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    expect(screen.queryByTestId("so-payment-row")).toBeNull();
+  });
+
+  it("flags a saved slip with zero recorded paid instead of claiming the customer never paid", () => {
+    useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
+    render(<PaymentLedger orderId="o1" saved={{ paid: 0, method: "online", reference: "FT2083020", slip: "orders-attachments/slip.jpg" }} />);
+    expect(screen.getByText(/Payment evidence is saved, but the recorded paid amount is zero/)).toBeTruthy();
+    expect(screen.getByText("FT2083020")).toBeTruthy();
+    expect(screen.queryByTestId("so-payments-empty")).toBeNull();
+    expect(screen.queryByText("RM 2,874.00")).toBeNull();
+  });
+
   it("⭐ does NOT read an unreadable ledger as a zero", () => {
     /* The route answers 403 to anyone who is not operation/principal. Printing
        "No payment has been recorded" there would state, as a fact, that the

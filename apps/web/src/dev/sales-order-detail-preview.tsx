@@ -44,10 +44,11 @@ const ORDER = {
   placed_at: "2026-08-21T02:00:00Z", delivery_date: "2026-09-24",
   delivery_date_tbd: false, proceed_date: "2026-08-26",
   source_ref: ["CR-2207", "TCF-8891"], source_system: "native",
-  paid: 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
+  paid: STATE === "evidence-zero" ? 0 : STATE === "saved" ? 1250 : 2999.5, dealer_id: "d1", outlet_id: "o1", salesperson_id: "s1",
   dealers: { name: "Carres HQ" }, outlets: { name: "PJ Showroom" },
   salespersons: { name: "Bernard" },
-  installment_months: 12, payment_method: "credit_card",
+  installment_months: 12, payment_method: "installment",
+  approval_code: "BANK-REFERENCE", payment_slip_url: "orders-attachments/preview/slip.jpg",
   do_number: null, invoice_no: null, invoiced_at: null, delivered_at: null,
   dispatched_at: null, warehouse_id: null, delivery_partner_id: null,
 };
@@ -87,7 +88,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
   if (url.includes(`/payments`)) {
-    if (STATE === "empty") return json({ payments: [] });
+    if (["empty", "saved", "evidence-zero"].includes(STATE)) return json({ payments: [] });
     if (STATE === "forbidden") return json({ error: "Operation or principal only" }, 403);
     return json({ payments: PAYMENTS });
   }

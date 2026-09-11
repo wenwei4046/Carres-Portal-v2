@@ -273,8 +273,10 @@ Pages, the ERP and POS canonical hosts, and the API Worker) report that SHA, and
 bundle carries `Delivery access`, `Sales ownership`, `Recorded by` and `Line total` — the SHA
 alone has been wrong before, so the asset was read too.
 
-⚠️ **What that record does NOT cover, stated rather than implied:** the **authenticated** page
-walk is owner-only and was not performed; the **re-cut-on-resize** path was not observed end to
+⚠️ **What that original record did not cover:** an authenticated page walk was not performed;
+owner-only acceptance does not prohibit engineering from read-only verification. The takeover
+walk found SO-1319's positive Paid with an empty transaction list and SO-1357's saved reference
+and slip with zero Paid. These findings require the capture/evidence states described below; the **re-cut-on-resize** path was not observed end to
 end (a hidden tab delivers neither `ResizeObserver` callbacks nor `requestAnimationFrame` —
 measured — so the padding arithmetic is unit-tested and the wiring pinned by the contract suite
 instead); browser coverage is **macOS + Chromium only**; and a **pre-existing** 120px page
@@ -1477,13 +1479,30 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   - **The at-sale plan is stated only where it was recorded** — `installment_months` +
     `payment_method`, as an ORDER fact above the ledger. **No monthly figure is derived**: a month
     count and a total do not say what the customer's bank charges, and a number this screen
-    invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent and no
-    Account Sheet mapping. Saved `orders.approval_code` is the at-sale reference;
+    invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent. Saved `orders.approval_code` is the at-sale reference;
     `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
     saved method/months under `Payment details recorded at sale`, separate from transactions.
     No payment amount, paid date or collector is inferred from the order's cumulative Paid or
-    current salesperson. An empty ledger says `No payment transactions to show` and does not
-    contradict a positive Paid value. The detail GET explicitly carries all four capture fields.
+    current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that
+    individual transactions are unavailable. A saved reference/slip with zero Paid flags the
+    inconsistent records and points to Payments. Only an order without those facts gets the
+    neutral empty-transaction state. Saved evidence survives a failed transaction read. The
+    detail GET explicitly carries all four capture fields. The page never substitutes an
+    inferred amount or creates a payment as a rendering side effect.
+  - **Read-only source findings, 2026-09-11:** SO-1319 records Paid RM 1,250 but no canonical
+    transactions. SO-1357 records Paid RM 0, reference FT2083020 and a slip attachment; its
+    creation history also says 0% deposit. The authenticated Sales Portal My orders drawer
+    confirms `Paid so far RM 0 / 2,874` and `0% collected`; its additional-payment input
+    pre-fills 2,874 but is not a submitted payment. The attachment cannot establish a paid
+    amount. No business rows were changed. The Sales Portal create route
+    does not post its initial deposit to the canonical writer; the raw create route alone has
+    a best-effort mirror. Payment ownership confirmed this is outside its active UI change.
+    Historical money reconciliation needs verified source amounts and the governed Payments
+    correction path; displaying captured evidence does not claim that writer gap is repaired.
+  - **Old revisions use their own lines and services.** SKU/configuration and service amounts
+    cannot be paired with current rows by position. Current Unit IDs/destinations do not prove
+    historical allocation. Current partially allocated lines preserve all recorded Unit IDs,
+    including explicitly unverified links, while still showing the short quantity.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired

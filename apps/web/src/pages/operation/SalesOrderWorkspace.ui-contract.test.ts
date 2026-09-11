@@ -1158,12 +1158,13 @@ describe("Sales Order object page — one form grammar", () => {
   });
 
   it("states a recorded instalment plan, and invents nothing when there is none", () => {
+    const ledger = readFileSync(join(here, "components/SalesOrderPaymentLedger.tsx"), "utf8");
     /* `orders.installment_months` + `orders.payment_method` are the at-sale
        capture — an ORDER fact, so it is stated above the ledger, never as a
        column on rows that do not carry it. */
-    expect(workspace).toContain('data-testid="money-instalment"');
+    expect(ledger).toContain('data-testid="money-instalment"');
     expect(workspace).toContain("installment_months");
-    expect(workspace).toContain("!isNew && (instalmentWord || order?.approval_code || order?.payment_slip_url)");
+    expect(ledger).toContain("atSalePaymentWord(saved.method, saved.months)");
     /* ⛔ NO DERIVED MONTHLY FIGURE. A number this screen computed would be
        read as one Carres agreed to, and a month count plus a total does not
        say what the customer's bank actually charges. */
