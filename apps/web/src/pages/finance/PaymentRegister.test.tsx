@@ -60,6 +60,9 @@ describe("Payments Register", () => {
     for (const label of ["Receipt No", "Paid Date", "Customer", "SO No", "Amount", "Method"]) {
       expect(within(table).getAllByText(label).length).toBeGreaterThan(0);
     }
+    for (const optional of ["Invoice", "Recorded by", "Exception"]) {
+      expect(within(table).queryByText(optional)).not.toBeInTheDocument();
+    }
     expect(screen.getByText("RC-060926-0001")).toBeInTheDocument();
     expect(screen.getByText("VOIDED")).toBeInTheDocument();
     expect(screen.getByTestId("payment-register-summary")).toHaveTextContent("2 payments · RM 200.00 received");
@@ -221,7 +224,11 @@ describe("Correct allocation", () => {
 
 // §11 (0453) — history filterable by invoice, actor and exception.
 describe("the §11 history axes", () => {
-  it("shows the invoice, the recorder and the exception as their own columns", () => {
+  it("keeps the invoice, recorder and exception available through Columns", () => {
+    localStorage.setItem("carres.payment.register.v2", JSON.stringify({
+      order: ["receipt", "paid", "customer", "so", "amount", "method", "invoice", "actor", "exception"],
+      hidden: [],
+    }));
     show();
     const table = screen.getByRole("table");
     for (const label of ["Invoice", "Recorded by", "Exception"]) {
@@ -236,6 +243,10 @@ describe("the §11 history axes", () => {
 
   it("says so honestly when a payment sits on no invoice", () => {
     state.data = [{ ...payment, payment_allocations: [] }];
+    localStorage.setItem("carres.payment.register.v2", JSON.stringify({
+      order: ["receipt", "paid", "customer", "so", "amount", "method", "invoice"],
+      hidden: [],
+    }));
     show();
     expect(screen.getByText("Not allocated to an invoice")).toBeInTheDocument();
   });

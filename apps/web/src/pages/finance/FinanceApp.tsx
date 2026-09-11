@@ -40,7 +40,7 @@ export default function FinanceApp() {
       <main className="flex-1 min-w-0">
         <Routes>
           <Route index element={role === "operation"
-            ? <Navigate to="payments" replace /> : <Navigate to="dashboard" replace />} />
+            ? <Navigate to="invoices" replace /> : <Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
           <Route path="ar"        element={financeOnly(<FinanceAR />)} />
           <Route path="ap"        element={financeOnly(<FinanceAP />)} />

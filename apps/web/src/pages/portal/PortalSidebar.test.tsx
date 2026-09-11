@@ -213,10 +213,10 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
      for the whole time the approved Register lived at `/finance/payments`.
      This is the assertion that failed to exist: the rail was tested for its
      SHAPE and never for its DESTINATION. */
-  it("Payments opens the canonical Register, never the retired desk", () => {
+  it("Payments opens the collection listing first, never the retired desk", () => {
     renderAt("/operation");
     const row = child("payments");
-    expect(row).toHaveAttribute("href", "/finance/payments");
+    expect(row).toHaveAttribute("href", "/finance/invoices");
     expect(row.getAttribute("href")).not.toContain("tab=payments");
   });
 

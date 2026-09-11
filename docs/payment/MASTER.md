@@ -1514,8 +1514,14 @@ Use the UI MASTER Register Shell: 50px destination header `Payments` with global
 The footer names visible record count and money total. The first data identity remains sticky.
 At 390px and 200% zoom preserve one semantic Register with governed horizontal scrolling.
 
+The everyday Operation `Payments` rail door opens the `Invoices` listing first because it says
+which customer money is still needed and opens the collection action. `Payments` remains the same
+destination's toolbar listing for money already recorded. Finance may open either listing directly.
+This does not create a Payment Monitor or put Work actions into the read-only Register.
+
 Payments defaults, in order: `Receipt No · Paid Date · Customer · SO No · Amount · Method`.
 Do not repeat `Recorded`; show factual `VOIDED` or `RM {amount} needs review` only when true.
+Invoice, Recorded by and Exception remain available through Columns but are hidden by default.
 Invoices defaults: `Invoice No · Customer · SO No · Needed · Goods · Expected arrival ·
 Customer Delivery · Payment Timing`. Goods copy: `Goods ready`, `Arriving Monday, 7 Sep`,
 `Arrival not confirmed`.
