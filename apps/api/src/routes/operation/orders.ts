@@ -1052,7 +1052,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
     sb.from("orders").select("so").eq("id", id).maybeSingle(),
     sb.from("order_lines").select("id, sku, qty").eq("order_id", id),
     sb.from("order_supplier_threads").select("order_line_id, po_id").eq("order_id", id),
-    sb.from("purchasing_destinations").select("id, name, is_default").eq("active", true),
+    sb.from("purchasing_destinations").select("id, name, is_default, active"),
   ]);
   const firstError = orderErr ?? linesErr ?? threadsErr ?? destErr;
   if (firstError) { const m = mapPgError(firstError); return c.json(m.body, m.status); }
@@ -1062,18 +1062,18 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   // PO-line/source-line link, never a SKU match across the whole PO. A shared
   // PO line does not yet identify which physical Unit belongs to which SO.
   const { data: sources, error: sourceErr } = await sb.from("po_line_sources")
-    .select("po_line_id, order_line_id").eq("order_id", id);
+    .select("po_id, po_line_id, order_line_id, qty").eq("order_id", id);
   if (sourceErr) { const m = mapPgError(sourceErr); return c.json(m.body, m.status); }
-  const sourceRows = (sources ?? []) as Array<{ po_line_id: string | null; order_line_id: string | null }>;
+  const sourceRows = (sources ?? []) as Array<{ po_id: string; po_line_id: string | null; order_line_id: string | null; qty: number }>;
   const sourcePoLineIds = [...new Set(sourceRows.map((s) => s.po_line_id).filter((v): v is string => Boolean(v)))];
   const incomingByLine = new Map<string, string[]>();
   const poLineByUnit = new Map<string, string>();
+  const exclusive = new Map<string, string>();
   if (sourcePoLineIds.length) {
     const { data: owners, error: ownerErr } = await sb.from("po_line_sources")
       .select("po_line_id, order_id, order_line_id").in("po_line_id", sourcePoLineIds);
     if (ownerErr) { const m = mapPgError(ownerErr); return c.json(m.body, m.status); }
     const ownerRows = (owners ?? []) as Array<{ po_line_id: string; order_id: string | null; order_line_id: string | null }>;
-    const exclusive = new Map<string, string>();
     for (const poLineId of sourcePoLineIds) {
       const linked = ownerRows.filter((s) => s.po_line_id === poLineId);
       const lineId = linked[0]?.order_line_id;
@@ -1092,20 +1092,20 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
     }
   }
 
-  const destinationRows = (destinations ?? []) as Array<{ id: string; name: string; is_default: boolean }>;
+  const destinationRows = (destinations ?? []) as Array<{ id: string; name: string; is_default: boolean; active?: boolean }>;
   const destinationName = new Map(destinationRows.map((d) => [d.id, d.name]));
-  const defaultDeliverTo = destinationRows.find((d) => d.is_default)?.name ?? null;
+  const defaultDeliverTo = destinationRows.find((d) => d.is_default && d.active !== false)?.name ?? null;
   const threadRows = (threads ?? []) as Array<{ order_line_id: string; po_id: string | null }>;
-  const poIds = [...new Set(threadRows.map((t) => t.po_id).filter((v): v is string => Boolean(v)))];
+  const poIds = [...new Set([...threadRows.map((t) => t.po_id), ...sourceRows.map((s) => s.po_id)].filter((v): v is string => Boolean(v)))];
   const [{ data: pos, error: posErr }, { data: poLines, error: poLinesErr }, { data: units, error: unitsErr }] = await Promise.all([
-    poIds.length ? sb.from("purchase_orders").select("id, destination_id").in("id", poIds) : Promise.resolve({ data: [], error: null }),
-    poIds.length ? sb.from("purchase_order_lines").select("po_id, sku, qty, destination_id").in("po_id", poIds) : Promise.resolve({ data: [], error: null }),
-    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
+    poIds.length ? sb.from("purchase_orders").select("id, destination_id, status").in("id", poIds) : Promise.resolve({ data: [], error: null }),
+    poIds.length ? sb.from("purchase_order_lines").select("id, po_id, sku, qty, destination_id").in("po_id", poIds) : Promise.resolve({ data: [], error: null }),
+    sb.from("ops_stock_items").select("unit_code, sku, po_line_id, warehouse_id, holder_party_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
   ]);
   const secondError = posErr ?? poLinesErr ?? unitsErr;
   if (secondError) { const m = mapPgError(secondError); return c.json(m.body, m.status); }
 
-  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null };
+  type UnitRow = { unit_code: string | null; sku: string; po_line_id?: string | null; warehouse_id?: string | null; holder_party_id?: string | null };
   const unitRows = (units ?? []) as UnitRow[];
   for (const unit of unitRows) {
     if (unit.unit_code && unit.po_line_id) poLineByUnit.set(unit.unit_code, unit.po_line_id);
@@ -1135,44 +1135,51 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
       holderName: u.holder_party_id ? holderName.get(u.holder_party_id) ?? null : null,
     }));
 
-  const poDestination = new Map(((pos ?? []) as Array<{ id: string; destination_id: string }>).map((p) => [p.id, p.destination_id]));
-  const poByLine = new Map(threadRows.map((t) => [t.order_line_id, t.po_id]));
-  const unitIdsBySku = new Map<string, string[]>();
+  const activePos = ((pos ?? []) as Array<{ id: string; destination_id: string; status?: string }>).filter((p) => p.status !== "cancelled");
+  const poDestination = new Map(activePos.map((p) => [p.id, p.destination_id]));
+  const verifiedByLine = new Map<string, string[]>();
+  const unverifiedBySku = new Map<string, string[]>();
   for (const unit of unitRows) {
     if (!unit.unit_code) continue;
+    const lineId = unit.po_line_id ? exclusive.get(unit.po_line_id) : undefined;
+    if (lineId) {
+      verifiedByLine.set(lineId, [...(verifiedByLine.get(lineId) ?? []), unit.unit_code]);
+      continue;
+    }
     const key = normalizeSkuKey(unit.sku) || unit.sku;
-    unitIdsBySku.set(key, [...(unitIdsBySku.get(key) ?? []), unit.unit_code]);
+    unverifiedBySku.set(key, [...(unverifiedBySku.get(key) ?? []), unit.unit_code]);
   }
-  const purchaseLines = (poLines ?? []) as Array<{ po_id: string; sku: string; qty: number; destination_id: string | null }>;
+  const purchaseLines = new Map(((poLines ?? []) as Array<{ id: string; po_id: string; destination_id: string | null }>).map((p) => [p.id, p]));
   return c.json({
     defaultDeliverTo,
     unitCoverage,
     place,
     lines: ((lines ?? []) as Array<{ id: string; sku: string; qty: number }>).map((line) => {
-      const poId = poByLine.get(line.id);
-      const matches = poId ? purchaseLines.filter((p) => p.po_id === poId && normalizeSkuKey(p.sku) === normalizeSkuKey(line.sku)) : [];
-      // A consolidated PO can carry more of the same SKU than this SO owns.
-      // Never project somebody else's quantity onto this order: consume only
-      // this line's committed quantity, preserving PO-line destination splits.
-      let remaining = Math.max(0, Number(line.qty) || 0);
+      // A destination belongs to the recorded source allocation, not whichever
+      // matching SKU happens to be returned first from a consolidated PO.
       const byDestination = new Map<string, number>();
-      for (const p of matches) {
-        if (remaining <= 0) break;
-        const qty = Math.min(remaining, Math.max(0, Number(p.qty) || 0));
+      for (const source of sourceRows.filter((s) => s.order_line_id === line.id)) {
+        const p = source.po_line_id ? purchaseLines.get(source.po_line_id) : undefined;
+        if (!p || !poDestination.has(p.po_id)) continue;
+        const qty = Math.max(0, Number(source.qty) || 0);
         if (qty <= 0) continue;
-        const name = destinationName.get(p.destination_id ?? poDestination.get(p.po_id) ?? "") ?? defaultDeliverTo ?? "Not recorded";
+        const name = destinationName.get(p.destination_id ?? poDestination.get(p.po_id) ?? "") ?? "Not recorded";
         byDestination.set(name, (byDestination.get(name) ?? 0) + qty);
-        remaining -= qty;
       }
       const deliverTo = [...byDestination].map(([name, qty]) => ({ name, qty }));
+      const unitIds = [...new Set([
+        ...(verifiedByLine.get(line.id) ?? []),
+        ...(incomingByLine.get(line.id) ?? []),
+      ])].sort();
       return {
         lineId: line.id,
         sku: line.sku,
-        unitIds: [...new Set([
-          ...(unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? []),
-          ...(incomingByLine.get(line.id) ?? []),
-        ])].sort(),
-        deliverTo: deliverTo.length ? deliverTo : (defaultDeliverTo ? [{ name: defaultDeliverTo, qty: Number(line.qty) || 0 }] : []),
+        unitIds,
+        // Keep order/SKU associations inspectable, but never present them as
+        // proven allocation to this particular configured goods line.
+        unverifiedUnitIds: [...new Set(unverifiedBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? [])].sort(),
+        unitQuantityMismatch: unitIds.length > Math.max(0, Number(line.qty) || 0),
+        deliverTo,
       };
     }),
   });

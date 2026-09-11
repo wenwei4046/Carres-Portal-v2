@@ -249,27 +249,27 @@ const amountOf = (s: MoneyState): number => (s.kind === "amount" ? s.value : 0);
  */
 export const REGISTER_FIELDS: readonly RegisterField[] = [
   /* The eight owner-ruled defaults, in their governed order. */
-  { key: "so", label: "SO No", width: "85px", group: "Document", on: true,
+  { key: "so", label: "SO No", width: "80px", group: "Document", on: true,
     text: (r) => `SO-${r.so}`, sortBy: (r) => r.so },
-  { key: "ordered", label: "SO Date", width: "113px", group: "Dates", on: true,
+  { key: "ordered", label: "SO Date", width: "104px", group: "Dates", on: true,
     text: (r) => fmtDate(r.ordered), sortBy: (r) => r.ordered,
     kind: "date", iso: (r) => r.ordered },
   { key: "customer_delivery", label: "Requested Delivery Date", width: "192px", group: "Dates", on: true,
     text: (r) => date(r.customerDelivery, NO_DATE_YET), sortBy: (r) => r.customerDelivery ?? "",
     kind: "date", iso: (r) => r.customerDelivery },
-  { key: "customer", label: "Customer", width: "190px", group: "Customer", on: true,
+  { key: "customer", label: "Customer", width: "144px", group: "Customer", on: true,
     text: (r) => r.customer, sortBy: (r) => r.customer },
-  { key: "delivery_location", label: "Delivery Location", width: "280px", group: "Customer", on: true,
+  { key: "delivery_location", label: "Delivery Location", width: "160px", group: "Customer", on: true,
     text: (r) => r.deliveryLocation },
   /* Re-ruled to EIGHT defaults, 2026-08-15 (Chai). `Showroom` READS the
      Sales-ownership fact the order already carries (`outlets.name`) — it is
      the same declaration that has always been in this catalog, promoted to a
      default. No new writer, no new query, no new fact. */
-  { key: "showroom", label: "Showroom", width: "126px", group: "Sales ownership", on: true,
+  { key: "showroom", label: "Showroom", width: "112px", group: "Sales ownership", on: true,
     text: (r) => showroomShort(r.o.outlets?.name) || NOT_RECORDED },
-  { key: "po_number", label: "PO No", width: "170px", group: "Document", on: true,
+  { key: "po_number", label: "PO No", width: "156px", group: "Document", on: true,
     text: (r) => r.poNumbers.join(" · ") || NOT_RECORDED },
-  { key: "do_number", label: "DO No", width: "150px", group: "Document", on: true,
+  { key: "do_number", label: "DO No", width: "144px", group: "Document", on: true,
     text: (r) =>
       r.deliveryOrders.length === 0
         ? "No delivery order yet"

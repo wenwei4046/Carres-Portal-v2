@@ -48,6 +48,8 @@
 // register above it owns all three, and wrapping a disclosure in ListPageShell
 // would draw a second page chrome inside one table cell.
 import type { ReactNode } from "react";
+import Button from "@/components/kit/Button";
+import Popover from "@/components/kit/Popover";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -141,6 +143,8 @@ export interface GoodsMiniLine {
   category: string;
   /** One printed line each; empty means the absence below is printed instead. */
   unitIds: string[];
+  /** Optional read-only inspection surface supplied by the owning page. */
+  unitNode?: ReactNode;
   /** The governed word for an empty `Unit ID` on THIS kind of line. */
   unitAbsence: string;
   deliverTo: string[];
@@ -563,7 +567,7 @@ export default function GoodsMiniTable({
                   );
                 case "unit":
                   if (evidence) return unit.unitId;
-                  return line.unitIds.length ? (
+                  return line.unitNode != null ? line.unitNode : line.unitIds.length ? (
                     line.unitIds.map((id) => <div key={id}>{id}</div>)
                   ) : (
                     <Absence>{line.unitAbsence}</Absence>
@@ -649,4 +653,20 @@ export default function GoodsMiniTable({
       </table>
     </div>
   );
+}
+
+export function UnitEvidence({ ids, unverified, mismatch }: { ids: string[]; unverified: string[]; mismatch: boolean }) {
+  if (ids.length === 0 && unverified.length === 0 && mismatch) return <p className="text-meta text-kit-amber-11">Unit ID count exceeds order quantity</p>;
+  if (ids.length === 0 && unverified.length === 0) return <span data-absence="true" className="text-kit-slate-9">Not allocated</span>;
+  if (ids.length === 1 && unverified.length === 0 && !mismatch) return <span>{ids[0]}</span>;
+  return <div>
+    <Popover label="Unit ID" trigger={<Button size="sm" variant="ghost">Unit ID ({ids.length + unverified.length})</Button>}>
+      <div className="max-h-64 overflow-y-auto text-body">
+        {ids.map((id) => <div key={id}>{id}</div>)}
+        {unverified.length > 0 && <><p className="text-kit-amber-11">Unit ID link not verified</p>{unverified.map((id) => <div key={id}>{id}</div>)}</>}
+      </div>
+    </Popover>
+    {mismatch && <p className="text-meta text-kit-amber-11">Unit ID count exceeds order quantity</p>}
+    {unverified.length > 0 && <p className="text-meta text-kit-amber-11">Unit ID link not verified</p>}
+  </div>;
 }

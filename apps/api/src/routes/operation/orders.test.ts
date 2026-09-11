@@ -2795,6 +2795,35 @@ describe("GET /api/operation/orders/:id/commitment", () => {
 });
 
 describe("GET /api/operation/orders/:id/expansion", () => {
+  it.each([false, true])("never launders excess or unverified IDs into an ordinary Qty 1 row (verified=%s)", async (verified) => {
+    const orderId = "00000000-0000-0000-0000-000000000a01";
+    const ids = Array.from({ length: 14 }, (_, i) => `U1-${i}`);
+    const from = vi.fn((table: string) => ({ select: (columns: string) => {
+      let data: unknown = [];
+      if (table === "orders") data = { so: 1340 };
+      if (table === "order_lines") data = [{ id: "l1", sku: "H1401F-K", qty: 1 }, { id: "l2", sku: "H1401F-K", qty: 1 }];
+      if (table === "purchasing_destinations") data = [{ id: "default", name: "Carres Klang", is_default: true }];
+      if (table === "po_line_sources" && verified) data = [{ po_line_id: "p1", po_id: "po1", order_id: orderId, order_line_id: "l1", qty: 1 }];
+      if (table === "ops_stock_items" && columns.includes("warehouse_id")) data = ids.map((unit_code) => ({ unit_code, sku: "H1401F-K", po_line_id: verified ? "p1" : null }));
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or"]) chain[method] = () => chain;
+      chain.maybeSingle = () => Promise.resolve({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return chain;
+    } }));
+    vi.mocked(userClient).mockReturnValue({ from } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; unverifiedUnitIds: string[]; unitQuantityMismatch: boolean; deliverTo: unknown[] }> };
+    expect(body.lines[0].unitIds).toHaveLength(verified ? 14 : 0);
+    expect(body.lines[0].unverifiedUnitIds).toHaveLength(verified ? 0 : 14);
+    expect(body.lines[0].unitQuantityMismatch).toBe(verified);
+    expect(body.lines[1].unitIds).toEqual([]);
+    // No PO destination exists: a current default is never a historical fact.
+    expect(body.lines.every((line) => line.deliverTo.length === 0)).toBe(true);
+  });
+
   it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
     const orderId = "00000000-0000-0000-0000-000000000a01";
     const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
@@ -2841,18 +2870,22 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       orders: { so: 1303 },
       order_lines: [{ id: "line-1", sku: "B1201S-K", qty: 11 }],
       order_supplier_threads: [{ order_line_id: "line-1", po_id: "PO-2032" }],
+      po_line_sources: [
+        { po_id: "PO-2032", po_line_id: "pol-1", order_id: ORDER_ID, order_line_id: "line-1", qty: 10 },
+        { po_id: "PO-2032", po_line_id: "pol-2", order_id: ORDER_ID, order_line_id: "line-1", qty: 1 },
+      ],
       purchasing_destinations: [
         { id: "klang", name: "Carres Klang", is_default: true },
         { id: "al", name: "AL Sungai Buloh", is_default: false },
       ],
       purchase_orders: [{ id: "PO-2032", destination_id: "klang" }],
       purchase_order_lines: [
-        { po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
-        { po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
+        { id: "pol-1", po_id: "PO-2032", sku: "B1201S-K", qty: 10, destination_id: null },
+        { id: "pol-2", po_id: "PO-2032", sku: "B1201S-K", qty: 1, destination_id: "al" },
       ],
       ops_stock_items: [
-        { unit_code: "id-001", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: null },
-        { unit_code: "id-002", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: "party-nets" },
+        { unit_code: "id-001", po_line_id: "pol-1", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: null },
+        { unit_code: "id-002", po_line_id: "pol-1", sku: "B1201S-K", warehouse_id: "wh-klang", holder_party_id: "party-nets" },
       ],
       /* DELIVERY CARD 02 — Where and Who has it come from Stock's own two
          lookup tables, never from a name copied onto the Unit. */
@@ -2865,7 +2898,8 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
       chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
       chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
-      return { select: vi.fn(() => chain) };
+      return { select: vi.fn((columns: string) => table === "ops_stock_items" && !columns.includes("warehouse_id")
+        ? { in: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }) } : chain) };
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue({ from } as any);
@@ -2876,7 +2910,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       defaultDeliverTo: "Carres Klang",
-      unitCoverage: {},
+      unitCoverage: { "id-001": "PO-2032", "id-002": "PO-2032" },
       /* WHERE each Unit is and WHO has it — the SAME Units the lines already
          name, resolved to Stock's own names. Delivery Work reads this block;
          the Sales Orders register ignores it. */
@@ -2888,6 +2922,8 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         lineId: "line-1",
         sku: "B1201S-K",
         unitIds: ["id-001", "id-002"],
+        unverifiedUnitIds: [],
+        unitQuantityMismatch: false,
         deliverTo: [
           { name: "Carres Klang", qty: 10 },
           { name: "AL Sungai Buloh", qty: 1 },

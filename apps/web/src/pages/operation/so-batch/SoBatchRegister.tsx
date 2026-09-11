@@ -48,6 +48,7 @@ import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import ReadyStockPanel from "./ReadyStockPanel";
 import GoodsMiniTable, {
+  UnitEvidence,
   categoryWord,
   type GoodsMiniLine,
 } from "../components/GoodsMiniTable";
@@ -1233,6 +1234,7 @@ function SoBatchOrderExpansion({
   }
 
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
+    const fact = expansion.data?.lines.find((item) => item.lineId === l.orderLineId);
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
     const eligible = leaf != null && isSelectableForOrder(leaf, order.status);
@@ -1253,6 +1255,9 @@ function SoBatchOrderExpansion({
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
+      unitNode: !expansion.isError && !expansion.isPending && ((fact?.unverifiedUnitIds?.length ?? 0) > 0 || fact?.unitQuantityMismatch)
+        ? <UnitEvidence ids={[]} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
+        : undefined,
       unitAbsence: expansion.isError
         ? "Unit IDs could not be loaded"
         : expansion.isPending
