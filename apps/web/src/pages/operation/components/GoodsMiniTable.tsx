@@ -330,28 +330,18 @@ export default function GoodsMiniTable({
   identityFirst = false,
   showSupplier = false,
   showPoDeliveryDate = false,
- fix/zul-dev-branch
+  showPoNo = false,
+  showUnitId = true,
   oneRowPerUnit = false,
   salesOrderLayout = false,
   onCoveredByClick,
   isCoveredByLinkable,
-
-  showPoNo = false,
-  showUnitId = true,
   onPoClick,
   onOpenPoDetails,
- main
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
- fix/zul-dev-branch
-  /** Trial nested-card presentation for the Sales Orders register only. */
-  salesOrderLayout?: boolean;
-  /** Disclose each physical Unit separately while retaining line selection. */
-  oneRowPerUnit?: boolean;
-
-  main
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
   /**
@@ -417,6 +407,10 @@ export default function GoodsMiniTable({
    * MASTER rather than fake a read.
    */
   showUnitId?: boolean;
+  /** Trial nested-card presentation for the Sales Orders register only. */
+  salesOrderLayout?: boolean;
+  /** Disclose each physical Unit separately while retaining line selection. */
+  oneRowPerUnit?: boolean;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
   /**
@@ -426,33 +420,6 @@ export default function GoodsMiniTable({
    */
   onOpenPoDetails?: () => void;
 }) {
- fix/zul-dev-branch
-  /* The six ruled columns, plus the buying page's own — `Covered by` after
-     `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
-  type Column = { key: string; label: string; width: number | string | null };
-  const columns: Column[] = showCoveredBy
-    ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
-    : [...CHILD_COLUMNS];
-  if (salesOrderLayout) {
-    columns.splice(0, columns.length,
-      { key: "category", label: "Category", width: "15%" },
-      { key: "item", label: "Item Details", width: "45%" },
-      { key: "unit", label: "Unit ID", width: "15%" },
-      { key: "qty", label: "Qty", width: "10%" },
-      { key: "deliverTo", label: "Deliver To", width: "15%" },
-    );
-  }
-  const itemAt = columns.length - 1;
-  if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
-  if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
-  const minWidth =
-    (salesOrderLayout ? 1100 - ITEM_FLOOR : FIXED_TOTAL) +
-    ITEM_FLOOR +
-    (selection ? SELECT_WIDTH : 0) +
-    (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
-    (showSupplier ? SUPPLIER_COLUMN.width : 0) +
-    (showPoDeliveryDate ? PO_DATE_COLUMN.width : 0);
-
   /**
    * ⭐ ONE REGISTRY, TWO READING ORDERS — and every width still fixed but one.
    *
@@ -513,17 +480,8 @@ export default function GoodsMiniTable({
   /* Below this the box scrolls sideways rather than crushing a column. */
   const minWidth =
     columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
-main
+
   return (
-    /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
-       The first shipped version fused it into the grid: two rules and nothing
-       else, so the child header sat directly against the parent row and read
-       as more of the same table. The child of a record is its OWN object, and
-       the frame is what says so — the same `rounded-control` border the box
-       has always carried, with the register's own breathing space above and
-       below it (the ENGINE's, so every expansion sits the same way). The
-       LEFT and RIGHT edges are untouched: the frame is drawn on the `SO No`
-       column's left edge and the parent table's right edge. */
     <div
       className={`${styles.tableFrame} ${salesOrderLayout ? "w-full min-w-0 [&_td]:align-top [&_td]:whitespace-normal [&_td]:break-words" : "overflow-x-auto"}`}
       data-testid="goods-mini-table"
@@ -539,27 +497,14 @@ main
             <col key={c.key} style={c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
-        {/* LEVEL ONE — the parent header's own treatment: 11px, grey, the
-            button family's uppercase tracking. The eye should not have to
-            learn a second header style eight pixels below the first. */}
         <thead className="border-b border-base-200 bg-base-50">
           <tr className="divide-x divide-base-200">
-            {/* THE HEADER ROW CARRIES NO CHECKBOX (owner ruling). Select-all is
-                the PARENT row's box — one whole-order switch, not two. */}
             {selection ? <th className="px-2 py-1.5" aria-label="Select goods line" /> : null}
             {columns.map((c) => (
               <th
                 key={c.key}
                 scope="col"
                 style={salesOrderLayout ? { width: c.width ?? undefined } : undefined}
-                /* The parent header's treatment, spelled in TOKENS: `text-label`
-                   is the 11px the owner named, `text-base-500` its grey. The
-                   parent's 0.06em tracking is a CSS-module value with no token
-                   behind it, and inventing an arbitrary one here to chase the
-                   last hundredth of an em would put a new literal into a scale
-                   `01-design-tokens.md` has locked. Size, colour and case carry
-                   the match — and the weight is 600, because §2.2 deleted 700
-                   into 600 and the CSS module's own 700 predates that ruling. */
                 className={`px-2 py-1.5 align-middle text-label font-semibold uppercase text-base-500 ${salesOrderLayout && c.key === "qty" ? "text-center" : "text-left"}`}
               >
                 {c.label}
@@ -567,25 +512,8 @@ main
             ))}
           </tr>
         </thead>
-        {/* LEVEL TWO — every value, 13px. */}
         <tbody className="divide-y divide-base-200 text-body">
           {lines.map((line) => {
-            /**
-             * ⭐ ONE ROW PER DEMAND, AND NOTHING ELSE — 2026-09-11.
-             *
-             * This table used to expand one item line into N Unit rows that
-             * each carried the SAME line key, selection state and destination
-             * editor, so one ticked demand drew N ticked boxes and the
-             * arrangement editor appeared again beside records of documents
-             * already sent. The first correction gave the records their own row
-             * KIND; the owner's correction goes further and gives them their
-             * own TABLE, because a record of what was bought is not a quieter
-             * kind of demand — it is a different question, and it belongs under
-             * its own heading with `PO No` and `Unit ID` beside each other.
-             *
-             * What is left here is the actionable demand: one row per line, at
-             * the height of its own item description and nothing else's.
-             */
             const cell = (key: string) => {
               switch (key) {
                 case "category":
@@ -612,81 +540,21 @@ main
                 case "toBuy":
                   return line.toBuy == null || line.toBuy <= 0 ? (
                     <Absence>—</Absence>
- fix/zul-dev-branch
-                  )}
-                </td>
-              ) : null}
-              {/* ONE ink for every value — and ONE FACE (Jess, 2026-08-27:
-                  "why all the font type different"). `font-mono` fell back to
-                  the browser's monospace stack, so Unit ID, PO and SKU wore a
-                  different typeface than the row they sit in. Carres has no
-                  mono face — the register engine itself aliases --font-mono
-                  to Inter — so an identifier is plain body text here too. */}
-              <td className="px-2 py-2">{line.category}</td>
-              {salesOrderLayout ? (
-                <td className="px-2 py-2 align-top text-left">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="font-medium text-base-900 break-words">{line.item}</div>
-                    <div className="text-base-600 break-words">{line.sku}{line.itemDetail ? ` \u00b7 ${line.itemDetail}` : ""}</div>
-                  </div>
-                </td>
-              ) : null}
-              <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
-                {line.unitIds.length ? (
-                  salesOrderLayout ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {line.unitIds.map((id) => (
-                        <span key={id} className="max-w-full break-all">{id}</span>
-                      ))}
-                    </div>
-                  ) : line.unitIds.map((id) => <div key={id}>{id}</div>)
-                ) : (
-                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.unitAbsence === "\u2014"}>{line.unitAbsence}</Absence>
-                )}
-              </td>
-              {showCoveredBy ? (
-                <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
-                  {line.coveredBy?.length ? (
-                    line.coveredBy.map((po) =>
-                      /* `Ready Stock` and anything else that is not a
-                         document stays text — only a real PO number is a
-                         door, and only the page knows which is which. */
-                      onCoveredByClick && (isCoveredByLinkable?.(po) ?? false) ? (
-                        <div key={po}>
-                          <button
-                            type="button"
-                            className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
-                            data-testid={`goods-covered-by-${po}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCoveredByClick(po);
-                            }}
-                          >
-                            {po}
-                          </button>
-
                   ) : (
                     <span title={line.toBuyNoteWhy}>
                       <span className="tabular-nums font-medium">{line.toBuy}</span>
                       {line.toBuyNote?.length ? (
                         <div className="mt-0.5">
-                          {/* Written AT the width it is read at — a sentence
-                              left to wrap under a one-digit figure is a
-                              row-height defect in words. */}
                           {line.toBuyNote.map((l) => (
                             <div key={l}>
                               <Absence>{l}</Absence>
                             </div>
                           ))}
- main
                         </div>
                       ) : null}
                     </span>
                   );
                 case "orderedQty": {
-                  /* A QUANTITY, AND A DOOR TO THE DOCUMENTS. The purchase
-                     orders are named once, in the read-only details table
-                     below; a collection of them never sets this row's height. */
                   const qty = line.orderedQty ?? 0;
                   if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? "—"}</Absence>;
                   return onOpenPoDetails ? (
@@ -707,34 +575,11 @@ main
                   );
                 }
                 case "deliverTo":
-                  /* THE ONE ARRANGEMENT EDITOR, on the one row that can act. */
                   return line.deliverToNode != null ? (
                     line.deliverToNode
                   ) : line.deliverTo.length ? (
                     line.deliverTo.map((d) => <div key={d}>{d}</div>)
                   ) : (
-                        fix/zul-dev-branch
-                    <Absence>{line.coveredByAbsence ?? "—"}</Absence>
-                  )}
-                </td>
-              ) : null}
-              {!salesOrderLayout ? (
-              <td className="px-2 py-2">
-                {line.deliverToNode != null ? (
-                  line.deliverToNode
-                ) : line.deliverTo.length ? (
-                  line.deliverTo.map((d) => <div key={d}>{d}</div>)
-                ) : (
-                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.deliverToAbsence === "\u2014"}>{line.deliverToAbsence}</Absence>
-                )}
-              </td>
-              ) : null}
-              {!salesOrderLayout ? <td className="px-2 py-2">{line.sku}</td> : null}
-              <td className={salesOrderLayout ? "px-2 py-2 align-top text-center tabular-nums" : "px-2 py-2 tabular-nums"}>{line.qty}</td>
-              {showSupplier ? (
-                <td className="px-2 py-2">
-                  {line.supplier ? (
-
                     <Absence>{line.deliverToAbsence}</Absence>
                   );
                 case "unit":
@@ -745,7 +590,6 @@ main
                   );
                 case "supplier":
                   return line.supplier ? (
- main
                     line.supplier
                   ) : (
                     <Absence>{line.supplierAbsence ?? "—"}</Absence>
@@ -761,29 +605,6 @@ main
                     line.poDeliveryDate
                   ) : (
                     <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
- fix/zul-dev-branch
-                  )}
-                </td>
-              ) : null}
-              {salesOrderLayout ? (
-              <td className="px-2 py-2">
-                {line.deliverToNode != null ? (
-                  line.deliverToNode
-                ) : line.deliverTo.length ? (
-                  line.deliverTo.map((d) => <div key={d}>{d}</div>)
-                ) : (
-                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.deliverToAbsence === "\u2014"}>{line.deliverToAbsence}</Absence>
-                )}
-              </td>
-              ) : (
-                <td className="px-2 py-2">
-                  <div className="font-medium text-base-900">{line.item}</div>
-                  {line.itemDetail ? <div className="mt-0.5 text-base-600">{line.itemDetail}</div> : null}
-                </td>
-              )}
-            </tr>
-          ))}
-              
                   );
                 default:
                   return null;
@@ -794,9 +615,6 @@ main
                 key={line.key}
                 data-testid={line.testId}
                 data-row="demand"
-                /* A ticked demand reads as selected, in the register's own
-                   selected fill — the same answer the parent row gives, so one
-                   page has one selected colour. */
                 className={`divide-x divide-base-200 align-top${
                   selection?.selectedKeys.has(line.key) ? " bg-kit-blue-3" : ""
                 }`}
@@ -830,7 +648,6 @@ main
               </tr>
             );
           })}
- main
         </tbody>
       </table>
     </div>
