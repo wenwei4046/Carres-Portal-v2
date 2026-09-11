@@ -1378,6 +1378,14 @@ to logistics, with no button pressed anywhere. The one governed manual door is `
 Delivery Order` (the outstation trip's door, same path, same gates). Nobody ever authors a delivery
 order by hand.
 
+### Sales Order read-only evidence states
+
+| Meaning | Use exactly | Boundary |
+|---|---|---|
+| Successfully read an empty payment transaction list | `No payment transactions to show` | Does not claim that `Paid` is zero or that an older order never recorded money. |
+| Saved payment capture on the order | `Payment details recorded at sale` | Method, recorded instalment months, reference and slip only; not a synthesized transaction. |
+| Goods evidence read failed | `The goods could not be opened.` | Never show an allocation shortage or missing destination as the result of a failed read. |
+
 ### The On hand Category filter words (card 2026-08-19)
 
 The `Category` heading itself is already governed above (*facts about the record*). These are

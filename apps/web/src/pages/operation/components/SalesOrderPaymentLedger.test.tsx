@@ -16,6 +16,8 @@ vi.mock("@/lib/supabase", () => ({
 const useOrderPayments = vi.fn();
 vi.mock("@/lib/queries", () => ({ useOrderPayments: (...a: unknown[]) => useOrderPayments(...a) }));
 
+const { atSalePaymentWord } = await import("@/lib/payment-display");
+
 const { default: PaymentLedger } = await import("./SalesOrderPaymentLedger");
 
 /** One live goods payment, one deposit, one VOIDED row — the shape a real
@@ -88,10 +90,12 @@ describe("the Sales Order payment ledger", () => {
     expect(screen.getAllByText("Not recorded")).toHaveLength(4);
   });
 
-  it("says nothing has been recorded when the ledger is genuinely empty", () => {
+  it("reports an empty transaction list without claiming the order has never been paid", () => {
     useOrderPayments.mockReturnValue({ data: { payments: [] }, isLoading: false, isError: false });
     render(<PaymentLedger orderId="o1" />);
     expect(screen.getByTestId("so-payments-empty")).toBeTruthy();
+    expect(screen.getByText("No payment transactions to show")).toBeTruthy();
+    expect(screen.queryByText("No payment has been recorded on this order")).toBeNull();
     expect(screen.queryByTestId("so-payments")).toBeNull();
   });
 
@@ -125,5 +129,18 @@ describe("the Sales Order payment ledger", () => {
     useOrderPayments.mockReturnValue({ data: undefined, isLoading: false, isError: false });
     rerender(<PaymentLedger orderId={null} />);
     expect(screen.queryByTestId("so-payments")).toBeNull();
+  });
+});
+
+describe("saved POS payment details", () => {
+  it("does not reinterpret the POS online-transfer code as the ledger e-wallet code", () => {
+    expect(atSalePaymentWord("online", null)).toBe("Online transfer");
+    expect(atSalePaymentWord("installment", 12)).toBe("12-month instalment · Installment");
+  });
+  it("preserves a recorded custom method and never invents a missing plan", () => {
+    expect(atSalePaymentWord("CUSTOM_BANK", null)).toBe("CUSTOM_BANK");
+    expect(atSalePaymentWord(null, null)).toBeNull();
+    expect(atSalePaymentWord("cash", 0)).toBe("Cash");
+    expect(atSalePaymentWord(null, 1.5)).toBeNull();
   });
 });

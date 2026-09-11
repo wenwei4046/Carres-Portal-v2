@@ -87,7 +87,7 @@ import { CONTROL_BASE, CONTROL_BORDER } from "@/components/kit/field-recipe";
 import Input from "@/components/kit/Input";
 import Loading from "@/components/kit/Loading";
 import PaymentLedger from "./components/SalesOrderPaymentLedger";
-import { payMethodWord } from "@/lib/payment-display";
+import { atSalePaymentWord, viewSlip } from "@/lib/payment-display";
 import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Money from "@/components/Money";
@@ -1622,14 +1622,7 @@ export default function SalesOrderWorkspace() {
   /* The at-sale payment plan, in words, or null when nothing was recorded.
      `installment_months` is only meaningful with a method behind it; either
      one alone is stated on its own rather than padded out. */
-  const instalmentWord = useMemo(() => {
-    const months = (order as { installment_months?: number | null } | undefined)?.installment_months;
-    const method = (order as { payment_method?: string | null } | undefined)?.payment_method;
-    const plan = months != null && Number(months) > 0 ? `${Number(months)}-month instalment` : null;
-    const word = method ? payMethodWord(method) : null;
-    if (plan && word) return `${plan} · ${word}`;
-    return plan ?? word ?? null;
-  }, [order]);
+  const instalmentWord = atSalePaymentWord(order?.payment_method, order?.installment_months);
 
   /* ── The money the left side states (same arithmetic as the register). ── */
   const money = useMemo(() => {
@@ -2733,7 +2726,9 @@ export default function SalesOrderWorkspace() {
                         `Not allocated` on a fully allocated line. Same guard,
                         same word, same column behaviour. */}
                     <td className="py-1.5 pr-3">
-                      {goodsTruthQ.isLoading && !truth ? (
+                      {goodsTruthQ.isError ? (
+                        <span className="text-meta">The goods could not be opened.</span>
+                      ) : goodsTruthQ.isLoading && !truth ? (
                         <span className="font-mono text-meta">Loading…</span>
                       ) : truth && truth.unitIds.length >= r.qty && truth.unitIds.length > 0 ? (
                         <div className="flex max-w-[220px] flex-wrap gap-1">
@@ -2766,7 +2761,7 @@ export default function SalesOrderWorkspace() {
                         <div className="mt-0.5 text-meta text-base-600">{operationalConfig(liveLine).join(" · ")}</div>
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">{destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
+                    <td className="py-1.5 pr-3">{goodsTruthQ.isError ? "The goods could not be opened." : destinations.length ? destinations.map((d) => destinations.length > 1 ? `${d.name} ×${d.qty}` : d.name).join(" · ") : goodsTruthQ.isLoading ? "Loading…" : "Not recorded"}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.unitPrice)}</td>
                     <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(r.total)}</td>
                   </tr>
@@ -2934,10 +2929,18 @@ export default function SalesOrderWorkspace() {
             actually charges — and a number this screen invented would be read
             as one Carres agreed to. Absent stays absent: an order with no
             recorded plan prints nothing at all here. */}
-        {!isNew && instalmentWord && (
-          <p className="mb-3 text-meta text-base-600" data-testid="money-instalment">
-            {instalmentWord}
-          </p>
+        {!isNew && (instalmentWord || order?.approval_code || order?.payment_slip_url) && (
+          <div className="mb-3 text-meta text-base-600" data-testid="money-instalment">
+            <div className="font-medium">Payment details recorded at sale</div>
+            {instalmentWord && <div>{instalmentWord}</div>}
+            {order?.approval_code && <div className="break-words">Reference · {order.approval_code}</div>}
+            {order?.payment_slip_url && (
+              <button type="button" className="text-meta font-medium text-kit-blue-11 underline-offset-2 hover:underline"
+                onClick={() => void viewSlip({ receipt_url: order.payment_slip_url! })}>
+                View slip
+              </button>
+            )}
+          </div>
         )}
         <PaymentLedger orderId={isNew ? null : (orderId ?? null)} />
         {/* ⭐ THE TWO COLLECTION FACTS SIT UNDER THE LEDGER THEY SUM, ON THE

@@ -1457,7 +1457,12 @@ the amendment machinery, the goods truth and the Order Route architecture are un
     `payment_method`, as an ORDER fact above the ledger. **No monthly figure is derived**: a month
     count and a total do not say what the customer's bank charges, and a number this screen
     invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent and no
-    approval-code mapping; neither is invented.
+    Account Sheet mapping. Saved `orders.approval_code` is the at-sale reference;
+    `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
+    saved method/months under `Payment details recorded at sale`, separate from transactions.
+    No payment amount, paid date or collector is inferred from the order's cumulative Paid or
+    current salesperson. An empty ledger says `No payment transactions to show` and does not
+    contradict a positive Paid value. The detail GET explicitly carries all four capture fields.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired

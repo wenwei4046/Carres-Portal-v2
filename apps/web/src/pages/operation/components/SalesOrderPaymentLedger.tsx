@@ -72,7 +72,7 @@ export default function PaymentLedger({ orderId }: { orderId: string | null }) {
   if (rows.length === 0) {
     return (
       <div data-testid="so-payments-empty">
-        <EmptyState title="No payment has been recorded on this order" />
+        <EmptyState title="No payment transactions to show" />
       </div>
     );
   }

@@ -13,7 +13,7 @@
  * The slip door is the drawer's own, moved.
  */
 import { toast } from "sonner";
-import type { OrderPaymentMethod, OrderPaymentRow } from "@carres/shared";
+import { DEFAULT_PAYMENT_METHODS, type OrderPaymentMethod, type OrderPaymentRow } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
 import { methodLabel } from "@/lib/payment-methods";
@@ -43,4 +43,12 @@ export async function viewSlip(p: Pick<OrderPaymentRow, "receipt_url">) {
     return;
   }
   window.open(data.signedUrl, "_blank", "noopener");
+}
+
+/** POS capture codes have different meanings from operational ledger codes. */
+export function atSalePaymentWord(method: string | null | undefined, months: number | null | undefined): string | null {
+  const word = method ? (DEFAULT_PAYMENT_METHODS.find((m) => m.key === method)?.label ?? payMethodWord(method)) : null;
+  const plan = months != null && Number.isInteger(Number(months)) && Number(months) > 0
+    ? `${Number(months)}-month instalment` : null;
+  return plan && word ? `${plan} · ${word}` : plan ?? word;
 }

@@ -584,6 +584,22 @@ describe("GET /api/operation/orders/:id", () => {
     expect(res.status).toBe(404);
   });
 
+  it("carries saved POS payment facts without creating or inferring a transaction", async () => {
+    const capture = { payment_method: "installment", installment_months: 12,
+      approval_code: "BANK-REF", payment_slip_url: "orders-attachments/dealer/proof.pdf" };
+    const from = mockDetailQueries({ order: { id: ORDER_ID, so: 1319, paid: 1250, ...capture } });
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect((await res.json() as { order: unknown }).order).toMatchObject(capture);
+    const orderCall = from.mock.calls.findIndex(([table]) => table === "orders");
+    const projection = from.mock.results[orderCall].value.select.mock.calls[0][0].split(", ");
+    for (const field of Object.keys(capture)) expect(projection).toContain(field);
+    expect(from.mock.calls.map(([table]) => table)).not.toContain("order_payments");
+  });
+
   it("returns aggregated detail for an in_production order", async () => {
     mockDetailQueries({
       order: {
