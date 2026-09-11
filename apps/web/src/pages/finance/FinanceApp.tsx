@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 // Unified Internal Portal (2026-06-30) — shared role-aware rail.
 import PortalSidebar from "@/pages/portal/PortalSidebar";
@@ -41,6 +42,12 @@ export default function FinanceApp() {
   // reach ONLY the Payments and Invoices destinations here; every finance-only
   // page bounces them to Payments instead of rendering finance controls.
   const role = useAuth((s) => s.role);
+  // Finance figures read with a plain zero (index.css `.finance-surface`).
+  // Set on <body> so drawers portalled outside this tree get it too.
+  useEffect(() => {
+    document.body.classList.add("finance-surface");
+    return () => document.body.classList.remove("finance-surface");
+  }, []);
   const financeOnly = (page: React.ReactNode) =>
     role === "operation" ? <Navigate to="/finance/payments" replace /> : page;
   return (

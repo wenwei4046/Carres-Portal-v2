@@ -92,7 +92,7 @@ export default function ARDrawer({
             </div>
             <div className="font-display text-title mt-1">{row.invoice_no}</div>
             <div className="text-meta text-muted-foreground mt-0.5">
-              {row.customer_name} · {row.dealer_name ?? "—"}
+              {row.customer_name} · <span className="uppercase">{row.dealer_name ?? "—"}</span>
             </div>
           </div>
           <button

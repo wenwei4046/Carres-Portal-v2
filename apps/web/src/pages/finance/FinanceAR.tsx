@@ -194,7 +194,7 @@ function ARRow({ row, onView }: { row: FinanceArAgingRow; onView: () => void }) 
     >
       <span className="font-mono font-semibold">{row.invoice_no}</span>
       <span>{row.customer_name}</span>
-      <span className="text-muted-foreground">{row.dealer_name ?? "—"}</span>
+      <span className="text-muted-foreground uppercase">{row.dealer_name ?? "—"}</span>
       <span>
         <AgingPill bucket={row.aging} />
       </span>
