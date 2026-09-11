@@ -246,7 +246,20 @@ and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing s
 each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
 sections left THIS TAB because `Order Route` already owns them.**
 
-**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11. APPROVED + IMPLEMENTED.** This
+**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11. PR #1222 `a27d2896`,
+production-verified 2026-09-11.** All five canonical surfaces (`carres-portal` and `carres-pos`
+Pages, the ERP and POS canonical hosts, and the API Worker) report that SHA, and the served ERP
+bundle carries `Delivery access`, `Sales ownership`, `Recorded by` and `Line total` — the SHA
+alone has been wrong before, so the asset was read too.
+
+⚠️ **What that record does NOT cover, stated rather than implied:** the **authenticated** page
+walk is owner-only and was not performed; the **re-cut-on-resize** path was not observed end to
+end (a hidden tab delivers neither `ResizeObserver` callbacks nor `requestAnimationFrame` —
+measured — so the padding arithmetic is unit-tested and the wiring pinned by the contract suite
+instead); browser coverage is **macOS + Chromium only**; and a **pre-existing** 120px page
+overflow at 390px comes from the shell header chrome, not from these cards.
+
+This
 OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
 five questions in the order an operator asks them: **who · when · where · what · money.**
 
