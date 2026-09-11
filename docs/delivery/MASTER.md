@@ -753,8 +753,8 @@ header select-all over the visible filtered rows · the in-place same-height sel
 page and the print path already run) · sticky `DO No` identity with real horizontal scrolling ·
 search · governed per-column filters · Export · Columns · the fixed 32px result footer.
 
-- **Default columns, in order — owner ruling 2026-09-11, BUILT
-  (overwriting the 2026-09-09 order completely):** `DO No` · **`DO date`** · `SO No` ·
+- **Default columns, in order — owner ruling 2026-09-11, BUILT AND
+  PRODUCTION-VERIFIED (overwriting the 2026-09-09 order completely):** `DO No` · **`DO date`** · `SO No` ·
   `Customer` · **`Status`** · **`Requested Delivery Date`** · **`Confirmed Delivery`** ·
   **`Confirmed Time`** · **`Logistics`** · `Delivery Location` · **`Driver submission`**.
   In the chooser, off by default: `Goods` · `Created`.
@@ -845,6 +845,29 @@ search · governed per-column filters · Export · Columns · the fixed 32px res
   `Showing only:` strip above the table now lists every live condition as a removable chip under
   one `Clear filters`. It renders nothing when nothing is narrowed, and the power is opt-in on the
   shared engine, so no other register gained a band.
+- **PRODUCTION CLOSURE — walked as a signed-in Operation account on `1c8cd56c`, 2026-09-11.**
+  `https://erp.carresofficial.com/operation/delivery-orders` served the eleven approved headings
+  in the ruled order and nothing else: `DO No · DO date · SO No · Customer · Status · Requested
+  Delivery Date · Confirmed Delivery · Confirmed Time · Logistics · Delivery Location · Driver
+  submission`. Both live documents measured **exactly 38px**. `WORK TO DO` counted
+  `Record delivery result 1 · Upload delivery photo 0 · Upload signed Delivery Order 0` and
+  `DOCUMENT STATUS` read `All (2)` — which is the database: **2 delivery orders, 0 recorded
+  delivery results, 0 ledger entries, 0 signed DO files, 4 handover events** (measured the same
+  round). Picking `Record delivery result` raised the `Showing only:` strip, narrowed to
+  `DO-180826-3035`, footed `1 of 2 delivery orders`, recounted the dropdown to `All (1)` and put
+  the Delivery Order page's own `Record Delivery Result` button on the row; `Clear filters`
+  returned all of it. **`Driver submission` read `Not delivered yet` / `No signed document yet`
+  on both rows — the truthful answer for documents with no recorded result and no files, and NOT
+  a fabricated zero or a decorative button.** The shipped bundle was proved in both directions
+  against its predecessor (`index-rFH559OB.js` → `index-8z1zsJvf.js`): `Driver submission` 0→1,
+  `Showing only:` 0→1, `Videos` 0→3, `signed-document` 0→2, `Proof Status` 1→0,
+  `Delivery photo saved` 1→0, with `Delivery Orders` holding 6→6 as the control that proves the
+  predecessor was really read.
+  **NOT WALKABLE IN PRODUCTION AND SAID SO:** the gallery, the player and the signed-document
+  link have no live file to open — production holds none — so those were exercised on the dev
+  preview harness (`apps/web/delivery-orders-preview.html`) and are held by tests. Every row in
+  the database today is test data (Constitution §6), so this is a fact about the data, not the
+  code.
 - **AT NARROW WIDTHS THE RAIL STARTS COLLAPSED, ITS DOOR STILL VISIBLE (2026-09-11).** Below
   1100px the 240px rail spends a quarter of the sheet on filters nobody has picked yet, and the
   dates this register exists to answer scroll off the right edge. It starts hidden and
@@ -852,7 +875,15 @@ search · governed per-column filters · Export · Columns · the fixed 32px res
   width. **Validated at the observed 949px viewport**: `DO No` · `DO date` · `SO No` ·
   `Customer` · `Status` and the customer's requested date are all reachable without scrolling,
   the sticky identity pins cleanly with no overlap, and ordinary parent rows measure exactly
-  **38px** while a two-line status stays fully readable inside them.
+  **38px** while a two-line status stays fully readable inside them. **Confirmed again on the
+  live page**, which served the rail collapsed at `innerWidth 1024` with `Show filters` in the
+  toolbar.
+- **A DOOR CARRIES NO FUNNEL (walk finding, 2026-09-11).** Every data column gets a per-column
+  filter, which is right for a column that STATES something. The queue-action column carries an
+  ACTION and states nothing, so its funnel opened on a single `(blank)` option whose only
+  possible effect was to hide the row the operator had come to act on. The shared engine gained
+  `DataGridColumn.filterable` (default true, so no existing column moved) and the door declares
+  it false.
 - **Selection is document-oriented output only:** `{N} delivery orders selected · Clear ·
   Print {N} delivery orders` (each document's governed single-DO page, assembled server-side
   under RLS, one file) plus the shared selected-row Excel export. **`Assign logistics` never
