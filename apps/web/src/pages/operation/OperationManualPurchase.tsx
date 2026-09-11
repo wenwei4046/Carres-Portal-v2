@@ -224,7 +224,8 @@ interface RequestRegisterRow {
   itemsText: string;
   supplierText: string;
   deliverToText: string;
-  requestedBy: string;
+  /** The real staff name, or null when the individual cannot be recovered. */
+  requestedBy: string | null;
   status: ManualPurchaseStatus;
   /** Live remainder still issuable — the selection gate's other half. */
   remainingQty: number;
@@ -358,7 +359,16 @@ function buildRows(data: ManualPurchaseRegisterPayload): RequestRegisterRow[] {
       deliverToText: manualPurchaseDeliverToSummary(
         deliverNames.length > 0 ? deliverNames : [destName.get(r.destination_id) ?? ""],
       ),
-      requestedBy: userName.get(r.created_by ?? "") ?? "",
+      /* ⭐ AN UNRECOVERABLE INDIVIDUAL SAYS SO (production walk, 2026-09-11).
+         `app_users` RLS does not show every account to every reader — the
+         `principal` seed row is hidden from an `operation` caller — so this
+         lookup MISSES and used to print an empty string. Three of the four
+         live requests were raised by that account, and `Requested By` is now
+         the SECOND column rather than the tenth: a blank there reads as a
+         broken page, not as an absence. The object has always printed the
+         governed sentence for exactly this case; the Register now prints it
+         too, so the two surfaces answer alike. A person is never invented. */
+      requestedBy: userName.get(r.created_by ?? "") || null,
       status,
       remainingQty: live.reduce((n, l) => n + remainingOf(l), 0),
       lineCategories: live.map(
@@ -757,14 +767,19 @@ export default function OperationManualPurchase() {
         width: 130,
         sortable: true,
         chooserGroup: "Request",
-        accessor: (r) => (
-          <span className="block truncate" title={r.requestedBy}>
-            {r.requestedBy}
-          </span>
-        ),
-        searchValue: (r) => r.requestedBy,
-        filterValue: (r) => r.requestedBy,
-        exportValue: (r) => r.requestedBy,
+        accessor: (r) =>
+          r.requestedBy ? (
+            <span className="block truncate" title={r.requestedBy}>
+              {r.requestedBy}
+            </span>
+          ) : (
+            <span className="block truncate text-base-500" title={MW.staffIdentityNotRecorded}>
+              {MW.staffIdentityNotRecorded}
+            </span>
+          ),
+        searchValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
+        filterValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
+        exportValue: (r) => r.requestedBy ?? MW.staffIdentityNotRecorded,
       },
       {
         key: "proceed_date",

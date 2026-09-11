@@ -73,6 +73,7 @@ import {
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
+import { viewSlip } from "@/lib/payment-display";
 import {
   renderDoPdf,
   renderReceiptPdf,
@@ -6077,30 +6078,10 @@ function AddPaymentModal({
   );
 }
 
-// 0476 — a payment row's method reads through `methodLabel` (lib/payment-methods):
-// the Settings → Payment name, never the raw key.
-
-/** Open a payment's uploaded proof: an https receipt URL directly, or a
- *  storage path via a fresh signed URL (internal read, 1h TTL). */
-async function viewSlip(p: OrderPaymentRow) {
-  const u = p.receipt_url;
-  if (!u) return;
-  if (/^https?:/i.test(u)) {
-    window.open(u, "_blank", "noopener");
-    return;
-  }
-  const path = u.startsWith(`${ATTACHMENTS_BUCKET}/`)
-    ? u.slice(ATTACHMENTS_BUCKET.length + 1)
-    : u;
-  const { data, error } = await supabase.storage
-    .from(ATTACHMENTS_BUCKET)
-    .createSignedUrl(path, 3600);
-  if (error || !data?.signedUrl) {
-    toast.error(`Couldn't open slip — ${error?.message ?? "no URL"}`);
-    return;
-  }
-  window.open(data.signedUrl, "_blank", "noopener");
-}
+/* `viewSlip` lives in `@/lib/payment-display` so the Sales Order detail's
+   payment card opens the same slip through the same door (ownership Law D).
+   A payment row's method reads through `methodLabel` (0476, lib/payment-methods):
+   the Settings → Payment name, never the raw key. */
 
 /** "Where this order is" — the SPINE (Jess 2026-07-18): ONE vertical
  *  progress line that is ALSO the section nav. Steps in doing order with

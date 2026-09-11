@@ -246,29 +246,46 @@ and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing s
 each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
 sections left THIS TAB because `Order Route` already owns them.**
 
+**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11. APPROVED + IMPLEMENTED.** This
+OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
+five questions in the order an operator asks them: **who · when · where · what · money.**
+
 ```
 CUSTOMER                name · phone · email · demographics
   ├ header              New customer / Existing customer — the standing answer, beside the name
-  ├ Delivery address    the MY cascade · building type · billing
-  └ Emergency contact   name · phone · relationship
-MONEY                   Total · paid · outstanding · Open Payments →
-ORDER INFO              SO Date · Requested Delivery Date · Proceed date · floor · stair carry · lift
-  ├ Sales ownership     Dealer · Showroom · Salesperson
-  └ Amend delivery date the governed three fields · creates a Revision · needs approval
-GOODS                   the six-column truth
+  ├ Sales ownership     Dealer · Showroom · Salesperson  (+ the approval lane)
+  └ Emergency contact   name · phone · relationship      (own heading, own divider)
+ORDER INFO              SO Date · Requested Delivery Date · Proceed date · Customer reference
+  └ Change delivery date  the governed three fields · creates a Revision · needs approval
+DELIVERY                the MY cascade · building type · billing relationship · billing address
+  └ Delivery access     floor · items needing stair carry · lift + the stair working line
+GOODS                   the six ruled columns · Unit price · Line total, and ONE Total beneath
+MONEY                   the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
-**THE THIRD MERGE PASS — 2026-08-27 (YH).** Seven cards became **four**, and the order changed:
-`MONEY` rises above `ORDER INFO`, directly under `CUSTOMER`. `Emergency contact` joins the customer
-it describes; `Amend delivery date` joins the dates it moves.
+**WHY EACH MOVED.** `Sales ownership` stopped being a card: who sold it is part of who bought it,
+and a reader answering *"whose customer is this?"* had to leave the customer to find three names.
+`DELIVERY` became a card because the address and the access conditions are ONE question — *can we
+deliver this, and what will it cost to carry* — and they were split across two cards, the address
+inside `CUSTOMER` and floor/lift/stair on `ORDER INFO`. `MONEY` fell below `GOODS` so the money
+reads after the thing it is about.
 
-Those were the last two COLLAPSIBLE cards, and merging retires the `forceOpen` machinery with the
-fold: a section that is always on screen cannot hide an unsaved change or a live amendment, which
-is the only thing those guards existed for. Neither section loses its name, and
+**NO WORD MOVED.** `Sales ownership`, `Delivery address` and `Emergency contact` are locked words
+and survive as in-card headings; `Block` and `SubHead` render the same string at a different rank.
 `creates a Revision · needs approval` is governed copy that moved onto the subsection heading
 rather than being reworded. Held mechanically by `SalesOrderWorkspace.ui-contract.test.ts`, which
-now pins the card list and its order.
+pins the card list, its order and the placement of every moved field.
+
+**THE ORDER TOTAL IS STATED ONCE.** It sits under the `GOODS` table that produces it, and it is
+`orderMoney({lineSum, addonSum})` — the same value the register and the document read, never a
+re-sum of the printed rows (Law D). `MONEY` therefore carries only the collections facts: the
+ledger, `Paid` and `Outstanding`. A service — stair carry included, which is a stamped
+`STAIR_CARRY` addon — is counted in that total exactly once and is never charged again as a
+separate summary. The stair WORKING LINE on `DELIVERY` explains the charge; it does not levy it.
+
+**THE COLLAPSIBLE FOLD STAYS RETIRED.** A section that is always on screen cannot hide an unsaved
+change or a live amendment, which is the only thing the `forceOpen` machinery existed for.
 
 **A merged section keeps its NAME.** `Delivery address` and `Sales ownership` are locked words and
 survive as in-card headings; the merge moves a border, a 24px gap and a second heading rule, never
@@ -1282,13 +1299,25 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   own and the page itself does not scroll at desktop widths. Below ~1024px the panes stack, form
   first, and the page scrolls normally.
 - **The left pane's block order** was `CUSTOMER → ORDER INFO → AMEND DELIVERY DATE →
-  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN 2026-08-26 —
-  see § THE MERGED ORDER TAB, which is the current composition:** `DELIVERY ADDRESS` merged into
-  `CUSTOMER` and `SALES OWNERSHIP` into `ORDER INFO`, both keeping their names as in-card
-  headings. What survives from this ruling is the rest of the sentence — **`GOODS` follows them**, and
-  it is not a form: the six-column `Category | Unit ID | SKU | Qty | Item | Deliver To` truth
-  locked above is Stock's and Purchasing's fact, and the customer document beside it never prints
-  Unit ID or Deliver To. Removing it would have lost governed truth the card did not name.
+  EMERGENCY CONTACT → DELIVERY ADDRESS → MONEY → SALES OWNERSHIP`. ⛔ **OVERWRITTEN — see
+  § THE CURRENT COMPOSITION (2026-09-11), which is the only current card list.** What survives
+  from this ruling is the rest of the sentence — **`GOODS` is not a form.** Its six ruled columns
+  `Category | Unit ID | SKU | Qty | Item | Deliver To` are Stock's and Purchasing's facts, read
+  only; removing them would lose governed truth the card does not name.
+
+  **THE OBJECT PAGE'S GOODS TABLE ALSO STATES THE MONEY — APPROVED + IMPLEMENTED 2026-09-11.**
+  `Unit price` and `Line total` are APPENDED to the right of those six; the six keep their ruled
+  order and alignment. This is the OBJECT page only. **The register's `▸` child mini-table stays
+  at exactly six** (§ the goods expander, and `GoodsMiniTable.tsx`) — a register answers *what
+  records exist*, and a price column there would re-open the sheet the register deliberately is
+  not. The reason the object page earns them: an operator could not read what the customer agreed
+  to pay per line without opening the PDF beside it, which is a document, not a field.
+
+  ⚠️ **`DISCOUNT` IS NOT AVAILABLE AND IS NOT INVENTED.** The 2990 reference prints a discount
+  column; `order_lines` carries `sku · qty · unit_price · attrs · source_po` and no discount of any
+  kind. A discount column here would have to be derived from nothing. **Not built** — recorded as a
+  gap, not as a field. The same applies to COST and MARGIN: they are a management view and this is
+  the page an operator opens in front of a customer.
 - **A dark save bar appears at the bottom of the form ONLY when something changed**
   (`⚠ {n} changes · Discard · Save`). Save is unreachable until dirty; dirty navigation still
   refuses safely.
@@ -1299,6 +1328,33 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   `renderSalesOrderPdf` call, one blob; pdf.js paints those bytes and `Print ▾` opens that same
   blob. There is no second lookalike renderer, and there is no toolbar on or above the paper —
   `Print ▾` stays in the page header. The paper is centred at a 700px maximum.
+
+  **THE PAPER IS CUT TO THE PANE'S CONTENT BOX, AND RE-CUT WHEN THAT CHANGES — FIXED
+  2026-09-11.** Two defects, and either one alone clipped the document:
+  ① the pages were scaled to `pane.clientWidth`, which INCLUDES the pane's own `px-4` padding, so
+  every page was drawn 32px wider than the box it had to sit in — at every width, on every order;
+  ② the render effect depended on `[data, paneEpoch]` only, so nothing watched the pane and any
+  later width change (dragging the window, opening a side panel) left a bitmap cut for the old
+  width hanging over the new one. A `ResizeObserver` now feeds the measured CONTENT width into the
+  effect's dependencies.
+  - The redraw is coalesced on a **timer, deliberately not `requestAnimationFrame`** — measured in
+    a hidden tab, neither rAF nor ResizeObserver delivery runs at all, so a width change that
+    happened while the tab was away would never be applied and the operator would come back to a
+    clipped page. The frame loop may make it smooth; it may not be what makes it correct.
+  - Below `MIN_PDF_WIDTH` (320px) the page stops shrinking and the PANE scrolls, which is the same
+    rule the tables follow. The pane therefore carries `overflow-auto` at **every** width, not
+    `lg:` only: below the split breakpoint the panes stack, the document is at its narrowest, and
+    the old `lg:overflow-auto` let a too-wide page push the PAGE sideways instead of scrolling
+    inside its own box. The page never scrolls horizontally; its containers do.
+  - ⛔ **The permanent 50/50 split is NOT retired.** Replacing it with an on-demand comparison was
+    proposed and is **not an approved layout change**; the pane, its live redraw and its Print path
+    stay exactly where they are. Only the clipping was a defect.
+  - ⚠️ **Unverified:** the re-cut-on-resize path could not be observed end to end in the preview
+    harness, because a hidden browser tab delivers neither `ResizeObserver` callbacks nor
+    `requestAnimationFrame` (measured: `visibilityState: "hidden"`, zero deliveries). The
+    padding arithmetic that caused the clipping is unit-tested
+    (`SalesOrderWorkspace.pdf-width.test.ts`) and the observer wiring is pinned by the contract
+    suite; the live redraw itself wants one human resize to confirm.
 - **Typing updates the preview immediately** (300ms debounce), and while unsaved changes exist the
   paper carries a light diagonal `UNSAVED` watermark. The watermark is preview chrome painted over
   the canvas; it never enters the PDF.
@@ -1357,7 +1413,36 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   differed — three line-heights under `items-end`, which is why the three numbers never sat on
   one line. Weighting that only moves the box around the number is not weighting. Colour does
   the separating now, which is the half that was always visible.
-  The existing `Open this order in Payments` door is unchanged.
+  ⛔ **`Total` LEFT THIS BLOCK — 2026-09-11.** It is stated once, under the `GOODS` table that
+  produces it. What MONEY answers is the collections question, so it carries the LEDGER, `Paid`
+  and `Outstanding`, the two right-aligned beneath the rows they summarise.
+
+  **THE PAYMENT LEDGER — APPROVED + IMPLEMENTED 2026-09-11.** MONEY prints the `order_payments`
+  rows the collections desk owns: `Date · Method · Amount · Reference · Receipt · Slip ·
+  Recorded by`. It is a SUMMARY and may never gain a form (Law B): recording, voiding, refunding
+  and allocating stay Payment's acts, reached through the one `Open this order in Payments` door,
+  which is unchanged.
+  - **Nothing on this card is summed from those rows.** `Paid` is `orders.paid` through
+    `orderMoney` — the figure every gate reads. A re-sum would be a second arithmetic for one fact
+    (Law D) and would go wrong on exactly the rows that look most ordinary: a
+    `counted_in_paid: false` history mirror of a deposit the create door already banked, and every
+    `storage` collection, which is a different debt with a different clock.
+  - **A VOIDED row stays, struck and stamped with its reason.** A void is a stamp, never a delete
+    (0343/0347); `isLivePayment` is the one predicate and no reader spells `voided_at` itself.
+  - **Amounts print to the cent** through `fmtMoney`. The rounding `<Money>` recipe would show
+    `RM 2,500` against a ledger row of `RM 2,499.50`, and the receipt would disagree with the
+    screen.
+  - **`Receipt` is `receipt_no`; `Slip` is `receipt_url`** — the mapping the order drawer already
+    uses (`viewSlip`). `recorded_by` resolves to a name from `app_users`, fail-soft, the same
+    lookup the SO PDF does; an unreadable name prints `Not recorded` and never costs the ledger.
+  - **A 403 is not a zero.** A reader whose role cannot see the ledger is told so. Printing
+    `No payment has been recorded` there would state, as a fact, that the customer has paid
+    nothing.
+  - **The at-sale plan is stated only where it was recorded** — `installment_months` +
+    `payment_method`, as an ORDER fact above the ledger. **No monthly figure is derived**: a month
+    count and a total do not say what the customer's bank charges, and a number this screen
+    invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent and no
+    approval-code mapping; neither is invented.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired
@@ -2187,10 +2272,11 @@ timeline line, the drawer's four void readers). The two
 parallel-load timeout — that file passes alone and touches no money code.
 
 **Known boundaries, reported not hidden:**
-- **`online` prints as "Online" on the SO document and "e-wallet" in the
-  drawer** — one payment method, two words. Left alone deliberately: picking
-  the winner is a COPY-STANDARD ruling, not an engineering call, so the
-  activity line omits the method rather than minting a third spelling.
+- **`online` prints as "Online" on the SO document and "Online payment" on
+  screen** — COPY-STANDARD's payment-method row names `Online payment` and bans
+  "e-wallet"; the drawer and the Sales Order payment card both read it through
+  `methodLabel` (lib/payment-methods). The SO document word is still its own,
+  so the activity line keeps omitting the method until the document follows.
 - **Money is bilateral; the REFUND record arrives with Card 7** (change /
   cancel / refund lineage) — "an approved but unpaid refund means Carres still
   owes the customer" needs the lineage that card owns; minting a refund store

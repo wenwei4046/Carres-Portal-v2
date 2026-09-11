@@ -7465,17 +7465,22 @@ export function useAssignOrderStaff(
 // ===========================================================================
 // Balance job (migration 0184) — payment ledger + storage collect / waiver.
 // ===========================================================================
+/** The ledger as the endpoint returns it. */
+export interface OrderPaymentsResponse {
+  payments: OrderPaymentRow[];
+}
+
 /** Read the order's payment ledger (newest first). `null` id disables. */
 export function useOrderPayments(
   orderId: string | null,
-  opts?: Partial<UseQueryOptions<{ payments: OrderPaymentRow[] }>>,
+  opts?: Partial<UseQueryOptions<OrderPaymentsResponse>>,
 ) {
   return useQuery({
     queryKey: orderId
       ? qk.operation.orderPayments(orderId)
       : (["operation", "orders", "null", "payments"] as const),
     queryFn: () =>
-      apiFetch<{ payments: OrderPaymentRow[] }>(
+      apiFetch<OrderPaymentsResponse>(
         `/api/operation/orders/${orderId}/payments`,
       ),
     enabled: !!orderId,
