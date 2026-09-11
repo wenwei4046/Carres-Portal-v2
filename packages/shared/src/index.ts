@@ -3048,6 +3048,11 @@ export * from "./booking-brief";
 // CARD 4 — the collection clock: T−3 · T−2 · T−1 (final deadline) on working
 // days before the delivery, one arithmetic for every surface that presses.
 export * from "./collection-clock";
+// DELIVERY MONITOR (2026-09-11) — when the goods reach us, as a delivery
+// surface must read it: the recorded purchase-order dates, the latest supplier
+// reply, the exact per-line shortage, and ONE arrival state over them. It
+// computes no arrival date — `expectedArrivalOf` already did, once.
+export * from "./delivery-arrival";
 
 /**
  * The Finance exception — the ONE money blocker (owner ruling 2026-08-16,

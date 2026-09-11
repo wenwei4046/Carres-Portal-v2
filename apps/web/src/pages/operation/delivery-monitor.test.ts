@@ -41,7 +41,6 @@ import {
   groupCardsByDay,
   buildMonitorRails,
   monitorCardHref,
-  isCalendarProjection,
   emptyRangeSentence,
   needConfirmedDateSentence,
   activeFilterLabels,
@@ -65,6 +64,12 @@ import {
   MONITOR_STATUS_LABEL,
   MONITOR_CALENDAR_VIEWS,
   DEFAULT_CALENDAR_VIEW,
+  MONITOR_TOP_TABS,
+  MONITOR_TOP_TAB_LABEL,
+  DEFAULT_TOP_TAB,
+  DEFAULT_WORK_VIEW,
+  contactWeekOf,
+  siteAccessOf,
   type DeliveryMonitorCard,
   type DeliveryMonitorFilters,
 } from "./delivery-monitor";
@@ -171,6 +176,7 @@ function cards(
     handoverEvents: [],
     partnerNameById: new Map(),
     arrangements: byScope,
+    todayIso: TODAY,
   });
 }
 
@@ -180,6 +186,8 @@ const noFilters: DeliveryMonitorFilters = {
   logisticsPartnerId: null,
   status: null,
   search: "",
+  contactDue: null,
+  contactOverdueOnly: false,
   todayIso: TODAY,
 };
 
@@ -447,20 +455,37 @@ describe("expired planned time", () => {
   });
 });
 
-/* ── 5 · The projection rule ───────────────────────────────────────────── */
+/* ── 5 · The two top-level views (owner ruling 2026-09-10) ─────────────── */
 
-describe("isCalendarProjection", () => {
-  it("no operational pick is the only calendar projection", () => {
-    expect(isCalendarProjection(noFilters)).toBe(true);
+describe("the two top-level views", () => {
+  it("Work to do is the landing, and its queue is All delivery work", () => {
+    expect(MONITOR_TOP_TABS).toEqual(["work", "calendar"]);
+    expect(DEFAULT_TOP_TAB).toBe("work");
+    expect(DEFAULT_WORK_VIEW).toBe("all");
+    expect(MONITOR_TOP_TAB_LABEL.work).toBe("Work to do");
+    expect(MONITOR_TOP_TAB_LABEL.calendar).toBe("Confirmed deliveries");
   });
 
-  it("any operational pick answers with the work list, never a card wall", () => {
-    expect(isCalendarProjection({ ...noFilters, view: "all" })).toBe(false);
-    expect(isCalendarProjection({ ...noFilters, view: "no_confirmed_date" })).toBe(false);
-    expect(isCalendarProjection({ ...noFilters, view: "failed" })).toBe(false);
-    expect(isCalendarProjection({ ...noFilters, region: "Johor" })).toBe(false);
-    expect(isCalendarProjection({ ...noFilters, logisticsPartnerId: "none" })).toBe(false);
-    expect(isCalendarProjection({ ...noFilters, status: "waiting_warehouse" })).toBe(false);
+  it("a STATE pick narrows the calendar instead of replacing it", () => {
+    /* The retired projection rule swapped the view out from under the
+       operator; a narrowing is now a narrowing on whichever view is open. */
+    const shown = filterMonitorCalendarCards(
+      SET,
+      { ...noFilters, region: "Johor" },
+      WINDOW,
+    );
+    expect(shown.every((c) => c.region === "Johor")).toBe(true);
+    expect(filterMonitorCalendarCards(SET, noFilters, WINDOW).length).toBeGreaterThan(
+      shown.length,
+    );
+  });
+
+  it("a WORK TO DO queue never narrows the calendar", () => {
+    /* The queues ask about work nobody has agreed a day for, so answering one
+       on a calendar of agreed appointments would print an empty week. */
+    expect(
+      filterMonitorCalendarCards(SET, { ...noFilters, view: "no_confirmed_date" }, WINDOW),
+    ).toEqual(filterMonitorCalendarCards(SET, noFilters, WINDOW));
   });
 });
 
@@ -483,6 +508,13 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     statusKey: "confirmed",
     statusLabel: "Delivery confirmed",
     missingProof: NO_PROOF_MISSING,
+    items: [],
+    extras: [],
+    siteAccess: null,
+    readiness: { ready: false, shortLines: [], shortQty: 0 },
+    arrival: { kind: "no_purchase_order" },
+    contactDueIso: null,
+    contactOverdue: false,
     scope: { so: 0, refs: [] } as unknown as DeliveryScopeRow,
     ...over,
   };
@@ -716,7 +748,13 @@ describe("the work list's own words — never `scope` (owner correction 2026-09-
   });
 
   it("no visible word says scope or leg", () => {
-    for (const word of Object.values(MONITOR_COPY)) {
+    /* Two entries are sentence BUILDERS (`Call by {date}` · `Late — was due
+       {date}`); they are checked on a real date so the rule covers the words
+       they produce, not just the plain strings beside them. */
+    const words = Object.values(MONITOR_COPY).map((w) =>
+      typeof w === "function" ? w("Tue, 15 Sep") : w,
+    );
+    for (const word of words) {
       expect(word).not.toMatch(/\bscopes?\b/i);
       expect(word).not.toMatch(/\blegs?\b/i);
     }
@@ -730,7 +768,13 @@ describe("activeFilterLabels", () => {
         { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none", status: "waiting_warehouse" },
         () => null,
       ),
-    ).toEqual([MONITOR_COPY.noConfirmedDate, MONITOR_COPY.noLogistics, MONITOR_STATUS_LABEL.waiting_warehouse]);
+    ).toEqual([
+      /* The QUEUE is named after the job (owner ruling 2026-09-10); the
+         summary names the queue the operator clicked, not the cell word. */
+      MONITOR_COPY.callCustomer,
+      MONITOR_COPY.noLogistics,
+      MONITOR_STATUS_LABEL.waiting_warehouse,
+    ]);
   });
 
   it("a partner pick prints the partner's NAME, never a raw id", () => {
@@ -1018,5 +1062,247 @@ describe("monitorRowAction — one row, one next act", () => {
     for (const banned of ["Pending", "Follow up", "Chase", "Unscheduled", "Send"]) {
       expect(text).not.toContain(banned);
     }
+  });
+});
+
+/* ── 8 · The goods, the arrival and the contact deadline ────────────────── */
+
+describe("the row's goods, kept in two cells", () => {
+  const withGoods = () =>
+    cards([
+      order({
+        id: "a",
+        so: 1301,
+        delivery_floor: 3,
+        delivery_has_lift: false,
+        order_lines: [
+          { id: "l-1", sku: "mattress:M1401F-K", qty: 2, label: "Serena · King" },
+          { id: "l-2", sku: "Pillow soft", qty: 2 },
+          { id: "l-3", sku: "Disposal old mattress", qty: 1 },
+        ],
+        order_addons: [{ addon_key: "dispose-mattress", qty: 1 }],
+        allocated_units: [{ sku: "mattress:M1401F-K", status: "reserved", qty: 1 }],
+      }),
+    ])[0]!;
+
+  it("MAIN goods and accessories/services are two cells, never one summary", () => {
+    const card = withGoods();
+    expect(card.items.map((l) => l.name)).toEqual(["Serena · King"]);
+    expect(card.extras.map((l) => l.kind)).toEqual(["accessory", "service", "service"]);
+  });
+
+  it("a short line names the EXACT missing quantity", () => {
+    const card = withGoods();
+    expect(card.items[0]!.qty).toBe(2);
+    expect(card.items[0]!.shortQty).toBe(1);
+    expect(card.readiness.ready).toBe(false);
+    expect(card.readiness.shortQty).toBe(4);
+  });
+
+  it("a service carries no shortage — it moves no Unit", () => {
+    const services = withGoods().extras.filter((l) => l.kind === "service");
+    expect(services.every((l) => l.shortQty === 0)).toBe(true);
+  });
+
+  it("the add-on prints its CATALOG name, never its key", () => {
+    const card = buildDeliveryMonitorCards({
+      orders: [
+        order({ id: "a", so: 1301, order_addons: [{ addon_key: "dispose-mattress", qty: 1 }] }),
+      ],
+      deliveryOrders: [],
+      attempts: [],
+      handoverEvents: [],
+      partnerNameById: new Map(),
+      arrangements: new Map(),
+      todayIso: TODAY,
+      addonNameByKey: new Map([["dispose-mattress", "Dispose old mattress"]]),
+    })[0]!;
+    const named = card.extras.find((l) => l.key.startsWith("addon-"));
+    expect(named!.name).toBe("Dispose old mattress");
+    expect(named!.name).not.toContain("dispose-mattress");
+  });
+
+  it("the site the crew meets comes from Sales Orders' own answers", () => {
+    expect(withGoods().siteAccess).toBe("Floor 3 · No lift");
+    expect(siteAccessOf({ delivery_floor: 1, delivery_has_lift: true })).toBe(
+      "Floor 1 · Has lift",
+    );
+    /* Nobody asked is NOT `No lift` — a three-state fact keeps its third state. */
+    expect(siteAccessOf({ delivery_floor: null, delivery_has_lift: null })).toBeNull();
+  });
+});
+
+describe("Expected arrival — recorded dates only", () => {
+  const arrivalOf = (po: Record<string, unknown>) =>
+    cards([
+      order({
+        id: "a",
+        so: 1301,
+        order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1 }],
+        allocated_units: [],
+        po_arrivals: [
+          {
+            poId: "PO-1",
+            status: "open",
+            owedSkus: ["mattress:M1401F-K"],
+            plannedIso: null,
+            originalIso: null,
+            reply: null,
+            ...po,
+          },
+        ],
+      }),
+    ])[0]!.arrival;
+
+  it("no reply prints OUR date, and the note says it is not a confirmation", () => {
+    expect(arrivalOf({ originalIso: "2026-09-20" })).toMatchObject({
+      kind: "planned",
+      dateIso: "2026-09-20",
+    });
+  });
+
+  it("a REVISED date keeps the original beside it — never a lone delay icon", () => {
+    expect(
+      arrivalOf({
+        originalIso: "2026-09-20",
+        reply: {
+          answer: "delayed",
+          aboutIso: "2026-09-20",
+          previousIso: null,
+          newIso: "2026-09-28",
+          recordedAt: "2026-09-05T00:00:00Z",
+        },
+      }),
+    ).toMatchObject({
+      kind: "moved",
+      dateIso: "2026-09-28",
+      originalIso: "2026-09-20",
+      later: true,
+    });
+  });
+
+  it("an open purchase order with NO date states the gap, never a guess", () => {
+    expect(arrivalOf({})).toMatchObject({ kind: "no_date" });
+  });
+
+  it("a date behind us with no goods is the supplier exception", () => {
+    expect(arrivalOf({ originalIso: "2026-08-01" })).toMatchObject({
+      kind: "passed",
+      dateIso: "2026-08-01",
+    });
+  });
+
+  it("goods already in the register answer `on_hand`, whatever a PO says", () => {
+    const card = cards([
+      order({
+        id: "a",
+        so: 1301,
+        order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1 }],
+        allocated_units: [{ sku: "mattress:M1401F-K", status: "reserved", qty: 1 }],
+        po_arrivals: [
+          {
+            poId: "PO-1",
+            status: "open",
+            owedSkus: ["mattress:M1401F-K"],
+            plannedIso: "2026-09-20",
+            originalIso: "2026-09-20",
+            reply: null,
+          },
+        ],
+      }),
+    ])[0]!;
+    expect(card.readiness.ready).toBe(true);
+    expect(card.arrival).toEqual({ kind: "on_hand" });
+  });
+});
+
+describe("the contact deadline — three working days, counted once", () => {
+  const chaseCard = (over: Partial<operationOrderListRow> = {}) =>
+    cards([order({ id: "a", so: 1301, ...over })])[0]!;
+
+  it("T−3 working days before the requested date, Sunday skipped", () => {
+    /* Fri 18 Sep − 3 working days on the Mon–Sat week: Thu 17, then Wed 16
+       is MALAYSIA DAY and is skipped, Tue 15, Mon 14. The holiday set is the
+       injected Malaysian one every other delivery clock counts on. */
+    expect(chaseCard({ delivery_date: "2026-09-18" }).contactDueIso).toBe("2026-09-14");
+  });
+
+  it("a customer who named no day has no deadline, and is never late", () => {
+    const card = chaseCard({ delivery_date: null, delivery_date_tbd: true });
+    expect(card.contactDueIso).toBeNull();
+    expect(card.contactOverdue).toBe(false);
+  });
+
+  it("a missed deadline KEEPS the day it missed", () => {
+    /* Requested Fri 28 Aug: Thu 27, Wed 26, then Tue 25 is Maulidur Rasul
+       and is skipped, so the deadline was Mon 24 Aug. TODAY is 4 Sep. */
+    const card = chaseCard({ delivery_date: "2026-08-28" });
+    expect(card.contactDueIso).toBe("2026-08-24");
+    expect(card.contactOverdue).toBe(true);
+  });
+
+  it("an agreed date closes the deadline — a booking is not a late call", () => {
+    const card = cards([order({ id: "a", so: 1301, delivery_date: "2026-08-28" })], {
+      arrangements: [arrangement({ order_id: "a", confirmed_date: "2026-09-10" })],
+    })[0]!;
+    expect(card.contactOverdue).toBe(false);
+  });
+
+  it("the contact week is Mon–Sat and counts CONTACT deadlines, not deliveries", () => {
+    const week = contactWeekOf(
+      [
+        datedCard({ scopeId: "x", contactDueIso: "2026-09-01" }),
+        datedCard({ scopeId: "y", contactDueIso: "2026-09-01" }),
+        datedCard({ scopeId: "z", contactDueIso: "2026-09-03" }),
+      ],
+      "2026-09-03",
+    );
+    expect(week.map((d) => d.iso)).toEqual([
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+      "2026-09-05",
+    ]);
+    expect(week.map((d) => d.count)).toEqual([0, 2, 0, 1, 0, 0]);
+  });
+
+  it("the contact-week pick narrows the chase and NOTHING else", () => {
+    const set = [
+      datedCard({ scopeId: "a", confirmedDate: null, contactDueIso: "2026-09-01" }),
+      datedCard({ scopeId: "b", confirmedDate: null, contactDueIso: "2026-09-02" }),
+    ];
+    const picked: DeliveryMonitorFilters = {
+      ...noFilters,
+      view: "no_confirmed_date",
+      contactDue: "2026-09-01",
+    };
+    expect(filterMonitorListRows(set, picked).map((c) => c.scopeId)).toEqual(["a"]);
+    /* The same pick on another queue changes nothing — a hidden second
+       narrowing would make a complete-looking list incomplete. */
+    expect(filterMonitorListRows(set, { ...picked, view: "all" }).map((c) => c.scopeId)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("the Overdue chip answers across every date", () => {
+    const set = [
+      datedCard({ scopeId: "late", confirmedDate: null, contactOverdue: true }),
+      datedCard({ scopeId: "fine", confirmedDate: null, contactDueIso: "2026-09-30" }),
+    ];
+    expect(
+      filterMonitorListRows(set, {
+        ...noFilters,
+        view: "no_confirmed_date",
+        contactOverdueOnly: true,
+      }).map((c) => c.scopeId),
+    ).toEqual(["late"]);
+  });
+
+  it("the queue is named after the JOB and the cell keeps the FACT", () => {
+    expect(MONITOR_VIEW_LABEL.no_confirmed_date).toBe("Call customer");
+    expect(MONITOR_COPY.noConfirmedDate).toBe("No confirmed date");
   });
 });

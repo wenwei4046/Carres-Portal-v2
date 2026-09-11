@@ -1,6 +1,6 @@
 /**
  * DELIVERY MONITOR — the arithmetic behind the Monitor page.
- * Owner UI corrections 2026-09-06 / 2026-09-07 · `docs/delivery/MASTER.md` §8.
+ * Owner ruling 2026-09-10 · `docs/delivery/MASTER.md` §8.
  *
  * PURE. No React, no I/O, no clock of its own — every function that needs
  * "today" is handed it, so the browser, the tests and a CI runner in UTC can
@@ -8,33 +8,53 @@
  *
  * ── WHAT THIS FILE OWNS ─────────────────────────────────────────────────────
  *
- * ONE question: *which deliveries are planned, and which record does each one
- * open?* Monitor projects the SAME canonical rows two ways:
+ * ONE question: *what do I owe today, and which record does each row open?*
+ * Monitor answers it through TWO NAMED VIEWS over the SAME canonical rows:
  *
- *     Calendar (DEFAULT)     Day · Week · Month in the page toolbar — the
- *                            delivery cards by day, or the month's counts
- *     a work queue picked    the standard selectable work list (DataGrid rows)
+ *     Work to do (DEFAULT)   the standard selectable work list over one
+ *                            WORK TO DO queue — the landing
+ *     Confirmed deliveries   Day · Week · Month; only rows a customer has
+ *                            actually agreed a day for
  *
- * ⭐ CALENDAR IS A VIEW, NEVER A `WORK TO DO` ROW (owner correction
- * 2026-09-07). `Week` is the desktop default; a rail date or a Month-view
- * date opens that date's `Day`; a phone only ever shows `Day`.
+ * ⭐ THE VIEW IS A NAMED TAB, NEVER A SIDE EFFECT OF A FILTER (owner ruling
+ * 2026-09-10, retiring the 2026-09-07 projection rule). A STATE / LOGISTICS
+ * PARTNER / DELIVERY STATUS pick NARROWS whichever view is open; a WORK TO DO
+ * queue belongs to the work list; a rail date opens that date's `Day` on the
+ * calendar. A phone only ever shows `Day`.
  *
- * The windows, the card mapping, the filters, the rail counts, the month
- * counts and the one href arithmetic all live here, so the rail count and the
- * listing it filters cannot be two different numbers (Architecture Law D).
+ * The windows, the card mapping, the goods split, the contact deadline, the
+ * filters, the rail counts, the month counts and the one href arithmetic all
+ * live here, so the rail count and the listing it filters cannot be two
+ * different numbers (Architecture Law D).
  *
  * ── WHAT IT DELIBERATELY DOES NOT OWN ───────────────────────────────────────
  *
  * It writes nothing and derives no second truth. The rows come from
  * `delivery-work.ts` — the SAME `buildDeliveryScopeRows` entry rule and status
  * ladder — the missing-evidence facts come from the Delivery Orders register's
- * own `missingDeliveryProofOf`, and this file only arranges what those owners
- * already say. A planned window ending proves nothing: no rung of any status
- * reads the clock.
+ * own `missingDeliveryProofOf`, the contact deadline is the shared `chase`
+ * step's (`deliveryStepDueIso`), the arrival is `deliveryArrivalStateOf`'s over
+ * Purchasing's recorded dates, and the shortage is `deliveryStockReadinessOf`'s
+ * over Stock's register. This file only arranges what those owners already
+ * say. A planned window ending proves nothing: no rung of any status reads the
+ * clock.
  */
 
 import type { DeliveryWorkStatusKind } from "@carres/shared";
-import { DELIVERY_WORK_STATUS_LABEL } from "@carres/shared";
+import {
+  DELIVERY_WORK_STATUS_LABEL,
+  ARRIVAL_COPY,
+  deliveryArrivalStateOf,
+  deliveryStepDueIso,
+  deliveryStockReadinessOf,
+  goodsCategoryWordOf,
+  lineKind,
+  lineShortagesOf,
+  myHolidaySet,
+  type DeliveryArrivalState,
+  type DeliveryQueueLeads,
+  type DeliveryStockReadiness,
+} from "@carres/shared";
 import {
   buildDeliveryScopeRows,
   regionBucketOf,
@@ -47,6 +67,7 @@ import {
   missingDeliveryProofOf,
   type MissingDeliveryProof,
 } from "./delivery-orders-register";
+import { lineName } from "./sales-order-facts";
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
@@ -70,6 +91,17 @@ export const MONITOR_COPY = {
   railStatus: "DELIVERY STATUS",
   allDeliveryWork: "All delivery work",
   noLogistics: "No logistics picked",
+  /**
+   * ⭐ THE CONTACT-WORK QUEUE (owner ruling 2026-09-10).
+   *
+   * The rows are unchanged — a delivery nobody has agreed a day for — but the
+   * queue is named after the JOB rather than after the hole, because the job
+   * has a DEADLINE: Logistics contacts the customer at least three working
+   * days before the requested delivery date, whether or not the goods are in.
+   * `No confirmed date` stays the CELL's absence word (it is the fact) and
+   * the retired `?view=no_confirmed_date` still opens this queue.
+   */
+  callCustomer: "Call customer",
   noConfirmedDate: "No confirmed date",
   overdue: "Overdue",
   failed: "Failed Delivery",
@@ -88,7 +120,10 @@ export const MONITOR_COPY = {
   previousMonth: "Previous month",
   nextMonth: "Next month",
   clearFilters: "Clear filters",
-  openNoConfirmedDate: "Open No confirmed date",
+  /** The empty calendar's door into the contact queue. It names the QUEUE it
+   *  opens (owner ruling 2026-09-10), so the button and the rail row it lands
+   *  on cannot read as two different places. */
+  openNoConfirmedDate: "Open Call customer",
   calendarViews: "Calendar view",
   day: "Day",
   week: "Week",
@@ -97,6 +132,40 @@ export const MONITOR_COPY = {
    *  the count) so the operator reads what the rail already taught. */
   cellDeliveries: "Deliveries",
   cellExceptions: "Exceptions",
+  /* ── THE TWO TOP-LEVEL VIEWS (owner ruling 2026-09-10) ─────────────────── */
+  /** The landing: what an operator must DO today. */
+  tabWork: "Work to do",
+  /** The calendar: only deliveries a customer has actually agreed a day for. */
+  tabCalendar: "Confirmed deliveries",
+  tabs: "Monitor views",
+  /** The calendar's own boundary, stated ON the calendar rather than learned
+   *  by noticing an absence (Delivery MASTER §8 — an unconfirmed delivery
+   *  never enters a date cell). */
+  calendarScope: "Only deliveries with a confirmed date and time appear here.",
+  /* ── THE CONTACT WEEK (owner ruling 2026-09-10) ────────────────────────── */
+  /** The strip's own caption — these dates are CONTACT deadlines, and a reader
+   *  who mistakes them for delivery appointments will call on the wrong day. */
+  contactWeekScope: "Contact deadlines — not supplier or delivery dates",
+  contactWeek: "Contact-work week",
+  previousWeek: "Previous week",
+  nextWeek: "Next week",
+  /** A contact deadline nothing can be measured from: the customer has not
+   *  named a day, so nothing about this row is late (delivery-queue's own
+   *  "a step with no anchor is never late"). */
+  noContactDeadline: "No contact deadline",
+  /** The governed late spelling, unchanged from every other late step. */
+  lateWasDue: (date: string) => `Late — was due ${date}`,
+  callBy: (date: string) => `Call by ${date}`,
+  /* ── THE GOODS COLUMNS (owner ruling 2026-09-10) ───────────────────────── */
+  items: "Items",
+  extras: "Accessories & services",
+  /** No accessory and no service on this order — a fact, not a blank. */
+  noExtras: "None",
+  /** The site facts the crew meets, from the Sales Order's own answers. */
+  floor: "Floor",
+  hasLift: "Has lift",
+  noLift: "No lift",
+  stock: "Stock",
 } as const;
 
 /**
@@ -114,6 +183,14 @@ export const MONITOR_COLUMN = {
   confirmedTime: "Confirmed Time",
   doNumber: "DO No",
   location: "Delivery Location",
+  /** The main goods on the truck — the model, its size and how many. */
+  items: MONITOR_COPY.items,
+  /** Everything that travels with them, and every service the crew performs. */
+  extras: MONITOR_COPY.extras,
+  /** WHEN the goods reach us — the supplier's date, never the customer's. */
+  expectedArrival: ARRIVAL_COPY.column,
+  /** Whether the register already holds the goods. */
+  stock: MONITOR_COPY.stock,
   goods: "Goods",
   deliveryStatus: "Delivery Status",
   /** The ROW's open-action list — the governed word (COPY-STANDARD). */
@@ -262,11 +339,42 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   all: MONITOR_COPY.allDeliveryWork,
   no_logistics: MONITOR_COPY.noLogistics,
-  no_confirmed_date: MONITOR_COPY.noConfirmedDate,
+  /** The rows are unchanged; the NAME is the job, and the job has a deadline
+   *  (owner ruling 2026-09-10). `No confirmed date` remains the CELL's word. */
+  no_confirmed_date: MONITOR_COPY.callCustomer,
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
   upload_proof: MONITOR_COPY.uploadProof,
 };
+
+/**
+ * ⭐ THE TWO TOP-LEVEL VIEWS (owner ruling 2026-09-10), overwriting the
+ * 2026-09-07 "calendar shows while nothing is picked" projection rule.
+ *
+ * ```
+ * work       what must be DONE — the selectable work list. THE LANDING.
+ * calendar   Confirmed deliveries — the Mon–Sat week, Day and Month
+ * ```
+ *
+ * The old rule made the projection a SIDE EFFECT of the rail: picking a state
+ * silently replaced the calendar with a sheet, and the only way back was to
+ * find `Clear filters`. Two named tabs make the choice the operator's, and
+ * every narrowing then applies to whichever view is open — which is also why
+ * the rail's two-month calendar now stays useful on both.
+ *
+ * The work list leads because Monitor's morning question is *what do I owe
+ * today?*, and a calendar of agreed appointments cannot answer it: a delivery
+ * nobody has agreed a day for is not on the calendar at all.
+ */
+export type MonitorTopTab = "work" | "calendar";
+export const MONITOR_TOP_TABS: readonly MonitorTopTab[] = ["work", "calendar"];
+export const MONITOR_TOP_TAB_LABEL: Record<MonitorTopTab, string> = {
+  work: MONITOR_COPY.tabWork,
+  calendar: MONITOR_COPY.tabCalendar,
+};
+export const DEFAULT_TOP_TAB: MonitorTopTab = "work";
+/** The queue a Work to do tab opens on when the URL names none. */
+export const DEFAULT_WORK_VIEW: MonitorWorkView = "all";
 
 /**
  * The DELIVERY STATUS group (owner correction 2026-09-07) — filters over the
@@ -316,16 +424,79 @@ export interface DeliveryMonitorCard {
    * false for any row whose result has not reached the customer.
    */
   missingProof: MissingDeliveryProof;
+  /** THE MAIN GOODS on the truck, with their size and quantity. */
+  items: MonitorGoodsLine[];
+  /** Accessories and services, kept APART from the main goods (owner ruling
+   *  2026-09-10) — the two questions are answered by two cells. */
+  extras: MonitorExtraLine[];
+  /** The site the crew meets, from Sales Orders' own answers, or null when
+   *  nobody has recorded one. */
+  siteAccess: string | null;
+  /** Whether the register holds every committed piece, and what is missing. */
+  readiness: DeliveryStockReadiness;
+  /** When the goods reach us — the ONE shared reader over recorded dates. */
+  arrival: DeliveryArrivalState;
+  /**
+   * ⭐ THE CONTACT DEADLINE — three working days before the customer's
+   * requested date, through the SAME `chase` step every other Carres surface
+   * counts (`deliveryStepDueIso`), so the Orders list and Monitor cannot name
+   * two different days. Null when the customer has not named a date: a step
+   * with no anchor is never late.
+   *
+   * IT NEVER MOVES. A late contact keeps the deadline it missed — that is what
+   * makes it late, and rolling it forward would erase the only evidence that
+   * anything went wrong.
+   */
+  contactDueIso: string | null;
+  /** The deadline is behind us and no date has been agreed. A RECORDED fact
+   *  about a RECORDED absence — never an inference about the customer. */
+  contactOverdue: boolean;
   /** The full row behind the card — the work list's own columns and the
    *  governed `Assign logistics` door read it; the calendar card never does. */
   scope: DeliveryScopeRow;
 }
 
+/** One goods line as the work list prints it. */
+export interface MonitorGoodsLine {
+  key: string;
+  /** `Trion · Queen` — the catalog's own resolved name (model AND size), or
+   *  the text the order carries when the catalog does not know the SKU. */
+  name: string;
+  /** The catalog's own category word (`Mattress` · `Pillow` · `Service`). */
+  category: string;
+  qty: number;
+  /** Pieces the register does not hold for this line — 0 when it is all in. */
+  shortQty: number;
+}
+
+/** One accessory or service line. A service moves no Unit and can be short of
+ *  nothing, so it carries a `detail` instead of a shortage. */
+export interface MonitorExtraLine extends MonitorGoodsLine {
+  kind: "accessory" | "service";
+}
+
 /** The source is the workspace's own canonical reads — nothing new is fetched. */
-export type DeliveryMonitorSource = ScopeInputs;
+export interface DeliveryMonitorSource extends ScopeInputs {
+  /**
+   * The `Confirm delivery date` lead in WORKING DAYS (Purchasing → Settings,
+   * `logistics_call_working_days`, three since 0342). Absent leaves the step
+   * on `delivery-queue.ts`'s own seed — never on a number this file invented.
+   */
+  queueLeads?: DeliveryQueueLeads;
+  /** Malaysian public holidays. Omitted → the live set, the same one every
+   *  other delivery clock counts on. */
+  holidays?: ReadonlySet<string>;
+  /** Business today — the contact deadline is a question about it. */
+  todayIso: string;
+  /** Addon key → its catalog NAME (`dispose-mattress` → `Dispose old
+   *  mattress`). A key nobody can name is printed as the order recorded it,
+   *  never as a database word dressed up (COPY-STANDARD: no internal enum on
+   *  screen — so an unresolved key is spaced out, not translated). */
+  addonNameByKey?: Map<string, string>;
+}
 
 export interface DeliveryMonitorFilters {
-  /** The picked WORK TO DO queue; null = no queue (the Calendar shows). */
+  /** The picked WORK TO DO queue; null narrows no queue at all. */
   view: MonitorWorkView | null;
   region: string | null;
   /** A partner id, or null for all. `"none"` survives only for a retired
@@ -333,24 +504,26 @@ export interface DeliveryMonitorFilters {
   logisticsPartnerId: string | "none" | null;
   status: MonitorDeliveryStatus | null;
   search: string;
+  /**
+   * ⭐ THE CONTACT-WEEK PICK (owner ruling 2026-09-10) — ONE contact deadline,
+   * or null for every date. It narrows only the `Call customer` queue, because
+   * it is a question only that queue asks; anywhere else it would be a hidden
+   * second narrowing of a list that looks complete.
+   */
+  contactDue: string | null;
+  /** The strip's own `Overdue` chip: contact deadlines already behind us. It
+   *  is always visible WITH ITS COUNT, so navigating to a quiet Thursday can
+   *  never hide the calls that are already late. */
+  contactOverdueOnly: boolean;
   /** Business today — `Overdue` is a question about it, answered here once. */
   todayIso: string;
 }
 
-/**
- * THE PROJECTION RULE. The Calendar renders ONLY while no operational pick
- * holds: a work queue, a STATE row, a LOGISTICS PARTNER row or a DELIVERY
- * STATUS row is an operational question, and its answer is the standard
- * selectable work list, never a card wall.
- */
-export function isCalendarProjection(filters: DeliveryMonitorFilters): boolean {
-  return (
-    filters.view === null &&
-    filters.region === null &&
-    filters.logisticsPartnerId === null &&
-    filters.status === null
-  );
-}
+/* ⛔ `isCalendarProjection` was DELETED by the owner ruling of 2026-09-10.
+   It made the projection a SIDE EFFECT of the rail: picking `Selangor`
+   silently replaced the calendar with a sheet, and the operator's way back was
+   to notice `Clear filters`. Two NAMED tabs (`MonitorTopTab`) now decide which
+   view is showing, and every narrowing applies to whichever one is open. */
 
 /** PostgREST may embed a to-one overlay as an object or a one-row array. */
 function overlayOf<T>(value: T | T[] | null | undefined): T | null {
@@ -367,6 +540,7 @@ function overlayOf<T>(value: T | T[] | null | undefined): T | null {
  */
 export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): DeliveryMonitorCard[] {
   const rows = buildDeliveryScopeRows(input);
+  const holidays = input.holidays ?? myHolidaySet();
   const docByNumber = new Map(input.deliveryOrders.map((d) => [d.do_number, d] as const));
   /* The LATEST recorded attempt per document — the same "latest" the Delivery
      Orders register reads (newest `recorded_at`). */
@@ -392,6 +566,55 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       photosPresent: photos === undefined || photos === null ? null : photos.length > 0,
       signedDoPresent: Boolean(doc?.orders.do_file_path),
     });
+    /* ── THE GOODS, THE STOCK AND THE ARRIVAL (owner ruling 2026-09-10) ────
+       Every one of these comes from a shared arithmetic and none of them is
+       recomputed here: the shortage is `lineShortagesOf` over the register
+       rows the list read carries, the readiness is the same function's
+       whole-order answer, and the arrival state is `deliveryArrivalStateOf`
+       over the purchase orders' own recorded dates. */
+    const committed = (row.o.order_lines ?? []).map((l) => ({ sku: l.sku, qty: l.qty }));
+    const units = row.o.allocated_units ?? [];
+    const readiness = deliveryStockReadinessOf(committed, units);
+    const shortBySku = new Map<string, number>();
+    lineShortagesOf(committed, units).forEach((s, index) => {
+      shortBySku.set(`${index}`, s.shortQty);
+    });
+    const items: MonitorGoodsLine[] = [];
+    const extras: MonitorExtraLine[] = [];
+    (row.o.order_lines ?? []).forEach((line, index) => {
+      const kind = lineKind(line.sku);
+      const entry: MonitorGoodsLine = {
+        key: line.id ?? `${line.sku}-${index}`,
+        name: lineName(line),
+        category: goodsCategoryWordOf(line),
+        qty: line.qty,
+        shortQty: shortBySku.get(`${index}`) ?? 0,
+      };
+      /* `unknown` is a physical thing nobody recognised — it travels on the
+         truck, so it belongs with the MAIN goods, never buried under the
+         pillows (line-category's own D9 ruling). */
+      if (kind === "core" || kind === "unknown") items.push(entry);
+      else if (kind === "service") extras.push({ ...entry, kind: "service", shortQty: 0 });
+      else extras.push({ ...entry, kind: "accessory" });
+    });
+    for (const [index, addon] of (row.o.order_addons ?? []).entries()) {
+      const key = addon.addon_key ?? "";
+      extras.push({
+        key: `addon-${index}-${key}`,
+        name: addonName(key, input.addonNameByKey),
+        category: "Service",
+        qty: addon.qty,
+        shortQty: 0,
+        kind: "service",
+      });
+    }
+    /* ── THE CONTACT DEADLINE — the `chase` step, counted once ────────────── */
+    const contactDueIso = deliveryStepDueIso(
+      "chase",
+      row.customerDeliveryIso,
+      { holidays },
+      input.queueLeads,
+    );
     return {
       scopeId: row.key,
       orderId: row.orderId,
@@ -409,9 +632,96 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       statusKey: row.status.kind,
       statusLabel: row.status.label,
       missingProof,
+      items,
+      extras,
+      siteAccess: siteAccessOf(row.o),
+      readiness,
+      arrival: deliveryArrivalStateOf({
+        arrivals: row.o.po_arrivals ?? [],
+        readiness,
+        todayIso: input.todayIso,
+      }),
+      contactDueIso,
+      /* Late is a question about a RECORDED absence: a deadline behind us with
+         no agreed date. It is never an inference about what the customer said
+         — a contact ATTEMPT is not a confirmed booking, and neither is
+         silence. */
+      contactOverdue:
+        contactDueIso !== null && contactDueIso < input.todayIso && row.confirmedIso === null,
       scope: row,
     };
   });
+}
+
+/**
+ * The addon's own catalog NAME. A key the catalog cannot name is spaced out
+ * (`dispose-mattress` → `dispose mattress`) rather than printed raw: a
+ * database word may not reach an operator (COPY-STANDARD), and inventing a
+ * prettier name for a key nobody recognises would be worse than saying what
+ * the order actually recorded.
+ */
+function addonName(key: string, names: Map<string, string> | undefined): string {
+  const named = names?.get(key);
+  if (named && named.trim()) return named.trim();
+  const spaced = key.replace(/[_-]+/g, " ").trim();
+  if (!spaced) return "Service";
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+/**
+ * The site the crew meets — `Floor 3 · No lift`.
+ *
+ * Sales Orders owns both answers and Delivery only reads them. The lift is a
+ * THREE-state fact (`Has lift` · `No lift` · nobody asked), so an unrecorded
+ * lift prints nothing rather than the cheaper of the two answers.
+ */
+export function siteAccessOf(o: {
+  delivery_floor?: number | null;
+  delivery_has_lift?: boolean | null;
+}): string | null {
+  const parts: string[] = [];
+  if (o.delivery_floor != null) parts.push(`${MONITOR_COPY.floor} ${o.delivery_floor}`);
+  if (o.delivery_has_lift != null) {
+    parts.push(o.delivery_has_lift ? MONITOR_COPY.hasLift : MONITOR_COPY.noLift);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * ⭐ THE CONTACT WEEK — Monday to Saturday, counted by CONTACT DEADLINE.
+ *
+ * These six dates are not delivery appointments and not supplier dates: each
+ * one is the last day a customer conversation can open without being late. The
+ * strip exists because *how many calls do I owe on Thursday?* is the question
+ * the chase actually asks, and a flat list of 86 rows answers it by making the
+ * operator count.
+ *
+ * Rows with NO deadline (the customer named no day) belong to no date and are
+ * never hidden by one: they stay in the list under their own group.
+ */
+export interface ContactWeekDay {
+  iso: string;
+  count: number;
+}
+
+export function contactWeekOf(
+  cards: readonly DeliveryMonitorCard[],
+  weekOfIso: string,
+): ContactWeekDay[] {
+  const counts = new Map<string, number>();
+  for (const c of cards) {
+    if (!c.contactDueIso) continue;
+    counts.set(c.contactDueIso, (counts.get(c.contactDueIso) ?? 0) + 1);
+  }
+  return operatingWeekOf(weekOfIso).map((iso) => ({ iso, count: counts.get(iso) ?? 0 }));
+}
+
+/** Every contact deadline already behind us with no agreed date — the chip's
+ *  count, and the same rows the `Overdue contact work` band lists. */
+export function overdueContactCards(
+  cards: readonly DeliveryMonitorCard[],
+): DeliveryMonitorCard[] {
+  return sortByRequestedDeliveryDate(cards.filter((c) => c.contactOverdue));
 }
 /** A recorded delivered result still owed evidence — the `Upload delivery
  *  proof` queue's one membership test. */
@@ -456,25 +766,36 @@ export function callToConfirmDeliveryDate(partnerName: string): string {
 /**
  * ⭐ ONE ROW, ONE NEXT ACT (the chase workflow, Delivery MASTER §8).
  *
- * The operator's question on a row with no confirmed date is *who do I
- * contact?* and it has exactly two answers:
- *
  * ```
- * nobody carries this row yet   Assign logistics
- * a partner carries it          Call {partner} — confirm delivery date,
- *                               then Edit Delivery to record what they said
+ * the goods already reached the customer   Upload the exact missing evidence
+ * nobody carries this row yet              Assign logistics
+ * a partner carries it, no agreed day      Call {partner} — confirm delivery
+ *                                          date, then Edit Delivery records it
+ * everything agreed                        Edit Delivery
  * ```
  *
- * Every other row already has both a carrier and an agreed day, so its one
- * door is the Delivery-owned editor. The act is derived from RECORDED facts
- * — a partner and a confirmed date — never from the clock.
+ * ⭐ A RECORDED RESULT OUTRANKS AN UNASSIGNED PARTNER (correction 2026-09-10).
+ * A delivery that already happened cannot have `Assign logistics` as its next
+ * act: the trip is over, and the one thing still outstanding is the proof. The
+ * old order asked the operator to book a carrier for goods the customer was
+ * already sitting on — which is how a real proof queue could print an act
+ * nobody could perform.
+ *
+ * Every branch is derived from RECORDED facts — the evidence ledger, a
+ * partner, a confirmed date — and never from the clock.
  */
 export type MonitorRowAction =
+  | { kind: "upload_proof"; label: string }
   | { kind: "assign_logistics"; label: string }
   | { kind: "confirm_date"; call: string; label: string }
   | { kind: "edit_delivery"; label: string };
 
 export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
+  if (needsProof(card)) {
+    /* The EXACT missing file(s), in the register's own governed words — both
+       when both are missing (owner correction 2026-09-07). */
+    return { kind: "upload_proof", label: missingProofLabels(card).join(" · ") };
+  }
   if (card.logisticsPartnerId === null) {
     return { kind: "assign_logistics", label: MONITOR_COPY.assignLogistics };
   }
@@ -577,7 +898,16 @@ function matchesSearch(card: DeliveryMonitorCard, search: string): boolean {
     .includes(q);
 }
 
-/** The Calendar projection's cards: inside the visible window, plus search. */
+/**
+ * The Confirmed deliveries calendar's cards: a CONFIRMED date inside the
+ * visible window, narrowed by the same STATE / LOGISTICS PARTNER / DELIVERY
+ * STATUS picks the work list uses (owner ruling 2026-09-10 — a narrowing now
+ * applies to whichever view is open instead of switching the view).
+ *
+ * The WORK TO DO queue is deliberately NOT applied: the queues are questions
+ * about work that has not been agreed yet, and answering one on a calendar of
+ * agreed appointments would print an empty week for a real queue.
+ */
 export function filterMonitorCalendarCards(
   cards: readonly DeliveryMonitorCard[],
   filters: DeliveryMonitorFilters,
@@ -588,6 +918,9 @@ export function filterMonitorCalendarCards(
     (c) =>
       c.confirmedDate !== null &&
       daySet.has(c.confirmedDate) &&
+      matchesRegion(c, filters.region) &&
+      matchesLogisticsPartner(c, filters.logisticsPartnerId) &&
+      matchesStatus(c, filters.status) &&
       matchesSearch(c, filters.search),
   );
 }
@@ -603,15 +936,22 @@ export function filterMonitorListRows(
   cards: readonly DeliveryMonitorCard[],
   filters: DeliveryMonitorFilters,
 ): DeliveryMonitorCard[] {
+  const chase = filters.view === "no_confirmed_date";
   const rows = cards.filter(
     (c) =>
       (filters.view === null ? true : matchesView(c, filters.view, filters.todayIso)) &&
       matchesRegion(c, filters.region) &&
       matchesLogisticsPartner(c, filters.logisticsPartnerId) &&
       matchesStatus(c, filters.status) &&
+      /* The contact-week pick belongs to the chase and to nothing else. */
+      (!chase || !filters.contactOverdueOnly || c.contactOverdue) &&
+      (!chase ||
+        filters.contactOverdueOnly ||
+        filters.contactDue === null ||
+        c.contactDueIso === filters.contactDue) &&
       matchesSearch(c, filters.search),
   );
-  return filters.view === "no_confirmed_date" ? sortByRequestedDeliveryDate(rows) : rows;
+  return chase ? sortByRequestedDeliveryDate(rows) : rows;
 }
 
 /** The stable tie-break every Delivery listing uses: the customer name
