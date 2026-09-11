@@ -539,15 +539,34 @@ export default function GoodsMiniTable({
                       <Absence>Not recorded</Absence>
                     );
                   }
-                  return line.poAllocations?.length ? (
-                    line.poAllocations.map((a) => (
-                      <div key={a.poId}>
-                        {poLink(a.poId)}
-                        <span className="tabular-nums text-base-600">{` ×${a.qty}`}</span>
+                  if (!line.poAllocations?.length) {
+                    return <Absence>{line.onPoAbsence ?? "—"}</Absence>;
+                  }
+                  if (line.poAllocations.length === 1) {
+                    const only = line.poAllocations[0]!;
+                    return (
+                      <div>
+                        {poLink(only.poId)}
+                        <span className="tabular-nums text-base-600">{` ×${only.qty}`}</span>
                       </div>
-                    ))
-                  ) : (
-                    <Absence>{line.onPoAbsence ?? "—"}</Absence>
+                    );
+                  }
+                  /* ⭐ SEVERAL DOCUMENTS SUMMARISE — found on the production
+                     walk, 2026-09-11. One live item line carries FOURTEEN
+                     purchase orders (the historical duplicate-PO shape the
+                     `already_on_po` guard now refuses), and listing them all
+                     made one cell fourteen lines tall while the row it belongs
+                     to is one. The summary is the page's own grammar — `{n}
+                     POs` — and it keeps the quantity, which is the fact the
+                     operator is actually reconciling. The exact documents are
+                     one row below, each against the Unit it brought in. */
+                  return (
+                    <span className="tabular-nums">
+                      {`${line.poAllocations.length} POs ×${line.poAllocations.reduce(
+                        (n, a) => n + a.qty,
+                        0,
+                      )}`}
+                    </span>
                   );
                 case "deliverTo":
                   if (evidence) {
