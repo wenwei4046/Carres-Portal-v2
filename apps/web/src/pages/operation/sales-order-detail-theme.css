@@ -1,4 +1,4 @@
-/* Sales Order detail-only palette trial. Keep geometry, shared kit tokens,
+/* Shared Sales Order create and detail palette. Keep geometry, shared kit tokens,
    semantic states, interactive blue and PDF document rendering unchanged. */
 [data-so-theme="trial"] {
   background-color: #f5f7fa;

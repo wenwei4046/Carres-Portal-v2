@@ -280,6 +280,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
     flush?: boolean;
+    /** Join the detail card to the parent across every column, without gutters or borders. */
+    fullWidth?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -1660,7 +1662,7 @@ function DataGridInner<T>({
           <tr className={styles.tr} style={{ background: "var(--c-cream)" }}>
             {/* The gutter, kept EMPTY beside the child rows — the indent IS
                 the parent-child link (owner ruling 2026-08-15). */}
-            {expansionGutter.map((key) => (
+            {(expandable.fullWidth ? [] : expansionGutter).map((key) => (
               <td
                 key={key}
                 data-testid={`grid-expansion-gutter-${key}`}
@@ -1668,14 +1670,15 @@ function DataGridInner<T>({
               />
             ))}
             <td
-              colSpan={visibleColumns.length - expansionGutter.length}
+              colSpan={visibleColumns.length - (expandable.fullWidth ? 0 : expansionGutter.length)}
+              className={expandable.fullWidth ? "p-0 border-0" : undefined}
               data-testid="grid-expansion-cell"
               /* ⭐ VERTICAL ONLY (owner correction 2026-08-15). The child is a
                  separate object and needs air above and below it to read as
                  one — but HORIZONTAL padding is exactly what the gutter cells
                  replaced, so it stays at zero: the left edge is the first data
                  column's, the right edge is the parent table's. */
-              style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
+              style={expandable.fullWidth ? { padding: 0, border: 0 } : { padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
               {expandable.renderExpansion(row)}
             </td>

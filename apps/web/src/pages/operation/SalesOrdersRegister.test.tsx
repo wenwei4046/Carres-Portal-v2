@@ -667,7 +667,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
+  it("renders the five-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
@@ -710,8 +710,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
+      "Category", "Item Details", "Unit ID", "Qty", "Deliver To",
     ]);
+    const headers = within(table).getAllByRole("columnheader");
+    expect(headers.map((header) => header.style.width)).toEqual(["15%", "45%", "15%", "10%", "15%"]);
+    expect(table.style.minWidth).toBe("");
     const row = screen.getByTestId("expanded-good-B1201S-K");
     expect(row).toHaveTextContent("Mattress");
     expect(row).toHaveTextContent("id-001");
@@ -772,17 +775,15 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
    * hint, and this grid stretches its columns to fill the frame, so the 30px
    * ☐ and 32px ▸ render 41 and 43 at 1440 and a 62px padding lands 22px short.
    */
-  it("starts the expansion at the first data column, with the gutter left empty", () => {
+  it("starts the expansion under SO No with empty checkbox and disclosure gutters", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    const gutter = screen.getAllByTestId(/^grid-expansion-gutter-/);
-    expect(gutter.map((c) => c.dataset.testid)).toEqual([
+    const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutters.map((cell) => cell.dataset.testid)).toEqual([
       "grid-expansion-gutter-__select__",
       "grid-expansion-gutter-__expand__",
     ]);
-    for (const cell of gutter) expect(cell).toBeEmptyDOMElement();
-    /* Eight default business columns; the gutter is not one of them, and the
-       box's right edge is therefore the parent table's. */
+    for (const cell of gutters) expect(cell).toBeEmptyDOMElement();
     expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
     /* Flush expansion: the child grid joins its parent without card spacing. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
@@ -798,8 +799,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const box = screen.getByTestId("goods-mini-table");
-    expect(box.className).toContain("rounded-control");
-    expect(box.className).toContain("border-base-200");
+    expect(box.className).toContain("tableFrame");
     expect(box.className).not.toContain("border-y");
   });
 
@@ -812,11 +812,11 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });
     const [head, body] = within(goods).getAllByRole("rowgroup");
-    expect(within(head).getByRole("row").className).toContain("divide-x");
+    expect(head.className).toContain("border-base-200");
     expect(body.className).toContain("divide-y");
     expect(body.className).toContain("divide-base-200");
     for (const row of within(body).getAllByRole("row")) {
-      expect(row.className).toContain("divide-x");
+      expect(row.className).toContain("align-top");
       expect(row.className).toContain("divide-base-200");
     }
   });
@@ -828,7 +828,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
    * checkbox — the parent row's tick already scopes Export, and a second tick
    * inside the box would claim the register can act on one line.
    */
-  it("prints the child header at 11px with no checkbox, and every value at 13px", () => {
+  it("prints micro-headers with no child selection checkbox", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     const goods = screen.getByRole("table", { name: "Goods on SO-1303" });

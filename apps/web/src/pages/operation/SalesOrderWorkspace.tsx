@@ -1947,7 +1947,7 @@ export default function SalesOrderWorkspace() {
       <Block
         title="Customer"
         headerSlot={
-          customerBuiltins["customerType"]?.enabled !== false ? (
+          !isNew && customerBuiltins["customerType"]?.enabled !== false ? (
             <span
               className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-base-700"
               data-pos-field="customerType"
@@ -2840,7 +2840,7 @@ export default function SalesOrderWorkspace() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-so-theme={mode !== "create" ? "trial" : undefined}>
+    <div className="flex h-full min-h-0 flex-col" data-so-theme="trial">
       <SalesOrderTabs
         identity={soWord}
         /* Capitalize up — owner ruling 2026-08-15. Display only; the

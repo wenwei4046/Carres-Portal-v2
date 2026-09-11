@@ -48,6 +48,7 @@
 // register above it owns all three, and wrapping a disclosure in ListPageShell
 // would draw a second page chrome inside one table cell.
 import type { ReactNode } from "react";
+import styles from "./GoodsMiniTable.module.css";
 import { lineClass } from "@carres/shared";
 
 /**
@@ -168,12 +169,12 @@ export interface GoodsMiniTableSelection {
  * loses its weight, so a column of eight absences and two real unit codes
  * reads as two facts.
  */
-function Absence({ children }: { children: ReactNode }) {
+function Absence({ children, serviceDash = false }: { children: ReactNode; serviceDash?: boolean }) {
   /* `font-sans` because an absence is a WORD, not a code: `Not allocated` set
      in the `Unit ID` column's mono face reads like a unit somebody registered
      under that name. The column keeps mono for the codes it actually holds. */
   return (
-    <span className="font-sans text-kit-slate-9" data-absence="true">
+    <span className={serviceDash ? "block text-center font-sans text-gray-300" : "font-sans text-kit-slate-9"} data-absence="true">
       {children}
     </span>
   );
@@ -241,12 +242,15 @@ export default function GoodsMiniTable({
   showSupplier = false,
   showPoDeliveryDate = false,
   oneRowPerUnit = false,
+  salesOrderLayout = false,
   onCoveredByClick,
   isCoveredByLinkable,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
+  /** Trial nested-card presentation for the Sales Orders register only. */
+  salesOrderLayout?: boolean;
   /** Disclose each physical Unit separately while retaining line selection. */
   oneRowPerUnit?: boolean;
   /** Present only on a page that buys from these lines. */
@@ -282,15 +286,24 @@ export default function GoodsMiniTable({
 }) {
   /* The six ruled columns, plus the buying page's own — `Covered by` after
      `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
-  type Column = { key: string; label: string; width: number | null };
+  type Column = { key: string; label: string; width: number | string | null };
   const columns: Column[] = showCoveredBy
     ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
     : [...CHILD_COLUMNS];
+  if (salesOrderLayout) {
+    columns.splice(0, columns.length,
+      { key: "category", label: "Category", width: "15%" },
+      { key: "item", label: "Item Details", width: "45%" },
+      { key: "unit", label: "Unit ID", width: "15%" },
+      { key: "qty", label: "Qty", width: "10%" },
+      { key: "deliverTo", label: "Deliver To", width: "15%" },
+    );
+  }
   const itemAt = columns.length - 1;
   if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
   if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
   const minWidth =
-    FIXED_TOTAL +
+    (salesOrderLayout ? 1100 - ITEM_FLOOR : FIXED_TOTAL) +
     ITEM_FLOOR +
     (selection ? SELECT_WIDTH : 0) +
     (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
@@ -307,12 +320,12 @@ export default function GoodsMiniTable({
        LEFT and RIGHT edges are untouched: the frame is drawn on the `SO No`
        column's left edge and the parent table's right edge. */
     <div
-      className="overflow-x-auto rounded-control border border-base-200 bg-white"
+      className={`${styles.tableFrame} ${salesOrderLayout ? "w-full min-w-0 [&_td]:align-top [&_td]:whitespace-normal [&_td]:break-words" : "overflow-x-auto"}`}
       data-testid="goods-mini-table"
     >
       <table
         className="w-full table-fixed text-left"
-        style={{ minWidth }}
+        style={salesOrderLayout ? { width: "100%", tableLayout: "fixed" } : { minWidth }}
         aria-label={label}
       >
         <colgroup>
@@ -333,6 +346,7 @@ export default function GoodsMiniTable({
               <th
                 key={c.key}
                 scope="col"
+                style={salesOrderLayout ? { width: c.width ?? undefined } : undefined}
                 /* The parent header's treatment, spelled in TOKENS: `text-label`
                    is the 11px the owner named, `text-base-500` its grey. The
                    parent's 0.06em tracking is a CSS-module value with no token
@@ -341,7 +355,7 @@ export default function GoodsMiniTable({
                    `01-design-tokens.md` has locked. Size, colour and case carry
                    the match — and the weight is 600, because §2.2 deleted 700
                    into 600 and the CSS module's own 700 predates that ruling. */
-                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
+                className={`px-2 py-1.5 align-middle text-label font-semibold uppercase text-base-500 ${salesOrderLayout && c.key === "qty" ? "text-center" : "text-left"}`}
               >
                 {c.label}
               </th>
@@ -387,11 +401,25 @@ export default function GoodsMiniTable({
                   mono face — the register engine itself aliases --font-mono
                   to Inter — so an identifier is plain body text here too. */}
               <td className="px-2 py-2">{line.category}</td>
+              {salesOrderLayout ? (
+                <td className="px-2 py-2 align-top text-left">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="font-medium text-base-900 break-words">{line.item}</div>
+                    <div className="text-base-600 break-words">{line.sku}{line.itemDetail ? ` \u00b7 ${line.itemDetail}` : ""}</div>
+                  </div>
+                </td>
+              ) : null}
               <td className={oneRowPerUnit ? "px-2 py-2 font-mono tabular-nums text-[13px]" : "px-2 py-2"}>
                 {line.unitIds.length ? (
-                  line.unitIds.map((id) => <div key={id}>{id}</div>)
+                  salesOrderLayout ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {line.unitIds.map((id) => (
+                        <span key={id} className="max-w-full break-all">{id}</span>
+                      ))}
+                    </div>
+                  ) : line.unitIds.map((id) => <div key={id}>{id}</div>)
                 ) : (
-                  <Absence>{line.unitAbsence}</Absence>
+                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.unitAbsence === "\u2014"}>{line.unitAbsence}</Absence>
                 )}
               </td>
               {showCoveredBy ? (
@@ -424,17 +452,19 @@ export default function GoodsMiniTable({
                   )}
                 </td>
               ) : null}
+              {!salesOrderLayout ? (
               <td className="px-2 py-2">
                 {line.deliverToNode != null ? (
                   line.deliverToNode
                 ) : line.deliverTo.length ? (
                   line.deliverTo.map((d) => <div key={d}>{d}</div>)
                 ) : (
-                  <Absence>{line.deliverToAbsence}</Absence>
+                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.deliverToAbsence === "\u2014"}>{line.deliverToAbsence}</Absence>
                 )}
               </td>
-              <td className="px-2 py-2">{line.sku}</td>
-              <td className="px-2 py-2 tabular-nums">{line.qty}</td>
+              ) : null}
+              {!salesOrderLayout ? <td className="px-2 py-2">{line.sku}</td> : null}
+              <td className={salesOrderLayout ? "px-2 py-2 align-top text-center tabular-nums" : "px-2 py-2 tabular-nums"}>{line.qty}</td>
               {showSupplier ? (
                 <td className="px-2 py-2">
                   {line.supplier ? (
@@ -453,12 +483,22 @@ export default function GoodsMiniTable({
                   )}
                 </td>
               ) : null}
+              {salesOrderLayout ? (
               <td className="px-2 py-2">
-                <div className="font-medium text-base-900">{line.item}</div>
-                {line.itemDetail ? (
-                  <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
-                ) : null}
+                {line.deliverToNode != null ? (
+                  line.deliverToNode
+                ) : line.deliverTo.length ? (
+                  line.deliverTo.map((d) => <div key={d}>{d}</div>)
+                ) : (
+                  <Absence serviceDash={salesOrderLayout && line.category === "Service" && line.deliverToAbsence === "\u2014"}>{line.deliverToAbsence}</Absence>
+                )}
               </td>
+              ) : (
+                <td className="px-2 py-2">
+                  <div className="font-medium text-base-900">{line.item}</div>
+                  {line.itemDetail ? <div className="mt-0.5 text-base-600">{line.itemDetail}</div> : null}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

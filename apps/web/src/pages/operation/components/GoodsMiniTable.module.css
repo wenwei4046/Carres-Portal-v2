@@ -1,0 +1,23 @@
+/* Shared expansion appearance for Sales Orders and SO Batch Purchase. */
+.tableFrame {
+  background: #ffffff;
+  border: 1px solid #d2dae3;
+  border-radius: 2px;
+  box-shadow: none;
+  color: #1f2937;
+  font-family: Inter, "DM Sans", system-ui, sans-serif;
+}
+
+.tableFrame :is(thead, tr, th, td) {
+  border-color: #d2dae3;
+}
+
+.tableFrame :is(thead, th) {
+  background: #e7ecf1;
+  color: #26384a;
+  font-weight: 600;
+}
+
+.tableFrame tbody { background: #ffffff; }
+.tableFrame :global(.text-base-900) { color: #1f2937; }
+.tableFrame :is([data-absence="true"], :global(.text-base-600)) { color: #667085; }

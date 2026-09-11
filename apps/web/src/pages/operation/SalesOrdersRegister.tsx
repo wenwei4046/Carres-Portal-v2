@@ -433,7 +433,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   ];
   return (
     <div data-testid="row-expansion">
-      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
+      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} salesOrderLayout />
     </div>
   );
 }
