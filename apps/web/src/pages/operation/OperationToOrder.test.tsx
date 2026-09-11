@@ -168,7 +168,9 @@ describe("the page reads the ONE projection and draws the Register", () => {
     expect(screen.getByTestId("purchasing-tabs")).toHaveTextContent("SO Batch Purchase");
     const rail = screen.getByTestId("so-batch-rail");
     expect(rail).toBeInTheDocument();
-    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).not.toBeNull();
+    // ⛔ `TO ORDER / All not ordered` is retired (owner correction 2026-09-11):
+    // it named the page's own default, not a fact about a Sales Order.
+    expect(rail.querySelector("[data-testid='so-batch-all-not-ordered']")).toBeNull();
     // The five timing rows; `SETUP TO FIX` hides while its count is zero.
     expect(rail.querySelectorAll("[data-testid^='so-batch-state-']")).toHaveLength(5);
     expect(rail.textContent).not.toContain("SETUP TO FIX");

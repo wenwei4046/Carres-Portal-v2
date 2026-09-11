@@ -112,6 +112,16 @@ async function loadRegisterRows(
   type LineageRow = {
     id: string;
     po_id: string;
+    /**
+     * ⭐ THE DOCUMENT LINE, not just the document — owner correction
+     * 2026-09-11. A purchase order may carry two lines of one SKU to two
+     * different `Deliver To` destinations (the governed Split), and it may
+     * source both of them to the same customer item line. Aggregating by
+     * `po_id` alone erased that: the register then had only the PARENT
+     * document's destination to print, which is a different fact from the
+     * line's own recorded one.
+     */
+    po_line_id: string | null;
     order_id: string;
     order_line_id: string | null;
     qty: number;
@@ -120,7 +130,7 @@ async function loadRegisterRows(
   for (const batch of chunk(orderIds)) {
     const { data, error } = await sb
       .from("po_line_sources")
-      .select("id, po_id, order_id, order_line_id, qty")
+      .select("id, po_id, po_line_id, order_id, order_line_id, qty")
       .in("order_id", batch);
     if (error) {
       const m = mapPgError(error);
@@ -164,6 +174,33 @@ async function loadRegisterRows(
       sentVersions.add(`${s.po_id as string}::${Number(s.po_version)}`);
     }
   }
+  /**
+   * ⭐ THE PURCHASE-ORDER LINE'S OWN `Deliver To` (owner correction
+   * 2026-09-11), read through the SAME rule the Sales Order expansion door
+   * already uses: the LINE's `destination_id` when it has one, and the
+   * document's only when it does not. That fallback is how the paper works — a
+   * line with no destination of its own is delivered where the purchase order
+   * says — and it is the only case in which a parent summary may stand for a
+   * line. A line that HAS a destination may never have it replaced by the
+   * document's.
+   */
+  const poLineIds = [...new Set([...lineage.values()].map((r) => r.po_line_id).filter((v): v is string => Boolean(v)))];
+  const poLineDestination = new Map<string, string | null>();
+  for (const batch of chunk(poLineIds)) {
+    if (batch.length === 0) continue;
+    const { data, error } = await sb
+      .from("purchase_order_lines")
+      .select("id, destination_id")
+      .in("id", batch);
+    if (error) {
+      const m = mapPgError(error);
+      return { ok: false, status: m.status, body: m.body };
+    }
+    for (const r of (data ?? []) as Array<{ id: string; destination_id: string | null }>) {
+      poLineDestination.set(r.id, r.destination_id ?? null);
+    }
+  }
+
   const qualifies = (po: PoRow | undefined): po is PoRow =>
     po != null && po.status !== "cancelled";
   const sentCurrent = (po: PoRow): boolean =>
@@ -191,8 +228,11 @@ async function loadRegisterRows(
       qualifies(poById.get(r.po_id)),
     );
 
-    /* Per order line: which POs, and how many units each. */
-    const lineagePerLine = new Map<string, Map<string, number>>();
+    /* Per order line: which purchase-order LINES, and how many units each.
+       Keyed by `po_id::po_line_id` so a document that carries one SKU to two
+       destinations stays two facts — merging them would leave the register
+       with only the parent document's destination to print. */
+    const lineagePerLine = new Map<string, Map<string, { poId: string; poLineId: string | null; qty: number }>>();
     for (const r of orderLineage) {
       if (!r.order_line_id) continue;
       let per = lineagePerLine.get(r.order_line_id);
@@ -200,17 +240,30 @@ async function loadRegisterRows(
         per = new Map();
         lineagePerLine.set(r.order_line_id, per);
       }
-      per.set(r.po_id, (per.get(r.po_id) ?? 0) + Math.max(0, Number(r.qty ?? 0)));
+      const key = `${r.po_id}::${r.po_line_id ?? ""}`;
+      const hit = per.get(key);
+      if (hit) hit.qty += Math.max(0, Number(r.qty ?? 0));
+      else per.set(key, { poId: r.po_id, poLineId: r.po_line_id ?? null, qty: Math.max(0, Number(r.qty ?? 0)) });
     }
 
     let buyingRequiredQty = 0;
     let sentCoveredQty = 0;
     const outstandingSupplierIds = new Set<string>();
     const lines: SoBatchOrderLineFact[] = soLines.map((l) => {
-      const per = lineagePerLine.get(l.lineId) ?? new Map<string, number>();
-      const pos = [...per]
-        .map(([poId, qty]) => ({ poId, qty }))
-        .sort((a, b) => a.poId.localeCompare(b.poId));
+      const per = lineagePerLine.get(l.lineId) ?? new Map<string, { poId: string; poLineId: string | null; qty: number }>();
+      const pos = [...per.values()]
+        .map((e) => ({
+          poId: e.poId,
+          poLineId: e.poLineId,
+          qty: e.qty,
+          /* The LINE's destination, and the document's only where the line has
+             none — never the other way round. */
+          destinationId:
+            (e.poLineId ? poLineDestination.get(e.poLineId) ?? null : null) ??
+            poById.get(e.poId)?.destination_id ??
+            null,
+        }))
+        .sort((a, b) => a.poId.localeCompare(b.poId) || (a.poLineId ?? "").localeCompare(b.poLineId ?? ""));
       const required = Math.max(0, l.qty - l.stockTaken);
       const sent = pos.reduce(
         (s, p) => (sentCurrent(poById.get(p.poId)!) ? s + p.qty : s),
@@ -531,6 +584,10 @@ purchaseDemandsRouter.get("/", requireOperation, async (c) => {
           readyStock: q.readyStock,
           takenFromStock: q.takenFromStock,
           onPo: q.onPo,
+          /* The engine's own flag, passed through — the screen may then say
+             whether `toBuy` is a remainder or the coverage it would buy a
+             second time. No new arithmetic. */
+          fullyOnPo: q.fullyOnPo,
           poNumbers: build.coveredByOpenPoPos,
           toBuy: q.toBuy,
           goodsMustArrive,

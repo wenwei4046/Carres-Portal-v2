@@ -89,9 +89,17 @@ export default function ReadyStockPanel({
   orderId,
   so,
   onReserved,
+  frameClassName,
 }: {
   orderId: string;
   so: number | null;
+  /**
+   * The frame's own outer spacing. Defaulted inside the disclosure to the
+   * `mt-2` this section has always carried; SO Batch passes "" because the
+   * connected-section stack above it owns the air between sections and the
+   * line that is drawn through it.
+   */
+  frameClassName?: string;
   /**
    * The item lines this act answered. The Register drops every purchasing tick
    * standing on them, because the `To buy` those ticks were arranged against
@@ -247,6 +255,7 @@ export default function ReadyStockPanel({
 
   return (
     <ReadyStockDisclosure
+      className={frameClassName}
       testId={`ready-stock-${orderId}`}
       open={open}
       onToggle={() => setOpen((v) => !v)}

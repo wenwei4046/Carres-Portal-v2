@@ -86,16 +86,53 @@ const CHILD_COLUMNS = [
  * not tell how MUCH of the line that document covers, and a line that was half
  * bought looked exactly like a line that was wholly bought.
  *
- * The facts did not go away; they went to explicit places. `On PO` names the
- * documents and the quantity each one carries, `To buy` states the remainder
- * this page can still act on, and `Qty` stays the customer's original order —
- * three numbers that add up in front of the operator instead of one word that
- * hid the arithmetic. Ready-Stock coverage is stated by the `Ready Stock`
- * section below, which owns that fact and can name the exact Units.
+ * The facts did not go away; they went to explicit places. `Ordered Qty` states
+ * how many units documents have carried for this line, `To buy` states the
+ * remainder this page can still act on, and `Qty` stays the customer's original
+ * order. Ready-Stock coverage is stated by the `Ready Stock` section below,
+ * which owns that fact and can name the exact Units.
+ *
+ * ⭐ IT IS A NUMBER, NOT A LIST — owner correction 2026-09-11.
+ *
+ * It printed every purchase order covering the line, stacked inside the cell.
+ * On a line fourteen documents touch, ONE item row became fourteen lines tall
+ * and filled the screen — and the same fourteen numbers were then repeated in
+ * the rows below it. A collection must never decide how tall an item row is.
+ * The cell states the quantity, and is a DOOR to the read-only details where
+ * each document is its own row. The evidence is not truncated; it is moved to
+ * the table that is about documents.
+ *
+ * ⭐ AND IT IS `Ordered Qty`, NOT `On PO` — owner correction 2026-09-11.
+ *
+ * `On PO` is the dictionary's head for *how many of this item an OPEN purchase
+ * order already covers* — the engine's pooled, netted, EFFECTIVE coverage. The
+ * number this cell prints is a different one: the exact `po_line_sources`
+ * lineage for this item line, which counts every NON-CANCELLED document,
+ * `Completed` ones included, and is never netted by what has already arrived.
+ * It is the HISTORICAL ordered quantity, and printing it under `On PO` said
+ * "still on order" about goods that may be in the warehouse.
+ *
+ * `Ordered Qty` is the approved word for exactly that, already in the
+ * dictionary and already used by Manual Purchase's own purchase-order lineage
+ * table for the same relationship — beside `Already On PO` for the effective
+ * coverage it is deliberately NOT. Nothing else moves: one figure, one head,
+ * the same door.
  */
 const FROM_STOCK_COLUMN = { key: "fromStock", label: "Ready Stock", width: 96 } as const;
-const ON_PO_COLUMN = { key: "onPo", label: "On PO", width: 176 } as const;
-const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 74 } as const;
+/* 112, not 176 and not 88. The cell holds a QUANTITY, so it needs almost
+   nothing — but the governed absence `Not ordered yet` measures 96px at the
+   box's 13px, and anything under 96 + the cell's own 16px of padding wrapped
+   it to two lines. A WORD deciding an item row's height is the same defect as
+   a list of documents deciding it, only smaller. Measured on the rendered
+   preview, 2026-09-11. */
+const ORDERED_QTY_COLUMN = { key: "orderedQty", label: "Ordered Qty", width: 116 } as const;
+/* 148, not 74. `To buy` carries two written lines under its figure when the
+   number is the coverage a tick would buy AGAIN rather than a remainder, and
+   the longer of them — `Issue PO buys again` — measures 118px at the box's
+   13px. Below 148 (132 of content) it wrapped, which took the item row to 91px
+   and made a note nobody reads out of the one sentence that says what the act
+   DOES. Measured on the rendered preview, 2026-09-11. */
+const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 148 } as const;
 
 /**
  * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
@@ -152,35 +189,37 @@ export interface GoodsMiniLine {
    * it the cell. Absent = the strings render exactly as before.
    */
   deliverToNode?: ReactNode;
-  /**
-   * ⭐ THE EVIDENCE ROWS — read-only, and they are NOT demand (2026-09-11).
-   *
-   * Each exact Unit this line already has, with the purchase order it came in
-   * on. They render as their own rows UNDER the demand row, carrying no
-   * checkbox and no arrangement editor, because they are records of what has
-   * already happened. The defect this replaces: the table expanded one line
-   * into N Unit rows that each carried the SAME line key, selection state and
-   * `deliverToNode`, so one ticked demand drew N ticked boxes and N copies of
-   * the Deliver To / Split editor beside historical records — the toolbar said
-   * `1 selected` while the screen showed four.
-   */
-  units?: Array<{
-    unitId: string;
-    /** The document this Unit came in on, when the read can evidence one. */
-    poNo?: string | null;
-    /** Where that document sent it. Never the plan for the remaining demand. */
-    deliverTo?: string | null;
-    supplier?: string | null;
-    poDeliveryDate?: string | null;
-  }>;
   /** Units of this line already answered off the shelf. Read with `showFromStock`. */
   fromStock?: number | null;
   /** The remainder this page can still buy on this line. Read with `showToBuy`. */
   toBuy?: number | null;
-  /** The documents already carrying part of this line, and how much each holds. */
-  poAllocations?: Array<{ poId: string; qty: number }>;
-  /** The governed word for a line no document carries yet. */
-  onPoAbsence?: string;
+  /**
+   * ⭐ THE SENTENCE UNDER `To buy`, when that number is NOT a remainder
+   * (owner correction 2026-09-11).
+   *
+   * The engine prints the covering document's quantity under `To buy` when
+   * every unit of a build is already on an open purchase order, because the
+   * row stays buyable — the pool has no customer attribution, so the covering
+   * document routinely belongs to somebody else. But a remainder and a re-buy
+   * offer are opposite situations wearing the same number, and a screen that
+   * cannot tell them apart invites a purchase nobody meant to make.
+   *
+   * The page supplies the words; this box only prints them, quietly, under the
+   * figure they qualify. `toBuyNoteWhy` is the longer governed explanation,
+   * carried as the cell's title — a sentence that wraps to three lines under a
+   * one-digit number is a row-height defect wearing words.
+   */
+  toBuyNote?: readonly string[];
+  toBuyNoteWhy?: string;
+  /**
+   * How many units of this line purchase orders have carried — the HISTORICAL
+   * ordered quantity, not open-PO coverage. A NUMBER: the documents themselves
+   * are named once, in the read-only details table the page draws beneath this
+   * one. Read with `showOrderedQty`.
+   */
+  orderedQty?: number | null;
+  /** The governed word for a line no document has ever carried. */
+  orderedQtyAbsence?: string;
   /** Card 02-B — read only when the table is asked for the column. */
   supplier?: string;
   supplierAbsence?: string;
@@ -285,7 +324,7 @@ export default function GoodsMiniTable({
   lines,
   selection,
   showFromStock = false,
-  showOnPo = false,
+  showOrderedQty = false,
   showToBuy = false,
   identityFirst = false,
   showSupplier = false,
@@ -293,6 +332,7 @@ export default function GoodsMiniTable({
   showPoNo = false,
   showUnitId = true,
   onPoClick,
+  onOpenPoDetails,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
@@ -300,12 +340,12 @@ export default function GoodsMiniTable({
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
   /**
-   * A page that BUYS asks for `On PO` and `To buy`; a truth register does not.
-   * Together they state the arithmetic `Covered by` used to hide: what the
-   * customer ordered, what documents already carry, what is left.
+   * A page that BUYS asks for `Ordered Qty` and `To buy`; a truth register does
+   * not. Together they state what `Covered by` used to hide: what the customer
+   * ordered, what documents have ordered for the line, and what is left.
    */
   showFromStock?: boolean;
-  showOnPo?: boolean;
+  showOrderedQty?: boolean;
   showToBuy?: boolean;
   /**
    * ⭐ IDENTITY FIRST — owner correction 2026-09-11, the buying page only.
@@ -364,6 +404,12 @@ export default function GoodsMiniTable({
   showUnitId?: boolean;
   /** Present only on a page whose `PO No` cell should navigate. */
   onPoClick?: (poId: string) => void;
+  /**
+   * Opens the read-only details where every document covering a line is its
+   * own row. Absent = `Ordered Qty` prints its number as plain text, which is
+   * what a page with nowhere to send the reader should do.
+   */
+  onOpenPoDetails?: () => void;
 }) {
   /**
    * ⭐ ONE REGISTRY, TWO READING ORDERS — and every width still fixed but one.
@@ -387,19 +433,19 @@ export default function GoodsMiniTable({
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
     fromStock: { ...FROM_STOCK_COLUMN },
-    onPo: { ...ON_PO_COLUMN },
+    orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
   };
   const order = identityFirst
-    ? ["sku", "item", "qty", "fromStock", "onPo", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
-    : ["category", "unit", "onPo", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
+    ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
+    : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
     unit: showUnitId,
     supplier: showSupplier,
     poNo: showPoNo,
     poDeliveryDate: showPoDeliveryDate,
     fromStock: showFromStock,
-    onPo: showOnPo,
+    orderedQty: showOrderedQty,
     toBuy: showToBuy,
   };
   const columns: Column[] = order
@@ -479,34 +525,31 @@ export default function GoodsMiniTable({
         </thead>
         {/* LEVEL TWO — every value, 13px. */}
         <tbody className="divide-y divide-base-200 text-body">
-          {lines.flatMap((line) => {
+          {lines.map((line) => {
             /**
-             * ⭐ ONE DEMAND ROW, THEN ITS EVIDENCE — the 2026-09-11 correction.
+             * ⭐ ONE ROW PER DEMAND, AND NOTHING ELSE — 2026-09-11.
              *
-             * The demand row carries the checkbox, the arrangement editor and
-             * the customer's own quantity. Every row after it is a RECORD: one
-             * exact Unit, the document it came in on, where that document sent
-             * it. A record cannot be bought again, so it carries no control at
-             * all — which is precisely what the previous version got wrong.
+             * This table used to expand one item line into N Unit rows that
+             * each carried the SAME line key, selection state and destination
+             * editor, so one ticked demand drew N ticked boxes and the
+             * arrangement editor appeared again beside records of documents
+             * already sent. The first correction gave the records their own row
+             * KIND; the owner's correction goes further and gives them their
+             * own TABLE, because a record of what was bought is not a quieter
+             * kind of demand — it is a different question, and it belongs under
+             * its own heading with `PO No` and `Unit ID` beside each other.
+             *
+             * What is left here is the actionable demand: one row per line, at
+             * the height of its own item description and nothing else's.
              */
-            const cell = (
-              key: string,
-              unit: NonNullable<GoodsMiniLine["units"]>[number] | null,
-            ) => {
-              const evidence = unit != null;
+            const cell = (key: string) => {
               switch (key) {
                 case "category":
-                  return evidence ? null : line.category;
+                  return line.category;
                 case "sku":
-                  return evidence ? (
-                    /* The record belongs to the line above it and says so
-                       without repeating its identity. */
-                    <Absence>↳</Absence>
-                  ) : (
-                    <span className="font-medium">{line.sku}</span>
-                  );
+                  return <span className="font-medium">{line.sku}</span>;
                 case "item":
-                  return evidence ? null : (
+                  return (
                     <>
                       <div className="font-medium text-base-900">{line.item}</div>
                       {line.itemDetail ? (
@@ -515,63 +558,57 @@ export default function GoodsMiniTable({
                     </>
                   );
                 case "qty":
-                  return <span className="tabular-nums">{evidence ? 1 : line.qty}</span>;
+                  return <span className="tabular-nums">{line.qty}</span>;
                 case "fromStock":
-                  /* The shelf answered part of this line — a fact of the LINE,
-                     never of one Unit record under it. */
-                  return evidence || !line.fromStock ? (
+                  return !line.fromStock ? (
                     <Absence>—</Absence>
                   ) : (
                     <span className="tabular-nums">{line.fromStock}</span>
                   );
                 case "toBuy":
-                  /* The remainder is the DEMAND's, never a record's. */
-                  return evidence || line.toBuy == null || line.toBuy <= 0 ? (
+                  return line.toBuy == null || line.toBuy <= 0 ? (
                     <Absence>—</Absence>
                   ) : (
-                    <span className="tabular-nums font-medium">{line.toBuy}</span>
-                  );
-                case "onPo":
-                  if (evidence) {
-                    return unit.poNo ? (
-                      poLink(unit.poNo)
-                    ) : (
-                      <Absence>Not recorded</Absence>
-                    );
-                  }
-                  if (!line.poAllocations?.length) {
-                    return <Absence>{line.onPoAbsence ?? "—"}</Absence>;
-                  }
-                  if (line.poAllocations.length === 1) {
-                    const only = line.poAllocations[0]!;
-                    return (
-                      <div>
-                        {poLink(only.poId)}
-                        <span className="tabular-nums text-base-600">{` ×${only.qty}`}</span>
-                      </div>
-                    );
-                  }
-                  /* ⭐ SEVERAL DOCUMENTS SUMMARISE — found on the production
-                     walk, 2026-09-11. One live item line carries FOURTEEN
-                     purchase orders (the historical duplicate-PO shape the
-                     `already_on_po` guard now refuses), and listing them all
-                     made one cell fourteen lines tall while the row it belongs
-                     to is one. The summary is the page's own grammar — `{n}
-                     POs` — and it keeps the quantity, which is the fact the
-                     operator is actually reconciling. The exact documents are
-                     one row below, each against the Unit it brought in. */
-                  return (
-                    <span className="tabular-nums">
-                      {`${line.poAllocations.length} POs ×${line.poAllocations.reduce(
-                        (n, a) => n + a.qty,
-                        0,
-                      )}`}
+                    <span title={line.toBuyNoteWhy}>
+                      <span className="tabular-nums font-medium">{line.toBuy}</span>
+                      {line.toBuyNote?.length ? (
+                        <div className="mt-0.5">
+                          {/* Written AT the width it is read at — a sentence
+                              left to wrap under a one-digit figure is a
+                              row-height defect in words. */}
+                          {line.toBuyNote.map((l) => (
+                            <div key={l}>
+                              <Absence>{l}</Absence>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </span>
                   );
+                case "orderedQty": {
+                  /* A QUANTITY, AND A DOOR TO THE DOCUMENTS. The purchase
+                     orders are named once, in the read-only details table
+                     below; a collection of them never sets this row's height. */
+                  const qty = line.orderedQty ?? 0;
+                  if (qty <= 0) return <Absence>{line.orderedQtyAbsence ?? "—"}</Absence>;
+                  return onOpenPoDetails ? (
+                    <button
+                      type="button"
+                      className="tabular-nums text-kit-blue-11 underline-offset-2 hover:underline"
+                      data-testid={`goods-ordered-qty-${line.key}`}
+                      title={`${qty} ordered on purchase orders — show the details`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenPoDetails();
+                      }}
+                    >
+                      {qty}
+                    </button>
+                  ) : (
+                    <span className="tabular-nums">{qty}</span>
+                  );
+                }
                 case "deliverTo":
-                  if (evidence) {
-                    return unit.deliverTo ? unit.deliverTo : <Absence>—</Absence>;
-                  }
                   /* THE ONE ARRANGEMENT EDITOR, on the one row that can act. */
                   return line.deliverToNode != null ? (
                     line.deliverToNode
@@ -581,62 +618,48 @@ export default function GoodsMiniTable({
                     <Absence>{line.deliverToAbsence}</Absence>
                   );
                 case "unit":
-                  if (evidence) return unit.unitId;
                   return line.unitIds.length ? (
                     line.unitIds.map((id) => <div key={id}>{id}</div>)
                   ) : (
                     <Absence>{line.unitAbsence}</Absence>
                   );
-                case "supplier": {
-                  const value = evidence ? unit.supplier : line.supplier;
-                  return value ? value : <Absence>{line.supplierAbsence ?? "—"}</Absence>;
-                }
+                case "supplier":
+                  return line.supplier ? (
+                    line.supplier
+                  ) : (
+                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
+                  );
                 case "poNo":
-                  if (evidence) {
-                    return unit.poNo ? poLink(unit.poNo) : <Absence>{line.poNoAbsence ?? "—"}</Absence>;
-                  }
                   return line.poNos?.length ? (
                     line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
                   ) : (
                     <Absence>{line.poNoAbsence ?? "—"}</Absence>
                   );
-                case "poDeliveryDate": {
-                  const value = evidence ? unit.poDeliveryDate : line.poDeliveryDate;
-                  return value ? value : <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>;
-                }
+                case "poDeliveryDate":
+                  return line.poDeliveryDate ? (
+                    line.poDeliveryDate
+                  ) : (
+                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
+                  );
                 default:
                   return null;
               }
             };
-            const row = (
-              unit: NonNullable<GoodsMiniLine["units"]>[number] | null,
-            ) => (
+            return (
               <tr
-                key={unit == null ? line.key : `${line.key}::${unit.unitId}`}
-                data-testid={
-                  unit == null ? line.testId : `${line.testId ?? line.key}-unit-${unit.unitId}`
-                }
-                data-row={unit == null ? "demand" : "evidence"}
-                /* ⭐ A RECORD READS QUIETER THAN THE DEMAND IT BELONGS TO.
-                   The tint is the table header's own grey, so the eye groups
-                   the records under the white row above them without a new
-                   colour joining the page. Reviewed on the rendered preview,
-                   2026-09-11: at `base-50/60` the two row kinds were almost
-                   the same weight and the group read as four sibling lines. */
+                key={line.key}
+                data-testid={line.testId}
+                data-row="demand"
+                /* A ticked demand reads as selected, in the register's own
+                   selected fill — the same answer the parent row gives, so one
+                   page has one selected colour. */
                 className={`divide-x divide-base-200 align-top${
-                  unit != null
-                    ? " bg-kit-slate-3"
-                    : /* A ticked demand reads as selected, in the register's
-                         own selected fill — the same answer the parent row
-                         gives, so one page has one selected colour. */
-                      selection?.selectedKeys.has(line.key)
-                      ? " bg-kit-blue-3"
-                      : ""
+                  selection?.selectedKeys.has(line.key) ? " bg-kit-blue-3" : ""
                 }`}
               >
                 {selection ? (
                   <td className="px-2 py-2 text-center">
-                    {unit == null && line.selectable ? (
+                    {line.selectable ? (
                       <input
                         type="checkbox"
                         aria-label={`Select ${line.item}`}
@@ -652,17 +675,16 @@ export default function GoodsMiniTable({
                   <td
                     key={c.key}
                     className={
-                      c.key === "unit" || c.key === "onPo" || c.key === "poNo"
+                      c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }
                   >
-                    {cell(c.key, unit)}
+                    {cell(c.key)}
                   </td>
                 ))}
               </tr>
             );
-            return [row(null), ...(line.units ?? []).map((u) => row(u))];
           })}
         </tbody>
       </table>

@@ -1100,12 +1100,12 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
   const [{ data: pos, error: posErr }, { data: poLines, error: poLinesErr }, { data: units, error: unitsErr }] = await Promise.all([
     poIds.length ? sb.from("purchase_orders").select("id, destination_id").in("id", poIds) : Promise.resolve({ data: [], error: null }),
     poIds.length ? sb.from("purchase_order_lines").select("po_id, sku, qty, destination_id").in("po_id", poIds) : Promise.resolve({ data: [], error: null }),
-    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
+    sb.from("ops_stock_items").select("unit_code, sku, warehouse_id, holder_party_id, po_line_id, reserved_order_line_id, identity_scope").or(`and(status.eq.reserved,reserved_ref.eq.SO-${order.so}),and(status.eq.sold,sold_order_id.eq.${id})`),
   ]);
   const secondError = posErr ?? poLinesErr ?? unitsErr;
   if (secondError) { const m = mapPgError(secondError); return c.json(m.body, m.status); }
 
-  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null };
+  type UnitRow = { unit_code: string | null; sku: string; warehouse_id?: string | null; holder_party_id?: string | null; po_line_id?: string | null; reserved_order_line_id?: string | null; identity_scope?: string | null };
   const unitRows = (units ?? []) as UnitRow[];
   for (const unit of unitRows) {
     if (unit.unit_code && unit.po_line_id) poLineByUnit.set(unit.unit_code, unit.po_line_id);
@@ -1137,16 +1137,62 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
 
   const poDestination = new Map(((pos ?? []) as Array<{ id: string; destination_id: string }>).map((p) => [p.id, p.destination_id]));
   const poByLine = new Map(threadRows.map((t) => [t.order_line_id, t.po_id]));
+  // ⭐ THE STORED BINDING FIRST — 0471, applied to this read 2026-09-11.
+  //
+  // `ops_stock_items.reserved_order_line_id` is the exact item line a Unit
+  // answers, and the Ready Stock door has written it since 0471. This fan-in
+  // ignored it and grouped every reserved/sold Unit of the order by NORMALIZED
+  // SKU, so a Sales Order with two lines of one SKU — SO-1251, SO-1207 and
+  // SO-1246 carry exactly that — printed the SAME Unit IDs under BOTH lines.
+  // That is a row position answering a question the database already answers.
+  //
+  // A bound Unit now appears under its OWN line and nowhere else. A Unit with
+  // no binding (a pre-0471 reservation) keeps the SKU reading, so nothing is
+  // lost — but it is reported as such through `unitLines`, which carries the
+  // stored value and `null` where there is none. A screen may then say
+  // "this Unit answers this line" and "this Unit belongs to the order, and
+  // which line it answers is not recorded" as the two different facts they are,
+  // instead of printing an inference as evidence.
+  const unitLines: Record<string, string | null> = {};
+  const boundUnitsByLine = new Map<string, string[]>();
   const unitIdsBySku = new Map<string, string[]>();
   for (const unit of unitRows) {
     if (!unit.unit_code) continue;
+    const boundLine = unit.reserved_order_line_id ?? null;
+    unitLines[unit.unit_code] = boundLine;
+    if (boundLine) {
+      boundUnitsByLine.set(boundLine, [...(boundUnitsByLine.get(boundLine) ?? []), unit.unit_code]);
+      continue;
+    }
     const key = normalizeSkuKey(unit.sku) || unit.sku;
     unitIdsBySku.set(key, [...(unitIdsBySku.get(key) ?? []), unit.unit_code]);
+  }
+  // ⭐ AN INCOMING UNIT DECLARES ITS LINE — it does not leave the map and let a
+  // reader infer one from its own absence (owner correction 2026-09-11).
+  //
+  // `exclusive` above already proved the fact: every `po_line_sources` row on
+  // that purchase-order line names THIS order and THIS item line, so the
+  // document evidences the binding even though `reserved_order_line_id` is
+  // still null on goods that have not arrived. Writing it into `unitLines` is
+  // what makes the reader's rule safe: a Unit that is ABSENT from this map is
+  // a Unit nothing evidenced, and absence can no longer be read as proof.
+  for (const [lineId, codes] of incomingByLine) {
+    for (const code of codes) unitLines[code] = lineId;
+  }
+  // ⛔ A COUNTED ROW IS NOT A UNIT (0453, `unit-identity.ts`). The reserved/sold
+  // read is not scoped, so a bulk row's technical `QTY-` key can reach
+  // `unitIds` — where a `Unit ID` heading would present a database key as an
+  // identity. The scope rides the wire so no reader has to guess from a shape.
+  const unitScopes: Record<string, string> = {};
+  for (const unit of unitRows) {
+    if (unit.unit_code) unitScopes[unit.unit_code] = unit.identity_scope ?? "unit";
   }
   const purchaseLines = (poLines ?? []) as Array<{ po_id: string; sku: string; qty: number; destination_id: string | null }>;
   return c.json({
     defaultDeliverTo,
     unitCoverage,
+    unitLines,
+    unitScopes,
     place,
     lines: ((lines ?? []) as Array<{ id: string; sku: string; qty: number }>).map((line) => {
       const poId = poByLine.get(line.id);
@@ -1169,6 +1215,7 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
         lineId: line.id,
         sku: line.sku,
         unitIds: [...new Set([
+          ...(boundUnitsByLine.get(line.id) ?? []),
           ...(unitIdsBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? []),
           ...(incomingByLine.get(line.id) ?? []),
         ])].sort(),

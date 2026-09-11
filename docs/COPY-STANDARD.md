@@ -798,21 +798,25 @@ No recorded business date is silently moved to fit a calendar. Purchasing/Operat
 Office calendar (Mon–Fri); Receiving/GRN/Warehouse uses the Warehouse calendar (Mon–Sat); Sunday
 and Selangor public holidays are excluded.
 
-**The SO Batch Purchase rail — latest owner ruling 2026-08-30.** Six purchasing fact sections,
-in this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
-one affected Sales Order exists:
+**The SO Batch Purchase rail — owner correction 2026-09-11.** FIVE purchasing fact sections, in
+this order. Central Work actions do not appear here. `SETUP TO FIX` renders only when at least
+one affected Sales Order exists. **`TO ORDER` / `All not ordered` is RETIRED from this rail**: it
+named the page's own default — what an operator already sees with nothing selected — rather than a
+fact about a Sales Order, and it sat above the section that answers what to buy today. The
+outstanding arithmetic behind it is untouched and still governs the tick and the Ready Stock door;
+Manual Purchase keeps its own `All not ordered`, which is a different object and a different
+arithmetic.
 
 | Heading | Rail rows |
 |---|---|
-| `TO ORDER` | `All not ordered` |
 | `ORDER TIMING` | `Can order early` · `14 safety days left` · `1–13 safety days left` · `No safety days left` · `Not enough production days` |
 | `PRODUCT` | `All products` · `Mattress` · `Bedframe` · `Sofa` |
 | `SUPPLIER` | `All suppliers` · actual supplier names, alphabetical — never hardcoded, never a placeholder, and no `No supplier` row |
 
 `PURCHASE PURPOSE`, `PRODUCT` and `SUPPLIER` are **compact fact dropdowns** (owner ruling
-2026-09-11; `PRODUCT` and `SUPPLIER` on SO Batch Purchase too). The `All …` word is the
+2026-09-11; `PRODUCT`, `SUPPLIER` and `REGION` on SO Batch Purchase too). The `All …` word is the
 control's first option and its clear; every governed value stays present as an option; the
-count rides in the option text (`Ohana · 4`). `WORK TO DO`, `TO ORDER`, `ORDER TIMING` and
+count rides in the option text (`Ohana · 4`). `WORK TO DO` (Manual Purchase), `ORDER TIMING` and
 `SETUP TO FIX` keep their visible rows.
 | `REGION` | `All regions` · `Klang Valley` first · actual outstation Delivery State names, alphabetical · `Others` last and only when Delivery State is not recorded |
 | `SETUP TO FIX` | `Production days not set` |
@@ -825,11 +829,10 @@ fact rows print their live count, zero included; a supplier or region row exists
 matches — except the selected row, which stays visible with `0`. Region reads the server's
 recorded Delivery State: Kuala Lumpur, Selangor and Putrajaya group as `Klang Valley`; every
 outstation state keeps its own name; an absent state is `Others`. The default no-filter Register
-shows every proceeded record; `All not ordered` is a real outstanding-only filter that
-reads customer quantity less Ready Stock already taken and less exact, non-cancelled PO lineage.
-A generic Open PO SKU pool is not proof that this SO was ordered; without exact
-`po_line_sources`, the SO remains in `All not ordered`. The issue leaf is not the count
-authority. One filter per section; sections combine; a second click on
+shows every proceeded record. The outstanding arithmetic reads customer quantity less Ready Stock
+already taken and less exact, non-cancelled PO lineage. A generic Open PO SKU pool is not proof
+that this SO was ordered; without exact `po_line_sources` the units stay outstanding. The issue
+leaf is not the coverage authority. One filter per section; sections combine; a second click on
 the selected timing row clears it; `All products`, `All suppliers` and `All regions` clear
 their sections.
 The rail carries NO checkboxes — filters are `NavRow` rows; the only checkboxes on the page
@@ -868,8 +871,25 @@ found nothing). The last two are DIFFERENT answers and may not be merged.
 `Follow up` · `Pending` · `Waiting` · `Priority` · `Buffer` · a generic `Next action` column. A
 word that tells the operator a row is important without telling them what is wrong with it is not
 a word this Register may use. **Retired from the SO Batch Purchase rail, never to return:**
+`TO ORDER` · `All not ordered` ·
 `Ready to buy` · `Covered` · `No customer date` · `No SKU` · `No supplier` · `No production days` ·
 `BUYING RECORDS` · `All lines` · `No buying needed` · `Cannot buy`.
+
+**THE SO BATCH EXPANSION'S THREE SECTIONS — owner correction 2026-09-11.** An expanded Sales Order
+holds `Goods on SO-{n}` (the actionable demand), `Ready Stock` (the shelf) and
+**`Purchase order details`** (the read-only record), in that order, joined by the navigation's own
+connector line.
+
+| Where | The words |
+|---|---|
+| The actionable goods table | `SKU` · `Item` · `Qty` · `Ready Stock` · **`Ordered Qty`** · `To buy` · `Deliver To` · `Supplier` · `Category`. **`Ordered Qty`, NOT `On PO`** — that head means *how many an OPEN purchase order still covers*, and this figure is the exact `po_line_sources` lineage: every non-cancelled document, `Completed` ones included, never netted by what has arrived. It is the HISTORICAL ordered quantity, and `On PO` would have said *still on order* about goods already in the warehouse. `Ordered Qty` is the dictionary's own word for it, used by Manual Purchase's purchase-order lineage table for the same relationship — beside `Already On PO` for the effective coverage it is not. **It is a QUANTITY**, and a door to the details — never a stack of PO numbers, which made one item row fourteen lines tall. A line no document has ever carried reads `Not ordered yet`; a line the shelf fully answered reads `—`. **`Unit ID` and `PO Delivery Date` are absent here** — both describe a document's goods, and on an unbought row they printed an absence in the width of a real answer. **`Deliver To` on a covered line states the document LINE's own destination**, never the parent document's where the line records one. |
+| The record's heading | **`Purchase order details`** — never `Covered by` (retired: one heading, three questions) and never `ON PO` (that is the goods table's quantity column; a heading repeating a column name makes the number and the section read as one thing). |
+| The record's heads | `PO No` · `Unit ID` · `SKU` · `Item` · `Qty` · `Deliver To` · `Supplier` · `PO Status` · `PO Delivery Date`. **`PO No` first and `Unit ID` beside it** — the two identifiers a person copies. Both print in FULL: `PO-20260904-4665`, **never** `PO-260904-4665`. **Absent on purpose:** `Ready Stock` · `To buy` · `Category` · any tick — a column of dashes states nothing. |
+| `PO Status` | The DOCUMENT's own state, in the ONE Purchasing vocabulary: **`Completed`** · **`Issued`** · **`Not sent to supplier`** — the same `documentState` union the Purchase Orders register prints. **`Open` is never a Purchase Order status** and the raw database value never reaches a screen. It is the column that makes `On PO` legible: that figure counts every non-cancelled document, `Completed` ones included, while `To buy` is netted against OPEN documents only. |
+| A Unit cell with no Unit | **FIVE answers, never one.** `Loading…` in flight · `Could not be loaded` on failure · **`Not checked`** when the read answered for the ORDER but carried no entry for this item line (Carres did not look here — never `Not read`, which reads as an unopened message rather than an unasked question) · **`Counted stock`** when the goods are counted rather than individually tracked (0453 — the technical `QTY-` key never reaches a `Unit ID` heading; never `Not unit-tracked`, which names a database column to an operator who has never seen one) · `Not allocated` ONLY when the read answered for this line and nothing is tied to it. **Printing any of the first four as the last tells an operator goods do not exist because a request was slow.** |
+| HOW a Unit reached this item line — three answers, never merged | The record binds it here, or a purchase-order line sourced exclusively to this line carries it: **nothing extra is printed**, because that is evidence, and the row carries its quantity. It got here by SKU (no binding, or a binding naming another line): **`Item line matched by SKU`**, and the row carries **NO quantity** — the same physical Unit is offered to every item line of that SKU, so counting it would let one Unit answer two lines at once. Nothing in the read evidences it at all: **`Item line unknown`** — a gap in the READ, which may never borrow the sentence for a gap in the RECORD. The Unit is SHOWN in all three cases; what changes is what the screen claims about it. |
+| `To buy` when it is not a remainder | TWO short lines under the figure: **`Already on a PO`** then **`Nothing to buy here`**, with `An open purchase order already covers this line. Nothing to buy here — check the covering purchase order instead. Issue PO refuses it.` as the cell's title. The engine prints the covering document's quantity under `To buy` on a build every unit of which is already on an OPEN purchase order, and since 0430 `issue-batch` **refuses** such a selection by name (`already_on_po`, 422, naming the document) and creates nothing. **The words are the door's own** — `purchasingRefusal("already_on_po")` at cell width — so the operator meets ONE sentence, not two, and the row is not tickable. **The quantity, the action and the consequence are read together or not at all.** Written as two lines, never left to wrap: the long sentence takes the item row to 91px. **Never `Open PO …`** — a retired column head. |
+| A document fact that is not on file | `Not recorded` — the same word Purchase Orders uses, never back-filled from a planning date. |
 
 **MANUAL PURCHASE — the internal buy's own words.**
 
