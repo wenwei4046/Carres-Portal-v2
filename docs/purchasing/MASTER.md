@@ -1233,9 +1233,13 @@ has answered that question since 0471 and the read simply did not ask it. It ask
 - a Unit bound to a line appears under THAT line and nowhere else;
 - a Unit incoming on a purchase-order line sourced EXCLUSIVELY to one SO item line is exact by the
   document, exactly as before;
-- a Unit that carries NO binding (a pre-0471 reservation) keeps the SKU reading — evidence is never
-  dropped to tidy a screen — and the row says **`Item line not recorded`**, so an unresolved
-  association stays inspectable and can never be read as evidence.
+- a Unit that carries NO binding (a pre-0471 reservation), or one bound to another line, keeps the
+  SKU reading — evidence is never dropped to tidy a screen — and the row says
+  **`Item line matched by SKU`**, so an INFERENCE stays inspectable and can never be read as
+  evidence.
+- a read that carries no binding map at all (an older Worker) says **`Item line unknown`**. A gap in
+  the READ is not a gap in the RECORD, and it may not borrow the other sentence: that one would be a
+  claim about this browser wearing the clothes of a fact about the goods.
 - The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
   this build against an older Worker reads it as absent and says the association is unknown rather
   than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.

@@ -1269,7 +1269,7 @@ describe("the expansion — the ONE shared child table", () => {
    * that carries none is still SHOWN — evidence is never dropped to tidy a
    * screen — and it says that its item line was never recorded.
    */
-  it("says so when a Unit's item line was never recorded, instead of implying one", async () => {
+  it("says a Unit reached this line by SKU, instead of implying a binding", async () => {
     apiFetch.mockResolvedValueOnce({
       defaultDeliverTo: null,
       place: [],
@@ -1281,7 +1281,7 @@ describe("the expansion — the ONE shared child table", () => {
     fireEvent.click(screen.getByTestId("so-batch-expand-o5"));
     const box = await screen.findByTestId("so-batch-inspector-o5");
     const row = (await within(box).findByText("U1-000-777")).closest("tr")!;
-    expect(row).toHaveTextContent("Item line not recorded");
+    expect(row).toHaveTextContent("Item line matched by SKU");
   });
 
   /**

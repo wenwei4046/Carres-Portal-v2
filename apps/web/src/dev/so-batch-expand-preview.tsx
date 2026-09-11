@@ -126,7 +126,7 @@ const PO_ROWS: PoDetailRow[] = [
     poNo: "PO-20260820-4827",
     unitId: "U1-000-078",
     unitAbsence: "Not allocated",
-    associationRecorded: true,
+    association: "exact" as const,
     sku: "L1201S-K",
     item: "Laveo",
     itemDetail: "King · Fabric 3",
@@ -140,9 +140,10 @@ const PO_ROWS: PoDetailRow[] = [
     poNo: "PO-20260820-4827",
     unitId: "U1-000-079",
     unitAbsence: "Not allocated",
-    /* The Unit is on this Sales Order; WHICH item line it answers was never
-       recorded. An unresolved association stays inspectable and says so. */
-    associationRecorded: false,
+    /* The Unit is on this Sales Order; the record binds it to no item line, so
+       it got here by matching its SKU. An inference stays inspectable AND says
+       what kind of claim it is. */
+    association: "inferred" as const,
     sku: "L1201S-K",
     item: "Laveo",
     itemDetail: "King · Fabric 3",
@@ -156,7 +157,7 @@ const PO_ROWS: PoDetailRow[] = [
     poNo,
     unitId: null,
     unitAbsence: "Not allocated",
-    associationRecorded: true,
+    association: "exact" as const,
     sku: "JAGER-SS",
     item: "Jager",
     itemDetail: "Super Single · Fabric 1",

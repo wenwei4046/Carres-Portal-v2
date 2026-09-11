@@ -65,7 +65,7 @@ describe("poDetailRowsForLine — the lineage, resolved", () => {
       ["U1-000-079", 1],
       [null, 1],
     ]);
-    expect(rows.every((r) => r.associationRecorded)).toBe(true);
+    expect(rows.every((r) => r.association === "exact")).toBe(true);
   });
 
   /* ⛔ NOT A GUESS DRESSED AS EVIDENCE. A Unit whose stored binding names
@@ -78,17 +78,29 @@ describe("poDetailRowsForLine — the lineage, resolved", () => {
     });
     const unitRow = rows.find((r) => r.unitId === "U1-000-078")!;
     /* It is still SHOWN — evidence is never dropped to tidy a screen — and it
-       says the association is not this line's. */
-    expect(unitRow.associationRecorded).toBe(false);
+       says the association is an inference, not this line's record. */
+    expect(unitRow.association).toBe("inferred");
   });
 
-  it("treats a Unit the record carries no binding for as unresolved, not as evidence", () => {
+  it("calls a Unit the record carries no binding for INFERRED, never evidence", () => {
     const rows = base({
       unitIds: ["U1-000-078"],
       unitCoverage: { "U1-000-078": PO_A.poId },
       unitLines: { "U1-000-078": null },
     });
-    expect(rows[0]!.associationRecorded).toBe(false);
+    expect(rows[0]!.association).toBe("inferred");
+  });
+
+  /* ⭐ A GAP IN THE READ IS NOT A GAP IN THE RECORD. An older Worker sends no
+     `unitLines` at all, and "the record does not say" would then be a sentence
+     about this browser wearing the clothes of a fact about the goods. */
+  it("calls an absent binding map UNRESOLVED, never inferred and never exact", () => {
+    const rows = base({
+      unitIds: ["U1-000-078"],
+      unitCoverage: { "U1-000-078": PO_A.poId },
+      unitLines: undefined,
+    });
+    expect(rows[0]!.association).toBe("unresolved");
   });
 
   /* A Unit incoming on a purchase-order line sourced EXCLUSIVELY to this item
@@ -99,7 +111,7 @@ describe("poDetailRowsForLine — the lineage, resolved", () => {
       unitCoverage: { "U1-000-078": PO_A.poId },
       unitLines: {},
     });
-    expect(rows[0]!.associationRecorded).toBe(true);
+    expect(rows[0]!.association).toBe("exact");
   });
 
   it("says which kind of nothing an empty Unit cell is", () => {

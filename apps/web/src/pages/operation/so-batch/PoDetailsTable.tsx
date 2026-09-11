@@ -40,16 +40,37 @@
  *   loaded`             that is how a reader concludes goods do not exist
  *                       because a request was slow.
  *
- * A Unit that is on this Sales Order but whose ITEM LINE was never recorded
- * (a pre-0471 reservation) is shown with its own `Item line not recorded`
- * sentence rather than being silently attached to whichever line shares its
- * SKU. An unresolved association stays inspectable; it never becomes evidence.
+ * ── AND THREE ANSWERS FOR *WHICH LINE DOES THIS UNIT ANSWER* ────────────────
+ *
+ *   EXACT      the record binds it to this line, or a purchase-order line
+ *              sourced exclusively to this line carries it. Evidence, and the
+ *              row says nothing extra.
+ *   INFERRED   the record carries no binding, so the Unit reached this line by
+ *              matching its SKU — a pre-0471 reservation. The row says
+ *              `Item line matched by SKU`, because an inference that looks like
+ *              evidence is the defect this whole section exists to end.
+ *   UNRESOLVED this browser's read does not carry the binding at all (an older
+ *              Worker). `Item line unknown` — which is a different sentence
+ *              from "the record does not say", and must not borrow it.
+ *
+ * The Unit is SHOWN in all three cases. Evidence is never dropped to tidy a
+ * screen; what changes is what the screen CLAIMS about it.
  */
 import { fmtDate } from "@/lib/fmt-date";
 import type { SoBatchOrderPoFact } from "@carres/shared";
 
 /** What the Unit read is currently able to say about this order. */
 export type UnitReadState = "ready" | "loading" | "error";
+
+/** How a Unit came to be on an item line — see the three answers above. */
+export type UnitAssociation = "exact" | "inferred" | "unresolved";
+
+/** The sentence each non-exact association prints under its Unit ID. */
+const ASSOCIATION_WORD: Record<UnitAssociation, string | null> = {
+  exact: null,
+  inferred: "Item line matched by SKU",
+  unresolved: "Item line unknown",
+};
 
 export interface PoDetailRow {
   /** Stable identity for React and for the test that counts these rows. */
@@ -61,10 +82,11 @@ export interface PoDetailRow {
   /** Printed when `unitId` is null — and it says WHICH kind of nothing. */
   unitAbsence: string;
   /**
-   * The association is recorded, not inferred. `false` prints a sentence under
-   * the Unit so an unresolved association cannot be read as evidence.
+   * How this Unit came to be on this item line. Anything but `exact` prints its
+   * own sentence under the Unit ID, so an inference can never be read as
+   * evidence and a gap in the READ is never read as a gap in the RECORD.
    */
-  associationRecorded: boolean;
+  association: UnitAssociation;
   sku: string;
   item: string;
   itemDetail: string | null;
@@ -118,13 +140,16 @@ export function poDetailRowsForLine(input: {
         : "Not allocated";
 
   /* A binding that names ANOTHER line is not this line's Unit, whatever SKU it
-     wears. `undefined` means the record carries no binding at all — either a
-     pre-0471 reservation, or a Unit incoming on a PO line sourced exclusively
-     to this item line, which the document itself evidences. */
-  const recorded = (unitId: string): boolean => {
-    if (!unitLines) return false;
-    if (!(unitId in unitLines)) return true; // incoming, exclusive by document
-    return unitLines[unitId] === orderLineId;
+     wears. A Unit ABSENT from the map is incoming on a purchase-order line
+     sourced exclusively to this item line — the document evidences it, and
+     reserved/sold Units are the only ones the map carries. */
+  const association = (unitId: string): UnitAssociation => {
+    if (!unitLines) return "unresolved";
+    if (!(unitId in unitLines)) return "exact"; // incoming, exclusive by document
+    if (unitLines[unitId] === orderLineId) return "exact";
+    /* No binding at all, or a binding naming another line: either way this row
+       got here by SKU, and the screen says which kind of claim that is. */
+    return "inferred";
   };
 
   const facts = (poNo: string) => {
@@ -148,7 +173,7 @@ export function poDetailRowsForLine(input: {
         poNo: poId,
         unitId,
         unitAbsence: absence,
-        associationRecorded: recorded(unitId),
+        association: association(unitId),
         sku, item, itemDetail,
         qty: 1,
         ...facts(poId),
@@ -161,7 +186,7 @@ export function poDetailRowsForLine(input: {
         poNo: poId,
         unitId: null,
         unitAbsence: absence,
-        associationRecorded: true,
+        association: "exact",
         sku, item, itemDetail,
         qty: remaining,
         ...facts(poId),
@@ -180,7 +205,7 @@ export function poDetailRowsForLine(input: {
       poNo,
       unitId,
       unitAbsence: absence,
-      associationRecorded: recorded(unitId),
+      association: association(unitId),
       sku, item, itemDetail,
       qty: 1,
       ...facts(poNo),
@@ -294,15 +319,15 @@ export default function PoDetailsTable({
                 {r.unitId ? (
                   <>
                     <div>{r.unitId}</div>
-                    {r.associationRecorded ? null : (
-                      /* The Unit is real and it is on this Sales Order. WHICH
-                         item line it answers was never recorded, so the screen
-                         says that instead of letting a SKU match pass for a
+                    {ASSOCIATION_WORD[r.association] ? (
+                      /* The Unit is real and it is on this Sales Order. HOW it
+                         reached this item line is a separate fact, and the row
+                         states it rather than letting a SKU match pass for a
                          binding. */
                       <div className="mt-0.5">
-                        <Absence>Item line not recorded</Absence>
+                        <Absence>{ASSOCIATION_WORD[r.association]!}</Absence>
                       </div>
-                    )}
+                    ) : null}
                   </>
                 ) : (
                   <Absence>{r.unitAbsence}</Absence>
