@@ -208,6 +208,8 @@ export type DataGridProps<T> = {
   /** Optional destination composition. `reference` changes geometry/chrome
       only; all grid behaviour remains in this same engine. */
   appearance?: "default" | "reference";
+  /** Keep frequent controls labelled while the container has room. */
+  labelledToolbar?: boolean;
   toolbar?: ReactNode;
   /** Reference-toolbar slots. Start renders before Search; End renders after
       Filters / Export / Columns. The legacy `toolbar` slot is unchanged. */
@@ -507,6 +509,7 @@ function DataGridInner<T>({
   onSearchChange,
   initialSearch = "",
   appearance = "default",
+  labelledToolbar = false,
   toolbar,
   toolbarStart,
   toolbarEnd,
@@ -1766,6 +1769,7 @@ function DataGridInner<T>({
         styles.root,
         embedded ? styles.rootEmbedded : null,
         isReference ? styles.rootReference : null,
+        labelledToolbar ? styles.rootLabelledToolbar : null,
       ]
         .filter(Boolean)
         .join(" ")}
@@ -1780,7 +1784,7 @@ function DataGridInner<T>({
         {isReference && toolbarStart}
         {isReference && <div className={styles.toolbarSpacer} />}
         {!embedded && (
-          isReference && !searchOpen && !search ? (
+          isReference && !labelledToolbar && !searchOpen && !search ? (
             <button
               type="button"
               aria-label="Search"
@@ -1798,6 +1802,7 @@ function DataGridInner<T>({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="search"
+                aria-label="Search"
                 placeholder={searchPlaceholder}
                 value={search}
                 autoFocus={isReference && searchOpen}
@@ -1850,7 +1855,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Export"
             title="Export"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconCaret : ""} ${outputMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={() => setOutputMenuOpen((open) => {
               const next = !open;
               if (next && outputBtnRef.current) {
@@ -1864,7 +1869,7 @@ function DataGridInner<T>({
             aria-expanded={outputMenuOpen}
           >
             <Download size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && (
+            {(!isReference || labelledToolbar) && (
               <>
                 <span>Export</span>
                 <ChevronDown size={12} strokeWidth={2} aria-hidden />
@@ -1926,7 +1931,7 @@ function DataGridInner<T>({
             type="button"
             aria-label="Columns"
             title="Columns"
-            className={`${styles.toolbarPill} ${isReference ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
+            className={`${styles.toolbarPill} ${isReference && !labelledToolbar ? styles.toolbarPillIconOnly : ""} ${columnsMenuOpen ? styles.toolbarPillOn : ""}`}
             onClick={(e) => {
               e.stopPropagation();
               setColumnsMenuOpen((v) => {
@@ -1940,7 +1945,7 @@ function DataGridInner<T>({
             }}
           >
             <Columns3 size={14} strokeWidth={1.75} aria-hidden />
-            {!isReference && <span>Columns</span>}
+            {(!isReference || labelledToolbar) && <span>Columns</span>}
           </button>
           {columnsMenuOpen && (
             <>

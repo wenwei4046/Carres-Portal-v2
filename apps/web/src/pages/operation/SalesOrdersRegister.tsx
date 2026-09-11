@@ -52,6 +52,8 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import Money from "@/components/Money";
+import Button from "@/components/kit/Button";
+import Popover from "@/components/kit/Popover";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { renderCombinedSalesOrderPdf, renderSalesOrderPdf } from "@/lib/pdf/render";
@@ -63,7 +65,7 @@ import {
 } from "@/lib/queries";
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
-import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import GoodsMiniTable, { UnitEvidence, goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
 import styles from "./SalesOrdersRegister.module.css";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
@@ -185,8 +187,14 @@ function toGridColumn(
       accessor: (r) =>
         r.poNumbers.length === 0 ? (
           absenceAware(f.text(r))
+        ) : r.poNumbers.length === 1 ? (
+          <button type="button" className="font-medium text-blue-700 underline-offset-2 hover:underline" onClick={(event) => {
+            event.stopPropagation();
+            navigate(`/operation/procurement?po=${encodeURIComponent(r.poNumbers[0]!)}`);
+          }}>{r.poNumbers[0]}</button>
         ) : (
-          <span className="inline-flex gap-1.5">
+          <Popover label="Purchase Orders" trigger={<Button variant="ghost" size="sm">{r.poNumbers.length} Purchase Orders</Button>}>
+          <div className="flex flex-col gap-2">
             {r.poNumbers.map((po) => (
               <button
                 key={po}
@@ -200,7 +208,8 @@ function toGridColumn(
                 {po}
               </button>
             ))}
-          </span>
+          </div>
+          </Popover>
         ),
     };
   }
@@ -313,6 +322,11 @@ function toGridColumn(
   if (f.key === "phone") {
     return { ...base, searchValue: (r) => `${r.phone} ${r.phoneDigits}` };
   }
+  if (f.key === "delivery_location") {
+    return { ...base, accessor: (r) => <Popover label="Delivery Location" trigger={<Button size="sm" variant="ghost">{f.text(r)}</Button>}>
+      <p className="text-body">{f.text(r)}</p>
+    </Popover> };
+  }
   if (f.key === "items") {
     return {
       ...base,
@@ -368,7 +382,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   }
   const configOf = (line: (typeof lines)[number]) => {
     const attrs = line.attrs ?? {};
-    const facts = lineConfigBits(attrs);
+    const facts = lineConfigBits(attrs).map((fact) => fact === "gap KIV" ? "Mattress gap: Confirm later" : fact);
     // The register is an operational identification surface, not a raw attrs
     // inspector. Keep only governed, human-readable product facts here; sofa
     // builder coordinates/keys and pricing metadata remain with their owners.
@@ -390,6 +404,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
     return facts;
   };
   const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
+  const unavailable = expansion.isError ? "Could not load goods details" : expansion.isLoading ? "Loading…" : null;
   /* The goods lines, then the services — the same order the document prints. */
   const miniLines: GoodsMiniLine[] = [
     ...lines.map((line, index): GoodsMiniLine => {
@@ -400,13 +415,17 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
         testId: `expanded-good-${line.sku}`,
         category: goodsCategoryOf(line),
         unitIds: fact?.unitIds ?? [],
+        unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
+          <UnitEvidence ids={fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
+        ),
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the
            quantity, because `×1` on a one-route line is noise. */
         deliverTo: (fact?.deliverTo ?? []).map((d) =>
-          (fact?.deliverTo.length ?? 0) > 1 ? `${d.name} ×${d.qty}` : d.name,
+          (fact?.deliverTo.length ?? 0) > 1 || d.qty !== line.qty ? `${d.name} ×${d.qty}` : d.name,
         ),
-        deliverToAbsence: expansion.isLoading ? "Loading…" : "Not recorded",
+        deliverToNode: unavailable ? <span>{unavailable}</span> : undefined,
+        deliverToAbsence: "Not recorded",
         sku: line.sku,
         qty: line.qty,
         item: lineName(line),
@@ -433,6 +452,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   ];
   return (
     <div data-testid="row-expansion">
+      {expansion.isError && <Button variant="ghost" size="sm" onClick={() => void expansion.refetch()}>Retry</Button>}
       <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} salesOrderLayout />
     </div>
   );
@@ -649,6 +669,7 @@ export default function SalesOrdersRegister() {
         ) : (
           <DataGrid<RegisterRow>
             appearance="reference"
+            labelledToolbar
             rows={rows}
             columns={columns}
             storageKey={storageKey}
@@ -662,7 +683,7 @@ export default function SalesOrdersRegister() {
                item, and the ▽ per-column filters say so column by column. */
             searchPlaceholder="Search sales orders…"
             isLoading={isLoading}
-            emptyMessage={rows.length === 0 ? "No orders yet" : "No matching sales orders."}
+            emptyMessage={rows.length === 0 && !serverSearch ? "No orders yet" : "No matching sales orders."}
             groupBanner={false}
             /* Optional columns may widen the sheet (MASTER §0.1), so the row's
                identity pins: ☐ · ▸ · SO No stay against the left edge while
@@ -791,28 +812,14 @@ function RegisterResultSummary({
     : filtered.length === total
       ? `${filtered.length} ${orderWord}`
       : `${filtered.length} of ${total} orders`;
-  /* ⛔ `Other goods` IS COUNTED AND NOT PRINTED — YH, 2026-08-27.
-     This OVERWRITES `COPY-STANDARD.md`'s "never dropped from the count", which
-     ruled the word must always appear.
-
-     What the word actually reports is a CATALOG GAP: a line nothing recognises,
-     because its SKU has no catalog row (or its category has no word here — a
-     `guarantee` item is catalogued correctly and still lands in this bucket,
-     since the footer's vocabulary has five of the catalog's six categories).
-     Neither is a fact about the customer's goods, which is what the rest of
-     this tally is, and neither is actionable from a register footer.
-
-     🟡 THE HONEST COST, stated rather than hidden: the printed numbers no
-     longer add up to the order's item count. The bucket is still computed —
-     `footerWord` is untouched and the count is still available to anything
-     that asks — so this is a display decision, reversible by deleting one
-     line, and it destroys no data. */
+  // A quantity breakdown must account for every counted line, including
+  // goods the classifier cannot name. It is separate from the order count.
   const parts = FOOTER_WORDS.filter(
-    (label) => label !== "Other goods" && (counts.get(label) ?? 0) > 0,
+    (label) => (counts.get(label) ?? 0) > 0,
   ).map((label) => `${label} ${counts.get(label)}`);
   /* One unwrapped line by law (REGISTER STATUS FOOTER), so a long tally on a
      narrow window truncates instead of pushing a second row into the frame —
      and the full sentence rides the title. */
-  const line = [countWord, ...parts].join(" · ");
+  const line = [countWord, ...(parts.length ? [`Qty: ${parts.join(" · ")}`] : [])].join(" · ");
   return <span className="block truncate" title={line}>{line}</span>;
 }

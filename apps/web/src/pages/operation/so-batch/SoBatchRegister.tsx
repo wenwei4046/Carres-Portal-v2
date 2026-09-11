@@ -59,6 +59,7 @@ import PoDetailsTable, {
   type UnitReadState,
 } from "./PoDetailsTable";
 import GoodsMiniTable, {
+  UnitEvidence,
   categoryWord,
   type GoodsMiniLine,
 } from "../components/GoodsMiniTable";
@@ -1317,6 +1318,7 @@ function SoBatchOrderExpansion({
   }
 
   const lines: GoodsMiniLine[] = order.lines.map((l) => {
+    const fact = expansion.data?.lines.find((item) => item.lineId === l.orderLineId);
     const leaf = leafByLineId.get(l.orderLineId);
     const linePos = l.pos.map((p) => poById.get(p.poId)).filter(Boolean);
     const eligible = leaf != null && isSelectableForOrder(leaf, order.status);

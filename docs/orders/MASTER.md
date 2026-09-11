@@ -234,6 +234,27 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
+**Register correction — owner approved 2026-09-11; locally verified, not deployed.**
+Unit IDs with an exclusive PO-source-to-order-line relationship are shown as line evidence.
+Order/SKU-only links remain inspectable but say `Unit ID link not verified`; matching a SKU
+does not assign an exact Unit to a configured line. Proven IDs exceeding the order-line Qty
+say `Unit ID count exceeds order quantity`; never truncate the IDs to make the counts agree.
+One verified ID prints directly; multiple IDs open a read-only kit Popover with the full list. The shared SO Batch reader preserves unverified associations in the same inspection surface, never as allocated Unit rows or as Not allocated; excess verified Units keep their quantity warning. Unit-to-PO coverage from the current Purchasing implementation is preserved.
+Deliver To uses actual `po_line_sources` quantities and the corresponding PO-line destination,
+falling back only to that PO's recorded destination. A current default destination is not an
+order fact. Missing line provenance renders `Not recorded`. Loading, failed reads and verified
+absence are distinct; failed reads offer Retry and never render `Not allocated`.
+The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
+Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
+The footer explicitly labels category values as Qty and includes Other goods when counted.
+Default column widths fit the eight-column sample at 1180px without shrinking typography;
+existing saved column layouts are preserved. Destination header padding and spacing adapt on
+narrow screens. Local Edge checks at 1180/390/320px show no document overflow; the narrow grid
+retains its own horizontal scroll. The 14-ID sample expands to 85px, with every ID inspectable.
+These checks use isolated sample responses and do not establish production data correctness
+or Mac browser parity. Old Orders remains because its AutoCount import is still reachable only there.
+These are read-only corrections: Purchasing, Stock, Payment and Delivery keep their writers.
+
 ## Order view — one page, foreign facts read-only
 
 The Order view keeps the governed object header and one-page document composition.
@@ -687,10 +708,10 @@ read only as implementation history.
   Warehouse physical location is deliberately absent and must never be substituted for Deliver To.
   A physical goods line with no allocated Stock Unit says `Not allocated`; a Service says
   `Not applicable` rather than pretending a Unit should exist.
-- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Where the existing
-  Purchasing relationship cannot identify that allocation structurally, the Register must keep
-  the governed default/readable fallback and must not distribute another Sales Order's quantity
-  or destination by inference. A future allocation key may close this; this UI slice does not.
+- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Without a
+  structural source link, the Register shows `Not recorded` for Deliver To and exposes
+  order/SKU-only Unit associations as unverified. It never substitutes a current default or
+  distributes another Sales Order's quantity or destination by matching SKU alone.
 - Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
   may scope Export; it does not license workflow bulk actions on a truth register.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
