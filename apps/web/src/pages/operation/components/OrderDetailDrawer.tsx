@@ -68,13 +68,12 @@ import {
   updateOrderInputSchema,
   type OpsStockListResponse,
   type OpsOrderControl,
-  type OrderPaymentMethod,
   type OrderActionTrack,
 } from "@carres/shared";
 import { apiFetch, ApiError } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
-import { PAY_METHOD_LABEL, viewSlip } from "@/lib/payment-display";
+import { viewSlip } from "@/lib/payment-display";
 import {
   renderDoPdf,
   renderReceiptPdf,
@@ -112,6 +111,7 @@ import {
   type operationOrderDetailLine,
   type operationOrderDetailPo,
 } from "@/lib/queries";
+import { methodLabel, useManualMethods } from "@/lib/payment-methods";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate, fmtDateShort } from "@/lib/fmt-date";
 import { displayCustomerName } from "@/lib/customer-name";
@@ -5787,7 +5787,7 @@ const MY_BANKS = [
 /** PaymentForm (Balance-tab inline spec, 2026-07-18) — ONE payment entry
  *  form, used INLINE in the Balance tab's Payments column and (wrapped in a
  *  Modal) by the collapsed band's Add-payment shortcut. Amount · Date ·
- *  Method (Cash / Bank transfer / Cheque / e-wallet) · Bank (when transfer) ·
+ *  Method (0476: the Active methods in Settings → Payment) · Bank (when transfer) ·
  *  Ref no · receipt UPLOAD (drag/tap, image/PDF → orders-attachments, live
  *  via the 0180 internal-write policy) · Save/Cancel. Saving uploads the slip
  *  first, then records with `receiptUrl` (persistence deploy-gated — the live
@@ -5804,7 +5804,13 @@ function PaymentForm({
 }) {
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<OrderPaymentMethod>("bank");
+  // 0476 — the methods are the Settings → Payment list; a method switched off
+  // there disappears here. Bank transfer is the default when it is Active.
+  const { methods } = useManualMethods();
+  const [chosenMethod, setMethod] = useState<string>("bank");
+  const method = methods.some((m) => m.value === chosenMethod)
+    ? chosenMethod
+    : methods[0].value;
   const [bank, setBank] = useState("");
   const [refNo, setRefNo] = useState("");
   const [note, setNote] = useState("");
@@ -5908,14 +5914,15 @@ function PaymentForm({
           <span className="t4-label">Method</span>
           <select
             value={method}
-            onChange={(e) => setMethod(e.target.value as OrderPaymentMethod)}
+            onChange={(e) => setMethod(e.target.value)}
             aria-label="Payment method"
             className={cell}
           >
-            <option value="cash">Cash</option>
-            <option value="bank">Bank transfer</option>
-            <option value="cheque">Cheque</option>
-            <option value="online">e-wallet</option>
+            {methods.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </label>
         {method === "bank" ? (
@@ -6071,9 +6078,10 @@ function AddPaymentModal({
   );
 }
 
-/* `PAY_METHOD_LABEL` and `viewSlip` moved to `@/lib/payment-display` so the
-   Sales Order detail's payment card prints the same method words and opens
-   the same slip through the same door (ownership Law D). */
+/* `viewSlip` lives in `@/lib/payment-display` so the Sales Order detail's
+   payment card opens the same slip through the same door (ownership Law D).
+   A payment row's method reads through `methodLabel` (0476, lib/payment-methods):
+   the Settings → Payment name, never the raw key. */
 
 /** "Where this order is" — the SPINE (Jess 2026-07-18): ONE vertical
  *  progress line that is ALSO the section nav. Steps in doing order with
@@ -6922,7 +6930,7 @@ function MoneyCard({
                       />
                     </div>
                     <div className="text-meta text-base-500 truncate">
-                      {fmtDate(p.paid_on)} · {PAY_METHOD_LABEL[p.method] ?? p.method}
+                      {fmtDate(p.paid_on)} · {methodLabel(p.method)}
                       {p.reference ? ` · ${p.reference}` : ""}
                     </div>
                   </div>

@@ -1,8 +1,10 @@
 import {
   buildToOrder,
+  isOtherCreditor,
   isToOrderCategory,
   myHolidaySet,
   productionWorkingDaysFor,
+  purchasingSuppliersOnly,
   readyStockRef,
   stockMatchKey,
   workWeekOffDaysFor,
@@ -550,6 +552,18 @@ export async function loadToOrder(
     const m = mapPgError(supErr);
     return { ok: false, status: m.status, body: m.body };
   }
+  /* 0477 — an other creditor (a landlord, an advertiser) is Finance's row in
+     `suppliers`. A catalog slot pointing at one has no supplier Purchasing may
+     buy from, so it reads exactly like an empty slot: named as `no_supplier`,
+     never proposed, never issued. */
+  const otherCreditorIds = new Set(
+    (supRows ?? []).filter((s) => isOtherCreditor(s)).map((s) => s.id as string),
+  );
+  if (otherCreditorIds.size > 0) {
+    for (const fact of cat.values()) {
+      if (fact.supplierId && otherCreditorIds.has(fact.supplierId)) fact.supplierId = null;
+    }
+  }
 
   const demand: ToOrderLine[] = [];
   const missingProductionDays: { supplierId: string; category: string }[] = [];
@@ -996,8 +1010,11 @@ export async function loadToOrder(
   }
 
   const today = todayIso();
+  /* Only the two kinds Purchasing buys from. The wire enum
+     (`purchaseDemandRowSchema.supplierKind`) knows no other, and an other
+     creditor's kind reaching it would fail the whole page's parse. */
   const supplierKinds = new Map<string, "own_logistics" | "factory_pickup">(
-    (supRows ?? []).map((s) => [
+    purchasingSuppliersOnly(supRows ?? []).map((s) => [
       s.id as string,
       s.kind as "own_logistics" | "factory_pickup",
     ]),

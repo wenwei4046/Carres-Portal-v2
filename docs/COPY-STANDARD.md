@@ -2698,6 +2698,136 @@ that repeats a guarantee the operator cannot verify is noise.
 
 ---
 
+## Finance ledger words — PROPOSAL, awaiting owner review
+
+**PROPOSAL / NOT LAW.** Words the finance ledger builds (migrations 0475–0479) put on screen
+before the owner has ruled on them. Each block names its build and pages; until a ruling, a word
+here may appear only on the page its block names. Falsifier: a finance user reads a word here and
+cannot say what it means or does. A stored key never reaches the screen.
+
+### Journal · Trial Balance · Self-check (migration 0479)
+
+| Group | Word | Meaning |
+|---|---|---|
+| Destinations | **`Journal`** | Every ledger entry, newest first. |
+| | **`Trial Balance`** | Every account's balance on one day, debits beside credits. |
+| | **`Self-check`** | The books test themselves and name what is wrong. |
+| Journal columns | **`Entry No`** · **`Date`** · **`Source`** · **`Document`** · **`Narration`** · **`Amount`** · **`Reversal`** | The entry's number, day, what made it, its document, its note, its total, its reversed pair. |
+| Sources | **`Sales invoice`** · **`Customer payment`** · **`Supplier bill`** · **`Supplier payment`** · **`Payment voucher`** · **`Other debtor invoice`** · **`Other receipt`** · **`Rental payment`** · **`Manual journal`** | What made the entry. |
+| | **`{source} reversal`** | The entry that cancels one of those. |
+| | **`Other entry`** | A source this list does not name yet. Never the key. |
+| Reversed pairs | **`Not reversed`** · **`Reversed`** · **`Reversal`** | The entry stands · it was cancelled · it cancels another. |
+| | **`Reversed by {Entry No}`** · **`Reverses {Entry No}`** | Links each half of a pair to the other. |
+| Entry lines | **`Account`** · **`Debit`** · **`Credit`** · **`Party`** · **`Memo`** · **`Total`** | One line of an entry, and its totals. |
+| | **`Customer · {name}`** · **`Supplier · {name}`** · **`Other party`** · **`No party`** | Who the line belongs to. |
+| Entry page | **`Entry`** · **`Lines`** · **`Same document`** | The entry's facts · its lines · other entries on that document. |
+| Absent values | **`No document number`** · **`No narration`** · **`No memo`** · **`Name not available`** · **`Account name not available`** | The value is missing, said in words. |
+| Journal scope | **`All accounts`** · **`{code} {name} only`** · **`From {date}`** · **`Up to {date}`** · **`Show all entries`** | The account and dates the Journal is narrowed to, and the way out. |
+| Buttons | **`Show lines`** · **`Open entry`** · **`Back to Journal`** · **`Open Self-check`** · **`Check again`** | Row expand · open one entry · return · go to the checks · read the checks again. |
+| Trial Balance | **`Kind`** · **`Asset`** · **`Liability`** · **`Equity`** · **`Income`** · **`Expense`** · **`Other account`** | The account's kind, used to group the page. |
+| | **`As of`** | The day the balances are taken on. |
+| | **`Since {date} · No opening balances`** | Figures are movement since the ledger started, not a full position. |
+| | **`Difference {money}`** · **`Difference not checked`** | Debits less credits · the read failed, so no figure. |
+| Self-check verdicts | **`Clean`** · **`{n} findings`** · **`Finding`** · **`Not checked`** | Nothing wrong · how many problems · this check failed · the read failed. Never zero for a failed read. |
+| Self-check cards | **`Debits and credits`** · **`Customer receivables`** · **`Supplier payables`** · **`Rental months`** · **`Ledger checks`** · **`{code} {name}`** | One card per question; one per customer or supplier account. |
+| | **`Checked {date and time}`** | When the checks were read. |
+| | **`Ledger {money} · Bills {money}`** | One supplier's ledger figure beside its bills less payments. |
+
+Sentences these pages print follow the Empty-state and Error patterns above, for example
+`No entries yet. Invoices, payments and bills add entries here.` ·
+`The Journal could not be loaded. Try again.` · `No entry has that number. Check it and try again.`
+The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
+`finance-ledger.ts` from the row's own numbers.
+
+
+### Supplier bills and payment vouchers (migration 0477)
+
+Pages: Finance → `Bills`, `Payment Vouchers`, `Unpaid by Supplier`; the AP drawer's doors.
+
+| Where | Word on screen | Stored value it replaces | Note |
+|---|---|---|---|
+| Destination / nav | **Bills** · **Payment Vouchers** · **Unpaid by Supplier** | — | three listings, one toolbar switch |
+| Bill status | **Draft** · **Confirmed** · **Cancelled** | `draft` · `confirmed` · `cancelled` | `Posted` never reaches the screen: a confirmed bill *is* entered in the ledger |
+| Voucher status | **Draft** · **Prepared** · **Checked** · **Approved** · **Cancelled** | same, lower case | `Voided` never reaches the screen |
+| Voucher purpose | **Pay supplier bills** · **Direct payment** | `SUPPLIER_BILLS` · `DIRECT` | |
+| Pay method | **Bank transfer** · **Cheque** · **Cash** · **Other** | `BANK_TRANSFER` … | |
+| History | **Created** · **Changed** · **Confirmed** · **Prepared** · **Checked** · **Approved** · **Returned to draft** · **Cancelled** · **File added** | `created` … `file_added` | |
+| Creditor type | **Supplier** · **Other creditor** | `suppliers.kind` | an other creditor is a landlord, an advertiser, a lorry company on credit — its bills go to 2120 Other payables |
+| Money a SUPPLIER is still owed | **Unpaid** | — | `Outstanding` stays customer money only (§ Vocabulary); `Balance` stays banned for money |
+| Voucher form | **Left to pay** · **Pay now** · **Paid from** · **Payee** | — | the voucher **Total** is added up, never typed |
+| Price check | **Same as PO price** · **RM x above PO price** · **RM x below PO price** · **No PO price** · **`n` lines differ from PO** | — | a flag, never a block |
+| Line source | **Not from a GRN** | `warehouse_receipt_id is null` | |
+| No number yet | **Draft, no number yet** | `bill_no` / `voucher_no` null | numbers are drawn on confirm / prepare |
+| Ledger link | **Ledger entry** · **reversed by `JE-…`** | `gl_entries` | |
+| An unknown stored value | **Not known** | anything the word map lacks | never the raw value |
+| Buttons | **+ New Bill** · **Convert GRN to bill** · **Confirm bill** · **Cancel bill** · **+ New Payment Voucher** · **Prepare voucher** · **Check voucher** · **Approve payment** · **Return to draft** · **Cancel voucher** · **Add other creditor** · **Attach file** · **Use this GRN** | — | form buttons stay `Save` / `Cancel`; line lists stay `+ Add line` / `Remove` |
+
+**Three dictionary conflicts, reported rather than decided:**
+
+1. **`Prepare`** was retired with `Prepare PO` on 2026-07-30. The voucher's first step keeps
+   it (`Prepare voucher`) because the brief names the Houzs structure Draft → Prepared →
+   Checked → Approved, and the preparer is the person the separation-of-duties rule excludes
+   from the next two steps. *Overturned by:* an owner ruling for another word (e.g. `Submit
+   voucher`); only the word map and the button change.
+2. **`Check`** means establishing a missing fact. `Check voucher` fits loosely — the fact
+   established is "the bills, amounts and payee match the papers attached" — but the object is
+   a document, not an absent fact. *Overturned by:* the owner reading `Check` as the
+   Purchasing-only verb.
+3. **`Approve`** is ruled for a purchase nobody's customer ordered. `Approve payment` names what
+   is approved, as the rule demands, but widens the verb to money leaving Carres. *Overturned
+   by:* an owner ruling that money out takes its own verb (e.g. `Release payment`).
+
+The brief's `Reject` is shown as **`Return to draft`**: the voucher goes back to the person who
+prepared it, which is the dictionary's `Return` exactly.
+**NOT LAW.** Words the finance ledger builds put on screen that this dictionary did not have.
+Each carries its meaning; the owner accepts, renames or strikes it.
+
+### Invoice doors and payment methods (migration 0476)
+
+| Meaning | Proposed words | Do NOT use |
+|---|---|---|
+| The ledger account a payment method's money lands in (Settings → Payment → Payment methods) | **`Money account`** · `Money account: {code} · {name}` | GL account · Posting account · Clearing |
+| A method with no money account yet (reuses the Warehouse Settings word for an unrecorded setting) | **`Money account: Not configured`** | Not set · None · a blank |
+| The door that adds a method | **`Add a payment method`** | New method · + Method · Create |
+| The method form's Save, naming its gap while disabled | **`Save method`** · `Save method — type a name` · `Save method — choose a money account` | Save changes · Submit |
+| The account picker's empty state | **`Choose a money account`** | Select · Pick one |
+| The saved toast / the failed read | **`Payment method saved`** · `Payment methods could not be loaded. Try again.` | Success! · Error |
+| The proof a manager-added method asks for (the six governed methods keep their §16 words) | **`Payment proof`** | Attachment · Upload · Evidence file |
+| The method the provider records (a receipt row, never a manual choice) | **`Online payment`** | e-wallet · Stripe · Online |
+| An invoice before the issue draws its number (Generate invoice header · PDF preview stamp) | **`Draft`** · **`DRAFT`** on the preview paper | a predicted `INV-YYYY-…` number · Pending |
+| Where a Sales Invoice is issued (the old AR drawer door is gone) | **`To issue a Sales Invoice, open the order and choose Generate invoice.`** | Issue invoice (AR drawer) |
+| The correction door on an issued invoice | **`Void and replace`** · `Void and replace — say why this invoice is wrong` | Void invoice · Cancel invoice · Edit invoice |
+| Its reason field | **`Why is this invoice wrong?`** | Void reason · Remarks |
+| What it will do, said before the act | **`{INV No} is voided and keeps its paper. A replacement draft with the same lines is created; issue it from the order with Generate invoice. It gets a new number.`** | Are you sure? |
+| After the act | **`{INV No} voided — the replacement draft is ready. Issue it from the order: Generate invoice.`** | Done · Voided successfully |
+
+### Money in that is not a sale — Other debtors and Other receipts (migration 0478)
+
+| Word | Meaning |
+|---|---|
+| `Other debtors` | Finance destination: parties that are not customers and owe Carres money, and the invoices raised to them. |
+| `Other receipts` | Finance destination: money into our bank or cash that is not customer order money (loan in, director's money, other income, or payment of an other debtor invoice). |
+| `Party` / `Parties` | Someone Carres bills or receives money from who is neither a customer nor a supplier — a sister company, a lender, a director. |
+| `Company or person` · `SSM or IC number` | The party's kind and its registration number. |
+| `New invoice` · `New party` · `New receipt` | The one create action on each register (Row 2). |
+| `Issue invoice` | Gives the draft its ARI number and adds its total to what the party owes. Asks first. |
+| `Save draft` | Keeps the invoice without a number; it owes nothing yet. |
+| `Cancel invoice` | A draft simply stops. An issued invoice is reversed on its own date by the finance approver. |
+| `Record receipt` | Records money received; it gets its RV number at once. Asks first. Same verb as `Record payment`. |
+| `Cancel receipt` | The finance approver reverses a receipt; the invoices it paid owe that money again. |
+| `Draft` · `Issued` · `Cancelled` | An other debtor invoice's status. |
+| `Recorded` · `Cancelled` | An other receipt's status (the database words `posted` / `voided` never reach the screen). |
+| `Draft — no number yet` | The Invoice No cell of a draft. |
+| `Not issued yet` · `Paid in full` | The Outstanding cell of a draft, and of an issued invoice with nothing left to pay. |
+| `Outstanding` | Extended here: what a party that is not a customer still owes on issued invoices. `Balance` stays banned. |
+| `What for` | The column saying what an invoice or receipt was for, in the chart's own account names. |
+| `Received from` · `Received into` · `Payer name` | Who paid; which bank or cash account the money went into; the payer when there is no party. |
+| `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
+| `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
+| `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
+
+---
+
 ## Header rules (see UI-KIT for the shell)
 
 Purchasing has no module tab bar. Each destination uses the approved compact Destination Header:

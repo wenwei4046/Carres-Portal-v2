@@ -11,6 +11,15 @@ import FinanceRefunds from "./FinanceRefunds";
 import FinanceReports from "./FinanceReports";
 import FinancePaymentReport from "./FinancePaymentReport";
 import FinanceRentalApprover from "./FinanceRentalApprover";
+import OtherDebtorsPage from "./other-money-in/OtherDebtorsPage";
+import OtherReceiptsPage from "./other-money-in/OtherReceiptsPage";
+// The read-only Finance Ledger — three destinations, three nav rows.
+import LedgerJournal from "./ledger/LedgerJournal";
+import LedgerTrialBalance from "./ledger/LedgerTrialBalance";
+import LedgerSelfCheck from "./ledger/LedgerSelfCheck";
+import SupplierBills from "./payables/SupplierBills";
+import PaymentVouchers from "./payables/PaymentVouchers";
+import ApOutstanding from "./payables/ApOutstanding";
 
 /**
  * Finance (HQ Internal) shell — sidebar + main routing area.
@@ -44,6 +53,11 @@ export default function FinanceApp() {
           <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
           <Route path="ar"        element={financeOnly(<FinanceAR />)} />
           <Route path="ap"        element={financeOnly(<FinanceAP />)} />
+          {/* 0477 — supplier bills, payment vouchers, and what is unpaid per
+              supplier. A voucher is the one door money leaves by. */}
+          <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />
+          <Route path="payment-vouchers/*" element={financeOnly(<PaymentVouchers />)} />
+          <Route path="ap-outstanding"     element={financeOnly(<ApOutstanding />)} />
           {/* Payment MASTER §16 — Finance → Payments is the canonical
               receipt Register; the Phase-5 bucket page is retired. */}
           <Route path="payments"  element={<PaymentRegister />} />
@@ -60,6 +74,14 @@ export default function FinanceApp() {
           <Route path="reports/payment" element={financeOnly(<FinancePaymentReport />)} />
           {/* 0268 — the rent-to-own credit gate (9th tab). */}
           <Route path="rental-approver" element={financeOnly(<FinanceRentalApprover />)} />
+          {/* 0478 — money in that is not a sale: other debtor invoices and
+              other receipts. Finance only; customer money stays in Payments. */}
+          <Route path="other-debtors"  element={financeOnly(<OtherDebtorsPage />)} />
+          <Route path="other-receipts" element={financeOnly(<OtherReceiptsPage />)} />
+          {/* The Finance Ledger (read-only). `?entry=JE-…` opens one entry. */}
+          <Route path="ledger" element={financeOnly(<LedgerJournal />)} />
+          <Route path="ledger/trial-balance" element={financeOnly(<LedgerTrialBalance />)} />
+          <Route path="ledger/self-check" element={financeOnly(<LedgerSelfCheck />)} />
           <Route path="*"         element={<Navigate to="." replace />} />
         </Routes>
       </main>

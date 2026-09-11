@@ -5,9 +5,16 @@ import { apiFetch } from "@/lib/api";
 import Button from "@/components/kit/Button";
 import Input from "@/components/kit/Input";
 import PageShell from "@/components/kit/PageShell";
+import Select from "@/components/kit/Select";
 import PaymentTemplateLibrary from "./PaymentTemplateLibrary";
 import { rm } from "@/lib/format-currency";
 import { toast } from "sonner";
+import type { PaymentMethodRegistryRow } from "@carres/shared";
+import {
+  PAYMENT_METHODS_QUERY_KEY,
+  manualMethodSpec,
+  usePaymentMethodRegistry,
+} from "@/lib/payment-methods";
 
 /**
  * Settings → Payment (payment/MASTER.md §12 · §16, migration 0431).
@@ -16,6 +23,11 @@ import { toast } from "sonner";
  * focused Edit — never raw config fields by default. Numbering shows only the
  * next example and `Numbers are created automatically.` No approver name, no
  * Payment Duty and no staff roster lives here (Workspace owns people).
+ *
+ * 0476 — Payment methods is the ONE list of methods (payment/MASTER.md §12
+ * puts methods here). A manager adds a method, renames it, switches it off and
+ * chooses the money account it lands in; every form that records customer
+ * money offers the Active rows. Every change is kept in the settings history.
  */
 interface BankAccount {
   route_source: "pj_showroom" | "dealer";
@@ -23,7 +35,6 @@ interface BankAccount {
   account_name: string | null;
   account_no: string | null;
 }
-interface ManualMethod { method: string; active: boolean; sort: number }
 interface StorageRule {
   id: string;
   product_group: "mattress_bedframe" | "sofa";
@@ -38,21 +49,12 @@ interface StorageRule {
 }
 interface SettingsPayload {
   bank_accounts: BankAccount[];
-  manual_methods: ManualMethod[];
   storage_rules: StorageRule[];
 }
 
 const SOURCE_WORD: Record<BankAccount["route_source"], string> = {
   pj_showroom: "PJ own-showroom order",
   dealer: "Dealer order",
-};
-const METHOD_WORD: Record<string, string> = {
-  bank: "Bank transfer — transfer slip",
-  duitnow_qr: "DuitNow QR — payment screenshot",
-  cheque: "Cheque — cheque photo and cheque number",
-  cash: "Cash — cash collection proof",
-  credit_card: "Credit card — terminal receipt and approval code",
-  debit_card: "Debit card — terminal receipt and approval code",
 };
 const GROUP_WORD: Record<StorageRule["product_group"], string> = {
   mattress_bedframe: "Mattress / Bedframe",
@@ -87,14 +89,6 @@ export default function PaymentSettings() {
       setEditing(null);
       void qc.invalidateQueries({ queryKey: ["finance", "payment-settings"] });
     },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const toggleMethod = useMutation({
-    mutationFn: (input: { method: string; active: boolean }) =>
-      apiFetch("/api/finance/payment-settings/method", {
-        method: "POST", body: JSON.stringify(input),
-      }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["finance", "payment-settings"] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -155,24 +149,7 @@ export default function PaymentSettings() {
         </div>
       </section>
 
-      <section className="rounded-card border border-kit-slate-5 bg-white p-5">
-        <h2 className="text-section">Payment methods</h2>
-        <p className="mt-1 text-body text-kit-slate-11">
-          Only Active methods can be chosen when recording money. Online payment is recorded by
-          the provider and is never a manual method.
-        </p>
-        <div className="mt-3 space-y-1.5">
-          {(data?.manual_methods ?? []).map((m) => <label key={m.method}
-            className="flex items-center gap-2 text-body">
-            <input type="checkbox" checked={m.active}
-              disabled={toggleMethod.isPending}
-              onChange={(e) => toggleMethod.mutate({ method: m.method, active: e.target.checked })}
-              aria-label={METHOD_WORD[m.method] ?? m.method} />
-            <span>{METHOD_WORD[m.method] ?? m.method}</span>
-            {!m.active && <span className="text-label">Inactive</span>}
-          </label>)}
-        </div>
-      </section>
+      <PaymentMethodsCard />
 
       <section className="rounded-card border border-kit-slate-5 bg-white p-5">
         <h2 className="text-section">Invoice and Receipt numbers</h2>
@@ -222,4 +199,126 @@ export default function PaymentSettings() {
       </section>
     </div>
   </PageShell>;
+}
+
+/** The draft behind the Edit / Add form. `method` null = a new method. */
+interface MethodDraft {
+  method: string | null;
+  label: string;
+  accountCode: string;
+  active: boolean;
+}
+
+/**
+ * Payment methods (0476). One row per method: its name, the proof staff attach,
+ * the money account it lands in, and Active. `Edit` opens the one form that
+ * renames, switches and re-points a method; `Add a payment method` opens the
+ * same form empty. The SQL door (payment_method_save) is the guard: manager
+ * only, a money account only, at least one method stays Active.
+ */
+function PaymentMethodsCard() {
+  const qc = useQueryClient();
+  const registry = usePaymentMethodRegistry();
+  const rows = registry.data?.methods ?? [];
+  const accounts = registry.data?.money_accounts ?? [];
+  const [draft, setDraft] = useState<MethodDraft | null>(null);
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
+    void qc.invalidateQueries({ queryKey: ["finance", "payment-settings"] });
+  };
+  const toggle = useMutation({
+    mutationFn: (input: { method: string; active: boolean }) =>
+      apiFetch("/api/finance/payment-settings/method", {
+        method: "POST", body: JSON.stringify(input),
+      }),
+    onSuccess: refresh,
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const save = useMutation({
+    mutationFn: (d: MethodDraft) =>
+      apiFetch("/api/finance/payment-settings/method/save", {
+        method: "POST",
+        body: JSON.stringify({
+          method: d.method, label: d.label.trim(), accountCode: d.accountCode, active: d.active,
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Payment method saved");
+      setDraft(null);
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const accountOptions = accounts.map((a) => ({ value: a.code, label: `${a.code} · ${a.name}` }));
+  const gap = !draft ? null
+    : !draft.label.trim() ? "type a name"
+    : !draft.accountCode ? "choose a money account"
+    : null;
+
+  const form = draft && <div className="mt-2 grid grid-cols-2 gap-3 rounded-card border border-kit-slate-5 p-4"
+    data-testid="payment-method-form">
+    <Input id="method-name" label="Name" value={draft.label} maxLength={40}
+      onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
+    <Select id="method-account" label="Money account" placeholder="Choose a money account"
+      value={draft.accountCode || undefined} options={accountOptions}
+      onValueChange={(v) => setDraft({ ...draft, accountCode: v })} />
+    <label className="col-span-2 flex items-center gap-2 text-body">
+      <input type="checkbox" checked={draft.active}
+        onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
+      <span>Active</span>
+    </label>
+    <div className="col-span-2 flex gap-2">
+      <Button variant="primary" loading={save.isPending} disabled={gap !== null}
+        onClick={() => save.mutate(draft)}>
+        {gap ? `Save method — ${gap}` : "Save method"}
+      </Button>
+      <Button variant="neutral" onClick={() => setDraft(null)}>Cancel</Button>
+    </div>
+  </div>;
+
+  return <section className="rounded-card border border-kit-slate-5 bg-white p-5">
+    <h2 className="text-section">Payment methods</h2>
+    <p className="mt-1 text-body text-kit-slate-11">
+      Only Active methods can be chosen when recording money. Each method lands in one money
+      account. Online payment is recorded by the provider and is never a manual method.
+    </p>
+    {registry.isError && <div role="alert" className="mt-3 text-body">
+      <p>Payment methods could not be loaded. Try again.</p>
+      <button className="btn-secondary mt-2" onClick={() => void registry.refetch()}>Try again</button>
+    </div>}
+    <div className="mt-3 space-y-2">
+      {rows.map((m: PaymentMethodRegistryRow) => {
+        const spec = manualMethodSpec(m.method, rows);
+        return <div key={m.method} className="text-body" data-testid={`method-row-${m.method}`}>
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={m.active}
+                disabled={toggle.isPending}
+                onChange={(e) => toggle.mutate({ method: m.method, active: e.target.checked })}
+                aria-label={`${m.label} — ${spec.evidence}`} />
+              <span>
+                <span className="font-semibold">{m.label}</span> — {spec.evidence}
+                {!m.active && <span className="ml-2 text-label">Inactive</span>}
+                <span className="block text-label font-normal">
+                  Money account: {m.account_code ? `${m.account_code} · ${m.account_name ?? ""}` : "Not configured"}
+                </span>
+              </span>
+            </label>
+            {draft?.method !== m.method && <Button variant="neutral" onClick={() => setDraft({
+              method: m.method, label: m.label, accountCode: m.account_code ?? "", active: m.active,
+            })}>Edit</Button>}
+          </div>
+          {draft?.method === m.method && form}
+        </div>;
+      })}
+    </div>
+    {draft?.method === null ? form
+      : <div className="mt-3">
+        <Button variant="neutral" onClick={() => setDraft({
+          method: null, label: "", accountCode: "", active: true,
+        })}>Add a payment method</Button>
+      </div>}
+  </section>;
 }

@@ -5,6 +5,7 @@ import {
   LEGACY_OPS_MANAGER_EMAILS,
   expectedArrivalOf,
   isOpsGenericAccount,
+  isOtherCreditor,
   manualPurchaseLineRemainingOf,
   orderByFromDeliveryDate,
   productionWorkingDaysFor,
@@ -12,6 +13,7 @@ import {
   type PoDatePromise,
   PURCHASING_REFUSAL_CODES,
   purchasingRefusal,
+  purchasingSuppliersOnly,
   railItemLabel,
   stockMatchKey,
   transitDaysFor,
@@ -702,7 +704,9 @@ manualPurchaseRouter.get("/", requireOperation, async (c) => {
     defaultDestinationId:
       ((dests.data ?? []).find((d) => d.is_default === true)?.id as string | undefined) ?? null,
     supplierCollections: settings?.supplierCollections ?? [],
-    suppliers: sups.data ?? [],
+    /* 0477 — Finance's other creditors share the table; Purchasing's list
+       never carries one. */
+    suppliers: purchasingSuppliersOnly(sups.data ?? []),
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: await canApprove(c),
@@ -974,7 +978,7 @@ manualPurchaseRouter.get("/detail/:id", requireOperation, async (c) => {
     /* The collection rule per collected supplier — the object's Deliver To
        door applies the same lock the create form applies (1083). */
     supplierCollections: settings?.supplierCollections ?? [],
-    suppliers: sups.data ?? [],
+    suppliers: purchasingSuppliersOnly(sups.data ?? []),
     users: (users.data ?? []).map((u) => ({ id: u.id, name: u.name })),
     approvers,
     canApprove: approver,
@@ -1861,7 +1865,13 @@ manualPurchaseRouter.post("/issue", requireOperation, async (c) => {
   >();
   for (const l of toIssue) {
     const cat = catalog.get(l.sku as string);
-    if (!cat || !cat.supplierId) {
+    /* A catalog slot that points at Finance's other creditor (0477) has no
+       supplier Purchasing may buy from — the same refusal as an empty slot. */
+    if (
+      !cat ||
+      !cat.supplierId ||
+      isOtherCreditor({ kind: supplierKind.get(cat.supplierId) })
+    ) {
       return refuse(c, 422, "unresolved_supplier", { sku: l.sku as string });
     }
     if (cat.cost == null || cat.cost <= 0) {

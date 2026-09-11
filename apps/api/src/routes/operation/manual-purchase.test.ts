@@ -361,7 +361,10 @@ describe("Card 03 · GET /purchasing/requests — the CATALOG's category rides e
               { sku: "MATTRESS-TEXT-9", product_models: null },
             ]);
           case "suppliers":
-            return tableStub([{ id: SUP, name: "Hooka", kind: "own_logistics" }]);
+            return tableStub([
+              { id: SUP, name: "Hooka", kind: "own_logistics" },
+              { id: "cccccccc-0000-0000-0000-000000000009", name: "Bayview Properties", kind: "other_creditor" },
+            ]);
           default:
             return tableStub([]);
         }
@@ -387,6 +390,23 @@ describe("Card 03 · GET /purchasing/requests — the CATALOG's category rides e
     const bySku = new Map(body.lines.map((l) => [l.sku, l.category]));
     expect(bySku.get("5539-2NA")).toBe("sofa");
     expect(bySku.get("MATTRESS-TEXT-9")).toBeNull();
+  });
+
+  /* 0477 — Finance's landlord shares the suppliers table; the Register's
+     supplier list is Purchasing's and never carries it. */
+  it("leaves Finance's other creditors out of the supplier list", async () => {
+    vi.mocked(userClient).mockReturnValue(makeRegisterSb());
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("https://api.test/api/operation/purchasing/requests", {
+        headers: { Authorization: `Bearer ${jwt}` },
+      }),
+      env as never,
+      { waitUntil() {}, passThroughException() {} } as never,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { suppliers: Array<{ name: string; kind: string }> };
+    expect(body.suppliers.map((s) => s.name)).toEqual(["Hooka"]);
   });
 });
 
@@ -1628,6 +1648,25 @@ describe("POST /purchasing/requests/issue — a refusal says what is wrong and w
     expectSpoken(body, "unresolved_supplier");
     /* The sentence names the SKU rather than saying "an item". */
     expect(body.message).toContain("5539-2NA");
+  });
+
+  /* 0477 — a catalog slot pointed at Finance's landlord is not a supplier
+     Purchasing may buy from: the same refusal as an empty slot, and no PO. */
+  it("refuses a SKU whose catalog supplier is Finance's other creditor", async () => {
+    const { res, rpc, body } = await issueAgainst(
+      {
+        lines: [LINES[0]],
+        suppliers: [{ id: SUP, kind: "other_creditor", name: "Bayview Properties" }],
+      },
+      { requestIds: [REQ_A], together: true, expectedCosts: REVIEWED },
+    );
+    expect(res.status).toBe(422);
+    expectSpoken(body, "unresolved_supplier");
+    expect(body.message).toContain("5539-2NA");
+    expect(rpc, "no PO was created").not.toHaveBeenCalledWith(
+      "purchasing_issue_pos_batch",
+      expect.anything(),
+    );
   });
 
   /* ⭐ THE DELIVER TO DOOR (0421). MPR-20260903-3381 was told "Set Deliver To

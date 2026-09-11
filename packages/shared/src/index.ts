@@ -401,6 +401,11 @@ export {
   supplierCreateInput,
   supplierSlug,
   type SupplierCreateInput,
+  // 0477 — an other creditor (landlord, advertiser) is Finance's row in
+  // `suppliers`; every Purchasing, Catalog and Operation list drops it.
+  OTHER_CREDITOR_KIND,
+  isOtherCreditor,
+  purchasingSuppliersOnly,
   // 0388 — dual-sourcing's recording half: a SKU remembers every supplier
   // that quoted it; the supplier_id slot stays the routing truth.
   skuSupplierOfferSchema,
@@ -602,6 +607,13 @@ export {
   type MonthlyPlQuery,
   type TopSkusQuery,
   type RefundApplyInput,
+} from "./schemas/finance";
+
+// The read-only Finance Ledger (Journal · Trial Balance · Self-check).
+export {
+  ledgerAccountCode, ledgerSourceType, ledgerEntriesQuery, ledgerEntryRef,
+  ledgerAsOfQuery, ledgerPeriodQuery, ledgerAccountLedgerQuery,
+  type LedgerEntriesQuery, type LedgerAsOfQuery, type LedgerPeriodQuery, type LedgerAccountLedgerQuery,
 } from "./schemas/finance";
 
 export {
@@ -1591,6 +1603,14 @@ export * from "./order-activity";
 export {
   PAYMENT_METHODS,
   PAYMENT_KINDS,
+  // 0476 — a payment method is a key; the registry lives in Settings → Payment.
+  PAYMENT_METHOD_KEY_RE,
+  paymentMethodKeySchema,
+  paymentMethodSaveInput,
+  type PaymentMethodKey,
+  type PaymentMethodRegistryRow,
+  type PaymentMoneyAccount,
+  type PaymentMethodSaveInput,
   recordPaymentInputSchema,
   collectStorageInput,
   summarizePayments,

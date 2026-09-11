@@ -8,32 +8,19 @@
  * map is how `e-wallet` becomes `E-Wallet` on one screen and not the other
  * (ownership Law D: one derived fact, one implementation).
  *
- * Nothing here is new behaviour. The map and the door are the drawer's own,
- * moved.
+ * The method word is not a second map: since 0476 a payment method is a
+ * setting, and `methodLabel` (lib/payment-methods) is the one name lookup.
+ * The slip door is the drawer's own, moved.
  */
 import { toast } from "sonner";
 import type { OrderPaymentMethod, OrderPaymentRow } from "@carres/shared";
 import { supabase } from "@/lib/supabase";
 import { ATTACHMENTS_BUCKET } from "@/lib/storage";
+import { methodLabel } from "@/lib/payment-methods";
 
-/** Method → display label (Balance v3 payment rows + the record modal). */
-export const PAY_METHOD_LABEL: Record<OrderPaymentMethod, string> = {
-  cash: "Cash",
-  bank: "Bank transfer",
-  card: "Card",
-  cheque: "Cheque",
-  online: "e-wallet",
-  other: "Other",
-  duitnow_qr: "DuitNow QR",
-  credit_card: "Credit card",
-  debit_card: "Debit card",
-};
-
-/** The method word for one row, falling back to the raw value so an unmapped
- *  method is still readable rather than blank. */
+/** The method word for one row — the same name every payment surface prints. */
 export function payMethodWord(method: OrderPaymentMethod | string | null): string {
-  if (!method) return "Not recorded";
-  return PAY_METHOD_LABEL[method as OrderPaymentMethod] ?? String(method);
+  return methodLabel(method);
 }
 
 /** Open a payment's uploaded proof: an https receipt URL directly, or a

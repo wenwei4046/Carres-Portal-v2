@@ -144,10 +144,6 @@ import {
   type RawCreateOrderInput,
   type DealerSelf,
   type BankStatementCreateInput,
-  type FinanceInvoiceIssueInput,
-  type FinanceInvoiceVoidInput,
-  type FinancePoPayInput,
-  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
@@ -8454,8 +8450,6 @@ export function useReassignPoWarehouseMutation(
 //   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
-//   POST  /api/finance/invoices/issue             mutation -> invoices row
-//   POST  /api/finance/invoices/:id/void          mutation -> invoices row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
 //   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
 //
@@ -8754,45 +8748,10 @@ export function useRecordReceipt(
   });
 }
 
-export function useIssueInvoice(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceIssueInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceIssueInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/invoices/issue", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // orders.invoice_no + invoiced_at set; new invoices row.
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
-      await qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useVoidInvoice(
-  invoiceId: string,
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceVoidInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceVoidInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>(`/api/finance/invoices/${invoiceId}/void`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0476 — useIssueInvoice / useVoidInvoice are gone with their doors. POST
+// /api/finance/invoices/issue and /:id/void answer 410: a Sales Invoice is
+// issued from the order (Generate invoice) or at dispatch, and corrected by
+// void and replace (/api/finance/invoices/:id/void-replace).
 
 export function useCreateRefund(
   opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
@@ -8835,45 +8794,9 @@ export function useRefundPay(
   });
 }
 
-export function usePoPay(
-  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
-    mutationFn: (input) =>
-      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status='paid' + new outbound payments row. Ripples to
-      // ap-aging, dashboard summary, payments list.
-      await qc.invalidateQueries({ queryKey: ["finance"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function usePoSchedule(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/payments/po-schedule", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
-      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
-      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
+// routes answer 410 — a supplier is paid by a Payment Voucher
+// (lib/payables-queries.ts), the one door money leaves by.
 
 export function useCreateBankStatement(
   opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,
