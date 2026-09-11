@@ -171,48 +171,55 @@ describe("goodsCategoryOf — one answer, three sources in falling authority", (
 });
 
 /**
- * ⭐ `Covered by` IS A CAPABILITY, NOT A COPY (law ④, extended 2026-08-24).
+ * ⭐ `On PO` IS A QUANTITY AND A DOOR — owner correction 2026-09-11.
  *
- * A page that BUYS has to say what already covers a line. A truth register does
- * not, and must render exactly as it did before the column existed.
+ * It used to stack every covering purchase order inside the cell, so a line
+ * fourteen documents touch drew a fourteen-line-tall item row. A collection
+ * must never decide how tall an item row is: the cell states the quantity the
+ * arithmetic needs and points at the read-only details, where each document is
+ * its own row. A truth register still asks for none of it.
  */
-describe("the optional Covered by column", () => {
+describe("the optional On PO column", () => {
   it("is absent unless the page asks for it", () => {
     render(<GoodsMiniTable label="Goods on SO-1303" lines={[goodsLine()]} />);
-    expect(screen.queryByRole("columnheader", { name: "Covered by" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "On PO" })).not.toBeInTheDocument();
   });
 
-  it("names every covering document AND how much of the line it carries", () => {
+  it("states HOW MANY units documents carry — never the documents themselves", () => {
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
         showOnPo
-        lines={[
-          {
-            ...goodsLine(),
-            poAllocations: [
-              { poId: "PO-20260820-4827", qty: 2 },
-              { poId: "PO-20260821-1190", qty: 1 },
-            ],
-            onPoAbsence: "Not ordered yet",
-          },
-        ]}
+        lines={[{ ...goodsLine(), onPoQty: 3, onPoAbsence: "Not ordered yet" }]}
       />,
     );
     expect(screen.getByRole("columnheader", { name: "On PO" })).toBeInTheDocument();
-    /* `Covered by` said WHICH document and never HOW MUCH, so a half-bought
-       line read exactly like a wholly bought one. */
-    expect(screen.getByText("PO-20260820-4827").closest("div")).toHaveTextContent("×2");
-    expect(screen.getByText("PO-20260821-1190").closest("div")).toHaveTextContent("×1");
+    expect(screen.getByText("3")).toBeInTheDocument();
+    /* THE ROW'S HEIGHT IS ITS OWN. No PO number reaches this table at all. */
+    expect(screen.queryByText(/PO-d/)).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Covered by" })).toBeNull();
   });
 
-  it("prints the governed absence, quietly, when nothing covers the line", () => {
+  it("opens the details when the page gives it somewhere to send the reader", () => {
+    const onOpenPoDetails = vi.fn();
     render(
       <GoodsMiniTable
         label="Goods on SO-1303"
         showOnPo
-        lines={[{ ...goodsLine(), poAllocations: [], onPoAbsence: "Not ordered yet" }]}
+        onOpenPoDetails={onOpenPoDetails}
+        lines={[{ ...goodsLine(), onPoQty: 14 }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "14" }));
+    expect(onOpenPoDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints the governed absence, quietly, when no document carries the line", () => {
+    render(
+      <GoodsMiniTable
+        label="Goods on SO-1303"
+        showOnPo
+        lines={[{ ...goodsLine(), onPoQty: 0, onPoAbsence: "Not ordered yet" }]}
       />,
     );
     const absence = screen.getByText("Not ordered yet");
@@ -225,7 +232,7 @@ describe("the optional Covered by column", () => {
       <GoodsMiniTable
         label="Goods on SO-1303"
         showOnPo
-        lines={[{ ...goodsLine(), poAllocations: [{ poId: "PO-1", qty: 1 }] }]}
+        lines={[{ ...goodsLine(), onPoQty: 1 }]}
       />,
     );
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
@@ -257,7 +264,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
         lines={[
           {
             ...goodsLine(),
-            poAllocations: [{ poId: "PO-20260820-1111", qty: 1 }],
+            onPoQty: 1,
             onPoAbsence: "Not ordered yet",
             supplier: "Nice Future",
             poDeliveryDate: "Fri, 18 Sep",
@@ -266,7 +273,7 @@ describe("Card 02-B · optional Supplier and PO Delivery Date", () => {
             ...goodsLine(),
             key: "second",
             sku: "B1201S-Q",
-            poAllocations: [],
+            onPoQty: 0,
             onPoAbsence: "Not ordered yet",
             supplierAbsence: "—",
             poDeliveryDateAbsence: "—",

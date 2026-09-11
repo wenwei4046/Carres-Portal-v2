@@ -4,7 +4,7 @@
 // second ListPageShell would draw a page inside a page — the
 // windows-inside-windows AutoCount pattern the Constitution rejects (§2). Its
 // table follows GoodsMiniTable's grammar, its sibling.
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { READY_STOCK_CONDITION_ABSENT, readyStockConditionWord } from "@carres/shared";
 
 /**
@@ -243,24 +243,35 @@ export default function ReadyStockTable({
 }
 
 /**
- * The collapsible frame the section sits in — the Carres section connector
- * the expansion already uses between its sections, written once so the two
- * purchasing pages cannot drift into two handles.
+ * The collapsible frame a section sits in, written once so the purchasing
+ * pages cannot drift into three handles.
+ *
+ * `title` and `className` are both defaulted to what Ready Stock has always
+ * rendered, so Manual Purchase and SO Batch's own Ready Stock section are
+ * byte-identical. SO Batch's `Purchase order details` names itself, and hands
+ * its own spacing to the connector stack that draws the line to it.
  */
 export function ReadyStockDisclosure({
   testId,
   open,
   onToggle,
+  title = "Ready Stock",
+  className = "mt-2",
+  headingRef,
   children,
 }: {
   testId: string;
   open: boolean;
   onToggle: () => void;
+  title?: string;
+  className?: string;
+  headingRef?: Ref<HTMLDivElement>;
   children: ReactNode;
 }) {
   return (
     <div
-      className="mt-2 overflow-hidden rounded-control border border-base-200 bg-white"
+      ref={headingRef}
+      className={`${className} overflow-hidden rounded-control border border-base-200 bg-white`}
       data-testid={testId}
     >
       <button
@@ -271,7 +282,7 @@ export function ReadyStockDisclosure({
         className="flex h-9 w-full items-center gap-2 bg-base-50 px-3 text-left text-body font-semibold text-base-900 hover:bg-base-100"
       >
         <span aria-hidden>{open ? "▾" : "▸"}</span>
-        <span>Ready Stock</span>
+        <span>{title}</span>
       </button>
       {open ? children : null}
     </div>

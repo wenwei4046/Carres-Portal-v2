@@ -2877,6 +2877,10 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(await res.json()).toEqual({
       defaultDeliverTo: "Carres Klang",
       unitCoverage: {},
+      /* 0471 — the stored binding, carried verbatim. Neither Unit here has
+         one, and `null` is the honest answer for that: the Unit is on this
+         Sales Order and WHICH item line it answers was never recorded. */
+      unitLines: { "id-001": null, "id-002": null },
       /* WHERE each Unit is and WHO has it — the SAME Units the lines already
          name, resolved to Stock's own names. Delivery Work reads this block;
          the Sales Orders register ignores it. */
@@ -2894,6 +2898,84 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         ],
       }],
     });
+  });
+});
+
+/**
+ * ⭐ THE STORED BINDING, NOT A SKU MATCH — 0471 applied to this read
+ * 2026-09-11.
+ *
+ * This fan-in grouped every reserved/sold Unit of the order by NORMALIZED SKU,
+ * so a Sales Order with two item lines of one SKU — SO-1251, SO-1207 and
+ * SO-1246 carry exactly that today — printed the SAME Unit IDs under BOTH
+ * lines. `ops_stock_items.reserved_order_line_id` has answered that question
+ * since 0471 and the read simply did not ask it: a row position was answering
+ * something the database already knew.
+ */
+describe("GET /api/operation/orders/:id/expansion — the Unit's own item line", () => {
+  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
+
+  const call = async (units: Array<Record<string, unknown>>) => {
+    const rows: Record<string, unknown> = {
+      orders: { so: 1251 },
+      order_lines: [
+        { id: "line-1", sku: "JAGER-SS", qty: 1 },
+        { id: "line-2", sku: "JAGER-SS", qty: 1 },
+      ],
+      order_supplier_threads: [],
+      purchasing_destinations: [{ id: "klang", name: "Carres Klang", is_default: true }],
+      purchase_orders: [],
+      purchase_order_lines: [],
+      po_line_sources: [],
+      ops_stock_items: units,
+      warehouses: [],
+      stock_operating_parties: [],
+    };
+    const from = vi.fn((table: string) => {
+      const data = rows[table];
+      const chain: Record<string, unknown> = {};
+      for (const method of ["eq", "in", "or", "not"]) chain[method] = vi.fn(() => chain);
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
+      chain.then = (resolve: (value: unknown) => unknown) => resolve({ data, error: null });
+      return { select: vi.fn(() => chain) };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    return (await res.json()) as {
+      lines: Array<{ lineId: string; unitIds: string[] }>;
+      unitLines: Record<string, string | null>;
+    };
+  };
+
+  it("puts a bound Unit under its OWN line and nowhere else", async () => {
+    const body = await call([
+      { unit_code: "U1-000-001", sku: "JAGER-SS", reserved_order_line_id: "line-1" },
+      { unit_code: "U1-000-002", sku: "JAGER-SS", reserved_order_line_id: "line-2" },
+    ]);
+    expect(body.lines[0]!.unitIds).toEqual(["U1-000-001"]);
+    expect(body.lines[1]!.unitIds).toEqual(["U1-000-002"]);
+    expect(body.unitLines).toEqual({
+      "U1-000-001": "line-1",
+      "U1-000-002": "line-2",
+    });
+  });
+
+  /* A pre-0471 reservation carries no binding. It is NOT dropped — evidence is
+     never thrown away to tidy a read — it keeps the SKU reading it always had,
+     and `unitLines` reports `null` so a screen can say the association was
+     never recorded instead of printing an inference as a fact. */
+  it("keeps the SKU reading for an unbound Unit, and reports that it is unbound", async () => {
+    const body = await call([
+      { unit_code: "U1-000-003", sku: "JAGER-SS", reserved_order_line_id: null },
+    ]);
+    expect(body.lines[0]!.unitIds).toEqual(["U1-000-003"]);
+    expect(body.lines[1]!.unitIds).toEqual(["U1-000-003"]);
+    expect(body.unitLines).toEqual({ "U1-000-003": null });
   });
 });
 

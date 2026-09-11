@@ -5,6 +5,12 @@ import { useAuth } from "@/lib/auth";
 import CarresLockup from "@/components/CarresLockup";
 import NavBadge from "@/components/NavBadge";
 import {
+  ConnectorElbow,
+  ConnectorTrunk,
+  CONNECTOR_ELBOW_W,
+  CONNECTOR_ROW_GAP,
+} from "@/components/tree-connector";
+import {
   useOperationBadges,
   useMarkOperationBadgeSeen,
   usePrincipalDashboard,
@@ -53,12 +59,16 @@ const MODULE_ICON = 16;
  *  the card measured ≈18px against a narrower padding, and an elbow that
  *  misses the icon it hangs from is the one defect this drawing cannot have. */
 const ELBOW_X = ROW_PAD_X + MODULE_ICON / 2;
-const ELBOW_W = 11;
-const ELBOW_R = 9;
+/* ⭐ THE DRAWING ITSELF NOW LIVES IN `components/tree-connector` (2026-09-11),
+   because the owner asked for THIS line between the sections of an expanded
+   SO Batch Purchase row — the same subtle curve, not a second one that starts
+   identical and drifts. The geometry the rail MEASURES stays here; the two
+   spans that paint it do not. */
+const ELBOW_W = CONNECTOR_ELBOW_W;
 /** child text = parent text + 4px (the card's own alignment rule). */
 const CHILD_PAD_L = ROW_PAD_X + MODULE_ICON + 11 + 4;
 /** the flex `gap-0.5` the trunk has to bridge to look continuous. */
-const ROW_GAP = 2;
+const ROW_GAP = CONNECTOR_ROW_GAP;
 /** module row bottom → icon bottom, so the first elbow reaches the icon. */
 const ICON_TO_ROW_BOTTOM = (36 - MODULE_ICON) / 2;
 /** a `dividerAbove` hairline: 2px gap + 4px margin + 1px rule + 4px + 2px. */
@@ -533,24 +543,13 @@ export default function PortalSidebar() {
 
     const elbow = (
       <>
-        {/* The corner: down the trunk, then a 9px turn into the row. */}
-        <span
-          aria-hidden="true"
-          data-testid={`nav-elbow-${child.key}`}
-          className="absolute pointer-events-none border-kit-slate-6"
-          style={{
-            left: geom.elbowX - 0.5,
-            top: -gapAbove,
-            width: ELBOW_W,
-            // Down to the row's MIDDLE, where it turns.
-            height: `calc(50% + ${gapAbove}px)`,
-            borderLeftWidth: 1,
-            borderBottomWidth: 1,
-            borderBottomLeftRadius: ELBOW_R,
-            // Above the row's own wash: a selected page must still show which
-            // module it hangs from, the way any tree keeps its indent guide.
-            zIndex: 1,
-          }}
+        {/* The corner: down the trunk, then the turn into the row — at the
+         * row's MIDDLE, which is what a one-line row's `connectAt` is. */}
+        <ConnectorElbow
+          left={geom.elbowX}
+          gapAbove={gapAbove}
+          connectAt="50%"
+          testId={`nav-elbow-${child.key}`}
         />
         {/* The trunk carrying on to the NEXT child — absent on the last one,
          * which is what makes the line END at the last elbow instead of
@@ -558,17 +557,11 @@ export default function PortalSidebar() {
          * than measured once, so a two-line `Coming soon` row cannot knock the
          * arithmetic out. */}
         {!isLast && (
-          <span
-            aria-hidden="true"
-            data-testid={`nav-trunk-${child.key}`}
-            className="absolute pointer-events-none border-kit-slate-6"
-            style={{
-              left: geom.elbowX - 0.5,
-              top: "50%",
-              bottom: -ROW_GAP,
-              borderLeftWidth: 1,
-              zIndex: 1,
-            }}
+          <ConnectorTrunk
+            left={geom.elbowX}
+            from="50%"
+            gapBelow={ROW_GAP}
+            testId={`nav-trunk-${child.key}`}
           />
         )}
       </>
@@ -666,35 +659,20 @@ export default function PortalSidebar() {
     return (
       <div key={block.group.key} className="relative">
         {/* The MODULE's elbow, turning into this group's word. */}
-        <span
-          aria-hidden="true"
-          data-testid={`nav-elbow-${block.group.key}`}
-          className="absolute pointer-events-none border-kit-slate-6"
-          style={{
-            left: ELBOW_X - 0.5,
-            top: -gapAbove,
-            width: ELBOW_W,
-            height: gapAbove + GROUP_TRUNK_TO_ROW_BOTTOM,
-            borderLeftWidth: 1,
-            borderBottomWidth: 1,
-            borderBottomLeftRadius: ELBOW_R,
-            zIndex: 1,
-          }}
+        <ConnectorElbow
+          left={ELBOW_X}
+          gapAbove={gapAbove}
+          connectAt={`${GROUP_TRUNK_TO_ROW_BOTTOM}px`}
+          testId={`nav-elbow-${block.group.key}`}
         />
         {/* The module's trunk carrying on PAST this whole drawer — children
          * and all — to reach the next row at the module's level. */}
         {!isLastBlock && (
-          <span
-            aria-hidden="true"
-            data-testid={`nav-trunk-${block.group.key}`}
-            className="absolute pointer-events-none border-kit-slate-6"
-            style={{
-              left: ELBOW_X - 0.5,
-              top: GROUP_TRUNK_TO_ROW_BOTTOM,
-              bottom: -ROW_GAP,
-              borderLeftWidth: 1,
-              zIndex: 1,
-            }}
+          <ConnectorTrunk
+            left={ELBOW_X}
+            from={`${GROUP_TRUNK_TO_ROW_BOTTOM}px`}
+            gapBelow={ROW_GAP}
+            testId={`nav-trunk-${block.group.key}`}
           />
         )}
         <button

@@ -4,6 +4,7 @@ import {
   SO_BATCH_RAIL,
   SO_BATCH_RAIL_CLEAR,
   soBatchOrderSupplierNames,
+  soBatchOrderLineOutstandingQty,
   soBatchRailFacts,
   soBatchRailModel,
   type SoBatchOrderRow,
@@ -100,7 +101,6 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     /* Section ORDER is the object's key order — a reader of this contract
        sees the rail top to bottom. */
     expect(Object.keys(SO_BATCH_RAIL)).toEqual([
-      "toOrder",
       "timing",
       "product",
       "supplier",
@@ -108,8 +108,12 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
       "setup",
     ]);
     expect(SO_BATCH_RAIL).not.toHaveProperty("work");
-    expect(SO_BATCH_RAIL.toOrder.heading).toBe("TO ORDER");
-    expect(SO_BATCH_RAIL.toOrder.all).toBe("All not ordered");
+    /* ⛔ `TO ORDER / All not ordered` is RETIRED (owner correction
+       2026-09-11): the one row that named the page's own default rather than a
+       fact about a Sales Order. The heading may not return under any spelling,
+       and the section may not come back as a key. */
+    expect(SO_BATCH_RAIL).not.toHaveProperty("toOrder");
+    expect(JSON.stringify(SO_BATCH_RAIL)).not.toMatch(/not ordered/i);
     expect(SO_BATCH_RAIL.timing.heading).toBe("ORDER TIMING");
     expect(SO_BATCH_RAIL.timing.states).toEqual([
       "can_order_early",
@@ -194,8 +198,6 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
   it("no banned or retired Purchasing word is spelt anywhere in the dictionary or the rail", () => {
     const spelt = [
       ...Object.values(W),
-      SO_BATCH_RAIL.toOrder.heading,
-      SO_BATCH_RAIL.toOrder.all,
       SO_BATCH_RAIL.timing.heading,
       SO_BATCH_RAIL.product.heading,
       SO_BATCH_RAIL.product.all,
@@ -359,24 +361,19 @@ describe("the rail model — unique-SO counts that cross-update between sections
     /* oA has TWO leafs in the band and TWO mattress lines — one order. */
     expect(m.timingCounts.can_order_early).toBe(1);
     expect(m.productCounts.mattress).toBe(2); // oA + oB, not four lines
-    expect(m.notOrderedCount).toBe(3); // oA · oB · oD — outstanding only
+    expect(m).not.toHaveProperty("notOrderedCount");
   });
 
-  it("counts an uncovered Register line even when the issue leaf is absent", () => {
-    const uncovered = railOrder({
-      orderId: "open-po-pool-mismatch",
-      lines: [line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] })],
-      outstandingSuppliers: ["Ohana"],
-    });
-    const m = soBatchRailModel(soBatchRailFacts([uncovered], []), SO_BATCH_RAIL_CLEAR);
-
-    expect(m.notOrderedCount).toBe(1);
+  /* THE ROW WENT; THE ARITHMETIC DID NOT. `All not ordered` was retired as a
+     rail row, and the exact-evidence remainder it counted still governs the
+     tick and the Ready Stock door — so it keeps its own test rather than
+     leaving with the control that used to print it. */
+  it("an uncovered Register line is outstanding even when the issue leaf is absent", () => {
     expect(
-      soBatchRailModel(soBatchRailFacts([uncovered], []), {
-        ...SO_BATCH_RAIL_CLEAR,
-        notOrderedOnly: true,
-      }).visibleOrderIds,
-    ).toEqual(new Set(["open-po-pool-mismatch"]));
+      soBatchOrderLineOutstandingQty(
+        line({ orderLineId: "uncovered-line", qty: 1, stockTaken: 0, pos: [] }),
+      ),
+    ).toBe(1);
   });
 
   it("every timing band is present, zero included — an empty band prints 0, not silence", () => {
@@ -438,7 +435,6 @@ describe("the rail model — unique-SO counts that cross-update between sections
     const m = model({ product: "sofa" });
     /* Only oC (ordered) and oD (setup) are sofas. */
     expect(m.timingCounts.can_order_early).toBe(0);
-    expect(m.notOrderedCount).toBe(1); // oD
     expect(m.suppliers).toEqual([
       { name: "Nice Future", count: 1 },
       { name: "Ohana", count: 1 },
@@ -456,8 +452,8 @@ describe("the rail model — unique-SO counts that cross-update between sections
     expect([...kept.visibleOrderIds]).toEqual([]);
   });
 
-  it("filters from different sections combine — All not ordered + Mattress + Hooka", () => {
-    const m = model({ notOrderedOnly: true, product: "mattress", supplier: "Hooka" });
+  it("filters from different sections combine — Mattress + Hooka + can order early", () => {
+    const m = model({ product: "mattress", supplier: "Hooka", timing: "can_order_early" });
     expect([...m.visibleOrderIds]).toEqual(["oA"]);
   });
 

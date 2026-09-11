@@ -3048,6 +3048,19 @@ export interface operationOrderListRow {
 export interface SalesOrderExpansionResponse {
   /** Exact stock Unit -> originating PO, resolved through its PO line. */
   unitCoverage?: Record<string, string | null>;
+  /**
+   * ⭐ WHICH ITEM LINE A UNIT ANSWERS, AS STORED (0471; carried 2026-09-11).
+   *
+   * `ops_stock_items.reserved_order_line_id` for every Unit this order holds,
+   * and `null` for a Unit that carries no binding — a pre-0471 reservation
+   * whose line was never recorded. The two are DIFFERENT facts and a screen
+   * must be able to tell them apart: an exact association is evidence, an
+   * unrecorded one is an unresolved association, and neither is a guess to be
+   * printed as the other. Optional, so a browser on this build against an
+   * older Worker reads it as absent and says the association is unknown rather
+   * than inventing one.
+   */
+  unitLines?: Record<string, string | null>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has

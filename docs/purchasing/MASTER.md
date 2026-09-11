@@ -842,9 +842,6 @@ Catalog cost therefore reads `Catalog cost is missing` plus `Set the cost of {it
 the affected order; it never returns as a `WORK TO DO` rail panel or as an editor in Issue review.
 
 ```text
-TO ORDER
-  All not ordered
-
 ORDER TIMING
   Can order early
   14 safety days left
@@ -878,26 +875,35 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   as rows they pushed `SETUP TO FIX` — and on a short window `ORDER TIMING`, *what to buy
   today* — below the fold of a 240px rail. Each control writes the same single-slot section
   value the rows wrote, keeps the counts in its option text and wears the rail's own blue
-  active treatment when narrowed. `TO ORDER`, `ORDER TIMING` and `SETUP TO FIX` keep their
-  visible rows: they are the daily worklist, not a fact list.
+  active treatment when narrowed. `ORDER TIMING` and `SETUP TO FIX` keep their visible rows:
+  they are the daily worklist, not a fact list.
+- **⭐ `TO ORDER / All not ordered` IS RETIRED — owner correction 2026-09-11.** It was the one
+  rail row that named no FACT about a Sales Order: it named the page's own DEFAULT, which is
+  exactly what an operator already sees with nothing selected — and it sat ABOVE `ORDER TIMING`,
+  the section that answers *what to buy today*. The section, the row and the word are gone from
+  this surface and may not return under another spelling. **The arithmetic behind it is
+  untouched** (`soBatchOrderLineOutstandingQty`): customer quantity less the Ready Stock ledger
+  draw less exact non-cancelled `po_line_sources` lineage still governs the tick and the Ready
+  Stock reservation door. Manual Purchase keeps its OWN `All not ordered` (§9.2) — a different
+  object, a different arithmetic, and this ruling does not reach it.
 - **The rail is navigation, not batch selection.** No checkboxes in the rail — rows use the
   governed `NavRow` active treatment; the only checkboxes on the page are the Register's own
   `Issue PO` selection. One filter may be selected per section; filters from different
-  sections combine; clicking a selected timing row again clears it; `All products` and
-  `All suppliers`, and `All regions` clear their sections; clearing every filter restores the
-  complete permanent Register, Ordered records included. `All not ordered` remains the
-  explicit outstanding-only filter.
+  sections combine; clicking a selected timing row again clears it; `All products`,
+  `All suppliers` and `All regions` clear their sections; clearing every filter restores the
+  complete permanent Register, Ordered records included.
 - **Counts are UNIQUE Sales Orders** — never documents, notifications, leaf lines, SKU
   quantities or PO counts. Each section's counts update against the other selected sections,
-  so the printed number predicts the resulting SO rows. The fixed rows (`All not ordered`,
-  the five timing rows, the three product rows and the setup row) print
-  their live count, zero included. A supplier or region appears only while it has a matching SO
-  under the other active filters — except the currently selected row, which stays visible with `0`.
-- **`All not ordered` reads the permanent Register's exact coverage facts** — for each SO line,
-  customer quantity less Ready Stock already taken and less non-cancelled PO lineage. A generic
-  Open PO SKU pool may prevent the same units being issued twice today, but it does not make that
-  Sales Order ordered and must not remove it from this count without exact `po_line_sources`
-  evidence. The issue leaf is an action contract, never the count authority.
+  so the printed number predicts the resulting SO rows. The fixed rows (the five timing rows,
+  the three product rows and the setup row) print their live count, zero included. A supplier or
+  region appears only while it has a matching SO under the other active filters — except the
+  currently selected row, which stays visible with `0`.
+- **The outstanding arithmetic reads the permanent Register's exact coverage facts** — for each SO
+  line, customer quantity less Ready Stock already taken and less non-cancelled PO lineage
+  (`soBatchOrderLineOutstandingQty`). A generic Open PO SKU pool may prevent the same units being
+  issued twice today, but it does not make that Sales Order ordered and it may not claim coverage
+  without exact `po_line_sources` evidence. The issue leaf is an action contract, never the
+  coverage authority.
 - **Product comes from the authoritative Catalog category** — never SKU text, model name,
   description, supplier, or a browser-only mapping. A multi-category Sales Order counts once
   under every matching category and still appears once in the Register. Records outside the
@@ -932,6 +938,12 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   panel-left icon grammar as the Portal sidebar. While hidden it does not become a 60px icon rail;
   the Register takes the width and its toolbar exposes `Show filters`. The choice is remembered for
   that staff browser. This is one local-filter control, not another module-navigation control.
+- **⭐ ON A NARROW WINDOW THE RAIL FLOATS; IT DOES NOT EAT THE TABLE — owner correction
+  2026-09-11.** Below `md` the 240px rail leaves the flow and overlays the Register, which is the
+  shared purchasing responsive pattern already shipped on Purchase Orders. At 459px the Register
+  keeps its full width, the page itself never scrolls sideways, each table scrolls inside its own
+  box, and `Issue PO` stays on screen. Above `md` nothing changes. The rail is never squeezed
+  below 240px and a governed label is never truncated.
 - **PO Duty appears only in the selected Issue action, never as a permanent toolbar/rail block and
   never repeated on rows.** Selection replaces the Register's top Work Toolbar; it never adds a
   bottom action bar. The selected bar direction is
@@ -949,7 +961,8 @@ SETUP TO FIX              ← the whole section renders only when at least one a
   deep-links to that owning door. It never becomes a local rail category and is never silently
   defaulted.
 - Every category derives from the one server planning engine. There is no second stored status.
-- Retired rail words, never to return on this surface: `Ready to buy` · `Covered` ·
+- Retired rail words, never to return on this surface: `TO ORDER` · `All not ordered` ·
+  `Ready to buy` · `Covered` ·
   `No customer date` · `No SKU` · `No supplier` · `No production days` · `BUYING RECORDS` ·
   `All lines` · `No buying needed` · `Cannot buy` — alongside the standing bans
   `Today` · `Tomorrow` · `Overdue` · `Follow Up` · `Needs Attention` · `Priority` · `Pending` ·
@@ -1045,8 +1058,8 @@ Open PO coverage ahead of a proceeded order), no rail count, no Register row, no
 Ready Stock take and no PO. Both write doors (`take-stock`, `issue-batch`) recompute through the
 same read at POST time; a demand naming a `place` order resolves to nothing and is refused by name,
 creating and reserving nothing. Every rail count — timing, Product, Supplier — draws from this same
-proceeded-SO population. Rail filters combine with AND: `All not ordered` plus a timing facet shows
-only rows satisfying both.
+proceeded-SO population. Rail filters combine with AND: a timing facet plus a product facet shows
+only rows satisfying both, never a widening OR.
 
 **Columns, exactly and in this reading order — owner correction 2026-09-11:** SO No · Customer ·
 Proceed Date · Requested Delivery Date · Delivery Location · Supplier · Deliver To · PO No ·
@@ -1121,24 +1134,48 @@ widened with the optional mapping columns 2026-08-27, and with an optional `PO N
 `Unit ID` 2026-09-11 for the settled Manual Purchase design — a page asks for the columns it can
 actually answer, and siblings that do not ask render byte-identically).
 
-**⭐ ONE DEMAND ROW, THEN ITS READ-ONLY RECORDS — owner correction 2026-09-11.** The box used to
-expand one item line into N Unit rows and carry the SAME line key, selection state and destination
-editor into every one of them. A single ticked demand therefore drew N ticked boxes, and the
-`Deliver To` / `Split` editor appeared again beside each historical purchase order — a control
-offering to re-arrange a document that had already been sent. The toolbar said `1 selected` while
-the screen showed four, and the obvious "fix" — counting the visible rows as demand — would have
-turned a display defect into a double purchase.
+**⭐ ONE EXPANDED ROW, THREE CONNECTED SECTIONS — owner correction 2026-09-11.**
+
+An expanded Sales Order holds exactly three sections, in this order, joined to their parent by the
+portal navigation's own connector (`docs/ui/MASTER.md` §6.9 — the same subtle curve, one drawing,
+called by both surfaces):
 
 ```text
-☑  SKU   Item / configuration   Qty  Ready Stock  On PO         To buy  Deliver To  Unit ID
-☑  L12…  Laveo · King · Fab 3    4        1        PO-…4827 ×2    1     ▾ + Split   —
-—   ↳                            1        —        PO-…4827       —     Carres Klang  U1-000-078
-—   ↳                            1        —        PO-…4827       —     Carres Klang  U1-000-079
+▼ SO-1303
+  │
+  ├─ Goods on SO-1303            ACTIONABLE demand — one tick, one destination editor per demand
+  │
+  ├─ ▸ Ready Stock               what is on the shelf for it
+  │
+  ╰─ ▾ Purchase order details    the READ-ONLY record — PO No · Unit ID · no control at all
+▸ SO-1302                        the line NEVER reaches the next Sales Order
 ```
 
-- **Exactly one checkbox and one arrangement editor per real purchasing demand.** A Unit row is a
-  RECORD: no checkbox, no editor, its own document's destination — never the plan for whatever is
-  still to buy. A ticked demand row carries the register's own selected fill.
+The connector starts beneath the parent, lands on each section's own heading, and **ends in a curve
+at the last section** — every section draws its own elbow and its own trunk to the NEXT one, and the
+last draws no trunk, so nothing can run on into the following record. The sections keep their own
+ordinary table borders; **they are not wrapped in a large nested card**, and no section is tinted to
+look disabled. Ready Stock sits BETWEEN the two tables: after the compact demand it can answer, and
+before the record, which is the section that grows without limit.
+
+**THE ACTIONABLE TABLE (`GoodsMiniTable`), and why it is compact.**
+
+```text
+☑  SKU   Item / configuration   Qty  Ready Stock  On PO  To buy  Deliver To   Supplier  Category
+☑  L12…  Laveo · King · Fab 3    4        1         2      1     ▾ + Split    Nice F…   Mattress
+☐  JAG…  Jager · SS · Fab 1      1        —        14      1     ▾ + Split    Ohana     Bedframe
+```
+
+- **⭐ `On PO` IS A QUANTITY AND A DOOR, NEVER A STACK OF REFERENCES.** It printed every covering
+  purchase order inside the cell, so a line fourteen documents touch drew a fourteen-line-tall item
+  row that filled the screen — and the same fourteen numbers were repeated underneath it. **A
+  collection of documents may never decide how tall an item row is.** The cell states the units
+  documents already carry, which is the number the arithmetic needs, and pressing it opens the
+  details below. **Nothing is truncated to tidy the screen**: every reference is still on the page,
+  in the section that is about references. An item description may wrap; a PO collection may not.
+- **Exactly one checkbox and one arrangement editor per real purchasing demand**, on the item table
+  and nowhere else. A ticked demand row carries the register's own selected fill — the selected
+  styling belongs to the compact row, never to a block that also holds history.
 - **A matched set is ONE demand across several of the customer's item lines.** It is ticked once
   and arranged once, on the first of its lines, which names what the tick covers
   (`With {n} more lines in this set`); its other lines are listed with their own goods and print
@@ -1147,18 +1184,78 @@ turned a display defect into a double purchase.
   the shelf, documents already carrying quantity, and `Not ordered yet` — so a half-bought line
   read exactly like a wholly bought one. The arithmetic is explicit instead, and it adds up in
   front of the operator: **`Qty`** what the customer ordered · **`Ready Stock`** what the shelf
-  already answered · **`On PO`** each document and the quantity it carries (`PO-… ×2`) ·
-  **`To buy`** the remainder this page may still act on.
-- **Identity leads.** `SKU` then the item and its recorded configuration come before `Category` and
-  `Unit ID`, so two lines of one model are told apart by the goods rather than by position. The
-  configuration is the line's own recorded variant, never re-derived from the SKU text. Exactly one
-  column is flexible, so two expansions opened together still line up column for column.
-- Existing Unit IDs are those allocated to the SO or incoming on a PO line sourced exclusively to
-  that SO item line, read through the Sales Order expansion door. Shared PO lines do not imply a
-  physical Unit allocation to any one SO. Each Unit row shows only its own PO; missing provenance
-  prints an absence, and line-level PO arrays are never copied onto Unit rows. Loading and read
-  failures are shown separately from `Not allocated`.
+  already answered · **`On PO`** how many units documents carry · **`To buy`** the remainder this
+  page may still act on.
+- **Identity leads.** `SKU` then the item and its recorded configuration come first, so two lines of
+  one model are told apart by the goods rather than by position. The configuration is the line's own
+  recorded variant, never re-derived from the SKU text. Exactly one column is flexible, so two
+  expansions opened together still line up column for column.
+- **No `Unit ID` column and no `PO Delivery Date` column here.** Both describe a DOCUMENT's goods,
+  so on the actionable table they printed an absence on every row of every unbought order — a column
+  of dashes in the width of a real answer. Both belong to the record below, where the Unit sits
+  beside the purchase order it came in on.
 - Batch Purchase owns no duplicate demand editor and no second mini-table.
+
+**THE READ-ONLY RECORD — `Purchase order details`, its own heading, its own table.**
+
+```text
+PO No              Unit ID              SKU       Item              Qty  Deliver To    Supplier  PO Delivery Date
+PO-20260820-4827   U1-000-078           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
+PO-20260820-4827   U1-000-079           L1201S-K  Laveo · King       1   Carres Klang  Nice F…   Thu, 17 Sep
+                   Item line not recorded
+PO-20260904-4665   Not allocated        JAGER-SS  Jager · SS         1   Carres Klang  Ohana     Not recorded
+```
+
+- **`PO No`, not `Covered by` and not `ON PO`**, and `PO No` and `Unit ID` are NEIGHBOURS: they are
+  the two identifiers a person copies, and a reader who must look across four columns to pair a
+  document with its goods pairs them wrongly. Both print in FULL and stay selectable.
+  **`PO-20260904-4665` is never shortened to `PO-260904-4665`** — no numbering change is approved,
+  and a shortened number names a document that does not exist.
+- **Ordinary readable rows, no control, no grey block.** A record cannot be bought again, so it
+  carries no checkbox and no destination editor; what makes it read-only is the ABSENCE of controls,
+  not a disabled-looking wash over the module's own audit evidence.
+- **Columns that would only ever print a dash here are absent** — `Ready Stock`, `To buy`,
+  `Category` and the tick column.
+- **Every `po_line_sources` unit gets a row.** Units the read can evidence for that document are
+  named one per row; the quantity the document carries beyond them is stated as a remainder. A Unit
+  naming a document this line's lineage does not carry is **still printed** — a disagreement between
+  two authoritative reads is what an audit register exists to show. A Unit with no document behind it
+  is Ready Stock's answer and stays out of this table.
+- The section renders only when the order has lineage; an order with no purchase order says
+  `Not ordered yet` once, on the item table, and has no details section at all.
+
+**⭐ A UNIT'S ITEM LINE IS READ FROM THE RECORD, NOT INFERRED FROM ITS SKU — owner correction
+2026-09-11.** The Sales Order expansion door grouped every reserved/sold Unit of an order by
+NORMALIZED SKU, so a Sales Order with two item lines of one SKU — SO-1251, SO-1207 and SO-1246 carry
+exactly that — printed the SAME Unit IDs under BOTH lines. `ops_stock_items.reserved_order_line_id`
+has answered that question since 0471 and the read simply did not ask it. It asks now:
+
+- a Unit bound to a line appears under THAT line and nowhere else;
+- a Unit incoming on a purchase-order line sourced EXCLUSIVELY to one SO item line is exact by the
+  document, exactly as before;
+- a Unit that carries NO binding (a pre-0471 reservation) keeps the SKU reading — evidence is never
+  dropped to tidy a screen — and the row says **`Item line not recorded`**, so an unresolved
+  association stays inspectable and can never be read as evidence.
+- The response carries the stored value verbatim as `unitLines`; it is optional, so a browser on
+  this build against an older Worker reads it as absent and says the association is unknown rather
+  than inventing one. The field is ADDITIVE — Sales Orders and Delivery are unaffected.
+
+**⭐ UNKNOWN, LOADING AND CONFIRMED-ABSENT ARE THREE ANSWERS.** `Loading…` while the Unit read is in
+flight, `Could not be loaded` when it failed (with the existing retry), and `Not allocated` only
+when the read ANSWERED and no Unit is tied to the line. Printing the first two as the third is how a
+reader concludes goods do not exist because a request was slow.
+
+**⭐ WHAT THE TWO QUANTITIES MEAN, AND WHY THEY MAY DISAGREE — recorded 2026-09-11.** `On PO` is the
+EXACT `po_line_sources` quantity for that item line. `To buy` is the ENGINE's remainder, drained
+from a per-SKU Open-PO pool with no customer attribution (T6, `to-order.ts`) — it is the number the
+tick is arranged against and the number `issue-batch` recomputes and refuses against, so it is the
+only number that may drive a purchase. **They are two different reads and the screen prints both.**
+An order can therefore show `Qty 1 · On PO 14 · To buy 1`: fourteen documents name that exact line
+while the pooled remainder still says one unit is unbought. That is not proof of duplicate buying
+and it is not proof of coverage; it is a disagreement, and the buyer judges it (YH, 2026-09-03).
+**Neither number is re-derived to make the other agree, no third arithmetic is invented, the
+customer's ordered `Qty` is never rewritten, and nothing on this page cancels or edits an existing
+purchase order.**
 
 **Footer — owner correction 2026-09-11.** The footer answers SCOPE: `{n} of {total} Sales Orders`,
 and the bare total when nothing is filtered. The retired `{n} Partial · {n} Ordered` tally came

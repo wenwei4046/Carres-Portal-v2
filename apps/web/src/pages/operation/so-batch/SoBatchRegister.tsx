@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PanelLeftOpen } from "lucide-react";
 import {
@@ -47,6 +47,16 @@ import PurchasingTabs from "../PurchasingTabs";
 import styles from "./SoBatchRegister.module.css";
 import DestinationAllocationEditor from "./DestinationAllocationEditor";
 import ReadyStockPanel from "./ReadyStockPanel";
+import { ReadyStockDisclosure } from "../components/ReadyStockTable";
+import ConnectedSections, {
+  CONNECT_AT_DISCLOSURE,
+  CONNECT_AT_TABLE_HEADER,
+  type ConnectedSection,
+} from "../components/ConnectedSections";
+import PoDetailsTable, {
+  poDetailRowsForLine,
+  type UnitReadState,
+} from "./PoDetailsTable";
 import GoodsMiniTable, {
   categoryWord,
   type GoodsMiniLine,
@@ -849,24 +859,32 @@ export default function SoBatchRegister({ data, isLoading, onIssue }: SoBatchReg
       data-testid="so-batch-page"
     >
       <PurchasingTabs />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* `relative` is what lets the rail LEAVE the flow on a narrow window —
+          see the rail's own class below. */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Card 02-C — the readable 240px shell. Navigation, not batch
             selection: no rail row carries a checkbox, one filter per section,
             sections combine, and the fixed rows print their live count, zero
             included. */}
-        {filterRailOpen && <FilterRail testId="so-batch-rail" onHide={() => setFilterRailVisible(false)}>
-          <FilterRailGroup title={SO_BATCH_RAIL.toOrder.heading}>
-            <FilterRailRow
-              active={filter.notOrderedOnly}
-              onClick={() =>
-                setFilter((prev) => ({ ...prev, notOrderedOnly: !prev.notOrderedOnly }))
-              }
-              testId="so-batch-all-not-ordered"
-              label={SO_BATCH_RAIL.toOrder.all}
-              count={rail.notOrderedCount}
-              title={`${rail.notOrderedCount} ${W.footerUnit} not ordered`}
-            />
-          </FilterRailGroup>
+        {filterRailOpen && <FilterRail
+          testId="so-batch-rail"
+          onHide={() => setFilterRailVisible(false)}
+          /* ⭐ THE RAIL DOES NOT EAT THE TABLE ON A NARROW WINDOW — the shared
+             purchasing responsive pattern, already shipped on Purchase Orders
+             (`PurchaseOrdersPage.tsx`). Below `md` the 240px rail floats over
+             the Register instead of taking 240 of its 459 pixels, so the
+             primary action and the goods stay reachable; `Hide filters` puts
+             it away exactly as it does on a wide screen. Above `md` nothing
+             changes at all. */
+          className="max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30"
+        >
+          {/* ⛔ `TO ORDER / All not ordered` IS GONE (owner correction
+              2026-09-11). It was the one row on this rail that named no fact
+              about a Sales Order — it named the page's own default, which is
+              what an operator sees with nothing selected — and it sat ABOVE
+              `ORDER TIMING`, the section that answers what to buy today. The
+              outstanding arithmetic behind it is untouched and still governs
+              the tick and the Ready Stock door. */}
           <FilterRailGroup title={SO_BATCH_RAIL.timing.heading}>
             {SO_BATCH_RAIL.timing.states.map((s) => (
               <FilterRailRow
@@ -1163,17 +1181,46 @@ function poDutyLabel(data: SoBatchPurchaseResponse): string {
 }
 
 /**
- * ▸ THE ORDER'S OWN GOODS — the shared `GoodsMiniTable`, and nothing else
- * (owner ruling 2026-08-15; Card 02-B §5).
+ * ▸ ONE SALES ORDER, THREE CONNECTED SECTIONS — owner correction 2026-09-11.
  *
- * The expansion says only what the parent row cannot: per item line, what
- * covers it (`Ready Stock` · the exact PO numbers · `Not ordered yet`), the
- * Unit ID where one is allocated, the exact supplier / `Deliver To` /
- * `PO Delivery Date` mapping when the parent cell could only summarise, and
- * the arrangement editor for the lines still being bought.
+ * ```
+ *   ▼ SO-1303
+ *     │
+ *     ├─ Goods on SO-1303           the ACTIONABLE demand: what the customer
+ *     │                             ordered, what is left, and the one tick
+ *     │                             and one destination editor per demand
+ *     ├─ ▸ Ready Stock              what is on the shelf for it
+ *     │
+ *     ╰─ ▾ Purchase order details   the READ-ONLY record: every document, every
+ *                                   Unit, and no control at all
+ *   ▸ SO-1302
+ * ```
  *
- * Unit IDs include incoming goods bound to this SO line through its PO line.
- * Shared PO-line goods need a physical allocation before naming an SO's Units.
+ * ── WHY THE RECORD LEFT THE ITEM TABLE ──────────────────────────────────────
+ *
+ * It was inside it twice. `On PO` stacked every covering purchase order in one
+ * cell — a line fourteen documents touch drew a fourteen-line-tall item row and
+ * filled the screen with one item — and the same fourteen numbers were then
+ * repeated in the rows underneath. A collection of documents was deciding how
+ * tall a demand row is, and the demand it belonged to had become the smallest
+ * thing on screen.
+ *
+ * Nothing was truncated to fix it. `On PO` states the QUANTITY documents carry,
+ * which is the number the arithmetic `Qty · Ready Stock · On PO · To buy`
+ * actually needs, and it is a door: pressing it opens the details, where each
+ * document is its own row with its own Unit, quantity, destination, supplier
+ * and original date. Every reference is still on the page, in the section that
+ * is about references.
+ *
+ * ── AND THE TWO TABLES ANSWER TWO DIFFERENT QUESTIONS ───────────────────────
+ *
+ * The goods table is about what can still be BOUGHT, so every row on it carries
+ * a checkbox and an arrangement editor. The details table is about what has
+ * already BEEN bought, so nothing on it carries either — a sent purchase order
+ * is not re-arranged from a register, and a Unit that exists is not bought
+ * again. Keeping them in one table is what put a destination editor beside a
+ * historical document in the first place.
+ *
  * Unit IDs are read LAZILY through the Sales Order expansion endpoint — the
  * same read the Sales Orders register uses (Law D: Stock owns the fact, both
  * disclosures ask the same door), and only when a row is actually opened.
@@ -1213,12 +1260,38 @@ function SoBatchOrderExpansion({
     () => new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l.unitIds])),
     [expansion.data],
   );
+  /**
+   * ⭐ UNKNOWN IS NOT `None` (2026-09-11). Three different things can be true
+   * of a Unit cell — the goods exist, no Unit is tied to this line yet, or the
+   * read has not answered — and printing the third as the second is how an
+   * operator concludes goods do not exist because a request was slow.
+   */
+  const unitRead: UnitReadState = expansion.isError
+    ? "error"
+    : expansion.isPending
+      ? "loading"
+      : "ready";
   const leafByLineId = useMemo(() => {
     const m = new Map<string, PurchaseDemandRow>();
     for (const leaf of leafs) for (const id of leaf.lineIds) m.set(id, leaf);
     return m;
   }, [leafs]);
   const poById = useMemo(() => new Map(order.pos.map((p) => [p.poId, p])), [order.pos]);
+
+  /**
+   * The details section opens with the row, because the parent's `14 POs`
+   * summary is a door and a door that opens onto a closed box has not answered
+   * anything. `On PO` in the goods table above scrolls it into view — and opens
+   * it again if the operator has collapsed it.
+   */
+  const [poOpen, setPoOpen] = useState(true);
+  const poSection = useRef<HTMLDivElement | null>(null);
+  const openPoDetails = useCallback(() => {
+    setPoOpen(true);
+    requestAnimationFrame(() =>
+      poSection.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }),
+    );
+  }, []);
 
   /* ⭐ THE TICK AND THE EDITOR BELONG TO THE DEMAND, NOT TO EVERY ROW THAT
      SHOWS IT (owner correction 2026-09-11). A matched set spans several item
@@ -1247,39 +1320,20 @@ function SoBatchOrderExpansion({
       ...(leaf ? [leaf.supplier] : []),
       ...linePos.map((p) => p!.supplierName),
     ]);
-    const poDate = soBatchCellSummary(linePos.map((p) => p!.officialDeliveryDate));
     return {
       key: l.orderLineId,
       testId: `so-batch-part-${l.sku}`,
       category: l.category ? categoryWord(l.category) : "Other goods",
       unitIds: [],
-      unitAbsence: expansion.isError
-        ? "Unit IDs could not be loaded"
-        : expansion.isPending
-          ? "Loading…"
-          : (unitIdsByLine.get(l.orderLineId) ?? []).length > 0
-            ? "—"
-            : "Not allocated",
-      /* ⭐ THE EXACT RECORDS, AS READ-ONLY ROWS. Each Unit names the document
-         it came in on, and that document's own supplier, date and destination
-         — never the plan for whatever is still to buy. */
-      units: (unitIdsByLine.get(l.orderLineId) ?? []).map((unitId) => {
-        const poNo = expansion.data?.unitCoverage?.[unitId] ?? null;
-        const po = poNo ? poById.get(poNo) : undefined;
-        return {
-          unitId,
-          poNo,
-          deliverTo: po ? destinationName(po.destinationId) : null,
-          supplier: po?.supplierName ?? null,
-          poDeliveryDate: po?.officialDeliveryDate ? fmtDate(po.officialDeliveryDate) : null,
-        };
-      }),
+      unitAbsence: "—",
       /* The four numbers that used to hide inside `Covered by` — and they add
          up in front of the operator: what the customer ordered, what the shelf
-         already answered, what documents already carry, what is left. */
+         already answered, how much documents already carry, what is left.
+         `On PO` is the EXACT `po_line_sources` quantity for THIS item line, not
+         a count of the order's documents and not a per-SKU pool. */
       fromStock: l.stockTaken > 0 ? l.stockTaken : null,
       toBuy: drawEditor ? (leaf!.toBuy ?? 0) : null,
-      poAllocations: l.pos.map((p) => ({ poId: p.poId, qty: p.qty })),
+      onPoQty: l.pos.reduce((sum, p) => sum + Math.max(0, p.qty), 0),
       onPoAbsence: l.stockTaken > 0 && l.pos.length === 0 ? "—" : "Not ordered yet",
       /* An eligible line carries its own editor (Split included); a covered
          line states the destination the issued document carries. */
@@ -1308,17 +1362,10 @@ function SoBatchOrderExpansion({
             ? []
             : issuedDest.kind === "one"
               ? [issuedDest.value]
-              : issuedDest.values,
+              : [W.multiple],
       deliverToAbsence: eligible ? "Not chosen" : "—",
       supplier: summaryText(supplier, (n) => `${n} suppliers`) ?? undefined,
       supplierAbsence: "—",
-      poDeliveryDate:
-        poDate.kind === "none"
-          ? undefined
-          : poDate.kind === "one"
-            ? fmtDate(poDate.value)
-            : W.multiple,
-      poDeliveryDateAbsence: "—",
       sku: l.sku,
       qty: l.qty,
       item: l.item,
@@ -1352,13 +1399,12 @@ function SoBatchOrderExpansion({
         testId: `so-batch-part-${part.sku}`,
         category: leaf.category ? categoryWord(leaf.category) : "Other goods",
         unitIds: [],
-        unitAbsence: "Not allocated",
+        unitAbsence: "—",
         onPoAbsence: "Not ordered yet",
         deliverTo: [],
         deliverToAbsence: "—",
         supplierAbsence: "—",
         supplier: leaf.supplier ?? undefined,
-        poDeliveryDateAbsence: "—",
         sku: part.sku,
         qty: part.qty,
         item: leaf.item,
@@ -1366,6 +1412,31 @@ function SoBatchOrderExpansion({
       });
     }
   }
+
+  /**
+   * THE RECORD, RESOLVED ONCE PER ITEM LINE.
+   *
+   * `po_line_sources` is the only visible attribution (Card 02-B), so a row
+   * exists for every unit of it — named by its Unit where the read can evidence
+   * one, and stated as a quantity where it cannot. Nothing is counted as
+   * coverage without that lineage, and nothing with it is dropped.
+   */
+  const poRows = order.lines.flatMap((l) =>
+    poDetailRowsForLine({
+      lineKey: l.orderLineId,
+      sku: l.sku,
+      item: l.item,
+      itemDetail: l.variant,
+      lineage: l.pos,
+      unitIds: unitIdsByLine.get(l.orderLineId) ?? [],
+      unitCoverage: expansion.data?.unitCoverage ?? {},
+      unitLines: expansion.data?.unitLines,
+      orderLineId: l.orderLineId,
+      unitRead,
+      po: (poId) => poById.get(poId),
+      destinationName,
+    }),
+  );
 
   if (lines.length === 0) {
     return <div className="px-2 py-2 text-body text-kit-slate-11">No items on this order</div>;
@@ -1376,23 +1447,109 @@ function SoBatchOrderExpansion({
      any. They fail `isSelectableForOrder` because the order is FINISHED
      buying, not because something is wrong with them — printing
      "Issue PO to Ohana" in an amber panel on an order whose purchase orders
-     are already sent would be an instruction to duplicate work. The `Ordered`
-     pill and the `PO No` column are the explanation, and both read the same
-     lineage that closed the tick. */
+     are already sent would be an instruction to duplicate work. The
+     `PO No` column and the details section are the explanation, and both read
+     the same lineage that closed the tick. */
   const blockers =
     order.status === "ordered"
       ? []
       : leafs.filter((leaf) => !isSelectableForBuying(leaf) && leaf.action != null);
 
+  const goodsTable = (
+    <GoodsMiniTable
+      label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
+      lines={lines}
+      /* ⭐ THE GOODS IDENTIFY THEMSELVES FIRST (owner correction 2026-09-11),
+         and the arithmetic is explicit: `Qty` the customer's order, `Ready
+         Stock` what the shelf answered, `On PO` how much documents already
+         carry, and `To buy` the remainder this page can still act on. */
+      identityFirst
+      showFromStock
+      showOnPo
+      showToBuy
+      showSupplier
+      /* ⛔ NO `Unit ID` COLUMN, and no `PO Delivery Date` (owner correction
+         2026-09-11). Both describe a DOCUMENT's goods, not a demand, so on the
+         actionable table they printed an absence on every row of every order
+         that has not been bought — a column of dashes in the width of a real
+         answer. Both are columns of the details section below, where the Unit
+         sits next to the purchase order it came in on. */
+      showUnitId={false}
+      onOpenPoDetails={poRows.length > 0 ? openPoDetails : undefined}
+      selection={{
+        selectedKeys: new Set(
+          order.lines
+            .filter((l) => {
+              const leaf = leafByLineId.get(l.orderLineId);
+              return leaf != null && selectedIds.has(leaf.id);
+            })
+            .map((l) => l.orderLineId),
+        ),
+        onToggle: (lineKey) => {
+          const leaf = leafByLineId.get(lineKey);
+          if (leaf) onToggleLeaf(leaf.id);
+        },
+      }}
+    />
+  );
+
+  const sections: ConnectedSection[] = [
+    { key: "goods", connectAt: CONNECT_AT_TABLE_HEADER, node: goodsTable },
+    {
+      key: "ready-stock",
+      connectAt: CONNECT_AT_DISCLOSURE,
+      /* ⭐ READY STOCK sits between the two tables (owner ruling 2026-09-10,
+         placement confirmed 2026-09-11): after the compact demand it can
+         answer, and BEFORE the record, which is the section that grows without
+         limit. Its selection is its own — choosing a Unit never touches the
+         purchasing tick above. */
+      node: <ReadyStockPanel orderId={order.orderId} so={order.so} onReserved={onReserved} frameClassName="" />,
+    },
+    ...(poRows.length > 0
+      ? [
+          {
+            key: "po-details",
+            connectAt: CONNECT_AT_DISCLOSURE,
+            node: (
+              <ReadyStockDisclosure
+                testId={`so-batch-po-details-${order.orderId}`}
+                open={poOpen}
+                onToggle={() => setPoOpen((v) => !v)}
+                title={W.poDetails}
+                className=""
+                headingRef={poSection}
+              >
+                <PoDetailsTable
+                  label={
+                    order.so == null
+                      ? "Purchase order details"
+                      : `Purchase order details for SO-${order.so}`
+                  }
+                  rows={poRows}
+                  onPoClick={(poId) =>
+                    navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
+                  }
+                />
+              </ReadyStockDisclosure>
+            ),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div data-testid={`so-batch-inspector-${order.orderId}`}>
       {expansion.isError && (
-        <button type="button" className="text-kit-blue-11 hover:underline" onClick={() => void expansion.refetch()}>
+        <button
+          type="button"
+          className="px-2 pt-2 text-kit-blue-11 hover:underline"
+          onClick={() => void expansion.refetch()}
+        >
           Unit IDs could not be loaded. Try again
         </button>
       )}
       {blockers.length > 0 && (
-        <div className="mb-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
+        <div className="mt-2 overflow-hidden rounded-control border border-warning/40 bg-warning-soft/40">
           {blockers.map((leaf) => (
             <div
               key={leaf.id}
@@ -1407,48 +1564,7 @@ function SoBatchOrderExpansion({
           ))}
         </div>
       )}
-      <GoodsMiniTable
-        label={order.so == null ? "Goods on this order" : `Goods on SO-${order.so}`}
-        lines={lines}
-        /* ⭐ THE GOODS IDENTIFY THEMSELVES FIRST (owner correction 2026-09-11),
-           and the arithmetic is explicit: `Qty` the customer's order, `On PO`
-           the documents already carrying it with the quantity each holds, and
-           `To buy` the remainder this page can still act on. */
-        identityFirst
-        showFromStock
-        showOnPo
-        showToBuy
-        showSupplier
-        showPoDeliveryDate
-        /* ⭐ THE EXPANSION IS THE MULTI-PO DOOR (YH, 2026-09-01). The parent
-           `PO No` cell links only when there is exactly one; with several it
-           prints `2 POs` and sends the reader here, where every number is a
-           door of its own. */
-        onPoClick={(poId) =>
-          navigate(`/operation/procurement?po=${encodeURIComponent(poId)}`)
-        }
-        selection={{
-          selectedKeys: new Set(
-            order.lines
-              .filter((l) => {
-                const leaf = leafByLineId.get(l.orderLineId);
-                return leaf != null && selectedIds.has(leaf.id);
-              })
-              .map((l) => l.orderLineId),
-          ),
-          onToggle: (lineKey) => {
-            const leaf = leafByLineId.get(lineKey);
-            if (leaf) onToggleLeaf(leaf.id);
-          },
-        }}
-      />
-      {/* ⭐ READY STOCK — an INDEPENDENTLY collapsible table directly below
-          the order's own goods (owner-accepted design, 2026-09-10). It is a
-          sibling section, not a column and not a second mini-table: the
-          goods table answers *what was ordered and what covers it*, this one
-          answers *what is on the shelf for it*. Its selection is its own —
-          choosing a Unit never touches the purchasing tick above. */}
-      <ReadyStockPanel orderId={order.orderId} so={order.so} onReserved={onReserved} />
+      <ConnectedSections sections={sections} testId={`so-batch-sections-${order.orderId}`} />
     </div>
   );
 }

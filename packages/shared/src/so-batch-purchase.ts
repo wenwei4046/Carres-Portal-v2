@@ -99,6 +99,18 @@ export const SO_BATCH_PURCHASE_WORDS = {
    */
   poDeliveryDateUnknown: "Not recorded",
 
+  /**
+   * ⭐ THE READ-ONLY SECTION'S OWN HEADING (owner correction 2026-09-11).
+   *
+   * `Purchase order details` — the section under the expanded row that holds
+   * every document covering the Sales Order, each with its own Unit, quantity,
+   * destination, supplier and original date. Deliberately NOT `Covered by`
+   * (retired: one heading for three questions) and NOT `ON PO` (that is the
+   * goods table's QUANTITY column, and a heading that repeats a column name
+   * makes the number and the section read as the same thing).
+   */
+  poDetails: "Purchase order details",
+
   /* THE ROW INSPECTOR HAS NO WORDS OF ITS OWN (owner correction 2026-08-24).
      It draws `GoodsMiniTable`, the child table Sales Orders and Delivery draw,
      and that component owns its own headings. The eight labels that used to
@@ -127,9 +139,7 @@ export const SO_BATCH_PURCHASE_WORDS = {
  * Purchasing fact sections, in their governed order. Work remains in the
  * central owner-resolved `My Work` / `Team Work` surfaces; the local rail must
  * not copy Sales, Catalog or Purchasing actions into a second work lens.
- * `TO ORDER` holds the one `All not
- * ordered` outstanding-only filter. `ORDER TIMING` holds the five timing rows,
- * every one of them orderable. `PRODUCT` holds the three Catalog categories —
+ * `ORDER TIMING` holds the five timing rows, every one of them orderable. `PRODUCT` holds the three Catalog categories —
  * the CATALOG's answer, never SKU-text inference. `SUPPLIER` holds the actual
  * supplier names the Register itself projects, alphabetical and never
  * hardcoded. `REGION` groups the order's recorded Delivery State using the
@@ -142,8 +152,18 @@ export const SO_BATCH_PURCHASE_WORDS = {
  * sections combine, and no rail row ever grows a checkbox — the page's only
  * checkboxes are the Register's `Issue PO` selection.
  */
+/**
+ * ⭐ `TO ORDER / All not ordered` IS RETIRED — owner correction 2026-09-11.
+ *
+ * It was the one rail row that named no FACT about a Sales Order. It named the
+ * page's own DEFAULT, and the default is what the operator already sees when
+ * nothing is selected — so the first row on the rail was the least useful
+ * narrowing on it, sitting above `ORDER TIMING`, the section that actually
+ * answers *what to buy today*. The arithmetic behind it is untouched and still
+ * governs the tick and the Ready Stock door
+ * (`soBatchOrderLineOutstandingQty`); what goes is the row.
+ */
 export const SO_BATCH_RAIL = {
-  toOrder: { heading: "TO ORDER", all: "All not ordered" },
   timing: { heading: "ORDER TIMING", states: PURCHASE_DEMAND_TIMING_STATES },
   product: {
     heading: "PRODUCT",
@@ -176,8 +196,6 @@ export type SoBatchProductCategory =
  * records included.
  */
 export interface SoBatchRailFilter {
-  /** `All not ordered` — the explicit outstanding-only filter. */
-  notOrderedOnly: boolean;
   /** One `ORDER TIMING` row, or none. A second click clears it. */
   timing: PurchaseDemandTimingState | null;
   /** One `PRODUCT` category; `null` is `All products`. */
@@ -191,7 +209,6 @@ export interface SoBatchRailFilter {
 }
 
 export const SO_BATCH_RAIL_CLEAR: SoBatchRailFilter = {
-  notOrderedOnly: false,
   timing: null,
   product: null,
   supplier: null,
@@ -252,8 +269,6 @@ export function soBatchOrderLineOutstandingQty(
  */
 export interface SoBatchRailFacts {
   orderId: string;
-  /** Has quantity without Ready Stock or exact PO lineage. */
-  outstanding: boolean;
   /** Every leaf state under this order. */
   states: ReadonlySet<PurchaseDemandState>;
   /** The CATALOG's categories on the order's lines. */
@@ -279,7 +294,6 @@ export function soBatchRailFacts(
   }
   return orders.map((o) => ({
     orderId: o.orderId,
-    outstanding: o.lines.some((line) => soBatchOrderLineOutstandingQty(line) > 0),
     states: statesByOrder.get(o.orderId) ?? new Set(),
     categories: new Set(
       o.lines
@@ -294,7 +308,6 @@ export function soBatchRailFacts(
 }
 
 type SoBatchRailSection =
-  | "toOrder"
   | "timing"
   | "product"
   | "supplier"
@@ -307,7 +320,6 @@ function railMatches(
   filter: SoBatchRailFilter,
   except?: SoBatchRailSection,
 ): boolean {
-  if (except !== "toOrder" && filter.notOrderedOnly && !f.outstanding) return false;
   if (except !== "timing" && filter.timing != null && !f.states.has(filter.timing)) {
     return false;
   }
@@ -333,7 +345,6 @@ function railMatches(
 export interface SoBatchRailModel {
   /** Orders passing every selected filter — what the Register shows. */
   visibleOrderIds: ReadonlySet<string>;
-  notOrderedCount: number;
   timingCounts: Record<PurchaseDemandTimingState, number>;
   productCounts: Record<SoBatchProductCategory, number>;
   /** Actual names, alphabetical. Never hardcoded, never a placeholder. */
@@ -393,7 +404,6 @@ export function soBatchRailModel(
     visibleOrderIds: new Set(
       facts.filter((f) => railMatches(f, filter)).map((f) => f.orderId),
     ),
-    notOrderedCount: count("toOrder", (f) => f.outstanding),
     timingCounts,
     productCounts,
     suppliers: [...supplierCounts]
