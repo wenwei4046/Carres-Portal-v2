@@ -57,6 +57,8 @@ import { SkeletonRows } from "./Skeleton";
 import { DateField } from "./DateField";
 import styles from "./DataGrid.module.css";
 
+import { ViewportExpansion } from "./ViewportExpansion";
+
 const ICON = { size: 14, strokeWidth: 1.75 } as const;
 
 export type DataGridColumn<T> = {
@@ -298,6 +300,8 @@ export type DataGridProps<T> = {
     renderExpansion: (row: T) => ReactNode;
     /** Attach detail content beneath the parent without vertical padding; retain control gutters. */
     flush?: boolean;
+    /** Keep the child within the visible width, retaining the data-column indent. */
+    fitExpansionToViewport?: boolean;
     /** Optional: derive a stable row id for expansion state. Defaults to rowKey. */
     rowExpansionKey?: (row: T) => string;
     /** Per-row test id for the disclosure chevron. */
@@ -1720,7 +1724,11 @@ function DataGridInner<T>({
                  column's, the right edge is the parent table's. */
               style={{ padding: expandable.flush ? 0 : "12px 0", borderTop: "1px solid var(--line)" }}
             >
-              {expandable.renderExpansion(row)}
+              {expandable.fitExpansionToViewport ? (
+                <ViewportExpansion>
+                  {expandable.renderExpansion(row)}
+                </ViewportExpansion>
+              ) : expandable.renderExpansion(row)}
             </td>
           </tr>
         )}

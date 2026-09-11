@@ -667,7 +667,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(customer).not.toHaveTextContent("019-3478913");
   });
 
-  it("renders the locked six-column goods table with Stock Unit IDs and Purchasing Deliver To", () => {
+  it("renders the five-column goods table with merged item details, Stock Unit IDs and Purchasing Deliver To", () => {
     listHookState.data = {
       orders: [
         order({
@@ -710,7 +710,7 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     const table = screen.getByRole("table", { name: "Goods on SO-1303" });
     expect(table).toBeInTheDocument();
     expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
-      "Category", "Unit ID", "Deliver To", "SKU", "Qty", "Item",
+      "Category", "Item Details", "Qty", "Unit ID", "Deliver To",
     ]);
     const row = screen.getByTestId("expanded-good-B1201S-K");
     expect(row).toHaveTextContent("Mattress");
@@ -762,28 +762,19 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     expect(screen.queryByText(/other goods/i)).not.toBeInTheDocument();
   });
 
-  /**
-   * ⭐ THE CHILD BOX BEGINS AT `SO No` — owner ruling 2026-08-15.
-   *
-   * The indent is the parent-child link, and it is the TABLE's own column
-   * layout that draws it: one real EMPTY cell per gutter column, then the box
-   * spanning the data columns with no padding of its own. A computed
-   * `padding-left` was tried and measured wrong — `width` on a `<td>` is a
-   * hint, and this grid stretches its columns to fill the frame, so the 30px
-   * ☐ and 32px ▸ render 41 and 43 at 1440 and a 62px padding lands 22px short.
-   */
-  it("starts the expansion at the first data column, with the gutter left empty", () => {
+  it("starts under SO Number and fits the available viewport width", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
-    const gutter = screen.getAllByTestId(/^grid-expansion-gutter-/);
-    expect(gutter.map((c) => c.dataset.testid)).toEqual([
+    const gutters = screen.getAllByTestId(/^grid-expansion-gutter-/);
+    expect(gutters.map((cell) => cell.dataset.testid)).toEqual([
       "grid-expansion-gutter-__select__",
       "grid-expansion-gutter-__expand__",
     ]);
-    for (const cell of gutter) expect(cell).toBeEmptyDOMElement();
-    /* Eight default business columns; the gutter is not one of them, and the
-       box's right edge is therefore the parent table's. */
-    expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
+    for (const gutter of gutters) expect(gutter).toBeEmptyDOMElement();
+    const cell = screen.getByTestId("grid-expansion-cell");
+    expect(cell).toHaveAttribute("colspan", "8");
+    expect(cell.querySelector('[class*="100cqw"]')).toBeNull();
+    expect(within(cell).getByTestId("goods-mini-table")).toHaveClass("w-full");
     /* Flush expansion: the child grid joins its parent without card spacing. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
       paddingTop: "0px",
