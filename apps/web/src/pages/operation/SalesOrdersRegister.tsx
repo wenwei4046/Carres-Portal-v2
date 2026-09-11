@@ -433,7 +433,7 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
   ];
   return (
     <div data-testid="row-expansion">
-      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} />
+      <GoodsMiniTable label={`Goods on SO-${row.o.so}`} lines={miniLines} salesOrderLayout />
     </div>
   );
 }
@@ -603,7 +603,7 @@ export default function SalesOrdersRegister() {
   );
 
   const expandable = useMemo(
-    () => ({ flush: true, renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
+    () => ({ flush: true, fitExpansionToViewport: true, renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
     [],
   );
 

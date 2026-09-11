@@ -163,6 +163,11 @@ const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
+const SALES_ORDER_WIDTHS: Record<string, string> = {
+  category: "w-[15%]", item: "w-[45%]", qty: "w-[10%]",
+  unit: "w-[15%]", deliverTo: "w-[15%]",
+};
+
 /**
  * The sum of the fixed columns plus a floor for `Item`. Below this the box
  * scrolls sideways rather than crushing a column — the portal's standing
@@ -327,6 +332,7 @@ export default function GoodsMiniTable({
   showOrderedQty = false,
   showToBuy = false,
   identityFirst = false,
+  salesOrderLayout = false,
   showSupplier = false,
   showPoDeliveryDate = false,
   showPoNo = false,
@@ -361,6 +367,8 @@ export default function GoodsMiniTable({
    * byte-identically to what they rendered before.
    */
   identityFirst?: boolean;
+  /** Compact Sales Orders layout with SKU/specs merged into Item Details. */
+  salesOrderLayout?: boolean;
   /**
    * ⭐ THE EXACT MAPPING IS ALSO A DOOR (YH, 2026-09-01).
    *
@@ -428,7 +436,7 @@ export default function GoodsMiniTable({
     deliverTo: { ...CHILD_COLUMNS[2] },
     sku: { ...CHILD_COLUMNS[3] },
     qty: { ...CHILD_COLUMNS[4] },
-    item: { ...CHILD_COLUMNS[5] },
+    item: { ...CHILD_COLUMNS[5], label: salesOrderLayout ? "Item Details" : "Item" },
     supplier: { ...SUPPLIER_COLUMN },
     poNo: { ...PO_NO_COLUMN },
     poDeliveryDate: { ...PO_DATE_COLUMN },
@@ -436,7 +444,9 @@ export default function GoodsMiniTable({
     orderedQty: { ...ORDERED_QTY_COLUMN },
     toBuy: { ...TO_BUY_COLUMN },
   };
-  const order = identityFirst
+  const order = salesOrderLayout
+    ? ["category", "item", "qty", "unit", "deliverTo"]
+    : identityFirst
     ? ["sku", "item", "qty", "fromStock", "orderedQty", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
     : ["category", "unit", "orderedQty", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
   const asked: Record<string, boolean> = {
@@ -482,18 +492,20 @@ export default function GoodsMiniTable({
        LEFT and RIGHT edges are untouched: the frame is drawn on the `SO No`
        column's left edge and the parent table's right edge. */
     <div
-      className="overflow-x-auto rounded-control border border-base-200 bg-white"
+      className={`${salesOrderLayout ? "w-full min-w-0 max-w-full" : "overflow-x-auto"} rounded-control border border-base-200 bg-white`}
       data-testid="goods-mini-table"
     >
       <table
         className="w-full table-fixed text-left"
-        style={{ minWidth }}
+        style={salesOrderLayout ? undefined : { minWidth }}
         aria-label={label}
       >
         <colgroup>
           {selection ? <col style={{ width: SELECT_WIDTH }} /> : null}
           {columns.map((c) => (
-            <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+            <col key={c.key}
+              className={salesOrderLayout ? SALES_ORDER_WIDTHS[c.key] : undefined}
+              style={!salesOrderLayout && c.width ? { width: c.width } : undefined} />
           ))}
         </colgroup>
         {/* LEVEL ONE — the parent header's own treatment: 11px, grey, the
@@ -516,7 +528,7 @@ export default function GoodsMiniTable({
                    `01-design-tokens.md` has locked. Size, colour and case carry
                    the match — and the weight is 600, because §2.2 deleted 700
                    into 600 and the CSS module's own 700 predates that ruling. */
-                className="px-2 py-1.5 text-label font-semibold uppercase text-base-500"
+                className={`px-2 py-1.5 text-label font-semibold uppercase text-base-500${salesOrderLayout ? ` ${SALES_ORDER_WIDTHS[c.key]} break-words whitespace-normal leading-tight` : ""}`}
               >
                 {c.label}
               </th>
@@ -549,6 +561,16 @@ export default function GoodsMiniTable({
                 case "sku":
                   return <span className="font-medium">{line.sku}</span>;
                 case "item":
+                  if (salesOrderLayout) {
+                    return (
+                      <div className="break-words whitespace-normal leading-tight">
+                        <div className="text-sm font-medium leading-tight text-base-900">{line.item}</div>
+                        <div className="text-xs leading-tight text-gray-500">
+                          {[line.sku, line.itemDetail].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <>
                       <div className="font-medium text-base-900">{line.item}</div>
@@ -666,7 +688,7 @@ export default function GoodsMiniTable({
                 }`}
               >
                 {selection ? (
-                  <td className="px-2 py-2 text-center">
+                  <td className={salesOrderLayout ? "py-1 px-2 align-middle leading-tight text-center" : "px-2 py-2 text-center"}>
                     {line.selectable ? (
                       <input
                         type="checkbox"
@@ -683,7 +705,9 @@ export default function GoodsMiniTable({
                   <td
                     key={c.key}
                     className={
-                      c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
+                      salesOrderLayout
+                        ? `py-1 px-2 align-middle leading-tight break-words whitespace-normal${c.key === "unit" ? " tabular-nums" : ""}`
+                        : c.key === "unit" || c.key === "orderedQty" || c.key === "poNo"
                         ? "px-2 py-2 tabular-nums"
                         : "px-2 py-2"
                     }
