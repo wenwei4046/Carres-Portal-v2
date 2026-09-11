@@ -9,10 +9,14 @@
  * WhatsApp · Email.
  *
  * Persistence (option C): the first output click ISSUES the invoice through
- * POST /api/orders/:id/issue-invoice (0229 RPC — idempotent, same
- * INV-YYYY-{so} formula as the dispatch auto-issue, amount = the Balance
- * tab's goods+storage total) and the issue lands in order_history +
- * audit_log. Real e-mail SENDING needs a mail provider (not configured) —
+ * POST /api/orders/:id/issue-invoice (issue_order_invoice — idempotent; 0476:
+ * it issues the order's prepared draft if one exists, draws a governed
+ * INV-DDMMYY-NNNN number the same way the dispatch auto-issue does, and posts
+ * the Sales Invoice to the ledger; amount = the Balance tab's goods+storage
+ * total). The number is drawn, never predicted, so the preview reads `Draft`
+ * until the issue answers. The issue lands in order_history + audit_log. A
+ * ledger refusal comes back as a 422 with the ledger's own sentence.
+ * Real e-mail SENDING needs a mail provider (not configured) —
  * the Email output opens a prefilled mailto: draft; attach the saved PDF.
  */
 import { useEffect, useMemo, useState } from "react";
@@ -34,11 +38,6 @@ type IssueInvoiceResponse = {
   amount: number;
   already_issued: boolean;
 };
-
-/** The deterministic on-demand number — MUST match the 0229 RPC (and 0098). */
-function predictedInvoiceNo(so: number): string {
-  return `INV-${new Date().getFullYear()}-${String(so).padStart(6, "0")}`;
-}
 
 export default function GenerateInvoiceOverlay({
   orderId,
@@ -84,7 +83,9 @@ export default function GenerateInvoiceOverlay({
   const imported = !hasLineTotal;
   const [issued, setIssued] = useState<IssueInvoiceResponse | null>(null);
   const [issuing, setIssuing] = useState(false);
-  const effectiveNo = issued?.invoice_no ?? invoiceNo ?? predictedInvoiceNo(so);
+  // 0476 — numbers are drawn at issue (random, governed), so there is nothing
+  // to predict: before the issue the invoice is a Draft.
+  const effectiveNo = issued?.invoice_no ?? invoiceNo ?? null;
   const isIssued = !!(issued?.invoice_no ?? invoiceNo);
 
   // ── The same charge merge the Balance tab renders (same-SKU lines fold). ──
@@ -150,7 +151,7 @@ export default function GenerateInvoiceOverlay({
         : [];
     return {
       doc_title: imported ? "PAYMENT REQUEST" : undefined,
-      invoice_no: imported ? `SO-${so}` : effectiveNo,
+      invoice_no: imported ? `SO-${so}` : (effectiveNo ?? "DRAFT"),
       issue_date: (issued?.issued_at ?? new Date().toISOString()).slice(0, 10),
       order_id: orderId,
       order_code: `SO-${so}`,
@@ -313,8 +314,7 @@ export default function GenerateInvoiceOverlay({
             {imported ? "Payment request" : "Generate invoice"}
           </span>
           <span className="font-mono text-meta text-base-500">
-            {imported ? `SO-${so} · statement` : effectiveNo}
-            {!imported && !isIssued && " · draft"}
+            {imported ? `SO-${so} · statement` : (effectiveNo ?? "Draft")}
           </span>
           <button
             type="button"

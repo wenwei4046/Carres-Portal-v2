@@ -1201,6 +1201,29 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
       // on its way → neither
       { id: "u5", sku: "SONIC-S", qty: 9, status: "incoming", condition: "new", needs_repair: false },
     ];
+    /* P10's offer now reads the AUTHORITATIVE register view (0366 · 0371 ·
+       0453) rather than re-deciding availability over the base table. The
+       fixture derives it from the SAME rows through `unit_availability`'s own
+       rule, so the mock cannot answer something the database would not. */
+    const registerView = stock.map((r) => ({
+      ...r,
+      unit_code: `U1-000-00${String(r.id).slice(1)}`,
+      warehouse_id: WH,
+      site_name: "Carres Klang",
+      holder_name: null,
+      ownership: "carres_owned",
+      supplier: null,
+      identity_scope: "unit",
+      date_in: null,
+      availability:
+        r.status === "free" && !r.needs_repair && r.condition !== "damaged"
+          ? "available"
+          : r.status === "reserved"
+            ? "reserved"
+            : r.status === "incoming"
+              ? "incoming"
+              : "not_available",
+    }));
     return {
       from: vi.fn((table: string) => {
         const rows =
@@ -1223,13 +1246,18 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
                   ? [{ id: WH, name: "Carres Klang", kind: "own" }]
                   : table === "ops_stock_items"
                     ? stock
-                    : [];
+                    : table === "stock_unit_register_v"
+                      ? registerView
+                      : [];
         const q: Record<string, unknown> = {};
         const chain = () => q;
         // Every narrowing the route applies, honoured so the shaped rows are
         // what the route would really have seen.
         q.select = vi.fn(chain);
         q.eq = vi.fn((col: string, val: unknown) => {
+          if (table === "stock_unit_register_v" && col === "availability") {
+            (q as { _rows: unknown[] })._rows = registerView.filter((r) => r.availability === val);
+          }
           if (table === "ops_stock_items" && col === "status") {
             (q as { _rows: unknown[] })._rows = stock.filter((r) => r.status === val);
           }
@@ -1252,9 +1280,10 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
         q.order = vi.fn(chain);
         q.then = (resolve: (v: unknown) => unknown) =>
           resolve({
-            data: table === "ops_stock_items"
-              ? ((q as { _rows?: unknown[] })._rows ?? stock)
-              : rows,
+            data:
+              table === "ops_stock_items" || table === "stock_unit_register_v"
+                ? ((q as { _rows?: unknown[] })._rows ?? rows)
+                : rows,
             error: null,
           });
         return q;
@@ -1320,7 +1349,13 @@ describe("GET …/to-order/demand/pick-items — the picker's own read (P15)", (
     const c = client();
     const realFrom = c.from;
     c.from = vi.fn((table: string) => {
-      if (table === "ops_stock_items") throw new Error("register down");
+      /* THE REGISTER IS BOTH ITS TABLE AND ITS AUTHORITATIVE VIEW. P10's
+         offer reads `stock_unit_register_v` (0366 · 0371 · 0453) and the
+         On Hand / Reserved counts read the base table, so "unreachable"
+         means neither answers — otherwise this test would prove nothing. */
+      if (table === "ops_stock_items" || table === "stock_unit_register_v") {
+        throw new Error("register down");
+      }
       return (realFrom as (t: string) => unknown)(table);
     }) as never;
     const { res, body } = await pick(c);

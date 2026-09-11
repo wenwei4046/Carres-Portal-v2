@@ -2798,6 +2798,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
   it.each([false, true])("reads incoming IDs from an exclusive source line, never a shared line (shared=%s)", async (shared) => {
     const orderId = "00000000-0000-0000-0000-000000000a01";
     const source = { po_line_id: "pol-1", order_id: orderId, order_line_id: "line-1" };
+    const secondSource = { ...source, po_line_id: "pol-2" };
     const from = vi.fn((table: string) => ({
       select: vi.fn((columns: string) => {
         let data: unknown = [];
@@ -2807,8 +2808,12 @@ describe("GET /api/operation/orders/:id/expansion", () => {
           { id: "line-2", sku: "H1401F-K", qty: 1 },
         ];
         if (table === "po_line_sources") data = columns.includes("order_id") && shared
-          ? [source, { ...source, order_id: "other-order", order_line_id: "other-line" }] : [source];
-        if (table === "ops_stock_items" && columns.includes("po_line_id")) data = [{ unit_code: "U1-000-070", po_line_id: "pol-1" }];
+          ? [source, secondSource, ...[source, secondSource].map((s) => ({ ...s, order_id: "other-order", order_line_id: "other-line" }))] : [source, secondSource];
+        if (table === "ops_stock_items" && !columns.includes("sku")) data = [
+          { unit_code: "U1-000-071", po_line_id: "pol-2" },
+          { unit_code: "U1-000-070", po_line_id: "pol-1" },
+        ];
+        if (table === "purchase_order_lines") data = [{ id: "pol-1", po_id: "PO-1" }, { id: "pol-2", po_id: "PO-2" }];
         const chain: Record<string, unknown> = {};
         for (const method of ["eq", "in", "or"]) chain[method] = vi.fn(() => chain);
         chain.maybeSingle = vi.fn().mockResolvedValue({ data, error: null });
@@ -2822,8 +2827,9 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       headers: { Authorization: `Bearer ${jwt}` },
     }), env);
     expect(res.status).toBe(200);
-    const body = await res.json() as { lines: Array<{ unitIds: string[] }>; place: unknown[] };
-    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070"]);
+    const body = await res.json() as { lines: Array<{ unitIds: string[] }>; place: unknown[]; unitCoverage: Record<string, string> };
+    expect(body.lines[0].unitIds).toEqual(shared ? [] : ["U1-000-070", "U1-000-071"]);
+    expect(body.unitCoverage).toEqual(shared ? {} : { "U1-000-070": "PO-1", "U1-000-071": "PO-2" });
     expect(body.lines[1].unitIds).toEqual([]);
     // Incoming goods are not reported as physical allocated stock for Delivery.
     expect(body.place).toEqual([]);
@@ -2870,6 +2876,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       defaultDeliverTo: "Carres Klang",
+      unitCoverage: {},
       /* WHERE each Unit is and WHO has it — the SAME Units the lines already
          name, resolved to Stock's own names. Delivery Work reads this block;
          the Sales Orders register ignores it. */

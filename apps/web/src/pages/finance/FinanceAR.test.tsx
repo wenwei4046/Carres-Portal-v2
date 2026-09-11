@@ -125,7 +125,7 @@ describe("FinanceAR page", () => {
     });
   });
 
-  it("settled row drawer renders Issue invoice as enabled when status=delivered + outstanding=0", async () => {
+  it("a settled row's drawer has no Issue invoice door — the order's Generate invoice is the one door (0476)", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("ar-aging")) return AR_PAYLOAD;
       if (url.includes("payments?orderId=")) return [];
@@ -147,9 +147,8 @@ describe("FinanceAR page", () => {
     fireEvent.click(viewBtns[1]);
 
     await waitFor(() => {
-      const issueBtn = screen.getByRole("button", { name: /Issue invoice/i });
-      expect(issueBtn).toBeInTheDocument();
-      expect(issueBtn).not.toBeDisabled();
+      expect(screen.getByText("Payment history")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: /Issue invoice/i })).not.toBeInTheDocument();
   });
 });

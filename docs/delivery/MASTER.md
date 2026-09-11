@@ -440,17 +440,21 @@ The governed entry rule below still gates the population (no cancelled orders, n
 no delivery, no row missing its minimum facts). Calendar continues to show only rows with a
 confirmed date and never places undated work into date columns.
 
-**THE RAIL'S FULL-MONTH CALENDAR (owner correction 2026-09-06).** The rail's first, FIXED
-region is the complete current month — never a one-week strip, never the Portal sidebar:
-month arrows move exactly one month; the selected date wears the governed blue selected
+**THE RAIL'S TWO-MONTH CALENDAR (owner correction 2026-09-06, extended to two months by
+the owner ruling of 2026-09-10 — the single-month spelling is retired).** The rail's first,
+FIXED region is **the complete current month above the complete next month** — never a
+one-week strip, never the Portal sidebar. **ONE pair of arrows moves BOTH months by exactly
+one month**, so the pair always reads as *this month and the one after it*; there is no second
+arrow pair and no per-month navigation. The selected date wears the governed blue selected
 state; today stays distinguishable from the selection; Sundays — the non-operating day —
 stay visible in the governed muted treatment and take no click; a date holding confirmed
 deliveries carries a dot mark (shape, never colour alone); the arithmetic is real and
 locale-aware, hard-coded to no month. It renders the ONE calendar primitive the kit already
-pins (`react-day-picker`, the DatePicker's own exported skin). The filter groups scroll
-independently BELOW it; scrolling them never removes the month from view. **Clicking a date opens
-that date's Day view in the right workspace** and clears the selected work queue. Clicking a day
-in the right-side Month view does the same.
+pins (`react-day-picker`, the DatePicker's own exported skin) — two months is that
+primitive's own `numberOfMonths`, never a second calendar. The filter groups scroll
+independently BELOW it; scrolling them never removes the months from view. **Clicking a date
+opens that date's Day view in the right workspace** and clears the selected work queue.
+Clicking a day in the right-side Month view does the same.
 
 A work queue (`All delivery work` · `No logistics picked` · `No confirmed date` · `Overdue` ·
 `Failed Delivery` · `Upload delivery proof`), a STATE row, a LOGISTICS PARTNER row or a DELIVERY

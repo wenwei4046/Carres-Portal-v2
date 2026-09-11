@@ -143,6 +143,22 @@ Sales Order owns choosing, binding, changing and releasing the exact promised Un
 eligibility and reflects the result. Warehouse may report a problem but cannot silently release or
 substitute a reserved Unit.
 
+**A RESERVATION NAMES THE ITEM LINE, NOT JUST THE ORDER — BUILT AND PRODUCTION-VERIFIED
+2026-09-10, migration 0471.** `ops_stock_items.reserved_ref` says which Sales Order a Unit is
+committed to; `ops_stock_items.reserved_order_line_id` says which of that order's ITEM LINES it
+answers. Both are needed: a Sales Order may carry two item lines of one SKU, and three do today.
+The binding is a column on the Unit row rather than a second table, because the Unit row already is
+the reservation — so release and reassignment clear it in the same write and the customer's
+requirement returns to Purchasing by itself. It survives the sale, so a delivered requirement never
+returns as something to buy. Both register views expose it.
+
+`ops_stock_pool_draw` is still the one reserve door and now validates the binding in SQL on the
+locked row: the line belongs to that Sales Order, the goods match by `stock_match_key`, the Unit is
+an exact Unit and never a counted row (§3 · 0368), it is `available` by `unit_availability`, and the
+line still has a remaining requirement of ordered quantity less bound Ready Stock less
+non-cancelled purchase-order lineage. There is no override. A caller that names no line has one
+RESOLVED — a single candidate, or a refusal by name; the door never picks out of several.
+
 Ready stock contains only exact Units satisfying every eligibility rule; every total drills to IDs.
 A customer shortage separates available Units from remaining demand: Warehouse receives dated
 preparation work for available Units, Purchasing receives dated arrival work for the missing demand,

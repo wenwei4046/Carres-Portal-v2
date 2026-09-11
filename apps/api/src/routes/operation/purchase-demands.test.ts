@@ -545,6 +545,23 @@ describe("the derived states — blockers and order timing", () => {
     });
   });
 
+  /* 0477 — a catalog slot pointed at Finance's other creditor (a landlord) has
+     no supplier Purchasing may buy from. It reads as `Supplier not assigned`,
+     is never proposed, and its kind never reaches the wire enum that the SO
+     Batch page parses. */
+  it("a slot on Finance's other creditor reads as `Supplier not assigned`, and the wire still parses", async () => {
+    const t = TABLES();
+    (t.suppliers.data as Record<string, unknown>[])[1]!.kind = "other_creditor";
+    const { res } = await getDemands(t as unknown as Tbl);
+    expect(res.status).toBe(200);
+    const parsed = (await import("@carres/shared")).soBatchPurchaseResponseSchema.parse(
+      await res.json(),
+    );
+    const onLandlord = bySku(parsed.rows, "H1401S-K");
+    expect(onLandlord).toMatchObject({ state: "no_supplier", supplierId: null, supplier: null });
+    expect(parsed.rows.some((r) => r.supplierId === OHANA)).toBe(false);
+  });
+
   it("a dateless Sales Order stays visible and is not ready to buy", async () => {
     const { rows } = await rowsOf();
     const tbd = rows.find((r) => r.so === 1204);

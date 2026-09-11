@@ -274,3 +274,84 @@ export function FilterRailRow({
     </button>
   );
 }
+
+/**
+ * ── THE COMPACT FACT DROPDOWN — owner ruling 2026-09-11 ─────────────────────
+ *
+ * A rail SECTION whose facts are a long, open-ended list collapses into one
+ * control instead of printing every value as a row.
+ *
+ * ⭐ WHY ONLY SOME SECTIONS. `WORK TO DO` and `ORDER TIMING` are the same
+ * five and three rows every day, they are what an operator scans first thing
+ * in the morning, and their counts are the point — those stay visible rows.
+ * `PRODUCT`, `SUPPLIER` and Manual Purchase's `PURCHASE PURPOSE` are FACT
+ * lists: the supplier list grows with the business, and on a rail 240px wide
+ * a dozen supplier names push the timing rows — the ones that say what to do
+ * today — below the fold. A fact list answers *narrow to this one*, which a
+ * select answers in one control and one line.
+ *
+ * ⛔ WHAT IT IS NOT. It is not a second filter model: it writes the same
+ * single-slot section value the rows wrote, so sections still combine with
+ * AND and the `All …` option still clears only its own section. It is not a
+ * multi-select, and it never grows a checkbox — the rail is navigation, not
+ * batch selection.
+ *
+ * The ACTIVE treatment is the rail's own: a chosen value keeps the blue
+ * left-edge marker and the blue field, so a narrowed section is as visible
+ * as a selected row was. A count rides in the option text (`Ohana · 4`),
+ * because the reason the counts existed — knowing a name is worth clicking
+ * before you click it — does not go away just because the rows became
+ * options.
+ */
+export function FilterRailSelect({
+  label,
+  value,
+  options,
+  onChange,
+  testId,
+  allLabel,
+}: {
+  /** The accessible name — the section heading is visual, not programmatic. */
+  label: string;
+  /** `null` = the section is not narrowed (the `All …` option). */
+  value: string | null;
+  options: ReadonlyArray<{ value: string; label: string; count?: number }>;
+  onChange: (next: string | null) => void;
+  testId: string;
+  /** `All suppliers` — the section's own clearing word, never invented here. */
+  allLabel: string;
+}) {
+  const active = value != null;
+  return (
+    <div className="relative">
+      {active && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1 bottom-1 z-10 w-0.5 bg-kit-blue-9"
+        />
+      )}
+      <select
+        aria-label={label}
+        data-testid={testId}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+        className={[
+          /* The rail row's own geometry: 36px minimum, the same rounded
+             control, the same body type — so a section that collapsed does
+             not change the rail's rhythm. */
+          "min-h-[36px] w-full rounded-control border px-2 py-[9px] text-body",
+          active
+            ? "border-kit-blue-9 bg-kit-blue-3 font-semibold text-kit-slate-12"
+            : "border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3",
+        ].join(" ")}
+      >
+        <option value="">{allLabel}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.count == null ? o.label : `${o.label} · ${o.count}`}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}

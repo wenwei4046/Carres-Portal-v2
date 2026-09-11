@@ -363,26 +363,37 @@ describe("the shape", () => {
     expect(within(rail).queryByTestId("delivery-monitor-logistics-none")).toBeNull();
   });
 
-  it("the rail carries the COMPLETE month calendar fixed above the scrolling filters", () => {
+  it("the rail carries TWO consecutive months fixed above the scrolling filters, one arrow pair moving both", () => {
     wrap(<OperationDelivery />);
     const calendar = screen.getByTestId("delivery-monitor-month-calendar");
+    /* Current month above next month — owner ruling 2026-09-10. */
     expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/October 2026/i)).toBeTruthy();
+    /* ONE pair of arrows, and it steps BOTH months by exactly one month. */
+    expect(within(calendar).getAllByRole("button", { name: "Previous month" })).toHaveLength(1);
     fireEvent.click(within(calendar).getByRole("button", { name: "Previous month" }));
     expect(within(calendar).getByText(/August 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).queryByText(/October 2026/i)).toBeNull();
     fireEvent.click(within(calendar).getByRole("button", { name: "Next month" }));
     expect(within(calendar).getByText(/September 2026/i)).toBeTruthy();
+    expect(within(calendar).getByText(/October 2026/i)).toBeTruthy();
     const rail = screen.getByTestId("delivery-monitor-rail");
     const scrollRegion = rail.querySelector(".overflow-y-auto");
     expect(scrollRegion).toBeTruthy();
     expect(scrollRegion!.contains(calendar)).toBe(false);
-    const sunday = within(calendar).getByText("6").closest("button");
+    /* Sunday stays visible and unclickable — scoped to the FIRST month, since
+       both months now carry a "6". */
+    const september = within(calendar).getAllByRole("grid")[0];
+    const sunday = within(september).getByText("6").closest("button");
     expect(sunday?.disabled).toBe(true);
   });
 
   it("clicking a rail date opens that date's DAY view and clears the picked queue", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
     const calendar = screen.getByTestId("delivery-monitor-month-calendar");
-    fireEvent.click(within(calendar).getByText("15"));
+    const september = within(calendar).getAllByRole("grid")[0];
+    fireEvent.click(within(september).getByText("15"));
     const probe = screen.getByTestId("location-probe").textContent ?? "";
     expect(probe).toContain("date=2026-09-15");
     expect(probe).toContain("view=day");

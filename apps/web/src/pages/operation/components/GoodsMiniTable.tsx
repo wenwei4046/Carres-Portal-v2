@@ -78,18 +78,24 @@ const CHILD_COLUMNS = [
 ] as const;
 
 /**
- * ⭐ `Covered by` — THE BUYING PAGE'S OWN COLUMN (Card 02 follow-up, 2026-08-24).
+ * ⭐ `Covered by` IS RETIRED — owner correction 2026-09-11.
  *
- * Optional, exactly like `selection` and for the same reason (law ④): a page
- * that BUYS has to say what ALREADY covers a line, and a truth register does
- * not. Sales Orders and Delivery pass neither and render byte-identically to
- * what they rendered before.
+ * One heading answered three different questions at once: units already drawn
+ * from the shelf, purchase orders already carrying the quantity, and `Not
+ * ordered yet`. An operator reading `PO-20260820-4827` under *Covered by* could
+ * not tell how MUCH of the line that document covers, and a line that was half
+ * bought looked exactly like a line that was wholly bought.
  *
- * It sits beside `Unit ID` because the two answer one question — *what exists
- * for this line already* — an allocated Unit, or an open purchase order. It is
- * a fixed column and it is not last, because law ① keeps `Item` last.
+ * The facts did not go away; they went to explicit places. `On PO` names the
+ * documents and the quantity each one carries, `To buy` states the remainder
+ * this page can still act on, and `Qty` stays the customer's original order —
+ * three numbers that add up in front of the operator instead of one word that
+ * hid the arithmetic. Ready-Stock coverage is stated by the `Ready Stock`
+ * section below, which owns that fact and can name the exact Units.
  */
-const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } as const;
+const FROM_STOCK_COLUMN = { key: "fromStock", label: "Ready Stock", width: 96 } as const;
+const ON_PO_COLUMN = { key: "onPo", label: "On PO", width: 176 } as const;
+const TO_BUY_COLUMN = { key: "toBuy", label: "To buy", width: 74 } as const;
 
 /**
  * ⭐ `Supplier` · `PO Delivery Date` — CARD 02-B's exact-mapping columns
@@ -103,6 +109,20 @@ const COVERED_BY_COLUMN = { key: "coveredBy", label: "Covered by", width: 168 } 
 const SUPPLIER_COLUMN = { key: "supplier", label: "Supplier", width: 140 } as const;
 const PO_DATE_COLUMN = { key: "poDeliveryDate", label: "PO Delivery Date", width: 150 } as const;
 
+/**
+ * ⭐ `PO No` — MANUAL PURCHASE'S OWN COLUMN (settled design, owner ruling
+ * 2026-09-11). Optional, exactly like the three above and for law ④'s reason.
+ *
+ * SO Batch answers *what covers this item line* with `Covered by`, because a
+ * customer line can be covered by Ready Stock OR a purchase order and the
+ * operator needs both in one cell. A Manual Purchase line has no Ready Stock
+ * coverage to state — an internal replenishment is not answered by the shelf
+ * — so the honest column is the DOCUMENT, and the owner ruled `Covered by`
+ * off this page for exactly that reason. It sits directly before
+ * `PO Delivery Date`: the two are one document's facts, read together.
+ */
+const PO_NO_COLUMN = { key: "poNo", label: "PO No", width: 168 } as const;
+
 /** ☑ is chrome, so it is narrow and it is not one of the six ruled columns. */
 const SELECT_WIDTH = 36;
 
@@ -111,7 +131,6 @@ const SELECT_WIDTH = 36;
  * scrolls sideways rather than crushing a column — the portal's standing
  * answer everywhere else (Purchase Orders, To Order), never truncation.
  */
-const FIXED_TOTAL = CHILD_COLUMNS.reduce((n, c) => n + (c.width ?? 0), 0);
 const ITEM_FLOOR = 220;
 
 /** One goods line, already resolved to strings by the page that owns the data. */
@@ -133,15 +152,44 @@ export interface GoodsMiniLine {
    * it the cell. Absent = the strings render exactly as before.
    */
   deliverToNode?: ReactNode;
-  /** One printed line each. Read only when the table is asked for the column. */
-  coveredBy?: string[];
-  /** The governed word for a line nothing covers yet. */
-  coveredByAbsence?: string;
+  /**
+   * ⭐ THE EVIDENCE ROWS — read-only, and they are NOT demand (2026-09-11).
+   *
+   * Each exact Unit this line already has, with the purchase order it came in
+   * on. They render as their own rows UNDER the demand row, carrying no
+   * checkbox and no arrangement editor, because they are records of what has
+   * already happened. The defect this replaces: the table expanded one line
+   * into N Unit rows that each carried the SAME line key, selection state and
+   * `deliverToNode`, so one ticked demand drew N ticked boxes and N copies of
+   * the Deliver To / Split editor beside historical records — the toolbar said
+   * `1 selected` while the screen showed four.
+   */
+  units?: Array<{
+    unitId: string;
+    /** The document this Unit came in on, when the read can evidence one. */
+    poNo?: string | null;
+    /** Where that document sent it. Never the plan for the remaining demand. */
+    deliverTo?: string | null;
+    supplier?: string | null;
+    poDeliveryDate?: string | null;
+  }>;
+  /** Units of this line already answered off the shelf. Read with `showFromStock`. */
+  fromStock?: number | null;
+  /** The remainder this page can still buy on this line. Read with `showToBuy`. */
+  toBuy?: number | null;
+  /** The documents already carrying part of this line, and how much each holds. */
+  poAllocations?: Array<{ poId: string; qty: number }>;
+  /** The governed word for a line no document carries yet. */
+  onPoAbsence?: string;
   /** Card 02-B — read only when the table is asked for the column. */
   supplier?: string;
   supplierAbsence?: string;
   poDeliveryDate?: string;
   poDeliveryDateAbsence?: string;
+  /** The purchase orders THIS row's quantity went onto. Read only when the
+   *  table is asked for `PO No`; empty prints the absence below. */
+  poNos?: string[];
+  poNoAbsence?: string;
   sku: string;
   qty: number;
   item: string;
@@ -236,19 +284,43 @@ export default function GoodsMiniTable({
   label,
   lines,
   selection,
-  showCoveredBy = false,
+  showFromStock = false,
+  showOnPo = false,
+  showToBuy = false,
+  identityFirst = false,
   showSupplier = false,
   showPoDeliveryDate = false,
-  onCoveredByClick,
-  isCoveredByLinkable,
+  showPoNo = false,
+  showUnitId = true,
+  onPoClick,
 }: {
   /** The table's accessible name — `Goods on SO-1303`. */
   label: string;
   lines: GoodsMiniLine[];
   /** Present only on a page that buys from these lines. */
   selection?: GoodsMiniTableSelection;
-  /** A page that BUYS asks for `Covered by`; a truth register does not. */
-  showCoveredBy?: boolean;
+  /**
+   * A page that BUYS asks for `On PO` and `To buy`; a truth register does not.
+   * Together they state the arithmetic `Covered by` used to hide: what the
+   * customer ordered, what documents already carry, what is left.
+   */
+  showFromStock?: boolean;
+  showOnPo?: boolean;
+  showToBuy?: boolean;
+  /**
+   * ⭐ IDENTITY FIRST — owner correction 2026-09-11, the buying page only.
+   *
+   * `Category` and `Unit ID` led the ruled order, so the first two things an
+   * operator read about a line were the least identifying: a page of
+   * `Mattress` · `Not allocated` before any SKU. The goods themselves come
+   * first here — SKU, then the item and its configuration, then the numbers.
+   * Law ① is kept: exactly ONE column is flexible, every other width is fixed,
+   * so two expansions opened together still line up column for column. What
+   * changes is WHICH column is flexible and where it sits, not how many.
+   * Sales Orders, Delivery and Manual Purchase pass nothing and render
+   * byte-identically to what they rendered before.
+   */
+  identityFirst?: boolean;
   /**
    * ⭐ THE EXACT MAPPING IS ALSO A DOOR (YH, 2026-09-01).
    *
@@ -275,23 +347,84 @@ export default function GoodsMiniTable({
   /** Card 02-B — the exact-mapping columns the buying Register asks for. */
   showSupplier?: boolean;
   showPoDeliveryDate?: boolean;
+  /** Manual Purchase's document column — the PO each allocation went onto. */
+  showPoNo?: boolean;
+  /**
+   * ⭐ A PAGE MAY OMIT `Unit ID`, AND ONLY BECAUSE IT HAS NO SUCH FACT.
+   *
+   * Sales Orders, Delivery and SO Batch all reach a per-line Unit read, so
+   * they keep the ruled column and default to it. Manual Purchase has none:
+   * an internal purchase's goods become Units at RECEIVING, through the PO
+   * line, and no door maps a request line to them. Drawing the column anyway
+   * would print `Not allocated` on every row of every request forever — an
+   * absence that states nothing, in the width of a real answer. The honest
+   * move is to omit a column this page cannot answer, and to say so in the
+   * MASTER rather than fake a read.
+   */
+  showUnitId?: boolean;
+  /** Present only on a page whose `PO No` cell should navigate. */
+  onPoClick?: (poId: string) => void;
 }) {
-  /* The six ruled columns, plus the buying page's own — `Covered by` after
-     `Unit ID`, the mapping columns before `Item`, never after it (law ①). */
+  /**
+   * ⭐ ONE REGISTRY, TWO READING ORDERS — and every width still fixed but one.
+   *
+   * The ruled order (law ①) is what Sales Orders, Delivery and Manual Purchase
+   * draw, unchanged. `identityFirst` is the buying page's order, where the
+   * goods identify themselves before anything is said about them. Both are
+   * declared as lists of keys rather than assembled by splicing an array at
+   * computed offsets, which is how `Supplier` and `PO No` ended up depending
+   * on whether `PO Delivery Date` happened to be asked for.
+   */
   type Column = { key: string; label: string; width: number | null };
-  const columns: Column[] = showCoveredBy
-    ? [CHILD_COLUMNS[0], CHILD_COLUMNS[1], COVERED_BY_COLUMN, ...CHILD_COLUMNS.slice(2)]
-    : [...CHILD_COLUMNS];
-  const itemAt = columns.length - 1;
-  if (showPoDeliveryDate) columns.splice(itemAt, 0, PO_DATE_COLUMN);
-  if (showSupplier) columns.splice(itemAt, 0, SUPPLIER_COLUMN);
+  const REGISTRY: Record<string, Column> = {
+    category: { ...CHILD_COLUMNS[0] },
+    unit: { ...CHILD_COLUMNS[1] },
+    deliverTo: { ...CHILD_COLUMNS[2] },
+    sku: { ...CHILD_COLUMNS[3] },
+    qty: { ...CHILD_COLUMNS[4] },
+    item: { ...CHILD_COLUMNS[5] },
+    supplier: { ...SUPPLIER_COLUMN },
+    poNo: { ...PO_NO_COLUMN },
+    poDeliveryDate: { ...PO_DATE_COLUMN },
+    fromStock: { ...FROM_STOCK_COLUMN },
+    onPo: { ...ON_PO_COLUMN },
+    toBuy: { ...TO_BUY_COLUMN },
+  };
+  const order = identityFirst
+    ? ["sku", "item", "qty", "fromStock", "onPo", "toBuy", "deliverTo", "unit", "supplier", "poNo", "poDeliveryDate", "category"]
+    : ["category", "unit", "onPo", "deliverTo", "sku", "qty", "fromStock", "toBuy", "supplier", "poNo", "poDeliveryDate", "item"];
+  const asked: Record<string, boolean> = {
+    unit: showUnitId,
+    supplier: showSupplier,
+    poNo: showPoNo,
+    poDeliveryDate: showPoDeliveryDate,
+    fromStock: showFromStock,
+    onPo: showOnPo,
+    toBuy: showToBuy,
+  };
+  const columns: Column[] = order
+    .filter((key) => asked[key] ?? true)
+    .map((key) => REGISTRY[key]!);
+  /** A PO number is a DOOR only where the page can open one. */
+  const poLink = (poId: string) =>
+    onPoClick ? (
+      <button
+        type="button"
+        className="text-kit-blue-11 underline-offset-2 hover:underline"
+        data-testid={`goods-po-no-${poId}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPoClick(poId);
+        }}
+      >
+        {poId}
+      </button>
+    ) : (
+      <span>{poId}</span>
+    );
+  /* Below this the box scrolls sideways rather than crushing a column. */
   const minWidth =
-    FIXED_TOTAL +
-    ITEM_FLOOR +
-    (selection ? SELECT_WIDTH : 0) +
-    (showCoveredBy ? COVERED_BY_COLUMN.width : 0) +
-    (showSupplier ? SUPPLIER_COLUMN.width : 0) +
-    (showPoDeliveryDate ? PO_DATE_COLUMN.width : 0);
+    columns.reduce((n, c) => n + (c.width ?? ITEM_FLOOR), 0) + (selection ? SELECT_WIDTH : 0);
   return (
     /* ⭐ A BOX, NOT A CONTINUATION OF THE SHEET — owner correction 2026-08-15.
        The first shipped version fused it into the grid: two rules and nothing
@@ -346,107 +479,191 @@ export default function GoodsMiniTable({
         </thead>
         {/* LEVEL TWO — every value, 13px. */}
         <tbody className="divide-y divide-base-200 text-body">
-          {lines.map((line) => (
-            <tr
-              key={line.key}
-              data-testid={line.testId}
-              className="divide-x divide-base-200 align-top"
-            >
-              {selection ? (
-                <td className="px-2 py-2 text-center">
-                  {line.selectable ? (
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${line.item}`}
-                      checked={selection.selectedKeys.has(line.key)}
-                      onChange={() => selection.onToggle(line.key)}
-                    />
+          {lines.flatMap((line) => {
+            /**
+             * ⭐ ONE DEMAND ROW, THEN ITS EVIDENCE — the 2026-09-11 correction.
+             *
+             * The demand row carries the checkbox, the arrangement editor and
+             * the customer's own quantity. Every row after it is a RECORD: one
+             * exact Unit, the document it came in on, where that document sent
+             * it. A record cannot be bought again, so it carries no control at
+             * all — which is precisely what the previous version got wrong.
+             */
+            const cell = (
+              key: string,
+              unit: NonNullable<GoodsMiniLine["units"]>[number] | null,
+            ) => {
+              const evidence = unit != null;
+              switch (key) {
+                case "category":
+                  return evidence ? null : line.category;
+                case "sku":
+                  return evidence ? (
+                    /* The record belongs to the line above it and says so
+                       without repeating its identity. */
+                    <Absence>↳</Absence>
                   ) : (
+                    <span className="font-medium">{line.sku}</span>
+                  );
+                case "item":
+                  return evidence ? null : (
+                    <>
+                      <div className="font-medium text-base-900">{line.item}</div>
+                      {line.itemDetail ? (
+                        <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
+                      ) : null}
+                    </>
+                  );
+                case "qty":
+                  return <span className="tabular-nums">{evidence ? 1 : line.qty}</span>;
+                case "fromStock":
+                  /* The shelf answered part of this line — a fact of the LINE,
+                     never of one Unit record under it. */
+                  return evidence || !line.fromStock ? (
                     <Absence>—</Absence>
-                  )}
-                </td>
-              ) : null}
-              {/* ONE ink for every value — and ONE FACE (Jess, 2026-08-27:
-                  "why all the font type different"). `font-mono` fell back to
-                  the browser's monospace stack, so Unit ID, PO and SKU wore a
-                  different typeface than the row they sit in. Carres has no
-                  mono face — the register engine itself aliases --font-mono
-                  to Inter — so an identifier is plain body text here too. */}
-              <td className="px-2 py-2">{line.category}</td>
-              <td className="px-2 py-2">
-                {line.unitIds.length ? (
-                  line.unitIds.map((id) => <div key={id}>{id}</div>)
-                ) : (
-                  <Absence>{line.unitAbsence}</Absence>
-                )}
-              </td>
-              {showCoveredBy ? (
-                <td className="px-2 py-2">
-                  {line.coveredBy?.length ? (
-                    line.coveredBy.map((po) =>
-                      /* `Ready Stock` and anything else that is not a
-                         document stays text — only a real PO number is a
-                         door, and only the page knows which is which. */
-                      onCoveredByClick && (isCoveredByLinkable?.(po) ?? false) ? (
-                        <div key={po}>
-                          <button
-                            type="button"
-                            className="font-mono text-kit-blue-11 underline-offset-2 hover:underline"
-                            data-testid={`goods-covered-by-${po}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCoveredByClick(po);
-                            }}
-                          >
-                            {po}
-                          </button>
-                        </div>
-                      ) : (
-                        <div key={po}>{po}</div>
-                      ),
-                    )
                   ) : (
-                    <Absence>{line.coveredByAbsence ?? "—"}</Absence>
-                  )}
-                </td>
-              ) : null}
-              <td className="px-2 py-2">
-                {line.deliverToNode != null ? (
-                  line.deliverToNode
-                ) : line.deliverTo.length ? (
-                  line.deliverTo.map((d) => <div key={d}>{d}</div>)
-                ) : (
-                  <Absence>{line.deliverToAbsence}</Absence>
-                )}
-              </td>
-              <td className="px-2 py-2">{line.sku}</td>
-              <td className="px-2 py-2 tabular-nums">{line.qty}</td>
-              {showSupplier ? (
-                <td className="px-2 py-2">
-                  {line.supplier ? (
-                    line.supplier
+                    <span className="tabular-nums">{line.fromStock}</span>
+                  );
+                case "toBuy":
+                  /* The remainder is the DEMAND's, never a record's. */
+                  return evidence || line.toBuy == null || line.toBuy <= 0 ? (
+                    <Absence>—</Absence>
                   ) : (
-                    <Absence>{line.supplierAbsence ?? "—"}</Absence>
-                  )}
-                </td>
-              ) : null}
-              {showPoDeliveryDate ? (
-                <td className="px-2 py-2">
-                  {line.poDeliveryDate ? (
-                    line.poDeliveryDate
+                    <span className="tabular-nums font-medium">{line.toBuy}</span>
+                  );
+                case "onPo":
+                  if (evidence) {
+                    return unit.poNo ? (
+                      poLink(unit.poNo)
+                    ) : (
+                      <Absence>Not recorded</Absence>
+                    );
+                  }
+                  if (!line.poAllocations?.length) {
+                    return <Absence>{line.onPoAbsence ?? "—"}</Absence>;
+                  }
+                  if (line.poAllocations.length === 1) {
+                    const only = line.poAllocations[0]!;
+                    return (
+                      <div>
+                        {poLink(only.poId)}
+                        <span className="tabular-nums text-base-600">{` ×${only.qty}`}</span>
+                      </div>
+                    );
+                  }
+                  /* ⭐ SEVERAL DOCUMENTS SUMMARISE — found on the production
+                     walk, 2026-09-11. One live item line carries FOURTEEN
+                     purchase orders (the historical duplicate-PO shape the
+                     `already_on_po` guard now refuses), and listing them all
+                     made one cell fourteen lines tall while the row it belongs
+                     to is one. The summary is the page's own grammar — `{n}
+                     POs` — and it keeps the quantity, which is the fact the
+                     operator is actually reconciling. The exact documents are
+                     one row below, each against the Unit it brought in. */
+                  return (
+                    <span className="tabular-nums">
+                      {`${line.poAllocations.length} POs ×${line.poAllocations.reduce(
+                        (n, a) => n + a.qty,
+                        0,
+                      )}`}
+                    </span>
+                  );
+                case "deliverTo":
+                  if (evidence) {
+                    return unit.deliverTo ? unit.deliverTo : <Absence>—</Absence>;
+                  }
+                  /* THE ONE ARRANGEMENT EDITOR, on the one row that can act. */
+                  return line.deliverToNode != null ? (
+                    line.deliverToNode
+                  ) : line.deliverTo.length ? (
+                    line.deliverTo.map((d) => <div key={d}>{d}</div>)
                   ) : (
-                    <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>
-                  )}
-                </td>
-              ) : null}
-              <td className="px-2 py-2">
-                <div className="font-medium text-base-900">{line.item}</div>
-                {line.itemDetail ? (
-                  <div className="mt-0.5 text-base-600">{line.itemDetail}</div>
+                    <Absence>{line.deliverToAbsence}</Absence>
+                  );
+                case "unit":
+                  if (evidence) return unit.unitId;
+                  return line.unitIds.length ? (
+                    line.unitIds.map((id) => <div key={id}>{id}</div>)
+                  ) : (
+                    <Absence>{line.unitAbsence}</Absence>
+                  );
+                case "supplier": {
+                  const value = evidence ? unit.supplier : line.supplier;
+                  return value ? value : <Absence>{line.supplierAbsence ?? "—"}</Absence>;
+                }
+                case "poNo":
+                  if (evidence) {
+                    return unit.poNo ? poLink(unit.poNo) : <Absence>{line.poNoAbsence ?? "—"}</Absence>;
+                  }
+                  return line.poNos?.length ? (
+                    line.poNos.map((po) => <div key={po}>{poLink(po)}</div>)
+                  ) : (
+                    <Absence>{line.poNoAbsence ?? "—"}</Absence>
+                  );
+                case "poDeliveryDate": {
+                  const value = evidence ? unit.poDeliveryDate : line.poDeliveryDate;
+                  return value ? value : <Absence>{line.poDeliveryDateAbsence ?? "—"}</Absence>;
+                }
+                default:
+                  return null;
+              }
+            };
+            const row = (
+              unit: NonNullable<GoodsMiniLine["units"]>[number] | null,
+            ) => (
+              <tr
+                key={unit == null ? line.key : `${line.key}::${unit.unitId}`}
+                data-testid={
+                  unit == null ? line.testId : `${line.testId ?? line.key}-unit-${unit.unitId}`
+                }
+                data-row={unit == null ? "demand" : "evidence"}
+                /* ⭐ A RECORD READS QUIETER THAN THE DEMAND IT BELONGS TO.
+                   The tint is the table header's own grey, so the eye groups
+                   the records under the white row above them without a new
+                   colour joining the page. Reviewed on the rendered preview,
+                   2026-09-11: at `base-50/60` the two row kinds were almost
+                   the same weight and the group read as four sibling lines. */
+                className={`divide-x divide-base-200 align-top${
+                  unit != null
+                    ? " bg-kit-slate-3"
+                    : /* A ticked demand reads as selected, in the register's
+                         own selected fill — the same answer the parent row
+                         gives, so one page has one selected colour. */
+                      selection?.selectedKeys.has(line.key)
+                      ? " bg-kit-blue-3"
+                      : ""
+                }`}
+              >
+                {selection ? (
+                  <td className="px-2 py-2 text-center">
+                    {unit == null && line.selectable ? (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${line.item}`}
+                        checked={selection.selectedKeys.has(line.key)}
+                        onChange={() => selection.onToggle(line.key)}
+                      />
+                    ) : (
+                      <Absence>—</Absence>
+                    )}
+                  </td>
                 ) : null}
-              </td>
-            </tr>
-          ))}
+                {columns.map((c) => (
+                  <td
+                    key={c.key}
+                    className={
+                      c.key === "unit" || c.key === "onPo" || c.key === "poNo"
+                        ? "px-2 py-2 tabular-nums"
+                        : "px-2 py-2"
+                    }
+                  >
+                    {cell(c.key, unit)}
+                  </td>
+                ))}
+              </tr>
+            );
+            return [row(null), ...(line.units ?? []).map((u) => row(u))];
+          })}
         </tbody>
       </table>
     </div>

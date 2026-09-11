@@ -199,8 +199,8 @@ export function describeActivity(row: ActivityLike): {
     if ((type === "payment.received" || type === "payment.voided") && d?.amount != null) {
       const amount = Number(d.amount);
       // The METHOD is deliberately absent: the portal spells it two ways today
-      // (`online` prints as "Online" on the SO document and "e-wallet" in the
-      // drawer), and a timeline is not the place to pick a winner. The ledger
+      // (`online` prints as "Online" on the SO document and "Online payment" on
+      // screen), and a timeline is not the place to pick a winner. The ledger
       // row beside it states the method; reported for the copy owner.
       const bits = [
         Number.isFinite(amount) ? fmtMoney(amount) : null,

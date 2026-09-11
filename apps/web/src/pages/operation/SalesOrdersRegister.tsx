@@ -64,6 +64,7 @@ import {
 import CancelSalesOrderDialog from "./CancelSalesOrderDialog";
 import DestinationHeader from "./DestinationHeader";
 import GoodsMiniTable, { goodsCategoryOf, type GoodsMiniLine } from "./components/GoodsMiniTable";
+import styles from "./SalesOrdersRegister.module.css";
 import { lineConfigBits } from "../dealer/new-order/special-addons-picker";
 import { isRental, lineName, type MoneyState } from "./sales-order-facts";
 import {
@@ -602,12 +603,12 @@ export default function SalesOrdersRegister() {
   );
 
   const expandable = useMemo(
-    () => ({ renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
+    () => ({ flush: true, renderExpansion: (r: RegisterRow) => <ExpandedLines row={r} /> }),
     [],
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={`${styles.page} flex h-full min-h-0 flex-col`}>
       <DestinationHeader />
 
       {cancelTarget && (

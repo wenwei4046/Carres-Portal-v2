@@ -151,28 +151,26 @@ describe("the rail — latest Owner ruling 2026-08-30", () => {
     expect(W.multiple).toBe("Multiple");
   });
 
-  it("Card 02-B — the ten business column heads, in the approved order exactly", () => {
+  it("the nine business column heads, in the approved reading order exactly", () => {
     expect([
-      W.colStatus,
-      W.colProceedDate,
-      W.colPoNo,
       W.colSoNo,
       W.colCustomer,
-      W.colDeliveryLocation,
+      W.colProceedDate,
       W.colRequestedDelivery,
+      W.colDeliveryLocation,
       W.colSupplier,
       W.deliverTo,
+      W.colPoNo,
       W.colPoDeliveryDate,
     ]).toEqual([
-      "Status",
-      "Proceed Date",
-      "PO No",
       "SO No",
       "Customer",
-      "Delivery Location",
+      "Proceed Date",
       "Requested Delivery Date",
+      "Delivery Location",
       "Supplier",
       "Deliver To",
+      "PO No",
       "PO Delivery Date",
     ]);
   });

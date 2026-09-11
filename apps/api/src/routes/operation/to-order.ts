@@ -580,6 +580,9 @@ toOrderRouter.post("/take-stock", requireOperation, async (c) => {
       p_sku: null,
       p_condition: null,
       p_wh: null,
+      /* 0471 — a Ready Stock destination row names no Sales Order line; a
+         customer row has its line resolved by the draw door. */
+      p_order_line_id: null,
     });
     if (error) {
       const m = mapPgError(error);

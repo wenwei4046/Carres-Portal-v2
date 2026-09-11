@@ -20,7 +20,7 @@ type AgingFilter  = "all" | "0-30" | "31-60" | "61-90" | "90+";
  *
  * Filters live in component state; the API itself returns all rows so
  * the user can re-filter without round-trips. Drawer opens on row View
- * click; ARDrawer wires the Record-receipt + Issue-invoice mutations
+ * click; ARDrawer wires the Record-receipt mutation (0476: no Issue invoice)
  * (A1 + A2 acceptance flows).
  */
 export default function FinanceAR() {
@@ -194,7 +194,7 @@ function ARRow({ row, onView }: { row: FinanceArAgingRow; onView: () => void }) 
     >
       <span className="font-mono font-semibold">{row.invoice_no}</span>
       <span>{row.customer_name}</span>
-      <span className="text-muted-foreground">{row.dealer_name ?? "—"}</span>
+      <span className="text-muted-foreground uppercase">{row.dealer_name ?? "—"}</span>
       <span>
         <AgingPill bucket={row.aging} />
       </span>

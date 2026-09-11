@@ -144,10 +144,6 @@ import {
   type RawCreateOrderInput,
   type DealerSelf,
   type BankStatementCreateInput,
-  type FinanceInvoiceIssueInput,
-  type FinanceInvoiceVoidInput,
-  type FinancePoPayInput,
-  type FinancePoScheduleInput,
   type FinanceRecordReceiptInput,
   type FinanceTopupApproveInput,
   type ReconciliationCreateInput,
@@ -3050,6 +3046,8 @@ export interface operationOrderListRow {
 }
 
 export interface SalesOrderExpansionResponse {
+  /** Exact stock Unit -> originating PO, resolved through its PO line. */
+  unitCoverage?: Record<string, string | null>;
   defaultDeliverTo: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — WHERE each allocated Unit is and WHO has
@@ -4938,6 +4936,23 @@ export interface PurchaseRequestLineRow {
   /** Card 04 — the line's REAL PO lineage (`purchase_order_lines.demand_id`
    *  plus the demand's own po_id), never an inference. */
   po_ids?: string[];
+  /**
+   * ⭐ ONE ENTRY PER PURCHASE ORDER THIS LINE ACTUALLY WENT ONTO, carrying
+   * THAT document's own quantity and destination (settled design, owner
+   * ruling 2026-09-11: "each quantity must correspond to its actual
+   * goods/source allocation… never repeat the entire request quantity on
+   * every PO allocation").
+   *
+   * `po_ids` above is the SET of documents and says nothing about how much
+   * went onto each — which is why the expansion used to print the whole
+   * request quantity beside a comma-joined list of numbers. Empty means
+   * nothing has been issued for this line yet. Absent on an older API.
+   */
+  allocations?: Array<{
+    poId: string;
+    qty: number;
+    destinationId: string | null;
+  }>;
   /** Card 06 — the SERVER date projection (the browser performs no
    *  working-day arithmetic): the line's effective Delivery Date, its
    *  derived Order By (null is a real answer, never a guessed one), and the
@@ -4954,7 +4969,14 @@ export interface ManualPurchaseRegisterPayload {
   /** Every PO the lines' lineage names — id → the actual po_no — plus the
    *  Card 06 issuance-completion fact: whether the CURRENT version has
    *  confirmed-sent evidence (`po_sends`, 0378). */
-  pos: Array<{ id: string; po_no: string; sent?: boolean }>;
+  pos: Array<{
+    id: string;
+    po_no: string;
+    sent?: boolean;
+    /** 0428/0430 — the ORIGINAL supplier-facing date, never `eta_date`. */
+    official_delivery_date?: string | null;
+    supplier_id?: string | null;
+  }>;
   /** The linked Service Cases behind `for_service_case_id`. */
   serviceCases: Array<{ id: string; case_no: string }>;
   destinations: Array<{ id: string; name: string }>;
@@ -4968,7 +4990,8 @@ export interface ManualPurchaseRegisterPayload {
   suppliers: Array<{ id: string; name: string; kind?: string | null }>;
   users: Array<{ id: string; name: string | null }>;
   /** Card 03 §3 — who actually decides `Need approval`: the resolved
-   *  `ops_manager` duty holder(s), by name. */
+   *  `purchasing_approver` Duty holder(s) by name, falling back to
+   *  `ops_manager` only while that duty has no active holder (0474). */
   approvers: Array<{ id: string; name: string | null }>;
   /** The Settings manager gate — decides what RENDERS (money, Approve). */
   canApprove: boolean;
@@ -7442,17 +7465,22 @@ export function useAssignOrderStaff(
 // ===========================================================================
 // Balance job (migration 0184) — payment ledger + storage collect / waiver.
 // ===========================================================================
+/** The ledger as the endpoint returns it. */
+export interface OrderPaymentsResponse {
+  payments: OrderPaymentRow[];
+}
+
 /** Read the order's payment ledger (newest first). `null` id disables. */
 export function useOrderPayments(
   orderId: string | null,
-  opts?: Partial<UseQueryOptions<{ payments: OrderPaymentRow[] }>>,
+  opts?: Partial<UseQueryOptions<OrderPaymentsResponse>>,
 ) {
   return useQuery({
     queryKey: orderId
       ? qk.operation.orderPayments(orderId)
       : (["operation", "orders", "null", "payments"] as const),
     queryFn: () =>
-      apiFetch<{ payments: OrderPaymentRow[] }>(
+      apiFetch<OrderPaymentsResponse>(
         `/api/operation/orders/${orderId}/payments`,
       ),
     enabled: !!orderId,
@@ -8422,8 +8450,6 @@ export function useReassignPoWarehouseMutation(
 //   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
-//   POST  /api/finance/invoices/issue             mutation -> invoices row
-//   POST  /api/finance/invoices/:id/void          mutation -> invoices row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
 //   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
 //
@@ -8722,45 +8748,10 @@ export function useRecordReceipt(
   });
 }
 
-export function useIssueInvoice(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceIssueInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceIssueInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/invoices/issue", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // orders.invoice_no + invoiced_at set; new invoices row.
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
-      await qc.invalidateQueries({ queryKey: ["orders"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function useVoidInvoice(
-  invoiceId: string,
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinanceInvoiceVoidInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinanceInvoiceVoidInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>(`/api/finance/invoices/${invoiceId}/void`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.finance.invoices() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// 0476 — useIssueInvoice / useVoidInvoice are gone with their doors. POST
+// /api/finance/invoices/issue and /:id/void answer 410: a Sales Invoice is
+// issued from the order (Generate invoice) or at dispatch, and corrected by
+// void and replace (/api/finance/invoices/:id/void-replace).
 
 export function useCreateRefund(
   opts?: Partial<UseMutationOptions<{ refund: unknown; needsApproval: boolean }, ApiError, RefundCreateInput>>,
@@ -8803,45 +8794,9 @@ export function useRefundPay(
   });
 }
 
-export function usePoPay(
-  opts?: Partial<UseMutationOptions<FinancePaymentRow, ApiError, FinancePoPayInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<FinancePaymentRow, ApiError, FinancePoPayInput>({
-    mutationFn: (input) =>
-      apiFetch<FinancePaymentRow>("/api/finance/payments/po-pay", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status='paid' + new outbound payments row. Ripples to
-      // ap-aging, dashboard summary, payments list.
-      await qc.invalidateQueries({ queryKey: ["finance"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
-export function usePoSchedule(
-  opts?: Partial<UseMutationOptions<unknown, ApiError, FinancePoScheduleInput>>,
-) {
-  const qc = useQueryClient();
-  return useMutation<unknown, ApiError, FinancePoScheduleInput>({
-    mutationFn: (input) =>
-      apiFetch<unknown>("/api/finance/payments/po-schedule", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    ...opts,
-    onSuccess: async (...args) => {
-      // PO.pay_status flips unpaid -> scheduled. Buckets shift.
-      await qc.invalidateQueries({ queryKey: qk.finance.apAging() });
-      await qc.invalidateQueries({ queryKey: qk.finance.dashboardSummary() });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
+// usePoPay / usePoSchedule retired with 0477: the po-pay and po-schedule
+// routes answer 410 — a supplier is paid by a Payment Voucher
+// (lib/payables-queries.ts), the one door money leaves by.
 
 export function useCreateBankStatement(
   opts?: Partial<UseMutationOptions<FinanceBankStatementRow, ApiError, BankStatementCreateInput>>,

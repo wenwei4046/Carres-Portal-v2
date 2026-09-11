@@ -7,6 +7,18 @@ import InvoiceRecordPayment from "./InvoiceRecordPayment";
 const state = vi.hoisted(() => ({
   mutate: vi.fn(),
   upload: vi.fn(async () => ({ error: null })),
+  /** 0476 — the registry read. Unset = the read fails and the governed six stand in. */
+  registry: null as null | { methods: unknown[]; money_accounts: unknown[] },
+}));
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(async (url: string) => {
+    if (url.includes("/payment-settings/methods")) {
+      if (!state.registry) throw new Error("down");
+      return state.registry;
+    }
+    if (url.includes("/payment-settings/templates")) return { templates: [] };
+    throw new Error(`unexpected ${url}`);
+  }),
 }));
 vi.mock("@/lib/queries", () => ({
   qk: { finance: {
@@ -46,6 +58,34 @@ function show() {
 beforeEach(() => {
   state.mutate.mockReset();
   state.upload.mockClear();
+  state.registry = null;
+});
+
+describe("the methods are the Settings → Payment list (0476)", () => {
+  it("offers a method a manager added, by its name, and posts its key", async () => {
+    state.registry = {
+      methods: [
+        { method: "bank", label: "Bank transfer", account_code: "1120", account_name: "Bank", active: true, sort: 1 },
+        { method: "cheque", label: "Cheque", account_code: "1120", account_name: "Bank", active: false, sort: 3 },
+        { method: "probe_wallet", label: "Probe Wallet", account_code: "1130", account_name: "Card", active: true, sort: 7 },
+      ],
+      money_accounts: [],
+    };
+    show();
+    await waitFor(() => expect(screen.getByRole("option", { name: "Probe Wallet" })).toBeInTheDocument());
+    const options = Array.from(screen.getByLabelText("Payment method").querySelectorAll("option"))
+      .map((o) => o.getAttribute("value"));
+    // Active rows only, in the manager's order; Cheque is switched off.
+    expect(options).toEqual(["bank", "probe_wallet"]);
+    fireEvent.change(screen.getByLabelText("Payment method"), { target: { value: "probe_wallet" } });
+    const file = new File(["p"], "proof.jpg", { type: "image/jpeg" });
+    fireEvent.change(screen.getByLabelText("Payment proof"), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Review payment" }));
+    expect(screen.getByText("Method: Probe Wallet")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Record payment" }));
+    await waitFor(() => expect(state.mutate).toHaveBeenCalledTimes(1));
+    expect(state.mutate.mock.calls[0][0]).toMatchObject({ method: "probe_wallet" });
+  });
 });
 
 describe("Record payment (§16)", () => {

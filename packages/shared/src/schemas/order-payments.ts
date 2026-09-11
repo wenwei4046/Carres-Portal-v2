@@ -28,6 +28,49 @@ export const PAYMENT_METHODS = [
 ] as const;
 export type OrderPaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+/**
+ * 0476 — a payment method is a KEY, not a fixed word. `PAYMENT_METHODS` stays
+ * the list of words the system itself knows; the methods a manager adds in
+ * Settings → Payment → Payment methods (`payment_method_save`) are keys of the
+ * same shape. The SQL writer decides which keys are real (a system word or a
+ * registered method) and refuses one with no money account — the API only
+ * checks the shape, so a new method needs no code change.
+ */
+export const PAYMENT_METHOD_KEY_RE = /^[a-z][a-z0-9_]{1,39}$/;
+export const paymentMethodKeySchema = z
+  .string()
+  .trim()
+  .regex(PAYMENT_METHOD_KEY_RE, "choose a payment method from the list");
+/** A method as stored on a receipt: a system word or a registered key. */
+export type PaymentMethodKey = OrderPaymentMethod | (string & {});
+
+/** One row of the registry (`payment_method_registry()`). */
+export interface PaymentMethodRegistryRow {
+  method: string;
+  label: string;
+  /** The money account customer money of this method lands in; null = none yet. */
+  account_code: string | null;
+  account_name: string | null;
+  active: boolean;
+  sort: number;
+}
+
+/** One account a method may choose (`payment_method_money_accounts()`). */
+export interface PaymentMoneyAccount {
+  code: string;
+  name: string;
+}
+
+/** Add (method null), rename, (de)activate a method and choose its account —
+ *  POST /api/finance/payment-settings/method/save → payment_method_save. */
+export const paymentMethodSaveInput = z.object({
+  method: paymentMethodKeySchema.nullish(),
+  label: z.string().trim().min(1, "a payment method needs a name").max(40, "keep the name to 40 characters"),
+  accountCode: z.string().trim().regex(/^[0-9]{3,6}$/, "choose an account"),
+  active: z.boolean().default(true),
+});
+export type PaymentMethodSaveInput = z.infer<typeof paymentMethodSaveInput>;
+
 /** What the payment is for. `storage` = a storage-fee collection (proof of
  *  collection gates delivery); `deposit`/`payment` reduce the goods balance. */
 export const PAYMENT_KINDS = ["payment", "deposit", "storage"] as const;
@@ -39,7 +82,9 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected yyyy-mm-dd");
 export const recordPaymentInputSchema = z.object({
   amount: z.number().positive("amount must be greater than 0"),
   paidOn: isoDate,
-  method: z.enum(PAYMENT_METHODS).default("cash"),
+  /** 0476: a system word or a method from Settings → Payment (the SQL writer
+   *  checks which; an alias like `bank_transfer` folds to `bank`). */
+  method: paymentMethodKeySchema.default("cash"),
   kind: z.enum(PAYMENT_KINDS).default("payment"),
   reference: z.string().trim().max(120).nullish(),
   note: z.string().trim().max(500).nullish(),
@@ -121,13 +166,17 @@ export interface OrderPaymentRow {
   order_id: string;
   amount: number;
   paid_on: string;
-  method: OrderPaymentMethod;
+  method: PaymentMethodKey;
   kind: PaymentKind;
   reference: string | null;
   receipt_no: string | null;
   receipt_url: string | null;
   note: string | null;
   recorded_by: string | null;
+  /** `app_users.name` of `recorded_by`, resolved fail-soft by the reading
+   *  endpoint. Null when the id is absent or the row is unreadable — a screen
+   *  prints `Not recorded` rather than a uuid. */
+  recorded_by_name?: string | null;
   created_at: string;
   /** 0343 — did this row bump `orders.paid`? False on a HISTORY MIRROR of a
    *  deposit the create door already put inside `orders.paid`, and on every

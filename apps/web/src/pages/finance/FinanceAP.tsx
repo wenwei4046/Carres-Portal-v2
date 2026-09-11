@@ -6,7 +6,8 @@ import {
 } from "@/lib/queries";
 import { rm, rmCompact } from "@/lib/format-currency";
 import { FinanceKpi } from "@/components/FinanceKpi";
-import APDrawer from "./APDrawer";
+import { useSupplierBills } from "@/lib/payables-queries";
+import APDrawer, { billForPo } from "./APDrawer";
 
 type ApTab = FinanceApPayStatusUi;
 
@@ -33,11 +34,12 @@ const TAB_LABEL: Record<ApTab, string> = {
  * pay_status is only 3 values; the RPC derives the 5-bucket UI state from
  * po.status + sup_status + pay_status (see migration 0063 docstring).
  *
- * Row click opens the APDrawer (3-way match card + Schedule / Mark paid
- * actions on matched rows; Release payment on scheduled rows).
+ * Row click opens the APDrawer (3-way match card, and the doors to the bill
+ * and to a new Payment Voucher — 0477 retired paying from here).
  */
 export default function FinanceAP() {
   const aging = useFinanceApAging();
+  const bills = useSupplierBills();
   const rows  = aging.data?.rows ?? [];
   const buckets = aging.data?.byPayStatus;
 
@@ -118,7 +120,10 @@ export default function FinanceAP() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-meta text-muted-foreground">No POs in this state.</div>
         ) : (
-          filtered.map((r) => <ApTableRow key={r.po_id} row={r} onView={() => setDrawer(r)} />)
+          filtered.map((r) => (
+            <ApTableRow key={r.po_id} row={r} onView={() => setDrawer(r)}
+              invOk={billForPo(bills.data, r.po_id)?.status === "confirmed"} />
+          ))
         )}
       </div>
 
@@ -133,21 +138,17 @@ export default function FinanceAP() {
   );
 }
 
-function ApTableRow({ row, onView }: { row: FinanceApAgingRow; onView: () => void }) {
+function ApTableRow({ row, onView, invOk }: { row: FinanceApAgingRow; onView: () => void; invOk: boolean }) {
   const skuLabel =
     row.lines.length > 1
       ? `${row.lines.length} lines · ${row.qty} units total`
       : row.lines[0]?.sku_name ?? "—";
 
   // 3-way match: PO is always green (it exists). DO is green when has_do
-  // (po_receipts row exists). INV is green once pay_status_ui has progressed
-  // past matched (scheduled / paid imply finance has accepted the supplier
-  // invoice).
+  // (po_receipts row exists). INV is green only when a confirmed supplier
+  // bill (0477) is entered for the PO — never inferred from pay status.
   const doOk  = row.has_do || row.pay_status_ui !== "in_production"
                             && row.pay_status_ui !== "in_transit";
-  const invOk = row.pay_status_ui === "matched"
-              || row.pay_status_ui === "scheduled"
-              || row.pay_status_ui === "paid";
 
   return (
     <div

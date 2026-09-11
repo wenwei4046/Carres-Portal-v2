@@ -1057,6 +1057,26 @@ rail is never squeezed below 240px. The rail is navigation, not batch selection 
 no checkboxes. Pages still drawing the older 200px `RailGroup`/`RailItem` pair migrate to this
 shell in their own cards, not as a side effect of someone else's.
 
+**LOCAL FILTER RAIL — COMPACT FACT DROPDOWN — APPROVED / LOCKED, owner ruling 2026-09-11.**
+A rail SECTION whose facts are a long, open-ended list collapses into ONE control —
+`FilterRailSelect` in the same `workspace-rail.tsx` — instead of printing every value as a row.
+
+- **WHICH SECTIONS, AND WHY.** A section stays a list of ROWS when it is the same few every day
+  and its counts are what the operator scans first thing in the morning — the daily worklist and
+  timing lenses (`WORK TO DO`, `TO ORDER`, `ORDER TIMING`, `REGION`, `SETUP TO FIX`). A section
+  becomes a dropdown when it is a FACT LIST that grows with the business: today
+  `PURCHASE PURPOSE` (Manual Purchase), `PRODUCT` and `SUPPLIER` (both purchasing Registers).
+  **Measured 2026-09-11** on the Manual Purchase rail at a 1024×768 window: the collapsed rail's
+  content is 718px and does not scroll; with those thirteen fact rows it is ~1132px, so the
+  timing rows — the ones that say what to do today — sat below the fold.
+- **IT IS THE SAME FILTER, NOT A SECOND MODEL.** The control writes the same single-slot section
+  value the rows wrote: sections still combine with AND, the section's own `All …` word is the
+  first option and its clear, and one section never holds two values. It is never a multi-select.
+- **NOTHING QUIET IS LOST.** The count rides in the option text (`Ohana · 4`), and a narrowed
+  control wears the rail's own ACTIVE treatment — the `kit-blue-3` field with the `kit-blue-9`
+  left-edge marker — so a narrowed section is exactly as visible as a selected row was.
+- **STILL NAVIGATION, NOT BATCH SELECTION.** No checkbox, and no `multiple`.
+
 **LOCAL FILTER RAIL FIXED HEADER + MONTH CALENDAR — owner corrections 2026-09-06 (Delivery
 Monitor + Receiving, landed the same day).** `FilterRail` accepts an optional fixed `header`
 block: the header stays put while the filter groups scroll independently beneath it, separated
@@ -1467,6 +1487,32 @@ fourth Register on this template, and the first with a LEFT FILTER RAIL beside i
 - **There is no create button.** A Unit is born when a purchase order or consignment order is
   confirmed — Purchasing's door, never Stock's — so Row 2's create slot is deliberately empty rather
   than filled with an `Add stock` control the Unit authority removed.
+
+## §6.8 · `GoodsMiniTable` — the shared child table, and its one opt-in buying order
+
+**OWNER CORRECTION 2026-09-11 · SO BATCH PURCHASE ONLY. Sales Orders, Delivery and Manual Purchase
+render byte-identically to what they rendered before.**
+
+The child table is written ONCE so two pages cannot drift into two mini-tables that almost agree.
+That law holds. What changed is that the buying page may now ask for a second READING ORDER and for
+READ-ONLY record rows, and every sibling that does not ask gets the ruled layout unchanged.
+
+- **`identityFirst`** puts `SKU` and the item's configuration ahead of `Category` and `Unit ID`. The
+  ruled order opened with the two least identifying facts, so a buying page read `Mattress` ·
+  `Not allocated` before it read what the goods were. Law ① is kept: exactly ONE column is flexible
+  and every other width is fixed, so two expansions opened together still line up column for
+  column. What moved is WHICH column is flexible and where it sits, not how many.
+- **A line's `units` render as read-only rows beneath it.** The demand row owns the checkbox, the
+  arrangement editor and the customer's quantity; each Unit row is a record — its own Unit ID, its
+  own document, that document's destination — and carries no control at all. The previous version
+  copied the line's key, selection state and editor into every Unit row, which drew N ticked boxes
+  for one ticked demand and put a destination editor beside purchase orders that were already sent.
+  A record wears the table header's own grey; a ticked demand wears the register's selected blue.
+- **`Covered by` is retired from the component.** It answered three questions in one heading. The
+  page now asks for `Ready Stock`, `On PO` (each document with the quantity it carries) and
+  `To buy`, so the arithmetic adds up on screen instead of hiding inside one word.
+- **A number is a door only where the page can open one.** `onPoClick` makes every PO number
+  navigable; a truth register that passes nothing keeps the printed text.
 
 # §7 · Approved Evolution
 

@@ -784,11 +784,10 @@ describe("Stage A · one destination identity and one governed work toolbar", ()
     /* Eight default business columns; the gutter is not one of them, and the
        box's right edge is therefore the parent table's. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveAttribute("colspan", "8");
-    /* Air above and below, NOTHING left or right — horizontal padding is the
-       very thing the gutter cells replaced (owner correction 2026-08-15). */
+    /* Flush expansion: the child grid joins its parent without card spacing. */
     expect(screen.getByTestId("grid-expansion-cell")).toHaveStyle({
-      paddingTop: "12px",
-      paddingBottom: "12px",
+      paddingTop: "0px",
+      paddingBottom: "0px",
       paddingLeft: "0px",
       paddingRight: "0px",
     });
