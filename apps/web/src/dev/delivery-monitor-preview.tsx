@@ -41,6 +41,14 @@ function order(over: Record<string, unknown> & { id: string; so: number }) {
     source_ref: ["CR0854"],
     ops_assigned_logistic: null,
     order_lines: [{ id: "l-1", sku: "mattress:M1401F-K", qty: 1, label: "Serena · King" }],
+    order_addons: [],
+    /* DELIVERY MONITOR (2026-09-11) — the ARRIVAL and ALLOCATION facts the
+       work list now reads. Empty by default so a fixture states what it
+       means rather than inheriting a supplier date it never set. */
+    po_arrivals: [],
+    allocated_units: [],
+    delivery_floor: 1,
+    delivery_has_lift: true,
     delivery_partner_id: null,
     request_for_delivery_at: null,
     partner_accepted_at: null,
@@ -78,6 +86,20 @@ function arrangement(over: Record<string, unknown> & { order_id: string }) {
   };
 }
 
+/* The seven ARRIVAL states, one fixture each — so the walk sees every one of
+   them rather than the one the live data happened to hold that morning. */
+function arrival(over: Record<string, unknown> = {}) {
+  return {
+    poId: "PO-2100",
+    status: "open",
+    owedSkus: ["mattress:M1401F-K"],
+    plannedIso: null,
+    originalIso: null,
+    reply: null,
+    ...over,
+  };
+}
+
 const ORDERS = [
   order({ id: "a", so: 1322, do_number: "DO-030926-0001", customer_name: "kong chai yin" }),
   order({
@@ -89,7 +111,13 @@ const ORDERS = [
     customer_address_state: "Kuala Lumpur",
     building_type: "Condominium",
   }),
-  order({ id: "c", so: 1324, customer_name: "tan siew mei" }),
+  order({
+    id: "c",
+    so: 1324,
+    customer_name: "tan siew mei",
+    /* A supplier date already behind us — the amber exception. */
+    po_arrivals: [arrival({ poId: "PO-2103", originalIso: "2026-08-20", plannedIso: "2026-08-20" })],
+  }),
   order({
     id: "d",
     so: 1325,
@@ -106,8 +134,44 @@ const ORDERS = [
   /* THE CHASE (2026-09-09) — three deliveries with no confirmed date: one
      nobody carries yet, one a partner carries and has not answered on, and
      one whose customer has asked for a day still being settled. */
-  order({ id: "f", so: 1327, customer_name: "chong kah wai", delivery_date: "2026-09-18" }),
-  order({ id: "h", so: 1329, customer_name: "siti nurhaliza", delivery_date: "2026-09-11" }),
+  order({
+    id: "f",
+    so: 1327,
+    customer_name: "chong kah wai",
+    delivery_date: "2026-09-18",
+    delivery_floor: 3,
+    delivery_has_lift: false,
+    order_lines: [
+      { id: "l-f1", sku: "mattress:M1401F-K", qty: 2, label: "Serena · King" },
+      { id: "l-f2", sku: "Pillow soft", qty: 2 },
+    ],
+    order_addons: [{ addon_key: "dispose-mattress", qty: 1 }],
+    allocated_units: [{ sku: "mattress:M1401F-K", status: "reserved", qty: 1 }],
+    /* A supplier who MOVED the date: the new day leads, the original stays. */
+    po_arrivals: [
+      arrival({
+        poId: "PO-2101",
+        originalIso: "2026-09-14",
+        plannedIso: "2026-09-14",
+        reply: {
+          answer: "delayed",
+          aboutIso: "2026-09-14",
+          previousIso: null,
+          newIso: "2026-09-22",
+          recordedAt: "2026-09-05T00:00:00Z",
+        },
+      }),
+    ],
+  }),
+  order({
+    id: "h",
+    so: 1329,
+    customer_name: "siti nurhaliza",
+    delivery_date: "2026-09-11",
+    order_addons: [{ addon_key: "STAIR_CARRY", qty: 2 }],
+    /* An open purchase order carrying NO date — the truthful gap. */
+    po_arrivals: [arrival({ poId: "PO-2102" })],
+  }),
   order({
     id: "i",
     so: 1330,
@@ -131,6 +195,22 @@ const ORDERS = [
 
 const ROUTES: [ (url: string) => boolean, () => unknown ][] = [
   [(url) => url.includes("/api/operation/orders"), () => ({ orders: ORDERS })],
+  /* The contact deadline's own working-day lead, and the catalog that NAMES
+     an add-on — both shared reads the Monitor now makes. */
+  [(url) => url.includes("/api/operation/purchasing/settings"), () => ({
+    logisticsCallWorkingDays: 3,
+    suppliers: [],
+    productionDays: [],
+  })],
+  [(url) => url.includes("/api/catalog"), () => ({
+    models: [],
+    skus: [],
+    fabrics: [],
+    addons: [
+      { key: "dispose-mattress", name: "Dispose old mattress", price: 80, active: true },
+      { key: "STAIR_CARRY", name: "Stair carry", price: 0, active: true },
+    ],
+  })],
   [(url) => url.includes("/api/operation/partners"), () => ({
     partners: [
       { id: "p-nets", name: "NETS" },

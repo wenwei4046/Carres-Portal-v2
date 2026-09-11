@@ -289,6 +289,11 @@ import {
   type HrCreateTeamAccountInput,
   type HrCreateShowroomStaffInput,
   type BookingBrief,
+  // DELIVERY MONITOR (2026-09-11) — the arrival + allocation facts the orders
+  // list now carries, defined ONCE in shared so the Worker and the browser
+  // cannot describe the same wire two different ways.
+  type PoArrival,
+  type AllocatedUnit,
   type SupplierClaimMove,
   type WarehouseIncomingResponse,
   type WarehouseReceiptLine,
@@ -2942,6 +2947,27 @@ export interface operationOrderListRow {
   po_skus?: string[];
   /** Purchase-order identities linked by purchase_orders.so / so_refs. */
   po_numbers?: string[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the ARRIVAL facts, one entry per purchase
+   * order serving this order: its status, the SKUs it still owes, OUR
+   * production-plus-transit prediction (`eta_date`), the immutable
+   * supplier-facing original (`official_delivery_date`) and the latest recorded
+   * supplier reply. RECORDED DATES ONLY — the state and every word come from
+   * the ONE shared reader (`deliveryArrivalStateOf`).
+   *
+   * OPTIONAL, and `undefined` must behave as "we do not know", never as "there
+   * is no purchase order": a browser on this build against an older Worker
+   * prints the governed absence instead of accusing a supplier.
+   */
+  po_arrivals?: PoArrival[];
+  /**
+   * DELIVERY MONITOR (2026-09-11) — the register rows physically reserved or
+   * sold to THIS order, batched once for the whole page. The counting is
+   * `deliveryStockReadinessOf`'s, matched under `normalizeSkuKey` — the same
+   * rule `resolveUnitAllocation` applies. Optional for the same
+   * degrade-do-not-crash reason as `po_arrivals`.
+   */
+  allocated_units?: AllocatedUnit[];
   delivery_partner_id: string | null;
   /**
    * DELIVERY CARD 02 (2026-08-21) — the multi-leg Delivery Journey
