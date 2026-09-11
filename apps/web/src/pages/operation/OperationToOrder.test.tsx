@@ -268,12 +268,14 @@ describe("the whole journey — tick, arrange, issue, prove it arrived", () => {
     });
     fireEvent.click(screen.getByTestId("so-batch-evidence-confirm"));
     // Confirmed → back to buying, and the Register re-reads the server. The
-    // ordered Sales Order REMAINS — one permanent row, now reading `Ordered`.
+    // ordered Sales Order REMAINS — one permanent row, now carrying its
+    // document. (`Status` was retired as a presentation on 2026-09-11: the
+    // document and the refused tick say what the word used to.)
     await waitFor(() => expect(screen.getByTestId("so-batch-page")).toBeInTheDocument());
     await waitFor(() =>
-      expect(screen.getByTestId("so-batch-status-o1")).toHaveTextContent("Ordered"),
+      expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041"),
     );
-    expect(screen.getByTestId("so-batch-po-link-o1")).toHaveTextContent("PO-2041");
+    expect(screen.getByTestId("so-batch-select-o1")).toBeDisabled();
   });
 
   it("the confirmation declares the version the RENDERED document reported", async () => {

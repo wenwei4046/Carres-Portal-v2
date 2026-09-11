@@ -399,6 +399,63 @@ describe("failure and retry", () => {
     expect(onReserved).not.toHaveBeenCalled();
   });
 
+  /**
+   * ⭐ A TIMEOUT IS NOT A REFUSAL — 2026-09-11.
+   *
+   * A confirmed refusal is the door saying no: the transaction rolled back and
+   * nothing was reserved. A request that never came back says nothing at all
+   * about the transaction, which may have committed. Printing
+   * `No Unit was reserved.` there is a guess wearing the clothes of a fact,
+   * and the operator's next move is to press again and reserve a second Unit.
+   */
+  it("never claims nothing was reserved when the result is not known", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (String(path).endsWith("/ready-stock")) return response();
+      throw new Error("network timeout");
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ReadyStockPanel orderId={ORDER} so={1251} />
+      </QueryClientProvider>,
+    );
+    await open();
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    const act = await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    expect(act).toHaveTextContent("could not confirm the result");
+    expect(act).not.toHaveTextContent("No Unit was reserved.");
+    expect(act).toHaveTextContent("Check the Unit IDs below before choosing again.");
+  });
+
+  it("re-reads the authoritative record, and drops the choice, on an unknown result", async () => {
+    const reads: string[] = [];
+    apiFetch.mockImplementation(async (path: string) => {
+      if (String(path).endsWith("/ready-stock")) {
+        reads.push(String(path));
+        return response();
+      }
+      throw new Error("network timeout");
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ReadyStockPanel orderId={ORDER} so={1251} />
+      </QueryClientProvider>,
+    );
+    await open();
+    const before = reads.length;
+    const row = screen.getByTestId("ready-stock-unit-33333333-0000-0000-0000-00000000000a");
+    fireEvent.click(within(row).getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Ready Unit" }));
+    await screen.findByTestId(`ready-stock-act-${ORDER}`);
+    /* Pressing the same button again on an unknown outcome is exactly how a
+       Unit gets reserved twice, so the choice does not survive it. */
+    await waitFor(() => expect(screen.getByText("No Unit chosen")).toBeInTheDocument());
+    await waitFor(() => expect(reads.length).toBeGreaterThan(before));
+  });
+
   it("drops last act's sentence the moment the choice moves", async () => {
     drawRefusing({ code: "unit_no_longer_free" });
     await open();
