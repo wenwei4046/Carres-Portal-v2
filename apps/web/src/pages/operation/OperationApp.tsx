@@ -538,7 +538,7 @@ export default function OperationApp() {
                 reads as `?order=<SO No>`. */}
             {tab === "payments" && (
               <Navigate
-                to={`/finance/payments${
+                to={`/finance/monitor${
                   legacyPaymentsSo ? `?order=${encodeURIComponent(legacyPaymentsSo)}` : ""
                 }`}
                 replace

@@ -433,15 +433,15 @@ describe("OperationApp — the retired Purchase Demands address", () => {
  * reason to make the old address land.
  */
 describe("OperationApp — the retired Payments desk", () => {
-  it("?tab=payments leads to the canonical Payments Register", () => {
+  it("?tab=payments leads to the Payments Monitor — the collection desk (2026-09-12)", () => {
     renderApp("/operation?tab=payments");
-    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/payments");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/monitor");
   });
 
   it("a scoped bookmark keeps its order", () => {
     renderApp("/operation?tab=payments&so=1319");
     expect(screen.getByTestId("location-probe")).toHaveTextContent(
-      "/finance/payments?order=1319",
+      "/finance/monitor?order=1319",
     );
   });
 

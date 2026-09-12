@@ -680,11 +680,11 @@ describe("operation Work response composition", () => {
       module: "payment",
       object: { kind: "invoice", id: "invoice-1", label: "INV-2041" },
       problem: "Customer payment should have been received",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       recipient: "Tan Qu Qu",
       owner: { dutyKey: "payment_duty", normal: person, acting: person },
       timing: { dueOn: "2026-09-07", bucket: "overdue" },
-      destination: "/finance/invoices?invoice=invoice-1",
+      destination: "/finance/monitor?invoice=invoice-1",
     });
     expect(item?.completionFact).toContain("outstanding balance is RM 0");
     expect(item?.action).not.toContain("Shasha");
@@ -746,7 +746,7 @@ describe("payment.missed_promise — the promise outranks the window", () => {
       id: "payment:invoice-9:payment.missed_promise",
       module: "payment",
       problem: "Customer promise was missed",
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       // Due on the promised day — not the delivery window's day.
       timing: { dueOn: "2026-09-05", bucket: "overdue" },
     });

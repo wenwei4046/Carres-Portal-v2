@@ -27,7 +27,7 @@
  * duplicate.
  */
 
-import { collectionClock } from "./collection-clock";
+import { collectionClock, type CollectionTiming } from "./collection-clock";
 import { deliveryStepDueIso, type DeliveryQueueLeads } from "./delivery-queue";
 import { orderActionDueIso, OFFICE_OFF_DAYS } from "./order-action-due";
 import type { OrderOpenAction } from "./order-actions";
@@ -306,7 +306,7 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
     owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "payment_duty",
-    action: "Ask the customer to pay",
+    action: "Ask customer to pay",
     dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
   },
@@ -339,9 +339,25 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     trigger: "the customer promised to pay on a named day, that day has passed and the balance is still outstanding",
     owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
     ownerRule: "payment_duty",
-    action: "Ask the customer to pay",
+    action: "Ask customer to pay",
     dueRule: "the day the customer promised, on the OFFICE calendar",
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
+  },
+  {
+    /* §10 row: `Storage invoice live | responsible Delivery Operation |
+     * Send the invoice and collect payment | invoice fully paid` (owner ruling
+     * 2026-09-12). A live ISSUED storage-kind paper is money the customer has
+     * not been asked for yet; the act is to send it and collect. The owner is
+     * the governed Delivery word — no delivery-staff roster exists, exactly
+     * as the delivery items resolve. */
+    key: "payment.send_storage_invoice",
+    module: "payment",
+    trigger: "an issued Storage or Additional Storage Invoice is live and its money has not been received",
+    owner: "the responsible Delivery Operation (the governed Delivery word; Workspace resolves the person when a Delivery duty exists)",
+    ownerRule: "delivery_duty",
+    action: "Send the invoice and collect payment",
+    dueRule: "the shared collection clock's deadline for the order's delivery, else no date",
+    completionFact: "the order's live storage papers are fully allocated — storage owing is RM 0",
   },
   {
     key: "purchasing.supplier_reply",
@@ -585,6 +601,10 @@ export interface OrderWorkContext {
    *  governed item). */
   loanOutstanding?: boolean;
   financeExceptionHolds?: boolean;
+  /** `Settings → Payments → Collection timing` (owner ruling 2026-09-12) —
+   *  the effective ask/deadline pair for this order's clock. Absent ⇒ the
+   *  ruled default (3 · 2). */
+  collectionTiming?: CollectionTiming;
 }
 
 /**
@@ -636,6 +656,7 @@ export function workItemsForOrder(
           },
           todayIso,
           opts,
+          ctx.collectionTiming,
         ).dueIso;
       case "collect_loan_item":
         // The delivery day itself (blueprint card §7): the loan comes back on

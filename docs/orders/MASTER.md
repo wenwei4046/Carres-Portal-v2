@@ -4757,7 +4757,8 @@ approval — black and white in the system, never verbal.
 ✓ the date is not a Sunday and not a Malaysian public holiday
 ✓ every goods line is reserved to this order (accessories pass automatically)
 ✓ logistics chosen
-✓ outstanding = 0, OR an APPROVED Delivery Payment Approval covers the order
+✓ Amount needed = RM 0 (an APPROVED Delivery Payment Approval recorded before the 2026-09-01
+  closure is still honoured as history; none can be raised — 0486)
 ✓ no OPEN Finance exception (0355 — NOT retired: the second blocker)
 ```
 
@@ -4771,9 +4772,13 @@ waiting for the booking-confirm trigger.
 
 **The owner closed the exception on 2026-09-01 (PR #1031): money in full before delivery is
 absolute, the raise/decide surface was removed from the screen, and nothing can request an
-approval any more.** The definition below is retained because the record, its doors and the
-0362 trigger stay in the database untouched: an approval granted before the closure is still
-honoured by the gate, and restoring the door — if ever re-ruled — is a revert, not a rebuild.
+approval any more. On 2026-09-12 the owner re-affirmed it — there is no live unpaid-delivery
+approval or Payment Exception release door, and it may not be reintroduced — and migration `0486`
+shut it in the database too: `delivery_payment_approval_request` / `_decide` lost their EXECUTE
+grant and `POST /api/operation/payment-approvals/*` answers 410.** The definition below is
+retained because the record and the 0362 trigger stay in the database untouched: an approval
+granted before the closure is still honoured by the gate as history, and restoring the door — if
+ever re-ruled — is a re-grant, not a rebuild.
 
 One append-only record owned by Sales Orders (`order_delivery_payment_approvals`, 0362), beside
 the Finance exception it mirrors:

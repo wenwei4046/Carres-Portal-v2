@@ -538,8 +538,10 @@ shipped code, and stated the opposite.)*
 PR #861 replaced the short-lived uppercase-heading model with the current shared grammar: a
 multi-page module uses one icon + name + chevron row, with its pages hanging from quiet rounded
 elbows. A destination with only one page is a direct icon + name row; it does not hide that page
-behind a chevron that reveals the same name again. Delivery follows this direct-row rule from the
-2026-08-24 owner ruling. The existing `PortalSidebar` is the only left navigation surface: 232px
+behind a chevron that reveals the same name again. **Payments is a module of two destinations
+(owner ruling 2026-09-12): `Monitor` — the named landing — and `Payment Records`; no
+`Payments · Invoices` tabs, no standalone Invoices or Receipts row, and the same two rows for the
+finance role, which is never a second Payment information architecture.** The existing `PortalSidebar` is the only left navigation surface: 232px
 expanded and 60px collapsed. A module never opens a second sidebar, flyout or duplicate tab strip.
 
 Purchasing has enough permanent destinations to require one further level. Its module row toggles
@@ -712,7 +714,13 @@ directory only and said so.*
   A register cell's second line is supporting EVIDENCE (a channel · date, a state), never an
   instruction. The Purchase Orders Register's shipped `Work` column (fact + action + PO Duty
   avatar) violated this law and is removed under the 2026-09-04 correction; its actions stay in
-  My Work, Team Work, the PO detail and Order Route.
+  My Work, Team Work, the PO detail and Order Route. **THE ONE RULED EXCEPTION — the Payment
+  Monitor's `Payment timing` cell (owner ruling 2026-09-12, `docs/payment/MASTER.md` §3):** the
+  Monitor is a CONTROL LISTING, not a document register, and the owner ruled its last column a
+  two-line fact/action surface — line 1 the fact, line 2 the governed action with the shared
+  Work feed's resolved owner as an avatar (hover/accessible name = full name, never a name in the
+  sentence). It reads the Work feed's items; it resolves no owner and creates no second action.
+  No other register may copy this without its own owner ruling.
 - **THE SIZES ARE 13 / 11 — owner ruling 2026-08-15 (Chai).** Line 1 is `text-body` (13, semibold).
   Line 2 is **`text-label` (11) at `font-normal`**, moved down from `text-meta` (12). One point of
   separation was not enough to read as a second RANK: at 13/12 the two lines looked like one

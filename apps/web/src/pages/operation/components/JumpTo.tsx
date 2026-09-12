@@ -71,6 +71,12 @@ export interface JumpDestination {
   /** The area word, so `Sales Orders` and Admin's `Sales Orders` stay apart. */
   area: string;
   href: string;
+  /** The MODULE the page hangs under (`Payments` · `Delivery` · `Warehouse`),
+   *  present only when another permitted destination shares the same label —
+   *  three modules each have a `Monitor` (Delivery · Warehouse · Payments,
+   *  2026-09-12), and a search result that says `Monitor` three times names
+   *  nothing. Typing the module word finds its pages too. */
+  module?: string;
 }
 
 /**
@@ -94,10 +100,16 @@ export function permittedDestinations(
         label: item.label,
         area: group.label,
         href: navItemHref(group as PortalNavGroup, item as PortalNavItem),
+        ...(item.section ? { module: item.section } : {}),
       });
     }
   }
-  return out;
+  // A label that two destinations share keeps its module word; a unique one
+  // stays as it always was.
+  const seen = new Map<string, number>();
+  for (const d of out) seen.set(d.label, (seen.get(d.label) ?? 0) + 1);
+  return out.map((d) => ((seen.get(d.label) ?? 0) > 1 ? d : { ...d, module: undefined }))
+    .map(({ module, ...rest }) => (module ? { ...rest, module } : rest));
 }
 
 /** Destination-NAME matching, and only the name. */
@@ -111,8 +123,10 @@ export function matchDestinations(
   const contains: JumpDestination[] = [];
   for (const d of destinations) {
     const label = d.label.toLowerCase();
-    if (label.startsWith(q)) starts.push(d);
-    else if (label.includes(q)) contains.push(d);
+    // The module word is part of the governed name where it is shown.
+    const qualified = d.module ? `${d.module.toLowerCase()} · ${label}` : label;
+    if (label.startsWith(q) || qualified.startsWith(q)) starts.push(d);
+    else if (label.includes(q) || qualified.includes(q)) contains.push(d);
   }
   return [...starts, ...contains];
 }
@@ -437,7 +451,7 @@ function RowButton({
       ) : (
         <>
           <span className="min-w-0 truncate text-body text-kit-slate-12">
-            {row.destination.label}
+            {row.destination.module ? `${row.destination.module} · ` : ""}{row.destination.label}
           </span>
           <span className="shrink-0 text-meta text-kit-slate-11">{row.destination.area}</span>
         </>

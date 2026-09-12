@@ -27,6 +27,7 @@ import {
   type PortalNavItem,
   type PortalSection,
   WAREHOUSE_LANDING_KEY,
+  PAYMENTS_LANDING_KEY,
 } from "./portal-nav";
 import {
   purchasingChildBlocks,
@@ -108,6 +109,7 @@ const GROUP_GEOM: ChildGeom = {
 
 const PURCHASING: PortalSection = "Purchasing";
 const WAREHOUSE: PortalSection = "Warehouse";
+const PAYMENTS: PortalSection = "Payments";
 
 /**
  * Unified Internal Portal sidebar (2026-06-30, Loo).
@@ -497,6 +499,14 @@ export default function PortalSidebar() {
     if (block.module.section === WAREHOUSE) {
       const named = block.pages.find(
         (p) => p.key === WAREHOUSE_LANDING_KEY && !p.soon,
+      );
+      if (named) return named;
+    }
+    /* Payments lands on Monitor — the collection desk — by name (owner
+     * ruling 2026-09-12). */
+    if (block.module.section === PAYMENTS) {
+      const named = block.pages.find(
+        (p) => p.key === PAYMENTS_LANDING_KEY && !p.soon,
       );
       if (named) return named;
     }

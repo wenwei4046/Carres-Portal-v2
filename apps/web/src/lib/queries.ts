@@ -596,6 +596,12 @@ export const qk = {
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
     invoiceRegister: () => ["finance", "invoice-register"] as const,
+    /** Every open storage case (the Monitor's Storage cell). */
+    storageCases: () => ["finance", "storage-cases", "all"] as const,
+    /** Every customer later-date request (the Monitor's pending free request). */
+    laterDeliveryRequests: () => ["finance", "later-delivery-requests", "all"] as const,
+    /** Settings → Payments (banks · methods · timing · storage · changes). */
+    paymentSettings: () => ["finance", "payment-settings"] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -8705,6 +8711,67 @@ export function useInvoiceRegister() {
       return rows;
     },
     staleTime: 15_000,
+  });
+}
+
+/**
+ * The Payment Monitor's three source reads beside the invoice register
+ * (owner ruling 2026-09-12). Each is the owning module's own wire, read
+ * whole: the Monitor derives its Storage cell from the same cases and
+ * requests the Invoice object's Storage section reads, and its clock from
+ * the same effective timing rules Settings shows — never a second store.
+ */
+export function usePaymentStorageCases() {
+  return useQuery({
+    queryKey: qk.finance.storageCases(),
+    queryFn: () => apiFetch<{
+      cases: import("@carres/shared/payment-monitor").MonitorStorageCase[];
+    }>("/api/finance/payment-storage"),
+    staleTime: 15_000,
+  });
+}
+
+export function useLaterDeliveryRequests() {
+  return useQuery({
+    queryKey: qk.finance.laterDeliveryRequests(),
+    queryFn: () => apiFetch<{
+      requests: Array<import("@carres/shared/payment-monitor").MonitorFreeRequest & {
+        id: string; requested_date: string;
+      }>;
+    }>("/api/finance/payment-storage/later-delivery-requests"),
+    staleTime: 15_000,
+  });
+}
+
+export interface PaymentSettingsPayload {
+  bank_accounts: Array<{
+    route_source: "pj_showroom" | "dealer"; bank_name: string;
+    account_name: string | null; account_no: string | null;
+  }>;
+  storage_rules: Array<{
+    id: string; product_group: "mattress_bedframe" | "sofa"; free_days: number;
+    charge_amount: number; cycle_days: number; operation_limit_day: number | null;
+    waiver_limit_day: number | null; extra_free_allowed: boolean; inspection_days: number;
+    effective_from: string;
+  }>;
+  /** 0486 — newest effective first; the head is the current rule. */
+  collection_timing: Array<{
+    id: string; ask_days_before: number; deadline_days_before: number;
+    effective_from: string; reason: string | null; created_at: string;
+  }>;
+  setting_changes: Array<{
+    id: string; what: string; old_value: Record<string, unknown> | null;
+    new_value: Record<string, unknown> | null; reason: string | null;
+    effective_from: string | null; changed_at: string;
+    actor: { name: string | null } | { name: string | null }[] | null;
+  }>;
+  online_provider: { name: string; configured: boolean };
+}
+
+export function usePaymentSettings() {
+  return useQuery({
+    queryKey: qk.finance.paymentSettings(),
+    queryFn: () => apiFetch<PaymentSettingsPayload>("/api/finance/payment-settings"),
   });
 }
 

@@ -314,9 +314,15 @@ honest Work for admitted modules.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; Payment Duty/cover owns the action, the exact Invoice
-  is the object/door, and only an atomic allocated payment reducing outstanding to RM 0 completes it.
-  A sent message remains evidence and bank matching remains later evidence; neither is a second
-  settlement step nor closes Work.
+  is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
+  Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes
+  it. The clock's ask/deadline pair is `Settings → Payments → Collection timing` (0486),
+  snapshotted on the invoice's issue day, and an Operation contact action never lands on a
+  Saturday. A live unpaid Storage Invoice raises `Send the invoice and collect payment`
+  (`payment.send_storage_invoice`) under the governed Delivery owner word. The Payment Monitor is
+  the full collection overview and reads these same items for its owner avatar — it creates no
+  second action, completion, owner or `Done`. A sent message remains evidence and bank matching
+  remains later evidence; neither is a second settlement step nor closes Work.
 - Service Case admission was re-audited against the approved Service MASTER and shipped case plan,
   deadline clock and case API on 2026-09-07. The one deadline action (`Call {customer} — say why it
   is taking longer`) already has an authoritative trigger, 14-working-day deadline, exact case door
