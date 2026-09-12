@@ -50,6 +50,7 @@ export function paymentExceptionWord(row: PaymentRegisterRow): string {
  *  than a guess. */
 export const PAYMENT_SOURCE_WORD: Record<string, string> = {
   manual_payment: "Recorded by staff",
+  order_create: "Sales Portal deposit",
   finance_ar: "Finance receipt",
   sales_top_up: "Sales Portal top-up",
   stripe_checkout: "Online payment",

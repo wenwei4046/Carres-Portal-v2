@@ -337,7 +337,9 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
           <p>Amount received {rm(payment.amount)}</p>
           <p>Paid date {fmtDate(payment.paid_on)}</p>
           <p>Payment method {methodWord(payment.method)}</p>
-          <p>{methodRow?.account_name
+          <p>{payment.method === "online"
+            ? "Money account settled by the payment provider"
+            : methodRow?.account_name
             ? `Money account ${methodRow.account_name}${bankEndings.length && (payment.method === "bank" || payment.method === "bank_transfer") ? ` · ${bankEndings.join(" · ")}` : ""}`
             : registry.isSuccess ? "Money account not configured" : "Money account not available"}</p>
           {payment.reference && <p>Reference {payment.reference}</p>}
@@ -348,8 +350,10 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
         </Facts>
         <Facts title="Allocated to">
           <Allocation payment={payment} />
-          <p className="mt-1">{stillNeeded == null ? "Amount still needed not available"
-            : `Amount still needed ${rm(stillNeeded)}`}</p>
+          <p className="mt-1">{stillNeeded != null ? `Amount still needed ${rm(stillNeeded)}`
+            : invoicesQ.isSuccess && !invoiceRows.some((r) => r.order_id === payment.order_id)
+              ? "No Invoice issued for this order yet, so there is no amount still needed to show."
+              : "Amount still needed not available"}</p>
         </Facts>
         <Facts title="Evidence">
           <p className="flex items-center gap-2">

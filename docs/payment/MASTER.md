@@ -496,8 +496,49 @@ Owner ruling 2026-09-12, delivered as one slice (migration `0486`):
   PaymentMonitor (columns · facts · owner avatar · storage · disclosure · rail · workspace ·
   states), PaymentRecords (columns · exception · Inspect · selection · object · Print · overflow ·
   void), PaymentSettings (order · timing edit · storage edit · change log · provider).
-- **Production evidence** is recorded below this entry once the migration is applied and the
-  deployed SHA is walked authenticated.
+- **PRODUCTION-VERIFIED 2026-09-13.** PR #1252 merged as `cfbf6992`; the deploy workflow
+  converged and `erp.carresofficial.com`, `pos.carresofficial.com`, `carres-portal.pages.dev`
+  (`/__carres_deploy.json`) and the API Worker (`/health`) all reported `cfbf6992`. The served
+  bundle (`index-Nz-2IzuE.js`) prints `Payment Records` ×13 · `Ask customer to pay` ×6 ·
+  `Send the invoice and collect payment` · `Storage Invoice not paid` · `payment-monitor-rail`
+  · `Collection timing` ×3, and `Payments · Invoices` / `Ask the customer to pay` are 0.
+  Walked authenticated in the owner's signed-in Chrome session:
+  - Sidebar: `Payments` module expanded with exactly `Monitor` (`/finance/monitor`, lit) and
+    `Payment Records` (`/finance/payments`); no Invoices, Refunds, Order Payments or
+    Reconciliation row; the collapsed 60px rail lights the Payments icon.
+  - `/finance/monitor`: header `Monitor` (50px), 240px rail with `TODAY · Nothing needs
+    collection today` and the seven filters with counts (`Waiting for goods 2 · All unpaid 2`),
+    the seven columns in order, two live rows (SO-1321 · SO-1313) reading `Arrival not
+    confirmed` · `No storage charge` · `Thursday, 20 Aug` / `Sunday, 4 Oct · Not confirmed yet`
+    · `Arrival not confirmed / Wait`; footer `2 orders · RM 2,999.00 still needed`; no tabs,
+    no `Download DO`. `?order=1321` scopes to one row and says `SO-1321 only`; `Show items`
+    prints `Item · Qty · Goods` with `Jager · 1 · Arrival not confirmed`; the SO row opens the
+    collection workspace (`INV-2026-001321`, back word `Monitor`, sections Money → Goods and
+    Delivery → Storage → What to do → Invoice → Related Payments → Communication History,
+    `What to do` = `Wait`, doors `Statement · Print · Create payment link · Record payment`).
+  - `/finance/payments`: header `Payment Records`; columns `Receipt No · Paid date · Customer ·
+    SO No · Amount received · Method`; two live rows; footer `2 payments · RM 1,915.00
+    received`; no `New Payment`, no toolbar switch. Inspect is read-only and `Open payment`
+    opens `RC-110926-2994` with state `Payment recorded`, `Print`, and the six sections in
+    order. Two wording gaps found and closed in the closure PR: `Source order_create` printed
+    raw (now `Sales Portal deposit`), and a provider-recorded `online` payment said `Money
+    account not configured` (now `settled by the payment provider`); an order with no Invoice
+    now says so instead of `Amount still needed not available`.
+  - `/operation/settings/payment`: the eight sections in the ruled order, then `Changes`;
+    Collection timing `3 · 2 working days before Confirmed Delivery · In effect from Wed, 19
+    Aug`; Mattress / Bedframe `Free storage 7 calendar days … In effect from Sat, 12 Sep`;
+    Sofa unchanged; the `Changes` list shows the 0486 storage change with `Staff identity not
+    recorded` and `free days 14 → free days 7`.
+  - `POST /api/operation/payment-approvals/{orderId}` with the signed-in token → **410**
+    `no_unpaid_delivery_approval`.
+  - 🔴 **FOUND, NOT MINE, NOT FIXED HERE:** `GET /api/operation/work` answers **500** —
+    `Could not find the table 'public.issue_actions'`. The Issue Tracker lane's migration
+    `0454_an_issue_action_has_one_identity_and_one_result.sql` is merged on `main` and the
+    feed reads its table, but it was never applied to production. My Work, Team Work, the
+    Quick Rail counts and therefore the Monitor's owner avatars are dark until it is applied.
+    A rolled-back production probe of the exact file passed (table created; 0 rows backfilled;
+    0 `ops_tasks` cancelled — production holds 0 issues); applying it is the other lane's
+    governed step and is recorded as an owed action, not done silently here.
 
 
 **OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is
