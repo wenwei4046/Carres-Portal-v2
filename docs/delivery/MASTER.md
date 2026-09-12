@@ -453,6 +453,16 @@ confirmation, and do not introduce a new deadline. Revised supplier arrival keep
 above the original with the existing slate CalendarClock; no full-row warning background.
 This approval owns Monitor only, not Delivery Orders or partner coverage rules.
 
+**IMPLEMENTED 2026-09-12 — production verification pending merge.** The shared Select replaces
+the three long filter lists; the collapsed rail has a labelled return door; DataGrid's optional
+named identity block pins SO No and Customer without changing existing single-column callers.
+The named block uses separate cell borders after browser measurement exposed clipped sticky
+text with collapsed borders. The real OperationApp shell is available through the existing
+dev preview's `?shell=1&tab=delivery` switch, not a second production page. Local verification:
+4,451 web tests passed; 196 focused tests passed; after the browser border correction, the
+95 affected page/sticky tests passed again. Real-shell 1440×900 and 949×800 screenshots checked;
+the narrow reopened filter area scrolls, deliberately, instead of compressing the calendars.
+
 - **`Customer` carries the Logistics Partner as its inline second line** — the Constitution's one
   permitted second line. Who carries a delivery is the operator's second question about a row and
   it may not cost a Columns chooser.
@@ -802,16 +812,15 @@ cards the other groups already narrowed (Architecture Law D):
   recorded facts, never a clock inference. **The group belongs to the `Work to do` tab and is not
   drawn on `Confirmed deliveries`** (owner ruling 2026-09-10).
 - **`STATE`** (owner correction 2026-09-07, the heading formerly `REGION`) — the direct state
-  names ruled below, straight from the data, no `All …` row: picking again unpicks, and `Clear
-  filters` above the list clears everything. A STATE pick combines with a work queue
+  names ruled below, straight from the data, in the shared Select. `All` clears this selection;
+  `Clear filters` above the list clears everything. A STATE pick combines with a work queue
   (`Selangor · No logistics picked`), and header select-all then takes only those visible
   filtered rows.
 - **`LOGISTICS PARTNER`** (the heading formerly `LOGISTICS`) — only the governed partners
-  genuinely carrying a matching row, per the rows ruled below; no invented company, no `All …`
-  row.
+  genuinely carrying a matching row, in the shared Select with counts and `All`; no invented company.
 - **`DELIVERY STATUS`** — `Waiting for warehouse` · `Ready for handover` · `Out for delivery`.
   These are filters over recorded operational progress, not actions and not document statuses;
-  the three rows are fixed and print their live counts, zero included.
+  the three dropdown choices print their live counts, zero included, with `All` to clear the choice.
 
 **DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
 correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**

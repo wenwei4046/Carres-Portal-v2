@@ -1,3 +1,5 @@
+import Select from "../../components/kit/Select";
+import { callToConfirmDeliveryDate } from "./delivery-monitor";
 /**
  * DELIVERY MONITOR — the work list that leads, and the confirmed-delivery
  * calendar beside it.
@@ -415,6 +417,7 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
       className="block min-h-11 rounded-control border border-kit-slate-5 bg-white shadow-sm hover:border-kit-slate-6 hover:bg-hovertint"
     >
       <div className="flex flex-col gap-0.5 px-2 py-1.5 text-body">
+        {card.confirmedDate && !card.confirmedTime ? <div className="font-medium text-kit-slate-12">{fmtDate(card.confirmedDate)}</div> : null}
         {card.confirmedTime ? (
           <div className="font-medium text-kit-slate-12">{card.confirmedTime}</div>
         ) : (
@@ -449,7 +452,9 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
         ) : null}
       </div>
       <div className="border-t border-kit-slate-4 px-2 py-1">
-        <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>
+        {card.confirmedDate && !card.confirmedTime && !card.settled ? (
+          <span className="text-body text-kit-slate-12">{monitorRowAction(card).kind === "confirm_date" ? callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics, true) : monitorRowAction(card).label}</span>
+        ) : <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>}
       </div>
     </Link>
   );
@@ -1845,42 +1850,18 @@ export default function OperationDelivery() {
           ))}
         </FilterRailGroup>
       )}
-      <FilterRailGroup title={MONITOR_COPY.railState}>
-        {rails.regions.map((item) => (
-          <FilterRailRow
-            key={item.key}
-            label={item.label}
-            count={item.count}
-            active={region === item.key}
-            onClick={() => toggleParam("region", item.key)}
-            testId={`delivery-monitor-region-${item.key}`}
-          />
-        ))}
-      </FilterRailGroup>
-      <FilterRailGroup title={MONITOR_COPY.railLogistics}>
-        {rails.logistics.map((item) => (
-          <FilterRailRow
-            key={item.key}
-            label={item.label}
-            count={item.count}
-            active={logistics === item.key}
-            onClick={() => toggleParam("logistics", item.key)}
-            testId={`delivery-monitor-logistics-${item.key}`}
-          />
-        ))}
-      </FilterRailGroup>
-      <FilterRailGroup title={MONITOR_COPY.railStatus}>
-        {MONITOR_STATUS_FILTERS.map((key) => (
-          <FilterRailRow
-            key={key}
-            label={MONITOR_STATUS_LABEL[key]}
-            count={rails.status[key]}
-            active={status === key}
-            onClick={() => toggleParam("status", key)}
-            testId={`delivery-monitor-status-${key}`}
-          />
-        ))}
-      </FilterRailGroup>
+      <Select id="delivery-monitor-region" label={MONITOR_COPY.railState}
+        value={region ?? "all"}
+        onValueChange={(value) => toggleParam("region", value === "all" ? region ?? "" : value)}
+        options={[{ value: "all", label: "All" }, ...rails.regions.map((item) => ({ value: item.key, label: `${item.label} (${item.count})` }))]} />
+      <Select id="delivery-monitor-logistics" label={MONITOR_COPY.railLogistics}
+        value={logistics ?? "all"}
+        onValueChange={(value) => toggleParam("logistics", value === "all" ? logistics ?? "" : value)}
+        options={[{ value: "all", label: "All" }, ...rails.logistics.map((item) => ({ value: item.key, label: `${item.label} (${item.count})` }))]} />
+      <Select id="delivery-monitor-status" label={MONITOR_COPY.railStatus}
+        value={status ?? "all"}
+        onValueChange={(value) => toggleParam("status", value === "all" ? status ?? "" : value)}
+        options={[{ value: "all", label: "All" }, ...MONITOR_STATUS_FILTERS.map((key) => ({ value: key, label: `${MONITOR_STATUS_LABEL[key]} (${rails.status[key]})` }))]} />
     </FilterRail>
   );
 
@@ -1982,6 +1963,11 @@ export default function OperationDelivery() {
           ) : (
             rail
           )
+        ) : !isPhone ? (
+          <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2">
+            {showFiltersButton}
+            <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">{MONITOR_COPY.showFilters}</span>
+          </aside>
         ) : null}
 
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
@@ -2011,7 +1997,7 @@ export default function OperationDelivery() {
               {/* The calendar toolbar: where the window stands, Day · Week ·
                   Month, and the one search. */}
               <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
-                {!railVisible ? showFiltersButton : null}
+                {!railVisible && isPhone ? showFiltersButton : null}
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
@@ -2147,7 +2133,7 @@ export default function OperationDelivery() {
                     must stay on screen — the sheet's toolbar is not here to
                     carry it. */}
                 <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
-                  {!railVisible ? showFiltersButton : null}
+                  {!railVisible && isPhone ? showFiltersButton : null}
                   <input
                     type="search"
                     value={phoneSearch}
@@ -2209,7 +2195,7 @@ export default function OperationDelivery() {
                     cards.length === 0 ? MONITOR_COPY.emptyList : MONITOR_COPY.emptySearch
                   }
                   groupBanner={false}
-                  stickyIdentity
+                  stickyIdentity={{ columnKeys: ["so", "customer"] }}
                   chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
                   /* A row on this workspace IS a delivery, so opening it
                      opens the delivery (owner correction 2026-08-24). */
@@ -2272,7 +2258,7 @@ export default function OperationDelivery() {
                   ]}
                   toolbarStart={
                     <>
-                      {!railVisible ? showFiltersButton : null}
+                      {!railVisible && isPhone ? showFiltersButton : null}
                       {calendarControl}
                     </>
                   }

@@ -1067,6 +1067,12 @@ describe("monitorRowAction — one row, one next act", () => {
     expect(action.label).toBe("Assign logistics");
   });
 
+  it("keeps a known day and asks only for the missing time", () => {
+    const card = chase({ partner_id: "p-al", partner_name: "AL" });
+    const action = monitorRowAction({ ...card, confirmedDate: "2026-09-04", confirmedTime: null, booked: false });
+    expect(action).toEqual({ kind: "confirm_date", call: "Call AL — confirm delivery time", label: "Edit Delivery" });
+  });
+
   it("a partner carries it but no date is agreed → call THAT partner, then Edit Delivery", () => {
     const action = monitorRowAction(chase({ partner_id: "p-al", partner_name: "AL" }));
     expect(action).toEqual({

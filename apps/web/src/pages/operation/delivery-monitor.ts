@@ -847,8 +847,8 @@ export function monitorCardHref(card: DeliveryMonitorCard): string {
  * the row; no company is ever hard-coded, and a row with no partner never
  * reaches this sentence — it is asked to `Assign logistics` first.
  */
-export function callToConfirmDeliveryDate(partnerName: string): string {
-  return `Call ${partnerName} — confirm delivery date`;
+export function callToConfirmDeliveryDate(partnerName: string, timeOnly = false): string {
+  return `Call ${partnerName} — confirm delivery ${timeOnly ? "time" : "date"}`;
 }
 
 /**
@@ -900,7 +900,7 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
       /* The partner's own name, from the row — never a hard-coded company.
          A partner id whose name has not resolved would print an id at the
          operator, so the governed absence word stands in for it. */
-      call: callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics),
+      call: callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics, card.confirmedDate !== null),
       label: MONITOR_COPY.editDelivery,
     };
   }

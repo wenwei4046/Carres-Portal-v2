@@ -275,7 +275,7 @@ export type DataGridProps<T> = {
    * intervening columns slide beneath it. `true` keeps the original
    * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean | { columnKey: string };
+  stickyIdentity?: boolean | { columnKey: string } | { columnKeys: string[] };
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -925,7 +925,8 @@ function DataGridInner<T>({
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
     const identityKey =
-      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
+      typeof stickyIdentity === "object" && "columnKey" in stickyIdentity ? stickyIdentity.columnKey : null;
+    const identityKeys = typeof stickyIdentity === "object" && "columnKeys" in stickyIdentity ? stickyIdentity.columnKeys : null;
     let left = 0;
     for (const col of visibleColumns) {
       if (col.key.startsWith("__")) {
@@ -934,13 +935,14 @@ function DataGridInner<T>({
         left += Number(layout.widths[col.key] ?? col.width ?? 140);
         continue;
       }
-      if (identityKey == null || col.key === identityKey) {
+      if (identityKeys ? identityKeys.includes(col.key) : identityKey == null || col.key === identityKey) {
         // The identity: the first data column, or the NAMED one — pinned
         // directly after the gutter, so a scrolled sheet slides the columns
         // before it underneath. If the named column is hidden, only the
         // gutter pins: a wrong identity is worse than none.
         m.set(col.key, left);
-        break;
+        if (!identityKeys) break;
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
       }
     }
     return m;
@@ -2164,7 +2166,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
+        <table className={`${styles.table}${typeof stickyIdentity === "object" && "columnKeys" in stickyIdentity ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}

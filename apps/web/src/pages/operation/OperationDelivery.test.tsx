@@ -35,6 +35,14 @@ import type {
 } from "@/lib/queries";
 import type { DeliveryArrangementRow } from "@carres/shared";
 
+function openFilter(label: string) {
+  fireEvent.keyDown(screen.getByRole("combobox", { name: label }), { key: "ArrowDown" });
+}
+function pickFilter(label: string, option: RegExp) {
+  openFilter(label);
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+
 let ordersState: {
   data: { orders: operationOrderListRow[] } | undefined;
   isLoading: boolean;
@@ -330,9 +338,6 @@ describe("the shape", () => {
       "Overdue delivery",
       "Failed Delivery",
       "Upload delivery proof",
-      "Waiting for warehouse",
-      "Ready for handover",
-      "Out for delivery",
     ]) {
       expect(within(rail).getByText(row)).toBeTruthy();
     }
@@ -348,9 +353,6 @@ describe("the shape", () => {
       "delivery-monitor-work-overdue",
       "delivery-monitor-work-failed",
       "delivery-monitor-work-upload_proof",
-      "delivery-monitor-status-waiting_warehouse",
-      "delivery-monitor-status-ready_for_handover",
-      "delivery-monitor-status-out_for_delivery",
     ].map((id) => within(rail).getByTestId(id));
     for (let i = 1; i < rows.length; i += 1) {
       expect(
@@ -358,14 +360,15 @@ describe("the shape", () => {
       ).toBeTruthy();
     }
     expect(within(rail).getAllByText("No logistics picked")).toHaveLength(1);
-    expect(within(rail).getAllByText("Waiting for warehouse")).toHaveLength(1);
+    expect(within(rail).getByRole("combobox", { name: "DELIVERY STATUS" })).toBeTruthy();
     expect(within(rail).queryByTestId("delivery-monitor-work-waiting_warehouse")).toBeNull();
   });
 
   it("STATE lists direct state names from the real records — no sub-group headings", () => {
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-monitor-rail");
-    expect(within(rail).getByText("Selangor")).toBeTruthy();
+    openFilter("STATE");
+    expect(screen.getByRole("option", { name: /^Selangor/ })).toBeTruthy();
     for (const heading of ["EAST MALAYSIA", "WEST MALAYSIA", "SINGAPORE", "KLANG VALLEY"]) {
       expect(within(rail).queryByText(heading)).toBeNull();
     }
@@ -374,7 +377,8 @@ describe("the shape", () => {
   it("LOGISTICS PARTNER lists only governed partners genuinely carrying rows — no invented company, no duplicated No logistics picked row", () => {
     wrap(<OperationDelivery />);
     const rail = screen.getByTestId("delivery-monitor-rail");
-    expect(within(rail).getByText("NETS")).toBeTruthy();
+    openFilter("LOGISTICS PARTNER");
+    expect(screen.getByRole("option", { name: /^NETS/ })).toBeTruthy();
     expect(within(rail).queryByText("AL")).toBeNull();
     expect(within(rail).queryByText("HOUZS")).toBeNull();
     expect(within(rail).queryByTestId("delivery-monitor-logistics-none")).toBeNull();
@@ -633,7 +637,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
     expect(screen.queryByTestId("delivery-monitor-filter-summary")).toBeNull();
     /* A real narrowing brings the bar back, naming only what it narrowed. */
-    fireEvent.click(screen.getByTestId("delivery-monitor-region-Selangor"));
+    pickFilter("STATE", /^Selangor/);
     expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain(
       "Selangor",
     );
@@ -719,7 +723,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
 
   it("a STATE pick narrows the work list, and stays on the tab it was made on", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
-    fireEvent.click(screen.getByTestId("delivery-monitor-region-Selangor"));
+    pickFilter("STATE", /^Selangor/);
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-card-a")).toBeNull();
   });
@@ -742,7 +746,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
 
   it("a LOGISTICS PARTNER pick renders the work list narrowed to that partner", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
-    fireEvent.click(screen.getByTestId("delivery-monitor-logistics-p-nets"));
+    pickFilter("LOGISTICS PARTNER", /^NETS/);
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.getByText("SO-1323")).toBeTruthy();
     expect(screen.queryByText("SO-1322")).toBeNull();
@@ -750,7 +754,7 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
 
   it("a DELIVERY STATUS pick is a filter over recorded progress — Waiting for warehouse lists the arranged-but-not-ready rows", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
-    fireEvent.click(screen.getByTestId("delivery-monitor-status-waiting_warehouse"));
+    pickFilter("DELIVERY STATUS", /^Waiting for warehouse/);
     expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_warehouse");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     /* SO-1322 holds a live DO with no handover yet — Waiting for warehouse. */
@@ -941,7 +945,7 @@ describe("the URL is the state", () => {
   it("a retired ?view=waiting_warehouse (once a queue) resolves to the DELIVERY STATUS filter", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=waiting_warehouse");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
-    expect(screen.getByTestId("delivery-monitor-status-waiting_warehouse").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("combobox", { name: "DELIVERY STATUS" })).toHaveTextContent("Waiting for warehouse");
     expect(screen.getByText("SO-1322")).toBeTruthy();
     expect(screen.queryByText("SO-1323")).toBeNull();
   });

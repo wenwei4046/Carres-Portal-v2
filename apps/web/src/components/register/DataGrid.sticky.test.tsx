@@ -97,6 +97,18 @@ describe("DataGrid · stickyIdentity", () => {
    getComputedStyle assertion would pass on a broken grid. The offsets ARE the
    contract — 30 (selection) + 32 (expand) = 62 for the first data column. */
 describe("DataGrid · stickyIdentity offsets", () => {
+  it("pins both named identities at cumulative widths without pinning unrelated columns", () => {
+    const { container } = render(<DataGrid<Row> rows={ROWS}
+      columns={[...COLUMNS, { key: "action", label: "Action", width: 200, accessor: () => "Edit" }]}
+      storageKey="test.sticky.multiple" rowKey={(r) => r.id}
+      stickyIdentity={{ columnKeys: ["so", "customer"] }}
+      selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
+      expandable={{ renderExpansion: () => <div>goods</div> }} />);
+    expect([...container.querySelectorAll<HTMLElement>("thead th")].map((el) => el.style.left))
+      .toEqual(["0px", "30px", "62px", "147px", ""]);
+    expect([...container.querySelectorAll<HTMLElement>("tbody tr:first-child td")].map((el) => el.style.left))
+      .toEqual(["0px", "30px", "62px", "147px", ""]);
+  });
   it("pins the gutter and the FIRST data column at cumulative offsets", () => {
     const { container } = render(
       <DataGrid<Row>
