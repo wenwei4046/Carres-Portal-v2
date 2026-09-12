@@ -2866,6 +2866,28 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
 | `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
 
+### Finance Dashboard · AR · Receivables (build/finance-old-reads)
+
+**PROPOSAL / NOT LAW.** Pages: Finance → `Dashboard` and `AR · Receivables`, and the AR drawer.
+Both figures add up the same per-row numbers as the page they open (`money-owed.ts`). The words
+may appear only on these pages until the owner rules.
+
+| Word on screen | Meaning | Falsifier |
+|---|---|---|
+| `AR · Receivables` | Destination: every order a customer still owes money on, where Finance records a receipt. | The owner rules one global Dashboard with no Finance AR page (COPY 1690), or recording moves to the Invoices register. |
+| `Material exposure` | Dashboard section heading over the money-owed figures (Workspace MASTER §8). | A finance user cannot say what the section holds. |
+| `Open AR · Receivables` · `Open Unpaid by Supplier` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
+| `What customers still owe HQ, storage included. Orders with no price yet are left out.` | Meaning line under the Dashboard's Outstanding figure. | The figure includes an unpriced order, or leaves out storage owed. |
+| `What Carres still owes suppliers and other creditors on confirmed bills.` | Meaning line under the Dashboard's Unpaid figure. | The figure counts a draft bill, or differs from the Unpaid by Supplier footer. |
+| `includes storage {RM}` | Second line under Outstanding: the storage part of what the customer owes (Payment MASTER). | Storage owed shows as a separate total that the Outstanding figure leaves out. |
+| `Could not load {source}` · `Last available {date and time} · {RM}` · `Try again` | A figure whose read failed: said in words, never RM 0.00, with the last figure it had. | A failed read shows a zero or a blank. |
+| `Invoices could not be loaded. Try again.` | The AR register's failed read (Error pattern). | The page shows an empty list when the read failed. |
+| `No customer owes money.` | The AR register's empty state. | It shows while an order still owes money. |
+| `Search orders…` | Search placeholder on the AR register. | Search also matches something that is not an order or customer. |
+| `SO not available` | The SO No cell when the order has no SO number (absent value in words). | A raw id or blank shows instead. |
+| `Record payment received` · `Amount must be positive` · `Receipt failed: {reason}` · `Recorded {RM} for SO-{n}` | Heading, validation, failure and success of the drawer's Record receipt form. | The form records a zero or negative amount, or fails silently. |
+| `No receipts recorded yet.` · `Receipt number missing` · `Method not recorded` · `VOIDED` | Payment history: none yet · a receipt without its RC number · a receipt without its method · a cancelled receipt. | A stored method key or a blank reaches the screen. |
+
 ---
 
 ## Header rules (see UI-KIT for the shell)
