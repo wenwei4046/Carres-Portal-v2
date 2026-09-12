@@ -2888,7 +2888,8 @@ APPROVAL**, listed with where it appears.
 | `Advance applied` · `Advance taken off` · `Money back recorded` · `Money back cancelled` | History lines (event words) and toasts. |
 | `Applied` · `Taken off` | A knock-off's status (database `applied` / `cancelled`). |
 | `Recorded` · `Cancelled` | A money back's status (database `posted` / `voided`) — same pair as Other receipts. |
-| `Money back No` · `SRV-YYYYMMDD-NNNN` | The money back number; prefix SRV = supplier receipt voucher. |
+| `Money back No` · `SRV-YYYYMMDD-NNNN` | The money back number; prefix SRV = supplier receipt voucher (the owner may choose SMB instead; it is one line, `supplier_money_back_prefix()` in 0485). |
+| `This money back was already recorded as {No} with different details. Open the form again to record another.` | Refusal (`idempotency_mismatch`) when a key is re-sent with a different voucher, amount, account or date. |
 | `Received into` | Reused from 0478: the bank or cash account the money back came into. |
 | `Advance from {PV No}` | A knock-off row on a bill's Payments card. |
 | `This supplier has no advance left.` · `Choose the advance` · `Choose the bill` · `Loading advances…` · `The advances could not be loaded. Try again.` | The Apply advance modal. |
@@ -2900,6 +2901,14 @@ APPROVAL**, listed with where it appears.
 | `An advance applied to a bill or sent back must be taken off or cancelled first.` | Added to the cancel-voucher sentence when the voucher carries an advance. |
 | `A bill already on a payment voucher, or with an advance applied, cannot be cancelled.` | Cancel bill sentence (extends 0477's). |
 | `Advance Left` · `Unpaid After Advance` | Columns on Unpaid by Supplier (`advance_open`, `net_owing`). |
+| `Supplier money back` · `Supplier money back reversal` | The Journal's Source for `SUPPLIER_MONEY_BACK` and its reversal (finance-ledger.ts). |
+| `{Bill No} · {Supplier invoice} · {RM} left to pay` | An option in the Bill picker of Apply advance (from the voucher). |
+| `{PV No} · {date} · {RM} left` | An option in the Advance picker of Apply advance (from the bill). |
+| `Taken off — {reason}` · `Cancelled — {reason}` | Status cell of a knock-off taken off, and of a money back cancelled, with the reason. |
+| `This voucher is cancelled, so its advance was never paid or has been reversed.` | The Advance card of a cancelled voucher, in place of Applied / Money back / Advance left. |
+| `Loading accounts…` · `The accounts could not be loaded. Try again.` | Record money back, in place of the Received into list while it loads or fails. |
+| `Advance` (picker label) · `Bill` · `Date` · `Amount` · `Reference` | Field labels in the Apply advance and Record money back modals. |
+| `Bill No` · `Supplier invoice` · `Draft bill` · `Loading bills…` · `The bills could not be loaded. Try again.` · `This supplier has no confirmed bill left to pay.` · `Choose the bank or cash account` · `Bank reference or cheque No` | Reused from 0477 — the Apply advance and Record money back modals and the knock-off table. |
 
 ---
 

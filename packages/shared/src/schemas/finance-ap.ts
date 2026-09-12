@@ -383,7 +383,8 @@ export interface PaymentVoucherRegisterRow {
   created_at: string;
   /** 0485: the advance this voucher carries (0 = none). */
   advance_amount: ApMoney;
-  /** 0485: what is left of it; null until the voucher is approved. */
+  /** 0485: what is left of it; null unless the voucher is approved (a draft
+   *  advance is not paid yet; a cancelled one was never paid or is reversed). */
   advance_open: ApMoney | null;
 }
 
@@ -425,7 +426,8 @@ export interface PaymentVoucherAdvance {
   advance_amount: ApMoney;
   applied_total: ApMoney;
   money_back_total: ApMoney;
-  /** Null until the voucher is approved: before that the advance is not money yet. */
+  /** Null unless the voucher is approved: a draft advance is not money yet, and
+   *  a cancelled voucher's advance was never paid or has been reversed. */
   advance_open: ApMoney | null;
   applications: SupplierAdvanceApplication[];
   money_back: SupplierMoneyBack[];

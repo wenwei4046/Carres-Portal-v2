@@ -34,10 +34,14 @@
 --   C. supplier_advance_money_back_record(voucher, date, money account,
 --      amount, reference, narration, idempotency key) — finance or principal.
 --      Money-in pattern (0478 other_receipt_create): a double press with the
---      same key finds the first record; the date may not be before the ledger
---      start or before the advance was paid; the account must be a money
---      account; the amount may not exceed what the advance has left. Number
---      SRV-YYYYMMDD-RRRR, drawn at random (the formal document code, as PV).
+--      same key finds the first record — and the same key sent with a
+--      different voucher, amount, account or date is refused
+--      (idempotency_mismatch), never answered with the first record; the date
+--      may not be before the ledger start or before the advance was paid; the
+--      account must be a money account; the amount may not exceed what the
+--      advance has left. Number <prefix>-YYYYMMDD-RRRR, drawn at random (the
+--      formal document code, as PV); the prefix is written once, in
+--      supplier_money_back_prefix() (section 2 — SRV today).
 --   D. supplier_advance_money_back_cancel(money back, reason) — the finance
 --      approver, with a reason; gl_reverse on the original date (0478
 --      other_receipt_void).
@@ -74,16 +78,17 @@
 --     which bill is finance's decision; the bill says an advance is waiting.
 --   · No money back for an advance that is not approved: a draft advance is
 --     not money yet — change the draft instead.
---   · The Journal's source words (packages/shared finance-ledger.ts) are not
---     in this build's files: SUPPLIER_MONEY_BACK prints as the Journal's
---     "Other entry" until that one row is added.
 --   · No row changed, no row deleted. The events constraint is replaced by a
 --     wider one; every existing row satisfies both.
 --
 -- RLS / PERMISSIONS — what changes and why
 --   · ap_document_events: its action CHECK constraint is dropped and re-added
 --     with four more values (a superset). No policy and no grant changes.
---   · gl_doc_series: one register row, SRV. No policy or grant change.
+--   · gl_doc_series: one register row, the money-back prefix. No policy or
+--     grant change.
+--   · supplier_money_back_prefix(): a new invoker function returning a
+--     constant. Execute is revoked from public, anon and authenticated — only
+--     the definer door that numbers a money back (run as its owner) calls it.
 --   · The four doors and supplier_advances: execute revoked from public and
 --     anon, granted to authenticated — each checks its caller itself (finance
 --     or principal; the finance approver to cancel money back). gl_post and
@@ -124,12 +129,29 @@ comment on table public.ap_document_events is
 
 
 -- ── 2 · the money-back number ────────────────────────────────────────────────
+-- The prefix is written ONCE, in this function: the series row below, the
+-- numbering in section 5 and the sanity check all read it. The owner may still
+-- change it (SRV → SMB): that is this one line, before the file is applied.
 -- Checked against every prefix in this repository on 2026-09-11: gl_doc_series
--- holds ARI JE MJ PV RV SB; no code, test or migration uses SRV. SRV = supplier
--- receipt voucher, the supplier twin of 0478's RV. The primary key refuses a
--- second claim, so a collision fails here instead of sharing a series.
+-- holds ARI JE MJ PV RV SB; no code, test or migration uses SRV or SMB.
+-- SRV = supplier receipt voucher, the supplier twin of 0478's RV. The primary
+-- key refuses a second claim, so a collision fails here instead of sharing a
+-- series.
+create or replace function public.supplier_money_back_prefix()
+returns text
+language sql
+immutable
+set search_path = public, pg_temp
+as $fn$
+  select 'SRV'::text
+$fn$;
+
+comment on function public.supplier_money_back_prefix() is
+  '0485: the one place the supplier money-back number prefix is written.';
+
 insert into public.gl_doc_series (prefix, description)
-values ('SRV', 'Supplier money back — part of an advance a supplier sent back (0485)');
+values (public.supplier_money_back_prefix(),
+        'Supplier money back — part of an advance a supplier sent back (0485)');
 
 
 -- ── 3 · knock an advance off a bill ──────────────────────────────────────────
@@ -312,7 +334,7 @@ as $fn$
 declare
   v_role     text := public.app_role()::text;
   v_me       uuid := (select u.id from public.app_users u where u.id = auth.uid());
-  v_existing uuid;
+  v_seen     public.supplier_advance_money_back%rowtype;
   v_v        public.payment_vouchers%rowtype;
   v_money    text := btrim(coalesce(p_money_account_code, ''));
   v_ref      text := nullif(btrim(coalesce(p_reference, '')), '');
@@ -332,10 +354,21 @@ begin
   -- behind the first, and the second finds the first's record (0478 pattern).
   if p_idempotency_key is not null then
     perform pg_advisory_xact_lock(hashtextextended('supplier_money_back:' || p_idempotency_key::text, 0));
-    select m.id into v_existing from public.supplier_advance_money_back m
+    select m.* into v_seen from public.supplier_advance_money_back m
      where m.idempotency_key = p_idempotency_key;
-    if v_existing is not null then
-      return v_existing;
+    if found then
+      -- The same key must carry the same money back. A key re-sent with a
+      -- different voucher, amount, account or date is not a double press: say
+      -- so, never hand back a record that is not what the person typed.
+      if v_seen.voucher_id <> p_voucher_id
+         or v_seen.amount <> p_amount
+         or v_seen.money_account_code <> btrim(coalesce(p_money_account_code, ''))
+         or v_seen.money_back_date is distinct from p_money_back_date then
+        raise exception 'This money back was already recorded as % with different details. Open the form again to record another.',
+          v_seen.money_back_no
+          using errcode = 'P0001', detail = 'idempotency_mismatch';
+      end if;
+      return v_seen.id;
     end if;
   end if;
 
@@ -384,7 +417,7 @@ begin
 
   select s.name into v_supplier from public.suppliers s where s.id = v_v.supplier_id;
   v_id := gen_random_uuid();
-  v_no := public.allocate_formal_document_code('SRV', v_id::text, p_money_back_date);
+  v_no := public.allocate_formal_document_code(public.supplier_money_back_prefix(), v_id::text, p_money_back_date);
 
   -- Dr the money account; Cr the advance's own payables control, party = the
   -- supplier. The supplier's payables balance rises by what came back.
@@ -421,7 +454,7 @@ end;
 $fn$;
 
 comment on function public.supplier_advance_money_back_record(uuid, date, text, numeric, text, text, uuid) is
-  '0485: records money a supplier sent back out of an approved advance. Finance or principal. SRV number; posts Dr money account / Cr the advance''s payables control (party = supplier). Capped by the advance left. Idempotent on p_idempotency_key.';
+  '0485: records money a supplier sent back out of an approved advance. Finance or principal. Numbered with supplier_money_back_prefix(); posts Dr money account / Cr the advance''s payables control (party = supplier). Capped by the advance left. Idempotent on p_idempotency_key.';
 
 create or replace function public.supplier_advance_money_back_cancel(p_money_back_id uuid, p_reason text)
 returns uuid
@@ -846,6 +879,9 @@ grant execute on function public.supplier_advance_money_back_cancel(uuid, text) 
 grant execute on function public.supplier_advances(uuid)                                                       to authenticated;
 grant execute on function public.payment_voucher_register()                                                    to authenticated;
 
+-- The prefix: nobody calls it but the numbering door, which runs as its owner.
+revoke all on function public.supplier_money_back_prefix() from public, anon, authenticated;
+
 
 -- ── 8 · sanity ───────────────────────────────────────────────────────────────
 do $sanity$
@@ -890,8 +926,8 @@ begin
   end if;
 
   -- 3 · the number series
-  if not exists (select 1 from public.gl_doc_series where prefix = 'SRV') then
-    raise exception '0485 sanity: the SRV series is not registered';
+  if not exists (select 1 from public.gl_doc_series where prefix = public.supplier_money_back_prefix()) then
+    raise exception '0485 sanity: the money-back series is not registered';
   end if;
 
   -- 4 · a knock-off posts nothing; money back posts with the supplier; its
@@ -913,8 +949,9 @@ begin
   select p.prosrc into v_src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'supplier_advance_money_back_record';
   if position('''SUPPLIER_MONEY_BACK''' in v_src) = 0 or position('party_type' in v_src) = 0
-     or position('supplier_advance_open(' in v_src) = 0 or position('pg_advisory_xact_lock' in v_src) = 0 then
-    raise exception '0485 sanity: money back lost its posting, its cap or its double-press guard';
+     or position('supplier_advance_open(' in v_src) = 0 or position('pg_advisory_xact_lock' in v_src) = 0
+     or position('idempotency_mismatch' in v_src) = 0 or position('supplier_money_back_prefix()' in v_src) = 0 then
+    raise exception '0485 sanity: money back lost its posting, its cap, its double-press guard or its prefix';
   end if;
   select p.prosrc into v_src from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'supplier_advance_money_back_cancel';

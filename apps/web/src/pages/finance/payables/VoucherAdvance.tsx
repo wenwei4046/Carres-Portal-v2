@@ -66,13 +66,23 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
         }
       >
         <FactRow label="Advance">{money(adv.advance_amount)}</FactRow>
-        <FactRow label="Applied to bills">{money(adv.applied_total)}</FactRow>
-        <FactRow label="Money back">{money(adv.money_back_total)}</FactRow>
-        <FactRow label="Advance left">
-          <span data-testid="voucher-advance-left">
-            {open === null ? "Not paid yet — approving the payment pays it" : money(open)}
-          </span>
-        </FactRow>
+        {v.status === "cancelled"
+          ? (
+            <p data-testid="voucher-advance-cancelled">
+              This voucher is cancelled, so its advance was never paid or has been reversed.
+            </p>
+          )
+          : (
+            <>
+              <FactRow label="Applied to bills">{money(adv.applied_total)}</FactRow>
+              <FactRow label="Money back">{money(adv.money_back_total)}</FactRow>
+              <FactRow label="Advance left">
+                <span data-testid="voucher-advance-left">
+                  {open === null ? "Not paid yet — approving the payment pays it" : money(open)}
+                </span>
+              </FactRow>
+            </>
+          )}
         {adv.applications.length > 0 && (
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-body" data-testid="voucher-advance-applications">
@@ -94,7 +104,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
                     <td className="py-1 pr-3">{fmtDate(a.created_at, { time: true })} · {a.created_by_name ?? "Name not available"}</td>
                     <td className="py-1 pr-3">
                       {word(ADVANCE_APPLICATION_STATUS_WORD, a.status)}
-                      {a.status === "cancelled" && a.cancel_reason ? ` · ${a.cancel_reason}` : ""}
+                      {a.status === "cancelled" && a.cancel_reason ? ` — ${a.cancel_reason}` : ""}
                     </td>
                     <td className="py-1 pr-3 text-right">{money(a.amount)}</td>
                     <td className="py-1 text-right">
@@ -129,7 +139,7 @@ export function VoucherAdvanceCard({ doc }: { doc: PaymentVoucherDocument }) {
                     <td className="py-1 pr-3">{m.money_account_code} {m.money_account_name ?? ""}</td>
                     <td className="py-1 pr-3">
                       {word(MONEY_BACK_STATUS_WORD, m.status)}
-                      {m.status === "voided" && m.void_reason ? ` · ${m.void_reason}` : ""}
+                      {m.status === "voided" && m.void_reason ? ` — ${m.void_reason}` : ""}
                     </td>
                     <td className="py-1 pr-3 text-right">{money(m.amount)}</td>
                     <td className="py-1 text-right">
@@ -261,8 +271,12 @@ function MoneyBackModal({ voucherId, voucherNo, open, onClose }: {
   const [account, setAccount] = useState("");
   const [amount, setAmount] = useState(String(open));
   const [reference, setReference] = useState("");
-  // One key per opened form: a double press returns the first record.
-  const [key] = useState(() => crypto.randomUUID());
+  // One key per money back: a double press sends the same key and gets the
+  // first record back. Changing the amount, the account or the date makes it a
+  // different money back, so it takes a new key — the database refuses a key
+  // re-sent with different details (idempotency_mismatch).
+  const [key, setKey] = useState(() => crypto.randomUUID());
+  const fresh = () => setKey(crypto.randomUUID());
   const n = num(amount);
   const ready = account !== "" && /^\d{4}-\d{2}-\d{2}$/.test(date) && n !== null && n > 0 && n <= open;
 
@@ -293,17 +307,24 @@ function MoneyBackModal({ voucherId, voucherNo, open, onClose }: {
         <label className="block">
           Date
           <input aria-label="Date" type="date" className={`${fieldCls} mt-1`} value={date}
-            onChange={(e) => setDate(e.target.value)} />
+            onChange={(e) => { setDate(e.target.value); fresh(); }} />
         </label>
-        <label className="block">
-          Received into
-          <select aria-label="Received into" className={`${fieldCls} mt-1`} value={account}
-            onChange={(e) => setAccount(e.target.value)}>
-            <option value="">Choose the bank or cash account</option>
-            {choices.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
-          </select>
-        </label>
-        <AmountField amount={amount} onChange={setAmount} cap={open} capWord="More than the advance left" />
+        {accounts.isError
+          ? <p role="alert">The accounts could not be loaded. Try again.</p>
+          : !accounts.isSuccess
+            ? <p>Loading accounts…</p>
+            : (
+              <label className="block">
+                Received into
+                <select aria-label="Received into" className={`${fieldCls} mt-1`} value={account}
+                  onChange={(e) => { setAccount(e.target.value); fresh(); }}>
+                  <option value="">Choose the bank or cash account</option>
+                  {choices.map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
+                </select>
+              </label>
+            )}
+        <AmountField amount={amount} onChange={(next) => { setAmount(next); fresh(); }} cap={open}
+          capWord="More than the advance left" />
         <label className="block">
           Reference
           <input aria-label="Reference" className={`${fieldCls} mt-1`} value={reference} maxLength={120}

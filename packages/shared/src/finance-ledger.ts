@@ -250,6 +250,7 @@ export const LEDGER_SOURCE_WORDS: Readonly<Record<string, string>> = {
   OTHER_DEBTOR_INVOICE: "Other debtor invoice",
   OTHER_RECEIPT: "Other receipt",
   RENTAL_PAYMENT: "Rental payment",
+  SUPPLIER_MONEY_BACK: "Supplier money back",
   MANUAL: "Manual journal",
 };
 

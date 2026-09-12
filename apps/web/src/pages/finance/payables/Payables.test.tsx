@@ -343,7 +343,11 @@ const advanceOf = () => ({
   advance_amount: "500.00", applied_total: "200.00", money_back_total: "0.00", advance_open: "300.00",
   applications: [{ id: APP, bill_id: BILL1, bill_no: "BILL-4XK2", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10",
     amount: "200.00", status: "applied", created_at: "2026-09-12T01:00:00Z", created_by_name: "Aina",
-    cancelled_at: null, cancelled_by_name: null, cancel_reason: null }],
+    cancelled_at: null, cancelled_by_name: null, cancel_reason: null },
+  { id: "99999999-9999-4999-8999-999999999993", bill_id: BILL2, bill_no: "BILL-8PZ7", supplier_invoice_no: "LSW-902",
+    bill_date: "2026-09-10", amount: "100.00", status: "cancelled", created_at: "2026-09-11T05:00:00Z",
+    created_by_name: "Aina", cancelled_at: "2026-09-11T06:00:00Z", cancelled_by_name: "Boon",
+    cancel_reason: "Supplier sent a new invoice" }],
   money_back: [{ id: MB, money_back_no: "SRV-20260912-4821", money_back_date: "2026-09-12", money_account_code: "1120",
     money_account_name: "Bank", amount: "50.00", reference: null, narration: null, status: "posted", entry_no: "JE-1",
     reversal_entry_no: null, created_at: "2026-09-12T02:00:00Z", created_by_name: "Aina", voided_at: null,
@@ -356,7 +360,13 @@ describe("Supplier advance (0484–0485)", () => {
       advance: advanceOf(), can: { apply_advance: true, take_advance_off: true, money_back: true } });
     show(`/finance/payment-vouchers/${PV}`);
     expect(await screen.findByTestId("voucher-advance-left")).toHaveTextContent("RM 300.00");
-    expect(screen.getByTestId("voucher-advance-applications")).toHaveTextContent("Applied");
+    const appRows = within(screen.getByTestId("voucher-advance-applications")).getAllByRole("row");
+    // Row 0 is the header ("Applied" is also a column title there).
+    expect(appRows[1]!).toHaveTextContent("BILL-4XK2");
+    expect(within(appRows[1]!).getByText("Applied")).toBeInTheDocument();
+    expect(within(appRows[1]!).getByRole("button", { name: "Take advance off" })).toBeInTheDocument();
+    expect(appRows[2]!).toHaveTextContent("Taken off — Supplier sent a new invoice");
+    expect(within(appRows[2]!).queryByRole("button", { name: "Take advance off" })).not.toBeInTheDocument();
     expect(screen.getByTestId("voucher-money-back")).toHaveTextContent("SRV-20260912-4821");
     // An approver-only step is not offered to this person.
     expect(screen.queryByRole("button", { name: "Cancel money back" })).not.toBeInTheDocument();
@@ -376,7 +386,7 @@ describe("Supplier advance (0484–0485)", () => {
     api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
       advance: advanceOf(), can: { take_advance_off: true } });
     show(`/finance/payment-vouchers/${PV}`);
-    fireEvent.click(await screen.findByRole("button", { name: "Take advance off" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Take advance off" }))[0]!);
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "Wrong bill" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Take advance off" }));
@@ -397,11 +407,48 @@ describe("Supplier advance (0484–0485)", () => {
     expect(dialog).toHaveTextContent("More than the advance left");
     expect(go).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText("Amount"), { target: { value: "120" } });
+    // The first press fails; a press with a changed amount must not reuse its key.
+    api.fail.add(`${B}/vouchers/${PV}/money-back`);
     fireEvent.click(go);
     await waitFor(() => expect(writes()).toHaveLength(1));
-    const w = writes()[0]!;
-    expect(w).toMatchObject({ url: `${B}/vouchers/${PV}/money-back`, body: { moneyAccountCode: "1120", amount: 120 } });
-    expect((w.body as { idempotencyKey: string }).idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+    const first = writes()[0]!;
+    expect(first).toMatchObject({ url: `${B}/vouchers/${PV}/money-back`, body: { moneyAccountCode: "1120", amount: 120 } });
+    const key1 = (first.body as { idempotencyKey: string }).idempotencyKey;
+    expect(key1).toMatch(/^[0-9a-f-]{36}$/);
+
+    api.fail.clear();
+    fireEvent.change(within(dialog).getByLabelText("Amount"), { target: { value: "110" } });
+    await waitFor(() => expect(go).not.toBeDisabled());
+    fireEvent.click(go);
+    await waitFor(() => expect(writes()).toHaveLength(2));
+    const second = writes()[1]!;
+    expect(second.body).toMatchObject({ amount: 110 });
+    expect((second.body as { idempotencyKey: string }).idempotencyKey).not.toBe(key1);
+  });
+
+  it("money back never offers an empty account list while the accounts load or fail", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
+      advance: advanceOf(), can: { money_back: true } });
+    api.fail.add(`${B}/accounts`);
+    show(`/finance/payment-vouchers/${PV}`);
+    fireEvent.click(await screen.findByRole("button", { name: "Record money back" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("The accounts could not be loaded. Try again.")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Received into")).not.toBeInTheDocument();
+  });
+
+  it("a cancelled voucher does not say its advance is waiting to be paid", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "cancelled", advance_amount: "500.00",
+      advance: { ...advanceOf(), advance_open: null, applications: [], money_back: [] }, can: {} });
+    show(`/finance/payment-vouchers/${PV}`);
+    const card = await screen.findByTestId("voucher-advance");
+    expect(card).toHaveTextContent("RM 500.00");
+    expect(screen.getByTestId("voucher-advance-cancelled"))
+      .toHaveTextContent("This voucher is cancelled, so its advance was never paid or has been reversed.");
+    expect(card).not.toHaveTextContent("Not paid yet");
+    expect(screen.queryByTestId("voucher-advance-left")).not.toBeInTheDocument();
+    expect(card).not.toHaveTextContent("Applied to bills");
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("the bill lists an advance knocked off it, and applies one", async () => {
