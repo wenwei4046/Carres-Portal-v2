@@ -277,6 +277,8 @@ MONEY                   the payment ledger · Paid · Outstanding · Open this o
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
 
+**New Sales Order consistency (owner-approved 2026-09-11).** Create uses the same shared form template and theme as saved Sales Orders, including typography, colours, section headers and field sizing. The customer-type badge is hidden during creation; saved orders retain the phone-based customer classification.
+
 **WHY EACH MOVED.** `Sales ownership` stopped being a card: who sold it is part of who bought it,
 and a reader answering *"whose customer is this?"* had to leave the customer to find three names.
 `DELIVERY` became a card because the address and the access conditions are ONE question — *can we

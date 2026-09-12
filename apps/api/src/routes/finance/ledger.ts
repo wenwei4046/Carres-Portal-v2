@@ -132,15 +132,43 @@ async function readAllPages(
 
 // ── the Journal ──────────────────────────────────────────────────────────────
 
-/** The linked entry numbers come from the two self-references on
- *  `gl_entries`, named by their foreign keys so PostgREST knows which is which. */
+/** An entry's own columns — nothing embedded. `reverses` and `reversed_by`
+ *  point back into `gl_entries` itself, and PostgREST will not embed a table
+ *  in itself through a foreign-key hint ("To disambiguate recursive
+ *  relationships, PostgREST requires Computed Relationships" — its docs). The
+ *  hinted embed failed every read: production answered 500 to the Journal and
+ *  to an entry number that does not exist. The linked numbers are read
+ *  separately, by `linkedEntryNumbers`. */
 const ENTRY_COLUMNS =
   "id,entry_no,entry_date,source_type,source_doc_no,narration,total_debit,total_credit," +
-  "reversed,reverses,reversed_by,created_at," +
-  "reverses_entry:gl_entries!gl_entries_reverses_fkey(entry_no)," +
-  "reversed_by_entry:gl_entries!gl_entries_reversed_by_fkey(entry_no)";
+  "reversed,reverses,reversed_by,created_at";
 
-function toEntryRow(r: Json): LedgerEntryRow {
+/** Ids per linked-number read — keeps the `in (…)` list well inside a URL. */
+const LINK_SLICE = 100;
+
+/**
+ * The entry number of every entry these rows point at, through `reverses` or
+ * `reversed_by`. Fail closed like `readAllPages`: a slice that cannot be read
+ * is an error for the whole answer, never a reversal shown without its link.
+ */
+async function linkedEntryNumbers(sb: Sb, rows: Json[]): Promise<{ numbers: Map<string, string> } | { error: PgError }> {
+  const ids = [...new Set(rows
+    .flatMap((r) => [r.reverses, r.reversed_by])
+    .filter((v): v is string => typeof v === "string"))];
+  const numbers = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += LINK_SLICE) {
+    const { data, error } = await sb.from("gl_entries").select("id,entry_no").in("id", ids.slice(i, i + LINK_SLICE));
+    if (error) return { error };
+    for (const r of (data ?? []) as Json[]) {
+      if (typeof r.id === "string" && typeof r.entry_no === "string") numbers.set(r.id, r.entry_no);
+    }
+  }
+  return { numbers };
+}
+
+function toEntryRow(r: Json, numbers: Map<string, string>): LedgerEntryRow {
+  const reverses = (r.reverses as string | null) ?? null;
+  const reversedBy = (r.reversed_by as string | null) ?? null;
   return {
     id: String(r.id),
     entry_no: String(r.entry_no),
@@ -151,10 +179,10 @@ function toEntryRow(r: Json): LedgerEntryRow {
     total_debit: num(r.total_debit),
     total_credit: num(r.total_credit),
     reversed: r.reversed === true,
-    reverses: (r.reverses as string | null) ?? null,
-    reverses_entry_no: one(r.reverses_entry as { entry_no: string } | null)?.entry_no ?? null,
-    reversed_by: (r.reversed_by as string | null) ?? null,
-    reversed_by_entry_no: one(r.reversed_by_entry as { entry_no: string } | null)?.entry_no ?? null,
+    reverses,
+    reverses_entry_no: reverses ? (numbers.get(reverses) ?? null) : null,
+    reversed_by: reversedBy,
+    reversed_by_entry_no: reversedBy ? (numbers.get(reversedBy) ?? null) : null,
     created_at: String(r.created_at),
   };
 }
@@ -184,7 +212,10 @@ financeLedgerRouter.get("/entries", requireFinance, async (c) => {
     .range(offset, offset + limit - 1);
   if (error) return ledgerError(c, error, "The journal");
   if (!Array.isArray(data) || count == null) return failed(c, "The journal");
-  return c.json({ rows: (data as unknown as Json[]).map(toEntryRow), total: count });
+  const rows = data as unknown as Json[];
+  const linked = await linkedEntryNumbers(sb, rows);
+  if ("error" in linked) return ledgerError(c, linked.error, "The journal");
+  return c.json({ rows: rows.map((r) => toEntryRow(r, linked.numbers)), total: count });
 });
 
 financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
@@ -204,7 +235,10 @@ financeLedgerRouter.get("/entries/:ref", requireFinance, async (c) => {
   if (!head.data) {
     return c.json({ error: "not_found", code: "not_found", message: "No entry has that number." }, 404);
   }
-  const entry = toEntryRow(head.data as unknown as Json);
+  const headRow = head.data as unknown as Json;
+  const linked = await linkedEntryNumbers(sb, [headRow]);
+  if ("error" in linked) return ledgerError(c, linked.error, "This entry");
+  const entry = toEntryRow(headRow, linked.numbers);
   const base = baseSourceType(entry.source_type);
 
   const [lines, related] = await Promise.all([
