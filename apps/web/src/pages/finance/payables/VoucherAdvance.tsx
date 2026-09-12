@@ -1,3 +1,4 @@
+// design-standard: not-a-list-page — the advance card and its modals sit inside the Payment Voucher page, which owns the shell
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
