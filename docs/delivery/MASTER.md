@@ -816,10 +816,14 @@ The real shell can be walked through the existing dev preview with `?shell=1&tab
 **⭐ BELOW 1100px THE RAIL STARTS COLLAPSED (owner ruling 2026-09-12)** — the Delivery Orders
 register's own number, so the two Delivery pages do not disagree about what *narrow* means. 240px
 of a 949px window is a quarter of the page spent on filters nobody has asked for while the sheet
-is already scrolling sideways. The collapsed desktop rail is 44px wide with a visible `Show filters` button and text label;
-the active narrowing stays
-above the rows, so collapsed is DEFERRED, never gone — **a remembered choice still wins at any
-width**. Collapsed, the table viewport is **806px** rather than 566px.
+is already scrolling sideways. The collapsed desktop rail is 44px wide with a visible `Show filters`
+button and text label; the active narrowing stays above the rows, so collapsed is DEFERRED, never
+gone — **a remembered choice still wins at any width**.
+
+**MEASURED ON PRODUCTION `316a6ef4`, 2026-09-12, 949×800, Operation session:** open, the table
+viewport is 566px; collapsed behind the 44px strip it is **762px**, against 1821px of sheet. *(An
+earlier line here said 806px. That was measured before the 44px strip existed, when `Show filters`
+sat in the toolbar; the strip costs 44px of the 806 and the built page is the record.)*
 
 **The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
 `FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px
@@ -1378,6 +1382,34 @@ This MASTER persists the approved operating model only. It does not authorise Ca
 implementation sequencing, migration or build work.
 
 ## 16 · Production closure
+
+**DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
+appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA
+`316a6ef473880d552d6812cb2202b4d13f380441`; all five canonical surfaces report it** (`erp` ·
+`pos` · `carres-portal.pages.dev` in `/__carres_deploy.json`, plus the Worker's and
+`api.carresofficial.com`'s `/health`). Walked in an AUTHENTICATED OPERATION session (role
+`operation`) against **89 real delivery rows**.
+
+- **1440×900.** The rail carries both months in the fixed 429px band, the six `WORK TO DO` rows,
+  then `STATE` `All states (89)` · `LOGISTICS PARTNER` `All partners (89)` · `DELIVERY STATUS`
+  `All (89)` as kit dropdowns. The filter box holds **506px in 421px and scrolls 85px** — the
+  measured result, against 1152px in 421px (731px) before.
+- **949×800.** The rail starts collapsed behind a 44px strip carrying a visible `Show filters`
+  button and its label; the table viewport is **762px** of a 1821px sheet.
+- **Scrolled to `Actions`,** `SO No` (left 62px) and `Customer` (left 212px) both stay pinned —
+  `SO-1358 · Aina Rahman · No logistics picked` reads beside `Call NETS — confirm delivery date`
+  and `Edit Delivery`. That pairing is the defect the second pin exists to end.
+
+⚠️ **A CANCELLED DEPLOY RUN IS NOT A FAILED ONE, AND NOT A SHIPPED ONE EITHER.** The run for
+`8a5fc05b` was superseded by a newer push while it queued. The commit is an ancestor of the live
+SHA (`git merge-base --is-ancestor` verified), so the work shipped inside the following run — but
+a cancelled run beside one's own SHA must be traced to CONTAINMENT before anything is called
+deployed.
+
+**NOT PROVEN ON PRODUCTION:** no live row today holds a day without a window, so
+`Call {logistics} — confirm delivery time` and the corrected calendar card rest on unit tests and
+the design preview (`apps/web/monitor-proposal-preview.html`), not on live data.
+
 
 **DEPLOYED 2026-09-11 — the Monitor corrections and the arrival defect, PR #1240, main SHA
 `7b06227d60103798ab5fc73b42835f8ca8c7f6ae`, all five canonical surfaces converged**
