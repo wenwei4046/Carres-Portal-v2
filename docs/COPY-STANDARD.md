@@ -2779,6 +2779,29 @@ Sentences these pages print follow the Empty-state and Error patterns above, for
 The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
 `finance-ledger.ts` from the row's own numbers.
 
+### Reports (Profit and Loss · Balance Sheet)
+
+Page: Finance → `Reports`. Both statements are read from the ledger (migration 0469); every figure
+is one the ledger summed. The page also uses these words from the Journal block above, with the same
+meaning: `Account` · `Amount` · the kind words · `As of` · `Since {date} · No opening balances` ·
+`Account name not available` · `Open Self-check` · `Try again`.
+
+| Group | Word | Meaning | Falsifier (NOT LAW) |
+|---|---|---|---|
+| Statements | **`Profit and Loss`** | Income less expense for a period. Panel title. | A finance user calls it something else (`P&L`, `Income Statement`) and does not recognise this name. |
+| | **`Balance Sheet`** | What Carres has and owes on one day. Panel title. | As above, for `Statement of Financial Position`. |
+| Period | **`Month`** | Picks one whole month for the Profit and Loss. | A user picks a month expecting it to change the Balance Sheet too. |
+| | **`Custom Date Range`** | Shown in `Month` when the dates are not one whole month. | A user reads it as a button that opens a date range. |
+| | **`From`** · **`Up to`** | The first and last day of the Profit and Loss, as field labels. `Up to` includes that day. | A user asks whether the `Up to` day is included. |
+| Totals | **`Net result`** | Income less expense for the period, as the ledger served it. Bottom line of the Profit and Loss. | A user reads a negative figure here and does not see it is a loss. |
+| | **`Net result not yet closed`** | Income less expense up to the day, not yet moved into equity. A line inside Equity. | A user adds it to Equity a second time, not seeing it is already in the Equity total. |
+| Sentences | **`Every account is at RM 0.00 in this period.`** | Under a Profit and Loss section where every account nets to zero. Entries can cancel out, so it never says "no entries". | A user reads it as "nothing happened" when the Journal shows entries. |
+| | **`Every account is at RM 0.00 on this day.`** | The same, under a Balance Sheet section. | As above. |
+| | **`⚠ Assets differ from liabilities plus equity by {money}.`** | The ledger's own check failed on that day; followed by `Open Self-check`. The only place the difference prints. | A user cannot tell which side is larger, and needs to. |
+| | **`The ledger has no start date yet. Nothing can be totalled.`** | The ledger has no go-live day, so neither statement can be read. | A user does not know who sets the start date. |
+| | **`The ledger started on {date}. Pick a day from then on.`** | The chosen day or period ends before go-live. | A user picks a later day and still sees it. |
+| | **`The profit and loss could not be loaded. Try again.`** · **`The balance sheet could not be loaded. Try again.`** | The read failed; no figure is shown. Same sentence as the API sends. | A user retries and gets the same sentence every time, so `Try again` promises nothing. |
+
 ### Manual journal (principal only)
 
 **PROPOSAL / NOT LAW.** The words of the principal's manual journal door on the Journal
