@@ -311,6 +311,20 @@ describe("manual journal — the database's refusals become sentences", () => {
       500, "The journal entry could not be recorded. Try again."],
   ];
 
+  const UNKNOWN = "The answer did not come back. Check the Journal for this entry before you record it again.";
+  it.each<[string, Result]>([
+    ["a gateway page with no SQLSTATE", { data: null, error: { message: "<html><body>502 Bad Gateway internal</body></html>" } }],
+    ["an empty code", { data: null, error: { code: "", message: "fetch failed internal" } }],
+    ["no id and no error", { data: null, error: null }],
+  ])("answers 503 outcome_unknown, never \"try again\", for %s", async (_name, rpc) => {
+    happy({ rpc });
+    const res = await post(OPENING);
+    expect(res.status).toBe(503);
+    const out = await json(res);
+    expect(out).toMatchObject({ code: "outcome_unknown", message: UNKNOWN });
+    expect(JSON.stringify(out)).not.toMatch(/internal|html|Try again/);
+  });
+
   it.each(cases)("%s", async (_name, rpc, status, message) => {
     happy({ rpc });
     const res = await post(OPENING);

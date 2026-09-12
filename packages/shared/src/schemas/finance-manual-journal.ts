@@ -25,7 +25,7 @@ function isCalendarDay(s: string): boolean {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-const twoDecimals = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6;
+const twoDecimals = (n: number) => Math.round(n * 100) / 100 === n;
 
 /** A typed amount: more than zero, at most two decimals. A third decimal is
  *  refused, never rounded — rounding would post a figure nobody typed. */

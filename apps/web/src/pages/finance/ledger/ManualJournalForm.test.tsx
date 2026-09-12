@@ -6,12 +6,16 @@ import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { itSaysNoBannedWord, visibleStrings } from "@/test/banned-words";
+import { ApiError } from "@/lib/api";
 import LedgerJournal from "./LedgerJournal";
 
 const api = vi.hoisted(() => ({ fetch: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: "principal" as string | null }));
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock("@/lib/api", () => ({ apiFetch: api.fetch }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  apiFetch: api.fetch,
+}));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string | null }) => unknown) => selector({ role: auth.role }),
 }));
@@ -200,12 +204,12 @@ describe("the form", () => {
   it("adds and removes lines, and never goes below two", async () => {
     show("/finance/ledger?entry=new");
     await screen.findByTestId("manual-journal-form");
-    expect(screen.getByRole("button", { name: "Remove line 1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove, line 1" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Add line" }));
     expect(screen.getByTestId("journal-line-3")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Remove line 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove, line 3" }));
     expect(screen.queryByTestId("journal-line-3")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove line 2" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove, line 2" })).toBeDisabled();
   });
 });
 
@@ -249,7 +253,7 @@ describe("recording", () => {
 
   it("keeps the form and says why when the ledger refuses", async () => {
     const why = "Line 1 uses a customer, supplier or other party account. Those accounts move only through their own documents.";
-    recordAnswer = () => Promise.reject(Object.assign(new Error(why), { status: 422 }));
+    recordAnswer = () => Promise.reject(new ApiError(422, why, { error: "rule_violation", message: why }));
     show("/finance/ledger?entry=new");
     await fillOpeningBalance();
     fireEvent.click(screen.getByRole("button", { name: "Record journal entry" }));
@@ -270,6 +274,42 @@ describe("recording", () => {
     expect(refusal).toHaveTextContent("The connection dropped. Check the Journal for this entry before you record it again.");
     expect(refusal).not.toHaveTextContent("Failed to fetch");
     expect(screen.getByTestId("where")).toHaveTextContent("/finance/ledger?entry=new");
+  });
+
+  it("treats a gateway error as an unknown outcome, never as a refusal", async () => {
+    recordAnswer = () => Promise.reject(new ApiError(502, "Bad Gateway", "<html>502 Bad Gateway</html>"));
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+    fireEvent.click(screen.getByRole("button", { name: "Record journal entry" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Record journal entry" }));
+    const refusal = await screen.findByTestId("journal-refusal");
+    expect(refusal).toHaveTextContent("The connection dropped. Check the Journal for this entry before you record it again.");
+    expect(refusal).not.toHaveTextContent("Bad Gateway");
+  });
+
+  it("drops a blank row before recording, so the ledger's line number points at the right row", async () => {
+    show("/finance/ledger?entry=new");
+    await screen.findByTestId("manual-journal-form");
+    fireEvent.click(screen.getByRole("button", { name: "Add line" }));
+    await pick(1, "1120 Bank — current account");
+    type(1, "Debit", "100");
+    await pick(3, "6100 Rent");
+    type(3, "Credit", "100");
+    narrate("Correction of a test entry");
+    const why = "Line 2 names an account that is no longer in use.";
+    recordAnswer = () => Promise.reject(new ApiError(422, why, { error: "rule_violation", message: why }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Record journal entry" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(screen.queryByTestId("journal-line-3")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Record journal entry" }));
+
+    expect(await screen.findByTestId("journal-refusal")).toHaveTextContent(why);
+    const post = api.fetch.mock.calls.find(([u]) => u === "/api/finance/manual-journals");
+    const sent = JSON.parse(String((post?.[1] as RequestInit).body)) as { lines: { account_code: string }[] };
+    expect(sent.lines.map((l) => l.account_code)).toEqual(["1120", "6100"]);
+    expect(within(line(2)).getByLabelText("Credit")).toHaveValue("100");
+    expect(screen.queryByTestId("journal-line-3")).not.toBeInTheDocument();
   });
 });
 

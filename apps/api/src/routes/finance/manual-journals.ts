@@ -92,7 +92,16 @@ const REFUSALS: Record<string, { status: 403 | 409 | 422; message: string; perLi
   gl_post_zero_total:                 { status: 422, message: "The entry adds up to RM 0.00." },
 };
 
+/** The call went out and no database answer came back (a gateway page, a
+ *  dropped connection): the entry may stand. Never "try again" — a second
+ *  press is a second entry. */
+const OUTCOME_UNKNOWN = "The answer did not come back. Check the Journal for this entry before you record it again.";
+const outcomeUnknown = (c: Context<AppEnv>) =>
+  c.json({ error: "outcome_unknown", code: "outcome_unknown", message: OUTCOME_UNKNOWN }, 503);
+
 function journalError(c: Context<AppEnv>, error: PgError, goLive: string | null) {
+  // A database refusal always carries a five-character SQLSTATE.
+  if (!/^[0-9A-Z]{5}$/.test(error.code ?? "")) return outcomeUnknown(c);
   const known = error.details ? REFUSALS[error.details] : undefined;
   if (known) {
     let message = known.message;
@@ -151,9 +160,7 @@ financeManualJournalsRouter.post("/", requirePrincipal, async (c) => {
   });
   if (error) return journalError(c, error, goLive);
   const id = typeof data === "string" ? data : null;
-  if (!id) {
-    return c.json({ error: "rpc_failed", code: "rpc_failed", message: "The journal entry could not be recorded. Try again." }, 500);
-  }
+  if (!id) return outcomeUnknown(c);
 
   // The entry stands from here on. A failed read-back must not look like a
   // failed entry — a person told "it failed" presses again and posts twice —

@@ -34,6 +34,7 @@ import Modal from "@/components/kit/Modal";
 import Select from "@/components/kit/Select";
 import Textarea from "@/components/kit/Textarea";
 import { SectionCard } from "@/components/SectionPanel";
+import { ApiError } from "@/lib/api";
 import { appTodayIso, fmtDate } from "@/lib/fmt-date";
 import { rm } from "@/lib/format-currency";
 import SalesOrderTabs from "@/pages/operation/SalesOrderTabs";
@@ -57,9 +58,17 @@ function blankLine(): TypedLine {
   return { key: `journal-line-${lineSeq}`, account_code: "", debit: "", credit: "", memo: "" };
 }
 
-const twoDecimals = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6;
+const twoDecimals = (n: number) => Math.round(n * 100) / 100 === n;
 
 const DROPPED = "The connection dropped. Check the Journal for this entry before you record it again.";
+
+/** The server answered and said no, in its own words: a 4xx whose JSON body
+ *  carries a `message`. */
+function isRefusal(e: unknown): e is ApiError {
+  if (!(e instanceof ApiError) || e.status < 400 || e.status > 499) return false;
+  const body = e.body as { message?: unknown } | null;
+  return typeof body === "object" && body !== null && typeof body.message === "string";
+}
 
 /** A typed amount → a number, nothing (left blank), or the reason it cannot
  *  be read. A trailing point (`12.`) is read as the number typed so far. */
@@ -175,6 +184,16 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
     return parsed.data;
   };
 
+  // Blank rows are left out of the entry, so they leave the screen too:
+  // otherwise the database's "Line 2" would point at the wrong row.
+  const dropBlankLines = () => setLines((all) => all.filter((l) => !readLine(l).blank));
+
+  const askFirst = () => {
+    if (!build()) return;
+    dropBlankLines();
+    setConfirming(true);
+  };
+
   const submit = () => {
     if (record.isPending) return;
     setRefusal(null);
@@ -183,6 +202,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
       setConfirming(false);
       return;
     }
+    dropBlankLines();
     record.mutate(input, {
       onSuccess: (res) => {
         setConfirming(false);
@@ -191,11 +211,10 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
       },
       onError: (e) => {
         setConfirming(false);
-        // A refusal carries the server's status and its own sentence. No
-        // status means no answer: the entry may have landed before the line
-        // dropped, and a second press is a second entry — so look first.
-        const answered = typeof (e as { status?: unknown }).status === "number";
-        setRefusal(answered ? e.message : DROPPED);
+        // Only a 4xx that carries our own sentence is a refusal. Anything else
+        // (no answer, a gateway page, a 5xx) leaves the outcome unknown: the
+        // entry may already stand, and a second press is a second entry.
+        setRefusal(isRefusal(e) ? e.message : DROPPED);
       },
     });
   };
@@ -244,7 +263,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
                 error={l.errors.credit} onChange={(e) => set(l.line.key, { credit: e.target.value })} />
               <Input id={`journal-memo-${i + 1}`} label="Memo" maxLength={500} value={l.line.memo}
                 onChange={(e) => set(l.line.key, { memo: e.target.value })} />
-              <Button variant="ghost" aria-label={`Remove line ${i + 1}`} disabled={lines.length <= 2}
+              <Button variant="ghost" aria-label={`Remove, line ${i + 1}`} disabled={lines.length <= 2}
                 onClick={() => setLines((all) => all.filter((x) => x.key !== l.line.key))}>
                 Remove
               </Button>
@@ -267,7 +286,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
         {refusal && <p role="alert" className="text-body text-kit-red-11" data-testid="journal-refusal">{refusal}</p>}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" disabled={gap !== null} onClick={() => (build() ? setConfirming(true) : undefined)}>
+          <Button variant="primary" disabled={gap !== null} onClick={askFirst}>
             {gap ? `Record journal entry — ${gap}` : "Record journal entry"}
           </Button>
           <Button variant="ghost" onClick={onBack}>Back to Journal</Button>
@@ -279,7 +298,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
       title="Record this journal entry?"
       description={`${rm(totals.debit)} debit and credit, dated ${fmtDate(entryDate)}. A recorded entry cannot be changed. To correct it, record another entry.`}
       footer={<>
-        <Button variant="ghost" disabled={record.isPending} onClick={() => setConfirming(false)}>Back</Button>
+        <Button variant="ghost" disabled={record.isPending} onClick={() => setConfirming(false)}>Cancel</Button>
         <Button variant="primary" loading={record.isPending} onClick={submit}>Record journal entry</Button>
       </>}>
       <p className="text-body">It gets its entry number now.</p>
