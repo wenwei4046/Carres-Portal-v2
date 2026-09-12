@@ -507,14 +507,8 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         icon: ArrowDownLeft,
         financePath: "/finance/ar",
       },
-      {
-        key: "ap",
-        label: "AP · Payables",
-        icon: ArrowUpRight,
-        financePath: "/finance/ap",
-      },
-      // 0477 — a supplier's bill, and the voucher that pays it. Unpaid by
-      // Supplier is the Bills destination's third listing (toolbar switch).
+      // 0477 — a supplier's bill, the voucher that pays it, and what is still
+      // unpaid per supplier (also the third listing of the Bills toolbar switch).
       {
         key: "bills",
         label: "Bills",
@@ -526,6 +520,14 @@ export const PORTAL_NAV: PortalNavGroup[] = [
         label: "Payment Vouchers",
         icon: Banknote,
         financePath: "/finance/payment-vouchers",
+      },
+      {
+        // The old `AP · Payables` row. Its page read PO cost and pay states
+        // nothing writes since 0477; /finance/ap now redirects here.
+        key: "ap",
+        label: "Unpaid by Supplier",
+        icon: ArrowUpRight,
+        financePath: "/finance/ap-outstanding",
       },
       {
         key: "payments",
