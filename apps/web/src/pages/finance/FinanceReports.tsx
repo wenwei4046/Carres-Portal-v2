@@ -1,297 +1,230 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  useFinanceMonthlyPl,
-  useFinanceTopSkus,
-  type FinanceMonthlyPlRow,
-  type FinanceTopSkuRow,
-} from "@/lib/queries";
-import { rm, rmCompact } from "@/lib/format-currency";
-import { FinanceKpi } from "@/components/FinanceKpi";
-import { appYearNow } from "@/lib/fmt-date";
-
-type PeriodChoice = "6m" | "ytd" | "12m";
-
-// The year is read off the business clock, not typed in — "YTD 2026" was a
-// literal that would have gone stale on 1 January.
-const PERIOD_LABEL: Record<PeriodChoice, string> = {
-  "6m":  "Last 6 months",
-  "ytd": `YTD ${appYearNow()}`,
-  "12m": "Last 12 months",
-};
-
-const PERIOD_MONTHS: Record<PeriodChoice, number> = {
-  "6m":  6,
-  "ytd": ytdMonths(),
-  "12m": 12,
-};
-
-function ytdMonths(): number {
-  // Year-to-date = month index of current date + 1 (Jan=1, ..., Dec=12).
-  // Fallback to 6 if running without browser-host date semantics.
-  const m = new Date().getMonth() + 1;
-  return Math.max(1, Math.min(12, m));
-}
-
 /**
- * Finance Reports page — Phase 5 Chunk B.
+ * Finance → Reports. The Profit and Loss for a period and the Balance Sheet
+ * on a day, both read from the ledger (gl_profit_and_loss and
+ * gl_balance_sheet), plus the door to Reports → Payment.
  *
- * Visual reference: `reference/proto/finance-reports.jsx:1-143`. Wires:
- *   - useFinanceMonthlyPl: GET /reports/monthly-pl?months=N
- *     → finance_monthly_pl RPC (V1 placeholder cogs=55%/opex=42k, see
- *       migration 0064 docstring for the planned real-source switch)
- *   - useFinanceTopSkus: GET /reports/top-skus?limit=8
- *     → finance_top_skus RPC
+ * Every figure is a ledger sum served by the API; the page adds nothing up.
+ * Each account line opens the Journal narrowed to that account and dates.
  *
- * Layout per proto:
- *   - Period dropdown + Export PDF button (PDF stubs to Chunk C — Q7=A
- *     locks server-side render via @react-pdf/renderer)
- *   - 4 KPIs from latest month (Revenue with MoM% / COGS / Net profit /
- *     Opex)
- *   - P&L 6-col table (Month / Revenue / COGS / Gross profit / Opex / Net)
- *   - Revenue trend SVG polyline + dots
- *   - Top SKUs horizontal bar list
+ * Removed, and why:
+ *  - The monthly table, its four KPIs and the revenue trend. They read
+ *    finance_monthly_pl, which set cost at 55% of revenue and running cost
+ *    at RM 42,000 a month. Nobody entered those figures.
+ *  - Top SKUs. finance_top_skus adds up order lines (price × qty) for all
+ *    time, whatever period is chosen. That is order value, not income the
+ *    ledger recognised, so it would be a second revenue figure.
+ *  - A trend. The ledger answers one period per request, so a monthly trend
+ *    would cost one request per month. It can return when the ledger serves
+ *    a monthly series.
  */
+import { Link, useSearchParams } from "react-router-dom";
+import { ledgerAccountHref } from "@carres/shared/finance-ledger";
+import Button from "@/components/kit/Button";
+import DatePicker from "@/components/kit/DatePicker";
+import Panel from "@/components/kit/Panel";
+import Select from "@/components/kit/Select";
+import { appTodayIso, fmtDate, fmtMonth } from "@/lib/fmt-date";
+import { rm } from "@/lib/format-currency";
+import ModuleHeader from "@/pages/operation/components/ModuleHeader";
+import StatementTable from "./reports/StatementTable";
+import { useBalanceSheet, useProfitAndLoss } from "./reports/report-queries";
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A real calendar day as YYYY-MM-DD, or null. */
+function readDay(v: string | null): string | null {
+  if (!v || !ISO_DAY.test(v)) return null;
+  const [y, m, d] = v.split("-").map(Number) as [number, number, number];
+  const day = new Date(Date.UTC(y, m - 1, d));
+  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d ? v : null;
+}
+
+/** The last day of a YYYY-MM month. */
+function monthEnd(ym: string): string {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return `${ym}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+}
+
+function nextMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/** YYYY-MM when the period is exactly one whole month, else null. */
+function wholeMonth(from: string, to: string): string | null {
+  const ym = from.slice(0, 7);
+  return from === `${ym}-01` && to === monthEnd(ym) ? ym : null;
+}
+
+/** Every month from the ledger's first to this one, newest first, plus the
+ *  month on screen if it falls outside that. */
+function monthChoices(goLive: string | null, today: string, shown: string | null): string[] {
+  const last = today.slice(0, 7);
+  const out = new Set<string>([last]);
+  let ym = (goLive ?? today).slice(0, 7);
+  for (let i = 0; ym <= last && i < 600; i += 1) {
+    out.add(ym);
+    ym = nextMonth(ym);
+  }
+  if (shown) out.add(shown);
+  return [...out].sort().reverse();
+}
+
+/** The period in the address, or this month. An Up to before From is read as From. */
+function readPeriod(params: URLSearchParams, today: string): { from: string; to: string } {
+  const ym = today.slice(0, 7);
+  const from = readDay(params.get("from")) ?? `${ym}-01`;
+  const to = readDay(params.get("to")) ?? monthEnd(ym);
+  return { from, to: to < from ? from : to };
+}
+
+const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
+
+// Entries can cancel out, so an account at RM 0.00 is not "no entries".
+const PL_ALL_ZERO = "Every account is at RM 0.00 in this period.";
+const BS_ALL_ZERO = "Every account is at RM 0.00 on this day.";
+
+const beforeGoLive =(goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
+
+function ReadFailed({ testId, sentence, retrying, onRetry }: {
+  testId: string;
+  sentence: string;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  return <div role="alert" data-testid={testId} className="flex flex-col items-start gap-3 text-body">
+    <p>{sentence}</p>
+    <Button variant="neutral" loading={retrying} onClick={onRetry}>Try again</Button>
+  </div>;
+}
+
 export default function FinanceReports() {
-  const [period, setPeriod] = useState<PeriodChoice>("6m");
-  const months = PERIOD_MONTHS[period];
+  const [params, setParams] = useSearchParams();
+  const today = appTodayIso();
+  const { from, to } = readPeriod(params, today);
+  const asOf = readDay(params.get("asOf")) ?? today;
 
-  const pl      = useFinanceMonthlyPl(months);
-  const topSkus = useFinanceTopSkus(8);
+  const pl = useProfitAndLoss(from, to);
+  const bs = useBalanceSheet(asOf);
+  const notStarted = notStartedError(pl.error) || notStartedError(bs.error);
+  const goLive = pl.data?.goLiveOn ?? bs.data?.goLiveOn ?? null;
+  const plReport = pl.data;
+  const bsReport = bs.data;
 
-  const rows = pl.data?.rows ?? [];
-  const skus = topSkus.data?.rows ?? [];
-
-  const latest = rows[rows.length - 1];
-  const prev   = rows[rows.length - 2];
-
-  const revGrowth = (latest && prev && prev.revenue > 0)
-    ? ((latest.revenue - prev.revenue) / prev.revenue) * 100
-    : 0;
-  const margin = (latest && latest.revenue > 0)
-    ? (latest.net / latest.revenue) * 100
-    : 0;
-
-  return (
-    <div className="p-9 max-w-[1400px] mx-auto">
-      <header className="flex items-end justify-between gap-4 flex-wrap mb-7">
-        <div>
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">
-            Finance · Reports
-          </div>
-          <h1 className="font-display text-page mt-1.5 mb-1 text-foreground tracking-[-0.02em]">
-            Reports
-          </h1>
-          <div className="text-body text-muted-foreground">
-            Monthly P&amp;L · revenue trend · top SKUs ·{" "}
-            {/* Payment MASTER §16 — the door to Reports → Payment. */}
-            <Link to="/finance/reports/payment" className="text-kit-blue-11 hover:underline">
-              Payment
-            </Link>
-          </div>
-        </div>
-        {/* No Export button: there is no export yet. A button that only toasts
-            "coming later" is a promise on screen, and the operator learns to
-            stop trusting buttons. It returns with the feature. */}
-        <div className="flex gap-2">
-          <select
-            aria-label="Period"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as PeriodChoice)}
-            className="px-2.5 py-1.5 border border-border rounded text-meta bg-background"
-          >
-            {(Object.keys(PERIOD_LABEL) as PeriodChoice[]).map((k) => (
-              <option key={k} value={k}>{PERIOD_LABEL[k]}</option>
-            ))}
-          </select>
-        </div>
-      </header>
-
-      {/* Payment MASTER §16 — Reports → Payment is a first-class destination
-          of this shared Reports page, not a hidden route. */}
-      <Link to="/finance/reports/payment" data-testid="reports-payment-door"
-        className="mb-6 flex items-center justify-between rounded-md border border-border bg-card px-4 py-3 hover:bg-muted/40">
-        <span>
-          <span className="block text-meta font-semibold">Payment</span>
-          <span className="block text-label text-muted-foreground">
-            Money received · Customer balances · Storage charged and collected · Storage
-            waived · Payment corrections · Money needing review</span>
-        </span>
-        <span className="text-label text-muted-foreground">Open →</span>
-      </Link>
-
-      <div className="grid grid-cols-4 gap-3.5 mb-6">
-        <FinanceKpi
-          label={`Revenue · ${latest?.m ?? "—"}`}
-          value={rmCompact(latest?.revenue ?? 0)}
-          hint={prev ? `${revGrowth >= 0 ? "+" : ""}${revGrowth.toFixed(1)}% MoM` : "—"}
-          tone={revGrowth >= 0 ? "ok" : "warn"}
-        />
-        <FinanceKpi
-          label={`COGS · ${latest?.m ?? "—"}`}
-          value={rmCompact(latest?.cogs ?? 0)}
-          hint={latest && latest.revenue > 0 ? `${Math.round(latest.cogs / latest.revenue * 100)}% of rev` : "—"}
-        />
-        <FinanceKpi
-          label="Net profit"
-          value={rmCompact(latest?.net ?? 0)}
-          hint={`${margin.toFixed(1)}% margin`}
-          tone="ok"
-          accent
-        />
-        <FinanceKpi
-          label="Opex"
-          value={rmCompact(latest?.opex ?? 0)}
-          hint="Rent · payroll · ops"
-        />
-      </div>
-
-      {/* P&L table */}
-      <div className="bg-card rounded-md border border-border mb-6 overflow-auto">
-        <div className="px-5 py-3.5 border-b border-border">
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Profit &amp; Loss</div>
-          <div className="text-body font-semibold mt-0.5">{PERIOD_LABEL[period]}</div>
-        </div>
-        <div
-          className="grid items-center px-5 py-2.5 bg-muted/40 border-b border-border text-label uppercase tracking-[0.06em] font-semibold text-muted-foreground"
-          style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
-        >
-          <span>Month</span>
-          <span className="text-right">Revenue</span>
-          <span className="text-right">COGS</span>
-          <span className="text-right">Gross profit</span>
-          <span className="text-right">Opex</span>
-          <span className="text-right">Net</span>
-        </div>
-        {pl.isLoading ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-12 text-center text-meta text-muted-foreground">No revenue in this period.</div>
-        ) : (
-          rows.map((m) => <PlTableRow key={m.m} m={m} />)
-        )}
-      </div>
-
-      {/* Revenue trend + Top SKUs */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3.5">
-        <div className="bg-card rounded-md border border-border px-5 py-4">
-          <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Revenue trend</div>
-          <div className="text-body font-semibold mt-0.5 mb-3">Monthly revenue</div>
-          {rows.length > 0 ? (
-            <RevenueTrend rows={rows} />
-          ) : (
-            <div className="p-8 text-center text-meta text-muted-foreground">No data</div>
-          )}
-        </div>
-
-        <div className="bg-card rounded-md border border-border">
-          <div className="px-5 py-3.5 border-b border-border">
-            <div className="text-label uppercase tracking-[0.12em] text-muted-foreground">Top SKUs</div>
-            <div className="text-body font-semibold mt-0.5">Revenue by SKU</div>
-          </div>
-          {topSkus.isLoading ? (
-            <div className="p-8 text-center text-meta text-muted-foreground">Loading…</div>
-          ) : skus.length === 0 ? (
-            <div className="p-8 text-center text-meta text-muted-foreground">No SKU data.</div>
-          ) : (
-            skus.map((s) => <TopSkuRow key={s.sku} s={s} max={skus[0].revenue} />)
-          )}
-        </div>
-      </div>
-
-      {pl.error && (
-        <div className="mt-5 p-3 text-meta rounded-md bg-destructive/5 text-destructive border border-destructive/30">
-          Failed to load P&amp;L: {String(pl.error)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PlTableRow({ m }: { m: FinanceMonthlyPlRow }) {
-  const gp = m.revenue - m.cogs;
-  return (
-    <div
-      className="grid items-center px-5 py-2.5 border-b border-border text-meta last:border-0"
-      style={{ gridTemplateColumns: "120px repeat(5, 1fr)", minWidth: 720 }}
-    >
-      <span className="font-semibold">{m.m}</span>
-      <span className="font-mono text-right">{rm(m.revenue)}</span>
-      <span className="font-mono text-right text-muted-foreground">{rm(m.cogs)}</span>
-      <span className="font-mono text-right text-success">{rm(gp)}</span>
-      <span className="font-mono text-right text-muted-foreground">{rm(m.opex)}</span>
-      <span className="font-mono text-right font-semibold">{rm(m.net)}</span>
-    </div>
-  );
-}
-
-function RevenueTrend({ rows }: { rows: FinanceMonthlyPlRow[] }) {
-  const W = 600, H = 180, pad = 32;
-  const maxRev = Math.max(...rows.map((m) => m.revenue), 1);
-  const points = rows.map((m, i) => {
-    const x = pad + (rows.length === 1 ? 0 : (i / (rows.length - 1)) * (W - pad * 2));
-    const y = H - pad - (m.revenue / maxRev) * (H - pad * 2);
-    return { x, y, label: m.m };
+  const edit = (change: (next: URLSearchParams) => void) => setParams((before) => {
+    const next = new URLSearchParams(before);
+    change(next);
+    return next;
   });
-  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const pickMonth = (ym: string) => {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    edit((next) => {
+      next.set("from", `${ym}-01`);
+      next.set("to", monthEnd(ym));
+    });
+  };
+  // Both dates are always written, from the period on screen. Writing one
+  // alone would leave the other to its default, which moves with the month.
+  const pickFrom = (iso: string | null) => {
+    if (!iso) return;
+    edit((next) => {
+      next.set("from", iso);
+      next.set("to", iso > to ? iso : to);
+    });
+  };
+  const pickTo = (iso: string | null) => {
+    if (!iso) return;
+    edit((next) => {
+      next.set("to", iso);
+      next.set("from", iso < from ? iso : from);
+    });
+  };
+  const pickAsOf = (iso: string | null) => {
+    if (iso) edit((next) => next.set("asOf", iso));
+  };
 
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[200px] block" role="img" aria-label="Monthly revenue trend">
-      {[0, 0.25, 0.5, 0.75, 1].map((g, i) => {
-        const y = H - pad - g * (H - pad * 2);
-        return (
-          <line
-            key={i}
-            x1={pad}
-            x2={W - pad}
-            y1={y}
-            y2={y}
-            stroke="currentColor"
-            className="text-border"
-          />
-        );
-      })}
-      <polyline
-        points={polylinePoints}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        className="text-primary"
-      />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r={3.5} fill="currentColor" className="text-primary" />
-          <text
-            x={p.x}
-            y={H - 10}
-            fontSize="9.5"
-            textAnchor="middle"
-            fill="currentColor"
-            className="text-muted-foreground"
-          >
-            {p.label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
+  const month = wholeMonth(from, to);
 
-function TopSkuRow({ s, max }: { s: FinanceTopSkuRow; max: number }) {
-  const pct = max > 0 ? (s.revenue / max) * 100 : 0;
-  return (
-    <div className="px-5 py-2.5 border-b border-border last:border-0">
-      <div className="flex items-baseline justify-between mb-1.5 text-meta">
-        <span className="font-semibold truncate">{s.name}</span>
-        <span className="font-mono text-label">{rm(s.revenue)}</span>
+  return <div className="flex h-full min-h-0 flex-col">
+    <ModuleHeader destinationHeader testId="reports-destination-header" word="Reports" docTitle="Reports — Carres" />
+    <div className="min-h-0 flex-1 overflow-auto p-6">
+      <div className="flex flex-col gap-6">
+        {/* Payment MASTER §16: Reports → Payment is a destination of this
+            page, not a hidden route. */}
+        <Link to="/finance/reports/payment" data-testid="reports-payment-door"
+          className="flex items-center justify-between rounded-card border border-border bg-card px-4 py-3 hover:bg-muted/40">
+          <span>
+            <span className="block text-meta font-semibold">Payment</span>
+            <span className="block text-label text-muted-foreground">
+              Money received · Customer balances · Storage charged and collected · Storage
+              waived · Payment corrections · Money needing review</span>
+          </span>
+          <span className="text-label text-muted-foreground">Open →</span>
+        </Link>
+
+        {notStarted ? <div role="alert" className="text-body">
+          <p>The ledger has no start date yet. Nothing can be totalled.</p>
+        </div> : <>
+          {goLive && <p className="text-body text-kit-slate-11" data-testid="reports-go-live">
+            Since {fmtDate(goLive)} · No opening balances
+          </p>}
+
+          <div className="grid items-start gap-6 xl:grid-cols-2">
+            <Panel title="Profit and Loss">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-40">
+                    <Select id="reports-pl-month" label="Month" value={month ?? ""} onValueChange={pickMonth}
+                      placeholder="Custom Date Range"
+                      options={monthChoices(goLive, today, month).map((m) => ({ value: m, label: fmtMonth(m) }))} />
+                  </div>
+                  <div className="w-40">
+                    <DatePicker id="reports-pl-from" label="From" value={from} onChange={pickFrom} />
+                  </div>
+                  <div className="w-40">
+                    <DatePicker id="reports-pl-to" label="Up to" value={to} minDate={from} onChange={pickTo} />
+                  </div>
+                </div>
+                {pl.isError ? <ReadFailed testId="profit-and-loss-failed"
+                  sentence="The profit and loss could not be loaded. Try again."
+                  retrying={pl.isFetching} onRetry={() => void pl.refetch()} />
+                : <StatementTable label="Profit and Loss" testId="profit-and-loss"
+                  sections={plReport?.status === "ok" ? plReport.sections : []}
+                  loading={pl.isPending}
+                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : PL_ALL_ZERO}
+                  nothing={PL_ALL_ZERO}
+                  accountHref={(code) => ledgerAccountHref(code, from, to)}
+                  bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
+              </div>
+            </Panel>
+
+            <Panel title="Balance Sheet">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-40">
+                    <DatePicker id="reports-bs-as-of" label="As of" value={asOf} onChange={pickAsOf} />
+                  </div>
+                </div>
+                {bsReport?.status === "ok" && !bsReport.balances && <div role="status" data-testid="balance-sheet-differs"
+                  className="flex flex-wrap items-center gap-2 rounded-control bg-kit-amber-3 px-4 py-2 text-body text-kit-amber-11">
+                  ⚠ Assets differ from liabilities plus equity by {rm(Math.abs(bsReport.difference))}.
+                  <Link className="underline underline-offset-2" to="/finance/ledger/self-check">Open Self-check</Link>
+                </div>}
+                {bs.isError ? <ReadFailed testId="balance-sheet-failed"
+                  sentence="The balance sheet could not be loaded. Try again."
+                  retrying={bs.isFetching} onRetry={() => void bs.refetch()} />
+                : <StatementTable label="Balance Sheet" testId="balance-sheet"
+                  sections={bsReport?.status === "ok" ? bsReport.sections : []}
+                  loading={bs.isPending}
+                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : BS_ALL_ZERO}
+                  nothing={BS_ALL_ZERO}
+                  accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
+                  bottomLine={null} />}
+              </div>
+            </Panel>
+          </div>
+        </>}
       </div>
-      <div className="h-1 rounded bg-muted overflow-hidden">
-        <div
-          className="h-full bg-primary"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="text-label text-muted-foreground mt-1">{s.qty} units sold</div>
     </div>
-  );
+  </div>;
 }

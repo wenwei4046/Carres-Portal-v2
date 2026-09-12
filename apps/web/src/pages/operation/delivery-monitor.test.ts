@@ -1461,3 +1461,70 @@ describe("a trip that has already run has no contact work left", () => {
     expect(overdueContactCards([card])).toEqual([]);
   });
 });
+
+/**
+ * ⭐ WHICH HALF OF THE APPOINTMENT IS MISSING (owner ruling 2026-09-12).
+ *
+ * A delivery is booked only with a day AND a window. When the day is agreed
+ * and the window is not, the act is about the TIME — asking the operator to
+ * confirm the DATE sends them to re-open a question the customer has already
+ * answered, and the recorded day is a real fact the row must keep.
+ */
+describe("the chase names the half that is missing", () => {
+  const chasing = (over: Partial<DeliveryMonitorCard>) =>
+    datedCard({
+      scopeId: "c",
+      booked: false,
+      settled: false,
+      logisticsPartnerId: "p-1",
+      logisticsPartnerName: "NETS",
+      ...over,
+    });
+
+  it("⭐ a known day with no window asks for the TIME", () => {
+    const action = monitorRowAction(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
+    expect(action.kind).toBe("confirm_date");
+    if (action.kind !== "confirm_date") throw new Error("unreachable");
+    expect(action.call).toBe("Call NETS — confirm delivery time");
+    expect(action.call).not.toContain("delivery date");
+  });
+
+  it("no day at all still asks for the DATE", () => {
+    const action = monitorRowAction(chasing({ confirmedDate: null, confirmedTime: null }));
+    if (action.kind !== "confirm_date") throw new Error("unreachable");
+    expect(action.call).toBe("Call NETS — confirm delivery date");
+  });
+
+  it("the partner's own name is used, never a hard-coded company", () => {
+    const action = monitorRowAction(
+      chasing({ confirmedDate: "2026-09-04", confirmedTime: null, logisticsPartnerName: "HOUZS" }),
+    );
+    if (action.kind !== "confirm_date") throw new Error("unreachable");
+    expect(action.call).toBe("Call HOUZS — confirm delivery time");
+  });
+
+  it("both sentences reach the export as one spelling", () => {
+    const time = monitorRowActionText(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
+    expect(time).toContain("confirm delivery time");
+    const date = monitorRowActionText(chasing({ confirmedDate: null, confirmedTime: null }));
+    expect(date).toContain("confirm delivery date");
+  });
+});
+
+/**
+ * ⭐ WHAT `All` GIVES BACK (owner ruling 2026-09-12) — each dropdown's own
+ * cross-computed population, never the register's size.
+ */
+describe("the three rail dropdowns' All counts", () => {
+  it("each total is that group's own population, and matches what clearing it produces", () => {
+    const rails = buildMonitorRails(SET, { ...noFilters, view: "no_confirmed_date" }, []);
+    const cleared = filterMonitorListRows(SET, { ...noFilters, view: "no_confirmed_date" });
+    /* STATE's `All` is the rows surviving the QUEUE — the same list under it. */
+    expect(rails.regionTotal).toBe(cleared.length);
+    expect(rails.logisticsTotal).toBe(cleared.length);
+    expect(rails.statusTotal).toBe(cleared.length);
+    /* And each group's rows never add up to more than its own total. */
+    const regionSum = rails.regions.reduce((n, r) => n + r.count, 0);
+    expect(regionSum).toBeLessThanOrEqual(rails.regionTotal);
+  });
+});

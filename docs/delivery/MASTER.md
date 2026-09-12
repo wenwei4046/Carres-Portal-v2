@@ -440,29 +440,6 @@ Accessories & services · Expected arrival · Stock · Actions · Edit Delivery
                                         — sticky identity, real horizontal scrolling
 ```
 
-**RULING — corrected Monitor preview approved 2026-09-12.** Keep both complete months
-stacked above the scrolling filters. WORK TO DO remains six direct rows; STATE, LOGISTICS
-PARTNER and DELIVERY STATUS use the shared Select with counts and an All choice. Small
-filter-area scrolling is acceptable; never shrink text or remove calendar dates to claim a fit.
-The collapsed desktop rail keeps a visible Show filters button and label. SO No and Customer
-both remain pinned during horizontal scrolling, using measured column widths. Validate the
-real portal shell at 1440px and 949px, including the expanded and collapsed rail.
-A known confirmed day remains visible when its time is missing: No time agreed, with
-Call {logistics} — confirm delivery time. Do not call it Waiting for customer date or a completed
-confirmation, and do not introduce a new deadline. Revised supplier arrival keeps the new date
-above the original with the existing slate CalendarClock; no full-row warning background.
-This approval owns Monitor only, not Delivery Orders or partner coverage rules.
-
-**IMPLEMENTED 2026-09-12 — production verification pending merge.** The shared Select replaces
-the three long filter lists; the collapsed rail has a labelled return door; DataGrid's optional
-named identity block pins SO No and Customer without changing existing single-column callers.
-The named block uses separate cell borders after browser measurement exposed clipped sticky
-text with collapsed borders. The real OperationApp shell is available through the existing
-dev preview's `?shell=1&tab=delivery` switch, not a second production page. Local verification:
-4,451 web tests passed; 196 focused tests passed; after the browser border correction, the
-95 affected page/sticky tests passed again. Real-shell 1440×900 and 949×800 screenshots checked;
-the narrow reopened filter area scrolls, deliberately, instead of compressing the calendars.
-
 - **`Customer` carries the Logistics Partner as its inline second line** — the Constitution's one
   permitted second line. Who carries a delivery is the operator's second question about a row and
   it may not cost a Columns chooser.
@@ -562,6 +539,18 @@ Where is the confirmed date recorded? Edit Delivery, the one Delivery-owned edit
   the governed word and the governed absence styling, the same words the calendar card uses.
   Printing the day alone made a half-answered booking differ from a finished one only by a missing
   fragment an operator reads as formatting.
+- **⭐ AND THE ACT IS ABOUT THE TIME (owner ruling 2026-09-12).** When the day is agreed and the
+  window is not, `Actions` reads **`Call {logistics} — confirm delivery time`** — the sibling of
+  the shipped `confirm delivery date`, added to COPY-STANDARD's own delivery-queue table. Sending
+  the operator to *confirm delivery date* re-opens a question the customer has already answered.
+  The queue is unchanged: the row does not leave `Call customer` until BOTH halves are recorded.
+- **⭐ THE CALENDAR CARD KEEPS THE DAY, AND WEARS NO CONFIRMED PILL (owner ruling 2026-09-12,
+  correcting the 2026-09-11 card).** The 09-11 card REPLACED the day with the absence, which
+  traded one error for another — the agreed day is a recorded fact. The card now prints the day,
+  then `No time agreed` beneath it, and its footer carries the ACT instead of a status pill:
+  the work-status ladder reaches `Delivery confirmed` on a recorded day alone, so a half-answered
+  booking used to claim the appointment was settled. A fully booked card is unchanged — window
+  first, `Delivery confirmed` in the footer.
 - **THE CONTACT DEADLINE IS THE SHARED `chase` STEP AND NOTHING NEW** (`deliveryStepDueIso`, lead
   `logistics_call_working_days` = 3 since 0342, on the Mon–Sat delivery week with the injected
   Malaysian holidays). The Orders list, the booking brief and Monitor read the ONE arithmetic, so
@@ -793,6 +782,44 @@ queue — never the same absence repeated in every column; an individually empty
   sticky date heading and 44px rows, previous/next skips Sunday, **the full month opens through
   the kit's one standard date control (UI-KIT §11)**, and the cards and href arithmetic are
   identical to desktop.
+
+**⭐ THE RAIL'S THREE SINGLE-PICK GROUPS ARE KIT DROPDOWNS (owner ruling 2026-09-12).** `STATE`
+grew a row per state the data happened to hold — thirteen on production, and it grows — and with
+`LOGISTICS PARTNER` and `DELIVERY STATUS` under it the rail carried **1152px of filters in a
+421px box**, so `WORK TO DO`, the thing an operator comes here to DO, sat below the fold. The
+three become kit `Select`s; **the group titles, the option words and every count are unchanged**,
+and each group's `All` carries that group's own cross-computed population so the dropdown and the
+rows under it cannot disagree. `All` clears ONLY that group's condition.
+
+**THE TWO MONTHS DO NOT MOVE.** They stay in the rail's fixed 429px band at the top — the
+2026-09-06 correction's own slot — and the filters scroll below them, as they always did.
+
+**MEASURED, on the BUILT page at 1440×900:** the filter box holds **506px in 421px, so it scrolls
+85px** — `DELIVERY STATUS` is the part below the fold. That is the honest result and it is
+accepted (owner, 2026-09-12: *small filter-area scrolling is acceptable*); the number that
+mattered was 731px. **A first drawing of this claimed 35px** by under-counting the kit group
+padding — `WORK TO DO` is 248px and each picker group 58px, not 230 and 50 — and the built page,
+not the drawing, is the record.
+
+**⭐ `SO No` AND `Customer` BOTH PIN (owner ruling 2026-09-12).** The work sheet is 1818px wide;
+at 949px its viewport is **806px**, so under half a row is on screen at once, and scrolled to
+`Actions` a single pin left `Call NETS — confirm delivery date` with no name beside it. The
+shared Register engine's `stickyIdentity` now accepts a LIST, and pins a **contiguous run** —
+a gap between two pinned columns would let rows slide through it, so the run stops at the first
+column that is not named. Every other register is untouched: one name behaves exactly as before.
+
+**BROWSER VERIFICATION — 2026-09-12.** The multi-column pinned table uses separate borders
+with zero spacing and explicit row separators: measured browser scrolling otherwise clipped
+identity text. This is opt-in for the multi-column block; single-column callers stay unchanged.
+The real shell can be walked through the existing dev preview with `?shell=1&tab=delivery`.
+
+**⭐ BELOW 1100px THE RAIL STARTS COLLAPSED (owner ruling 2026-09-12)** — the Delivery Orders
+register's own number, so the two Delivery pages do not disagree about what *narrow* means. 240px
+of a 949px window is a quarter of the page spent on filters nobody has asked for while the sheet
+is already scrolling sideways. The collapsed desktop rail is 44px wide with a visible `Show filters` button and text label;
+the active narrowing stays
+above the rows, so collapsed is DEFERRED, never gone — **a remembered choice still wins at any
+width**. Collapsed, the table viewport is **806px** rather than 566px.
 
 **The 240px rail is PAGE-OWNED filtering, not the Portal sidebar** — the ONE shared
 `FilterRail`/`FilterRailGroup`/`FilterRailRow` grammar (the LOCAL FILTER RAIL law: 240px, 36px

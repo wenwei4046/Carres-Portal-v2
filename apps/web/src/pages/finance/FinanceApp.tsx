@@ -5,7 +5,6 @@ import PortalSidebar from "@/pages/portal/PortalSidebar";
 import { useAuth } from "@/lib/auth";
 import FinanceDashboard from "./FinanceDashboard";
 import FinanceAR from "./FinanceAR";
-import FinanceAP from "./FinanceAP";
 import PaymentRegister from "./PaymentRegister";
 import InvoiceRegister from "./InvoiceRegister";
 import FinanceRefunds from "./FinanceRefunds";
@@ -59,7 +58,10 @@ export default function FinanceApp() {
             ? <Navigate to="invoices" replace /> : <Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={financeOnly(<FinanceDashboard />)} />
           <Route path="ar"        element={financeOnly(<FinanceAR />)} />
-          <Route path="ap"        element={financeOnly(<FinanceAP />)} />
+          {/* The old AP page read finance_ap_aging: PO cost, not what is
+              billed, and pay states nothing writes since 0477. What is
+              unpaid per supplier is one page, so an old link lands there. */}
+          <Route path="ap"        element={<Navigate to="/finance/ap-outstanding" replace />} />
           {/* 0477 — supplier bills, payment vouchers, and what is unpaid per
               supplier. A voucher is the one door money leaves by. */}
           <Route path="bills/*"            element={financeOnly(<SupplierBills />)} />

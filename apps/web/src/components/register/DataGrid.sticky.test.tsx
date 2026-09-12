@@ -101,7 +101,7 @@ describe("DataGrid · stickyIdentity offsets", () => {
     const { container } = render(<DataGrid<Row> rows={ROWS}
       columns={[...COLUMNS, { key: "action", label: "Action", width: 200, accessor: () => "Edit" }]}
       storageKey="test.sticky.multiple" rowKey={(r) => r.id}
-      stickyIdentity={{ columnKeys: ["so", "customer"] }}
+      stickyIdentity={{ columnKey: ["so", "customer"] }}
       selectable={{ selectedKeys: new Set(), onToggle: () => {}, onToggleAll: () => {} }}
       expandable={{ renderExpansion: () => <div>goods</div> }} />);
     expect([...container.querySelectorAll<HTMLElement>("thead th")].map((el) => el.style.left))

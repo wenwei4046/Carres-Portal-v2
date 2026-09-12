@@ -1,5 +1,3 @@
-import Select from "../../components/kit/Select";
-import { callToConfirmDeliveryDate } from "./delivery-monitor";
 /**
  * DELIVERY MONITOR — the work list that leads, and the confirmed-delivery
  * calendar beside it.
@@ -78,6 +76,7 @@ import {
   myHolidaySet,
 } from "@carres/shared";
 import { fmtDate, fmtMonth, appTodayIso } from "@/lib/fmt-date";
+import Select from "@/components/kit/Select";
 import StatusPill from "@/components/kit/StatusPill";
 import {
   useCatalog,
@@ -159,6 +158,9 @@ const EDIT_DELIVERY = "Edit Delivery";
 
 /** The rail-collapse memory (LOCAL FILTER RAIL COLLAPSE law). */
 const FILTER_RAIL_STORAGE_KEY = "carres.deliveryMonitor.filterRail";
+/** Below this the local rail starts collapsed — the register's own number, so
+ *  the two Delivery pages do not disagree about what "narrow" means. */
+const NARROW_VIEWPORT_PX = 1100;
 /* v4 — the 2026-09-10 ruling changed the DEFAULT column order again (`Items` ·
    `Accessories & services` · `Expected arrival` · `Stock` · `Actions` · `Edit
    Delivery`) and moved six columns into the chooser. A persisted `order` array
@@ -409,6 +411,56 @@ function ContactDeadline({ card }: { card: DeliveryMonitorCard }) {
  * Delivery Status. A recorded result stays `Delivered` — the missing evidence
  * is the `Upload delivery proof` queue's job, never a second status word.
  */
+/**
+ * ⭐ ONE SINGLE-PICK RAIL GROUP, AS THE KIT'S OWN DROPDOWN (owner ruling
+ * 2026-09-12).
+ *
+ * The group title, the option words and every count are the rail rows' own —
+ * only the CONTROL changed. STATE alone carried thirteen rows on production
+ * and grows with the data; with the other two groups under it the rail held
+ * 1152px of filters in a 421px box, so the thing an operator comes here to
+ * DO — `WORK TO DO` — was below the fold.
+ *
+ * `All` clears ONLY this group's condition; a queue or another group's pick
+ * survives it, which is why the count beside it is that group's own
+ * cross-computed population and not the register's size.
+ */
+const RAIL_PICKER_ALL = "__all__";
+
+function RailPicker({
+  id,
+  label,
+  allLabel,
+  total,
+  value,
+  options,
+  onPick,
+}: {
+  id: string;
+  label: string;
+  allLabel: string;
+  total: number;
+  value: string | null;
+  options: readonly { key: string; label: string; count: number }[];
+  onPick: (next: string | null) => void;
+}) {
+  return (
+    /* The kit Select carries no aria-label prop, so the NAME lives on the
+       group around it — one accessible name, not a dropped one. */
+    <div className="px-1 pb-1" role="group" aria-label={label} data-testid={id + "-select"}>
+      <Select
+        id={id}
+        value={value ?? RAIL_PICKER_ALL}
+        onValueChange={(next) => onPick(next === RAIL_PICKER_ALL ? null : next)}
+        options={[
+          { value: RAIL_PICKER_ALL, label: allLabel + " (" + total + ")" },
+          ...options.map((o) => ({ value: o.key, label: o.label + " (" + o.count + ")" })),
+        ]}
+      />
+    </div>
+  );
+}
+
 function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
   return (
     <Link
@@ -417,17 +469,23 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
       className="block min-h-11 rounded-control border border-kit-slate-5 bg-white shadow-sm hover:border-kit-slate-6 hover:bg-hovertint"
     >
       <div className="flex flex-col gap-0.5 px-2 py-1.5 text-body">
-        {card.confirmedDate && !card.confirmedTime ? <div className="font-medium text-kit-slate-12">{fmtDate(card.confirmedDate)}</div> : null}
         {card.confirmedTime ? (
           <div className="font-medium text-kit-slate-12">{card.confirmedTime}</div>
         ) : (
-          /* ⭐ A DAY WITH NO WINDOW IS VISIBLY INCOMPLETE (owner ruling
-             2026-09-11). The customer has not been told when to be home, so
-             the card must not read as a settled appointment — and the row is
-             still in the contact queue, which is where the window is agreed. */
-          <div className="text-kit-slate-9" data-absence="true">
-            {MONITOR_COPY.noTimeAgreed}
-          </div>
+          /* ⭐ A DAY WITH NO WINDOW IS VISIBLY INCOMPLETE, AND THE DAY IS KEPT
+             (owner ruling 2026-09-12, correcting the 2026-09-11 card which
+             replaced the day with the absence). The agreed day is a real
+             recorded fact — losing it to say the time is missing trades one
+             error for another — so the card states BOTH: the day it has, then
+             the half it does not. */
+          <>
+            {card.confirmedDate ? (
+              <div className="font-medium text-kit-slate-12">{fmtDate(card.confirmedDate)}</div>
+            ) : null}
+            <div className="text-kit-slate-9" data-absence="true">
+              {MONITOR_COPY.noTimeAgreed}
+            </div>
+          </>
         )}
         {card.doNumber ? (
           <div className="font-mono font-medium text-blue-700">{card.doNumber}</div>
@@ -452,9 +510,24 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
         ) : null}
       </div>
       <div className="border-t border-kit-slate-4 px-2 py-1">
-        {card.confirmedDate && !card.confirmedTime && !card.settled ? (
-          <span className="text-body text-kit-slate-12">{monitorRowAction(card).kind === "confirm_date" ? callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics, true) : monitorRowAction(card).label}</span>
-        ) : <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>}
+        {/* ⭐ A HALF-ANSWERED BOOKING DOES NOT WEAR A CONFIRMED PILL (owner
+            ruling 2026-09-12). The ladder reaches `Delivery confirmed` on a
+            recorded day alone, so a card missing its window used to claim the
+            appointment was settled. While the window is open the footer
+            carries the ACT instead — about the TIME, never asking again for a
+            date the customer has already given. */}
+        {card.booked || card.settled ? (
+          <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>
+        ) : (
+          <span
+            className="block truncate text-label text-kit-slate-12"
+            data-testid={"delivery-monitor-card-act-" + card.scopeId}
+          >
+            {monitorRowAction(card).kind === "confirm_date"
+              ? (monitorRowAction(card) as { call: string }).call
+              : monitorRowActionText(card)}
+          </span>
+        )}
       </div>
     </Link>
   );
@@ -631,11 +704,22 @@ export default function OperationDelivery() {
      LOCAL FILTER RAIL COLLAPSE). On a phone the rail starts closed: the
      drawer opens on demand and never squeezes the one-day list. */
   const [filterRailOpen, setFilterRailOpen] = useState(() => {
+    /* ⭐ NARROW SCREENS START WITH THE RAIL CLOSED (owner ruling 2026-09-12,
+       the same 1100px rule the Delivery Orders register already runs). 240px
+       of a 949px window is a quarter of the page spent on filters nobody has
+       asked for, while the sheet is already scrolling sideways. The
+       `Show filters` button and the active narrowing both stay visible, so
+       collapsed is DEFERRED, never gone. A REMEMBERED choice still wins at
+       any width: the operator who opened it meant it. */
+    let stored: string | null = null;
     try {
-      return localStorage.getItem(FILTER_RAIL_STORAGE_KEY) !== "0";
+      stored = localStorage.getItem(FILTER_RAIL_STORAGE_KEY);
     } catch {
-      return true;
+      /* Storage may be unavailable; the width rule still answers. */
     }
+    if (stored === "0") return false;
+    if (stored === "1") return true;
+    return typeof window === "undefined" ? true : window.innerWidth >= NARROW_VIEWPORT_PX;
   });
   const setFilterRailVisible = (open: boolean) => {
     setFilterRailOpen(open);
@@ -761,13 +845,17 @@ export default function OperationDelivery() {
       next.delete("due");
       next.delete("late");
     });
-  const toggleParam = (key: "region" | "logistics" | "status", value: string) =>
+  /* `toggleParam` is retired with the three rail-row groups (2026-09-12): a
+     dropdown REPLACES, and picking the value you already hold is not a request
+     to clear it — `All` is. The retired `?view=waiting_warehouse` guard moved
+     into `setStatusParam` below, which is now the only writer of `status`. */
+  const setStatusParam = (value: string | null) =>
     setParams((next) => {
-      if (searchParams.get(key) === value) next.delete(key);
-      else next.set(key, value);
+      if (value === null) next.delete("status");
+      else next.set("status", value);
       /* A retired `?view=waiting_warehouse` was this filter — it may not
          linger beside the real one. */
-      if (key === "status" && viewParam === "waiting_warehouse") next.delete("view");
+      if (viewParam === "waiting_warehouse") next.delete("view");
     });
   /* `Clear filters` clears the NARROWINGS, never the tab: an operator who
      clears a state pick is not asking to leave the view they are reading. */
@@ -1850,18 +1938,49 @@ export default function OperationDelivery() {
           ))}
         </FilterRailGroup>
       )}
-      <Select id="delivery-monitor-region" label={MONITOR_COPY.railState}
-        value={region ?? "all"}
-        onValueChange={(value) => toggleParam("region", value === "all" ? region ?? "" : value)}
-        options={[{ value: "all", label: "All" }, ...rails.regions.map((item) => ({ value: item.key, label: `${item.label} (${item.count})` }))]} />
-      <Select id="delivery-monitor-logistics" label={MONITOR_COPY.railLogistics}
-        value={logistics ?? "all"}
-        onValueChange={(value) => toggleParam("logistics", value === "all" ? logistics ?? "" : value)}
-        options={[{ value: "all", label: "All" }, ...rails.logistics.map((item) => ({ value: item.key, label: `${item.label} (${item.count})` }))]} />
-      <Select id="delivery-monitor-status" label={MONITOR_COPY.railStatus}
-        value={status ?? "all"}
-        onValueChange={(value) => toggleParam("status", value === "all" ? status ?? "" : value)}
-        options={[{ value: "all", label: "All" }, ...MONITOR_STATUS_FILTERS.map((key) => ({ value: key, label: `${MONITOR_STATUS_LABEL[key]} (${rails.status[key]})` }))]} />
+      {/* ⭐ THREE SINGLE-PICK QUESTIONS, THREE KIT DROPDOWNS (owner ruling
+          2026-09-12). STATE grew a row per state the data happened to hold —
+          thirteen on production — and with LOGISTICS PARTNER and DELIVERY
+          STATUS under it the rail carried 1152px of filters in a 421px box.
+          The groups, their words and their counts are UNCHANGED; only the
+          control changed, and the two months above it do not move. */}
+      <FilterRailGroup title={MONITOR_COPY.railState}>
+        <RailPicker
+          id="delivery-monitor-region"
+          label={MONITOR_COPY.railState}
+          allLabel={MONITOR_COPY.allStates}
+          total={rails.regionTotal}
+          value={region}
+          options={rails.regions}
+          onPick={(next) => setParam("region", next)}
+        />
+      </FilterRailGroup>
+      <FilterRailGroup title={MONITOR_COPY.railLogistics}>
+        <RailPicker
+          id="delivery-monitor-logistics"
+          label={MONITOR_COPY.railLogistics}
+          allLabel={MONITOR_COPY.allPartners}
+          total={rails.logisticsTotal}
+          value={logistics}
+          options={rails.logistics}
+          onPick={(next) => setParam("logistics", next)}
+        />
+      </FilterRailGroup>
+      <FilterRailGroup title={MONITOR_COPY.railStatus}>
+        <RailPicker
+          id="delivery-monitor-status"
+          label={MONITOR_COPY.railStatus}
+          allLabel={MONITOR_COPY.allStatuses}
+          total={rails.statusTotal}
+          value={status}
+          options={MONITOR_STATUS_FILTERS.map((key) => ({
+            key,
+            label: MONITOR_STATUS_LABEL[key],
+            count: rails.status[key],
+          }))}
+          onPick={setStatusParam}
+        />
+      </FilterRailGroup>
     </FilterRail>
   );
 
@@ -2195,7 +2314,13 @@ export default function OperationDelivery() {
                     cards.length === 0 ? MONITOR_COPY.emptyList : MONITOR_COPY.emptySearch
                   }
                   groupBanner={false}
-                  stickyIdentity={{ columnKeys: ["so", "customer"] }}
+                  /* ⭐ TWO PINS (owner ruling 2026-09-12). Scrolled to
+                     `Actions`, one pin left the operator reading
+                     `Call NETS — confirm delivery date` with no customer
+                     attached to it. `SO No` is the identity; `Customer` is
+                     whose row it is, and at 949px the sheet shows under a
+                     third of its width at a time. */
+                  stickyIdentity={{ columnKey: ["so", "customer"] }}
                   chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
                   /* A row on this workspace IS a delivery, so opening it
                      opens the delivery (owner correction 2026-08-24). */

@@ -89,6 +89,11 @@ export const MONITOR_COPY = {
   loadFailed: "Monitor could not be loaded",
   tryAgain: "Try again",
   railWork: "WORK TO DO",
+  /** The three dropdowns own clear-this-one-condition word (2026-09-12).
+   *  `All` alone would read as all of everything; each says WHAT it clears. */
+  allStates: "All states",
+  allPartners: "All partners",
+  allStatuses: "All",
   railState: "STATE",
   railLogistics: "LOGISTICS PARTNER",
   railStatus: "DELIVERY STATUS",
@@ -847,8 +852,22 @@ export function monitorCardHref(card: DeliveryMonitorCard): string {
  * the row; no company is ever hard-coded, and a row with no partner never
  * reaches this sentence — it is asked to `Assign logistics` first.
  */
-export function callToConfirmDeliveryDate(partnerName: string, timeOnly = false): string {
-  return `Call ${partnerName} — confirm delivery ${timeOnly ? "time" : "date"}`;
+export function callToConfirmDeliveryDate(partnerName: string): string {
+  return `Call ${partnerName} — confirm delivery date`;
+}
+
+/**
+ * `Call NETS — confirm delivery time` — the same governed act about the OTHER
+ * half of the appointment (owner ruling 2026-09-12, COPY-STANDARD "the seven
+ * verbs": `Call {logistics} — confirm delivery time`).
+ *
+ * ⭐ IT IS A DIFFERENT SENTENCE BECAUSE IT IS A DIFFERENT JOB. When the day is
+ * agreed and the window is not, asking the operator to `confirm delivery date`
+ * sends them to re-open a question the customer already answered — and the
+ * date is a real recorded fact that the row must keep, not overwrite.
+ */
+export function callToConfirmDeliveryTime(partnerName: string): string {
+  return `Call ${partnerName} — confirm delivery time`;
 }
 
 /**
@@ -895,12 +914,20 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
      the operator what to DO. A recorded result outranks it, exactly as it
      already outranks an unassigned partner. */
   if (!card.booked && !card.settled) {
+    /* The partner's own name, from the row — never a hard-coded company. A
+       partner id whose name has not resolved would print an id at the
+       operator, so the governed absence word stands in for it. */
+    const partner = card.logisticsPartnerName ?? MONITOR_COPY.noLogistics;
+    /* ⭐ WHICH HALF IS MISSING DECIDES THE SENTENCE (owner ruling 2026-09-12).
+       A row with a DAY and no window is not missing a date — it is missing a
+       time, and sending the operator to confirm the date re-opens a question
+       the customer has already answered. */
     return {
       kind: "confirm_date",
-      /* The partner's own name, from the row — never a hard-coded company.
-         A partner id whose name has not resolved would print an id at the
-         operator, so the governed absence word stands in for it. */
-      call: callToConfirmDeliveryDate(card.logisticsPartnerName ?? MONITOR_COPY.noLogistics, card.confirmedDate !== null),
+      call:
+        card.confirmedDate !== null
+          ? callToConfirmDeliveryTime(partner)
+          : callToConfirmDeliveryDate(partner),
       label: MONITOR_COPY.editDelivery,
     };
   }
@@ -1238,6 +1265,17 @@ export interface MonitorRails {
   regions: MonitorRailRow[];
   logistics: MonitorRailRow[];
   status: Record<MonitorDeliveryStatus, number>;
+  /**
+   * WHAT `All` WOULD GIVE BACK (owner ruling 2026-09-12). Each dropdown
+   * needs the count for clearing its OWN condition, and it is the same
+   * cross-computed number the rows under it already obey: the cards surviving
+   * every OTHER group unchanged. Printing the whole register size instead
+   * would make `All states (89)` disagree with the 12 rows a picked queue
+   * actually leaves.
+   */
+  regionTotal: number;
+  logisticsTotal: number;
+  statusTotal: number;
 }
 
 /**
@@ -1277,6 +1315,11 @@ export function buildMonitorRails(
   const forRegion = cards.filter((c) => survives(c, "region"));
   const forLogistics = cards.filter((c) => survives(c, "logistics"));
   const forStatus = cards.filter((c) => survives(c, "status"));
+  /* Each group own `All` is that group own population — the same list its
+     rows are counted from, so the dropdown and the rows cannot disagree. */
+  const regionTotal = forRegion.length;
+  const logisticsTotal = forLogistics.length;
+  const statusTotal = forStatus.length;
 
   const work = Object.fromEntries(
     MONITOR_WORK_VIEWS.map((v) => [
@@ -1336,5 +1379,5 @@ export function buildMonitorRails(
     MONITOR_STATUS_FILTERS.map((s) => [s, forStatus.filter((c) => c.statusKey === s).length]),
   ) as Record<MonitorDeliveryStatus, number>;
 
-  return { work, regions, logistics, status };
+  return { work, regions, logistics, status, regionTotal, logisticsTotal, statusTotal };
 }

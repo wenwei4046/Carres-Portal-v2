@@ -401,7 +401,6 @@ checklist item. The list is closed; a new chat does not add a fifth:
 |---|---|
 | 1 | `Assign logistics` |
 | 2 | `Confirm delivery date` (row line: `Call {logistics} — confirm delivery date`) |
-| 2a | `Call {logistics} — confirm delivery time` when the delivery day is known but its time is not; retain the date and show `No time agreed`. No new deadline is implied. |
 | 3 | `Deliver on {weekday, date}` (re-worded from `Deliver today` — the Delivery dictionary bans Today/Tomorrow; the actual weekday + date is printed) |
 | 4 | `Upload delivery photo` |
 
@@ -615,6 +614,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Issue PO` · `Confirm ready date` | **→ defined once in the PURCHASING table below.** The Orders ladder DISPLAYS these two; it does not respell them. *(This row replaces the old `Send PO` entry — `Send PO` is retired, and so are `Prepare PO` and the Draft PO it produced.)* | | | |
 | `Assign logistics` | `Assign logistics` | `Assign logistics` | `{logistics} assigned` | `Every order has a logistics company.` |
 | `Confirm delivery date` | `Call {logistics} — confirm delivery date` | `Confirm booking` | `Delivery confirmed {date} · {slot}` | `0 calls to make · everything on track.` |
+| `Confirm delivery date` — **the day is agreed, the window is not** (owner ruling 2026-09-12) | `Call {logistics} — confirm delivery time` | `Confirm booking` | `Delivery confirmed {date} · {slot}` | *(same queue — a delivery is booked only with a day AND a window, so the row does not leave until both are recorded)* |
 | *(retired 2026-08-16 — the SYSTEM issues the DO; no tile, no button)* | — | — | `Delivery order issued` (history line only) | `Nothing waiting for a delivery order.` |
 | `Deliver on {weekday, date}` | `Deliver on {weekday, date}` | `Record Delivery Result` | `Delivered` | `No deliveries on {weekday, date}.` |
 | `Upload delivery photo` | `Upload delivery photo` | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
@@ -1275,7 +1275,8 @@ answer. `Confirm` presumes something was said; `Call` presumes we know whom to a
 
 Examples: `Assign logistics` · `Assign PIC` · `Assign warehouse picker` ·
 `Call {supplier} — confirm ready date` · `Call {logistics} — confirm delivery date` ·
-`Call {logistics} — arrange new delivery date` · `Issue invoice` · `Issue credit note` ·
+`Call {logistics} — confirm delivery time` · `Call {logistics} — arrange new delivery date` ·
+`Issue invoice` · `Issue credit note` ·
 `Upload delivery photo` · `Upload payment proof` · `Return count to Carres` ·
 `Return count to {warehouse}`.
 
@@ -2780,6 +2781,29 @@ Sentences these pages print follow the Empty-state and Error patterns above, for
 The Self-check finding sentences (`1 line for RM 5.00 names nobody.`) are composed in
 `finance-ledger.ts` from the row's own numbers.
 
+### Reports (Profit and Loss · Balance Sheet)
+
+Page: Finance → `Reports`. Both statements are read from the ledger (migration 0469); every figure
+is one the ledger summed. The page also uses these words from the Journal block above, with the same
+meaning: `Account` · `Amount` · the kind words · `As of` · `Since {date} · No opening balances` ·
+`Account name not available` · `Open Self-check` · `Try again`.
+
+| Group | Word | Meaning | Falsifier (NOT LAW) |
+|---|---|---|---|
+| Statements | **`Profit and Loss`** | Income less expense for a period. Panel title. | A finance user calls it something else (`P&L`, `Income Statement`) and does not recognise this name. |
+| | **`Balance Sheet`** | What Carres has and owes on one day. Panel title. | As above, for `Statement of Financial Position`. |
+| Period | **`Month`** | Picks one whole month for the Profit and Loss. | A user picks a month expecting it to change the Balance Sheet too. |
+| | **`Custom Date Range`** | Shown in `Month` when the dates are not one whole month. | A user reads it as a button that opens a date range. |
+| | **`From`** · **`Up to`** | The first and last day of the Profit and Loss, as field labels. `Up to` includes that day. | A user asks whether the `Up to` day is included. |
+| Totals | **`Net result`** | Income less expense for the period, as the ledger served it. Bottom line of the Profit and Loss. | A user reads a negative figure here and does not see it is a loss. |
+| | **`Net result not yet closed`** | Income less expense up to the day, not yet moved into equity. A line inside Equity. | A user adds it to Equity a second time, not seeing it is already in the Equity total. |
+| Sentences | **`Every account is at RM 0.00 in this period.`** | Under a Profit and Loss section where every account nets to zero. Entries can cancel out, so it never says "no entries". | A user reads it as "nothing happened" when the Journal shows entries. |
+| | **`Every account is at RM 0.00 on this day.`** | The same, under a Balance Sheet section. | As above. |
+| | **`⚠ Assets differ from liabilities plus equity by {money}.`** | The ledger's own check failed on that day; followed by `Open Self-check`. The only place the difference prints. | A user cannot tell which side is larger, and needs to. |
+| | **`The ledger has no start date yet. Nothing can be totalled.`** | The ledger has no go-live day, so neither statement can be read. | A user does not know who sets the start date. |
+| | **`The ledger started on {date}. Pick a day from then on.`** | The chosen day or period ends before go-live. | A user picks a later day and still sees it. |
+| | **`The profit and loss could not be loaded. Try again.`** · **`The balance sheet could not be loaded. Try again.`** | The read failed; no figure is shown. Same sentence as the API sends. | A user retries and gets the same sentence every time, so `Try again` promises nothing. |
+
 
 ### Supplier bills and payment vouchers (migration 0477)
 
@@ -2866,6 +2890,28 @@ Each carries its meaning; the owner accepts, renames or strikes it.
 | `Against invoices` · `Received for {ARI No} (RM)` | The part of a receipt that pays a party's open invoices. |
 | `Ledger entry {JE No}` | The History line naming the journal entry a document posted or reversed. |
 | `Active` · `Not active` | Whether a party can be chosen on a new invoice or receipt. |
+
+### Finance Dashboard · AR · Receivables (build/finance-old-reads)
+
+**PROPOSAL / NOT LAW.** Pages: Finance → `Dashboard` and `AR · Receivables`, and the AR drawer.
+Both figures add up the same per-row numbers as the page they open (`money-owed.ts`). The words
+may appear only on these pages until the owner rules.
+
+| Word on screen | Meaning | Falsifier |
+|---|---|---|
+| `AR · Receivables` | Destination: every order a customer still owes money on, where Finance records a receipt. | The owner rules one global Dashboard with no Finance AR page (COPY 1690), or recording moves to the Invoices register. |
+| `Material exposure` | Dashboard section heading over the money-owed figures (Workspace MASTER §8). | A finance user cannot say what the section holds. |
+| `Open AR · Receivables` · `Open Unpaid by Supplier` · `Open invoice` | Doors to the page that adds a figure up, and to the order's invoice (`Open {module}`). | A door opens a page whose total differs from the figure it sits under. |
+| `What customers still owe HQ, storage included. Orders with no price yet are left out.` | Meaning line under the Dashboard's Outstanding figure. | The figure includes an unpriced order, or leaves out storage owed. |
+| `What Carres still owes suppliers and other creditors on confirmed bills.` | Meaning line under the Dashboard's Unpaid figure. | The figure counts a draft bill, or differs from the Unpaid by Supplier footer. |
+| `includes storage {RM}` | Second line under Outstanding: the storage part of what the customer owes (Payment MASTER). | Storage owed shows as a separate total that the Outstanding figure leaves out. |
+| `Could not load {source}` · `Last available {date and time} · {RM}` · `Try again` | A figure whose read failed: said in words, never RM 0.00, with the last figure it had. | A failed read shows a zero or a blank. |
+| `Invoices could not be loaded. Try again.` | The AR register's failed read (Error pattern). | The page shows an empty list when the read failed. |
+| `No customer owes money.` | The AR register's empty state. | It shows while an order still owes money. |
+| `Search orders…` | Search placeholder on the AR register. | Search also matches something that is not an order or customer. |
+| `SO not available` | The SO No cell when the order has no SO number (absent value in words). | A raw id or blank shows instead. |
+| `Record payment received` · `Amount must be positive` · `Receipt failed: {reason}` · `Recorded {RM} for SO-{n}` | Heading, validation, failure and success of the drawer's Record receipt form. | The form records a zero or negative amount, or fails silently. |
+| `No receipts recorded yet.` · `Receipt number missing` · `Method not recorded` · `VOIDED` | Payment history: none yet · a receipt without its RC number · a receipt without its method · a cancelled receipt. | A stored method key or a blank reaches the screen. |
 
 ---
 
