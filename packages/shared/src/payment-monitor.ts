@@ -73,7 +73,13 @@ export function monitorGoods(row: InvoiceRegisterRow): MonitorGoods {
   const etas = ctrl?.line_etas ?? null;
   const hasStatus = !!status && Object.keys(status).length > 0;
   const hasEtas = !!etas && Object.keys(etas).length > 0;
-  const lines: MonitorItemLine[] = (order?.order_lines ?? []).map((l) => {
+  // The goods lines are the order's own; a row whose lines carry no SKU (an
+  // older import) still has the ladder's per-SKU signals, so those keys stand
+  // in as the items rather than reading every line as `not ready`.
+  const sourceLines: Array<{ sku?: string; qty: number }> = (order?.order_lines ?? []).some((l) => l.sku)
+    ? (order?.order_lines ?? [])
+    : [...new Set([...Object.keys(status ?? {}), ...Object.keys(etas ?? {})])].map((sku) => ({ sku, qty: 1 }));
+  const lines: MonitorItemLine[] = sourceLines.map((l) => {
     const sku = String(l.sku ?? "");
     const eta = etas?.[sku] ?? null;
     const arrivalIso = eta && ISO_DATE.test(eta) ? eta : null;

@@ -94,6 +94,12 @@ describe("Goods — Primary School English, and the exact item disclosure", () =
     expect(monitorGoodsWord(g)).toBe("Arrival not confirmed");
     expect(g.lines[1]!.word).toBe("Arrival not confirmed");
   });
+  it("lines without a SKU still read the ladder's per-SKU signals as the items", () => {
+    const g = monitorGoods(row({ lines: [{ qty: 1, unit_price: 1 }],
+      control: { line_stock_status: { "MS01-K": "ready" } } }));
+    expect(monitorGoodsWord(g)).toBe("Goods ready");
+    expect(g.lines.map((l) => l.sku)).toEqual(["MS01-K"]);
+  });
   it("no signal at all → Arrival not confirmed; never a technical word", () => {
     const word = monitorGoodsWord(monitorGoods(row()));
     expect(word).toBe("Arrival not confirmed");

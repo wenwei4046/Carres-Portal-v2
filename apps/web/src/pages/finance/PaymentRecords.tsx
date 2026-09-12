@@ -339,7 +339,7 @@ function PaymentRecordObject({ payment, onClose, onPrint, printing }: {
           <p>Payment method {methodWord(payment.method)}</p>
           <p>{methodRow?.account_name
             ? `Money account ${methodRow.account_name}${bankEndings.length && (payment.method === "bank" || payment.method === "bank_transfer") ? ` · ${bankEndings.join(" · ")}` : ""}`
-            : "Money account not configured"}</p>
+            : registry.isSuccess ? "Money account not configured" : "Money account not available"}</p>
           {payment.reference && <p>Reference {payment.reference}</p>}
           <p>{payment.recorded_by_name ? `Recorded by ${payment.recorded_by_name}` : "Recorder name not available"}</p>
           <p>Recorded {fmtDate(payment.created_at, { time: true })}</p>

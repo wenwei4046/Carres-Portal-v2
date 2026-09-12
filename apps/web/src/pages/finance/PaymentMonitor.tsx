@@ -109,6 +109,9 @@ function workOwnerFor(row: PaymentMonitorRow, items: readonly OperationWorkItem[
   return item.owner;
 }
 
+/** A Monitor row with the Work feed's resolved owner riding on it. */
+type MonitorRow = PaymentMonitorRow & { owner: OperationWorkItem["owner"] | null };
+
 function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const person = owner.acting ?? owner.normal;
   if (!person?.userId) {
@@ -213,15 +216,19 @@ export default function PaymentMonitor() {
     () => allRows.filter((r) => inOrderScope(r.door, orderScope)),
     [allRows, orderScope],
   );
-  const listRows = useMemo(
-    () => scopedRows.filter((r) => monitorFilterMatch(r, filter)),
-    [scopedRows, filter],
+  const workItems = workQ.data?.items;
+  // The owner rides ON the row: the shared DataGrid renders a cell from its
+  // row data, and a column accessor that read outer state would show the
+  // owner the grid was mounted with, not the one the feed answered.
+  const listRows = useMemo<MonitorRow[]>(
+    () => scopedRows.filter((r) => monitorFilterMatch(r, filter))
+      .map((r) => ({ ...r, owner: workOwnerFor(r, workItems) })),
+    [scopedRows, filter, workItems],
   );
   const counts = useMemo(() => Object.fromEntries(
     MONITOR_FILTERS.map((f) => [f.key, scopedRows.filter((r) => monitorFilterMatch(r, f.key)).length]),
   ) as Record<MonitorFilterKey, number>, [scopedRows]);
   const summaries = useMemo(() => monitorSummaries(scopedRows), [scopedRows]);
-  const workItems = workQ.data?.items;
 
   // Items read as human words (register ruling ③): the catalog model name
   // when the SKU is known to it, else the SKU itself — never a blank.
@@ -231,20 +238,20 @@ export default function PaymentMonitor() {
     return (sku: string) => models.get(skus.get(sku) ?? "") ?? sku;
   }, [catalogQ.data]);
 
-  const columns = useMemo<DataGridColumn<PaymentMonitorRow>[]>(() => [
-    { key: "so", label: COLUMN.so, width: 110, sortable: true,
+  const columns = useMemo<DataGridColumn<MonitorRow>[]>(() => [
+    { key: "so", label: COLUMN.so, width: 100, sortable: true,
       accessor: (r) => <button type="button" className="text-left font-medium hover:underline"
         onClick={() => open(r.door)}>{r.so != null ? `SO-${r.so}` : "SO not available"}</button>,
       searchValue: (r) => r.so != null ? `SO-${r.so} ${r.so}` : "",
       filterValue: (r) => r.so != null ? `SO-${r.so}` : "SO not available",
       exportValue: (r) => r.so != null ? `SO-${r.so}` : "SO not available",
       sortFn: (a, b) => (a.so ?? 0) - (b.so ?? 0) },
-    { key: "customer", label: COLUMN.customer, width: 200, sortable: true,
+    { key: "customer", label: COLUMN.customer, width: 180, sortable: true,
       accessor: (r) => <button type="button" className="text-left hover:underline"
         onClick={() => open(r.door)}>{r.customer}</button>,
       searchValue: (r) => `${r.customer} ${r.door.orders?.customer_phone ?? ""}`,
       filterValue: (r) => r.customer, exportValue: (r) => r.customer },
-    { key: "needed", label: COLUMN.needed, width: 150, align: "right", sortable: true,
+    { key: "needed", label: COLUMN.needed, width: 140, align: "right", sortable: true,
       accessor: (r) => <span className="block min-w-0">
         <span className="block">{r.money.known ? rm(r.money.outstanding) : "Value not recorded"}</span>
         {r.money.known && r.money.storageOwing > 0 && <span className="block text-label font-normal text-kit-slate-11">
@@ -252,15 +259,15 @@ export default function PaymentMonitor() {
       </span>,
       numberValue: (r) => r.money.known ? r.money.outstanding : null, filterType: "number",
       exportValue: (r) => r.money.known ? r.money.outstanding : "Value not recorded" },
-    { key: "goods", label: COLUMN.goods, width: 260, wrap: true,
+    { key: "goods", label: COLUMN.goods, width: 230, wrap: true,
       accessor: (r) => monitorGoodsWord(r.goods),
       searchValue: (r) => monitorGoodsWord(r.goods), filterValue: (r) => monitorGoodsWord(r.goods),
       exportValue: (r) => monitorGoodsWord(r.goods) },
-    { key: "storage", label: COLUMN.storage, width: 250, wrap: true,
+    { key: "storage", label: COLUMN.storage, width: 230, wrap: true,
       accessor: (r) => monitorStorageWord(r.storage, rm),
       searchValue: (r) => monitorStorageWord(r.storage, rm), filterValue: (r) => monitorStorageWord(r.storage, rm),
       exportValue: (r) => monitorStorageWord(r.storage, rm) },
-    { key: "delivery", label: COLUMN.delivery, width: 170, sortable: true, filterType: "date",
+    { key: "delivery", label: COLUMN.delivery, width: 150, sortable: true, filterType: "date",
       dateValue: (r) => r.delivery.dateIso,
       accessor: (r) => <span className="block min-w-0">
         {r.delivery.dateIso
@@ -275,9 +282,9 @@ export default function PaymentMonitor() {
        ruling 2026-09-12 — Monitor is a control listing, the ruled exception
        to the fact-only register cell). Line 1 the fact, line 2 the governed
        action; the owner is the avatar, never a word in the sentence. */
-    { key: "timing", label: COLUMN.timing, width: 240, wrap: true,
+    { key: "timing", label: COLUMN.timing, width: 230, wrap: true,
       accessor: (r) => {
-        const owner = workOwnerFor(r, workItems);
+        const owner = r.owner;
         const late = r.timing.late;
         return <span className="block min-w-0" data-testid={`monitor-timing-${r.so ?? r.orderId}`}>
           <span className={`block font-semibold ${late ? "text-kit-red-11" : ""}`}>{r.timing.fact}</span>
@@ -291,7 +298,7 @@ export default function PaymentMonitor() {
       filterValue: (r) => r.timing.fact,
       exportValue: (r) => r.timing.action ? `${r.timing.fact} · ${MONITOR_ACTION_WORD[r.timing.action]}` : r.timing.fact },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [workItems, today]);
+  ], [today]);
 
   const selected = params.get("invoice");
   const invoice = invoices.find((r) => r.id === selected);
@@ -405,7 +412,7 @@ export default function PaymentMonitor() {
 /** `Show items` — the read-only exact item disclosure: Item · Qty · Goods,
  *  for the goods of the delivery scope. Payment staff change no stock fact
  *  here; there is nothing to click. */
-function ItemsDisclosure({ row, itemName }: { row: PaymentMonitorRow; itemName: (sku: string) => string }) {
+function ItemsDisclosure({ row, itemName }: { row: MonitorRow; itemName: (sku: string) => string }) {
   const facts = invoiceGoodsFacts(row.door);
   if (row.goods.lines.length === 0) {
     return <div className="p-4 text-body" data-testid="payment-monitor-items">
