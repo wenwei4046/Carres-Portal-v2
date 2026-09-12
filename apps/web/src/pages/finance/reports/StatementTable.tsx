@@ -21,14 +21,14 @@ export type StatementRow =
   | { id: string; section: string; kind: "nothing" };
 
 /**
- * The rows the table prints, in the served order. An account with nothing on
- * it in the period is left out, as the Trial Balance does. A section with
- * nothing left gets one line saying so under its band. When no section has
- * anything, the table gets no rows at all and shows its empty sentence.
+ * The rows the table prints, in the served order. An account at RM 0.00 is
+ * left out, as the Trial Balance does. A section where every account is at
+ * RM 0.00 keeps its band and gets one line saying so. At RM 0.00 is not "no
+ * entries": entries can cancel out. So even when every section is at zero,
+ * the bands stay, and so does the bottom strip under them.
  */
 export function statementRows(sections: readonly StatementSection[]): StatementRow[] {
   const out: StatementRow[] = [];
-  let anything = false;
   for (const s of sections) {
     const groups = s.groups
       .map((g) => ({ g, lines: g.lines.filter((l) => !isZeroMoney(l.amount)) }))
@@ -48,9 +48,8 @@ export function statementRows(sections: readonly StatementSection[]): StatementR
       out.push({ id: `${s.kind}:unclosed`, section: s.kind, kind: "unclosed", amount: s.unclosedResult });
     }
     if (out.length === before) out.push({ id: `${s.kind}:nothing`, section: s.kind, kind: "nothing" });
-    else anything = true;
   }
-  return anything ? out : [];
+  return out;
 }
 
 export default function StatementTable({
@@ -68,9 +67,9 @@ export default function StatementTable({
   testId: string;
   sections: readonly StatementSection[];
   loading: boolean;
-  /** Shown instead of rows when there is nothing to print at all. */
+  /** Shown instead of rows when no statement was served (before go-live). */
   empty: string;
-  /** The line under a section band that has nothing in it. */
+  /** The line under a section band where every account is at RM 0.00. */
   nothing: string;
   accountHref: (code: string) => string;
   /** The strip under the last row. Null: no strip. */

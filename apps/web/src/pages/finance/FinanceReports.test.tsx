@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fileURLToPath } from "node:url";
@@ -110,8 +110,13 @@ function serve(over: { pl?: (from: string, to: string) => unknown; bs?: (asOf: s
 function show(at = "/finance/reports") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>
-    <MemoryRouter initialEntries={[at]}><FinanceReports /></MemoryRouter>
+    <MemoryRouter initialEntries={[at]}><FinanceReports /><Address /></MemoryRouter>
   </QueryClientProvider>);
+}
+
+/** The address bar's query, for tests that check what the page wrote there. */
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>;
 }
 
 /** Each band, line and bottom strip of one statement, cells joined by ` | `. */
@@ -164,7 +169,7 @@ describe("Reports — the statements read the ledger", () => {
     expect(within(table).queryByText("RM 12,850.00")).not.toBeInTheDocument();
   });
 
-  it("prints the Balance Sheet as served, with the result not yet closed inside equity and the difference", async () => {
+  it("prints the Balance Sheet as served, with the result not yet closed inside equity", async () => {
     show();
     const table = screen.getByTestId("balance-sheet");
     await within(table).findByRole("link", { name: "1120 Bank — current account" });
@@ -178,8 +183,8 @@ describe("Reports — the statements read the ledger", () => {
       "2110 Trade payables — suppliers | RM 2,800.00",
       "Equity | RM 4,050.00",
       "Net result not yet closed | RM 4,050.00",
-      "Difference | RM 0.00",
     ]);
+    expect(within(table).queryByText("Difference")).not.toBeInTheDocument();
     expect(screen.queryByTestId("balance-sheet-differs")).not.toBeInTheDocument();
   });
 
@@ -214,6 +219,19 @@ describe("Reports — the statements read the ledger", () => {
     await waitFor(() => expect(api.fetch)
       .toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${YM}-15&to=${TO}`));
     expect(screen.getByRole("combobox", { name: "Month" })).toHaveTextContent("Custom Date Range");
+  });
+
+  it("picking only Up to writes both dates into the address", async () => {
+    show();
+    await screen.findByTestId("reports-go-live");
+    fireEvent.click(screen.getByRole("button", { name: "Up to" }));
+    const day = screen.getAllByRole("gridcell").find((c) => c.textContent?.trim() === "15");
+    fireEvent.click(day!.querySelector("button") ?? day!);
+    await waitFor(() => expect(api.fetch)
+      .toHaveBeenCalledWith(`/api/finance/ledger/profit-and-loss?from=${FROM}&to=${YM}-15`));
+    const address = new URLSearchParams(screen.getByTestId("address").textContent ?? "");
+    expect(address.get("from")).toBe(FROM);
+    expect(address.get("to")).toBe(`${YM}-15`);
   });
 
   it("an Up to before From is read as From", async () => {
@@ -257,13 +275,29 @@ describe("Reports — when there is nothing, or no answer", () => {
     expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
   });
 
-  it("a period with no entries says so, never a column of zeros", async () => {
+  it("every account at RM 0.00 says so, keeps the served totals, and never claims there were no entries", async () => {
     serve({ pl: (f, t) => pl(f, t, zero(PL_BODY)), bs: (a) => bs(a, zero(bsBody(0))) });
     show();
-    expect(await within(screen.getByTestId("profit-and-loss")).findByText("No entries in this period.")).toBeInTheDocument();
-    expect(await within(screen.getByTestId("balance-sheet")).findByText("No entries up to this day.")).toBeInTheDocument();
-    expect(screen.queryByText("Net result")).not.toBeInTheDocument();
-    expect(screen.queryByText(/RM /)).not.toBeInTheDocument();
+    const plTable = screen.getByTestId("profit-and-loss");
+    await within(plTable).findAllByText("Every account is at RM 0.00 in this period.");
+    expect(lines(plTable)).toEqual([
+      "Income | RM 0.00",
+      "Every account is at RM 0.00 in this period. |",
+      "Expense | RM 0.00",
+      "Every account is at RM 0.00 in this period. |",
+      "Net result | RM 0.00",
+    ]);
+    const bsTable = screen.getByTestId("balance-sheet");
+    await within(bsTable).findAllByText("Every account is at RM 0.00 on this day.");
+    expect(lines(bsTable)).toEqual([
+      "Asset | RM 0.00",
+      "Every account is at RM 0.00 on this day. |",
+      "Liability | RM 0.00",
+      "Every account is at RM 0.00 on this day. |",
+      "Equity | RM 0.00",
+      "Every account is at RM 0.00 on this day. |",
+    ]);
+    expect(screen.queryByText(/No entries/)).not.toBeInTheDocument();
   });
 
   it("a section with nothing in it says so under its band", async () => {
@@ -274,7 +308,7 @@ describe("Reports — when there is nothing, or no answer", () => {
     await within(table).findByRole("link", { name: "4100 Furniture sales" });
     expect(lines(table).slice(3)).toEqual([
       "Expense | RM 0.00",
-      "No entries in this period. |",
+      "Every account is at RM 0.00 in this period. |",
       "Net result | RM 12,850.00",
     ]);
   });
@@ -285,7 +319,8 @@ describe("Reports — when there is nothing, or no answer", () => {
     const band = await screen.findByTestId("balance-sheet-differs");
     expect(band).toHaveTextContent("Assets differ from liabilities plus equity by RM 25.50.");
     expect(within(band).getByRole("link", { name: "Open Self-check" })).toHaveAttribute("href", "/finance/ledger/self-check");
-    expect(lines(screen.getByTestId("balance-sheet")).at(-1)).toBe("Difference | RM 25.50");
+    // The band is the one place the difference prints: no second strip under the table.
+    expect(within(screen.getByTestId("balance-sheet")).queryByText("Difference")).not.toBeInTheDocument();
   });
 
   it("a ledger with no start date says so once and prints no statement", async () => {

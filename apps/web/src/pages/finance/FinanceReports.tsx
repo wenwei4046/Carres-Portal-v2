@@ -80,7 +80,11 @@ function readPeriod(params: URLSearchParams, today: string): { from: string; to:
 
 const notStartedError = (error: unknown) => (error as { status?: number } | null)?.status === 409;
 
-const beforeGoLive = (goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
+// Entries can cancel out, so an account at RM 0.00 is not "no entries".
+const PL_ALL_ZERO = "Every account is at RM 0.00 in this period.";
+const BS_ALL_ZERO = "Every account is at RM 0.00 on this day.";
+
+const beforeGoLive =(goLiveOn: string) => `The ledger started on ${fmtDate(goLiveOn)}. Pick a day from then on.`;
 
 function ReadFailed({ testId, sentence, retrying, onRetry }: {
   testId: string;
@@ -119,18 +123,20 @@ export default function FinanceReports() {
       next.set("to", monthEnd(ym));
     });
   };
+  // Both dates are always written, from the period on screen. Writing one
+  // alone would leave the other to its default, which moves with the month.
   const pickFrom = (iso: string | null) => {
     if (!iso) return;
     edit((next) => {
       next.set("from", iso);
-      if (iso > to) next.set("to", iso);
+      next.set("to", iso > to ? iso : to);
     });
   };
   const pickTo = (iso: string | null) => {
     if (!iso) return;
     edit((next) => {
       next.set("to", iso);
-      if (iso < from) next.set("from", iso);
+      next.set("from", iso < from ? iso : from);
     });
   };
   const pickAsOf = (iso: string | null) => {
@@ -185,8 +191,8 @@ export default function FinanceReports() {
                 : <StatementTable label="Profit and Loss" testId="profit-and-loss"
                   sections={plReport?.status === "ok" ? plReport.sections : []}
                   loading={pl.isPending}
-                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : "No entries in this period."}
-                  nothing="No entries in this period."
+                  empty={plReport?.status === "before_go_live" ? beforeGoLive(plReport.goLiveOn) : PL_ALL_ZERO}
+                  nothing={PL_ALL_ZERO}
                   accountHref={(code) => ledgerAccountHref(code, from, to)}
                   bottomLine={plReport?.status === "ok" ? { label: "Net result", amount: plReport.net } : null} />}
               </div>
@@ -210,10 +216,10 @@ export default function FinanceReports() {
                 : <StatementTable label="Balance Sheet" testId="balance-sheet"
                   sections={bsReport?.status === "ok" ? bsReport.sections : []}
                   loading={bs.isPending}
-                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : "No entries up to this day."}
-                  nothing="No entries up to this day."
+                  empty={bsReport?.status === "before_go_live" ? beforeGoLive(bsReport.goLiveOn) : BS_ALL_ZERO}
+                  nothing={BS_ALL_ZERO}
                   accountHref={(code) => ledgerAccountHref(code, bsReport?.goLiveOn ?? null, asOf)}
-                  bottomLine={bsReport?.status === "ok" ? { label: "Difference", amount: Math.abs(bsReport.difference) } : null} />}
+                  bottomLine={null} />}
               </div>
             </Panel>
           </div>
