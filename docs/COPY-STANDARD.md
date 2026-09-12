@@ -1767,13 +1767,13 @@ its name: renaming a label is a copy decision, renaming an identifier is a break
 |---|---|---|
 | What the customer still owes HQ, anywhere on screen | **`Outstanding`** | Balance · Balance owing · Amount due · Owing |
 
-### The delivery money gate, payment approval and COD words (owner ruling 2026-08-19)
+### The delivery money gate, payment approval and COD words (owner ruling 2026-08-19 · door closed 2026-09-01 · shut in the database 2026-09-12)
 
-Money in full before delivery is the only default; the one exception is a recorded APPROVED
-Delivery Payment Approval, which means COD on the owner's exact terms. These are the governed
-spellings — the gate, the canvas, the object page, the drawer and the DO document all read them
-from the shared modules (`delivery-payment-approval.ts` · `delivery-order.ts`), never a local
-rewording.
+Money in full before delivery is absolute. The Delivery Payment Approval words below survive only
+for the HISTORY an approval granted before 2026-09-01 still carries (0362 · 0486); no screen
+offers the raise or decide door and the API answers 410. The gate, the canvas, the object page,
+the drawer and the DO document read them from the shared modules (`delivery-payment-approval.ts`
+· `delivery-order.ts`), never a local rewording.
 
 | Meaning | Use exactly | Do NOT use |
 |---|---|---|
@@ -1789,6 +1789,35 @@ rewording.
 | Route gate, money met | **`Money in full`** · under approval **`COD approved — collect before unloading`** | Paid · Settled |
 | Route gate, unpriced order | **`No price yet — unknown never holds`** | Money does not hold this delivery |
 | The drawer's absence sentence | **`No delivery order yet — the system issues it when the goods, money and date are ready`** | the 2026-08-16 version without `money` |
+
+### PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12)
+
+| Meaning | Use exactly | Do NOT use |
+|---|---|---|
+| The module heading and its two destinations | **`Payments`** · **`Monitor`** · **`Payment Records`** | Finance Portal · Invoices · Receipts · Order Payments · Collections desk |
+| Monitor columns, in order | **`SO No · Customer · Amount needed · Goods · Storage · Customer delivery · Payment timing`** | Needed · Expected arrival · Stock status · Logistics ETA · Payment Timing (capital T) |
+| Goods cell | **`Goods ready`** · **`2 of 3 items ready · Last item arriving Monday, 21 Sep`** · **`Arriving Monday, 21 Sep`** · **`Arrival not confirmed`** | Stock received Yes/No · ETA · In stock |
+| The item disclosure and its heads | **`Show items`** · **`Item · Qty · Goods`** — a line says `Ready` · `Arriving {day}` · `Arrival not confirmed` | Expand · Details · SKU (as a head) |
+| Storage cell | **`No storage charge`** · **`Free until {day}`** · **`{Group} · Day {n} · RM {x} so far`** · **`Free request waiting for approval · Estimated charge RM {x}`** · **`Free storage approved until {day}`** · **`Storage Invoice issued · RM {x} not paid`** | Storage fee · Accrued · Pending waiver |
+| Customer delivery cell | **`{Weekday}, {d} {Mon}`** with the second line **`Not confirmed yet`** when only requested · **`No delivery date`** | Logistics ETA · TBD · Delivery date |
+| Payment timing — the fact (line 1) | **`Payment due today`** · **`Ask customer today`** · **`Customer promised to pay today`** · **`Payment should have been received`** · **`Arrival not confirmed`** · **`Storage Invoice not paid`** · **`No delivery date`** · **`Payment due {day}`** | Overdue · Late · Due T−2 |
+| Payment timing — the action (line 2) | **`Ask customer to pay`** · **`Wait`** · **`Send the invoice and collect payment`** | Ask the customer to pay · Chase · Remind · Collect |
+| The owner on the action | the avatar chip; hover/accessible name = full name; **`Not assigned`** when the duty has no holder | a name inside the sentence |
+| The rail's seven filters | **`Needs attention · Ask customer today · Promised today · Should have been paid · Waiting for goods · Storage payments · All unpaid`** | tabs of any kind · Open · Late |
+| The summaries above the filters | **`{n} customer balances need collection today`** · **`{n} payment(s) should have been received already`** · **`{n} storage payment(s) need collection`** · **`Nothing needs collection today`** | `8 open · 2 late` |
+| Monitor footer / empty / scoped-empty | **`{n} orders · RM {x} still needed`** · **`No customer money is needed right now.`** · **`SO-{n} needs no payment right now. Its money is in Payment Records.`** | — |
+| Payment Records columns, in order | **`Receipt No · Paid date · Customer · SO No · Amount received · Method`** | Amount · Paid Date · Recorded |
+| The exception beside the receipt | **`VOIDED`** · **`RM {x} needs review`** | Overpaid · Duplicate? · Recorded |
+| Payment Records footer | **`{n} payments · RM {x} received`** | — |
+| Printing selected documents | **`Print {n} receipts`** (one: `Print 1 receipt`) | Export receipts · Download |
+| Payment Record header state | **`Payment recorded`** · **`VOIDED`** | Recorded · Success |
+| Payment Record sections, in order | **`Payment facts · Allocated to · Evidence · Actions · Receipt · History`** | — |
+| Evidence door · the two rare doors | **`View`** · **`Correct allocation`** · **`Void payment`** (overflow, authorised only) | Open slip · Edit · Delete · Reverse |
+| Settings → Payments sections, in order | **`Receiving bank accounts · Which bank to use · Payment methods · Collection timing · WhatsApp templates · Invoice and Receipt numbers · Storage charges · Online payment provider`** | — |
+| Collection timing fields | **`Start asking the customer to pay`** · **`Payment must be complete`** — each `{n} working days before Confirmed Delivery` | T−3 · T−2 · Chase window |
+| Storage rule card lines | **`Free storage {n} calendar days`** · **`Charge RM {x}`** · **`Charge every {n} calendar days`** · **`Operation may approve until Day {n}`** · **`Approver may approve until Day {n}`** · **`Extra free storage Not allowed`** · **`Check stored goods every {n} calendar days`** | Free days: · Rate · Cycle |
+| The settings change record | **`Changes`** — `{what}` / `{who} · {when} · effective from {date}` / `{old} → {new} · {reason}` | Audit log · History (as the section name) |
+| The retired approval door's refusal | **`Money must be in full before delivery. There is no approval that releases a delivery while money is owed. Collect the balance in Payments → Monitor.`** | Request payment approval |
 
 ### The Sales Order register and object words (owner ruling 2026-08-15)
 
@@ -2160,7 +2189,9 @@ The load-bearing ones, verbatim:
 
 Rules that bind every line, and are proved by test rather than reviewed:
 
-- **Banned outright**, here as everywhere: `Needs attention` · `Next action` · `Something went
+- **Banned outright**, here as everywhere (one ruled exception: the Payment Monitor's rail FILTER
+  `Needs attention`, owner ruling 2026-09-12 — a filter that gathers every row carrying a
+  non-`Wait` action, never a state word on a row): `Needs attention` · `Next action` · `Something went
   wrong` · `Pending` · `Waiting` · `Priority` · a bare `Follow up` · `Invalid` · `Failed to`.
 - **Fourteen words maximum per line**, and each line ends as a sentence.
 - A refusal **names the SKU, supplier, document or destination** it is about whenever the server
