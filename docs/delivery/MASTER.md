@@ -808,10 +808,16 @@ shared Register engine's `stickyIdentity` now accepts a LIST, and pins a **conti
 a gap between two pinned columns would let rows slide through it, so the run stops at the first
 column that is not named. Every other register is untouched: one name behaves exactly as before.
 
+**BROWSER VERIFICATION — 2026-09-12.** The multi-column pinned table uses separate borders
+with zero spacing and explicit row separators: measured browser scrolling otherwise clipped
+identity text. This is opt-in for the multi-column block; single-column callers stay unchanged.
+The real shell can be walked through the existing dev preview with `?shell=1&tab=delivery`.
+
 **⭐ BELOW 1100px THE RAIL STARTS COLLAPSED (owner ruling 2026-09-12)** — the Delivery Orders
 register's own number, so the two Delivery pages do not disagree about what *narrow* means. 240px
 of a 949px window is a quarter of the page spent on filters nobody has asked for while the sheet
-is already scrolling sideways. `Show filters` stays in the toolbar and the active narrowing stays
+is already scrolling sideways. The collapsed desktop rail is 44px wide with a visible `Show filters` button and text label;
+the active narrowing stays
 above the rows, so collapsed is DEFERRED, never gone — **a remembered choice still wins at any
 width**. Collapsed, the table viewport is **806px** rather than 566px.
 
@@ -833,16 +839,15 @@ cards the other groups already narrowed (Architecture Law D):
   recorded facts, never a clock inference. **The group belongs to the `Work to do` tab and is not
   drawn on `Confirmed deliveries`** (owner ruling 2026-09-10).
 - **`STATE`** (owner correction 2026-09-07, the heading formerly `REGION`) — the direct state
-  names ruled below, straight from the data, no `All …` row: picking again unpicks, and `Clear
-  filters` above the list clears everything. A STATE pick combines with a work queue
+  names ruled below, straight from the data, in the shared Select. `All` clears this selection;
+  `Clear filters` above the list clears everything. A STATE pick combines with a work queue
   (`Selangor · No logistics picked`), and header select-all then takes only those visible
   filtered rows.
 - **`LOGISTICS PARTNER`** (the heading formerly `LOGISTICS`) — only the governed partners
-  genuinely carrying a matching row, per the rows ruled below; no invented company, no `All …`
-  row.
+  genuinely carrying a matching row, in the shared Select with counts and `All`; no invented company.
 - **`DELIVERY STATUS`** — `Waiting for warehouse` · `Ready for handover` · `Out for delivery`.
   These are filters over recorded operational progress, not actions and not document statuses;
-  the three rows are fixed and print their live counts, zero included.
+  the three dropdown choices print their live counts, zero included, with `All` to clear the choice.
 
 **DELIVERY ORDERS — the formal document register on the Sales Orders grammar (owner UI
 correction 2026-09-06, overwriting the 2026-09-04 "restored unchanged" state).**

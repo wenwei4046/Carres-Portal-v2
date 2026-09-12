@@ -2188,7 +2188,7 @@ function DataGridInner<T>({
         className={`${styles.scroll} ${embedded ? styles.scrollEmbedded : ""}`}
         data-testid={isReference ? "grid-scroll" : undefined}
       >
-        <table className={styles.table}>
+        <table className={`${styles.table}${typeof stickyIdentity === "object" && Array.isArray(stickyIdentity.columnKey) ? ` ${styles.tablePinnedBlock}` : ""}`}>
           <thead
             className={`${styles.thead} ${embedded ? styles.theadEmbedded : ""}`}
             data-testid={isReference ? "grid-header" : undefined}

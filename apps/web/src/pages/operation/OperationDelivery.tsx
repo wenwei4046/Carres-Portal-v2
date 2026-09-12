@@ -2082,6 +2082,11 @@ export default function OperationDelivery() {
           ) : (
             rail
           )
+        ) : !isPhone ? (
+          <aside className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-kit-slate-5 bg-white py-2">
+            {showFiltersButton}
+            <span className="text-label text-kit-slate-11 [writing-mode:vertical-rl]">{MONITOR_COPY.showFilters}</span>
+          </aside>
         ) : null}
 
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
@@ -2111,7 +2116,7 @@ export default function OperationDelivery() {
               {/* The calendar toolbar: where the window stands, Day · Week ·
                   Month, and the one search. */}
               <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
-                {!railVisible ? showFiltersButton : null}
+                {!railVisible && isPhone ? showFiltersButton : null}
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
@@ -2247,7 +2252,7 @@ export default function OperationDelivery() {
                     must stay on screen — the sheet's toolbar is not here to
                     carry it. */}
                 <div className="flex h-11 shrink-0 items-center gap-3 border-b border-kit-slate-5 bg-white px-3">
-                  {!railVisible ? showFiltersButton : null}
+                  {!railVisible && isPhone ? showFiltersButton : null}
                   <input
                     type="search"
                     value={phoneSearch}
@@ -2378,7 +2383,7 @@ export default function OperationDelivery() {
                   ]}
                   toolbarStart={
                     <>
-                      {!railVisible ? showFiltersButton : null}
+                      {!railVisible && isPhone ? showFiltersButton : null}
                       {calendarControl}
                     </>
                   }
