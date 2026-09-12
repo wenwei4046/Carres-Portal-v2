@@ -1330,6 +1330,51 @@ implementation sequencing, migration or build work.
 
 ## 16 · Production closure
 
+**DEPLOYED 2026-09-11 — the Monitor corrections and the arrival defect, PR #1240, main SHA
+`7b06227d60103798ab5fc73b42835f8ca8c7f6ae`, all five canonical surfaces converged**
+(`erp` · `pos` · `carres-portal.pages.dev` each report that SHA in `/__carres_deploy.json`, and
+both `carres-portal-v2-api.wwch.workers.dev/health` and `api.carresofficial.com/health` report it
+too). Verified through an AUTHENTICATED OPERATION session (role `operation`, not a principal)
+against **89 real delivery rows**.
+
+- **The landing is `Work to do` 89** beside `Confirmed deliveries` 1, rail
+  `All delivery work 89 · No logistics picked 6 · Call customer 88 · Overdue delivery 1 ·
+  Failed Delivery 0 · Upload delivery proof 0`, and no filter summary — its queue narrows nothing.
+- **⭐ THE ARRIVAL DEFECT IS MEASURABLY FIXED ON REAL DATA.** Across the 89 rows:
+  `No purchase order raised yet` 57 · `Not confirmed` 24 · `No expected arrival calculated` **4**
+  · `Same as PO` 2 · `Supplier delivery date passed` 2. **Those 4 rows read
+  `The factory has not given a date` on 2026-09-11 morning** (the PR #1235 closure above records
+  exactly that count) — they were blaming the factory for a question nobody had asked. They now
+  name OUR gap. The compact cell prints the date alone; the state word is its accessible name
+  (`Expected arrival Thu, 13 Aug · Supplier delivery date passed`).
+- **The compact contact deadline is live on 87 rows** — 17 ahead of time, 70 late — as
+  `[phone] {date}`, with `Contact deadline Thu, 23 Jul — overdue, the deadline does not move` as
+  the cell's accessible name. **`Call by` and `Late — was due` no longer appear anywhere on the
+  page.**
+- **The two overdue populations are distinguishable on one screen at last:** the rail reads
+  `Overdue delivery 1` and the contact strip's chip reads `Overdue contact 70`. They used to be
+  two bare `Overdue` counts of 1 and 70.
+- **Delivery Orders (PRs #1238 / #1239) was verified in the same session** at
+  `/operation/delivery-orders`: the ruled column order, `DOCUMENT STATUS` as the kit's dropdown
+  (`All (2)`), the three work queues, and — on the two real documents, neither delivered —
+  `Not delivered yet · No signed document yet` rather than a fabricated `Photos 0`.
+
+⚠️ **What production could NOT prove, and why.** Three ruled states have no row in today's data:
+a confirmed date with **no agreed time** (no such arrangement exists), **`Waiting supplier reply`**
+(no advance arrival check is open today) and **`The factory has not given a date`** (no evidenced
+`delayed` reply naming no day exists). Each is covered by a shared unit test and was walked on the
+seeded Monitor fixture at 1440px, 949px and 375px. **The driver-submission GALLERY and PLAYER
+likewise have no production file to open** — both live delivery orders are undelivered — so the
+viewer's paging, its `This file could not be opened` state and its focus return were proved on
+fixtures and in the kit's own tests, not on live data. §6 of this MASTER says how real files
+arrive; until a delivery actually runs, that is the honest limit of the evidence.
+
+**STILL NOT BUILT, and named rather than implied:** there is no per-ATTEMPT evidence record, so a
+rebooked trip's second visit cannot be told from its first on a single-document order. A dedicated
+`delivery_attempt_evidence` table is the right home; it needs a migration and the governed apply
+path.
+
+
 **DEPLOYED 2026-08-24 — PR #896, main SHA
 `52804c005d7bf53bcbe9e1b1dcdd2b47cd684656`.** The first approved Delivery UI correction is live
 in production and has been verified through an authenticated Operations session:
