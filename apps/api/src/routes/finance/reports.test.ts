@@ -41,59 +41,28 @@ beforeEach(() => {
 
 afterAll(() => _setJwksForTesting(null));
 
-describe("GET /api/finance/reports/dashboard-summary", () => {
-  it("calls finance_dashboard_summary RPC and returns payload", async () => {
-    const payload = {
-      ar:           { outstanding: 21325, count: 6, overdueAmt: 0, overdueCount: 0 },
-      ap:           { dueAmt: 8400, count: 2 },
-      cashflow12w:  { inflow: 92000, outflow: 41000, net: 51000 },
-      agingBuckets: {
-        "0-30":  { amount: 21325, count: 6 },
-        "31-60": { amount: 0,     count: 0 },
-        "61-90": { amount: 0,     count: 0 },
-        "90+":   { amount: 0,     count: 0 },
-      },
-    };
-    const sb = { rpc: vi.fn().mockResolvedValue({ data: payload, error: null }) };
+describe("retired finance report routes", () => {
+  // The Finance Dashboard stopped reading finance_dashboard_summary and
+  // finance_cashflow_series; it reads the canonical Outstanding and Unpaid
+  // figures instead. These two doors are gone, and nothing reaches the RPCs.
+  it.each([
+    "/api/finance/reports/dashboard-summary",
+    "/api/finance/reports/cashflow",
+    "/api/finance/reports/cashflow?weeks=12",
+  ])("%s answers 404 and calls no RPC", async (path) => {
+    const sb = { rpc: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(userClient).mockReturnValue(sb as any);
 
     const jwt = await makeJwt("finance");
     const res = await app.fetch(
-      new Request("http://t/api/finance/reports/dashboard-summary", {
+      new Request(`http://t${path}`, {
         headers: { Authorization: `Bearer ${jwt}` },
       }),
       env,
     );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_dashboard_summary");
-    expect(await res.json()).toEqual(payload);
-  });
-
-  it("admits principal role", async () => {
-    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("principal");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/reports/dashboard-summary", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-  });
-
-  it("rejects dealer with 403", async () => {
-    const jwt = await makeJwt("dealer");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/reports/dashboard-summary", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(sb.rpc).not.toHaveBeenCalled();
   });
 });
 
@@ -206,55 +175,6 @@ describe("GET /api/finance/reports/ap-aging", () => {
       env,
     );
     expect(res.status).toBe(403);
-  });
-});
-
-describe("GET /api/finance/reports/cashflow", () => {
-  it("calls finance_cashflow_series with default 12 weeks", async () => {
-    const sb = {
-      rpc: vi.fn().mockResolvedValue({
-        data: { labels: [], inflow: [], outflow: [] },
-        error: null,
-      }),
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/reports/cashflow", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(sb.rpc).toHaveBeenCalledWith("finance_cashflow_series", { p_weeks: 12 });
-  });
-
-  it("passes weeks param when provided", async () => {
-    const sb = { rpc: vi.fn().mockResolvedValue({ data: {}, error: null }) };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue(sb as any);
-
-    const jwt = await makeJwt("finance");
-    await app.fetch(
-      new Request("http://t/api/finance/reports/cashflow?weeks=24", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(sb.rpc).toHaveBeenCalledWith("finance_cashflow_series", { p_weeks: 24 });
-  });
-
-  it("rejects out-of-range weeks with 422", async () => {
-    const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request("http://t/api/finance/reports/cashflow?weeks=999", {
-        headers: { Authorization: `Bearer ${jwt}` },
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
   });
 });
 

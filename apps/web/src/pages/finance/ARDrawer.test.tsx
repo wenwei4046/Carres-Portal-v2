@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
-import ARDrawer from "./ARDrawer";
-import type { FinanceArAgingRow } from "@/lib/queries";
+import ARDrawer, { type OrderPaymentRow } from "./ARDrawer";
+import type { CustomerOwingRow } from "./money-owed";
 
 vi.mock("@/lib/api", () => ({
   apiFetch: vi.fn(),
@@ -24,27 +25,28 @@ function wrap(ui: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
-      {ui}
+      <MemoryRouter>{ui}</MemoryRouter>
       <Toaster />
     </QueryClientProvider>
   );
 }
 
-const ROW: FinanceArAgingRow = {
-  order_id:      "11111111-1111-1111-1111-000000000001",
-  so:            1240,
-  customer_name: "Probe Customer AR",
-  dealer_id:     "d1",
-  dealer_name:   "Probe Dealer",
-  placed_at:     "2026-04-29T00:00:00Z",
-  days:          11,
-  aging:         "0-30",
-  total:         12500,
-  paid:          10000,
-  outstanding:   2500,
-  invoice_no:    "INV-2026-0001",
-  status:        "delivered",
+const BAL: CustomerOwingRow = {
+  orderId: "11111111-1111-1111-1111-000000000001",
+  so: 1240,
+  customer: "Probe Customer AR",
+  doorId: "inv-door-1",
+  outstanding: 2500,
+  storageOwing: 0,
+  overpaid: 0,
 };
+
+const HISTORY: OrderPaymentRow[] = [
+  { id: "p1", receipt_no: "RC-090926-0001", amount: 10000, paid_on: "2026-09-09",
+    voided_at: null, reference: "TRX-1", method: "bank" },
+  { id: "p2", receipt_no: "RC-090926-0002", amount: 50, paid_on: "2026-09-09",
+    voided_at: "2026-09-10T01:00:00Z", reference: null, method: "cash" },
+];
 
 const REGISTRY = {
   methods: [
@@ -55,6 +57,10 @@ const REGISTRY = {
   money_accounts: [],
 };
 
+function drawer(over: Partial<CustomerOwingRow> = {}, payments: OrderPaymentRow[] = []) {
+  return <ARDrawer balance={{ ...BAL, ...over }} payments={payments} open onOpenChange={() => {}} />;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -62,10 +68,29 @@ beforeEach(() => {
 describe("ARDrawer", () => {
   it("has no Issue invoice button — one invoice door per act (0476)", () => {
     vi.mocked(apiFetch).mockResolvedValue([]);
-    render(wrap(<ARDrawer row={{ ...ROW, paid: 12500, outstanding: 0 }} onClose={() => {}} />));
+    render(wrap(drawer({ outstanding: 0 })));
     expect(screen.queryByRole("button", { name: /Issue invoice/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Download invoice/i })).not.toBeInTheDocument();
     expect(apiFetch).not.toHaveBeenCalledWith("/api/finance/invoices/issue", expect.anything());
+  });
+
+  it("shows Outstanding with its storage part, and opens the invoice", () => {
+    vi.mocked(apiFetch).mockResolvedValue([]);
+    render(wrap(drawer({ outstanding: 2658, storageOwing: 158 })));
+    expect(screen.getByTestId("ar-drawer-outstanding")).toHaveTextContent("RM 2,658.00");
+    expect(screen.getByText("includes storage RM 158.00")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open invoice" })).toHaveAttribute("href", "/finance/invoices?invoice=inv-door-1");
+  });
+
+  it("Payment history is the order's own receipts — dated, worded, a voided one marked", () => {
+    vi.mocked(apiFetch).mockResolvedValue(REGISTRY);
+    render(wrap(drawer({}, HISTORY)));
+    const history = screen.getByTestId("ar-drawer-history");
+    expect(history).toHaveTextContent("RC-090926-0001");
+    expect(history).toHaveTextContent("RM 10,000.00");
+    expect(history).toHaveTextContent("RC-090926-0002 · VOIDED");
+    expect(history).not.toHaveTextContent("2026-09-09"); // a date goes through fmtDate
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringMatching(/^\/api\/finance\/payments\?/));
   });
 
   it("Record receipt offers the Active methods from Settings → Payment and sends the key", async () => {
@@ -74,7 +99,7 @@ describe("ARDrawer", () => {
       if (url.includes("/order-receipt")) return { id: "p1" };
       return [];
     });
-    render(wrap(<ARDrawer row={ROW} onClose={() => {}} />));
+    render(wrap(drawer()));
     fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
     await waitFor(() => expect(screen.getByRole("option", { name: "Probe Wallet" })).toBeInTheDocument());
     const options = Array.from(screen.getByLabelText("Method").querySelectorAll("option"))
@@ -85,9 +110,9 @@ describe("ARDrawer", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(
       "/api/finance/payments/order-receipt", expect.objectContaining({ method: "POST" })));
     const call = vi.mocked(apiFetch).mock.calls.find(([u]) => u === "/api/finance/payments/order-receipt")!;
-    expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({
-      orderId: ROW.order_id, amount: 2500, method: "probe_wallet",
-    });
+    const body = JSON.parse(String((call[1] as RequestInit).body));
+    expect(body).toMatchObject({ orderId: BAL.orderId, amount: 2500, method: "probe_wallet" });
+    expect(typeof body.idempotencyKey).toBe("string");
   });
 
   it("the default is bank, never the old bank_transfer word", async () => {
@@ -96,7 +121,7 @@ describe("ARDrawer", () => {
       if (url.includes("/order-receipt")) return { id: "p1" };
       return [];
     });
-    render(wrap(<ARDrawer row={ROW} onClose={() => {}} />));
+    render(wrap(drawer()));
     fireEvent.click(screen.getByRole("button", { name: "Record receipt" }));
     expect(screen.getByLabelText("Method")).toHaveValue("bank");
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
