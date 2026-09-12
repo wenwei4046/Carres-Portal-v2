@@ -440,6 +440,19 @@ Accessories & services · Expected arrival · Stock · Actions · Edit Delivery
                                         — sticky identity, real horizontal scrolling
 ```
 
+**RULING — corrected Monitor preview approved 2026-09-12.** Keep both complete months
+stacked above the scrolling filters. WORK TO DO remains six direct rows; STATE, LOGISTICS
+PARTNER and DELIVERY STATUS use the shared Select with counts and an All choice. Small
+filter-area scrolling is acceptable; never shrink text or remove calendar dates to claim a fit.
+The collapsed desktop rail keeps a visible Show filters button and label. SO No and Customer
+both remain pinned during horizontal scrolling, using measured column widths. Validate the
+real portal shell at 1440px and 949px, including the expanded and collapsed rail.
+A known confirmed day remains visible when its time is missing: No time agreed, with
+Call {logistics} — confirm delivery time. Do not call it Waiting for customer date or a completed
+confirmation, and do not introduce a new deadline. Revised supplier arrival keeps the new date
+above the original with the existing slate CalendarClock; no full-row warning background.
+This approval owns Monitor only, not Delivery Orders or partner coverage rules.
+
 - **`Customer` carries the Logistics Partner as its inline second line** — the Constitution's one
   permitted second line. Who carries a delivery is the operator's second question about a row and
   it may not cost a Columns chooser.

@@ -401,6 +401,7 @@ checklist item. The list is closed; a new chat does not add a fifth:
 |---|---|
 | 1 | `Assign logistics` |
 | 2 | `Confirm delivery date` (row line: `Call {logistics} — confirm delivery date`) |
+| 2a | `Call {logistics} — confirm delivery time` when the delivery day is known but its time is not; retain the date and show `No time agreed`. No new deadline is implied. |
 | 3 | `Deliver on {weekday, date}` (re-worded from `Deliver today` — the Delivery dictionary bans Today/Tomorrow; the actual weekday + date is printed) |
 | 4 | `Upload delivery photo` |
 
