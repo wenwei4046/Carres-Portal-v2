@@ -94,9 +94,34 @@ export const paymentVoucherDraftInput = z
     narration: optText(500),
     lines: z.array(paymentVoucherLineInput).max(100).default([]),
     allocations: z.array(paymentVoucherAllocationInput).max(200).default([]),
+    // 0484: money paid to the supplier before its bill. 0 = no advance.
+    advanceAmount: money.refine((n) => n >= 0, "An advance cannot be less than RM 0.00").default(0),
   })
   .strict();
 export type PaymentVoucherDraftInput = z.infer<typeof paymentVoucherDraftInput>;
+
+// ── supplier advances (0484–0485) ────────────────────────────────────────────
+const moneyAbove0 = money.refine((n) => n > 0, "The amount must be more than RM 0.00");
+
+/** Knock part of an approved advance off one confirmed bill. Posts nothing. */
+export const advanceApplyInput = z
+  .object({ billId: z.string().uuid(), amount: moneyAbove0 })
+  .strict();
+export type AdvanceApplyInput = z.infer<typeof advanceApplyInput>;
+
+/** Money the supplier sent back out of an approved advance. */
+export const moneyBackInput = z
+  .object({
+    moneyBackDate: isoDate,
+    moneyAccountCode: z.string().trim().min(1, "Choose where the money came into").max(10),
+    amount: moneyAbove0,
+    reference: optText(120),
+    narration: optText(500),
+    // A double press sends the same key; the database returns the first record.
+    idempotencyKey: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+export type MoneyBackInput = z.infer<typeof moneyBackInput>;
 
 // ── files ────────────────────────────────────────────────────────────────────
 export const apFileSignInput = z
@@ -198,14 +223,38 @@ export interface SupplierBillDocument {
     po_unit_cost: ApMoney | null;
     price_diff: ApMoney | null;
   }>;
-  payments: Array<{ voucher_id: string; voucher_no: string | null; status: string; voucher_date: string; amount_applied: ApMoney }>;
+  /** A voucher that pays the bill, or (0485) an advance knocked off it. */
+  payments: Array<{
+    kind: "voucher" | "advance";
+    /** The knock-off's own id — set for kind "advance" only. */
+    application_id: string | null;
+    voucher_id: string;
+    voucher_no: string | null;
+    /** The voucher's status, or the knock-off's: "applied" · "cancelled". */
+    status: string;
+    voucher_date: string;
+    /** The day an advance was applied; null for a voucher. */
+    applied_on: string | null;
+    amount_applied: ApMoney;
+  }>;
   files: ApFile[];
   events: ApEvent[];
   paid_total: ApMoney;
   allocated_total: ApMoney;
   unpaid: ApMoney | null;
+  /** Total less what is paid or already on a voucher; null unless confirmed. */
+  left_to_pay: ApMoney | null;
+  /** The supplier's advances left on this bill's payables account. */
+  advance_open: ApMoney;
   go_live_on: string | null;
-  can: { edit: boolean; confirm: boolean; cancel: boolean; add_file: boolean };
+  can: {
+    edit: boolean;
+    confirm: boolean;
+    cancel: boolean;
+    add_file: boolean;
+    apply_advance: boolean;
+    take_advance_off: boolean;
+  };
 }
 
 export interface GrnCandidateRow {
@@ -269,6 +318,25 @@ export interface ApOutstandingRow {
   supplier_kind: string;
   open_bills: number;
   oldest_unpaid_bill_date: string | null;
+  /** 0484: advance paid and not yet knocked off a bill or sent back. */
+  advance_open: ApMoney;
+  /** 0484: balance_owing less advance_open — what the ledger says is owed. */
+  net_owing: ApMoney;
+}
+
+/** One approved advance and what is left of it (0485 supplier_advances). */
+export interface SupplierAdvanceRow {
+  voucher_id: string;
+  voucher_no: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_kind: string;
+  voucher_date: string;
+  ap_account_code: string;
+  advance_amount: ApMoney;
+  applied_total: ApMoney;
+  money_back_total: ApMoney;
+  advance_open: ApMoney;
 }
 
 export interface ApBillOutstandingRow {
@@ -313,6 +381,54 @@ export interface PaymentVoucherRegisterRow {
   approved_by_name: string | null;
   file_count: number;
   created_at: string;
+  /** 0485: the advance this voucher carries (0 = none). */
+  advance_amount: ApMoney;
+  /** 0485: what is left of it; null until the voucher is approved. */
+  advance_open: ApMoney | null;
+}
+
+export interface SupplierAdvanceApplication {
+  id: string;
+  bill_id: string;
+  bill_no: string | null;
+  supplier_invoice_no: string;
+  bill_date: string;
+  amount: ApMoney;
+  status: "applied" | "cancelled";
+  created_at: string;
+  created_by_name: string | null;
+  cancelled_at: string | null;
+  cancelled_by_name: string | null;
+  cancel_reason: string | null;
+}
+
+export interface SupplierMoneyBack {
+  id: string;
+  money_back_no: string;
+  money_back_date: string;
+  money_account_code: string;
+  money_account_name: string | null;
+  amount: ApMoney;
+  reference: string | null;
+  narration: string | null;
+  status: "posted" | "voided";
+  entry_no: string | null;
+  reversal_entry_no: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  voided_at: string | null;
+  voided_by_name: string | null;
+  void_reason: string | null;
+}
+
+export interface PaymentVoucherAdvance {
+  advance_amount: ApMoney;
+  applied_total: ApMoney;
+  money_back_total: ApMoney;
+  /** Null until the voucher is approved: before that the advance is not money yet. */
+  advance_open: ApMoney | null;
+  applications: SupplierAdvanceApplication[];
+  money_back: SupplierMoneyBack[];
 }
 
 export interface PaymentVoucherDocument {
@@ -327,6 +443,11 @@ export interface PaymentVoucherDocument {
     payee_name: string;
     voucher_date: string;
     amount: ApMoney;
+    /** 0484: the part of `amount` paid before any bill. */
+    advance_amount: ApMoney;
+    /** The payables account the advance sits on (2110 / 2120); null without one. */
+    ap_account_code: string | null;
+    ap_account_name: string | null;
     pay_method: string;
     pay_reference: string | null;
     pay_from_account_code: string;
@@ -360,6 +481,8 @@ export interface PaymentVoucherDocument {
     ap_account_code: string;
     amount_applied: ApMoney;
   }>;
+  /** 0485: null when the voucher carries no advance. */
+  advance: PaymentVoucherAdvance | null;
   files: ApFile[];
   events: ApEvent[];
   go_live_on: string | null;
@@ -372,5 +495,9 @@ export interface PaymentVoucherDocument {
     reject: boolean;
     cancel: boolean;
     add_file: boolean;
+    apply_advance: boolean;
+    take_advance_off: boolean;
+    money_back: boolean;
+    cancel_money_back: boolean;
   };
 }

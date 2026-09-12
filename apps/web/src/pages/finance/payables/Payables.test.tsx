@@ -70,12 +70,15 @@ function billRow(over: Record<string, unknown>) {
   };
 }
 
-function voucherDoc(over: { status: string; can: Record<string, boolean>; you_prepared?: boolean }) {
+function voucherDoc(over: {
+  status: string; can: Record<string, boolean>; you_prepared?: boolean; advance?: unknown; advance_amount?: string;
+}) {
   return {
     voucher: {
       id: PV, voucher_no: "PV-9M3Q", status: over.status, purpose: "SUPPLIER_BILLS", supplier_id: SUP,
       supplier_name: "Lumen Sofa Works", supplier_kind: "supplier", payee_name: "Lumen Sofa Works",
-      voucher_date: "2026-09-11", amount: "1225.00", pay_method: "BANK_TRANSFER", pay_reference: "TRX-1",
+      voucher_date: "2026-09-11", amount: "1225.00", advance_amount: over.advance_amount ?? "0.00",
+      ap_account_code: "2110", ap_account_name: "Trade payables", pay_method: "BANK_TRANSFER", pay_reference: "TRX-1",
       pay_from_account_code: "1120", pay_from_name: "Bank", narration: null, created_at: "2026-09-11T01:00:00Z",
       created_by_name: "Aina", prepared_at: "2026-09-11T02:00:00Z", prepared_by_name: "Aina",
       checked_at: over.status === "checked" ? "2026-09-11T03:00:00Z" : null,
@@ -91,8 +94,10 @@ function voucherDoc(over: { status: string; can: Record<string, boolean>; you_pr
         bill_total: "200.00", ap_account_code: "2110", amount_applied: "200.00" },
     ],
     files: [], events: [{ action: "prepared", note: null, at: "2026-09-11T02:00:00Z", actor_name: "Aina" }],
+    advance: over.advance ?? null,
     go_live_on: "2026-09-10", you_prepared: over.you_prepared ?? false,
-    can: { edit: false, prepare: false, check: false, approve: false, reject: false, cancel: false, add_file: true, ...over.can },
+    can: { edit: false, prepare: false, check: false, approve: false, reject: false, cancel: false, add_file: true,
+      apply_advance: false, take_advance_off: false, money_back: false, cancel_money_back: false, ...over.can },
   };
 }
 
@@ -129,7 +134,12 @@ beforeEach(() => {
       { supplier_id: SUP, supplier_name: "Lumen Sofa Works", bills_confirmed: 2, billed_total: "1225.00",
         allocated_total: "1025.00", paid_total: "0.00", balance_owing: "1225.00", uncommitted: "200.00",
         oldest_confirmed_bill_date: "2026-09-10", go_live_on: "2026-09-10", supplier_kind: "supplier",
-        open_bills: 2, oldest_unpaid_bill_date: "2026-09-10" },
+        open_bills: 2, oldest_unpaid_bill_date: "2026-09-10", advance_open: "300.00", net_owing: "925.00" },
+    ] },
+    [`${B}/advances`]: { rows: [
+      { voucher_id: PV, voucher_no: "PV-9M3Q", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", voucher_date: "2026-09-11", ap_account_code: "2110", advance_amount: "500.00",
+        applied_total: "200.00", money_back_total: "0.00", advance_open: "300.00" },
     ] },
     [`${B}/vouchers`]: { rows: [] },
   };
@@ -252,6 +262,17 @@ describe("Payment voucher form", () => {
       lines: [{ accountCode: "6500", amount: 1 }],
     });
     expect(w.body).not.toHaveProperty("amount");
+    expect(w.body).toMatchObject({ advanceAmount: 0 });
+  });
+
+  it("an advance before the bill needs no bill ticked, and is sent as advanceAmount (0484)", async () => {
+    show(`/finance/payment-vouchers/new?supplier=${SUP}`);
+    fireEvent.change(await screen.findByLabelText("Advance"), { target: { value: "500" } });
+    expect(screen.getByTestId("voucher-form-total")).toHaveTextContent("RM 500.00");
+    fireEvent.change(screen.getByLabelText("Paid from"), { target: { value: "1120" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]!.body).toMatchObject({ purpose: "SUPPLIER_BILLS", supplierId: SUP, advanceAmount: 500, allocations: [] });
   });
 
   it("a direct payment sends lines and no bills", async () => {
@@ -316,12 +337,111 @@ describe("Payment voucher detail", () => {
   });
 });
 
+const APP = "99999999-9999-4999-8999-999999999991";
+const MB = "99999999-9999-4999-8999-999999999992";
+const advanceOf = () => ({
+  advance_amount: "500.00", applied_total: "200.00", money_back_total: "0.00", advance_open: "300.00",
+  applications: [{ id: APP, bill_id: BILL1, bill_no: "BILL-4XK2", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10",
+    amount: "200.00", status: "applied", created_at: "2026-09-12T01:00:00Z", created_by_name: "Aina",
+    cancelled_at: null, cancelled_by_name: null, cancel_reason: null }],
+  money_back: [{ id: MB, money_back_no: "SRV-20260912-4821", money_back_date: "2026-09-12", money_account_code: "1120",
+    money_account_name: "Bank", amount: "50.00", reference: null, narration: null, status: "posted", entry_no: "JE-1",
+    reversal_entry_no: null, created_at: "2026-09-12T02:00:00Z", created_by_name: "Aina", voided_at: null,
+    voided_by_name: null, void_reason: null }],
+});
+
+describe("Supplier advance (0484–0485)", () => {
+  it("the voucher shows what is left of the advance, and applies it to a bill", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
+      advance: advanceOf(), can: { apply_advance: true, take_advance_off: true, money_back: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    expect(await screen.findByTestId("voucher-advance-left")).toHaveTextContent("RM 300.00");
+    expect(screen.getByTestId("voucher-advance-applications")).toHaveTextContent("Applied");
+    expect(screen.getByTestId("voucher-money-back")).toHaveTextContent("SRV-20260912-4821");
+    // An approver-only step is not offered to this person.
+    expect(screen.queryByRole("button", { name: "Cancel money back" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply advance" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(await within(dialog).findByLabelText("Bill"), { target: { value: BILL1 } });
+    // Defaults to the smaller of what is left of the advance and of the bill.
+    expect(within(dialog).getByLabelText("Amount")).toHaveValue("300");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply advance" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/advance-applications`,
+      body: { billId: BILL1, amount: 300 } });
+  });
+
+  it("taking an advance off needs a reason", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
+      advance: advanceOf(), can: { take_advance_off: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    fireEvent.click(await screen.findByRole("button", { name: "Take advance off" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "Wrong bill" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take advance off" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toMatchObject({ url: `${B}/advance-applications/${APP}/cancel`, body: { reason: "Wrong bill" } });
+  });
+
+  it("money back names the account it came into and carries a key against a double press", async () => {
+    api.routes[`${B}/vouchers/${PV}`] = voucherDoc({ status: "approved", advance_amount: "500.00",
+      advance: advanceOf(), can: { money_back: true } });
+    show(`/finance/payment-vouchers/${PV}`);
+    fireEvent.click(await screen.findByRole("button", { name: "Record money back" }));
+    const dialog = await screen.findByRole("dialog");
+    const go = within(dialog).getByRole("button", { name: "Record money back" });
+    expect(go).toBeDisabled();
+    fireEvent.change(await within(dialog).findByLabelText("Received into"), { target: { value: "1120" } });
+    fireEvent.change(within(dialog).getByLabelText("Amount"), { target: { value: "301" } });
+    expect(dialog).toHaveTextContent("More than the advance left");
+    expect(go).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Amount"), { target: { value: "120" } });
+    fireEvent.click(go);
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    const w = writes()[0]!;
+    expect(w).toMatchObject({ url: `${B}/vouchers/${PV}/money-back`, body: { moneyAccountCode: "1120", amount: 120 } });
+    expect((w.body as { idempotencyKey: string }).idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("the bill lists an advance knocked off it, and applies one", async () => {
+    api.routes[`${B}/bills/${BILL1}`] = {
+      bill: { id: BILL1, bill_no: "BILL-4XK2", status: "confirmed", supplier_id: SUP, supplier_name: "Lumen Sofa Works",
+        supplier_kind: "supplier", supplier_invoice_no: "LSW-901", bill_date: "2026-09-10", due_date: null, po_id: null,
+        ap_account_code: "2110", ap_account_name: "Trade payables", total_amount: "1025.00", narration: null,
+        cancel_reason: null, created_at: "2026-09-10T01:00:00Z", created_by_name: "Aina", confirmed_at: null,
+        confirmed_by_name: null, cancelled_at: null, cancelled_by_name: null, entry_no: "JE-2", reversal_entry_no: null },
+      lines: [],
+      payments: [{ kind: "advance", application_id: APP, voucher_id: PV, voucher_no: "PV-9M3Q", status: "applied",
+        voucher_date: "2026-09-11", applied_on: "2026-09-12", amount_applied: "200.00" }],
+      files: [], events: [], paid_total: "200.00", allocated_total: "200.00", unpaid: "825.00", left_to_pay: "825.00",
+      advance_open: "300.00", go_live_on: "2026-09-10",
+      can: { edit: false, confirm: false, cancel: false, add_file: false, apply_advance: true, take_advance_off: true },
+    };
+    show(`/finance/bills/${BILL1}`);
+    const card = await screen.findByTestId("bill-payments");
+    expect(card).toHaveTextContent("Advance from PV-9M3Q · Applied");
+    expect(within(card).getByRole("button", { name: "Take advance off" })).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "Apply advance" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(await within(dialog).findByLabelText("Advance"), { target: { value: PV } });
+    expect(within(dialog).getByLabelText("Amount")).toHaveValue("300");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply advance" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toMatchObject({ url: `${B}/vouchers/${PV}/advance-applications`,
+      body: { billId: BILL1, amount: 300 } });
+  });
+});
+
 describe("Unpaid by Supplier", () => {
   it("shows what is owed per supplier, and what already sits on a voucher", async () => {
     show("/finance/ap-outstanding");
     await screen.findByText("Lumen Sofa Works");
     expect(screen.getByText("RM 1,025.00")).toBeInTheDocument(); // on a voucher, not approved
     expect(screen.getByTestId("ap-outstanding-summary")).toHaveTextContent("1 supplier · RM 1,225.00 unpaid");
+    // 0484: the advance left and what is owed after it, both from the database.
+    expect(screen.getByText("RM 300.00")).toBeInTheDocument();
+    expect(screen.getByText("RM 925.00")).toBeInTheDocument();
   });
 });
 
@@ -344,5 +464,7 @@ describe("payables words and sums", () => {
     const picks = { a: { on: true, amount: "10.10" }, b: { on: false, amount: "99" } };
     expect(voucherTotal("SUPPLIER_BILLS", picks, [{ amount: "0.20" }])).toBe(10.3);
     expect(voucherTotal("DIRECT", picks, [{ amount: "0.20" }])).toBe(0.2);
+    expect(voucherTotal("SUPPLIER_BILLS", picks, [], "250.05")).toBe(260.15);
+    expect(voucherTotal("DIRECT", picks, [], "250")).toBe(0);
   });
 });

@@ -29,11 +29,24 @@ export function PayablesSwitch({ current }: { current: "bills" | "vouchers" | "u
   );
 }
 
-export function Facts({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
+export function Facts({ title, children, testId, right }: {
+  title: string;
+  children: ReactNode;
+  testId?: string;
+  /** The card's own actions, on the title row. */
+  right?: ReactNode;
+}) {
   return (
     <SectionCard>
       <div className="p-3" data-testid={testId}>
-        <h2 className="text-strong mb-2">{title}</h2>
+        {right
+          ? (
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-strong">{title}</h2>
+              <span className="flex items-center gap-2">{right}</span>
+            </div>
+          )
+          : <h2 className="text-strong mb-2">{title}</h2>}
         <div className="text-body">{children}</div>
       </div>
     </SectionCard>

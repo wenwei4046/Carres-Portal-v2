@@ -14,6 +14,10 @@ import { PayablesSwitch, ReadFailed } from "./PayablesParts";
  * Carres still owes each supplier and creditor on confirmed bills, and how
  * much of that is already on a payment voucher waiting for approval. Read
  * only: paying is a Payment Voucher, one door.
+ *
+ * Advance Left and Unpaid After Advance (0484) come from the database
+ * (`advance_open`, `net_owing`) — the same figure the ledger self-check reads.
+ * A supplier with only an advance shows here with a negative Unpaid After Advance.
  */
 export default function ApOutstanding() {
   const navigate = useNavigate();
@@ -32,6 +36,12 @@ export default function ApOutstanding() {
       numberValue: (r) => num(r.paid_total), filterType: "number", exportValue: (r) => num(r.paid_total) ?? "" },
     { key: "unpaid", label: "Unpaid", width: 140, align: "right", accessor: (r) => money(r.balance_owing),
       numberValue: (r) => num(r.balance_owing), filterType: "number", exportValue: (r) => num(r.balance_owing) ?? "" },
+    // 0484: an advance paid before the bill is owed back to Carres until it is
+    // applied or sent back, so it comes off what Carres owes the supplier.
+    { key: "advance", label: "Advance Left", width: 140, align: "right", accessor: (r) => money(r.advance_open),
+      numberValue: (r) => num(r.advance_open), filterType: "number", exportValue: (r) => num(r.advance_open) ?? "" },
+    { key: "net", label: "Unpaid After Advance", width: 170, align: "right", accessor: (r) => money(r.net_owing),
+      numberValue: (r) => num(r.net_owing), filterType: "number", exportValue: (r) => num(r.net_owing) ?? "" },
     { key: "waiting", label: "On a Voucher, Not Approved", width: 200, align: "right",
       accessor: (r) => money(onVoucher(r)), numberValue: (r) => onVoucher(r), filterType: "number" },
     { key: "free", label: "Not on a Voucher", width: 160, align: "right", accessor: (r) => money(r.uncommitted),

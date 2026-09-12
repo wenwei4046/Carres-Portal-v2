@@ -1,9 +1,11 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
+  advanceApplyInput,
   apFileAddInput,
   apFileSignInput,
   apReasonInput,
+  moneyBackInput,
   otherCreditorInput,
   paymentVoucherDraftInput,
   supplierBillDraftInput,
@@ -44,6 +46,13 @@ import type { AppEnv } from "../../types";
  *     POST /vouchers/:id/prepare|check|approve
  *     POST /vouchers/:id/reject         back to Draft, with a reason
  *     POST /vouchers/:id/cancel         cancels; reverses the entry if approved
+ *
+ *   Supplier advances (0484–0485: a voucher pays before the bill)
+ *     GET  /advances                    supplier_advances — every approved advance, and what is left
+ *     POST /vouchers/:id/advance-applications   supplier_advance_apply — knock it off a bill; posts nothing
+ *     POST /advance-applications/:id/cancel     supplier_advance_application_cancel — take it off again
+ *     POST /vouchers/:id/money-back     supplier_advance_money_back_record — the supplier sent money back
+ *     POST /money-back/:id/cancel       supplier_advance_money_back_cancel — the approver reverses it
  *
  *   Files (supplier invoices, receipts, bank slips)
  *     POST /bills/:id/files/sign  · POST /vouchers/:id/files/sign    signed upload URL
@@ -129,6 +138,7 @@ function voucherArgs(voucherId: string | null, d: PaymentVoucherDraftInput) {
     p_pay_method: d.payMethod,
     p_pay_reference: d.payReference ?? null,
     p_narration: d.narration ?? null,
+    p_advance_amount: d.advanceAmount ?? 0,
   };
 }
 
@@ -313,6 +323,75 @@ for (const step of ["reject", "cancel"] as const) {
     return c.json({ id });
   });
 }
+
+// ── supplier advances ───────────────────────────────────────────────────────
+
+payablesRouter.get("/advances", requireFinance, async (c) => {
+  const f = supplierFilter(c);
+  if (!f.ok) return badId(c, "supplier");
+  const { data, error } = await sb(c).rpc("supplier_advances", { p_supplier_id: f.value });
+  if (error) return pgFail(c, error);
+  return c.json({ rows: data ?? [] });
+});
+
+payablesRouter.post("/vouchers/:id/advance-applications", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+  const body = await parseJsonBody(c, advanceApplyInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { data, error } = await sb(c).rpc("supplier_advance_apply", {
+    p_voucher_id: id,
+    p_bill_id: body.data.billId,
+    p_amount: body.data.amount,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/advance-applications/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "advance");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_advance_application_cancel", {
+    p_application_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
+
+payablesRouter.post("/vouchers/:id/money-back", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "payment voucher");
+  const body = await parseJsonBody(c, moneyBackInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const d = body.data;
+  const { data, error } = await sb(c).rpc("supplier_advance_money_back_record", {
+    p_voucher_id: id,
+    p_money_back_date: d.moneyBackDate,
+    p_money_account_code: d.moneyAccountCode,
+    p_amount: d.amount,
+    p_reference: d.reference ?? null,
+    p_narration: d.narration ?? null,
+    p_idempotency_key: d.idempotencyKey ?? null,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id: data as string }, 201);
+});
+
+payablesRouter.post("/money-back/:id/cancel", requireFinance, async (c) => {
+  const id = c.req.param("id");
+  if (!UUID_RE.test(id)) return badId(c, "money back");
+  const body = await parseJsonBody(c, apReasonInput);
+  if (!body.ok) return c.json(body.body, body.status);
+  const { error } = await sb(c).rpc("supplier_advance_money_back_cancel", {
+    p_money_back_id: id,
+    p_reason: body.data.reason,
+  });
+  if (error) return pgFail(c, error);
+  return c.json({ id });
+});
 
 // ── files ───────────────────────────────────────────────────────────────────
 

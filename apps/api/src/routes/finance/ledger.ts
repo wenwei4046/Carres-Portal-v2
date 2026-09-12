@@ -504,8 +504,11 @@ function toControls(rows: Json[]): ControlAccountCheck[] {
  * Accounts payable, two ways. The ledger side sums every supplier on the
  * liability-side supplier control accounts (read from the chart, so a second
  * payables account joins with no code change). The document side is
- * `ap_outstanding` — confirmed bills less released vouchers (0464). A
- * supplier whose two figures differ is named.
+ * `ap_outstanding.net_owing` — confirmed bills less what paid them, less the
+ * advance paid and not yet used (0484). An approved advance debits the same
+ * control, so `balance_owing` alone would name every supplier with an advance.
+ * `balance_owing` is the fallback for a server without 0484. A supplier whose
+ * two figures differ is named.
  */
 function toPayables(controlRows: Json[], apRows: Json[]): PayablesCheck {
   const accountCodes = controlRows
@@ -524,7 +527,10 @@ function toPayables(controlRows: Json[], apRows: Json[]): PayablesCheck {
   }
   const bills = new Map<string, { name: string | null; owing: number }>();
   for (const r of apRows) {
-    bills.set(String(r.supplier_id), { name: (r.supplier_name as string | null) ?? null, owing: num(r.balance_owing) });
+    bills.set(String(r.supplier_id), {
+      name: (r.supplier_name as string | null) ?? null,
+      owing: num(r.net_owing ?? r.balance_owing),
+    });
   }
   const differences: SupplierDifference[] = [];
   for (const id of new Set([...ledger.keys(), ...bills.keys()])) {

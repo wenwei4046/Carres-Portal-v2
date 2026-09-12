@@ -516,6 +516,26 @@ describe("GET /self-check", () => {
     expect(body.rentals).toEqual({ ok: true, months: [], month_count: 0, amount: 0 });
   });
 
+  it("compares net_owing, so a supplier with an unused advance is not named (0484)", async () => {
+    // B was paid a 1,500 advance (Dr 2110) and billed 1,000 (Cr 2110): the
+    // ledger says -500. Bills alone say 1,000 owed; less the advance, -500.
+    fakeClient(selfCheckAnswer({
+      gl_control_party_balances: ok([
+        ...controlRows,
+        { account_code: "2110", row_kind: "PARTY", party_type: "SUPPLIER", party_id: SUP_B, party_name: "Test Supplier B", party_matches: true, total_debit: "1500", total_credit: "1000", natural_balance: "-500", line_count: 2 },
+      ]),
+      ap_outstanding: ok([
+        { supplier_id: SUP_A, supplier_name: "Test Supplier A", balance_owing: "30", advance_open: "0", net_owing: "30" },
+        { supplier_id: SUP_B, supplier_name: "Test Supplier B", balance_owing: "1000", advance_open: "1500", net_owing: "-500" },
+      ]),
+    }));
+    const body = await json(await get("/self-check"));
+    expect(body.payables).toMatchObject({
+      ok: true, ledger_total: -470, bills_total: -470, difference: 0, supplier_difference_count: 0,
+    });
+    expect(body.payables.suppliers).toEqual([]);
+  });
+
   it("names every rental month collected with no ledger entry", async () => {
     fakeClient(selfCheckAnswer({
       gl_rental_payments_unposted: ok([
