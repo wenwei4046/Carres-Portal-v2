@@ -87,6 +87,15 @@ describe("AR · Receivables", () => {
     expect(api.urls.some((u) => u.startsWith("/api/finance/payments?"))).toBe(false);
   });
 
+  it("the row's Record receipt button opens the drawer with the receipt form already showing", async () => {
+    show();
+    await screen.findByText("Dahlia Suria");
+    fireEvent.click(screen.getByTestId("ar-record-o1"));
+    const drawer = await screen.findByTestId("ar-drawer");
+    expect(within(drawer).getByLabelText("Amount")).toHaveValue("4970");
+    expect(within(drawer).getByRole("button", { name: "Confirm" })).toBeInTheDocument();
+  });
+
   it("a failed read says so and offers Try again, never an empty list", async () => {
     api.fail.add(INV);
     show();

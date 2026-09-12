@@ -24,6 +24,8 @@ export default function FinanceAR() {
   const invoiceRows = query.data;
   const rows = useMemo(() => customerOwingRows(invoiceRows ?? []), [invoiceRows]);
   const [openId, setOpenId] = useState<string | null>(null);
+  // The row's Record receipt button opens the form; a double-click only opens the order.
+  const [recording, setRecording] = useState(false);
   const open = openId ? rows.find((r) => r.orderId === openId) ?? null : null;
   const payments: readonly OrderPaymentRow[] = useMemo(() => {
     if (!open) return [];
@@ -45,7 +47,7 @@ export default function FinanceAR() {
     { key: "act", label: "Record receipt", width: 150, filterable: false,
       accessor: (r) => (
         <button type="button" className="btn-secondary" data-testid={`ar-record-${r.orderId}`}
-          onClick={(e) => { e.stopPropagation(); setOpenId(r.orderId); }}>
+          onClick={(e) => { e.stopPropagation(); setRecording(true); setOpenId(r.orderId); }}>
           Record receipt
         </button>
       ),
@@ -76,7 +78,7 @@ export default function FinanceAR() {
             isLoading={!query.isSuccess}
             searchPlaceholder="Search orders…"
             emptyMessage="No customer owes money."
-            onRowDoubleClick={(r) => setOpenId(r.orderId)}
+            onRowDoubleClick={(r) => { setRecording(false); setOpenId(r.orderId); }}
             statusSummary={(visible) => {
               const t = outstandingTotal(visible);
               return (
@@ -89,7 +91,7 @@ export default function FinanceAR() {
         </ListPageShell>
       )}
       {open && (
-        <ARDrawer key={open.orderId} balance={open} payments={payments} open
+        <ARDrawer key={open.orderId} balance={open} payments={payments} open startRecording={recording}
           onOpenChange={(o) => { if (!o) setOpenId(null); }} />
       )}
     </div>

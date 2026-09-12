@@ -115,6 +115,16 @@ describe("ARDrawer", () => {
     expect(typeof body.idempotencyKey).toBe("string");
   });
 
+  it("opens with the form closed, and with it showing when startRecording is set", () => {
+    vi.mocked(apiFetch).mockResolvedValue(REGISTRY);
+    const closed = render(wrap(drawer()));
+    expect(screen.queryByLabelText("Amount")).not.toBeInTheDocument();
+    closed.unmount();
+    render(wrap(<ARDrawer balance={BAL} payments={[]} open onOpenChange={() => {}} startRecording />));
+    expect(screen.getByLabelText("Amount")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm" })).toBeInTheDocument();
+  });
+
   it("the default is bank, never the old bank_transfer word", async () => {
     vi.mocked(apiFetch).mockImplementation(async (url: string) => {
       if (url.includes("/payment-settings/methods")) throw new Error("down");

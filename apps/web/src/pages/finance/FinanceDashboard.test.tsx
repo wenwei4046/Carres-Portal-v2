@@ -100,7 +100,8 @@ describe("Finance Dashboard", () => {
 
     show(<ApOutstanding />);
     const footer = await screen.findByTestId("ap-outstanding-summary");
-    expect(footer.textContent).toContain(`${dashText} unpaid`);
+    // Same count too: the supplier owed nothing (Quiet Oak Beds) is not counted on either surface.
+    expect(footer).toHaveTextContent(`2 suppliers · ${dashText} unpaid`);
   });
 
   it("Outstanding is the sum of Customer balances that still owe, and the AR footer says the same", async () => {

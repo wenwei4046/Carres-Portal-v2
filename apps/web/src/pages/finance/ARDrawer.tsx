@@ -38,13 +38,16 @@ export default function ARDrawer({
   payments,
   open,
   onOpenChange,
+  startRecording = false,
 }: {
   balance: CustomerOwingRow;
   payments: readonly OrderPaymentRow[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Open with the Record receipt form already showing (the row's Record receipt button). */
+  startRecording?: boolean;
 }) {
-  const [recPanelOpen, setRecPanelOpen] = useState(false);
+  const [recPanelOpen, setRecPanelOpen] = useState(startRecording);
   const [recAmt, setRecAmt]             = useState(String(balance.outstanding || ""));
   const [recRef, setRecRef]             = useState("");
   const [chosenMethod, setRecMethod]    = useState<string>("bank");
