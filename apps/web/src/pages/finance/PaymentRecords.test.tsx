@@ -213,6 +213,15 @@ describe("the Payment Record object", () => {
     expect(doc.slip).toHaveBeenCalledWith(expect.objectContaining({ id: "p1" }));
     expect(screen.getByText("No receipt template yet. Ask a manager to add the approved wording in Settings.")).toBeInTheDocument();
   });
+  it("a provider-recorded payment and an un-invoiced order say so in plain words", () => {
+    state.data = [{ ...payment, method: "online", source_channel: "order_create", order_id: "o-none",
+      orders: { id: "o-none", so: 777, customer_name: "No Invoice Yet" }, payment_allocations: [] }];
+    openFirstPayment();
+    const scroll = screen.getByTestId("payment-object-scroll");
+    expect(scroll).toHaveTextContent("Money account settled by the payment provider");
+    expect(scroll).toHaveTextContent("Source Sales Portal deposit");
+    expect(scroll).toHaveTextContent("No Invoice issued for this order yet");
+  });
   it("a voided payment keeps its Receipt marked VOIDED and cannot send it", () => {
     show();
     fireEvent.click(screen.getAllByTitle("Inspect payment")[1]);
