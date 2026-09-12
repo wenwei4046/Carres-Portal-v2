@@ -8,6 +8,9 @@ export const paymentRegisterQuery = z.object({
 
 export interface PaymentRegisterRow extends OrderPaymentRow {
   recorded_by_name?: string | null;
+  /** 0351 — which entrance posted the money (manual · finance receipt ·
+   *  POS/top-up · online provider). Shown as `Source` on the record. */
+  source_channel?: string | null;
   /** §5 (0448): a Payment Approver continued past a likely duplicate. Derived
    *  server-side from the payment's own metadata — the raw metadata, which can
    *  hold a payment provider's payload, never reaches the browser. */
@@ -40,6 +43,23 @@ export function paymentExceptionWord(row: PaymentRegisterRow): string {
   if (row.voided_at != null) return "Voided";
   if (row.duplicate_acknowledged) return "Duplicate checked";
   return "None";
+}
+
+/** The `Source` word for a posting channel — the entrance that recorded the
+ *  money, in the operator's words. An unknown channel prints its key rather
+ *  than a guess. */
+export const PAYMENT_SOURCE_WORD: Record<string, string> = {
+  manual_payment: "Recorded by staff",
+  finance_ar: "Finance receipt",
+  sales_top_up: "Sales Portal top-up",
+  stripe_checkout: "Online payment",
+  rental_collection: "Rental collection",
+};
+
+export function paymentSourceWord(row: Pick<PaymentRegisterRow, "source_channel">): string {
+  const key = row.source_channel ?? "";
+  if (!key) return "Recorded by staff";
+  return PAYMENT_SOURCE_WORD[key] ?? key;
 }
 
 export interface PaymentRegisterPage {

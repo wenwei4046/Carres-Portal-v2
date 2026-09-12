@@ -58,6 +58,10 @@ import {
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
 import {
+  collectionTimingFor,
+  type CollectionTimingRule,
+} from "@carres/shared/collection-clock";
+import {
   latestOutcomeOf,
   missedPromise,
   type CollectionOutcomeRow,
@@ -129,6 +133,8 @@ export function projectSalesOrdersFromModuleFacts(input: {
   /** Gate convergence (2026-09-07): Σ live ISSUED storage papers per order —
    *  the canonical §2 storage obligation. Absent ⇒ legacy C9 only. */
   invoiceStorageByOrder?: ReadonlyMap<string, number>;
+  /** 0486 — the effective collection timing for the SO ladder's DO clock. */
+  timingRules?: readonly CollectionTimingRule[] | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -393,11 +399,16 @@ export function projectPaymentCollectionWork(input: {
    *  already broken outranks the delivery window — the item then hangs off the
    *  day the CUSTOMER chose, not the day the clock would have chosen. */
   outcomes?: readonly CollectionOutcomeRow[];
+  /** `Settings → Payments → Collection timing` (0486). The clock an invoice
+   *  runs under is the rule in force on its issue day — a snapshot by
+   *  construction. Absent ⇒ the ruled default (3 · 2). */
+  timingRules?: readonly CollectionTimingRule[] | null;
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
-    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays });
+    const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
     const money = invoiceNeeded(invoice);
     const owing = money.known && money.outstanding > 0;
     const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
@@ -415,7 +426,7 @@ export function projectPaymentCollectionWork(input: {
       module: "payment",
       soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
       orderId: invoice.id,
-      action: "Ask the customer to pay",
+      action: "Ask customer to pay",
       ownerRule: "payment_duty",
       ownerDutyKey: "payment_duty",
       normalOwner: owner?.normalOwner ?? null,
@@ -444,7 +455,66 @@ export function projectPaymentCollectionWork(input: {
         : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
-      destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
+      destination: `/finance/monitor?invoice=${encodeURIComponent(invoice.id)}`,
+      today: input.today,
+    })];
+  });
+}
+
+/**
+ * §10 — `Storage invoice live | responsible Delivery Operation | Send the
+ * invoice and collect payment | invoice fully paid` (owner ruling 2026-09-12).
+ *
+ * One item per SO whose live ISSUED storage papers still ask for money — the
+ * figure is the shared `soRemaining().storageOwing`, so this raises exactly
+ * what the Monitor's Storage cell and the DO gate read. The due is the same
+ * collection deadline the balance item uses (one clock); an order with no
+ * delivery anchor carries the governed `No date`.
+ */
+export function projectStorageInvoiceWork(input: {
+  invoices: readonly InvoiceRegisterRow[];
+  today: string;
+  timingRules?: readonly CollectionTimingRule[] | null;
+}): OperationWorkItem[] {
+  const holidays = myHolidaySet();
+  const seen = new Set<string>();
+  return input.invoices.flatMap((invoice) => {
+    if (invoice.kind === "sales" || invoice.status !== "issued" || !invoice.orders) return [];
+    if (seen.has(invoice.order_id)) return [];
+    const money = soRemaining(input.invoices as InvoiceRegisterRow[], invoice.order_id);
+    if (!money.known || money.storageOwing <= 0 || money.outstanding <= 0) return [];
+    seen.add(invoice.order_id);
+    const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
+    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const dueIso = clock.dueIso;
+    const late = !!dueIso && input.today > dueIso;
+    const workItem: WorkItem = {
+      ruleKey: "payment.send_storage_invoice",
+      module: "payment",
+      soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
+      orderId: invoice.id,
+      action: "Send the invoice and collect payment",
+      ownerRule: "delivery_duty",
+      ownerDutyKey: null,
+      normalOwner: null,
+      activeCover: null,
+      actingPerson: null,
+      ownerState: "not_assigned",
+      ownerName: null,
+      ownerUserId: null,
+      ownerDuty: "Delivery staff",
+      tone: late ? "danger" : "warning",
+      locked: false,
+      broken: false,
+      dueIso,
+      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, { holidays }) : 0,
+    };
+    return [operationWorkItemFromProjection(workItem, {
+      object: { kind: "invoice", id: invoice.id, label: invoice.invoice_no ?? `SO-${invoice.orders.so} storage invoice` },
+      problem: "Storage Invoice not paid",
+      recipient: invoice.orders.customer_name,
+      requiredResult: `Storage owing reduced from RM ${money.storageOwing.toFixed(2)} to RM 0`,
+      destination: `/finance/monitor?invoice=${encodeURIComponent(invoice.id)}`,
       today: input.today,
     })];
   });
@@ -812,6 +882,28 @@ export function projectReceivingWork(input: {
   });
 }
 
+/**
+ * 0486 — `Settings → Payments → Collection timing`, every effective row. The
+ * shared `collectionTimingFor` picks the rule in force on a clock's start day,
+ * so a read here is the snapshot every Payment item runs under. A read
+ * failure throws — a clock that silently fell back to the default would be a
+ * second arithmetic the Monitor does not run.
+ */
+async function readCollectionTimingRules(c: Context<AppEnv>): Promise<CollectionTimingRule[]> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("payment_collection_timing_rules")
+    .select("ask_days_before,deadline_days_before,effective_from")
+    .order("effective_from", { ascending: false });
+  if (error) throw new Error("Workspace collection-timing source could not be read");
+  return ((data ?? []) as Array<{ ask_days_before: number; deadline_days_before: number; effective_from: string }>)
+    .map((r) => ({
+      askDaysBefore: r.ask_days_before,
+      deadlineDaysBefore: r.deadline_days_before,
+      effectiveFrom: r.effective_from,
+    }));
+}
+
 /** The one response boundary. Module loaders remain responsible for producing
  * valid projections; invalid input fails the request instead of presenting a
  * false clear desk. Stable identity is the only deduplication key. */
@@ -1094,7 +1186,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks, issueSource] =
+         invoices, outcomes, refunds, storageChecks, issueSource, timingRules] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1129,6 +1221,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readRefunds(c),
       readStorageChecks(c),
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
+      readCollectionTimingRules(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -1162,6 +1255,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
+    timingRules,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),
@@ -1196,7 +1290,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes });
+  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes, timingRules });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
@@ -1211,8 +1306,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     arrivalCheckItems, receivingItems, paymentItems, overpaymentItems, storageCheckItems,
-     issueItems],
+     arrivalCheckItems, receivingItems, paymentItems, storageInvoiceItems, overpaymentItems,
+     storageCheckItems, issueItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,
