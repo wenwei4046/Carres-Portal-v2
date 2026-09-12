@@ -275,7 +275,7 @@ export type DataGridProps<T> = {
    * intervening columns slide beneath it. `true` keeps the original
    * first-data-column behaviour byte-identical for every existing caller.
    */
-  stickyIdentity?: boolean | { columnKey: string };
+  stickyIdentity?: boolean | { columnKey: string | readonly string[] };
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -924,9 +924,21 @@ function DataGridInner<T>({
   const pinnedLefts = useMemo(() => {
     const m = new Map<string, number>();
     if (!stickyIdentity) return m;
-    const identityKey =
-      typeof stickyIdentity === "object" ? stickyIdentity.columnKey : null;
+    /* ⭐ ONE NAME OR A RUN OF THEM (Delivery Monitor, owner ruling
+       2026-09-12). A sheet 1818px wide scrolled to its `Actions` column showed
+       `Call NETS — confirm delivery date` with no customer attached to it, so
+       a page may now name the identity AND the column that says whose row it
+       is. The set stays a CONTIGUOUS RUN: pinning two columns with a third
+       between them would leave a gap the rows slide through, so the run stops
+       at the first column that is not named. */
+    const named =
+      typeof stickyIdentity === "object"
+        ? Array.isArray(stickyIdentity.columnKey)
+          ? stickyIdentity.columnKey
+          : [stickyIdentity.columnKey as string]
+        : null;
     let left = 0;
+    let pinned = 0;
     for (const col of visibleColumns) {
       if (col.key.startsWith("__")) {
         // The control gutter always pins, at cumulative offsets.
@@ -934,14 +946,26 @@ function DataGridInner<T>({
         left += Number(layout.widths[col.key] ?? col.width ?? 140);
         continue;
       }
-      if (identityKey == null || col.key === identityKey) {
-        // The identity: the first data column, or the NAMED one — pinned
-        // directly after the gutter, so a scrolled sheet slides the columns
-        // before it underneath. If the named column is hidden, only the
-        // gutter pins: a wrong identity is worse than none.
+      if (named == null) {
+        // No name: the identity is the first data column, pinned directly
+        // after the gutter, so a scrolled sheet slides the rest underneath.
         m.set(col.key, left);
         break;
       }
+      if (named.includes(col.key)) {
+        m.set(col.key, left);
+        left += Number(layout.widths[col.key] ?? col.width ?? 140);
+        pinned += 1;
+        // Every named column found: the block is complete.
+        if (pinned === named.length) break;
+        continue;
+      }
+      // Not named. BEFORE the run starts this is an ordinary column the
+      // identity sits after — scan past it, exactly as the single-name form
+      // always did, and let it scroll under the block. ONCE the run has
+      // started, a gap would let rows slide through it, so the run ends here
+      // and whatever is already pinned stays correct.
+      if (pinned > 0) break;
     }
     return m;
   }, [stickyIdentity, visibleColumns, layout.widths]);
