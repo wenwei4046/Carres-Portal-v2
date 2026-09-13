@@ -110,12 +110,93 @@ real-record evidence for the Storage round-trips does not exist yet (R12).
 
 ## Second pass — 2026-09-13, after the first draft PR (#1274)
 
-**Blueprint comparison (step 1 of the second instruction): BLOCKED on the attachments.** The
-message said `receiving-proposal.html` and `CLAUDE-HANDOFF.md` were attached; neither reached this
-machine (no attachment content in the session, nothing on disk, nothing under the home directory or
-any remote ref — the first search was repeated). The comparison table cannot be written against
-files that were not received; it is owed as soon as they arrive, following the handoff's precedence
-rules and treating the HTML's historical audit text as history.
+**Blueprint comparison (step 1): STILL BLOCKED — the files have not reached this machine.** The
+first follow-up said `receiving-proposal.html` and `CLAUDE-HANDOFF.md` were attached; the second
+said a ZIP containing them was attached. Neither message carried attachment content into the
+session, and no such file exists on disk (session scratchpad, the desktop app's data folder,
+Downloads, Desktop, temp, or anything under the home directory newer than 90 minutes; searched
+twice). Nothing was substituted. Until they arrive, the comparison below is against the AGREED
+WRITTEN REQUIREMENTS of the 2026-09-13 instruction (§§2–9), which the handoff's precedence rules
+already rank above the prototype's historical audit text. Rows that depend on the two files are
+marked NOT RECEIVED.
+
+### Comparison against the agreed written requirements — 2026-09-13, head of PR #1274
+
+| Requirement (instruction) | Implemented behaviour | Discrepancy | Correction | Verification |
+|---|---|---|---|---|
+| §2 Kit and geometry: 50 / 45 / 36 / 38 / 32 / 240; one destination, one Register, no monitor/tabs/KPI cards | Measured inside the real Portal shell: module header 50 · toolbar 45 · header 36 · row 38 · footer 32 · rail 240; page test `is ONE destination — no Calendar/Register view switch, no Receiving Monitor` | The page overflowed the shell frame by 50px (found only by the in-shell walk) | `OperationApp.tsx`: the receiving tab gets the bounded flex frame | shell walk at 1440 and 831, `docs/evidence/receiving-02-grn-register/` |
+| §3 Default columns exactly `Expand · GRN No · GRN Date · Supplier DO No · Supplier · PO No · Items · Received Qty · Exceptions · GRN Status` | Exactly that order; secondary facts optional under Columns | none | — | page test `prints the DEFAULT columns exactly…`; shell walk `heads` |
+| §3 Expansion `Item · Received · Damaged · Wrong Item · Extra`; full real names; no SKU column; only the GRN's own lines; Received excludes damaged/wrong/extra | Child table with those five heads; `grnLineName` snapshot → catalog → SKU (source said); Received is the line's own received count | none | — | page test `▸ expands to THIS receipt's own lines…`; shared `grn-register-facts.test.ts` |
+| §3 GRN Status `Confirmed` / `Cancelled` over existing internal states | `posted → Confirmed`, `voided → Cancelled`; no new state | none | — | shared test `maps the EXISTING internal states…`; page test `speaks document status words…` |
+| §3 CO identified, never relabelled | `source_kind` + `CO` marker on the row and object header | none | — | page test `identifies a consignment source as a CO…` |
+| §3 GRN Date from schema semantics | `grnDateOf(posted_at)` in MYT | none | — | shared test `is the posting's stamp read in MYT, never the number` |
+| §4 Start Receiving left; Search/Export/Columns right; NO Clear filters; re-click clears; Hide/Show filters | As specified; `Clear filters` absent on every surface | none | — | page tests `draws the 240px rail… no Clear filters anywhere`, `a category pick narrows… picking it again clears…`, `Hide filters removes the rail…`; shell walk `clearFilters:false` |
+| §4 Rail closed by default 768–1129, 240 open; toolbar reachable while the sheet scrolls | Closed at 831 unless remembered; toolbar controls in view with the sheet scrolled 600px | none | — | page test `between 768 and 1129px…`; shell walk 831 |
+| §4 Footer info-only; pager top only past one page; complete-dataset counts; facets that cannot narrow hidden | As specified | none | — | page tests `the status footer is information only…`, `paginates on the SERVER…`, `shows real counts from the COMPLETE GRN result set` |
+| §4 Context preserved on return | Register stays mounted; expansion kept after Back in the shell | none | — | page test `a row opens the record, and the register stays MOUNTED…`; shell walk `expansionKept:true` |
+| §5 Two-month display calendar from kit primitives; display-only; counts not colour; today thin outline; arrows one month keeping two; no work cards; no invented dates | Kit `MonthCalendar months={2} selectable={false}`; markers from evidenced supplier replies only | none | — | kit tests (5); page tests `shows TWO complete months…`, `the month arrows move exactly one month…`, `marks expected supplier arrivals with an accessible COUNT…`, `the calendar is a DISPLAY…` |
+| §5 13 Sep review refinements shown as PENDING owner acceptance; "two months" never claimed as a universal standard | Shown and labelled pending in MASTER §9.4 and carry-forwards; no such claim anywhere | none | — | card R11; `docs/carry-forwards.md` |
+| §6 Six evidence flows scoped by GRN + stable line identity + type + kind; five states; zero qty → no door | Six doors → one viewer; `GET /:id/evidence` scoped; five states; zero exception draws nothing | none in behaviour | — | viewer tests (10); page tests `the Exceptions doors open ONE viewer…`, `a row whose evidence counts are not verified says so…` |
+| §6 Verify upload → save → close → reopen → view/play on non-production Storage + DB | Runnable test exists; cannot run here | **environment blocker, not a design discrepancy** | none possible here | NOT VERIFIED — see the Storage prerequisite below |
+| §7 GRN detail 50/50 with the six named sections; PO-2054 facts; exact Claim link; `What this saving did` replaced | As specified; the phrase is absent from the surfaces | none | — | page tests `the PO-2054 example…`, `a Valid GRN is 50/50…`; grep of the surfaces |
+| §8 Reviewed DB defects closed and proven | Designed out of 0493; PGlite 15 cases; full-chain replay; real multi-connection PostgreSQL 7 cases | none | — | see the corrected migration report below |
+| §9 Whole workflow; SMOKE rows investigated, never deleted | Suites + shell walk + real-Postgres doors; four `PO-SMOKE-*` GRNs counted, none touched | none | — | card R15 |
+| Prototype `receiving-proposal.html` / handoff precedence rules | — | **NOT RECEIVED** | — | owed on receipt |
+
+**Agreed design discrepancies still requiring fixes: none found against the written requirements.**
+The one defect the second pass found (the shell frame) is fixed at the head of this PR.
+
+**Optional refinements — NOT completion requirements, listed separately:**
+- The 13 Sep review items (overdue word/ink, per-month empty sentence, count unit, scrolling rail) —
+  shown, pending acceptance; the existing kit behaviour is retained.
+- At 831 with the rail open the child table scrolls sideways with the sheet — the existing kit
+  behaviour, retained; a pinned child table is NOT introduced.
+
+### Migration replay — corrected report
+
+"491 of 496 applied" is not a clean replay. The five failures, from
+`docs/audits/2026-09-10-MIGRATION-REPLAY.md` and this run's `replay.json`:
+
+| File | Why it fails from scratch | Objects it defines | Touches this feature or its tests? |
+|---|---|---|---|
+| `0149_rename_ohana_hookka` | asserts a production supplier row (red line 8) | none | no |
+| `0317_the_record_stops_claiming_a_send` | a backtick inside its closing `do $$` comment breaks the parse | `purchasing_record_send` | no (PO send record) |
+| `0339_one_purchase_order_creation_authority` | revokes a function signature that never existed (drift) | none | no |
+| `0398a_the_five_purposes_a_purchase_may_serve` | collision-order check constraint | `purchasing_set_purpose_approval`, `purchasing_create_request`, `purchasing_create_demand`, `purchasing_issue_pos_batch` | no |
+| `0453_a_quantity_row_is_keyed_not_identified` | its own sanity query runs `pg_get_functiondef` over an aggregate's oid (42809) | `gen_quantity_key` (new), `receiving_amend`, `ops_stock_book_in_units`, `operation_receive_po_with_do` (re-created), `gen_unit_code` (DROPPED), two views | **YES** — `receiving_amend` and `ops_stock_book_in_units` are receiving doors; on the plain replay they carried their PRE-0453 text and quantity rows still minted `id-…` keys |
+
+What that meant for the first integration run: `office_receive_post`, `warehouse_receipt_validate_lines`
+(0493), `receiving_void`, `receiving_line_evidence_add` and the duty gate — every door the seven
+cases assert on — are defined by files that replayed; only the quantity-line stock consequence
+inside the posting ran the pre-0453 book-in. **Closed:** 0453 was then applied to the throwaway
+cluster from a scratch copy (its sanity query rewritten as a materialised CTE, its two views
+skipped because 0471 already carries their later shape — never committed, never a migration
+edit), the generator swap verified (`gen_unit_code` gone, `gen_quantity_key` present, no
+`unit_code` DEFAULT), and the seven cases re-run: all pass, and the quantity row minted on that
+run wears a `QTY-` key. `0463`/`0466` replayed cleanly and should leave the baseline on `main`
+(not changed here).
+
+**Stubbed Supabase versus actual integration — what the replay proves and what it does not.**
+`scripts/dry-run-supabase-stub.sql` provides the roles, `auth.users`, `auth.uid()/role()/jwt()`
+reading the request-claims GUC (as PostgREST sets it), `storage.buckets` and `storage.objects`
+as plain tables, and the extensions. So the integration cases are REAL for: the committed
+PL/pgSQL doors, row locks and transaction interleaving across connections, RLS policies under
+`set role authenticated`, and the media law's existence check against `storage.objects`. They are
+NOT real for: GoTrue sign-in and JWT issue/verification, the Storage API (upload, signed URLs,
+object bytes), PostgREST's RPC transport, and the Worker route in front of the door. Those are
+exactly what `receiving-evidence-storage.integration.test.ts` covers and what stays NOT VERIFIED.
+
+### Storage round-trips — the secure non-production prerequisite
+
+Runnable test: `apps/api/src/test/receiving-evidence-storage.integration.test.ts` (six flows,
+real bucket → real door → real route with a JWKS-verified JWT → byte-equal signed download; the
+`missing` state after deletion; 403 for a warehouse account; refusals by name). It refuses the
+production project ref and SKIPS when unset. To run it, an owner-authorised person provisions a
+NON-production project (a Supabase preview branch of the project, or a separate project) with the
+chain applied, one operation login holding GRN duty, one posted receiving carrying a damaged
+unit, a wrong-item unit and an extra line, and optionally one warehouse login. The values go into
+a GitHub Actions environment secret set or a local untracked `.env` file — never into a chat,
+never into the repository. Nothing here was run against production.
 
 **Non-production infrastructure inspected before declaring anything blocked:** Supabase — one
 project (`kfprgpjpaffedghytstl`, production), `list_branches` returns only the default branch; a
