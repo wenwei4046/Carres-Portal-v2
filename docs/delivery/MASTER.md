@@ -865,6 +865,18 @@ timeliness and proof are measured instead. Warehouse and Logistics performance s
 when both are NETS. Observed reason and reviewed root cause stay separate. A rate with too few
 records is not printed. Old events enter historical measures only.
 
+**Built (【DELIVERY】 CARD 17, 2026-09-13).** `Reports → Delivery` (`/operation?tab=delivery-report`,
+`apps/web/src/pages/operation/OperationDeliveryReport.tsx`; the arithmetic in `delivery-report.ts`)
+prints the ten listings from the SAME reads Monitor and the Delivery Orders register run — the
+register rows through `buildDoRegisterRow`, today's facts through `buildDeliveryMonitorCards` and
+`isExceptionCard` — so a report figure and a register can never disagree (Law D). It stores nothing;
+every row is a door (the Delivery Order object, the Monitor row, the Monitor day, the Inbound
+arrival); each listing opens with its source fact, date basis and coverage sentence; a rate below
+five records reads `Rate withheld · fewer than 5 records`; an unreadable read prints `Not
+available`; Excel export writes one sheet per listing. The Cannot Deliver records (0417) reach the
+report through the arrangements read (`cannotDeliver`, absent when unreadable). The words are in
+`docs/COPY-STANDARD.md` (Reports → Delivery words).
+
 ## 13 · Owners, permissions and the external boundary
 
 ### 13.1 · The owner rule

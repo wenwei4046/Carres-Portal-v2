@@ -149,9 +149,18 @@ function refusedDeliveryDay(dateIso: string): string | null {
  *  all in one round trip; the status ladder reads the latest contact. */
 deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
-  const [{ data, error }, contactsRes] = await Promise.all([
+  const [{ data, error }, contactsRes, cannotRes] = await Promise.all([
     sb.from("ops_delivery_arrangements").select(ARRANGEMENT_SELECT),
     sb.from("ops_delivery_contacts").select(CONTACT_SELECT).order("contacted_at", { ascending: false }),
+    /* Card 17 — every recorded `Cannot Deliver` (0417), for the central
+       Delivery report's partner measures. Its own read; a failure here leaves
+       the field ABSENT (the report prints `Not available`, never 0) and the
+       workspace still opens. */
+    sb
+      .from("ops_delivery_arrangement_events")
+      .select("id, order_id, leg, from_partner_id, reason_key, note, recorded_at")
+      .eq("event", "cannot_deliver")
+      .order("recorded_at", { ascending: false }),
   ]);
   if (error) {
     const m = mapPgError(error);
@@ -161,9 +170,21 @@ deliveryArrangementsRouter.get("/", requireOperationOrPrincipal, async (c) => {
     const m = mapPgError(contactsRes.error);
     return c.json(m.body, m.status);
   }
+  const cannotDeliver = cannotRes.error
+    ? undefined
+    : ((cannotRes.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+        id: e.id as string,
+        order_id: e.order_id as string,
+        leg: Number(e.leg ?? 0),
+        partner_id: (e.from_partner_id as string | null) ?? null,
+        reason_key: (e.reason_key as string | null) ?? null,
+        note: (e.note as string | null) ?? null,
+        recorded_at: e.recorded_at as string,
+      }));
   return c.json({
     arrangements: ((data ?? []) as unknown as ArrangementRecord[]).map(shape),
     contacts: contactsRes.data ?? [],
+    ...(cannotDeliver ? { cannotDeliver } : {}),
   });
 });
 

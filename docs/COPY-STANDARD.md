@@ -539,6 +539,38 @@ delivery date`, `Ask NETS` over `Record the delivery result`, `Upload the delive
 `Attach the photo from NETS`, `Check the delivery proof` over `Accept it, ask for more, or reject
 it`, and `Collect the loan item` over `Bring back {Unit ID} on the delivery day`.
 
+### Reports → Delivery words — 【DELIVERY】 CARD 17 (Delivery MASTER §12, 2026-09-13)
+
+The central Delivery report lives at `Reports → Delivery` (`/operation?tab=delivery-report`,
+reachable by direct URL like the Receiving report). It draws the Delivery destination header, the
+eyebrow `Reports · Delivery`, the `Month` filter, `Export Excel`, and the §12 catalogue as ten
+sections, each opening with one sentence that names its **source fact, its date basis and its
+coverage** — the exclusion is always stated, never silent:
+
+| The ten listings | The words inside them |
+|---|---|
+| `Delivery Commitment Performance` | `Kept the requested date` · `After the requested date` · `No requested date` · `{n} deliveries · Kept the requested date {rate}` |
+| `First Delivery Success` | `Delivered on the first visit` · `Partly delivered on the first visit` · `Failed on the first visit` |
+| `Failed Delivery Analysis` | the reason library's own words with the category in brackets, e.g. `Customer unreachable (Customer)` |
+| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named` |
+| `Warehouse Performance` | `Ready {date} · Handed over {date} · Received by logistics {date}` · `Handed over by the delivery day` · `Handed over after the delivery day` |
+| `Delivery Proof Control` | `No proof yet` · `Not reviewed yet` · `Proof Accepted` · `More Proof Required` · `Proof Rejected` · `Delivery photo missing` · `Signed Delivery Order missing` |
+| `Schedule and Capacity` | `{n} deliveries confirmed across {n} days · busiest {day} with {n}` · `{n} deliveries · {n} booked` |
+| `Customer Contact Performance` | `{n} contacts · {n} confirmed · {n} recorded on behalf of a partner` · `Recorded on behalf of {partner}` · `Contact deadline passed today` |
+| `Return-to-Warehouse Control` | `Returned to Warehouse` · `Still with Logistics` · `Waiting at Inbound · {n} of {m} received` · `Received at Inbound · {site}` · `No Inbound arrival recorded` · `Inbound not available` |
+| `Exception Ageing` | `Overdue` · `Failed Delivery` · `Proof missing` · `{kind} since {date}` · `Today` · `1 to 2 days` · `3 to 7 days` · `Over 7 days` |
+
+**A rate with too few records is not printed (§12):** every rate reads `{hits} of {total} · {pct}%`
+from five records, and `Rate withheld · fewer than 5 records` below that. **An unreadable read is
+`Not available`, never 0** — the Cannot Deliver count and the Inbound join each say so. Empty
+listings say `No delivery reached a customer this month.` · `No first delivery visit was recorded
+this month.` · `No delivery failed this month.` · `No partner recorded a result this month.` · `No
+handover was recorded this month.` · `No delivery proof is on record for this month.` · `No
+delivery was confirmed for this month.` · `No customer contact was recorded this month.` · `No
+goods came back this month.` · `No open exception today.` The page failure is `This report could
+not be opened` over `Try again`. Every row is a door: the Delivery Order object, the Monitor row
+with its brief unfolded, the Monitor day, or the Inbound arrival.
+
 ## The delivery group words (T8, locked with Jess 2026-07-27)
 
 What may travel apart, and what may never. There are exactly TWO groups, and a
