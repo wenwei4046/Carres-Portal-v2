@@ -1054,6 +1054,15 @@ scopes from.
 
 ## 16 · Production closure
 
+**2026-09-13 · Cards 08–15 and 18 production-verified; the two-leg Journey walked end to end.** Journey legs
+(0490/0491) landed on `d78b4e26` and were corrected on the authenticated walk of the governed fixture SO-1362 by
+**0494** (`45238b71`), **0496** (`1984a7ba`) and **0497** (`9ee6db65`): leg 1 NETS `Carres Klang Warehouse → JB
+transit warehouse` (DO-130926-0842: handover, receipt, arrival), leg 2 AL `JB transit warehouse → Customer
+(Singapore)` (DO-130926-3223: handover from NETS, receipt, customer delivery with the signed DO and signature);
+each leg on its own document with its own facts; the Journey completed only on the last leg after the earlier leg
+arrived; the exact Unit `id-dtd627907` went reserved → with NETS → with AL → sold. Card 15 (0492, `0dc51c6b`) and
+Card 18 (`4e944e51`) walked the same day. Evidence: the Card files.
+
 **DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
 appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA
 `316a6ef473880d552d6812cb2202b4d13f380441`; all five canonical surfaces report it** (`erp` ·
