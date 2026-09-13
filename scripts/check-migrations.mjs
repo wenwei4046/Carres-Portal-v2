@@ -76,16 +76,16 @@ const COLLISION_BASELINE = new Set([
      halves touch disjoint objects (Delivery Order units vs
      purchase_requests), so their relative order is immaterial. */
   "0424",
-  /* 0489 · two lanes merged fifty-three minutes apart on 2026-09-13 (#1266
-     Delivery Card 13, then #1267 Payment) and both carried an 0489. Both
-     halves are committed AND both are applied — the tracker carries
-     `0489_one_sales_order_keeps_one_collection_owner` (20260913073027) and
-     `0489_proof_is_reviewed_and_every_attempt_keeps_its_evidence`
-     (20260913082417) — so the rename path is closed (immutability, red line
-     6) and the pair is baselined the way 0417 and 0424 were. The two halves
-     touch disjoint objects (the Payment collection owner vs the Delivery
-     proof-review and attempt-evidence tables), so their relative order is
-     immaterial. No apply debt. */
+  /* 0489 · two lanes merged seventeen minutes apart on 2026-09-13 (#1266, then
+     #1267) and both carried an 0489. Both halves are committed, so the rename
+     path is closed (immutability, red line 6) and the pair is baselined the
+     way 0417 and 0424 were. Measured state at baselining: BOTH halves are
+     APPLIED and the tracker defines their order —
+     `one_sales_order_keeps_one_collection_owner` at 07:30 UTC (Payment, a
+     rolled-back probe first) · `proof_is_reviewed_and_every_attempt_keeps_its_evidence`
+     at 08:24 UTC (Delivery). The two halves touch disjoint objects
+     (payment_collection_owners and its three doors vs Delivery proof/attempt
+     evidence), so their relative order is immaterial. */
   "0489",
 ]);
 
