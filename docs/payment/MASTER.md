@@ -1902,6 +1902,55 @@ and promises beside the sent messages. `payment_duty` retired from the Workspace
 Regression tests: `work.collection-owner.test.ts` (14), `collection-owner.test.ts` (5),
 `InvoiceCollectionOwner.test.tsx` (6), engine and Monitor suites updated.
 
+**PRODUCTION-VERIFIED on `e43cf5e1`, 2026-09-13** (contains #1267 `5cfda70d` and #1269
+`e43cf5e1`; ERP, POS, Pages and `/health` all reported the SHA). **#1269** exists because the
+`5cfda70d` deploy failed the authoritative migration check: Delivery's
+`0489_proof_is_reviewed_and_every_attempt_keeps_its_evidence` (#1266) and Payment's
+`0489_one_sales_order_keeps_one_collection_owner` (#1267) share a number; both are committed (the
+rename path is closed by the immutability gate, red line 6) and both are APPLIED (07:30 and 08:24
+UTC), so the pair was baselined in `scripts/check-migrations.mjs` the way 0417 and 0424 were —
+the tracker defines their order and the halves touch disjoint objects.
+
+- **Real production observations (the owner's signed-in Chrome, read-only):** the Work feed
+  carries 215 items and **0 payment items** — both unpaid orders (`SO-1321`, `SO-1313`) are
+  `Arrival not confirmed | Wait`, so no collection is admitted today; the strings `Payment Duty`
+  and `payment_duty` appear nowhere in the feed, on the Monitor, Work, Staff & Duties or the
+  collection workspace; the owner rules in use are `po_duty · delivery_duty · salesperson ·
+  order_pic · purchasing_approver · grn_duty`; the Staff & Duties catalogue lists eleven duties
+  with **no `payment_duty`**; `delivery_duty` resolves `not_assigned` today; Monitor rail all 0
+  except `Waiting for goods 2 · All unpaid 2`, footer `2 orders · RM 2,999.00 still needed`, 0
+  owner cells; the collection workspace for `SO-1321` prints the sections `Money · Goods and
+  Delivery · Storage · What to do · Collection owner · Invoice · Related Payments ·
+  Communication History`, the owner section says `Nobody holds Delivery Duty.` with the Staff &
+  Duties door, and a non-manager sees no `Hand over collection`; browser console clean.
+- **INJECTED UI EVIDENCE — NOT PRODUCTION CUSTOMER DATA** (a `window.fetch` wrapper + in-memory
+  React Query invalidation; **zero non-GET calls recorded, `localStorage` byte-identical**): two
+  synthetic invoices/items, `SO-9999` owned by Shasha with today's cover = the signed-in account
+  and `SO-9998` with nothing established. Monitor: `SO-9999` avatar = the acting person,
+  `title="Normal owner: Shasha · Today's cover: Operations"`, `data-normal-owner="Shasha"`,
+  `data-cover="Operations"`; `SO-9998` = `Nobody holds Delivery Duty. Staff & Duties` (href
+  `/operation?tab=staff-duties`), action `Ask customer to pay` preserved, no avatar; rail `Needs
+  attention 2 · Should have been paid 2 · All unpaid 4`. Team Work: `SO-9999` grouped under
+  **Shasha** (the normal owner), `SO-9998` under the `Delivery Duty` duty group. My Work (tab
+  clicked): exactly one item, `SO-9999`, for the acting account; `SO-9998` absent. Quick Rail:
+  `Late 1 · Due today 0 · Later 0`. The four surfaces agree because they read one feed and one
+  owner. **Reload restored the real state** — wrapper gone, `SO-9999`/`SO-9998` absent, the two
+  real `Wait` rows, `2 orders · RM 2,999.00 still needed`, My Work `No open work` for the account.
+- **Automated tests (deployed code):** stability across days / reload / delivery-date change,
+  buddy cover with the owner preserved, cover ending, formal handover evidence, split delivery,
+  completion, storage, Finance exception and Payment Approver — `work.collection-owner.test.ts`
+  (14); route (5); workspace section (6); engine, Monitor and cache suites; full web, API and
+  shared suites green. **Database (rolled-back production probe):** no holder → `unresolved 2`;
+  Shasha holds → `established 2`; same day → `kept 2`; a later day with Yu Jun holding → `kept 2`;
+  cover 17 Sep → normal Shasha · cover Yu Jun · acting Yu Jun; 19 Sep → Shasha; handover → Yu Jun
+  with previous Shasha, reason, changed by, changed on, effective from, two-row history.
+- **Unverified in production on real data:** automatic establishment itself (Delivery Duty has
+  no holder, and no collection is actionable today), a real cover row and a real handover — each
+  proven at SQL level in the rolled-back probe and at projection level in tests, not yet observed
+  on a live customer order. Responsive 390 px / 200 %: the signed-in Chrome window does not
+  change its viewport under `resize_window` (`innerWidth` stays 1920), so those views remain
+  locally verified only.
+
 ## 15 · Migration and module done-when
 
 Adapt 2990's useful lineage: SO → DO → Sales Invoice → canonical Payment → Receipt, ledger-derived
