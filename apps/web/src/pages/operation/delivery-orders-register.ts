@@ -33,6 +33,7 @@
 import {
   deliveryGroupOf,
   deliveryOrderStatusOf,
+  signedDeliveryDocumentOf,
   latestEvidenceAtOf,
   proofDecisionLabel,
   proofReviewStateOf,
@@ -423,13 +424,18 @@ export function buildDoRegisterRow(
   /* ⭐ Scoped to THIS document (owner ruling 2026-09-11): the ledger belongs
      to the Sales Order, the count belongs to the trip. */
   const submission = driverSubmissionOf(photos, r.do_number);
+  const signedDocument = signedDeliveryDocumentOf({
+    documentNumber: r.do_number,
+    order: r.orders,
+    evidence: proofRecords?.evidenceByDo.get(r.do_number),
+  });
   const reached = latest?.result === "delivered" || latest?.result === "partial";
   /* §6.1 — only a result that reached the customer has proof to review. */
   const proofReview = reached
     ? proofReviewOf({
         doNumber: r.do_number,
         ledger: photos,
-        signedDoUploadedAt: r.orders.do_file_path ? r.orders.do_uploaded_at ?? null : null,
+        signedDoUploadedAt: signedDocument?.uploadedAt ?? null,
         reviews: proofRecords?.reviewsByDo.get(r.do_number) ?? [],
         attemptEvidence: proofRecords?.evidenceByDo.get(r.do_number) ?? [],
       })
@@ -440,7 +446,7 @@ export function buildDoRegisterRow(
     submission,
     submissionLedger: (photos ?? null) as readonly DriverSubmissionFile[] | null,
     photosPresent: submission.known ? submission.photos > 0 : null,
-    signedDoPresent: Boolean(r.orders.do_file_path),
+    signedDoPresent: Boolean(signedDocument),
     proofReview,
   };
   const leg = r.leg ?? 0;

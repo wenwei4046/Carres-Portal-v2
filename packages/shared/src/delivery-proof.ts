@@ -118,3 +118,21 @@ export function latestEvidenceAtOf(input: {
   consider(input.signedDoUploadedAt);
   return latest;
 }
+
+
+/** The newest signed file belonging to THIS document, never a sibling DO.
+ * The order-level mirror is usable only when it names the same document.
+ * Bound evidence preserves older trips after the order mirror moves on. */
+export function signedDeliveryDocumentOf(input: {
+  documentNumber: string;
+  order?: { do_number?: string | null; do_file_path?: string | null; do_uploaded_at?: string | null } | null;
+  evidence?: ReadonlyArray<Pick<DeliveryAttemptEvidenceRow, "do_number" | "kind" | "path" | "recorded_at">>;
+}): { path: string; uploadedAt: string | null } | null {
+  const candidates = (input.evidence ?? [])
+    .filter((e) => e.do_number === input.documentNumber && e.kind === "document" && e.path.trim())
+    .map((e) => ({ path: e.path, uploadedAt: e.recorded_at as string | null }));
+  if (input.order?.do_number === input.documentNumber && input.order.do_file_path) {
+    candidates.push({ path: input.order.do_file_path, uploadedAt: input.order.do_uploaded_at ?? null });
+  }
+  return candidates.sort((a, b) => (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? ""))[0] ?? null;
+}

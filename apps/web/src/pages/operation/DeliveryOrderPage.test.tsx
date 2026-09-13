@@ -572,6 +572,12 @@ describe("DeliveryOrderPage", () => {
     });
   });
 
+  it("does not show the final DO’s signature as this document’s paper", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, do_number: "DO-FINAL", do_file_path: "order/final.pdf", do_uploaded_at: "2026-09-13T12:00:00Z" } }));
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByTestId("signed-do-link")).toBeNull();
+  });
+
   it("0491 — a Journey leg's document prints its route and records an ARRIVAL, never a delivery", () => {
     const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
     mount(
