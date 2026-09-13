@@ -31,16 +31,23 @@ import { deliveryReasonByKey } from "./delivery-reasons";
 export type DeliveryOrderStatusKind =
   | "created"
   | "out_for_delivery"
+  | "arrived"
   | "delivered"
   | "exception"
   | "cancelled";
 
 /** The operator words — capsule pill text on the register and object page.
  *  Registered in docs/STATUS-STANDARD.md / docs/COPY-STANDARD.md; no internal
- *  enum reaches a screen (COPY-STANDARD 2026-08-15). */
+ *  enum reaches a screen (COPY-STANDARD 2026-08-15).
+ *
+ *  `Arrived` (【DELIVERY】 CARD 20, 2026-09-13): an INTERMEDIATE Journey leg's
+ *  document whose goods reached the named partner warehouse. `Delivered` is
+ *  reserved for goods that reached the CUSTOMER (Delivery MASTER §14.1 — leg 1
+ *  completion never means the customer received them). */
 export const DELIVERY_ORDER_STATUS_LABEL: Record<DeliveryOrderStatusKind, string> = {
   created: "Created",
   out_for_delivery: "Out for delivery",
+  arrived: "Arrived",
   delivered: "Delivered",
   exception: "Delivery exception",
   cancelled: "Cancelled",
@@ -70,6 +77,14 @@ export interface DeliveryOrderStatusInput {
   attempts: ReadonlyArray<DeliveryOrderAttemptFact>;
   /** The handover facts recorded on THIS document (0363). */
   handoverEvents: ReadonlyArray<{ kind: DeliveryHandoverKind }>;
+  /** 0491 — true when this document is a Journey leg BEFORE the last one: its
+   *  `delivered` result is an ARRIVAL at the named partner warehouse, and the
+   *  customer leg still owes its own result. Absent = a whole-order document
+   *  or the customer leg. */
+  intermediateLeg?: boolean;
+  /** The intermediate leg's named stop (`JB transit warehouse`) — line two of
+   *  `Arrived`. */
+  legStop?: string | null;
 }
 
 export interface DeliveryOrderStatus {
@@ -78,6 +93,8 @@ export interface DeliveryOrderStatus {
   label: string;
   /** The exception's ONE reason in the library's own words; null otherwise. */
   reasonLabel: string | null;
+  /** `Arrived` only: the partner warehouse the goods reached; null otherwise. */
+  stop: string | null;
 }
 
 export function deliveryOrderStatusOf(
@@ -93,6 +110,7 @@ export function deliveryOrderStatusOf(
           : input.voidReason === "rescheduled"
             ? "Rescheduled"
             : null,
+      stop: null,
     };
   }
 
@@ -112,13 +130,26 @@ export function deliveryOrderStatusOf(
         kind: "out_for_delivery",
         label: DELIVERY_ORDER_STATUS_LABEL.out_for_delivery,
         reasonLabel: null,
+        stop: null,
       };
     }
-    return { kind: "created", label: DELIVERY_ORDER_STATUS_LABEL.created, reasonLabel: null };
+    return { kind: "created", label: DELIVERY_ORDER_STATUS_LABEL.created, reasonLabel: null, stop: null };
   }
 
   if (latest.result === "delivered") {
-    return { kind: "delivered", label: DELIVERY_ORDER_STATUS_LABEL.delivered, reasonLabel: null };
+    /* An intermediate Journey leg's success is an ARRIVAL at the named partner
+       warehouse (0491/0496 store it as the leg's `delivered` result, moving no
+       Unit). `Delivered` is the customer's word and stays with the customer
+       leg — Delivery MASTER §14.1, ERP-ARCHITECTURE §3.5.1. */
+    if (input.intermediateLeg) {
+      return {
+        kind: "arrived",
+        label: DELIVERY_ORDER_STATUS_LABEL.arrived,
+        reasonLabel: null,
+        stop: input.legStop?.trim() || null,
+      };
+    }
+    return { kind: "delivered", label: DELIVERY_ORDER_STATUS_LABEL.delivered, reasonLabel: null, stop: null };
   }
 
   // partial and failed are both the document's ONE exception + one reason
@@ -127,5 +158,6 @@ export function deliveryOrderStatusOf(
     kind: "exception",
     label: DELIVERY_ORDER_STATUS_LABEL.exception,
     reasonLabel: deliveryReasonByKey(latest.reasonKey)?.label ?? null,
+    stop: null,
   };
 }

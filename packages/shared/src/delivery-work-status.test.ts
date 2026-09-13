@@ -270,11 +270,59 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
       expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked|unscheduled/i);
       expect(label).not.toMatch(/^Waiting$/);
     }
-    expect(every).toHaveLength(12);
+    expect(every).toHaveLength(13);
   });
 
   it("every kind carries a colour word, and only the two exceptions are red", () => {
     const red = DELIVERY_WORK_STATUS_KINDS.filter((k) => DELIVERY_WORK_STATUS_TONE[k] === "red");
     expect(red).toEqual(["overdue", "failed"]);
+  });
+
+  /* 【DELIVERY】 CARD 20 — `Delivered` is the CUSTOMER's word. An intermediate
+     Journey leg's `delivered` result is the goods reaching the named partner
+     warehouse: `Arrived` over the stop, green, and no proof owed on it. */
+  describe("an intermediate Journey leg ARRIVES; only the customer leg is Delivered", () => {
+    const delivered = { result: "delivered" as const, reasonKey: null, recordedAt: "2026-09-13T12:23:00Z" };
+    const base = {
+      partnerName: "NETS",
+      confirmedDate: "2026-09-15",
+      confirmedTime: "10 AM to 1 PM",
+      hasDeliveryOrder: true,
+      handoverEvents: [{ kind: "received_by_logistics" as const }],
+      attempts: [delivered],
+      proof: { photoUploaded: false, signedDoUploaded: false, acceptedOn: null, review: null },
+    };
+
+    it("leg 1 of 2 with a delivered result reads Arrived over the stop, green, no proof line", () => {
+      const s = deliveryWorkStatusOf(
+        { ...base, intermediateLeg: true, legStop: "JB transit warehouse" },
+        SPELL,
+      );
+      expect(s.kind).toBe("arrived");
+      expect(s.label).toBe("Arrived");
+      expect(s.tone).toBe("green");
+      expect(s.second).toBe("JB transit warehouse");
+      expect(s.secondTone).toBeNull();
+    });
+
+    it("the same facts on the customer leg are Delivered, and the proof gap still prints", () => {
+      const s = deliveryWorkStatusOf({ ...base, intermediateLeg: false }, SPELL);
+      expect(s.kind).toBe("delivered");
+      expect(s.label).toBe("Delivered");
+      expect(s.second).toBe("Delivery photo not uploaded");
+    });
+
+    it("an intermediate leg with no result yet keeps the transit rungs", () => {
+      const s = deliveryWorkStatusOf({ ...base, attempts: [], intermediateLeg: true, legStop: "JB transit warehouse" }, SPELL);
+      expect(s.kind).toBe("collected");
+    });
+
+    it("`Arrived` sits in the dropdown order before `Delivered`, and is green", () => {
+      const i = DELIVERY_WORK_STATUS_KINDS.indexOf("arrived");
+      expect(i).toBeGreaterThan(-1);
+      expect(DELIVERY_WORK_STATUS_KINDS[i + 1]).toBe("delivered");
+      expect(DELIVERY_WORK_STATUS_TONE.arrived).toBe("green");
+      expect(deliveryWorkStatusLabelOf("arrived", "NETS")).toBe("Arrived");
+    });
   });
 });
