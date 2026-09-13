@@ -226,6 +226,21 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
   },
   // ── The blueprint card's two NEW acts (owner-approved 2026-08-16, §7) ──
   {
+    // Delivery MASTER §6.1 (Card 13, 2026-09-13): an uploaded file records
+    // what the driver sent; it is not proof accepted. Operation reviews it.
+    key: "check_delivery_proof",
+    module: "delivery",
+    trigger:
+      "a delivered or partially delivered result with a file on record that no review has judged yet (a newer upload reopens the question)",
+    owner:
+      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1)",
+    ownerRule: "delivery_duty",
+    action: orderActionQueue("check_delivery_proof"),
+    dueRule: "1 working day after the delivery, delivery week + MY holidays — the same clock as the upload it judges",
+    completionFact:
+      "a proof review newer than the latest file (delivery_proof_reviews, 0489) — Proof Accepted, More Proof Required or Proof Rejected",
+  },
+  {
     key: "collect_loan_item",
     module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
@@ -600,6 +615,11 @@ export interface OrderWorkContext {
    *  (one action per track is the ladder's own law; the Work feed lists every
    *  governed item). */
   loanOutstanding?: boolean;
+  /** §6.1 (Card 13): a delivered file on record awaits Operation's review. */
+  proofReviewPending?: boolean;
+  /** §6.1: the latest review asked for more or refused, and nothing newer
+   *  arrived — `Upload delivery photo` reopens even though a file exists. */
+  proofReopened?: boolean;
   financeExceptionHolds?: boolean;
   /** `Settings → Payments → Collection timing` (owner ruling 2026-09-12) —
    *  the effective ask/deadline pair for this order's clock. Absent ⇒ the
@@ -635,6 +655,7 @@ export function workItemsForOrder(
       case "deliver_today":
         return deliveryStepDueIso("deliver_today", ctx.confirmedDateIso, opts);
       case "upload_delivery_photo":
+      case "check_delivery_proof":
         return deliveryStepDueIso("photo", ctx.deliveredAtIso, opts);
       case "delay_planning":
         return orderActionDueIso("delay_planning", ctx.delayDetectedAtIso, opts.holidays);
@@ -685,6 +706,24 @@ export function workItemsForOrder(
       // Warning, matching the register's amber fact on the same rows.
       extra.push({
         key: "ask_delivery_date",
+        track: "delivery",
+        tone: "warning",
+      });
+    }
+    if (ctx.proofReviewPending) {
+      // §6.1 — the review is owed the moment a file lands and until a review
+      // newer than that file exists.
+      extra.push({
+        key: "check_delivery_proof",
+        track: "delivery",
+        tone: "warning",
+      });
+    }
+    if (ctx.proofReopened && !open.some((a) => a.key === "upload_delivery_photo")) {
+      // §6.1 — `Proof Rejected` / `More Proof Required` reopen the upload the
+      // ladder considers done, because a file is on record.
+      extra.push({
+        key: "upload_delivery_photo",
         track: "delivery",
         tone: "warning",
       });

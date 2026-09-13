@@ -141,6 +141,42 @@ describe("the blueprint card's two composed Work items (owner-approved 2026-08-1
     expect(item.ownerDuty).toBeUndefined();
   });
 
+  it("§6.1 — a delivered file awaiting review composes `Check delivery proof` for Delivery Duty, due the day after delivery", () => {
+    const delivered = { ...baseSignals, completed: true, photoOnFile: true };
+    const items = workItemsForOrder(
+      openOrderActions(delivered),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReviewPending: true },
+      "2026-08-21",
+      HOLS,
+    );
+    const review = items.find((item) => item.ruleKey === "check_delivery_proof");
+    expect(review).toMatchObject({ module: "delivery", ownerRule: "delivery_duty", ownerDuty: "Delivery Duty" });
+    expect(review?.dueIso).toBe("2026-08-21");
+    expect(review?.action).toBe("Check delivery proof");
+    expect(
+      workItemsForOrder(openOrderActions(delivered), { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z" }, "2026-08-21", HOLS)
+        .some((item) => item.ruleKey === "check_delivery_proof"),
+    ).toBe(false);
+  });
+
+  it("§6.1 — a rejection reopens `Upload delivery photo` although a file is on record, once", () => {
+    const delivered = { ...baseSignals, completed: true, photoOnFile: true };
+    const items = workItemsForOrder(
+      openOrderActions(delivered),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReopened: true },
+      "2026-08-21",
+      HOLS,
+    );
+    expect(items.filter((item) => item.ruleKey === "upload_delivery_photo")).toHaveLength(1);
+    const withoutFile = workItemsForOrder(
+      openOrderActions({ ...delivered, photoOnFile: false }),
+      { ...ctx, deliveredAtIso: "2026-08-20T03:00:00Z", proofReopened: true },
+      "2026-08-21",
+      HOLS,
+    );
+    expect(withoutFile.filter((item) => item.ruleKey === "upload_delivery_photo")).toHaveLength(1);
+  });
+
   it("neither composes before its fact holds — a loan waits for the delivery day", () => {
     const quiet = workItemsForOrder([], ctx, "2026-08-18", HOLS);
     expect(quiet.length).toBe(0);

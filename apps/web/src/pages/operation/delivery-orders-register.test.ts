@@ -26,6 +26,10 @@ import {
   submissionFilesOf,
   tripLinesOf,
   type DoRegisterRow,
+  groupProofRecords,
+  NO_PROOF_REVIEW,
+  DO_WORK_QUEUES,
+  DO_QUEUE_LABEL,
 } from "./delivery-orders-register";
 
 function doRow(over: Partial<DeliveryOrderRow> = {}): DeliveryOrderRow {
@@ -236,7 +240,7 @@ describe("doWorkQueueOf — one primary queue, canonical facts only", () => {
     expect(row.queue).toBe("upload_signed_do");
   });
 
-  it("photo saved + signed DO on file → the work is done; the document leaves every queue", () => {
+  it("photo saved + signed DO on file → the upload work is done, and the REVIEW is owed (§6.1, 0489)", () => {
     const row = build(
       {
         orders: {
@@ -251,7 +255,8 @@ describe("doWorkQueueOf — one primary queue, canonical facts only", () => {
       },
       [DELIVERED],
     );
-    expect(row.queue).toBeNull();
+    expect(row.queue).toBe("check_proof");
+    expect(row.proofReview.state).toBe("pending");
     expect(row.status.kind).toBe("delivered");
   });
 
@@ -292,6 +297,85 @@ describe("doWorkQueueOf — one primary queue, canonical facts only", () => {
         signedDoPresent: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe("§6.1 — the proof review, one arithmetic with Monitor and the DO object", () => {
+  const filed = {
+    orders: {
+      ...doRow().orders,
+      do_file_path: "do/signed.pdf",
+      do_uploaded_at: "2026-08-21T02:00:00Z",
+      ops_order_control: {
+        delivery_photos: [
+          { path: "p.jpg", at: "2026-08-21T01:00:00Z", by: null, doNumber: "DO-180826-3035", kind: "photo" as const },
+        ],
+      },
+    },
+  };
+  const review = (decision: "accepted" | "more_required" | "rejected", reviewed_at: string, reason: string | null = null) => ({
+    id: `r-${decision}`,
+    order_id: doRow().orders.id,
+    do_number: "DO-180826-3035",
+    attempt_id: null,
+    decision,
+    reason,
+    reviewed_by: null,
+    reviewed_at,
+  });
+  const withReviews = (reviews: ReturnType<typeof review>[]) => {
+    const r = doRow(filed);
+    return buildDoRegisterRow(
+      r,
+      new Map([[r.do_number, [DELIVERED]]]),
+      new Map([[r.id, []]]),
+      groupProofRecords(reviews, []),
+    );
+  };
+
+  it("`Proof Accepted` leaves every queue and names its day", () => {
+    const row = withReviews([review("accepted", "2026-08-22T01:00:00Z")]);
+    expect(row.queue).toBeNull();
+    expect(row.proofReview).toEqual({ state: "accepted", reason: null, reviewedAt: "2026-08-22T01:00:00Z", label: "Proof Accepted" });
+  });
+
+  it("`Proof Rejected` / `More Proof Required` reopen `Upload delivery photo`, carrying the reason", () => {
+    const rejected = withReviews([review("rejected", "2026-08-22T01:00:00Z", "The photo shows the lobby")]);
+    expect(rejected.queue).toBe("upload_photo");
+    expect(rejected.proofReview).toMatchObject({ state: "rejected", reason: "The photo shows the lobby" });
+    const more = withReviews([review("more_required", "2026-08-22T01:00:00Z", "Need the signed paper")]);
+    expect(more.queue).toBe("upload_photo");
+    expect(more.proofReview.state).toBe("more_required");
+  });
+
+  it("the LATEST review decides, and a file newer than it reopens the question", () => {
+    const superseded = withReviews([
+      review("rejected", "2026-08-22T01:00:00Z", "Lobby"),
+      review("accepted", "2026-08-23T01:00:00Z"),
+    ]);
+    expect(superseded.proofReview.state).toBe("accepted");
+    const reopened = withReviews([review("accepted", "2026-08-20T23:00:00Z")]);
+    expect(reopened.proofReview.state).toBe("pending");
+    expect(reopened.queue).toBe("check_proof");
+  });
+
+  it("a result that never reached the customer has nothing to review, whatever the ledger holds", () => {
+    const r = doRow(filed);
+    const row = buildDoRegisterRow(
+      r,
+      new Map([[r.do_number, [{ ...DELIVERED, result: "failed" as const, reason_key: "customer_unreachable" }]]]),
+      new Map([[r.id, []]]),
+      groupProofRecords([], []),
+    );
+    expect(row.proofReview).toEqual(NO_PROOF_REVIEW);
+    expect(row.queue).toBeNull();
+  });
+
+  it("the rails count the review queue like any other", () => {
+    const rows = [withReviews([]), withReviews([review("accepted", "2026-08-22T01:00:00Z")])];
+    expect(buildDoRegisterRails(rows, { queue: null, status: null }).work.check_proof).toBe(1);
+    expect(DO_WORK_QUEUES).toContain("check_proof");
+    expect(DO_QUEUE_LABEL.check_proof).toBe("Check delivery proof");
   });
 });
 

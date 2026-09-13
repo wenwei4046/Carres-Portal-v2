@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import {
+  attemptEvidenceInput,
   deliveryGroupOf,
+  proofReviewInput,
   recordHandoverInput,
   recordOutboundPrepInput,
   signHandoverProofUploadInput,
+  signedDoAttachInput,
   unitIdOf,
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
@@ -71,7 +74,53 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
  *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
  *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, do_uploaded_at, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+
+/**
+ * §6.1 (0489) — the proof reviews and the attempt evidence of a set of
+ * documents. Both are append-only records the web's ONE arithmetic
+ * (`proofReviewStateOf`) reads; nothing is judged here. A missing relation
+ * (the Worker deployed a moment before the migration applied) reads as no
+ * records, never as a failed register; any other error is a failure.
+ */
+type SbLike = { from: (table: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+async function readProofRecords(
+  sb: SbLike,
+  numbers: string[],
+): Promise<
+  | { ok: true; proofReviews: unknown[]; attemptEvidence: unknown[] }
+  | { ok: false; error: string; message: string }
+> {
+  if (numbers.length === 0) return { ok: true, proofReviews: [], attemptEvidence: [] };
+  const absent = (e: { code?: string } | null) => e?.code === "42P01";
+  const [reviews, evidence] = await Promise.all([
+    sb
+      .from("delivery_proof_reviews")
+      .select("id, order_id, do_number, attempt_id, decision, reason, reviewed_by, reviewed_at")
+      .in("do_number", numbers),
+    sb
+      .from("delivery_attempt_evidence")
+      .select("id, attempt_id, order_id, do_number, path, kind, recorded_by, recorded_at")
+      .in("do_number", numbers),
+  ]);
+  if (reviews.error && !absent(reviews.error)) {
+    return { ok: false, error: "proof_reviews_read_failed", message: reviews.error.message };
+  }
+  if (evidence.error && !absent(evidence.error)) {
+    return { ok: false, error: "attempt_evidence_read_failed", message: evidence.error.message };
+  }
+  return {
+    ok: true,
+    proofReviews: reviews.error ? [] : reviews.data ?? [],
+    attemptEvidence: evidence.error ? [] : evidence.data ?? [],
+  };
+}
+
+/** The bucket a bound file lives in: the signed paper rides `delivery-orders`
+ *  (0087); every driver photo or video rides `proof-of-delivery` (0280). */
+function evidenceBucketOf(kind: string): "delivery-orders" | "proof-of-delivery" {
+  return kind === "document" ? "delivery-orders" : "proof-of-delivery";
+}
 
 deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);
@@ -135,7 +184,18 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
     handoverEvents = res.data ?? [];
   }
 
-  return c.json({ deliveryOrders: rows ?? [], attempts, handoverEvents });
+  // §6.1 (0489) — the review and evidence records the register's
+  // `Check delivery proof` queue and Monitor's status line derive from.
+  const proof = await readProofRecords(sb, numbers);
+  if (!proof.ok) return c.json({ error: proof.error, message: proof.message }, 500);
+
+  return c.json({
+    deliveryOrders: rows ?? [],
+    attempts,
+    handoverEvents,
+    proofReviews: proof.proofReviews,
+    attemptEvidence: proof.attemptEvidence,
+  });
 });
 
 deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
@@ -175,7 +235,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   const [attemptsRes, loansRes, eventsRes] = await Promise.all([
     sb
       .from("delivery_attempts")
-      .select("do_number, result, reason_key, note, where_goods, recorded_at, recorded_by")
+      .select("id, do_number, result, reason_key, note, where_goods, recorded_at, recorded_by")
       .eq("do_number", row.do_number)
       .order("recorded_at", { ascending: true }),
     sb
@@ -349,6 +409,41 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     }),
   }));
 
+  // §6.1 (0489) — the Evidence section: every file bound to the attempt it
+  // proves, signed for viewing, and Operation's reviews with their reviewer.
+  const proof = await readProofRecords(sb, [row.do_number]);
+  if (!proof.ok) return c.json({ error: proof.error, message: proof.message }, 500);
+  const evidenceRows = proof.attemptEvidence as Array<{
+    id: string;
+    attempt_id: string;
+    path: string;
+    kind: string;
+    recorded_at: string;
+    recorded_by: string | null;
+  }>;
+  const attemptEvidence = await Promise.all(
+    evidenceRows.map(async (e) => {
+      const { data: signed } = await admin.storage
+        .from(evidenceBucketOf(e.kind))
+        .createSignedUrl(e.path, 3600);
+      return { ...e, url: signed?.signedUrl ?? null };
+    }),
+  );
+  const reviewRows = proof.proofReviews as Array<{ reviewed_by: string | null }>;
+  const reviewerIds = [...new Set(reviewRows.map((r) => r.reviewed_by).filter(Boolean))] as string[];
+  const reviewerNames: Record<string, string> = {};
+  if (reviewerIds.length > 0) {
+    const usersRes = await sb.from("app_users").select("id, name, email").in("id", reviewerIds);
+    for (const u of usersRes.data ?? []) {
+      const rec = u as { id: string; name: string | null; email: string | null };
+      reviewerNames[rec.id] = rec.name || rec.email || "";
+    }
+  }
+  const proofReviews = reviewRows.map((r) => ({
+    ...r,
+    reviewed_by_name: r.reviewed_by ? reviewerNames[r.reviewed_by] ?? null : null,
+  }));
+
   return c.json({
     deliveryOrder: row,
     attempts: attemptsRes.data ?? [],
@@ -357,8 +452,168 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     handoverEvents,
     scopeUnits,
     handoverEventUnits,
+    proofReviews,
+    attemptEvidence,
   });
 });
+
+/**
+ * §6.1 (0489) — the three review acts. The governed door
+ * (`delivery_proof_review`) owns the role gate, the reason rule, the attempt
+ * binding and the history line; this route only shapes the input and the
+ * refusal words. Append-only: a later review supersedes, it never edits.
+ */
+deliveryOrdersRouter.post("/:id/proof-review", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+  }
+  const parsed = proofReviewInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const doc = await documentNumberOf(sb, id);
+  if ("response" in doc) return doc.response(c);
+  const { data, error } = await sb.rpc("delivery_proof_review", {
+    p_do_number: doc.doNumber,
+    p_attempt_id: parsed.data.attemptId ?? null,
+    p_decision: parsed.data.decision,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ review: data }, 201);
+});
+
+/**
+ * §6.1 (0489) — bind files to the exact Delivery Visit they prove. Every path
+ * must already sit in this order's own storage prefix (the sign-upload doors
+ * mint those); the governed door refuses an attempt of another document.
+ */
+deliveryOrdersRouter.post("/:id/attempts/:attemptId/evidence", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  const attemptId = c.req.param("attemptId");
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+  }
+  const parsed = attemptEvidenceInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const doc = await documentNumberOf(sb, id);
+  if ("response" in doc) return doc.response(c);
+  const prefixes = [`order/${doc.orderId}/`, `order-${doc.orderId}/`, `handover/${doc.id}/`];
+  if (parsed.data.files.some((f) => !prefixes.some((p) => f.path.startsWith(p)))) {
+    return c.json(
+      { error: "invalid_input", message: "Evidence path does not belong to this delivery order" },
+      422,
+    );
+  }
+  const recorded: unknown[] = [];
+  for (const f of parsed.data.files) {
+    const { data, error } = await sb.rpc("delivery_attempt_evidence_record", {
+      p_attempt_id: attemptId,
+      p_path: f.path,
+      p_kind: f.kind,
+    });
+    if (error) {
+      const m = mapPgError(error);
+      return c.json(m.body, m.status);
+    }
+    recorded.push(data);
+  }
+  return c.json({ evidence: recorded }, 201);
+});
+
+/**
+ * §6.1 (Card 13) — the signed Delivery Order attached to a delivered or
+ * partially delivered document WITHOUT re-recording the delivery. The
+ * deliver-and-deduct door (`operation_attach_do_and_deliver`) stays the
+ * order-wide act it always was; this one files the paper as evidence of the
+ * latest recorded attempt and touches no status and no stock.
+ */
+deliveryOrdersRouter.post("/:id/signed-document", requireOperationOrPrincipal, async (c) => {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const id = c.req.param("id");
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid_input", message: "Body must be valid JSON" }, 400);
+  }
+  const parsed = signedDoAttachInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const doc = await documentNumberOf(sb, id);
+  if ("response" in doc) return doc.response(c);
+  const paths = [parsed.data.doFilePath, ...(parsed.data.signaturePath ? [parsed.data.signaturePath] : [])];
+  if (paths.some((p) => !p.startsWith(`order-${doc.orderId}/`))) {
+    return c.json(
+      { error: "invalid_input", message: "Signed document path does not belong to this order" },
+      422,
+    );
+  }
+  const { data, error } = await sb.rpc("delivery_signed_do_attach", {
+    p_do_number: doc.doNumber,
+    p_do_file_path: parsed.data.doFilePath,
+    p_signed_by: parsed.data.signerName ?? null,
+    p_signature_path: parsed.data.signaturePath ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ attached: data }, 201);
+});
+
+/** Resolve a route param (row id, or `DO-…`) to the document's own facts. */
+async function documentNumberOf(
+  sb: SbLike,
+  idOrNumber: string,
+): Promise<
+  | { id: string; doNumber: string; orderId: string }
+  | { response: (c: Context<AppEnv>) => Response }
+> {
+  let query = sb.from("ops_delivery_orders").select("id, do_number, order_id");
+  query = /^do-/i.test(idOrNumber)
+    ? query.eq("do_number", idOrNumber.toUpperCase())
+    : query.eq("id", idOrNumber);
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    const m = mapPgError(error);
+    return { response: (c) => c.json(m.body, m.status) };
+  }
+  if (!data) {
+    return {
+      response: (c) => c.json({ error: "not_found", message: "Delivery order not found" }, 404),
+    };
+  }
+  const row = data as { id: string; do_number: string; order_id: string };
+  return { id: row.id, doNumber: row.do_number, orderId: row.order_id };
+}
 
 /**
  * GET /:id/signed-document — the signed Delivery Order on file, signed for

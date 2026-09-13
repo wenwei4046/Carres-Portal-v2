@@ -69,6 +69,11 @@ import {
   type CollectionOutcomeRow,
 } from "@carres/shared/payment-collection-outcome";
 import { storageCheckDue } from "@carres/shared/payment-storage";
+import {
+  latestEvidenceAtOf,
+  proofReviewStateOf,
+  type ProofDecisionKey,
+} from "@carres/shared/delivery-proof";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -87,6 +92,9 @@ interface SalesOrderModuleRow {
   placed_at: string;
   delivered_at?: string | null;
   do_number?: string | null;
+  /** The signed paper on file and its clock (0087) — one of the §6.1 proof
+   *  files whose arrival can reopen the review question. */
+  do_uploaded_at?: string | null;
   paid?: number | string | null;
   ops_assigned_logistic?: string | null;
   delivery_partner_id?: string | null;
@@ -120,6 +128,42 @@ interface SalesOrderControlFacts {
   storage_waiver_status?: string | null;
 }
 
+/** §6.1 (0489) — what Operation has said about a document's proof, and when
+ *  files last arrived for it. Keyed by DO number. */
+export interface ProofFactsByDo {
+  reviews: ReadonlyMap<string, Array<{ decision: ProofDecisionKey; reviewed_at: string }>>;
+  evidenceAt: ReadonlyMap<string, string[]>;
+}
+
+/** The engine's two composed §6.1 flags — ONE arithmetic with the Monitor and
+ *  the register (`proofReviewStateOf` over `latestEvidenceAtOf`). Only a
+ *  delivered or partially delivered order can owe a review. */
+export function proofReviewFlagsOf(
+  row: SalesOrderModuleRow,
+  control: SalesOrderControlFacts | null,
+  facts: ProofFactsByDo | null,
+): { proofReviewPending: boolean; proofReopened: boolean } {
+  const none = { proofReviewPending: false, proofReopened: false };
+  const doNumber = row.do_number?.trim();
+  if (!facts || !doNumber) return none;
+  const reached = row.status === "delivered" || row.operation_stage === "delivered" || Boolean(row.delivered_at);
+  if (!reached) return none;
+  const latestEvidenceAt = latestEvidenceAtOf({
+    ledger: (control?.delivery_photos ?? []) as Array<{ doNumber?: string | null; at: string }>,
+    doNumber,
+    attemptEvidence: (facts.evidenceAt.get(doNumber) ?? []).map((recorded_at) => ({ recorded_at })),
+    signedDoUploadedAt: row.do_uploaded_at ?? null,
+  });
+  const { state } = proofReviewStateOf({
+    latestEvidenceAt,
+    reviews: facts.reviews.get(doNumber) ?? [],
+  });
+  return {
+    proofReviewPending: state === "pending",
+    proofReopened: state === "rejected" || state === "more_required",
+  };
+}
+
 function orderControl(row: SalesOrderModuleRow): SalesOrderControlFacts | null {
   const raw = row.ops_order_control;
   return (Array.isArray(raw) ? raw[0] : raw) ?? null;
@@ -140,6 +184,9 @@ export function projectSalesOrdersFromModuleFacts(input: {
   invoiceStorageByOrder?: ReadonlyMap<string, number>;
   /** 0486 — the effective collection timing for the SO ladder's DO clock. */
   timingRules?: readonly CollectionTimingRule[] | null;
+  /** §6.1 (0489) — the proof reviews and attempt evidence per document
+   *  number, read once. Absent ⇒ no review work is composed. */
+  proofFacts?: ProofFactsByDo | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -236,6 +283,7 @@ export function projectSalesOrdersFromModuleFacts(input: {
         loanOutstanding: (row.ops_sofa_loans ?? []).some(
           (loan) => loan.status === "on_loan",
         ),
+        ...proofReviewFlagsOf(row, control, input.proofFacts ?? null),
       },
       customer: row.customer_name,
       logistics:
@@ -726,6 +774,7 @@ const ORDER_PROBLEM: Record<string, string> = {
   confirm_delivery_date: "Customer delivery booking not confirmed",
   deliver_today: "Delivery due today",
   upload_delivery_photo: "Delivery proof missing",
+  check_delivery_proof: "Delivery proof not reviewed",
   collect: "Customer balance due",
   collect_loan_item: "Loan item still out",
   resolve_payment_exception: "Finance exception holding delivery",
@@ -741,6 +790,7 @@ const ORDER_RESULT: Record<string, string> = {
   confirm_delivery_date: "Customer-confirmed date and slot recorded",
   deliver_today: "Delivery result recorded",
   upload_delivery_photo: "Delivery photo recorded",
+  check_delivery_proof: "Proof Accepted, More Proof Required or Proof Rejected recorded with its reason",
   collect: "Outstanding balance is RM 0",
   collect_loan_item: "Loan item recorded as returned",
   resolve_payment_exception: "Finance exception cleared with evidence",
@@ -800,7 +850,10 @@ export function projectSalesOrderWork(input: {
       requiredResult:
         lines?.result ?? ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
       destination: deliveryOwned
-        ? deliveryOrder && (item.ruleKey === "deliver_today" || item.ruleKey === "upload_delivery_photo")
+        ? deliveryOrder &&
+          (item.ruleKey === "deliver_today" ||
+            item.ruleKey === "upload_delivery_photo" ||
+            item.ruleKey === "check_delivery_proof")
           ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
           : `/operation/delivery/edit/${encodeURIComponent(input.context.orderId)}`
         : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
@@ -1086,6 +1139,32 @@ export interface StorageCheckSource {
   inspectionDays: number;
 }
 
+/**
+ * §6.1 (0489) — every proof review and every attempt-evidence clock, read
+ * under the caller's own RLS. Both tables are append-only records; a read
+ * failure throws (Work that silently forgot a review would hide a delivered
+ * order whose proof nobody has looked at).
+ */
+async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [reviewsRes, evidenceRes] = await Promise.all([
+    sb.from("delivery_proof_reviews").select("do_number, decision, reviewed_at"),
+    sb.from("delivery_attempt_evidence").select("do_number, recorded_at"),
+  ]);
+  if (reviewsRes.error) throw new Error("Workspace proof-review source could not be read");
+  if (evidenceRes.error) throw new Error("Workspace attempt-evidence source could not be read");
+  const reviews = new Map<string, Array<{ decision: ProofDecisionKey; reviewed_at: string }>>();
+  for (const r of (reviewsRes.data ?? []) as Array<{ do_number: string; decision: ProofDecisionKey; reviewed_at: string }>) {
+    reviews.set(r.do_number, [...(reviews.get(r.do_number) ?? []), { decision: r.decision, reviewed_at: r.reviewed_at }]);
+  }
+  const evidenceAt = new Map<string, string[]>();
+  for (const e of (evidenceRes.data ?? []) as Array<{ do_number: string | null; recorded_at: string }>) {
+    if (!e.do_number) continue;
+    evidenceAt.set(e.do_number, [...(evidenceAt.get(e.do_number) ?? []), e.recorded_at]);
+  }
+  return { reviews, evidenceAt };
+}
+
 async function readStorageChecks(c: Context<AppEnv>): Promise<StorageCheckSource[]> {
   const sb = userClient(c.env, c.var.auth.jwt);
   const cases = await sb
@@ -1214,7 +1293,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks, issueSource, timingRules] =
+         invoices, outcomes, refunds, storageChecks, issueSource, timingRules, proofFacts] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1250,6 +1329,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readStorageChecks(c),
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
       readCollectionTimingRules(c),
+      readProofFacts(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
@@ -1289,6 +1369,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
     timingRules,
+    proofFacts,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),

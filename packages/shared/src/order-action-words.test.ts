@@ -30,6 +30,7 @@ const EVERY_KEY: OrderActionKey[] = [
   "issue_delivery_order",
   "deliver_today",
   "upload_delivery_photo",
+  "check_delivery_proof",
   "delivering",
   "collect",
   // §0.1 Action Owner Engine row 1 (composed 2026-08-27) — the missing

@@ -25,9 +25,9 @@
 
 ## Tasks
 
-- [ ] Migrations and doors; rolled-back production probe with negative controls
-- [ ] Evidence section on the DO object with the three review acts
-- [ ] `Check delivery proof` queue on Monitor and the register; status second line
-- [ ] Signed-DO attach door on delivered and partially delivered orders
-- [ ] Tests, typecheck, design guard
+- [x] Migrations and doors; rolled-back production probe with negative controls — `0489_proof_is_reviewed_and_every_attempt_keeps_its_evidence.sql`: `delivery_attempt_evidence`, `delivery_proof_reviews` (append-only triggers, reason CHECK), `delivery_attempt_evidence_record`, `delivery_proof_review`, `delivery_signed_do_attach`; probe 2026-09-13: three anon doors refused 42501 · blank reason 23514 · review rewrite/delete P0001 · evidence duplicate 23505 · bad kind 23514 · evidence delete P0001, all rolled back
+- [x] Evidence section on the DO object with the three review acts — `DeliveryEvidencePanel.tsx` (per-attempt files, driver submission uploader reused, signed paper, review state/history, `Proof Accepted` saves at once, the other two require a reason); the `Delivered` pill is amber until accepted
+- [x] `Check delivery proof` queue on Monitor and the register; status second line — `proofReviewStateOf`/`latestEvidenceAtOf` (shared), `proofReviewOf` (register), Monitor view `check_proof`, row action, `Delivered` orange until `Proof Accepted`, `Proof Rejected · {reason}` second line; Work rule `check_delivery_proof` for Delivery Duty and the reopened upload
+- [x] Signed-DO attach door on delivered and partially delivered orders — `POST /delivery-orders/:id/signed-document` → `delivery_signed_do_attach` (no status, no stock); the register's `Upload signed Delivery Order` queue now opens the DO object
+- [x] Tests, typecheck, design guard — shared 6 new + ladder/engine/words cases; api 9 new; web register/Monitor/DO page cases; tsc ×3 clean; lint stage-1
 - [ ] PR → merge → apply → deploy → authenticated production verification

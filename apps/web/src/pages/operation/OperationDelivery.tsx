@@ -603,8 +603,9 @@ function MonitorWorkCard({
             <span className="block">{action.call}</span>
             <span className="block text-kit-slate-11">{action.result}</span>
           </span>
-        ) : action.kind === "upload_proof" ? (
-          /* The EXACT missing evidence — the act, then the door below it. */
+        ) : action.kind === "upload_proof" || action.kind === "check_proof" ? (
+          /* The EXACT missing evidence, or the review owed — the act, then
+             the door below it. */
           <span className="text-body text-kit-slate-12">{action.label}</span>
         ) : null}
         {/* The contact deadline is one of the facts a chase needs, so it is on
@@ -808,7 +809,8 @@ export default function OperationDelivery() {
     viewParam === "no_confirmed_date" ||
     viewParam === "overdue" ||
     viewParam === "failed" ||
-    viewParam === "upload_proof"
+    viewParam === "upload_proof" ||
+    viewParam === "check_proof"
       ? viewParam
       : viewParam === "call_customer"
         ? "no_confirmed_date"
@@ -1011,6 +1013,8 @@ export default function OperationDelivery() {
         attempts: docsQ.data?.attempts ?? [],
         contacts: arrangementsQ.data?.contacts ?? [],
         handoverEvents: docsQ.data?.handoverEvents ?? [],
+        proofReviews: docsQ.data?.proofReviews ?? [],
+        attemptEvidence: docsQ.data?.attemptEvidence ?? [],
         partnerNameById,
         arrangements: arrangementsByScope,
         queueLeads,

@@ -54,6 +54,9 @@ export type OrderActionKey =
   | "issue_delivery_order"
   | "deliver_today"
   | "upload_delivery_photo"
+  // Delivery MASTER §6.1 (Card 13, 2026-09-13): Operation reviews the proof
+  // the driver sent — Proof Accepted · More Proof Required · Proof Rejected.
+  | "check_delivery_proof"
   | "delivering"
   | "collect"
   // §0.1 Action Owner Engine row 1 (owner ruling 2026-08-20, composed
@@ -284,6 +287,16 @@ const WORDS: readonly OrderActionWord[] = [
     line: () => "Upload the delivery photo",
     result: (p) => `Attach the photo from ${party(p.logistics, "logistics")}`,
     button: "Upload delivery photo",
+    done: null,
+  },
+  {
+    // §6.1 — a file on record is not proof accepted. The reviewer says which
+    // of the three governed words it is, and why (Card 13).
+    key: "check_delivery_proof",
+    queue: "Check delivery proof",
+    line: () => "Check the delivery proof",
+    result: () => "Accept it, ask for more, or reject it",
+    button: "Check delivery proof",
     done: null,
   },
   {

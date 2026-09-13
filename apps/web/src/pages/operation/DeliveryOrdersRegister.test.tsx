@@ -571,6 +571,32 @@ describe("DeliveryOrdersRegister", () => {
     expect(screen.getByTestId("do-result-primary-action")).toBeTruthy();
   });
 
+  it("§6.1 (0489) — `Check delivery proof` queues a delivered document whose files nobody has judged, and its door opens the DO object", () => {
+    const { locations } = mount(
+      [
+        doRow({
+          orders: {
+            ...doRow().orders,
+            do_file_path: "order-x/do.pdf",
+            do_uploaded_at: "2026-08-20T11:00:00Z",
+            ops_order_control: {
+              delivery_photos: [
+                { path: "p.jpg", at: "2026-08-20T10:00:00Z", by: null, doNumber: "DO-180826-3035", kind: "photo" },
+              ],
+            },
+          },
+        }),
+      ],
+      [{ do_number: "DO-180826-3035", result: "delivered", reason_key: null, recorded_at: "2026-08-20T09:00:00Z" }],
+    );
+    const rail = screen.getByTestId("delivery-orders-work-check_proof");
+    expect(rail).toHaveTextContent("Check delivery proof");
+    expect(rail).toHaveTextContent("1");
+    fireEvent.click(rail);
+    fireEvent.click(screen.getByTestId("do-queue-check-proof"));
+    expect(locations.at(-1)).toBe("/operation/delivery-orders/DO-180826-3035");
+  });
+
   it("prints the ruled facts: number, SO door, capitalised customer, the document dates, locality, partner", () => {
     mount([doRow()]);
     expect(screen.getByText("DO-180826-3035")).toBeTruthy();
