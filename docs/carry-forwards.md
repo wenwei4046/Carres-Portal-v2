@@ -1,17 +1,46 @@
-## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
-
 ## `delivery-duty-initial-holder` — ONE-TIME STAFFING CONFIGURATION OWED, opened 2026-09-13
 
-**🟡 Automatic customer-payment ownership is built, applied and verified (0489 · 0495 · 0498 · 0499)
-and is unusable in production for exactly one reason: nobody holds `delivery_duty`.** Measured
-2026-09-13: `grn_duty` and `po_duty` rotate monthly between Shasha (CR005) and Yu Jun (CR004);
-`payment_approver` and `storage_waiver_approver` are Jess; no delivery responsibility is configured
-anywhere else (no HR position duty names it, orders carry no assignee, every partner is
-`customer_contact_by = partner`). The owner names the initial Delivery Duty holder once in
-`Workspace → Staff & Duties`; from then on every actionable order's collection owner is established
-automatically on the next Work feed load, every new contact carries its responsible person, cover
-follows the shared buddy-cover law, and handovers are formal. This is a staffing configuration, not
-a per-customer assignment. Closes when the `delivery_duty` assignment row exists.
+**🟡 Automatic customer-payment ownership is built, applied and verified (0489 · 0495 · 0498 ·
+0499). It is complete, and today it is DORMANT rather than blocking: nobody holds `delivery_duty`,
+so the third source in the responsibility order can name nobody.** The order the chain reads is
+unchanged: the order's own collection-owner ledger row → else the normal responsible individual on
+its earliest qualifying customer contact → else the configured normal Delivery Duty holder that day
+→ else unresolved. Ownership is established when collection first becomes actionable and kept until
+the balance is RM 0; dates, reloads, duty rotations and later contacts never reassign it; cover
+changes only today's acting person; a formal handover changes the normal owner; a shared-login
+recorder is evidence, never an owner.
+
+**Measured read-only on production, 2026-09-13 — the scope is small, and it is not "every order":**
+
+```
+104 orders (101 not cancelled)
+  2 carry a live ISSUED invoice — the whole collection population today (SO-1313, SO-1321).
+    Both are fixture rows, neither is delivered, and neither carries line stock status or an
+    arrival date, so the goods readiness gate holds their collection clock shut.
+  0 orders are actionable for collection today ⇒ nothing is unowned in the present tense
+  0 collection-owner ledger rows
+  5 customer contacts — every one recorded by the shared `Operations` login,
+    0 naming an individual ⇒ the contact source establishes nobody
+  0 `delivery_duty` assignment rows · 0 covers
+  duties configured: grn_duty → Shasha (CR005) · po_duty → Yu Jun (CR004) ·
+    payment_approver and storage_waiver_approver → Jess. No delivery responsibility anywhere.
+```
+
+**What that means.** The staffing gap costs nothing until a real order's goods are ready (or
+delivered) while money is still owed — that is the first moment an order enters the actionable set
+and asks for an owner. From that day on, without a `delivery_duty` row, each such order is
+established from nobody and the surface prints `Nobody holds Delivery Duty.` The owner names the
+initial holder once in `Workspace → Staff & Duties`; everything after it is automatic. This is a
+staffing configuration, not a per-customer assignment, and no acceptance step or second assignment
+workflow is to be added. **Closes when the `delivery_duty` assignment row exists.**
+
+**Falsifier for the "0 actionable today" line:** an authenticated Work feed load that lists a
+`payment.collect_customer_balance` or `payment.missed_promise` item today. The count above is
+derived from the projection rules (`projectPaymentCollectionWork` · `projectStorageInvoiceWork`,
+`apps/api/src/routes/operation/work.ts`) applied to the measured production rows, not from an
+authenticated load — authenticated walks are the owner's.
+
+## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
 **Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
 
