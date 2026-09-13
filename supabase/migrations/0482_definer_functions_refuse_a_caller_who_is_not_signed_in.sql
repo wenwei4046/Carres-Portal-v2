@@ -18,8 +18,11 @@
 --
 -- WHAT THIS CHANGES (grants only -- no RLS, no function body)
 --   - Revokes EXECUTE from public and anon on the 190 SECURITY DEFINER
---     functions listed below. authenticated keeps EXECUTE, so signed-in staff
---     are unaffected; the 193 all carry an explicit authenticated grant.
+--     functions listed below. authenticated is left exactly as it was: signed-in
+--     staff keep what they had, and the few functions earlier migrations
+--     already closed to authenticated (po_receive, purchase_request_create/
+--     cancel, operation_receive_po_line, _v3_claim_threads_for_po) stay closed.
+--     The sanity block proves authenticated's access did not change.
 --   - Also revokes EXECUTE on gl_next_doc_no(text,date) from authenticated: it
 --     is called only from inside SECURITY DEFINER ledger functions (0462/0468/
 --     0478), so it needs no direct grant, and any signed-in user could
@@ -33,7 +36,7 @@
 --     are safe and are needed for policies to evaluate): app_dealer_id, app_partner_id, app_role, app_supplier_id, gl_may_read, is_internal, is_operation, is_principal.
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO
---   - Rewrites no function body. The NULL-blind role gates are fixed in 0486.
+--   - Rewrites no function body. The NULL-blind role gates are fixed in 0499.
 --   - Does not touch the eleven finance functions 0481 owns.
 --   - Does not ENABLE RLS or change any view's security_invoker.
 --
@@ -46,6 +49,11 @@
 -- =============================================================================
 
 begin;
+
+-- Remember which functions authenticated can run before the revoke, so the
+-- sanity block can prove this migration did not change that. (Some, such as
+-- po_receive, were already closed to authenticated by 0307/0359; that stays.)
+create temp table _auth_before (fn regprocedure primary key) on commit drop;
 
 do $revoke$
 declare s text; p regprocedure;
@@ -243,7 +251,9 @@ begin
     'public.warehouse_settings_gate()'
   ]) loop
     p := to_regprocedure(s);
-    if p is not null then execute format('revoke all on function %s from public, anon', p); end if;
+    if p is null then continue; end if;
+    if has_function_privilege('authenticated', p, 'execute') then insert into _auth_before values (p); end if;
+    execute format('revoke all on function %s from public, anon', p);
   end loop;
   -- gl_next_doc_no: only definer ledger functions call it; revoke authenticated too
   p := to_regprocedure('public.gl_next_doc_no(text, date)');
@@ -454,8 +464,8 @@ begin
     if p is null then continue; end if;
     if has_function_privilege('anon', p, 'execute') then
       raise exception 'anon still executes %', p; end if;
-    if not has_function_privilege('authenticated', p, 'execute') then
-      raise exception 'authenticated lost execute on %', p; end if;
+    if has_function_privilege('authenticated', p, 'execute') <> exists (select 1 from _auth_before b where b.fn = p) then
+      raise exception 'authenticated execute changed on %', p; end if;
   end loop;
   p := to_regprocedure('public.gl_next_doc_no(text, date)');
   if p is not null then
