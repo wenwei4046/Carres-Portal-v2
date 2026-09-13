@@ -1073,7 +1073,14 @@ transit warehouse` (DO-130926-0842: handover, receipt, arrival), leg 2 AL `JB tr
 (Singapore)` (DO-130926-3223: handover from NETS, receipt, customer delivery with the signed DO and signature);
 each leg on its own document with its own facts; the Journey completed only on the last leg after the earlier leg
 arrived; the exact Unit `id-dtd627907` went reserved → with NETS → with AL → sold. Card 15 (0492, `0dc51c6b`) and
-Card 18 (`4e944e51`) walked the same day. Evidence: the Card files.
+Card 18 (`4e944e51`) walked the same day. **Card 16** (`e0a6dc49`, the seven DO object sections) and **Card 17**
+(`a2bc7d53`, `Reports → Delivery`) were then walked on the same two documents and the same month. Evidence: the
+Card files. 🟡 Open after the walk, none blocking: (1) an intermediate leg's arrival is an `arrived` result but the
+register/Monitor status word, the DO `Evidence` heading and the `Logistics Partner Performance` listing print it as
+`Delivered` (+ `Delivery photo not uploaded`) — the Commitment and First Delivery listings already exclude it; the
+status vocabulary for `arrived` is the next Delivery correction; (2) the DO object's `Warehouse` fact reads the
+order's warehouse, so a Journey document prints `No warehouse recorded` beside a named source stop — read the leg's
+`from_loc` there; (3) the legacy warehouse-pick door still writes a derived stock total (Card 14 note).
 
 **DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
 appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA
