@@ -382,10 +382,12 @@ system resolves that normal owner from the authoritative Responsible Delivery Op
 collection first becomes actionable (balance in the window, a missed promise, or a live Storage
 Invoice): **the order's own recorded customer-contact owner** — the Operation person named on the
 earliest Delivery contact record for that order (0487 `ops_delivery_contacts`, a contact with the
-customer first, else the arrangement with the partner; Delivery MASTER §5.1) — and only when nobody
-has contacted this customer yet, the Delivery Duty NORMAL holder on that day (Delivery MASTER
-§13.1, the routine customer-contact rule). The result is written once to
-`payment_collection_owners` (append-only) with its basis in the row's reason (0489 · 0495). The owner does not rotate every day — a changed
+customer first, else the arrangement with the partner; Delivery MASTER §5.1) **provided that
+person is an individual staff identity (a People record — `staff_code`), never a shared role
+login, and was not acting as Delivery Duty buddy cover on the day of the contact** — and otherwise
+the Delivery Duty NORMAL holder on that day (Delivery MASTER §13.1, the routine customer-contact
+rule), never the cover. The result is written once to `payment_collection_owners` (append-only)
+with its basis in the row's reason (0489 · 0495 · 0498). The owner does not rotate every day — a changed
 date, a duty rotation, a filter or a page reload never changes it, and a split delivery has one
 owner because the owner is keyed by the Sales Order. Only two things change who acts: governed
 buddy cover (a `delivery_duty` cover on the owner's person makes the cover today's acting person;
@@ -1883,6 +1885,28 @@ built. What keeps the module short of DELIVERED is not engineering:
 
 Until 1–3 are closed, several slices carry deployment and DB-layer evidence but no visual or
 authenticated-interaction acceptance — stated per slice in §14 rather than averaged away.
+
+### SEMANTIC CHECK — a contact establishes an owner only when it names an individual who was not covering, 2026-09-13
+
+Verified from the contact writer (`delivery-arrangements.ts` `recordContact`) before accepting the
+contact as the owner source: `contact_owner_user_id` and `recorded_by` are BOTH the signed-in JWT
+subject, always; the proxy flow adds only `on_behalf_of_partner_id` (Operation standing proxy for a
+partner's reply) and never names a different Operation person; nothing resolves buddy cover, so a
+cover who records a contact is written as its owner; the Delivery tests assert only the partner
+provenance. And `Operations` (`operation@carres.com`) is a shared role login — no `staff_code`, no
+position, `operations_superuser` — which every contact recorded so far (5) names as owner. **The
+two identities are separated in schema but conflated in value.** Therefore an earliest contact may
+not silently become permanent ownership. **Migration 0498 (APPLIED after a rolled-back production
+probe)** admits a contact only when its owner is an individual staff identity (`staff_code`, active
+Operation/principal) who was not the acting `delivery_duty` cover on the contact day; any other
+contact establishes nobody and the order falls to the Delivery Duty NORMAL holder on the day
+(never the cover) or stays unresolved; the door reports `contacts_not_qualifying`. Probe: `SO-1313`
+contacted by Yu Jun (individual, not covering) → **Yu Jun**; `SO-1321` contacted by Yu Jun while
+covering Shasha → **Shasha** (the normal holder, from the duty rule, not the cover); `SO-1358`
+contacted by the shared `Operations` login → Shasha (duty), `contacts_not_qualifying 2`.
+**Remaining Delivery gap (reported, not changed here):** the contact writer cannot record a
+responsible owner distinct from the recorder and does not resolve cover; until it does, Payment's
+guard is what keeps the collection owner honest. No Payment UI change; no rotating owner.
 
 ### OWNER CORRECTION — the collection owner is the order's own customer-contact owner, 2026-09-13
 
