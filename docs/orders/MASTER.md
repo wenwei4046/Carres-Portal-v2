@@ -73,7 +73,7 @@ OWNER SCOPE  an authorised operator may find every order; owner may remain a fil
 
 > ### ⚠️ AND THE NEXT ACTION IS A SUMMARY, NOT A POSSESSION (corrected on the draft, 2026-08-08)
 > The draft listed *"overall operational next action"* under OWNS. **It is not Orders'.**
-> `Issue PO` is Purchasing's act, `Call {logistics} — confirm delivery date` is Delivery's,
+> `Issue PO` is Purchasing's act, `Call {logistics}` over `Confirm the delivery date` is Delivery's,
 > `Collect RM {amount}` is Payment's — and §1 already rules *"the same action is never defined
 > in two files"*, with `packages/shared/order-actions.ts` SHARED and the Delivery page rendering
 > the same computation. **Orders owns WHICH ACTION LEADS on the row. It does not own the
@@ -3069,10 +3069,12 @@ fact about the ORDER, not about the kind of action.
 ```
 1  Broken commitment or the day's run   Deliver on {weekday, date} · Upload delivery photo
 2  The customer must be told — THROUGH LOGISTICS, never by us
-                                        Call {logistics} — arrange new delivery date
+                                        Call {logistics} / Arrange a new delivery date
 3  Goods are not secured                Call {supplier} — confirm ready date · Issue PO
-4  Delivery preparation                 Assign logistics · Call {logistics} — confirm delivery
-                                        date · Issue delivery order
+4  Delivery preparation                 Assign logistics · Call {logistics} / Confirm the
+                                        delivery date · Issue delivery order
+   (a Delivery sentence is two structured lines, act with recipient then required result —
+    owner ruling 2026-09-13; the `/` above separates the two lines)
 5  Money                                Collect RM {amount} from {customer}
 ```
 
@@ -4564,7 +4566,7 @@ to delay"*, and nothing is being recovered yet.
 
 ```
 YES → continue the original delivery. The customer is never told.
-NO  → Call {logistics} — arrange new delivery date
+NO  → Call {logistics} / Arrange a new delivery date   (two Work lines, owner ruling 2026-09-13)
 ```
 
 **Stage 2 — Logistics arranges the customer's new date** (opens only on NO)
@@ -4612,7 +4614,8 @@ due: **WITHIN THE DAY the Purchase Order is issued** (owner re-ruling 2026-08-16
 PO: **within the order day**. Logistics is assigned the moment purchase starts, not near the
 delivery.
 
-**`Call {logistics} — confirm delivery date`** — trigger: logistics assigned but the customer
+**`Call {logistics}` over `Confirm the delivery date`** (two structured Work lines, owner ruling
+2026-09-13; never joined with an em dash) — trigger: logistics assigned but the customer
 has not confirmed BOTH a date and a slot · completion: **a customer-confirmed date AND slot
 exist. A date logistics proposed is a fact, not a confirmation** · due: a settable number of
 working days before the date (**1 today**) · the checklist adds driver name, driver phone,
@@ -4649,10 +4652,26 @@ Exception plus a Reason, never a family of failure words.**
 
 **`Upload delivery photo`** — trigger: delivered, no photo · due: 1 working day after delivery.
 
-**`Collect the loan item`** — NEW, blueprint card §7 (owner-approved 2026-08-16) · trigger: a
-loan item is still out (`ops_sofa_loans`) and the delivery day has arrived · owner: Delivery
-staff · due: the delivery day itself · completion: the loan row reads returned. Composed by the
-Work engine from the loan fact; it never blocks a delivery (Card 6's law is untouched).
+**`Collect the loan item`** over **`Bring back {Unit ID} on the delivery day`** — blueprint card §7
+(owner-approved 2026-08-16; two-line grammar 2026-09-13) · trigger: a loan item is still out
+(`ops_sofa_loans`) and the delivery day has arrived · owner: the `delivery_duty` rule through the
+Shared Duty Resolver · due: the delivery day itself · completion: the loan row reads returned.
+Composed by the Work engine from the loan fact; it never blocks a delivery (Card 6's law is
+untouched). **THE LOAN OFFER IS A RECORD OF THIS MODULE (Delivery Blueprint, owner ruling
+2026-09-13):** Carres Operation offers the loan and records the customer's answer on the Sales
+Order — `Loan offered` · accepted · rejected — as an approved-target record beside
+`ops_sofa_loans`; Logistics never makes the commercial offer, Warehouse prepares the exact Loan
+Unit, Delivery transports it, and Order Route holds the whole loan history while Monitor prints
+only the current loan line. The offer record is not built yet.
+
+**THE REQUIRED SALES FACTS FOR A DELIVERY (Delivery Blueprint, owner ruling 2026-09-13).**
+Delivery address, state, building type, floor, lift, access and the requested delivery information
+are required Sales Portal facts of a valid new order. Measured 2026-09-12: the POS schema requires
+`floor`, `hasLift` and the requested date; `address` is nullable behind `addressUnknown`;
+`addressState` is optional; building type lives in `entry_data.fields` with no schema requirement.
+Closing that gate is Sales Orders' build and a named dependency of the Delivery Blueprint; until it
+lands, Monitor prints each gap as `Order details incomplete` with the door `Open Sales Order to
+change`, never as a normal empty delivery.
 
 **`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
 exception holds the delivery (0355) · owner: the resolved `Payment Approver` Duty holder, with
@@ -5089,7 +5108,10 @@ so.** Audited 2026-08-06 by tracing every write the list and the drawer make.
 ✅ **Receiving was genuinely duplicated and is FIXED (D2, 2026-08-06).** The Orders drawer's
 write door is deleted; the Items tab reads the count and hands over to the Receiving Workspace.
 
-🟡 **`PartnerRulesEditor` edits carrier configuration from inside one order's drawer.** A
+🟡 **`PartnerRulesEditor` edits carrier configuration from inside one order's drawer** — RELOCATED
+by the Delivery Blueprint (owner ruling 2026-09-13) to central `Settings → Delivery → Logistics
+Partners`, an approved target not yet built; the drawer editor is implementation debt until that
+surface exists. A
 carrier's working days and capacity are not a fact about this customer's order.
 
 ---
@@ -5416,7 +5438,7 @@ the normal discoverable doors already governed for Edit, output or View Flow.
 | ~~**D2**~~ | ✅ **FIXED 2026-08-06** — the door, the hook, the route and its suite are deleted; a guard asserts the route now 404s. See §9.5 |
 | ~~**D3**~~ | ✅ **FIXED 2026-08-28 — and it was never "two spellings of one derivation".** It was **two questions**, each spelt once, in two files, with nothing naming the difference. `stageOf` answers *where is this order in the pipeline* — and `place` is a real slot there, because `controlTabOf` ends `return "proceed"; // confirmed OR autocount-placed`, so an imported row has to REACH `placed` for that fall-through to route it. The drawer's copy answered *what do we tell the operator*, applying Jess's 2026-07-02 ruling that an AutoCount import arrived already proceeded and is never "waiting for the dealer to push". **Merging them is the obvious move and it is wrong:** tried first, it moved imported rows out of `proceed` and six control tests caught it. The two questions now carry two names — `stageOf` and `displayStageOf` — one spelling each, in `components/StageChip.tsx` beside the type both surfaces already import. **That module is the home because the cycle was the cause:** the control imports the drawer, so the drawer could never import the rule back, which is why it was written twice. Eight tests hold both rules, including one pinning the single case they differ on so it cannot be tidied away. | fixed |
 | ~~**D4**~~ | ✅ **FIXED 2026-08-27 — one money rule, asked once. And the audit was pointing at the wrong half.** What it described — *"the drawer separately fetches `order_payments` for Collected"* — had already been corrected on 2026-07-27 by C5, ten days before this row was written; the drawer's own comment carries the production receipt (SO-1209 read *RM 7,248 outstanding · HOLD DELIVERY* while `orders.paid` said paid in full). **What actually survived was worse:** the goods half came through the shared `orderMoney` while the storage half was re-derived locally as `invoiceTotal - collectedAll`, so the screen carried TWO `outstanding` figures — the money sticker showing the shared rule's goods-only number, the payment dial showing the local goods+storage one — and they disagreed on every order with a fee owing, with one of them captioned `holding delivery`. **No invention was needed:** `orderMoney` already took `storageOwing` and `storageReleased` and already returned `outstanding` / `holding` / `holds`; nobody passed them. **Two deliberate behaviour changes, both recorded at the call site:** a manager-released fee is now still OWED and merely stops HOLDING (C9's rule, which the local boolean folded away), and overpaid goods no longer silently offset a storage fee only a manager may waive (`ERP-ARCHITECTURE.md` §6.1). Four source-scan tests hold it, including one asserting the rule is called exactly once. | fixed |
-| **D5** 🟡 | **Carrier rules are edited from one order's drawer.** | §9.5 |
+| **D5** 🟡 | **Carrier rules are edited from one order's drawer.** Relocated by the Delivery Blueprint 2026-09-13 to central Delivery Settings (approved target, not built). | §9.5 |
 | **D6** 🟡 | **`Issues module coming — needs the ops_issues table`** is a live tooltip on the Actions menu. A promise about the product on an operator's screen. | panel titles |
 | **D7** 🟡 | **The `deliver_today` checklist is empty by ruling**, so an operator expanding the day's own action sees nothing. Correct by the rule (*nobody records "goods loaded"*), and worth knowing before somebody calls it a bug. | `order-action-checklist.ts` |
 | ~~**D8**~~ | ✅ **FIXED 2026-08-27 — Orders stopped holding Purchasing's number.** `orderActionSignalsOf` read `hasMsbf ? 7 : hasSofa ? 5 : 7`, and its own comment said why: *"the supplier master holds production time as free text, so nothing can compute a real one yet"*. **Migration `0303` removed that blocker on 2026-07-28** — `purchasing_settings.order_by_buffer_days` is one governed, manager-editable value, which Purchasing's own reads already call `safetyDays` (`purchase-demands.ts:407`, `:611`) and `purchasing/MASTER.md:650` ruled visible as **`Safety days`** on 2026-08-26. Two arithmetics for one derived fact is Law D, so the ladder now takes the number as a parameter and `OperationOrdersControl` hands it Purchasing's. **The per-category fork went with it, and that is the second half:** it asked `lineCategory()` — the keyword parser `carry-forwards.md` records as display-only — to decide a business threshold, making it a third caller filtering on a guess. **`null` is not a default:** a window nobody has answered leaves the ready-date call amber rather than escalating it on an invented deadline. Two tests that pinned the old constants are rewritten to the governed contract; `lines` is now unread by the signals builder and marked so. | fixed |

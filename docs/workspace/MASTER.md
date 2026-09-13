@@ -70,8 +70,18 @@ employment and leave facts; Workspace owns Duty assignments; the Shared Duty Res
 them.
 
 Distinct Duties include Payment Duty, Storage Waiver Approver, Payment Approver, Purchasing
-Approver, Delivery Charge Approver, Stock Adjustment Approver and Service Case Approver. There is
-no fake `ERP Owner`.
+Approver, Delivery Charge Approver, Stock Adjustment Approver, Service Case Approver and, since
+the owner ruling of 2026-09-13, **Delivery Duty** (`delivery_duty`). There is no fake `ERP Owner`.
+
+**`Delivery Duty` is the assignment key of an owner rule the Work Engine already carried**
+(`ownerRule: "delivery_duty"`), not a new Delivery-local duty system: routine Delivery
+arrangement, customer contact, proxy recording, result recording on behalf of a partner and proof
+review all resolve through it and the Shared Duty Resolver. Its Primary holder and Buddy cover are
+configured only here. When no active holder or cover resolves, the action stays visible under its
+duty word and the surface prints the governed configuration failure with its door, `Nobody holds
+Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`; the protected act refuses with
+the same sentence. No action is routed to an Operations Superuser by default and Delivery Settings
+never holds a roster or an owner list (`../delivery/MASTER.md` §13.1).
 
 A missing holder is `Not assigned`, never a silent PIC/email/manager fallback. The action remains
 visible to authorised supervision with a Staff & Duties door.
