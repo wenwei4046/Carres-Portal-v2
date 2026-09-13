@@ -64,6 +64,7 @@ const DUTY_LABEL: Record<string, string> = {
 const STATUS_TONE: Record<string, OrderActionTone> = {
   created: "neutral",
   out_for_delivery: "info",
+  arrived: "success",
   delivered: "success",
   exception: "warning",
   cancelled: "neutral",
@@ -126,6 +127,16 @@ export default function DeliveryOrderPage() {
   const d = data?.deliveryOrder;
   const order = d?.orders;
 
+  /* 0491 — a Journey leg's document names its leg; the route prints without a
+     `Leg` word and an intermediate leg records an ARRIVAL, never a delivery
+     (Card 20: the word, the tone, the source stop and the proof all follow). */
+  const leg = d?.leg ?? 0;
+  const stops = order?.delivery_stops ?? [];
+  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
+  const legStop = leg > 0 ? stops.find((stop) => Number(stop.leg) === leg) ?? null : null;
+  const legRoute = legStop ? [legStop.from_loc, legStop.to_loc].filter(Boolean).join(" → ") : null;
+  const intermediateLeg = leg > 0 && leg < lastLeg;
+
   const status = useMemo(
     () =>
       d
@@ -140,9 +151,11 @@ export default function DeliveryOrderPage() {
             handoverEvents: (data?.handoverEvents ?? []).map((e) => ({
               kind: e.kind,
             })),
+            intermediateLeg,
+            legStop: legStop?.to_loc ?? null,
           })
         : null,
-    [d, data?.attempts, data?.handoverEvents],
+    [d, data?.attempts, data?.handoverEvents, intermediateLeg, legStop],
   );
 
   // Photos through the EXISTING signed-url door (0280) — one reader path.
@@ -252,7 +265,10 @@ export default function DeliveryOrderPage() {
      delivered document is amber until Operation has judged its proof. */
   const signedDocument = signedDeliveryDocumentOf({ documentNumber: d.do_number, order, evidence: data?.attemptEvidence });
   const latestAttempt = [...(data?.attempts ?? [])].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at)).at(-1);
-  const reached = latestAttempt?.result === "delivered" || latestAttempt?.result === "partial";
+  /* A warehouse arrival owes no delivery proof: the customer leg's document
+     carries the proof and its review (Card 20). */
+  const reached =
+    !intermediateLeg && (latestAttempt?.result === "delivered" || latestAttempt?.result === "partial");
   const proofReview = reached
     ? proofReviewOf({
         doNumber: d.do_number,
@@ -276,14 +292,6 @@ export default function DeliveryOrderPage() {
     !d.voided_at &&
     (data?.attempts ?? []).length === 0 &&
     (!d.trip_groups || d.trip_groups.length === 0);
-  /* 0491 — a Journey leg's document names its leg; the route prints without a
-     `Leg` word and an intermediate leg records an ARRIVAL, never a delivery. */
-  const leg = d.leg ?? 0;
-  const stops = order.delivery_stops ?? [];
-  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
-  const legStop = leg > 0 ? stops.find((stop) => Number(stop.leg) === leg) ?? null : null;
-  const legRoute = legStop ? [legStop.from_loc, legStop.to_loc].filter(Boolean).join(" → ") : null;
-
   /* The control overlay rides the base row type with only its photo ledger;
      the detail read adds the two site instructions (Card 16). */
   const control = (Array.isArray(order.ops_order_control) ? order.ops_order_control[0] : order.ops_order_control) as
@@ -300,8 +308,16 @@ export default function DeliveryOrderPage() {
   const pendingApprovals = (data?.paymentApprovals ?? []).filter((a) => a.status === "pending");
   const problemAttempts = attempts.filter((a) => a.result === "partial" || a.result === "failed");
   const siblings = (data?.siblingDocuments ?? []).filter((doc) => doc.do_number !== d.do_number);
+  /* On an intermediate leg's document a `delivered` result is the ARRIVAL at
+     the named stop — `Arrived`, the dictionary's word (Card 14 / Card 20). */
   const resultWord = (result: string) =>
-    result === "delivered" ? "Delivered" : result === "partial" ? "Partially Delivered" : "Failed Delivery";
+    result === "delivered"
+      ? intermediateLeg
+        ? "Arrived"
+        : "Delivered"
+      : result === "partial"
+        ? "Partially Delivered"
+        : "Failed Delivery";
   const whereWord: Record<string, string> = {
     returned_to_warehouse: "Returned to Warehouse",
     still_with_logistics: "Still with Logistics",
@@ -386,8 +402,14 @@ export default function DeliveryOrderPage() {
                   <Absence>No address recorded — record it on the Sales Order before the trip</Absence>
                 )}
               </Fact>
+              {/* A Journey leg's document leaves from ITS OWN source stop — leg 1
+                  the configured Carres source, a later leg the previous
+                  partner's warehouse (`from_loc`). The order-level warehouse is
+                  a whole-order fact and never a silent substitute (Card 20). */}
               <Fact label="Warehouse">
-                {warehouse?.name || <Absence>No warehouse recorded</Absence>}
+                {legStop
+                  ? legStop.from_loc?.trim() || <Absence>No warehouse recorded</Absence>
+                  : warehouse?.name || <Absence>No warehouse recorded</Absence>}
               </Fact>
               <Fact label="Logistics partner">
                 {arrangementPartner?.name || d.logistics_partner || (
@@ -552,6 +574,7 @@ export default function DeliveryOrderPage() {
             doNumber={d.do_number}
             orderId={order.id}
             attempts={attempts}
+            arrivalOnly={intermediateLeg}
             attemptEvidence={data?.attemptEvidence ?? []}
             proofReviews={data?.proofReviews ?? []}
             ledger={photos.data ? photoRows : null}

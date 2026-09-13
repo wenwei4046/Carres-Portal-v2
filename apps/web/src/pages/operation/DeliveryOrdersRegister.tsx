@@ -107,6 +107,9 @@ export function statusDetailOf(row: {
     const outcome = row.latestResult ? DELIVERY_RESULT_LABEL[row.latestResult] : null;
     return [outcome, reason].filter(Boolean).join(" · ") || null;
   }
+  /* An intermediate leg's arrival names the partner warehouse the goods
+     reached (Card 20) — the place is the fact, never `Delivered`. */
+  if (row.status.kind === "arrived") return row.status.stop;
   /* Cancelled carries its void reason; Delivered, Out for delivery and
      Created need no second line - the pill already is the whole fact. */
   return reason;
@@ -117,6 +120,7 @@ export function statusDetailOf(row: {
 const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
   created: "neutral",
   out_for_delivery: "info",
+  arrived: "success",
   delivered: "success",
   exception: "warning",
   cancelled: "neutral",
@@ -125,6 +129,7 @@ const STATUS_TONE: Record<DeliveryOrderStatus["kind"], OrderActionTone> = {
 const STATUS_LABEL: Record<DeliveryOrderStatus["kind"], string> = {
   created: "Created",
   out_for_delivery: "Out for delivery",
+  arrived: "Arrived",
   delivered: "Delivered",
   exception: "Delivery exception",
   cancelled: "Cancelled",

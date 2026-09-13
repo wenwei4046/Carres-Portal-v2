@@ -263,7 +263,7 @@ export interface DeliveryScopeRow {
  * order cannot be read on two different scales.
  */
 export function legWorkStatusOf(
-  stop: Pick<DeliveryStop, "status">,
+  stop: Pick<DeliveryStop, "status"> & Partial<Pick<DeliveryStop, "to_loc">>,
   confirmedIso: string | null,
   partnerName: string | null = null,
   confirmedTime: string | null = null,
@@ -282,12 +282,12 @@ export function legWorkStatusOf(
   });
   switch (stop.status) {
     case "delivered":
-    case "handed_off":
-      /* `handed_off` reads Delivered on purpose: leg 1 completing means the
-         goods were accepted at the named JB warehouse, which IS that leg's
-         delivery. It never claims the Singapore customer received them —
-         their leg is its own row with its own status. */
       return say("delivered");
+    case "handed_off":
+      /* A leg handed off at the named partner warehouse has ARRIVED there —
+         the goods reached the stop, never the customer (Delivery MASTER
+         §14.1; Card 20). The customer leg is its own row with its own word. */
+      return say("arrived", stop.to_loc?.trim() || null);
     case "picked_up":
       return say("collected");
     case "issue":
@@ -572,7 +572,11 @@ export function buildDeliveryScopeRows({
   const signedDocumentOf = (doc: DeliveryOrderRow | null) => doc
     ? signedDeliveryDocumentOf({ documentNumber: doc.do_number, order: doc.orders, evidence: attemptEvidence })
     : null;
-  const proofOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): MissingDeliveryProof => {
+  const proofOf = (
+    doc: DeliveryOrderRow | null,
+    o: operationOrderListRow,
+    intermediateLeg = false,
+  ): MissingDeliveryProof => {
     const latest = doc
       ? [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
           a.recorded_at.localeCompare(b.recorded_at),
@@ -587,6 +591,7 @@ export function buildDeliveryScopeRows({
       latestResult: latest?.result ?? null,
       photosPresent: submission.known ? submission.photos > 0 : null,
       signedDoPresent: Boolean(signedDocumentOf(doc)),
+      intermediateLeg,
     });
   };
   const docByNumber = new Map<string, DeliveryOrderRow>();
@@ -598,8 +603,13 @@ export function buildDeliveryScopeRows({
     ) ?? null;
   /* §6.1 — the review state over the SAME document row (Law D). */
   const proofRecords = groupProofRecords(proofReviews, attemptEvidence);
-  const reviewOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): DoProofReview => {
-    if (!doc) return NO_PROOF_REVIEW;
+  const reviewOf = (
+    doc: DeliveryOrderRow | null,
+    o: operationOrderListRow,
+    intermediateLeg = false,
+  ): DoProofReview => {
+    /* A warehouse arrival owes no delivery proof — nothing to review (Card 20). */
+    if (!doc || intermediateLeg) return NO_PROOF_REVIEW;
     const latest = [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
       a.recorded_at.localeCompare(b.recorded_at),
     ).at(-1) ?? null;
@@ -739,10 +749,14 @@ export function buildDeliveryScopeRows({
        result. It does not carry the order's document: `delivery_stops` holds no
        DO link, and printing the order's number on both legs would say one
        document authorised two different handovers. */
+    /* The Journey's last leg is the customer's; every leg before it is a
+       warehouse trip whose success is an ARRIVAL, not a delivery (Card 20). */
+    const lastLeg = legs.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
     for (const stop of legs) {
       /* Each leg has its OWN arrangement — two carriers, two dates, two rows.
          That is the whole reason the arrangement is keyed by (order, leg). */
       const arrangement = arrangements?.get(`${o.id}#${stop.leg}`) ?? null;
+      const intermediateLeg = stop.leg > 0 && stop.leg < lastLeg;
       const confirmedIso =
         arrangement?.confirmed_date ??
         (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
@@ -754,8 +768,8 @@ export function buildDeliveryScopeRows({
          status words. */
       const legDoc = legDocOf(o.id, stop.leg);
       const legFacts = factsOf(legDoc);
-      const legMissingProof = proofOf(legDoc, o);
-      const legReview = reviewOf(legDoc, o);
+      const legMissingProof = proofOf(legDoc, o, intermediateLeg);
+      const legReview = reviewOf(legDoc, o, intermediateLeg);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
@@ -793,6 +807,8 @@ export function buildDeliveryScopeRows({
                   acceptedOn: legReview.state === "accepted" ? legReview.reviewedAt : null,
                   review: { state: legReview.state, reason: legReview.reason },
                 },
+                intermediateLeg,
+                legStop: stop.to_loc ?? null,
                 ...legFacts,
               },
               DELIVERY_STATUS_SPELL,

@@ -176,8 +176,14 @@ describe("delivery scopes and journey legs", () => {
     expect(booked.label).toBe("Confirmed for Tue, 25 Aug");
     expect(booked.second).toBe("9am–12pm");
     expect(legWorkStatusOf({ status: "picked_up" }, null, "TEOW").label).toBe("Goods collected by TEOW");
-    // Leg 1 handing over at the named JB warehouse IS that leg's delivery.
-    expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Delivered");
+    /* Leg 1 handing over at the named JB warehouse is that leg's ARRIVAL —
+       the goods reached the stop, never the customer (Card 20). */
+    const arrived = legWorkStatusOf({ status: "handed_off", to_loc: "JB transit warehouse" }, null);
+    expect(arrived.kind).toBe("arrived");
+    expect(arrived.label).toBe("Arrived");
+    expect(arrived.second).toBe("JB transit warehouse");
+    expect(arrived.tone).toBe("green");
+    expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Arrived");
     expect(legWorkStatusOf({ status: "delivered" }, null).label).toBe("Delivered");
     expect(legWorkStatusOf({ status: "issue" }, null).label).toBe("Failed Delivery");
   });
@@ -476,4 +482,58 @@ describe("REGION classification — direct state names (owner correction 2026-09
   });
 
 
+});
+
+/* ── 【DELIVERY】 CARD 20 — a Journey leg's arrival on Monitor ──────────────
+   `Delivered` is the customer's word. Leg 1's `delivered` result on its own
+   document is the goods reaching the JB warehouse: `Arrived` over the stop,
+   green, no `Delivery photo not uploaded` line, no proof queue. */
+describe("an intermediate leg's arrival reads Arrived on Monitor (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", scheduled_at: "2026-09-15T02:00:00.000Z", status: "handed_off" },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", scheduled_at: "2026-09-17T06:00:00.000Z", status: "pending" },
+  ] as never;
+  const legDoc: DeliveryOrderRow = {
+    id: "do-leg-1",
+    order_id: "sg",
+    do_number: "DO-130926-0842",
+    leg: 1,
+    issued_at: "2026-09-13T02:00:00Z",
+    trip_groups: null,
+    delivery_date: "2026-09-15",
+    time_slot: "10 AM to 1 PM",
+    logistics_partner: "NETS",
+    voided_at: null,
+    void_reason: null,
+    orders: { id: "sg", so: 1362, customer_name: "kong chai yin", ops_order_control: { delivery_photos: [] } },
+  } as unknown as DeliveryOrderRow;
+  const chain = ["ready_for_handover", "handed_over", "received_by_logistics"].map((kind) => ({
+    delivery_order_id: "do-leg-1",
+    kind,
+    recorded_at: "2026-09-13T03:00:00Z",
+  })) as never;
+
+  it("with its own document and a delivered result, leg 1 is Arrived over the JB warehouse; leg 2 keeps its own word", () => {
+    const rows = buildDeliveryScopeRows({
+      orders: [order({ id: "sg", so: 1362, delivery_stops: stops })],
+      deliveryOrders: [legDoc],
+      attempts: [{ do_number: "DO-130926-0842", leg: 1, result: "delivered", reason_key: null, recorded_at: "2026-09-13T04:23:00Z" }],
+      handoverEvents: chain,
+      partnerNameById: NO_PARTNERS,
+    });
+    expect(rows[0]!.status.kind).toBe("arrived");
+    expect(rows[0]!.status.label).toBe("Arrived");
+    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+    expect(rows[0]!.status.tone).toBe("green");
+    expect(rows[0]!.missingProof).toEqual({ photo: false, signedDo: false });
+    expect(rows[0]!.proofReview.state).toBe("none");
+    expect(rows[1]!.status.kind).not.toBe("arrived");
+    expect(rows[1]!.status.kind).not.toBe("delivered");
+  });
+
+  it("without a document, a chain stop already handed off reads Arrived over its stop too", () => {
+    const rows = build([order({ id: "sg", so: 1362, delivery_stops: stops })]);
+    expect(rows[0]!.status.kind).toBe("arrived");
+    expect(rows[0]!.status.second).toBe("JB transit warehouse");
+  });
 });

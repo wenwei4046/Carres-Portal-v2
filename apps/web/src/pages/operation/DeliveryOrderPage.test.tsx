@@ -699,3 +699,45 @@ describe("DeliveryOrderPage", () => {
     expect(screen.getByTestId("do-loan-lines")).toHaveTextContent("Loan U1-000-082 · collect back on delivery day");
   });
 });
+
+/* ── 【DELIVERY】 CARD 20 — an intermediate leg ARRIVES; each leg names its
+   own source. `Delivered` is the customer's word; a leg before the last whose
+   goods reached the partner warehouse reads `Arrived`, leaves from its own
+   `from_loc`, and owes no delivery proof on its document. */
+describe("a Journey leg's document — Arrived, its own Warehouse, no proof owed (Card 20)", () => {
+  const stops = [
+    { leg: 1, partner_id: "p-nets", partner_name: "NETS", from_loc: "Carres Klang Warehouse", to_loc: "JB transit warehouse", status: "handed_off" as const },
+    { leg: 2, partner_id: "p-al", partner_name: "AL", from_loc: "JB transit warehouse", to_loc: "Customer (Singapore)", status: "pending" as const },
+  ];
+  const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
+  const legDoc = (leg: number) =>
+    payload(
+      { leg, orders: { ...payload().deliveryOrder.orders, warehouse_id: null, delivery_stops: stops } },
+      { attempts: [attempt("delivered")], handoverEvents: received },
+    );
+
+  it("leg 1 of 2: the pill reads Arrived, the Warehouse is the leg's own source, history says Arrived, no proof is owed", () => {
+    mount(legDoc(1));
+    expect(screen.getAllByText("Arrived").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Delivered")).toBeNull();
+    expect(screen.getByText("Carres Klang Warehouse")).toBeTruthy();
+    expect(screen.queryByText("No warehouse recorded")).toBeNull();
+    expect(screen.getAllByText(/^Delivery on .* · Arrived$/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("do-evidence-arrival-only")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-photo")).toBeNull();
+  });
+
+  it("leg 2 of 2: the customer leg keeps Delivered and leaves from the previous partner's warehouse", () => {
+    mount(legDoc(2));
+    expect(screen.getAllByText("Delivered").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Arrived")).toBeNull();
+    expect(screen.getByText("JB transit warehouse")).toBeTruthy();
+    expect(screen.queryByTestId("do-evidence-arrival-only")).toBeNull();
+  });
+
+  it("a whole-order document still reads the order's own warehouse", () => {
+    mount(payload({ orders: { ...payload().deliveryOrder.orders, warehouses: { name: "Carres Klang" } } }));
+    expect(screen.getByText("Carres Klang")).toBeTruthy();
+  });
+});

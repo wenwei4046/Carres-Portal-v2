@@ -78,11 +78,14 @@ export type DeliveryWorkStatusKind =
   | "collected"
   | "delivering"
   | "overdue"
+  | "arrived"
   | "delivered"
   | "failed"
   | "details_incomplete";
 
-/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is. */
+/** The ladder's own order — the `DELIVERY STATUS` dropdown lists it as is.
+ *  `arrived` (【DELIVERY】 CARD 20): an intermediate Journey leg whose goods
+ *  reached the named partner warehouse — never the customer's `Delivered`. */
 export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
   "assign_logistics",
   "partner_must_contact",
@@ -93,6 +96,7 @@ export const DELIVERY_WORK_STATUS_KINDS: readonly DeliveryWorkStatusKind[] = [
   "collected",
   "delivering",
   "overdue",
+  "arrived",
   "delivered",
   "failed",
   "details_incomplete",
@@ -115,6 +119,7 @@ export const DELIVERY_WORK_STATUS_TONE: Record<DeliveryWorkStatusKind, DeliveryW
   collected: "none",
   delivering: "none",
   overdue: "red",
+  arrived: "green",
   delivered: "green",
   failed: "red",
   details_incomplete: "orange",
@@ -155,6 +160,8 @@ export function deliveryWorkStatusLabelOf(
       return `${cap} is delivering to the customer`;
     case "overdue":
       return "Overdue";
+    case "arrived":
+      return "Arrived";
     case "delivered":
       return "Delivered";
     case "failed":
@@ -229,6 +236,13 @@ export interface DeliveryWorkStatusInput {
   } | null;
   /** Required Sales facts this row lacks, in the operator's words. */
   missingFacts?: ReadonlyArray<string>;
+  /** 0491 — this scope is a Journey leg BEFORE the last one: its `delivered`
+   *  result is an ARRIVAL at the named partner warehouse (`Arrived`), the
+   *  customer leg still owes its own result, and no delivery proof is owed
+   *  here. Absent = a whole-order scope or the customer leg. */
+  intermediateLeg?: boolean;
+  /** The intermediate leg's named stop — line two of `Arrived`. */
+  legStop?: string | null;
 }
 
 /**
@@ -267,6 +281,10 @@ export function deliveryWorkStatusOf(
   ];
   if (latest) {
     if (latest.result === "delivered") {
+      /* An intermediate leg's success is the goods reaching the named partner
+         warehouse — `Arrived` over the stop, green, no proof owed here; the
+         customer leg carries `Delivered` and its proof (Card 20). */
+      if (input.intermediateLeg) return say("arrived", input.legStop?.trim() || null);
       const proof = input.proof;
       const review = proof?.review ?? null;
       /* `Proof Accepted` is the fact that turns `Delivered` green everywhere

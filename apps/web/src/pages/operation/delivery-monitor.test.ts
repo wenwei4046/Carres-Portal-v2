@@ -985,7 +985,9 @@ describe("buildMonitorRails", () => {
   it("DELIVERY STATUS counts every rung of the shared dictionary, zero printed", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
     expect(rails.status).toMatchObject({ waiting_pickup: 1, collected: 1, delivering: 1, assign_logistics: 0 });
-    expect(Object.keys(rails.status)).toHaveLength(12);
+    expect(Object.keys(rails.status)).toHaveLength(13);
+    /* Card 20 — the intermediate leg's own word is a rung of its own. */
+    expect(rails.status).toHaveProperty("arrived", 0);
     const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
     expect(narrowed.status.delivering).toBe(0);
   });
@@ -1075,7 +1077,7 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
   it("DELIVERY STATUS is the shared actor-first dictionary in ladder order (§8.4)", () => {
     expect(MONITOR_STATUS_FILTERS).toEqual([
       "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
-      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "delivered", "failed",
+      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "arrived", "delivered", "failed",
       "details_incomplete",
     ]);
     expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");
