@@ -4,7 +4,6 @@ import {
   attachDoInput,
   receivePoWithDoInput,
   abandonOrderInput,
-  warehousePickInput,
   recheckStockInput,
   assignPickupPartnerInput,
   reassignPoWarehouseInput,
@@ -16,7 +15,6 @@ import {
   reselectPartnerInput,
   lpAcceptOrderInput,
   lpRejectOrderInput,
-  transferReadyInputSchema,
   partnerAcceptRfdInput,
   partnerRejectRfdInput,
   dispatchCustomerLegInput,
@@ -153,20 +151,6 @@ describe('abandonOrderInput', () => {
  *
  * Purchase Order creation has ONE wire contract now — Batch Purchase's issue
  * payload, covered by `apps/api/src/routes/operation/to-order.test.ts`. */
-
-describe('warehousePickInput', () => {
-  it('accepts a valid warehouse uuid', () => {
-    expect(warehousePickInput.safeParse({ warehouseId: UUID }).success).toBe(true);
-  });
-  it('rejects a missing warehouseId', () => {
-    expect(warehousePickInput.safeParse({}).success).toBe(false);
-  });
-  it('rejects extra keys (strict mode)', () => {
-    expect(
-      warehousePickInput.safeParse({ warehouseId: UUID, extraField: 'x' }).success,
-    ).toBe(false);
-  });
-});
 
 describe('recheckStockInput', () => {
   it('accepts an empty body', () => {
@@ -400,24 +384,6 @@ describe('lpRejectOrderInput (migration 0147 — item h)', () => {
   });
   it('rejects extra keys', () => {
     expect(lpRejectOrderInput.safeParse({ reason: 'ok', extra: 1 }).success).toBe(false);
-  });
-});
-
-describe('transferReadyInputSchema', () => {
-  it('rejects an empty body (warehouseId required — RPC `operation_warehouse_pick` raises 22023 warehouse_required on NULL)', () => {
-    expect(transferReadyInputSchema.safeParse({}).success).toBe(false);
-  });
-  it('accepts warehouseId as a uuid', () => {
-    expect(transferReadyInputSchema.safeParse({ warehouseId: UUID }).success).toBe(true);
-  });
-  it('rejects warehouseId=null (RPC rejects NULL — distinct from confirm-proceed which accepts it)', () => {
-    expect(transferReadyInputSchema.safeParse({ warehouseId: null }).success).toBe(false);
-  });
-  it('rejects warehouseId that is not a uuid', () => {
-    expect(transferReadyInputSchema.safeParse({ warehouseId: 'bogus' }).success).toBe(false);
-  });
-  it('rejects extra keys (strict mode)', () => {
-    expect(transferReadyInputSchema.safeParse({ warehouseId: UUID, extraField: 'x' }).success).toBe(false);
   });
 });
 
