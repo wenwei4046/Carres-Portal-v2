@@ -19,6 +19,8 @@ import {
   type DeliveryAttemptEvidenceRow,
   type ProofReviewInput,
   type SignedDoAttachInput,
+  type LoanOfferRow,
+  type LoanOfferRecordInput,
   type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
@@ -3072,7 +3074,13 @@ export interface operationOrderListRow {
    *  `paymentApprovalOpensGate` over them for the authoritative COD line
    *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
   order_delivery_payment_approvals?: { status: string }[];
-  ops_sofa_loans?: { status: "on_loan" | "returned" }[];
+  ops_sofa_loans?: {
+    status: "on_loan" | "returned";
+    /** 0492 (Card 15) — the loaned Unit, for `Loan {Unit ID} · collect back on delivery day`. */
+    item_id?: string | null;
+    loan_note_no?: string | null;
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
+  }[];
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */
   order_annotations: { content: string; tag: string | null; created_at: string }[];
@@ -5785,7 +5793,12 @@ export interface SalesOrderRouteFactsResponse {
   claims: SalesOrderRouteClaim[];
   financeExceptions: SalesOrderRouteFinanceException[];
   paymentApprovals: DeliveryPaymentApprovalRow[];
+  /** 0492 (Card 15) — the loan offer conversation on the Sales Order. */
+  loanOffers: LoanOfferView[];
 }
+
+/** One loan-offer record as the API returns it, with the offered Unit's ID. */
+export type LoanOfferView = LoanOfferRow & { unit_id: string | null };
 
 /**
  * The Order Route's read fan-in. Every request goes to the existing owning
@@ -5808,7 +5821,7 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals] =
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals, loanOffers] =
         await Promise.all([
           apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
           apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
@@ -5822,6 +5835,7 @@ export function useSalesOrderRouteFacts(
           // reads, so the canvas and the refusal can never disagree (Law D).
           apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
           apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
+          apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
         ]);
       const receiving = await receivingPromise;
       return {
@@ -5835,6 +5849,7 @@ export function useSalesOrderRouteFacts(
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
         financeExceptions,
         paymentApprovals,
+        loanOffers: loanOffers.offers,
       };
     },
     enabled: !!orderId && open,
@@ -7303,6 +7318,8 @@ export interface DeliveryOrderDetailPayload {
     loaned_at: string | null;
     returned_at: string | null;
     loan_note_no: string | null;
+    /** 0492 (Card 15) — the loaned Unit's identity. */
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
   }>;
   handoverEvents: DeliveryHandoverEventRow[];
 }
@@ -10302,6 +10319,38 @@ export function useMarkUrgentStockOrdered() {
 // ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
 const loansKey = (orderId: string | null) =>
   ["operation", "orders", orderId ?? "null", "loans"] as const;
+
+/** 0492 (Card 15) — the loan offer conversation, newest first. */
+export function useLoanOffers(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "loan-offers"] as const,
+    queryFn: () => apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${orderId}/loan-offers`),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Record the offer, or the customer's answer, through the one Orders door. */
+export function useRecordLoanOffer(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ offer: unknown }, ApiError, LoanOfferRecordInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ offer: unknown }, ApiError, LoanOfferRecordInput>({
+    mutationFn: (input) =>
+      apiFetch<{ offer: unknown }>(`/api/operation/orders/${orderId}/loan-offers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId, "loan-offers"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
 
 /** The order's sofa loans (active + returned). */
 export function useOrderLoans(orderId: string | null) {

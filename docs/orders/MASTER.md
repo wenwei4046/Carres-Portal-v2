@@ -907,7 +907,11 @@ trip carries.
 
 ### LOAN — conditional, and it blocks nothing
 
-Rendered ONLY while a loan item is out; there is no empty box on a clean order. Amber, with a
+Rendered while a loan item is out — and, since 2026-09-13 (Delivery Card 15, `ops_loan_offers`),
+while a loan OFFER is open or accepted and no item is out yet (`Loan offered · {what}` / `Waiting
+for the customer's answer`, `Customer accepted the loan · {what}` / `Prepare the loan Unit`); a
+declined offer renders nothing and stays in the drawer's history. There is no empty box on a
+clean order. Amber, with a
 **dashed edge into DELIVER labelled `collect back`**. It **never joins the gate**: a loan may not
 hold a delivery, and it never blocks delivery completion (Card 6 — an independent obligation; an
 open `ops_sofa_loans` row on a delivered order keeps the Loan obligation open, and Card 8's

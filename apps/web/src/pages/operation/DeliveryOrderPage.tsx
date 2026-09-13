@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Printer } from "lucide-react";
 import {
+  unitIdOf,
   deliveryGroupLabel,
   deliveryGroupOf,
   deliveryOrderStatusOf,
@@ -568,15 +569,19 @@ export default function DeliveryOrderPage() {
               ) : (
                 <p className="text-body text-base-900">Loan collected back</p>
               )}
-              <ul className="mt-2 flex flex-col gap-1">
-                {[...onLoan, ...returnedLoans].map((l) => (
-                  <li key={l.id} className="text-label text-base-600">
-                    {l.loan_note_no ?? "Loan"} ·{" "}
-                    {l.status === "on_loan"
-                      ? `On loan since ${l.loaned_at ? fmtDate(l.loaned_at) : "the delivery"}`
-                      : `Returned ${l.returned_at ? fmtDate(l.returned_at) : ""}`}
-                  </li>
-                ))}
+              <ul className="mt-2 flex flex-col gap-1" data-testid="do-loan-lines">
+                {[...onLoan, ...returnedLoans].map((l) => {
+                  /* 0492 (Card 15) — the exact Unit the crew brings back. */
+                  const unit = Array.isArray(l.ops_stock_items) ? l.ops_stock_items[0] : l.ops_stock_items;
+                  const unitId = unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null });
+                  return (
+                    <li key={l.id} className="text-label text-base-600">
+                      {l.status === "on_loan"
+                        ? `Loan ${unitId ?? l.loan_note_no ?? "item"} · collect back on delivery day · on loan since ${l.loaned_at ? fmtDate(l.loaned_at) : "the delivery"}`
+                        : `${l.loan_note_no ?? "Loan"}${unitId ? ` ${unitId}` : ""} · Returned ${l.returned_at ? fmtDate(l.returned_at) : ""}`}
+                    </li>
+                  );
+                })}
               </ul>
             </Panel>
           )}
