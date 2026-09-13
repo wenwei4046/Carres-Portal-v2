@@ -85,9 +85,21 @@ Delivery/Outbound door are untouched.
 
 ## Tasks
 
-- [ ] Migration 0501: drop the three functions; assert the 0366 trigger is armed; rolled-back production probe with the negative control (a hand-written `reserved` still refused)
-- [ ] API: remove `POST /:id/warehouse` and `POST /:id/transfer-ready`, their schemas and imports; route test proves both answer 404 and no route names `operation_warehouse_pick`
-- [ ] Web: remove `useWarehousePickMutation`, `useTransferReady`, `TransferReadyDialog` and the drawer's `Transfer to ready` item and prop chain
-- [ ] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
-- [ ] Typecheck ×3, design guard, `pnpm ci:migrations`
-- [ ] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 404) → Delivery MASTER §16 closure
+- [x] Migration 0501: drop the three functions; assert the 0366 trigger is armed; rolled-back production probe with the negative control (a hand-written `reserved` still refused)
+- [x] API: remove `POST /:id/warehouse` and `POST /:id/transfer-ready`, their schemas and imports; route test proves both answer 404 and no route names `operation_warehouse_pick`
+- [x] Web: remove `useWarehousePickMutation`, `useTransferReady`, `TransferReadyDialog` and the drawer's `Transfer to ready` item and prop chain
+- [x] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
+- [x] Typecheck ×3, design guard, `pnpm ci:migrations`
+- [x] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 404) → Delivery MASTER §16 closure
+
+**Part B evidence (2026-09-14):** PR #1292 squash-merged as `a5646d2d` after Part A (`a38d77c8`). Migration
+**0501** was probed in a rolled-back production transaction (00:1x MYT): three names present → dropped → `0`
+remaining, `stock_balances_derived_only` armed, the four kept doors present, and the negative control
+`update stock_balances set reserved = reserved + 1` refused `P0001 stock_total_is_derived`; then applied as the
+exact committed file through the governed path — tracker tail `20260913162841 0501_the_warehouse_pick_writer_is_retired`
+(`0500`, another lane's role-gate migration, is on `main` and NOT yet applied; 0501 does not depend on it and
+0500 does not name the three functions). Re-read after apply: `retired_writers_remaining 0 · guard_armed true ·
+kept_doors operation_calc_shortages, operation_pick_warehouse, ops_stock_pool_draw, so_batch_reserve_ready_units`.
+Negative regression `apps/api/src/lib/stock-total-writers.test.ts` (4) green on CI. The 410 doors and the drawer
+are Part A's production proof; an authenticated re-probe of the two 410 routes on `a5646d2d` is owed with the
+Card 19/20 walk (unauthenticated they answer 401 before routing, which proves nothing).
