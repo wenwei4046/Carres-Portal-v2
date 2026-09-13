@@ -15,8 +15,15 @@
  *
  * A recorded entry cannot be changed, and there is no reversal door (0468
  * took `gl_reverse` away from signed-in users) — a mistake is corrected by
- * recording another entry. The function has no idempotency key, so the confirm
- * button is busy while the call is out and a second press cannot reach it.
+ * recording another entry. The confirm button is busy while the call is out,
+ * so a double press cannot reach it.
+ *
+ * THE REQUEST KEY (0502). The form draws one key when it opens and sends it on
+ * every press of this entry, retries included: the database answers a resend
+ * with the first entry and never records it twice. A new entry is a new form,
+ * so a new key. Until 0502 is applied the API cannot honour the key, and it
+ * says so: only a 503 carrying `retry_safe: true` may tell the principal to
+ * press again; everything else unknown keeps "check the Journal first".
  */
 import { useMemo, useState, type ReactNode } from "react";
 import type { LedgerAccount } from "@carres/shared/finance-ledger";
@@ -68,6 +75,15 @@ function isRefusal(e: unknown): e is ApiError {
   if (!(e instanceof ApiError) || e.status < 400 || e.status > 499) return false;
   const body = e.body as { message?: unknown } | null;
   return typeof body === "object" && body !== null && typeof body.message === "string";
+}
+
+/** The answer did not come back, and the API knows the request key is
+ *  honoured, so a second press returns the first entry: its own sentence. */
+function isSafeToPressAgain(e: unknown): e is ApiError {
+  if (!(e instanceof ApiError) || e.status !== 503) return false;
+  const body = e.body as { code?: unknown; retry_safe?: unknown; message?: unknown } | null;
+  return typeof body === "object" && body !== null && body.code === "outcome_unknown"
+    && body.retry_safe === true && typeof body.message === "string";
 }
 
 /** A typed amount → a number, nothing (left blank), or the reason it cannot
@@ -147,6 +163,8 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
   const [lines, setLines] = useState<TypedLine[]>(() => [blankLine(), blankLine()]);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /* One key for this entry, kept across every press and retry. */
+  const [requestKey] = useState(() => crypto.randomUUID());
 
   /* Before the ledger starts, the first day it can take is its start date. */
   const entryDate = date && goLive && date === today && today < goLive ? goLive : date;
@@ -176,6 +194,7 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
         credit: l.credit,
         memo: l.line.memo.trim() || null,
       })),
+      requestKey,
     });
     if (!parsed.success) {
       setRefusal(parsed.error.issues[0]?.message ?? "Check the entry and try again.");
@@ -213,8 +232,9 @@ export default function ManualJournalForm({ onBack, onRecorded }: {
         setConfirming(false);
         // Only a 4xx that carries our own sentence is a refusal. Anything else
         // (no answer, a gateway page, a 5xx) leaves the outcome unknown: the
-        // entry may already stand, and a second press is a second entry.
-        setRefusal(isRefusal(e) ? e.message : DROPPED);
+        // entry may already stand. Only when the API says the key is honoured
+        // is a second press safe; otherwise it could be a second entry.
+        setRefusal(isRefusal(e) || isSafeToPressAgain(e) ? e.message : DROPPED);
       },
     });
   };

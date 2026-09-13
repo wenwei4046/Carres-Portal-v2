@@ -22,9 +22,19 @@ import type { AppEnv } from "../../types";
  * the caller's JWT is what makes that check see the person who pressed.
  *
  * The function draws the `MJ-YYYYMM-NNNN` document number and `gl_post` draws
- * the `JE-YYYYMM-NNNN` entry number. There is no idempotency key: every call is
- * a new MJ number, so a second press is a second entry. The form guards the
- * double press; this route does not invent a second numbering scheme.
+ * the `JE-YYYYMM-NNNN` entry number.
+ *
+ * THE REQUEST KEY (0502). The form draws one uuid per entry and sends it as
+ * `requestKey` on every press. It reaches `gl_manual_journal(…, p_request_key)`:
+ * the same key with the same details returns the SAME entry id and posts
+ * nothing; the same key with other details is refused (`idempotency_mismatch`).
+ *
+ * DEPLOY ORDER. This route ships before 0502 is applied. Until then the keyed
+ * call is answered "function not found" (PGRST202 / 42883) — nothing ran — and
+ * the route makes the old three-argument call instead, which posts every time.
+ * So an unknown outcome may say "press again" only when this isolate has seen
+ * the keyed function answer (`keyedJournalLive`); otherwise it keeps "check the
+ * Journal first".
  *
  * Control accounts (receivables and payables) are refused by the database and
  * that refusal is kept: those balances move only through their own documents.
@@ -93,15 +103,42 @@ const REFUSALS: Record<string, { status: 403 | 409 | 422; message: string; perLi
 };
 
 /** The call went out and no database answer came back (a gateway page, a
- *  dropped connection): the entry may stand. Never "try again" — a second
- *  press is a second entry. */
+ *  dropped connection): the entry may stand. Without a live request key,
+ *  never "try again" — a second press is a second entry. */
 const OUTCOME_UNKNOWN = "The answer did not come back. Check the Journal for this entry before you record it again.";
-const outcomeUnknown = (c: Context<AppEnv>) =>
-  c.json({ error: "outcome_unknown", code: "outcome_unknown", message: OUTCOME_UNKNOWN }, 503);
+/** The same, when the press carried a request key the database is known to
+ *  honour: a second press returns the first entry, or records it once. */
+const OUTCOME_UNKNOWN_KEYED = "The answer did not come back. Press Record journal entry again. This entry is never recorded twice.";
 
-function journalError(c: Context<AppEnv>, error: PgError, goLive: string | null) {
+/** True once this isolate has seen `gl_manual_journal(…, p_request_key)`
+ *  answer — a result or a refusal of its own, anything but "not found". A
+ *  migration is never unapplied, so it is never set back. Exported for tests. */
+let keyedJournalLive = false;
+export const _resetKeyedJournalLiveForTesting = () => { keyedJournalLive = false; };
+
+const outcomeUnknown = (c: Context<AppEnv>, retrySafe = false) =>
+  c.json({
+    error: "outcome_unknown",
+    code: "outcome_unknown",
+    message: retrySafe ? OUTCOME_UNKNOWN_KEYED : OUTCOME_UNKNOWN,
+    retry_safe: retrySafe,
+  }, 503);
+
+/** "Function not found": PostgREST's schema cache has no such signature
+ *  (PGRST202), or Postgres itself has none (42883). Nothing ran. */
+const isMissingFunction = (error: PgError | null) =>
+  error?.code === "PGRST202" || error?.code === "42883";
+
+function journalError(c: Context<AppEnv>, error: PgError, goLive: string | null, retrySafe: boolean) {
   // A database refusal always carries a five-character SQLSTATE.
-  if (!/^[0-9A-Z]{5}$/.test(error.code ?? "")) return outcomeUnknown(c);
+  if (!/^[0-9A-Z]{5}$/.test(error.code ?? "")) return outcomeUnknown(c, retrySafe);
+  if (error.details === "idempotency_mismatch") {
+    const entryNo = /already recorded as (JE-[0-9A-Za-z-]+)/.exec(error.message ?? "")?.[1];
+    return c.json({
+      error: "rule_violation", code: "idempotency_mismatch",
+      message: `This entry was already recorded${entryNo ? ` as ${entryNo}` : ""} before it was changed. Open it in the Journal. To record another, start a New journal entry.`,
+    }, 409);
+  }
   const known = error.details ? REFUSALS[error.details] : undefined;
   if (known) {
     let message = known.message;
@@ -148,7 +185,7 @@ financeManualJournalsRouter.post("/", requirePrincipal, async (c) => {
     return c.json({ error: "invalid_param", code: "gl_post_entry_date_before_go_live", message: beforeStart(goLive) }, 422);
   }
 
-  const { data, error } = await sb.rpc("gl_manual_journal", {
+  const args = {
     p_entry_date: input.entry_date,
     p_narration: input.narration,
     p_lines: input.lines.map((l) => ({
@@ -157,10 +194,27 @@ financeManualJournalsRouter.post("/", requirePrincipal, async (c) => {
       credit: l.credit ?? null,
       memo: l.memo ? l.memo : null,
     })),
-  });
-  if (error) return journalError(c, error, goLive);
+  };
+
+  // With a key, the keyed function; before 0502 is applied it is not found —
+  // nothing ran — and the old call is made instead. Only "not found" falls
+  // back: any other answer came from the keyed function itself.
+  let result = input.requestKey
+    ? await sb.rpc("gl_manual_journal", { ...args, p_request_key: input.requestKey })
+    : await sb.rpc("gl_manual_journal", args);
+  let keyed = Boolean(input.requestKey);
+  if (keyed && isMissingFunction(result.error)) {
+    keyed = false;
+    result = await sb.rpc("gl_manual_journal", args);
+  } else if (keyed && (result.error === null || /^[0-9A-Z]{5}$/.test(result.error.code ?? ""))) {
+    keyedJournalLive = true;
+  }
+  const retrySafe = keyed && keyedJournalLive;
+
+  const { data, error } = result;
+  if (error) return journalError(c, error, goLive, retrySafe);
   const id = typeof data === "string" ? data : null;
-  if (!id) return outcomeUnknown(c);
+  if (!id) return outcomeUnknown(c, retrySafe);
 
   // The entry stands from here on. A failed read-back must not look like a
   // failed entry — a person told "it failed" presses again and posts twice —
