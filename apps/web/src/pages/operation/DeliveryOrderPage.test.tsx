@@ -23,7 +23,7 @@ let detailState: {
 };
 
 const useDeliveryOrderSpy = vi.fn((..._args: unknown[]) => detailState);
-const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] }, isLoading: false }));
+const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] as Array<{ path: string; at: string; doNumber: string; url: string }> }, isLoading: false }));
 const recordHandoverMutate = vi.fn();
 const reviewMutate = vi.fn();
 const attachSignedMutate = vi.fn();
@@ -138,6 +138,7 @@ function mount(data: DeliveryOrderDetailPayload) {
 
 beforeEach(() => {
   useDeliveryOrderSpy.mockClear();
+  useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [] }, isLoading: false });
   recordHandoverMutate.mockClear();
   reviewMutate.mockClear();
   attachSignedMutate.mockClear();
@@ -715,6 +716,19 @@ describe("a Journey leg's document — Arrived, its own Warehouse, no proof owed
       { leg, orders: { ...payload().deliveryOrder.orders, warehouse_id: null, delivery_stops: stops } },
       { attempts: [attempt("delivered")], handoverEvents: received },
     );
+
+  it("an arrival keeps its own ledger files and never borrows the final signature or asks for one", () => {
+    const data = legDoc(1);
+    data.deliveryOrder.orders.do_number = "DO-FINAL";
+    data.deliveryOrder.orders.do_file_path = "order/final.pdf";
+    useDeliveryPhotosSpy.mockReturnValue({ data: { photos: [{ path: "arrival.jpg", url: "https://example.test/arrival.jpg", doNumber: data.deliveryOrder.do_number, at: "2026-09-13T10:00:00Z" }] }, isLoading: false });
+    mount(data);
+    expect(screen.getByTestId("do-evidence-document-files")).toBeTruthy();
+    expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://example.test/arrival.jpg");
+    expect(screen.queryByText(/Signed document on file/)).toBeNull();
+    expect(screen.queryByText("No signed document yet")).toBeNull();
+    expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+  });
 
   it("leg 1 of 2: the pill reads Arrived, the Warehouse is the leg's own source, history says Arrived, no proof is owed", () => {
     mount(legDoc(1));

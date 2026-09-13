@@ -577,6 +577,7 @@ describe("DeliveryOrdersRegister", () => {
         doRow({
           orders: {
             ...doRow().orders,
+            do_number: "DO-180826-3035",
             do_file_path: "order-x/do.pdf",
             do_uploaded_at: "2026-08-20T11:00:00Z",
             ops_order_control: {

@@ -1449,3 +1449,7 @@ redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar
 ### Supplemental production acceptance · 2026-09-13 23:32 MYT
 
 Card 12’s representative manager save is now verified as principal on the existing E2E LP-X fixture, persisted after reload and restored to its original value with both audit entries retained. Card 18’s office form was walked as principal: Building type is required, the retired address-later control is absent, and missing address/building/date facts disable Create order with the governed message. These are authenticated observations on `f2fb3efeb89c395dd9f7ee96cdc49d60e6e103ff`; see the supplemental sections of Cards 12 and 18 for exact test facts. Dealer POS remains open: the working dealer-test login reaches first-time staff PIN setup, not the wizard. No identity/security setup was changed. Cards 19/20 are being handled in their existing Delivery workspaces; Card 21 owns only legacy warehouse-pick application retirement, with database retirement explicitly still outstanding.
+
+### Document ownership correction · Card 22 · build pending
+
+The SO-1362 acceptance read found that an intermediate DO borrowed its sibling final DO’s signed document from the order mirror. Card 22 binds signed-file presence, download and review timestamps to the exact DO, using document-bound evidence or an explicitly matching order mirror. Intermediate arrivals retain their own recorded photos and show no customer signed-paper demand. This is a read correction with no migration or Unit write; production closure remains pending.

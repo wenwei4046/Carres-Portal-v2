@@ -128,9 +128,9 @@ export function signedDeliveryDocumentOf(input: {
   order?: { do_number?: string | null; do_file_path?: string | null; do_uploaded_at?: string | null } | null;
   evidence?: ReadonlyArray<Pick<DeliveryAttemptEvidenceRow, "do_number" | "kind" | "path" | "recorded_at">>;
 }): { path: string; uploadedAt: string | null } | null {
-  const candidates = (input.evidence ?? [])
+  const candidates: Array<{ path: string; uploadedAt: string | null }> = (input.evidence ?? [])
     .filter((e) => e.do_number === input.documentNumber && e.kind === "document" && e.path.trim())
-    .map((e) => ({ path: e.path, uploadedAt: e.recorded_at as string | null }));
+    .map((e) => ({ path: e.path, uploadedAt: e.recorded_at }));
   if (input.order?.do_number === input.documentNumber && input.order.do_file_path) {
     candidates.push({ path: input.order.do_file_path, uploadedAt: input.order.do_uploaded_at ?? null });
   }

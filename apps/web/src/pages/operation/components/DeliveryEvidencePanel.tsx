@@ -401,7 +401,7 @@ export default function DeliveryEvidencePanel({
                   {arrivalOnly && a.result === "delivered" ? EVIDENCE_COPY.arrived : DELIVERY_RESULT_LABEL[a.result]}
                 </span>
                 {shown.length === 0 ? (
-                  <Absent>{EVIDENCE_COPY.noFiles}</Absent>
+                  unbound.length === 0 ? <Absent>{EVIDENCE_COPY.noFiles}</Absent> : null
                 ) : (
                   <div className="flex flex-wrap items-start gap-3">
                     {shown.map((f, j) => (
@@ -420,8 +420,17 @@ export default function DeliveryEvidencePanel({
         </ul>
       )}
 
+      {/* Unbound files name this document, not an invented attempt binding. */}
+      {!latestReached && unbound.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-start gap-3" data-testid="do-evidence-document-files">
+          {unbound.map((file, index) => (
+            <EvidenceFileView key={file.path} index={index} file={{ path: file.path, url: file.url ?? null, kind: file.kind === "video" ? "video" : "photo", at: file.at }} />
+          ))}
+        </div>
+      ) : null}
+
       {/* ── The signed paper ─────────────────────────────────────────────── */}
-      <div className="mt-3 border-t border-kit-slate-4 pt-3">
+      {!arrivalOnly || signedDo.present ? <div className="mt-3 border-t border-kit-slate-4 pt-3">
         <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-11">{EVIDENCE_COPY.signedDo}</span>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-body">
           {signedDo.present ? (
@@ -439,7 +448,7 @@ export default function DeliveryEvidencePanel({
         {attaching && latestReached ? (
           <SignedDoAttachForm doNumber={doNumber} orderId={orderId} onDone={() => setAttaching(false)} />
         ) : null}
-      </div>
+      </div> : null}
 
       {/* ── The review ───────────────────────────────────────────────────── */}
       {latestReached ? (
