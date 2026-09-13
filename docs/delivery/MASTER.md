@@ -188,6 +188,10 @@ Need Preparation → Picking → Checking → Packing → ready for handover
 Readiness is not handover. Handover is not Logistics receipt. Logistics receipt is not delivery.
 On return, a Logistics report never substitutes for the Warehouse's actual receipt.
 
+**Built (0494, 2026-09-13):** a Journey leg's document hands over to the LEG's partner — the
+handover door resolves the goods-holder from the arrangement keyed `(order, leg)` of the document's
+own scope; a whole-order document (leg 0) resolves exactly as before.
+
 Handover records the exact required Unit IDs, each scanned Unit result, both parties, actual
 receiver, time, vehicle when known and signature, photo or reply proof. The derived Outbound
 control is:
