@@ -1090,6 +1090,40 @@ scopes from.
 
 ## 16 · Production closure
 
+**2026-09-14 · Final convergence — the three 🟡 notes of 2026-09-13 are closed, and a Sales Order opens by its
+number.** Main tip `a5646d2d` (Cards 19 → 20 → 21 merged in that order on top of the sibling PR #1288).
+
+- **Card 20 (`9dd3945b`, PR #1289) — an intermediate leg ARRIVES.** `Delivered` is the customer's word: an
+  intermediate Journey leg's `delivered` result reads `Arrived` over the partner warehouse on Monitor, the Delivery
+  Orders register (a sixth `DOCUMENT STATUS` word), the DO header, Delivery history, History and the Evidence section
+  (which states that a warehouse arrival owes no delivery proof); a leg document's `Warehouse` fact is its own
+  `from_loc`; `Logistics Partner Performance` counts customer legs only; the Work Engine's Delivery deep-link is the
+  Monitor row, not the retired Edit Delivery address. Notes (1) and (2) closed in law (§3.1 · §8.4 · §9 · §12) and in
+  code. The deploy of `9dd3945b` converged on all three surfaces at 00:2x MYT.
+- **Card 19 (`334c3720`, PR #1291) — a number and an id open the same page.** `salesOrderParamOf` classifies the URL
+  param; `GET /api/operation/orders/by-number/:so` resolves the document word to the id; the object page resolves a
+  number once and re-enters by the id with its search kept, so every fan-in read is by the canonical id; a miss prints
+  `Sales Order not found.`. Measured before: `SO-1362` in the URL → 500 `invalid input syntax for type uuid` and an
+  empty Order Route.
+- **Card 21 (`a38d77c8` Part A #1288 · `a5646d2d` Part B #1292, migration 0501 APPLIED) — no writer stores a second
+  stock quantity truth.** `operation_warehouse_pick`, `_operation_reserve_order` and `operation_receive_po_line` are
+  dropped (`pg_proc` re-read: 0 remaining; tracker tail `0501`); 0366's `stock_balances_derived_only` stays armed (a
+  hand-written `reserved` still refuses `stock_total_is_derived`, proven in the rolled-back probe); the two API doors
+  answer 410 and the drawer offers no `Transfer to ready`; a negative regression scans every later migration and every
+  app source. Note (3) closed.
+- **Cards 12 and 18 — the role-specific walks** were done by the sibling session on `f2fb3efe` as principal (PR
+  #1288): the Delivery Settings save on the E2E LP-X fixture is re-read here in `delivery_setting_changes` (two
+  `partner_details` rows by the principal at 15:32 UTC, value changed then restored); the office create form's
+  governed refusals were observed. **Still open, not hidden:** the dealer POS wizard walk — `dealer-test@x.com`
+  stops at the store's first-time staff PIN setup before the wizard; a dealer login whose PIN setup is complete
+  is the minimum owner action.
+
+⚠️ **NOT PRODUCTION-WALKED, and named rather than implied:** the authenticated walks of Cards 19 and 20 on
+`a5646d2d` (and the 410 re-probe of Card 21's doors) are OWED. The operation@ browser session this chat held expired
+at 00:02 MYT during the deploy wait, a sign-in needs a password the chat may not type, and unauthenticated probes
+answer 401 before routing. Each Card file carries the exact URLs and the words to expect; the walk is minutes once
+someone signs in. No later chat may promote these three Cards to `PRODUCTION-VERIFIED` on the strength of CI.
+
 **2026-09-13 · Cards 08–15 and 18 production-verified; the two-leg Journey walked end to end.** Journey legs
 (0490/0491) landed on `d78b4e26` and were corrected on the authenticated walk of the governed fixture SO-1362 by
 **0494** (`45238b71`), **0496** (`1984a7ba`) and **0497** (`9ee6db65`): leg 1 NETS `Carres Klang Warehouse → JB
@@ -1099,12 +1133,9 @@ each leg on its own document with its own facts; the Journey completed only on t
 arrived; the exact Unit `id-dtd627907` went reserved → with NETS → with AL → sold. Card 15 (0492, `0dc51c6b`) and
 Card 18 (`4e944e51`) walked the same day. **Card 16** (`e0a6dc49`, the seven DO object sections) and **Card 17**
 (`a2bc7d53`, `Reports → Delivery`) were then walked on the same two documents and the same month. Evidence: the
-Card files. 🟡 Open after the walk, none blocking: (1) an intermediate leg's arrival is an `arrived` result but the
-register/Monitor status word, the DO `Evidence` heading and the `Logistics Partner Performance` listing print it as
-`Delivered` (+ `Delivery photo not uploaded`) — the Commitment and First Delivery listings already exclude it; the
-status vocabulary for `arrived` is the next Delivery correction; (2) the DO object's `Warehouse` fact reads the
-order's warehouse, so a Journey document prints `No warehouse recorded` beside a named source stop — read the leg's
-`from_loc` there; (3) the legacy warehouse-pick door still writes a derived stock total (Card 14 note).
+Card files. The three 🟡 notes recorded after that walk — an intermediate leg printed as `Delivered`, a Journey document's
+`Warehouse` reading the order-level warehouse, the legacy warehouse-pick door still writing a stock total — are
+CLOSED by Cards 20 and 21 (the 2026-09-14 entry above).
 
 **DEPLOYED 2026-09-12 — the approved Monitor layout (D1 + D2 + D3) and the missing half of the
 appointment, PR #1245 (`8a5fc05b`) with PR #1250's browser fixes on top, live at main SHA

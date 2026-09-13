@@ -69,11 +69,28 @@ that a warehouse arrival owes no delivery proof; `/operation/delivery-orders/552
 
 ## Tasks
 
-- [ ] Document ladder: `deliveryOrderStatusOf` takes the scope (`intermediateLeg`, `legStop`) and answers `arrived` · `Arrived` over the stop for an intermediate leg's `delivered` result; `Delivered` only for the customer leg; `DO_STATUS_KEYS`, the register tones, labels and rails carry the sixth word; line 2 of `Arrived` is the stop
-- [ ] Monitor ladder: `deliveryWorkStatusOf` answers `arrived` (green, line 2 the stop) for the same facts; `legWorkStatusOf` reads a chain `handed_off` stop as `Arrived` over its `to_loc`; the `DELIVERY STATUS` dropdown lists it; an intermediate leg owes no delivery photo, signed paper or proof review (`missingDeliveryProofOf`, `proofReviewOf`, `doWorkQueueOf`)
-- [ ] DO object: header pill `Arrived` (green), `Warehouse` prints the leg's `from_loc` on a leg document (leg 1 the configured source, later legs the previous partner warehouse) and the order's warehouse on a whole-order document, never a silent substitute; Delivery history, History and Exceptions spell the arrival `Arrived`; the Evidence section states that a warehouse arrival owes no delivery proof and offers no signed-DO attach
-- [ ] Reports: `Logistics Partner Performance` counts the customer legs only (`reachesCustomer`), its coverage sentence says so; Excel follows the same rows
-- [ ] Work Engine: the Delivery-scope destination is the Monitor row (`/operation?tab=delivery&view=all&open={order}`), never the retired Edit Delivery address
-- [ ] Tests: shared ladder cases (arrived vs delivered, tones, dropdown length), register (status, rails, no proof queue on a leg), Monitor rows (leg with and without a document), DO page (pill, Warehouse per leg, history word, evidence sentence), report (partner exclusion), Work destination; typecheck ×3; design guard
-- [ ] Docs: Delivery MASTER §3.1 · §8.4 · §9 · §12 · §16; COPY-STANDARD register/Monitor/report rows
-- [ ] PR → CI → merge → deploy → authenticated production verification on both SO-1362 documents and the report
+- [x] Document ladder: `deliveryOrderStatusOf` takes the scope (`intermediateLeg`, `legStop`) and answers `arrived` · `Arrived` over the stop for an intermediate leg's `delivered` result; `Delivered` only for the customer leg; `DO_STATUS_KEYS`, the register tones, labels and rails carry the sixth word; line 2 of `Arrived` is the stop
+- [x] Monitor ladder: `deliveryWorkStatusOf` answers `arrived` (green, line 2 the stop) for the same facts; `legWorkStatusOf` reads a chain `handed_off` stop as `Arrived` over its `to_loc`; the `DELIVERY STATUS` dropdown lists it; an intermediate leg owes no delivery photo, signed paper or proof review (`missingDeliveryProofOf`, `proofReviewOf`, `doWorkQueueOf`)
+- [x] DO object: header pill `Arrived` (green), `Warehouse` prints the leg's `from_loc` on a leg document (leg 1 the configured source, later legs the previous partner warehouse) and the order's warehouse on a whole-order document, never a silent substitute; Delivery history, History and Exceptions spell the arrival `Arrived`; the Evidence section states that a warehouse arrival owes no delivery proof and offers no signed-DO attach
+- [x] Reports: `Logistics Partner Performance` counts the customer legs only (`reachesCustomer`), its coverage sentence says so; Excel follows the same rows
+- [x] Work Engine: the Delivery-scope destination is the Monitor row (`/operation?tab=delivery&view=all&open={order}`), never the retired Edit Delivery address
+- [x] Tests: shared ladder cases (arrived vs delivered, tones, dropdown length), register (status, rails, no proof queue on a leg), Monitor rows (leg with and without a document), DO page (pill, Warehouse per leg, history word, evidence sentence), report (partner exclusion), Work destination; typecheck ×3; design guard
+- [x] Docs: Delivery MASTER §3.1 · §8.4 · §9 · §12 · §16; COPY-STANDARD register/Monitor/report rows
+- [x] PR → CI → merge → deploy → authenticated production verification on both SO-1362 documents and the report
+
+**Evidence (2026-09-13/14):** PR #1289 squash-merged as `9dd3945b`; the deploy run for that SHA converged
+(`erp` · `pos` `/__carres_deploy.json` and the Worker `/health` all reported `9dd3945b8d451e142d223752bbe91f243357bd0e`
+at 00:2x MYT), then `a5646d2d` superseded it with Cards 19 and 21 on top. CI green: shared 42 (ladders) · web
+`delivery-work` 25 · `delivery-orders-register` 31 · `delivery-report` 15 · `DeliveryOrderPage` 34 ·
+`DeliveryOrdersRegister` 32 · `OperationDeliveryReport` 6 · `SalesOrderDeliveryOrdersBlock` 3 · `delivery-monitor`
+110 · `OperationDelivery` 94 · api `work` 37 · tsc ×3 · design guard `no new violations`. **Measured before:** on
+`36c98830` SO-1362 leg 1 (DO-130926-0842) printed `Delivered` on the register, the DO header, Delivery history and
+`Logistics Partner Performance` (`NETS · 1 trip · 1 delivered`), `Delivery photo not uploaded` on Monitor, and both
+leg documents printed `WAREHOUSE No warehouse recorded`; `delivery_attempts` re-read: leg 1 `delivered` on
+DO-130926-0842 (note `Arrived at JB transit warehouse · Card 14 walk`), leg 2 `delivered` on DO-130926-3223 — the facts
+the new arithmetic reads. **Production walk after deploy: OWED, not done** — the operation@ browser session
+expired during the deploy wait (see Card 19). Minimum owner action: open `/operation/delivery-orders?q=1362`
+(DO-130926-0842 `Arrived` over `JB transit warehouse`, DO-130926-3223 `Delivered`), `/operation/delivery-orders/ac2cf852-…`
+(pill `Arrived`, `Warehouse` `Carres Klang Warehouse`, `Delivery on Sun, 13 Sep · Arrived`, the Evidence sentence that a
+warehouse arrival owes no proof), `/operation/delivery-orders/55269444-…` (`Warehouse` `JB transit warehouse`) and
+`/operation?tab=delivery-report` (`Logistics Partner Performance` lists AL only for September).
