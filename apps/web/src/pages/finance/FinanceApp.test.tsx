@@ -27,6 +27,15 @@ vi.mock("./ledger/ledger-queries", () => {
     useTrialBalance: () => waiting, useLedgerSelfCheck: () => waiting,
   };
 });
+vi.mock("@/lib/payables-queries", async (importOriginal) => {
+  const waiting = { data: undefined, isLoading: true, isSuccess: false, isError: false,
+    isFetching: false, error: null, refetch: vi.fn() };
+  return {
+    ...(await importOriginal<object>()),
+    useApOutstanding: () => waiting,
+    useApBillOutstanding: () => waiting,
+  };
+});
 const auth = vi.hoisted(() => ({ role: "finance" as string }));
 vi.mock("@/lib/auth", () => ({
   useAuth: (selector: (s: { role: string; user: { id: string } | null }) => unknown) =>
@@ -86,6 +95,17 @@ describe("Finance routing", () => {
     show("/finance/ledger?entry=JE-202609-0003");
     expect(screen.getByTestId("object-identity")).toHaveTextContent("JE-202609-0003");
     expect(screen.queryByTestId("journal-destination-header")).not.toBeInTheDocument();
+  });
+  it("an old /finance/ap link lands on Unpaid by Supplier — the aging page is no longer routed", () => {
+    show("/finance/ap");
+    expect(screen.getByTestId("ap-outstanding-destination-header")).toBeInTheDocument();
+  });
+  it("opens the Dashboard and AR · Receivables on the canonical reads", () => {
+    show("/finance/dashboard");
+    expect(screen.getByTestId("finance-dashboard-destination-header")).toBeInTheDocument();
+    cleanup();
+    show("/finance/ar");
+    expect(screen.getByTestId("ar-destination-header")).toBeInTheDocument();
   });
   it("operation staff never reach the ledger", () => {
     auth.role = "operation";

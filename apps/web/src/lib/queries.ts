@@ -579,15 +579,11 @@ export const qk = {
     poReport: () => ["operation", "pos", "report"] as const,
   },
   // Phase 5 — HQ Finance namespace. Same nested-key strategy as `principal`
-  // and `operation` so mutations can blast `["finance"]` (e.g. topup-approve
-  // ripples to dashboard summary + payments list + AR aging) or a tighter
-  // sub-tree.
+  // and `operation` so mutations can blast `["finance"]` (e.g. a receipt
+  // ripples to the invoice and payment registers) or a tighter sub-tree.
   finance: {
-    dashboardSummary: () => ["finance", "dashboard-summary"] as const,
     arAging:          () => ["finance", "ar-aging"] as const,
     apAging:          () => ["finance", "ap-aging"] as const,
-    cashflow:         (weeks?: number) =>
-      ["finance", "cashflow", weeks ?? 12] as const,
     monthlyPl:        (months?: number) =>
       ["finance", "monthly-pl", months ?? 6] as const,
     topSkus:          (limit?: number) =>
@@ -728,6 +724,7 @@ export interface FinanceRefundsFilters {
 // payloads; no need for a domain layer for these aggregates since they're
 // read-only dashboard data, never round-tripped through adapters).
 // ---------------------------------------------------------------------------
+// No route reaches the AR aging read any more; FinancePayments/FinanceInvoices still import these types.
 export interface FinanceArAgingRow {
   order_id:      string;
   so:            number;
@@ -752,10 +749,10 @@ export interface FinanceArAgingResponse {
   buckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
 }
 
-// AP aging — finance_ap_aging() RPC payload (migration 0063). Single
-// round-trip returns per-PO rows + bucket aggregates so FinanceAP and the
-// dashboard ready-to-pay tile never disagree. pay_status_ui is a derived
-// 5-value bucket; the raw db enum (pay_status) only has 3 values.
+// AP aging — finance_ap_aging() RPC payload (migration 0063). pay_status_ui
+// is a derived 5-value bucket; the raw db enum (pay_status) only has 3 values.
+// No route reaches the AP aging read any more (/finance/ap redirects to
+// /finance/ap-outstanding); FinanceAP/APDrawer still import these types.
 export type FinanceApPayStatusUi =
   | "matched"
   | "scheduled"
@@ -781,7 +778,6 @@ export interface FinanceApAgingRow {
   supplier_id:         string | null;
   supplier_name:       string | null;
   warehouse_id:        string | null;
-  delivery_partner_id: string | null;
   placed_at:           string;
   expected_ready_date: string | null;
   eta_date:            string | null;
@@ -805,13 +801,6 @@ export interface FinanceApAgingBucket {
 export interface FinanceApAgingResponse {
   rows:        FinanceApAgingRow[];
   byPayStatus: Record<FinanceApPayStatusUi, FinanceApAgingBucket>;
-}
-
-// Cashflow series (Chunk B) — finance_cashflow_series RPC payload.
-export interface FinanceCashflowSeries {
-  labels:  string[];   // ["W18", "W19", ...]
-  inflow:  number[];   // positive numbers per week
-  outflow: number[];   // negative numbers per week (proto convention)
 }
 
 // Monthly P&L (Chunk B) — finance_monthly_pl RPC payload.
@@ -893,12 +882,6 @@ export interface FinanceReconSuggestResponse {
     reference:      string | null;
   };
   candidates: FinanceReconCandidate[];
-}
-export interface FinanceDashboardSummary {
-  ar:           { outstanding: number; count: number; overdueAmt: number; overdueCount: number };
-  ap:           { dueAmt: number; count: number };
-  cashflow12w:  { inflow: number; outflow: number; net: number };
-  agingBuckets: Record<"0-30" | "31-60" | "61-90" | "90+", FinanceArAgingBucket>;
 }
 export interface FinancePaymentRow {
   id:           string;
@@ -8544,31 +8527,24 @@ export function useReassignPoWarehouseMutation(
 // Phase 5 — Finance hooks (queries + mutations)
 // ---------------------------------------------------------------------------
 // Server contract:
-//   GET   /api/finance/reports/dashboard-summary  -> FinanceDashboardSummary
-//   GET   /api/finance/reports/ar-aging           -> FinanceArAgingResponse
-//   GET   /api/finance/payments?filter            -> FinancePaymentRow[]
+//   GET   /api/finance/invoices/register          -> InvoiceRegisterRow[] (paged, fail-closed)
+//   GET   /api/finance/payments/register          -> PaymentRegisterRow[] (paged, fail-closed)
+//   GET   /api/finance/reports/monthly-pl|top-skus
 //   POST  /api/finance/payments/topup-approve     mutation -> payments row
 //   POST  /api/finance/payments/order-receipt     mutation -> payments row
 //   POST  /api/finance/refunds/create             mutation -> { refund, needsApproval }
 //   POST  /api/finance/refunds/:id/pay            mutation -> refunds row
 //
+// Money owed has ONE arithmetic: customer Outstanding comes from the invoice
+// register through `soRemaining`, supplier Unpaid from
+// /api/finance/payables/outstanding — both read through
+// pages/finance/money-owed.ts. The old dashboard-summary and cashflow reads
+// (finance_dashboard_summary / finance_cashflow_series) are gone.
+//
 // Each mutation invalidates the relevant qk.finance.* keys + ripples to
 // related namespaces (e.g. topup-approve invalidates principal.approvals
 // since it mutates an approval row, plus dealer caches since deposit_balance
 // changes).
-
-function toFinancePaymentsSearch(f?: FinancePaymentsFilters): string {
-  if (!f) return "";
-  const p = new URLSearchParams();
-  if (f.orderId)   p.set("orderId",   f.orderId);
-  if (f.dealerId)  p.set("dealerId",  f.dealerId);
-  if (f.direction) p.set("direction", f.direction);
-  if (f.from)      p.set("from",      f.from);
-  if (f.to)        p.set("to",        f.to);
-  if (f.limit)     p.set("limit",     String(f.limit));
-  const qs = p.toString();
-  return qs ? `?${qs}` : "";
-}
 
 function toFinanceInvoicesSearch(f?: FinanceInvoicesFilters): string {
   if (!f) return "";
@@ -8594,17 +8570,7 @@ function toFinanceRefundsSearch(f?: FinanceRefundsFilters): string {
   return qs ? `?${qs}` : "";
 }
 
-export function useFinanceDashboardSummary(
-  opts?: Partial<UseQueryOptions<FinanceDashboardSummary>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.dashboardSummary(),
-    queryFn: () => apiFetch<FinanceDashboardSummary>("/api/finance/reports/dashboard-summary"),
-    staleTime: 30_000,
-    ...opts,
-  });
-}
-
+// No route reaches this any more (/finance/ar reads the invoice register); FinancePayments/FinanceInvoices still import it.
 export function useFinanceArAging(
   opts?: Partial<UseQueryOptions<FinanceArAgingResponse>>,
 ) {
@@ -8616,6 +8582,7 @@ export function useFinanceArAging(
   });
 }
 
+// No route reaches this any more (/finance/ap redirects to /finance/ap-outstanding); FinanceAP still imports it.
 export function useFinanceApAging(
   opts?: Partial<UseQueryOptions<FinanceApAgingResponse>>,
 ) {
@@ -8623,21 +8590,6 @@ export function useFinanceApAging(
     queryKey: qk.finance.apAging(),
     queryFn: () => apiFetch<FinanceApAgingResponse>("/api/finance/reports/ap-aging"),
     staleTime: 30_000,
-    ...opts,
-  });
-}
-
-export function useFinanceCashflow(
-  weeks?: number,
-  opts?: Partial<UseQueryOptions<FinanceCashflowSeries>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.cashflow(weeks),
-    queryFn: () =>
-      apiFetch<FinanceCashflowSeries>(
-        `/api/finance/reports/cashflow${weeks ? `?weeks=${weeks}` : ""}`,
-      ),
-    staleTime: 60_000,
     ...opts,
   });
 }
@@ -8756,17 +8708,10 @@ export function useInvoiceRegister() {
   });
 }
 
-export function useFinancePayments(
-  filters?: FinancePaymentsFilters,
-  opts?: Partial<UseQueryOptions<FinancePaymentRow[]>>,
-) {
-  return useQuery({
-    queryKey: qk.finance.payments(filters),
-    queryFn: () => apiFetch<FinancePaymentRow[]>(`/api/finance/payments${toFinancePaymentsSearch(filters)}`),
-    staleTime: 15_000,
-    ...opts,
-  });
-}
+// useFinancePayments is gone: it read the legacy `payments` table, so a
+// receipt recorded from the AR drawer (which lands in `order_payments`) never
+// showed in the drawer's own history. The drawer reads the invoice register's
+// `order_payments` instead.
 
 // Invoice row shape (matches the `invoices` table in 0001:409-420).
 export interface FinanceInvoiceRow {
@@ -8839,7 +8784,7 @@ export function useRecordReceipt(
       }),
     ...opts,
     onSuccess: async (...args) => {
-      // orders.paid bumped + new payment inserted. AR aging shifts.
+      // A new order_payments row: both registers and Outstanding move.
       await qc.invalidateQueries({ queryKey: ["finance"] });
       await qc.invalidateQueries({ queryKey: ["orders"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
@@ -8951,9 +8896,10 @@ export function useApplyCreditNote(
       // The target order's outstanding balance is conceptually reduced
       // but Phase 5 V1 doesn't auto-deduct on the order side — that
       // happens on next checkout / dealer ack. Invalidate the refunds
-      // list + AR aging so finance sees the CN move to "applied".
+      // list + the invoice register (where Outstanding is read) so finance
+      // sees the CN move to "applied".
       await qc.invalidateQueries({ queryKey: qk.finance.refunds() });
-      await qc.invalidateQueries({ queryKey: qk.finance.arAging() });
+      await qc.invalidateQueries({ queryKey: qk.finance.invoiceRegister() });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
