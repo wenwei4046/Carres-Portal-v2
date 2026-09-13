@@ -108,6 +108,26 @@ describe("GET /api/operation/orders", () => {
     expect(limit).toHaveBeenCalledWith(500);
   });
 
+  it.each(["4001", "SO-4001", "so-4001", "SO 4001"])("finds the order number entered as %s", async (search) => {
+    const { or } = mockOrdersList([]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders?search=${encodeURIComponent(search)}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(or).toHaveBeenCalledWith(expect.stringContaining("so.eq.4001"));
+  });
+
+  it.each(["4001 Smith", "CR4001", "SO-4001-extra", "9007199254740992"])("does not turn %s into an unrelated order number", async (search) => {
+    const { or } = mockOrdersList([]);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(new Request(`http://t/api/operation/orders?search=${encodeURIComponent(search)}`, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    }), env);
+    expect(res.status).toBe(200);
+    expect(or).toHaveBeenCalledWith(expect.not.stringContaining("so.eq."));
+  });
+
   // ── D1 · the list carries the SKUs a real purchase order covers ───────────
   //
   // Before D1 the only PO evidence on the wire was `order_lines.source_po`, a
