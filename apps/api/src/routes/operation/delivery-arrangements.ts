@@ -103,13 +103,25 @@ const shape = (r: ArrangementRecord) => ({
 });
 
 const CONTACT_SELECT =
-  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, contacted_at, " +
+  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, acting_user_id, owner_basis, contacted_at, " +
   "result_key, reply_evidence_path, next_action, note, on_behalf_of_partner_id, recorded_by, recorded_at";
 
 /**
  * THE ONE CONTACT WRITER (0487, Delivery MASTER §5.1). Both the standalone
  * contact door and the arrangement save that carries a contact land here, so
  * a record can never be written two ways.
+ *
+ * 0499 — the record names four people-facts, and the Worker asserts only ONE
+ * of them: `recorded_by`, the signed-in subject. `contact_owner_user_id` (the
+ * NORMAL responsible Operation person for this customer/SO) and
+ * `acting_user_id` (today's cover or the normal person) are resolved by the
+ * database's own arithmetic (`delivery_contact_responsibility`, applied by
+ * the table's BEFORE INSERT trigger), so a shared login can record evidence
+ * but never becomes the owner, and a cover never becomes the owner by
+ * recording. The value sent as `contact_owner_user_id` is only the recorder
+ * candidate the trigger may fall back to when nobody is established and no
+ * Delivery Duty holder exists. `on_behalf_of_partner_id` is the partner
+ * provenance, unchanged.
  */
 async function recordContact(
   sb: ReturnType<typeof adminClient>,

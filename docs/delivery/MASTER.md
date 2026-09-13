@@ -269,8 +269,17 @@ Delivery Date` · `Confirm Delivery Time` · `Confirm Customer Availability` · 
 Address` · `Confirm Site Access` · `Confirm Receiver` · `Obtain Missing Information` · `Confirm
 New Delivery Date after Failed Delivery` · `Confirm Cancellation`.
 
-Each contact record stores purpose, contact owner, channel, person contacted, actual time, result,
-reply evidence, recorder, proxy provenance and explicit next action. Results: `Confirmed` · `No
+Each contact record stores purpose, the **responsible person** (the normal Operation owner of
+this customer/SO — an individual staff identity, never a shared role login), the **acting person**
+(today's Delivery Duty buddy cover on that person, else the person), channel, person contacted,
+actual time, result, reply evidence, the **recorder** (whoever wrote it, the shared login
+included), **proxy provenance** (the partner whose reply Operation recorded) and explicit next
+action. The responsible and acting persons are resolved by the database when the record is written
+(0499 `delivery_contact_responsibility`: the order's current collection owner → the earliest
+contact whose responsible person was not covering that day → the Delivery Duty NORMAL holder on
+the day → the recorder only when an individual who is not covering → unresolved); the writer
+asserts only the recorder. A cover never becomes responsible by recording; a shared login never
+does at all. Payment's collection owner reads the same arithmetic (Payment MASTER §10). Results: `Confirmed` · `No
 Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details Incorrect` ·
 `Customer Refused Delivery` · `Waiting for Customer Reply`.
 

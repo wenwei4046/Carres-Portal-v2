@@ -1,5 +1,16 @@
 ## 🔴 A PAUSED READ RENDERS AS A CONFIRMED ZERO — seven registers outside Payment
 
+## `delivery-duty-initial-holder` — ONE-TIME STAFFING CONFIGURATION OWED, opened 2026-09-13
+
+**🟡 Automatic customer-payment ownership is built and verified (0489 · 0495 · 0498 · 0499) and
+is unusable in production for exactly one reason: nobody holds `delivery_duty`.** Measured
+2026-09-13: `grn_duty` and `po_duty` rotate monthly between Shasha (CR005) and Yu Jun (CR004);
+`payment_approver` and `storage_waiver_approver` are Jess; no delivery responsibility is configured
+anywhere else. The owner names the initial Delivery Duty holder once in `Workspace → Staff &
+Duties`; from then on every actionable order's collection owner is established automatically on
+the next Work feed load, cover follows the shared buddy-cover law, and handovers are formal. This
+is a staffing configuration, not a per-customer assignment. Closes when the assignment row exists.
+
 **Found 2026-09-09** on production, by walking the Payments entry point through to Invoices.
 
 React Query PAUSES a query rather than erroring it. A paused query reports

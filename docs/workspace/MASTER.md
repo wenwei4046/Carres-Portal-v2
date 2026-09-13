@@ -332,10 +332,11 @@ honest Work for admitted modules.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
   goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
-  Delivery Operation, established from the order's own recorded customer-contact owner (0487) when
-  that is an individual staff identity who was not covering that day, else the Delivery Duty
-  NORMAL holder when collection first became actionable, and kept until the balance is RM 0
-  (0489 · 0495 · 0498, owner ruling 2026-09-13) — owns the action
+  Delivery Operation, established from the order's own responsible person — the one the contact
+  record names since 0499 (resolved at write time from the current owner, the earliest qualifying
+  contact, or the Delivery Duty NORMAL holder; a shared login or a cover never becomes it) — else
+  the Delivery Duty NORMAL holder when collection first became actionable, and kept until the
+  balance is RM 0 (0489 · 0495 · 0498 · 0499, owner ruling 2026-09-13) — owns the action
   with the shared buddy-cover law and a formal handover door; `Payment Duty` is retired; the exact Invoice
   is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
   Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes

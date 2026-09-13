@@ -380,11 +380,16 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 Order's ordinary payment follow-up keeps one normal owner until the balance is fully paid. The
 system resolves that normal owner from the authoritative Responsible Delivery Operation when
 collection first becomes actionable (balance in the window, a missed promise, or a live Storage
-Invoice): **the order's own recorded customer-contact owner** — the Operation person named on the
-earliest Delivery contact record for that order (0487 `ops_delivery_contacts`, a contact with the
-customer first, else the arrangement with the partner; Delivery MASTER §5.1) **provided that
-person is an individual staff identity (a People record — `staff_code`), never a shared role
-login, and was not acting as Delivery Duty buddy cover on the day of the contact** — and otherwise
+Invoice): **the order's own responsible person, by the ONE arithmetic Delivery and Payment share**
+(`delivery_order_responsible_individual`, 0499) — the order's current collection owner, else the
+**responsible person named on the earliest Delivery contact record** for that order (0487
+`ops_delivery_contacts`, a contact with the customer first, else the arrangement with the partner;
+Delivery MASTER §5.1). Since 0499 that person is resolved by the database when the contact is
+written — never the recorder as such: the contact's `contact_owner_user_id` is the NORMAL
+responsible Operation person (an individual staff identity, a People record with a `staff_code`,
+never a shared role login), its `acting_user_id` is today's Delivery Duty buddy cover on that
+person or the person themself, and `recorded_by` is whoever wrote it. A contact's responsible
+person counts only when they were not acting as Delivery Duty cover on the contact day. Otherwise
 the Delivery Duty NORMAL holder on that day (Delivery MASTER §13.1, the routine customer-contact
 rule), never the cover. The result is written once to `payment_collection_owners` (append-only)
 with its basis in the row's reason (0489 · 0495 · 0498). The owner does not rotate every day — a changed
@@ -1904,9 +1909,52 @@ contact establishes nobody and the order falls to the Delivery Duty NORMAL holde
 contacted by Yu Jun (individual, not covering) → **Yu Jun**; `SO-1321` contacted by Yu Jun while
 covering Shasha → **Shasha** (the normal holder, from the duty rule, not the cover); `SO-1358`
 contacted by the shared `Operations` login → Shasha (duty), `contacts_not_qualifying 2`.
-**Remaining Delivery gap (reported, not changed here):** the contact writer cannot record a
-responsible owner distinct from the recorder and does not resolve cover; until it does, Payment's
-guard is what keeps the collection owner honest. No Payment UI change; no rotating owner.
+**CLOSED by 0499 (below):** the contact writer now records the responsible person, the acting
+person and the recorder as three facts, and Payment reads the same arithmetic.
+
+### OWNER INSTRUCTION — a contact names its responsible person, its acting person and its recorder, 2026-09-13
+
+**RULING.** Automatic, stable customer-payment ownership is the outcome; a guard that leaves every
+real order unassigned does not deliver it. The authoritative customer-contact flow distinguishes
+the **normal responsible Operation person**, **today's acting person or buddy cover**, the
+**actual recorder** and **partner provenance**, reusing the shared staff, duty, cover and handover
+authorities; Payment reads that responsibility consistently; permanent responsibility is never
+inferred merely from the earliest recorder; a shared Operations login may record evidence but
+never becomes the normal owner; the normal owner is preserved through cover.
+
+**BUILT — migration `0499_a_contact_names_its_responsible_person_its_acting_person_and_its_recorder`.**
+`ops_delivery_contacts` gains `acting_user_id` and `owner_basis`; ONE arithmetic
+`delivery_order_responsible_individual(order, on)` (current collection owner → earliest contact
+whose responsible person is an individual who was not covering that day → nothing) is shared by
+`delivery_contact_responsibility(order, recorder, on)` (normal := that person, else the
+`delivery_duty` NORMAL holder on the day, else the recorder only when they are an individual who
+is not covering, else unresolved; acting := the `delivery_duty` cover on the normal person, else
+the normal person) and by `payment_collection_owner_establish` (that person, else the Delivery
+Duty NORMAL holder, else unresolved). A BEFORE INSERT trigger applies the arithmetic to every
+contact whoever writes it — a supplied owner is only the recorder candidate. Historical contact
+rows are not rewritten; they establish nobody, exactly as under 0498. The Worker's contact writer
+asserts only `recorded_by`; no Payment UI change; the Monitor, My Work, Team Work, Quick Rail and
+the collection workspace keep reading the one `payment_collection_owner_context`.
+
+**VERIFIED on a real PostgreSQL running the whole chain** (`apps/api/src/test/collection-owner-responsibility.integration.test.ts`,
+7 cases): shared login + no holder → contact kept, owner unresolved, nothing established ·
+holder Shasha + shared-login contact → responsible Shasha, acting Shasha, recorder the shared login,
+Payment establishes Shasha, a later day/contact/reload rotates nothing · cover Yu Jun on Shasha →
+the cover's own contact names Shasha responsible and Yu Jun acting, the context says normal Shasha ·
+cover Yu Jun · acting Yu Jun, and work returns to Shasha when the cover ends · no holder: a cover's
+contact establishes nobody, her own contact after the cover establishes her, and a later shared-login
+contact follows the established owner · partner provenance rides with the record · a formal
+handover appends new owner · previous owner · reason · changed by, the history keeps both rows, a
+later contact follows the new owner, and an ordinary account cannot hand over · an order with no
+contact is established from the holder; no contact anywhere names a shared login as owner.
+
+**What remains is a one-time staffing configuration, not a per-customer assignment:** production
+has no `delivery_duty` holder (measured 2026-09-13: `grn_duty` and `po_duty` rotate monthly between
+Shasha and Yu Jun; `payment_approver` and `storage_waiver_approver` are Jess; no delivery
+responsibility is configured anywhere else — no HR position duty, no order assignee). Until the
+owner names the initial Delivery Duty holder in Staff & Duties, every order's contact is recorded
+with an unresolved responsible person and the Monitor prints `Nobody holds Delivery Duty.`; the
+moment a holder is set, the next feed load establishes every actionable order's owner automatically.
 
 ### OWNER CORRECTION — the collection owner is the order's own customer-contact owner, 2026-09-13
 

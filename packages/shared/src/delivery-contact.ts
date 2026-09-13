@@ -99,7 +99,12 @@ export interface DeliveryContactRow {
   purpose_key: DeliveryContactPurposeKey;
   channel: DeliveryContactChannelKey;
   contacted_person: "customer" | "partner";
+  /** 0499 — the NORMAL responsible Operation person (an individual), resolved by the database. */
   contact_owner_user_id: string | null;
+  /** 0499 — who acts today: the delivery_duty cover on the normal person, else the normal person. */
+  acting_user_id?: string | null;
+  /** 0499 — how the owner was resolved. */
+  owner_basis?: "collection_owner" | "established_contact" | "delivery_duty" | "recorder" | "unresolved" | null;
   contacted_at: string;
   result_key: DeliveryContactResultKey;
   reply_evidence_path: string | null;
