@@ -418,7 +418,10 @@ export function projectPaymentCollectionWork(input: {
     if (!broken && timing.kind !== "due" && timing.kind !== "late") return [];
     if (!owing) return [];
     const promisedIso = broken ? latest!.promised_date! : null;
-    const dueIso = promisedIso ?? clock.dueIso;
+    // The item is due the day the OWNER acts (their working day on or before
+    // the company-calendar deadline — owner ruling 2026-09-13); a promise is
+    // the customer's own day.
+    const dueIso = promisedIso ?? clock.actionDueIso;
     const late = broken || timing.kind === "late";
     const owner = input.paymentDuty;
     const workItem: WorkItem = {
@@ -486,8 +489,8 @@ export function projectStorageInvoiceWork(input: {
     seen.add(invoice.order_id);
     const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
     const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
-    const dueIso = clock.dueIso;
-    const late = !!dueIso && input.today > dueIso;
+    const dueIso = clock.actionDueIso;
+    const late = !!clock.dueIso && input.today > clock.dueIso;
     const workItem: WorkItem = {
       ruleKey: "payment.send_storage_invoice",
       module: "payment",

@@ -160,12 +160,23 @@ Editable by authorised Manager permission; asking must start earlier than the de
 Every change records old value · new value · effective from · changed by · changed on · reason.
 A clock runs under the rule in force on the day it started — the invoice's issue day — so an
 existing clock keeps its snapshot by construction and a new rule affects only new clocks from its
-effective date. The count runs on the delivery week (Mon–Sat, Malaysian holidays); **Operation
-does not work on Saturday**: an ask day or deadline that lands on Saturday, Sunday or a public
-holiday moves to the previous working day. Date facts (the delivery day itself) stay visible;
-no Saturday Operation action is invented. Logistics Partner DO lead time is Delivery's own
-setting (`Delivery Settings → Logistics Partners → Delivery Order needed {n} working day(s)
-before Confirmed Delivery`) and does not live here.
+effective date. **Two calendars, one clock (owner ruling 2026-09-13):**
+
+```text
+Calculate the Payment deadline (and the ask day) from the configured company calendar —
+  the delivery week (Mon–Sat) with Malaysian public holidays. These are FACTS and never move.
+Schedule the actual customer-contact ACTION on the resolved action owner's governed working
+  days — when a fact day is not one the owner works, the action moves to the owner's previous
+  working day.
+```
+
+Operation does not work on Saturday, so an Operation-held Payment Duty acts on Friday for a
+Saturday deadline while the Monitor still names the Saturday (`Payment due Saturday, 12 Sep`) and
+the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
+future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
+day gives each owner its own governed previous working day. Logistics Partner DO lead time is
+Delivery's own setting (`Delivery Settings → Logistics Partners → Delivery Order needed {n}
+working day(s) before Confirmed Delivery`) and does not live here.
 
 ### The collection workspace
 
@@ -531,14 +542,32 @@ Owner ruling 2026-09-12, delivered as one slice (migration `0486`):
     recorded` and `free days 14 → free days 7`.
   - `POST /api/operation/payment-approvals/{orderId}` with the signed-in token → **410**
     `no_unpaid_delivery_approval`.
-  - 🔴 **FOUND, NOT MINE, NOT FIXED HERE:** `GET /api/operation/work` answers **500** —
-    `Could not find the table 'public.issue_actions'`. The Issue Tracker lane's migration
-    `0454_an_issue_action_has_one_identity_and_one_result.sql` is merged on `main` and the
-    feed reads its table, but it was never applied to production. My Work, Team Work, the
-    Quick Rail counts and therefore the Monitor's owner avatars are dark until it is applied.
-    A rolled-back production probe of the exact file passed (table created; 0 rows backfilled;
-    0 `ops_tasks` cancelled — production holds 0 issues); applying it is the other lane's
-    governed step and is recorded as an owed action, not done silently here.
+
+### CONVERGENCE — the Work feed restored, the approvers configured, the two-calendar clock, 2026-09-13
+
+- **`GET /api/operation/work` was 500 in production** — `public.issue_actions` did not exist:
+  the Issue Tracker lane's `0454_an_issue_action_has_one_identity_and_one_result.sql` was merged
+  but never applied. Under the owner's explicit, limited authorisation it was applied through
+  the governed production door after re-checking the committed file's checksum
+  (`f1575745…`, identical on `origin/main` and disk) and the rolled-back probe (0 issues → 0
+  backfilled actions, 0 `ops_tasks` cancelled). Tracker tail `0454…`; the feed answers 200 with
+  215 items. Issue Tracker business behaviour was not touched.
+- **Duties configured** (owner ruling 2026-09-13 — Jess is the approver until a Manager is
+  assigned; the production staff identity `Jess <jess@carres.com>` is unambiguous): effective-dated
+  `workspace_duty_assignments` rows `payment_approver → Jess` and `storage_waiver_approver → Jess`
+  from 2026-09-13, written through `workspace_assign_duty` with the ruling as the note. **Payment
+  Duty is deliberately NOT assigned** — no authoritative assignment exists; the Monitor prints the
+  configuration exception `Payment Duty is not assigned · Staff & Duties` beside the action
+  (never a blank avatar, never an invented owner), and Work keeps the item under the duty word.
+- **The calendar rule corrected** (`collection-clock.ts`): the deadline/ask are company-calendar
+  facts (`dueIso` / `askIso`); the owner's action days (`actionDueIso` / `actionAskIso`) come from
+  the resolved owner's governed working days (`OwnerCalendar`, default the Operation week). Tests
+  cover: Operation owner unavailable Saturday → previous working day · owner configured to work
+  Saturday → Saturday action remains · Sunday/holiday → each owner's governed result · a
+  historical clock keeps its rule snapshot. The Work item's due date is the owner's action day.
+- **Non-blocking carry-forward:** `Print {n} receipts` prints the selected receipts one by one
+  through the governed receipt-document door; one merged PDF package is an improvement recorded
+  in `docs/carry-forwards.md`, not part of this closure.
 
 
 **OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is

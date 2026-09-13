@@ -19,7 +19,7 @@
  * Work feed (the one owner calculation). This module words the facts in
  * Primary School English, verbatim from the ruling.
  */
-import { collectionTimingFor, type CollectionTimingRule } from "./collection-clock";
+import { collectionTimingFor, type CollectionTimingRule, type OwnerCalendar } from "./collection-clock";
 import {
   invoiceArrivalDayWord,
   invoicePaymentTiming,
@@ -273,8 +273,12 @@ export interface MonitorTiming {
   /** Line 2 — the governed action, or null when nothing is asked of anyone. */
   action: MonitorAction | null;
   late: boolean;
+  /** The deadline and ask day — FACTS on the company calendar. */
   dueIso: string | null;
   askIso: string | null;
+  /** The days the OWNER acts — the Work item's due date. */
+  actionDueIso: string | null;
+  actionAskIso: string | null;
 }
 
 export function monitorTiming(input: {
@@ -286,6 +290,8 @@ export function monitorTiming(input: {
   timingRules?: ReadonlyArray<CollectionTimingRule> | null;
   /** The customer's latest standing promise (`will_pay_on_date`), if any. */
   promisedIso?: string | null;
+  /** The action owner's governed working days; absent ⇒ the Operation week. */
+  owner?: OwnerCalendar;
 }): MonitorTiming {
   const money = soRemaining(input.rows as InvoiceRegisterRow[], input.door.order_id);
   // The clock a collection runs under is the one in force the day the
@@ -293,8 +299,8 @@ export function monitorTiming(input: {
   const clockStart = input.door.issued_at?.slice(0, 10) ?? input.todayIso;
   const timing = collectionTimingFor(input.timingRules, clockStart);
   const { timing: t, clock } = invoicePaymentTiming(
-    input.door, input.todayIso, input.opts, input.rows as InvoiceRegisterRow[], timing);
-  const base = { dueIso: clock.dueIso, askIso: clock.askIso };
+    input.door, input.todayIso, input.opts, input.rows as InvoiceRegisterRow[], timing, input.owner);
+  const base = { dueIso: clock.dueIso, askIso: clock.askIso, actionDueIso: clock.actionDueIso, actionAskIso: clock.actionAskIso };
   if (!money.known) {
     return { kind: "value_unknown", fact: "Value not recorded", action: null, late: false, ...base };
   }
@@ -319,7 +325,13 @@ export function monitorTiming(input: {
     return { kind: "should_have_paid", fact: "Payment should have been received", action: ask, late: true, ...base };
   }
   if (clock.attention === "t2") {
-    return { kind: "due_today", fact: "Payment due today", action: ask, late: false, ...base };
+    // The deadline is a FACT on the company calendar; the owner acts on their
+    // own working day. `Payment due today` only when today IS the deadline —
+    // on the owner's earlier action day the fact names the deadline's day.
+    const fact = clock.dueIso === input.todayIso
+      ? "Payment due today"
+      : `Payment due ${monitorDayWord(clock.dueIso!)}`;
+    return { kind: "due_today", fact, action: ask, late: false, ...base };
   }
   if (clock.attention === "t3") {
     return { kind: "ask_today", fact: "Ask customer today", action: ask, late: false, ...base };
@@ -358,6 +370,8 @@ export interface PaymentMonitorInput {
   timingRules?: ReadonlyArray<CollectionTimingRule> | null;
   /** Latest standing promise per order (`will_pay_on_date`). */
   promisedByOrder?: ReadonlyMap<string, string>;
+  /** The action owner's governed working days; absent ⇒ the Operation week. */
+  owner?: OwnerCalendar;
 }
 
 /**
@@ -387,7 +401,7 @@ export function paymentMonitorRows(input: PaymentMonitorInput): PaymentMonitorRo
     const promisedIso = input.promisedByOrder?.get(orderId) ?? null;
     const timing = monitorTiming({
       door, rows: input.invoices, storage, todayIso: input.todayIso, opts: input.opts,
-      timingRules: input.timingRules, promisedIso,
+      timingRules: input.timingRules, promisedIso, owner: input.owner,
     });
     out.push({
       orderId,
