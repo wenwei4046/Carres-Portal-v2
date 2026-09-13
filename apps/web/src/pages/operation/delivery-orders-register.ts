@@ -290,6 +290,7 @@ export interface DoRegisterRow {
    *  Journey's last leg; and the leg's route (`Klang WH → JB transit`). */
   leg: number;
   lastLeg: number;
+  intermediateLeg?: boolean;
   legRoute: string | null;
   /** THIS TRIP's goods lines (trip_groups NULL = the whole order). */
   lines: Array<{ id?: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }>;

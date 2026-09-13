@@ -1453,3 +1453,7 @@ Card 12’s representative manager save is now verified as principal on the exis
 ### Document ownership correction · Card 22 · build pending
 
 The SO-1362 acceptance read found that an intermediate DO borrowed its sibling final DO’s signed document from the order mirror. Card 22 binds signed-file presence, download and review timestamps to the exact DO, using document-bound evidence or an explicitly matching order mirror. Intermediate arrivals retain their own recorded photos and show no customer signed-paper demand. This is a read correction with no migration or Unit write; production closure remains pending.
+
+### Production convergence checkpoint · 2026-09-14
+
+All five production surfaces converged to `9dd3945b8d451e142d223752bbe91f243357bd0e`. Authenticated checks confirm the intermediate SO-1362 DO is Arrived, each DO uses its own source warehouse, and customer delivery/partner/proof reports exclude the intermediate trip while warehouse handovers retain it. Both legacy warehouse-pick application doors return 410 without changing the fixture order or allocation. Database 0501 is recorded, its three retired functions are absent, and the post-migration derived-total refusal probe rolled back with qty 4 / reserved 2 unchanged. Exact observations are appended to Card 21. Signed-file ownership and the Register’s remaining intermediate proof absence are Card 22 work; SO-number door deployment acceptance and the dealer POS staff-PIN login remain outstanding at this checkpoint.

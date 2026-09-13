@@ -235,13 +235,14 @@ type ViewerPick = { row: DoRegisterRow; kind: "photo" | "video" } | null;
  * voided before anything came back", and inventing one to fill a cell is how a
  * dictionary rots, so the cell simply says nothing.
  *
+ * Intermediate warehouse trips likewise owe no customer delivery proof.
  * It is NOT silent when files exist: a document voided AFTER a driver sent
  * something still shows what was sent. Those are recorded facts and a void
  * never erases them.
  */
-function voidedWithNothingSubmitted(r: DoRegisterRow): boolean {
+function noSubmissionDueOrRecorded(r: DoRegisterRow): boolean {
   return (
-    r.status.kind === "cancelled" &&
+    (r.status.kind === "cancelled" || r.intermediateLeg === true) &&
     r.submission.photos === 0 &&
     r.submission.videos === 0 &&
     !r.signedDoPresent
@@ -255,9 +256,11 @@ function voidedWithNothingSubmitted(r: DoRegisterRow): boolean {
  * would be a second arithmetic (Law D).
  */
 function submissionSearchText(r: DoRegisterRow): string {
-  if (voidedWithNothingSubmitted(r)) return "";
+  if (noSubmissionDueOrRecorded(r)) return "";
   const reached = r.latestResult === "delivered" || r.latestResult === "partial";
-  const media = !r.submission.known
+  const media = r.intermediateLeg && r.submission.photos === 0 && r.submission.videos === 0
+    ? ""
+    : !r.submission.known
     ? DOR_COPY.notRecorded
     : r.submission.photos === 0 && r.submission.videos === 0
       ? reached
@@ -269,8 +272,8 @@ function submissionSearchText(r: DoRegisterRow): string {
         ]
           .filter(Boolean)
           .join(" · ");
-  const paper = r.signedDoPresent ? DOR_COPY.signedDoOnFile : DOR_COPY.noSignedDo;
-  return `${media} · ${paper}`;
+  const paper = r.signedDoPresent ? DOR_COPY.signedDoOnFile : r.intermediateLeg ? "" : DOR_COPY.noSignedDo;
+  return [media, paper].filter(Boolean).join(" · ");
 }
 
 /** A count button: the number is the ledger's own, never a placeholder. */
@@ -332,12 +335,12 @@ function DriverSubmissionCell({
     unbound > 0 ? `${unbound} ${DOR_COPY.unboundNote}` : undefined;
 
   /* Nothing was ever due and nothing ever came — the pill already said why. */
-  if (voidedWithNothingSubmitted(row)) return null;
+  if (noSubmissionDueOrRecorded(row)) return null;
 
   return (
     <span className="block min-w-0">
       <span className="flex items-center gap-1 truncate">
-        {!known ? (
+        {row.intermediateLeg && photos === 0 && videos === 0 ? null : !known ? (
           <Absent>{DOR_COPY.notRecorded}</Absent>
         ) : photos === 0 && videos === 0 ? (
           <span title={unboundTitle}>
@@ -369,7 +372,7 @@ function DriverSubmissionCell({
         )}
       </span>
       <span className="block truncate text-label font-normal">
-        <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} />
+        {!row.intermediateLeg || row.signedDoPresent ? <SignedDeliveryDocumentLink doNumber={row.doNumber} present={row.signedDoPresent} /> : null}
       </span>
     </span>
   );
@@ -832,6 +835,7 @@ export default function DeliveryOrdersRegister() {
         searchValue: (r) => submissionSearchText(r),
         exportValue: (r) => submissionSearchText(r),
         filterValue: (r) => {
+          if (r.intermediateLeg) return submissionSearchText(r);
           const reached = r.latestResult === "delivered" || r.latestResult === "partial";
           if (!reached) return DOR_COPY.notDelivered;
           if (!r.submission.known) return DOR_COPY.notRecorded;

@@ -6,9 +6,9 @@ Authority: the owner’s Delivery convergence request; Delivery MASTER Card 14 o
 
 The legacy `warehouse` and `transfer-ready` API routes call `operation_warehouse_pick`, which can call `_operation_reserve_order` and attempts to write derived stock totals. Close both application doors with 410 and remove the drawer’s Transfer to ready act. Reservation remains with the governed Ready Stock journey and its exact Unit selection. No Unit, warehouse, order stage or stock total is changed by this retirement.
 
-- [ ] API refusal tests including permission and no database calls
-- [ ] Remove the obsolete drawer act
-- [ ] Green CI, merge, exact-SHA deploy and authenticated refusal proof
+- [x] API refusal tests including permission and no database calls
+- [x] Remove the obsolete drawer act
+- [x] Green CI, merge, exact-SHA deploy and authenticated refusal proof
 - [ ] Database RPC retirement: separate reviewed SQL; not complete until tracker/all-branch maximum, rolled-back positive/negative probes and production application are verified
 
 Migration: no database change in the application retirement PR. The existing RPC remains a separate outstanding database boundary; do not claim it is retired by HTTP refusal alone.
@@ -91,3 +91,18 @@ Delivery/Outbound door are untouched.
 - [ ] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
 - [ ] Typecheck ×3, design guard, `pnpm ci:migrations`
 - [ ] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 404) → Delivery MASTER §16 closure
+
+## Supplemental convergence verification · 2026-09-14
+
+- PR #1288 merged a38d77c8e0bbf6dafcbb2222b3fcf62ece09e7c5 after full CI (shared 3,297 + API 3,229 + web 4,620 = 11,146 tests), all other required checks green. It returns HTTP 410 warehouse_pick_retired from both obsolete application doors before a DB call, and removes Transfer to ready from the drawer.
+- Card 19 PR #1291 merged 334c3720a4d7396f7f53048834559207db5acfd1 after green CI; Card 21 database PR #1292 merged a5646d2d961dab852f44c2cd8dcfc19a5e0483a1 after green CI.
+- At 00:30 MYT, authenticated production SQL read found no public functions named operation_warehouse_pick, _operation_reserve_order or operation_receive_po_line; stock_balances_derived_only has tgenabled O. Tracker records 0501_the_warehouse_pick_writer_is_retired at version 20260913162841. The existing database workstream applied this migration; this acceptance work adds no competing SQL.
+- Post-0501 negative control at 00:34 MYT: with carres.stock_rollup=off and statement/lock timeouts, an attempted reserved+1 for JAGER-SS / warehouse 00000000-0000-0000-0000-000000000c03 raised P0001 detail stock_total_is_derived. The guarded probe would fail if no refusal or a different detail occurred. The transaction rolled back and re-read remained qty 4 / reserved 2.
+- Existing Journey Unit id-dtd627907 is UUID b384b3bf-70df-4956-a174-c4eae677c989, JAGER-SS, sold, same warehouse c03, reserved_ref SO-1362, sold_order_id db9c939a-ebb7-4836-a2b8-866770728822. Its page retains NETS→AL handover and reserved→sold history.
+- Before deployment, Operation SO-1340 Monitor smoke showed all four governed sections; draft date change cancelled back to unconfirmed; logistics edit cancelled. No order, date or logistics facts saved.
+
+Exact-SHA application convergence and final authenticated UI/API observations remain pending.
+
+At 00:36 MYT all five surfaces converged exactly to 9dd3945b8d451e142d223752bbe91f243357bd0e (deploy run 34767793794 success). Authenticated Operation API calls to both obsolete endpoints returned HTTP 410 warehouse_pick_retired. SO-1362 allocation JSON and order id/so/status/operation_stage/warehouse_id/delivered_at/do_number were identical before/after; order remains delivered. Intermediate DO-130926-0842 now shows Arrived in the header, Delivery history, Evidence and current attempt in History; source warehouse Carres Klang Warehouse; no customer proof attach/review actions. Borrowed sibling signed-file display remains visibly pending Card 22.
+
+On 9dd3945b, final DO-130926-3223 remains Delivered and its Warehouse is JB transit warehouse. Register shows DO-0842 Arrived / JB transit warehouse and DO-3223 Delivered. Reports for Sep 2026: Delivery Commitment Performance and First Delivery Success each contain only DO-3223 (one customer delivery); Logistics Partner Performance contains AL 1 trip / 1 delivered / 0 failed and no NETS customer delivery. Warehouse Performance retains both leg handovers separately. Delivery Proof Control contains only final DO-3223. All ten report sections rendered.

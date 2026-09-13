@@ -19,3 +19,5 @@ No migration, no new file upload, no status/stock/Unit write. Reuse the existing
 Deployment reliability: the preceding production run for `50680e5e` failed when the Purchasing calendar test’s module-level TODAY was captured before MYT midnight and the page rendered after midnight. Freeze Date alone to the fixture instant in that test suite; timers remain real. The 126-test suite passes with a fixed clock. No Purchasing runtime logic changes.
 
 Local validation: shared proof projection 10 tests, signed-document API 36 tests, and seven web suites 359 tests passed (including the 126-test fixed-clock Purchasing suite). Workspace typecheck and lint passed. Full CI and production acceptance remain pending.
+
+Authenticated acceptance of the preceding 9dd3945b deployment also found that Register’s Driver submission cell and filter still demanded customer proof from intermediate arrivals. Apply the same intermediate-leg rule to the cell, search/export and filter; retain recorded photos. The page regression covers both empty and recorded-photo intermediate documents.
