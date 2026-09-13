@@ -25,8 +25,8 @@
 
 ## Tasks
 
-- [ ] Per-leg DO issuance through the one path; per-leg results
-- [ ] Returned-goods receipt as an Inbound arrival source
-- [ ] Leg rows in the Warehouse schedule feed and Outbound
+- [x] Per-leg DO issuance through the one path; per-leg results — 0491: `ops_delivery_orders.leg` (one live document per scope), `delivery_attempts.leg`, `delivery_leg_document_mint`, `delivery_attempt_record(p_leg)` admitting an intermediate leg's arrival; `attemptLegDocumentIssue` (same gate, number seeded on order + leg) hooked on the leg arrangement save; the one-live-claim guard re-read per order; Monitor leg rows carry the leg document and the shared ladder; the DO object prints `Route` and offers `Arrived` on an intermediate leg
+- [x] Returned-goods receipt as an Inbound arrival source — 0490 lands the Stock draft (`arrival_sources`, units, events, `receiving_arrival_post`…) with `attempt_id`; the attempt door plans ONE `Failed Delivery return` arrival for the visit's undelivered reserved Units; Inbound names it `DO No`; the immediate inspection hold is retired
+- [x] Leg rows in the Warehouse schedule feed and Outbound — the feed admits a leg whose own document exists (matched by (order, leg)); Outbound reads the same feed; the feed's delivery door is the Monitor row (Edit Delivery retired)
 - [ ] Tests, probes, typecheck, design guard
 - [ ] PR → merge → apply → deploy → authenticated production verification

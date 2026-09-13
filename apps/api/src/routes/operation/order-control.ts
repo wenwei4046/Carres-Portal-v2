@@ -729,8 +729,8 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
   const { data, error } = await sb.rpc("delivery_attempt_record", {
     p_order_id: idCheck.data,
     p_result: parsed.data.result,
-    p_reason_key: parsed.data.reasonKey,
-    p_where_goods: parsed.data.whereGoods,
+    p_reason_key: parsed.data.reasonKey ?? null,
+    p_where_goods: parsed.data.whereGoods ?? null,
     p_note: parsed.data.note ?? null,
     p_delivered_item_ids: parsed.data.deliveredItemIds,
     p_returned: parsed.data.returned.map((r) => ({
@@ -738,6 +738,8 @@ orderControlRouter.post("/:id/delivery-attempt", async (c) => {
       action: r.action,
       note: r.note ?? null,
     })),
+    // 0491 — the Delivery scope: a Journey leg records its own result.
+    p_leg: parsed.data.leg,
   });
   if (error) {
     const m = mapPgError(error);

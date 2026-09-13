@@ -587,6 +587,11 @@ export function buildDeliveryScopeRows({
   };
   const docByNumber = new Map<string, DeliveryOrderRow>();
   for (const d of deliveryOrders) docByNumber.set(d.do_number, d);
+  /* 0491 — a Journey leg's LIVE document, keyed by its scope. */
+  const legDocOf = (orderId: string, leg: number): DeliveryOrderRow | null =>
+    deliveryOrders.find(
+      (d) => d.order_id === orderId && (d.leg ?? 0) === leg && !d.voided_at,
+    ) ?? null;
   /* §6.1 — the review state over the SAME document row (Law D). */
   const proofRecords = groupProofRecords(proofReviews, attemptEvidence);
   const reviewOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): DoProofReview => {
@@ -739,6 +744,14 @@ export function buildDeliveryScopeRows({
         (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
       const legPartner = arrangement?.partner_name ?? stop.partner_name ?? null;
       const legTime = arrangement?.confirmed_time ?? null;
+      /* 0491 — since a leg carries its OWN document, its handover facts, its
+         own attempts and its own proof ride the same ladder as a whole-order
+         scope (Law D); a leg still without a document keeps the chain's own
+         status words. */
+      const legDoc = legDocOf(o.id, stop.leg);
+      const legFacts = factsOf(legDoc);
+      const legMissingProof = proofOf(legDoc, o);
+      const legReview = reviewOf(legDoc, o);
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
@@ -748,17 +761,39 @@ export function buildDeliveryScopeRows({
         logisticsName: legPartner,
         confirmedIso,
         confirmedTime: legTime,
-        doNumber: null,
+        doNumber: legDoc?.do_number ?? null,
         hasArrangement: Boolean(arrangement),
-        missingProof: proofOf(null, o),
-        proofReview: NO_PROOF_REVIEW,
+        missingProof: legMissingProof,
+        proofReview: legReview,
         arrangement,
-        handedOverAt: null,
-        receivedAt: null,
-        deliveryOrderId: null,
-        doIssuedAt: null,
+        handedOverAt: handoverClockOf(legDoc, "handed_over"),
+        receivedAt: handoverClockOf(legDoc, "received_by_logistics"),
+        deliveryOrderId: legDoc?.id ?? null,
+        doIssuedAt: legDoc?.issued_at ?? null,
         contacts: contactsByScope.get(`${o.id}#${stop.leg}`) ?? [],
-        status: legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
+        status: legDoc
+          ? deliveryWorkStatusOf(
+              {
+                partnerName: legPartner,
+                latestContact: latestContactOf(`${o.id}#${stop.leg}`),
+                callByDate: contactDueIso,
+                confirmedDate: confirmedIso,
+                confirmedTime: legTime,
+                hasDeliveryOrder: true,
+                expectedArrival: arrangement?.expected_arrival ?? null,
+                missingFacts: base.missingFacts,
+                todayIso: todayIso ?? null,
+                proof: {
+                  photoUploaded: legMissingProof.photo ? false : null,
+                  signedDoUploaded: legMissingProof.signedDo ? false : null,
+                  acceptedOn: legReview.state === "accepted" ? legReview.reviewedAt : null,
+                  review: { state: legReview.state, reason: legReview.reason },
+                },
+                ...legFacts,
+              },
+              DELIVERY_STATUS_SPELL,
+            )
+          : legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
       });
     }
   }

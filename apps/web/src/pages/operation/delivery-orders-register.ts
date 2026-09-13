@@ -282,6 +282,11 @@ export interface DoRegisterRow {
   signedDoPresent: boolean;
   /** §6.1 — Operation's review of this document's proof (0489). */
   proofReview: DoProofReview;
+  /** 0491 — the Delivery scope: 0 the whole order, 1..n a Journey leg; the
+   *  Journey's last leg; and the leg's route (`Klang WH → JB transit`). */
+  leg: number;
+  lastLeg: number;
+  legRoute: string | null;
   /** THIS TRIP's goods lines (trip_groups NULL = the whole order). */
   lines: Array<{ id?: string; sku: string; qty: number; attrs?: Record<string, unknown> | null }>;
   goodsSummary: string;
@@ -438,10 +443,17 @@ export function buildDoRegisterRow(
     signedDoPresent: Boolean(r.orders.do_file_path),
     proofReview,
   };
+  const leg = r.leg ?? 0;
+  const stops = r.orders.delivery_stops ?? [];
+  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
+  const stop = leg > 0 ? stops.find((s) => Number(s.leg) === leg) ?? null : null;
   return {
     id: r.id,
     doNumber: r.do_number,
     orderId: r.orders.id,
+    leg,
+    lastLeg,
+    legRoute: stop ? [stop.from_loc, stop.to_loc].filter(Boolean).join(" → ") : null,
     so: r.orders.so,
     customer: displayCustomerName(r.orders.customer_name ?? "") || "No customer name",
     /* The SAME `Requested Delivery Date` arithmetic Monitor and the Sales

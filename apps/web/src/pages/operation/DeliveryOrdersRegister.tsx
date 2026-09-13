@@ -405,6 +405,9 @@ function QueueAction({
       <DeliveryResultAction
         order={{ id: row.orderId, so: row.so, do_number: row.doNumber }}
         lines={row.lines}
+        leg={row.leg}
+        lastLeg={row.lastLeg}
+        legDestination={row.legRoute?.split(" → ").at(-1) ?? null}
       />
     );
   }

@@ -569,6 +569,30 @@ describe("DeliveryOrderPage", () => {
     });
   });
 
+  it("0491 — a Journey leg's document prints its route and records an ARRIVAL, never a delivery", () => {
+    const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
+    mount(
+      payload(
+        {
+          leg: 1,
+          orders: {
+            ...payload().deliveryOrder.orders,
+            delivery_stops: [
+              { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", status: "pending" },
+              { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", status: "pending" },
+            ],
+          },
+        },
+        { handoverEvents: received },
+      ),
+    );
+    expect(screen.getByText("Route")).toBeTruthy();
+    expect(screen.getByText("Klang WH → JB transit")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("do-result-primary-action"));
+    expect(screen.getByTestId("do-result-delivered")).toHaveTextContent("Arrived");
+    expect(screen.queryByRole("button", { name: "Delivered" })).toBeNull();
+  });
+
   it("the loan block renders only when a loan exists", () => {
     mount(payload());
     expect(screen.queryByText("Loan collection")).toBeNull();
