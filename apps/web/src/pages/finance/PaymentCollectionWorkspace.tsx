@@ -9,6 +9,7 @@ import {
   soRemaining,
 } from "@carres/shared/payment-invoice-register";
 import { collectionTimingFor, type CollectionTimingRule } from "@carres/shared/collection-clock";
+import { COLLECTION_OUTCOME_NEXT, COLLECTION_OUTCOME_WORD } from "@carres/shared/payment-collection-outcome";
 import { myHolidaySet } from "@carres/shared/my-holidays";
 import InvoiceRecordPayment from "./InvoiceRecordPayment";
 import InvoiceAskToPay from "./InvoiceAskToPay";
@@ -16,8 +17,10 @@ import InvoicePaymentLink from "./InvoicePaymentLink";
 import InvoiceStorage from "./InvoiceStorage";
 import InvoiceCollectionResult from "./InvoiceCollectionResult";
 import InvoiceVoidReplace from "./InvoiceVoidReplace";
+import InvoiceCollectionOwner from "./InvoiceCollectionOwner";
 import CustomerStatement from "./CustomerStatement";
 import { useAuth } from "@/lib/auth";
+import { useCollectionOutcomes } from "@/lib/queries";
 import { apiFetch } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/pdf/render";
 import type { InvoiceTemplateData } from "@/lib/pdf/types";
@@ -153,19 +156,22 @@ export default function PaymentCollectionWorkspace({ invoice, rows, timingRules,
             correctionInFlight={rows.some((r) => r.order_id === invoice.order_id
               && r.kind !== "sales" && r.status === "draft" && r.replaces_invoice_id != null)}
             canStorage={role === "operation" || role === "principal"}
+            canReadOwner={role === "operation" || role === "principal"}
             canCorrect={role === "principal"} />}
   </>;
 }
 
 /** One continuous scroll — Money → Goods and Delivery → Storage → What to do
- *  → Invoice → Related Payments → Communication History. */
-function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight, canStorage = false, canCorrect = false }: {
+ *  → Collection owner → Invoice → Related Payments → Communication History. */
+function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight, canStorage = false, canReadOwner = false, canCorrect = false }: {
   invoice: InvoiceRegisterRow;
   facts: ReturnType<typeof collectionFactsOf>;
   onAsk?: () => void;
   onResult?: () => void;
   correctionInFlight: boolean;
   canStorage?: boolean;
+  /** 0489 — Operation/principal see the collection owner facts. */
+  canReadOwner?: boolean;
   /** 0476 — Void and replace. Shown to the principal only: the SQL admits the
    *  Payment Approver duty too, but the screen cannot resolve a duty, and an
    *  unauthorised person must never see the door. */
@@ -215,6 +221,10 @@ function InvoiceObject({ invoice, facts: f, onAsk, onResult, correctionInFlight,
           </span>
         </>}
       </Facts>
+      {/* 0489 — who owns this collection: normal owner · today's cover ·
+          acting person, from the Work feed's own read; the formal handover
+          door for a principal or manager. */}
+      <InvoiceCollectionOwner orderId={invoice.order_id} canRead={canReadOwner} />
       <Facts title="Invoice">
         <p>{invoice.invoice_no ?? "No invoice number yet — this is a draft."}</p>
         <p>{invoice.status === "issued" && invoice.issued_at ? `Issued · ${fmtDate(invoice.issued_at)}`
@@ -249,21 +259,39 @@ const MESSAGE_KIND_WORD: Record<string, string> = {
   other: "Message sent",
 };
 
-/** The immutable sent-message ledger (0434), newest first — the three-rank
- *  record grammar: what happened · when · the message that actually went. */
+/** Communication History — ONE continuous record, newest first: the sent
+ *  messages (0434) and the customer's recorded answers (0446 — promises,
+ *  disputes, no-answers, with the next-contact fact), so today's cover or a
+ *  new owner sees every earlier conversation and the customer is never
+ *  contacted twice by different staff (owner ruling 2026-09-13). */
 function Communications({ invoice }: { invoice: InvoiceRegisterRow }) {
-  const rows = (invoice.orders?.payment_communications ?? [])
-    .slice()
-    .sort((a, b) => (a.recorded_at < b.recorded_at ? 1 : -1));
-  if (!rows.length) return <p>No messages recorded yet.</p>;
-  return <div className="space-y-2">
-    {rows.map((m) => <details key={m.id}>
-      <summary className="cursor-pointer">
-        <span className="font-semibold">{MESSAGE_KIND_WORD[m.kind] ?? "Message sent"}</span>
-        <span className="ml-2 text-meta font-normal">{fmtDate(m.recorded_at, { time: true })}</span>
-      </summary>
-      <pre className="mt-1 whitespace-pre-wrap font-sans text-label font-normal">{m.message_text}</pre>
-    </details>)}
+  const outcomesQ = useCollectionOutcomes(invoice.id);
+  const messages = (invoice.orders?.payment_communications ?? []).map((m) => ({
+    key: `m-${m.id}`, at: m.recorded_at, kind: "message" as const, m,
+  }));
+  const outcomes = (outcomesQ.data?.outcomes ?? []).map((o) => ({
+    key: `o-${o.id}`, at: o.recorded_at, kind: "outcome" as const, o,
+  }));
+  const rows = [...messages, ...outcomes].sort((a, b) => (a.at < b.at ? 1 : -1));
+  if (!rows.length) return <p>{outcomesQ.isLoading ? "Loading…" : "No messages or results recorded yet."}</p>;
+  return <div className="space-y-2" data-testid="communication-history">
+    {rows.map((row) => row.kind === "message"
+      ? <details key={row.key}>
+          <summary className="cursor-pointer">
+            <span className="font-semibold">{MESSAGE_KIND_WORD[row.m.kind] ?? "Message sent"}</span>
+            <span className="ml-2 text-meta font-normal">{fmtDate(row.m.recorded_at, { time: true })}</span>
+          </summary>
+          <pre className="mt-1 whitespace-pre-wrap font-sans text-label font-normal">{row.m.message_text}</pre>
+        </details>
+      : <div key={row.key} data-testid="communication-outcome">
+          <p>
+            <span className="font-semibold">{COLLECTION_OUTCOME_WORD[row.o.outcome] ?? "Result recorded"}</span>
+            {row.o.promised_date && <span> · promised {fmtDate(row.o.promised_date)}</span>}
+            <span className="ml-2 text-meta font-normal">{fmtDate(row.o.recorded_at, { time: true })}{row.o.recorded_by_user?.name ? ` · ${row.o.recorded_by_user.name}` : ""}</span>
+          </p>
+          {row.o.note && <p className="text-label font-normal">{row.o.note}</p>}
+          <p className="text-label font-normal">Next: {COLLECTION_OUTCOME_NEXT[row.o.outcome] ?? "Ask again."}</p>
+        </div>)}
   </div>;
 }
 

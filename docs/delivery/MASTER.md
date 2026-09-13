@@ -820,6 +820,14 @@ Engine; the approved architecture correction is only that it gains its assignmen
 cover are configured only in `Workspace → Staff & Duties`. This is not a Delivery-local duty
 system.
 
+**The Responsible Delivery Operation owns the customer's money follow-up (owner ruling
+2026-09-13; Payment MASTER §10, migration 0489).** When a Sales Order's collection first becomes
+actionable, the Delivery Duty NORMAL holder on that day becomes that order's stable collection
+owner — the same person who contacts the customer about delivery asks for the money — and stays
+so until the balance is RM 0. Later duty rotation never moves it; only buddy cover (acting today)
+or a formal handover changes who acts. Delivery configures nothing extra for this: the Payment
+module reads the resolver on the first actionable day and keeps its own append-only owner record.
+
 When the resolver returns no active holder and no cover, the action stays visible in Team Work
 under its duty word and the surface prints the governed configuration failure with its door:
 `Nobody holds Delivery Duty.` and `Set the holder in Workspace → Staff & Duties`. The protected

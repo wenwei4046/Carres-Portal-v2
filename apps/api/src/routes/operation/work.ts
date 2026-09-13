@@ -38,6 +38,7 @@ import {
   orderActionLines,
   type OrderActionKey,
 } from "@carres/shared";
+import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
@@ -130,6 +131,9 @@ export function projectSalesOrdersFromModuleFacts(input: {
   stock: Array<{ sku: string; available: number }>;
   staff: Array<{ user_id: string; name: string | null; email: string }>;
   dutyResolutions: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
+  /** 0489 — the order's stable collection owner, per order; absent ⇒ the
+   *  `collect` rule fails closed under the Delivery Duty word. */
+  collectionOwnerFor?: (orderId: string) => WorkspaceDutyResolution | null;
   /** Logistics Partner names by id — `Call NETS`, never `Call logistics`,
    *  wherever the order names its company. */
   partnerNameById?: ReadonlyMap<string, string>;
@@ -219,7 +223,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
         so: row.so,
         picName: pic?.name ?? pic?.email ?? null,
         picUserId: picId,
-        dutyResolutions: input.dutyResolutions,
+        dutyResolutions: {
+          ...input.dutyResolutions,
+          ...(input.collectionOwnerFor?.(row.id) ? { collection_owner: input.collectionOwnerFor(row.id)! } : {}),
+        },
         salespersonName: row.salespersons?.name ?? null,
         askDeliveryDate:
           !row.delivery_date &&
@@ -400,7 +407,10 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
 
 export function projectPaymentCollectionWork(input: {
   invoices: readonly InvoiceRegisterRow[];
-  paymentDuty: WorkspaceDutyResolution | null;
+  /** 0489 — the order's stable collection owner (Responsible Delivery
+   *  Operation). Called once per admitted order, so a caller may also use
+   *  it to LEARN which orders are actionable today. */
+  ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
   today: string;
   /** §10 row 2 (0446): the recorded conversations. A promise the customer has
    *  already broken outranks the delivery window — the item then hangs off the
@@ -430,22 +440,22 @@ export function projectPaymentCollectionWork(input: {
     // the customer's own day.
     const dueIso = promisedIso ?? clock.actionDueIso;
     const late = broken || timing.kind === "late";
-    const owner = input.paymentDuty;
+    const owner = input.ownerFor(invoice.order_id);
     const workItem: WorkItem = {
       ruleKey: broken ? "payment.missed_promise" : "payment.collect_customer_balance",
       module: "payment",
       soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
       orderId: invoice.id,
       action: "Ask customer to pay",
-      ownerRule: "payment_duty",
-      ownerDutyKey: "payment_duty",
+      ownerRule: "collection_owner",
+      ownerDutyKey: "delivery_duty",
       normalOwner: owner?.normalOwner ?? null,
       activeCover: owner?.activeCover ?? null,
       actingPerson: owner?.actingPerson ?? null,
       ownerState: owner?.state ?? "not_assigned",
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
-      ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Duty" }),
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
       tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
@@ -485,9 +495,10 @@ export function projectStorageInvoiceWork(input: {
   invoices: readonly InvoiceRegisterRow[];
   today: string;
   timingRules?: readonly CollectionTimingRule[] | null;
-  /** The effective Delivery Duty resolution (Delivery MASTER §13.1). Absent
-   *  or unassigned ⇒ the duty word stands; never the PIC. */
-  deliveryDuty?: WorkspaceDutyResolution | null;
+  /** 0489 — the SAME stable collection owner the ordinary balance uses
+   *  (owner ruling 2026-09-13). Absent or unassigned ⇒ the Delivery Duty
+   *  word stands; never the PIC. */
+  ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
   const seen = new Set<string>();
@@ -501,14 +512,14 @@ export function projectStorageInvoiceWork(input: {
     const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
     const dueIso = clock.actionDueIso;
     const late = !!clock.dueIso && input.today > clock.dueIso;
-    const owner = input.deliveryDuty;
+    const owner = input.ownerFor(invoice.order_id);
     const workItem: WorkItem = {
       ruleKey: "payment.send_storage_invoice",
       module: "payment",
       soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
       orderId: invoice.id,
       action: "Send the invoice and collect payment",
-      ownerRule: "delivery_duty",
+      ownerRule: "collection_owner",
       ownerDutyKey: "delivery_duty",
       normalOwner: owner?.normalOwner ?? null,
       activeCover: owner?.activeCover ?? null,
@@ -1039,6 +1050,32 @@ async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<I
  * fabricated empty answer: a missed promise that cannot be read must not
  * quietly turn back into an ordinary balance.
  */
+/**
+ * 0489 — establish, then read, the stable collection owner of every order
+ * whose collection is actionable today. `establish` is idempotent (an order
+ * that has an owner is never touched) and writes nothing when Delivery Duty
+ * has no holder; `context` returns normal owner · today's cover · acting
+ * person · history. Both are the ONE door; no owner is computed here.
+ */
+async function establishAndReadCollectionOwners(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+  today: string,
+): Promise<Map<string, CollectionOwnerContextRow>> {
+  if (orderIds.length === 0) return new Map();
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const established = await sb.rpc("payment_collection_owner_establish", {
+    p_order_ids: [...orderIds], p_on: today,
+  });
+  if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  const context = await sb.rpc("payment_collection_owner_context", {
+    p_order_ids: [...orderIds], p_on: today,
+  });
+  if (context.error) throw new Error("Workspace collection-owner source could not be read");
+  const rows = (context.data ?? []) as CollectionOwnerContextRow[];
+  return new Map(rows.map((row) => [row.order_id, row]));
+}
+
 async function readCollectionOutcomes(c: Context<AppEnv>): Promise<CollectionOutcomeRow[]> {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
@@ -1254,18 +1291,16 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
-  const paymentDuty = dutyResolution(duties, "payment_duty", today);
   // §12 gives overpayment review to the Payment Approver, never to Payment
   // Duty — an unassigned approver leaves the item honestly ownerless.
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
   const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
   // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): every routine Delivery
-  // action resolves through the same shared resolver as PO and Payment Duty.
+  // action resolves through the same shared resolver as PO Duty.
   const deliveryDuty = dutyResolution(duties, "delivery_duty", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
-    ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
     ...(deliveryDuty ? { delivery_duty: deliveryDuty } : {}),
   };
   // Gate convergence (2026-09-07): the same invoices read that feeds the
@@ -1279,11 +1314,23 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       );
     }
   }
+  // 0489 — which orders' collection is actionable today is the projections'
+  // own admission; a probe pass learns the set, the door establishes the
+  // owner for any newcomer (Delivery Duty holder today) and the read answers
+  // the same stable owner for every later pass.
+  const actionable = new Set<string>();
+  const probe = (orderId: string) => { actionable.add(orderId); return null; };
+  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
+  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
+  const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], today);
+  const collectionOwnerFor = (orderId: string) =>
+    collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
   const orderItems = projectSalesOrdersFromModuleFacts({
     orders: orders.orders,
     stock: stock.skus,
     staff: staff.staff,
     dutyResolutions,
+    collectionOwnerFor,
     partnerNameById: new Map((purchasingSettings.deliveryPartners ?? []).map((p) => [p.id, p.name])),
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
@@ -1323,8 +1370,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes, timingRules });
-  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, deliveryDuty });
+  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });

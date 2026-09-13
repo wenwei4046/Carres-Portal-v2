@@ -269,7 +269,7 @@ export function invoicePaymentTiming(
    *  invoice's clock (owner ruling 2026-09-12). Absent ⇒ the ruled default. */
   timing?: CollectionTiming,
   /** The action owner's governed working days (owner ruling 2026-09-13).
-   *  Absent ⇒ the Operation week — Payment Duty is an Operation duty. */
+   *  Absent ⇒ the Operation week — the collection owner is Operation staff. */
   owner?: OwnerCalendar,
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);

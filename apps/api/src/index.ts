@@ -81,6 +81,7 @@ import financePaymentsRouter from "./routes/finance/payments";
 import financeReportsRouter from "./routes/finance/reports";
 import financeInvoicesRouter from "./routes/finance/invoices";
 import paymentSettingsRouter from "./routes/finance/payment-settings";
+import collectionOwnerRouter from "./routes/finance/collection-owner";
 import paymentStorageRouter from "./routes/finance/payment-storage";
 import financeRefundsRouter from "./routes/finance/refunds";
 import financePayablesRouter from "./routes/finance/payables";
@@ -267,6 +268,8 @@ api.route("/finance/payments", financePaymentsRouter);
 api.route("/finance/reports", financeReportsRouter);
 api.route("/finance/invoices", financeInvoicesRouter);
 api.route("/finance/payment-settings", paymentSettingsRouter);
+// 0489 — one Sales Order keeps one collection owner (owner ruling 2026-09-13).
+api.route("/finance/collection-owner", collectionOwnerRouter);
 api.route("/finance/payment-storage", paymentStorageRouter);
 api.route("/finance/refunds", financeRefundsRouter);
 // Money in that is not a sale (0478): other debtor invoices and receipts.

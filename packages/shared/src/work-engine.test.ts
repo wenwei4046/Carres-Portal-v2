@@ -68,7 +68,7 @@ describe("Payment MASTER — no blind collection Work", () => {
       openOrderActions({ ...waiting, stockEtaIso }), ctx, "2026-08-18", HOLS,
     );
     expect(itemsFor("2026-08-19").find((item) => item.ruleKey === "collect")).toMatchObject({
-      ownerRule: "payment_duty",
+      ownerRule: "collection_owner",
       dueIso: "2026-08-18",
     });
     expect(itemsFor(null).some((item) => item.ruleKey === "collect")).toBe(false);
@@ -176,7 +176,7 @@ describe("WORK_RULES — five parts, or no entry", () => {
     expect(byKey.get("issue_po")!.ownerRule).toBe("po_duty");
     expect(byKey.get("confirm_ready_date")!.ownerRule).toBe("po_duty");
     expect(byKey.get("ask_delivery_date")!.ownerRule).toBe("salesperson");
-    expect(byKey.get("collect")!.ownerRule).toBe("payment_duty");
+    expect(byKey.get("collect")!.ownerRule).toBe("collection_owner");
     expect(byKey.get("issue_delivery_order")!.ownerRule).toBe("system");
     expect(byKey.get("collect_loan_item")!.ownerRule).toBe("delivery_duty");
     expect(byKey.get("resolve_payment_exception")!.ownerRule).toBe("finance_duty");
@@ -267,7 +267,7 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
     expect(po.ownerDuty).toBe("Purchasing");
   });
 
-  it("Payment Duty with no assignment fails closed and never borrows the PIC", () => {
+  it("the collection owner with nothing established fails closed under the Delivery Duty word and never borrows the PIC", () => {
     const open = openOrderActions({
       ...baseSignals,
       hasLogistics: true,
@@ -283,10 +283,11 @@ describe("the Action Owner Engine resolution (§0.1, built 2026-08-27)", () => {
       HOLS,
     );
     const collect = items.find((i) => i.ruleKey === "collect")!;
-    expect(collect.ownerRule).toBe("payment_duty");
+    expect(collect.ownerRule).toBe("collection_owner");
     expect(collect.normalOwner).toBeNull();
     expect(collect.actingPerson).toBeNull();
-    expect(collect.ownerDutyKey).toBe("payment_duty");
+    expect(collect.ownerDutyKey).toBe("delivery_duty");
+    expect(collect.ownerDuty).toBe("Delivery Duty");
   });
 
   it("the missing customer promise composes `Ask for the delivery date` — the salesperson's work, a name without an account", () => {

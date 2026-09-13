@@ -69,7 +69,7 @@ hard-coded Jess/Manager identity or page-level cover calculation. People/HR supp
 employment and leave facts; Workspace owns Duty assignments; the Shared Duty Resolver combines
 them.
 
-Distinct Duties include Payment Duty, Storage Waiver Approver, Payment Approver, Purchasing
+Distinct Duties include Storage Waiver Approver, Payment Approver, Purchasing
 Approver, Delivery Charge Approver, Stock Adjustment Approver, Service Case Approver and, since
 the owner ruling of 2026-09-13, **Delivery Duty** (`delivery_duty`). There is no fake `ERP Owner`.
 
@@ -331,7 +331,10 @@ honest Work for admitted modules.
   context and is no longer presented as the universal owner of those actions.
 - Payment collection now enters from the complete issued-Invoice register, not a second Sales Order
   balance calculation. The shared readiness and collection clock admit only due/late balances whose
-  goods are ready or have a real arrival date; Payment Duty/cover owns the action, the exact Invoice
+  goods are ready or have a real arrival date; the order's ONE collection owner — the Responsible
+  Delivery Operation, established from the Delivery Duty holder when collection first became
+  actionable and kept until the balance is RM 0 (0489, owner ruling 2026-09-13) — owns the action
+  with the shared buddy-cover law and a formal handover door; `Payment Duty` is retired; the exact Invoice
   is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
   Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes
   it. The clock's ask/deadline pair is `Settings → Payments → Collection timing` (0486),

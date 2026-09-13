@@ -25,6 +25,11 @@ vi.mock("@/lib/queries", () => ({
   useLaterDeliveryRequests: () => state.requests,
   usePaymentSettings: () => state.settings,
   useOperationWork: () => state.work,
+  // 0489 — the collection owner section and the recorded results are read
+  // by the workspace; the Monitor tests pin the listing, not those reads.
+  useCollectionOwner: () => ({ data: { owner: null }, isLoading: false, isError: false }),
+  useWorkspaceDuties: () => ({ data: { can_assign: false, duties: [] }, isLoading: false, isError: false }),
+  useCollectionOutcomes: () => ({ data: { outcomes: [] }, isLoading: false, isError: false }),
   useCatalog: () => ({ data: { models: [{ id: "m1", name: "King Mattress" }], skus: [{ sku: "A", modelId: "m1" }] } }),
   useRecordPayment: () => ({ mutate: vi.fn(), isPending: false }),
   qk: { finance: {
@@ -180,7 +185,7 @@ describe("Payment Monitor — the listing", () => {
       object: { kind: "invoice", id: "i3", label: "INV-1" },
       problem: "Customer payment should have been received", action: "Ask customer to pay",
       recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
-      owner: { rule: "payment_duty", dutyKey: "payment_duty", normal: { userId: "u-shasha", name: "Shasha Tan" },
+      owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha Tan" },
         activeCover: null, acting: { userId: "u-shasha", name: "Shasha Tan" }, state: "primary" },
       timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
       destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
@@ -201,16 +206,39 @@ describe("Payment Monitor — the listing", () => {
       object: { kind: "invoice", id: "i3", label: "INV-1" },
       problem: "Customer payment should have been received", action: "Ask customer to pay",
       recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
-      owner: { rule: "payment_duty", dutyKey: "payment_duty", normal: null, activeCover: null, acting: null, state: "not_assigned" },
+      owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null, acting: null, state: "not_assigned" },
       timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
       destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
     }] };
     show();
     const late = screen.getByTestId("monitor-timing-1302");
-    expect(within(late).getByTestId("monitor-owner-unassigned")).toHaveTextContent("Payment Duty is not assigned");
+    expect(within(late).getByTestId("monitor-owner-unassigned")).toHaveTextContent("Nobody holds Delivery Duty.");
+    expect(late).not.toHaveTextContent("Payment Duty");
     expect(within(late).getByRole("link", { name: "Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
     expect(late).toHaveTextContent("Ask customer to pay");
     expect(screen.queryByTestId("monitor-owner-avatar")).not.toBeInTheDocument();
+  });
+
+  it("today's cover acts and the normal owner is kept beside it — two facts, never one name", () => {
+    state.work.data = { items: [{
+      id: "payment:i3:payment.collect_customer_balance", module: "payment",
+      ruleKey: "payment.collect_customer_balance",
+      object: { kind: "invoice", id: "i3", label: "INV-1" },
+      problem: "Customer payment should have been received", action: "Ask customer to pay",
+      recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
+      owner: { rule: "collection_owner", dutyKey: "delivery_duty", normal: { userId: "u-shasha", name: "Shasha" },
+        activeCover: { userId: "u-yujun", name: "Yu Jun" }, acting: { userId: "u-yujun", name: "Yu Jun" }, state: "covered" },
+      timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+      destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
+    }] };
+    show();
+    const late = screen.getByTestId("monitor-timing-1302");
+    const avatar = within(late).getByTestId("monitor-owner-avatar");
+    expect(avatar).toHaveAttribute("aria-label", "Yu Jun");
+    expect(avatar).toHaveAttribute("title", "Normal owner: Shasha · Today's cover: Yu Jun");
+    expect(avatar).toHaveAttribute("data-normal-owner", "Shasha");
+    expect(avatar).toHaveAttribute("data-cover", "Yu Jun");
+    expect(late).not.toHaveTextContent("Yu Jun");
   });
 
   it("no Work item for the SO → no invented owner", () => {

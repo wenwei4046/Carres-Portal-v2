@@ -3191,9 +3191,10 @@ feed wiring), and `workItemsForOrder` resolves the person per RULE instead of bo
 - **The PIC keeps what is truthfully the relationship owner's** — delay decision, logistics
   choice and calls (ACTION-FLOW Law 4 rung 2: the conversation is logistics', the closable ACTION
   is ours, and a partner has no login), today's run and its photo.
-- **`collect` records `payment_duty` as its rule** (payment/MASTER §5); no payment-duty roster
-  exists yet, so the PIC stands as governed COVER — money never sits unowned (the 2026-08-19
-  incident is why). When a payment-duty roster exists, only the resolver changes.
+- **`collect` records `collection_owner` as its rule** (payment/MASTER §10, owner ruling
+  2026-09-13): the Sales Order's ONE stable collection owner, the Responsible Delivery Operation,
+  established from the Delivery Duty holder when collection first became actionable (0489). It
+  never borrows the PIC; with nothing established the Delivery Duty word stands.
 - Completion facts, clocks, the two-line presentation and the duty-word honest-gap rule
   (`Delivery staff` · `Finance`) are unchanged. `WorkItem` gained `ownerUserId` so My Work
   filters on the RESOLVED account, and Team Work groups by account, then named person, then duty

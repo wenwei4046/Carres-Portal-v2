@@ -37,7 +37,7 @@ import ApOutstanding from "./payables/ApOutstanding";
  * `/finance/ar` and have the sidebar highlight the right tab.
  */
 export default function FinanceApp() {
-  // Payment MASTER §12 — operation staff (Payment Duty, Delivery Operation)
+  // Payment MASTER §12 — operation staff (the Responsible Delivery Operation)
   // reach ONLY the Payments Monitor and Payment Records here; every
   // finance-only page bounces them to the Monitor instead of rendering
   // finance controls.

@@ -174,7 +174,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       problem: "Customer balance due", action: "Ask customer to pay",
       recipient: ORDER.customer_name, requiredResult: "Outstanding balance reduced to RM 0",
       completionFact: "outstanding = RM 0",
-      owner: { rule: "payment_duty", dutyKey: "payment_duty",
+      owner: { rule: "collection_owner", dutyKey: "delivery_duty",
         normal: { userId: "u-sha", name: "Shasha Tan" }, activeCover: null,
         acting: { userId: "u-sha", name: "Shasha Tan" }, state: "primary" },
       timing: { dueOn: soon(8), workingDaysLate: 0, bucket: "later" },

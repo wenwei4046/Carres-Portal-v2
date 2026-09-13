@@ -10,7 +10,10 @@
 export const WORKSPACE_DUTIES = [
   { key: "po_duty", label: "PO Duty" },
   { key: "grn_duty", label: "GRN Duty" },
-  { key: "payment_duty", label: "Payment Duty" },
+  // `payment_duty` is RETIRED (owner ruling 2026-09-13, 0489): ordinary
+  // customer-balance collection is owned by the Responsible Delivery
+  // Operation, established from Delivery Duty. No caller remains, so the
+  // catalogue no longer offers the assignment.
   { key: "storage_waiver_approver", label: "Storage Waiver Approver" },
   { key: "purchasing_approver", label: "Purchasing Approver" },
   { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
