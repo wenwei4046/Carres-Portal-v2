@@ -30,12 +30,30 @@ export default mergeConfig(base, {
       output: asFile ? { format: "iife", inlineDynamicImports: true } : {},
     },
   },
-  plugins: asFile
-    ? [
-        {
-          name: "portable-file-html",
-          transformIndexHtml: (html: string) => html.replace(/ type="module"/g, " defer").replace(/ crossorigin/g, ""),
-        },
-      ]
-    : [],
+  plugins: [
+    /* The Carres lockup names its images by root path ("/carres-logo.png"),
+       which is right for the app at its own origin and wrong for a package
+       served under a folder or from a file. The packaging step rewrites those
+       two references to relative paths in the emitted chunks — reproducible,
+       never a hand edit of generated output. */
+    {
+      name: "portable-relative-lockup",
+      generateBundle(_options: unknown, bundle: Record<string, { type: string; code?: string }>) {
+        for (const chunk of Object.values(bundle)) {
+          if (chunk.type !== "chunk" || !chunk.code) continue;
+          chunk.code = chunk.code
+            .replace(/"\/carres-logo\.png"/g, '"./carres-logo.png"')
+            .replace(/"\/carres-wordmark\.webp"/g, '"./carres-wordmark.webp"');
+        }
+      },
+    },
+    ...(asFile
+      ? [
+          {
+            name: "portable-file-html",
+            transformIndexHtml: (html: string) => html.replace(/ type="module"/g, " defer").replace(/ crossorigin/g, ""),
+          },
+        ]
+      : []),
+  ],
 });
