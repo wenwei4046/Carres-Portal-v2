@@ -17,6 +17,9 @@
  * governed door (`PUT /delivery-arrangements/:orderId`), which decides the
  * later-date rule and records the customer contact in the same request.
  */
+// design-standard: not-a-list-page — this is the CHILD of a Monitor register
+// row (the expanded delivery brief), not a page. It has no destination, no
+// toolbar and no header of its own; the register above it owns all three.
 import { useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
