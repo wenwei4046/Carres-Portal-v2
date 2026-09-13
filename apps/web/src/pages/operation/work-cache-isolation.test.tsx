@@ -73,10 +73,10 @@ function collectItem(owner: OperationWorkItem["owner"]): OperationWorkItem {
   };
 }
 const UNASSIGNED: OperationWorkItem["owner"] = {
-  rule: "payment_duty", dutyKey: "payment_duty", normal: null, activeCover: null, acting: null, state: "not_assigned",
+  rule: "collection_owner", dutyKey: "delivery_duty", normal: null, activeCover: null, acting: null, state: "not_assigned",
 };
 const JESS_HOLDS: OperationWorkItem["owner"] = {
-  rule: "payment_duty", dutyKey: "payment_duty",
+  rule: "collection_owner", dutyKey: "delivery_duty",
   normal: { userId: JESS, name: "Jess" }, activeCover: null, acting: { userId: JESS, name: "Jess" }, state: "primary",
 };
 /** A delivery item I hold and am late on — the Quick Rail counts it under Late. */
@@ -252,7 +252,7 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     await waitFor(() => expect(within(timing).getByTestId("monitor-owner-unassigned")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId("legacy-tasks")).toHaveTextContent("tasks:1"));
 
-    // Management assigns Payment Duty; the feed now resolves Jess.
+    // The collection owner is established (Delivery Duty held); the feed now resolves Jess.
     state.work = { items: [collectItem(JESS_HOLDS), MINE], staff: [{ userId: ME, name: "Me", email: "me@carres.com" }], generatedOn: "2026-09-13" };
     await act(async () => { await qc.invalidateQueries({ queryKey: qk.operation.work() }); });
 
@@ -264,12 +264,12 @@ describe("one cache key per read — both mounting orders, real QueryClient", ()
     expectIsolatedShapes(qc);
   });
 
-  it("5 · an unassigned Payment Duty preserves the action and shows the configuration exception with the one assignment door", async () => {
+  it("5 · a collection owner nobody could be established for preserves the action and shows the configuration exception with the one assignment door", async () => {
     const qc = client();
     mount(qc, <PaymentMonitor />);
     const timing = await screen.findByTestId("monitor-timing-1302");
     const exception = await within(timing).findByTestId("monitor-owner-unassigned");
-    expect(exception).toHaveTextContent("Payment Duty is not assigned");
+    expect(exception).toHaveTextContent("Nobody holds Delivery Duty.");
     expect(within(exception).getByRole("link", { name: "Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
     expect(timing).toHaveTextContent("Payment should have been received");
     expect(timing).toHaveTextContent("Ask customer to pay");

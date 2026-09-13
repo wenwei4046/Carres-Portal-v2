@@ -615,6 +615,8 @@ export const qk = {
     laterDeliveryRequests: () => ["finance", "later-delivery-requests", "all"] as const,
     /** Settings → Payments (banks · methods · timing · storage · changes). */
     paymentSettings: () => ["finance", "payment-settings"] as const,
+    /** 0489 — one order's collection owner (normal · cover · history). */
+    collectionOwner: (orderId: string) => ["finance", "collection-owner", orderId] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -8938,6 +8940,36 @@ export interface PaymentSettingsPayload {
     actor: { name: string | null } | { name: string | null }[] | null;
   }>;
   online_provider: { name: string; configured: boolean };
+}
+
+/**
+ * 0489 — the order's collection owner: the Responsible Delivery Operation,
+ * normal owner · today's cover · acting person · handover history, from the
+ * same `payment_collection_owner_context` the Work feed reads.
+ */
+export function useCollectionOwner(orderId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.finance.collectionOwner(orderId ?? "none"),
+    queryFn: () => apiFetch<{ owner: import("@carres/shared/payment-collection-owner").CollectionOwnerContextRow | null }>(
+      `/api/finance/collection-owner?orderId=${encodeURIComponent(orderId ?? "")}`,
+    ),
+    enabled: enabled && !!orderId,
+    staleTime: 15_000,
+  });
+}
+
+/** The order's recorded collection results (0446) — promises, disputes,
+ *  no-answers — read by Communication History so a cover or a new owner
+ *  sees every earlier conversation before contacting the customer. */
+export function useCollectionOutcomes(invoiceId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["finance", "collection-outcomes", invoiceId ?? "none"],
+    queryFn: () => apiFetch<{ outcomes: Array<import("@carres/shared/payment-collection-outcome").CollectionOutcomeRow & {
+      recorded_by_user?: { name: string | null } | null;
+    }> }>(`/api/finance/invoices/${encodeURIComponent(invoiceId ?? "")}/collection-outcomes`),
+    enabled: !!invoiceId,
+    staleTime: 15_000,
+  });
 }
 
 export function usePaymentSettings() {

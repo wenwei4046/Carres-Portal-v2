@@ -41,8 +41,8 @@ Customer Order + immutable revision
 ```
 
 All entry paths use one Payment posting service and idempotency key. Operation may post money
-received in delivery/storage; Payment Duty may post normal collection. Neither writes a second
-`orders.paid` truth or receipt identity.
+received in delivery/storage; the Responsible Delivery Operation — the order's collection owner —
+may post normal collection. Neither writes a second `orders.paid` truth or receipt identity.
 
 `outstanding = issued live invoice obligations − canonical allocated money received`.
 Unknown and zero differ. No screen recalculates outstanding or storage independently.
@@ -170,7 +170,7 @@ Schedule the actual customer-contact ACTION on the resolved action owner's gover
   working day.
 ```
 
-Operation does not work on Saturday, so an Operation-held Payment Duty acts on Friday for a
+Operation does not work on Saturday, so an Operation collection owner acts on Friday for a
 Saturday deadline while the Monitor still names the Saturday (`Payment due Saturday, 12 Sep`) and
 the Work item is due Friday. That is a property of the owner's calendar, not a global rule: a
 future duty holder who works Saturdays keeps a Saturday action. A Sunday or public-holiday fact
@@ -367,14 +367,31 @@ object · Cover rule. Object identity is row/card header; owner is metadata/avat
 
 | Trigger | Owner rule | Action | Completion |
 |---|---|---|---|
-| Balance in window | Payment Duty | `Ask customer to pay` | outstanding = RM0 |
-| Missed promise | Payment Duty | same, should-have-been-done state | outstanding = RM0 |
-| Storage invoice live (`payment.send_storage_invoice`, admitted 2026-09-13) | responsible Delivery Operation (the governed Delivery word) | `Send the invoice and collect payment` | storage owing = RM0 |
+| Balance in window | Responsible Delivery Operation — the order's ONE collection owner | `Ask customer to pay` | outstanding = RM0 |
+| Missed promise | Responsible Delivery Operation — the same owner | same, should-have-been-done state | outstanding = RM0 |
+| Storage invoice live (`payment.send_storage_invoice`, admitted 2026-09-13) | Responsible Delivery Operation — the same owner | `Send the invoice and collect payment` | storage owing = RM0 |
 | Free request through day 21 | responsible Delivery Operation | `Review the free storage request` | decision exists |
 | Free request day 22–30 | Storage Waiver Approver | same | decision exists |
 | Overpaid/unallocated money | Payment Approver | `Review RM {amount}` | allocated/classified |
 | Suspected wrong/duplicate | Payment Approver | `Review payment RM {amount}` | distinct/corrected/voided |
 | Finance Exception | Finance Control Duty | `Review payment evidence` | exception resolved |
+
+**ONE SALES ORDER, ONE COLLECTION OWNER (owner ruling 2026-09-13; migration 0489).** One Sales
+Order's ordinary payment follow-up keeps one normal owner until the balance is fully paid. The
+system resolves that normal owner from the authoritative Responsible Delivery Operation: when
+collection first becomes actionable (balance in the window, a missed promise, or a live Storage
+Invoice), the Delivery Duty NORMAL holder on that day is written as the order's collection owner
+(`payment_collection_owners`, append-only). The owner does not rotate every day — a changed
+date, a duty rotation, a filter or a page reload never changes it, and a split delivery has one
+owner because the owner is keyed by the Sales Order. Only two things change who acts: governed
+buddy cover (a `delivery_duty` cover on the owner's person makes the cover today's acting person;
+the normal owner is preserved and work returns to them when the cover ends) and a formal handover
+(`payment_collection_owner_handover`, gated like Staff & Duties) that appends previous owner ·
+new owner · reason · changed by · changed on · effective from. No holder on the first actionable
+day → nothing is established; the action stays visible under the Delivery Duty word with the
+governed failure `Nobody holds Delivery Duty.` and the Staff & Duties door. `Payment Duty` is
+RETIRED: no caller remained, so the catalogue no longer offers it. There is no universal Sales
+Order Owner.
 
 My Work omits self avatar; Team Work groups by owner. Cover preserves normal owner, today's cover
 and actor. Every Payment item deep-links to `/finance/monitor?invoice={id}` — the same collection
@@ -417,8 +434,9 @@ entered or shown). Only manager permission edits them. Every effective change re
 new value · effective from · changed by · changed on · reason, shown in the page's `Changes` list.
 Storage Start and each collection clock snapshot the then-effective rule; later changes never
 recalculate old cases, invoices or clocks. Validate free ≤ Operation ≤ Approver where enabled, and
-ask-day > deadline. No Payment Duty, approver name or staff roster lives here — Workspace Staff &
-Duties is the only owner/cover authority.
+ask-day > deadline. No collection owner, approver name or staff roster lives here — Workspace Staff &
+Duties is the only duty/cover authority and the collection workspace's handover door the only
+owner change.
 
 Payment reads Calendar, Catalog category, Workspace duty/cover, Delivery/Order facts and
 Stock/Warehouse facts; it never duplicates them.
@@ -436,8 +454,8 @@ release. A live unpaid Storage Invoice prevents Delivery Order creation.
 
 | Duty/role | Authority |
 |---|---|
-| Payment Duty | normal collection/posting/receipt |
-| responsible Delivery Operation | delivery/storage contact, send invoice, evidence, normal posting |
+| Responsible Delivery Operation (the order's collection owner, from Delivery Duty) | ordinary balance collection, storage-invoice collection, free-storage requests through Operation authority, delivery/storage contact, evidence, normal posting/receipt |
+| Finance Control Duty | bank/payment evidence exception |
 | Storage Waiver Approver | mattress/bedframe day 22–30 decision |
 | Payment Approver | void, reallocation, overpayment review |
 | Finance | read/export, external bank control, Finance Exception |
@@ -855,7 +873,7 @@ no row), and append-only effective-dated §7 storage rules seeded with the appro
 Settings Workspace gains the Payment section: readable summaries, focused bank-account Edit,
 method toggles, the two storage cards, and the numbering summary that says only the next
 example and `Numbers are created automatically.` Record payment's method list now reads the
-Active set. No approver name, Payment Duty or roster appears in Payment Settings.
+Active set. No approver name, collection owner or roster appears in Payment Settings.
 
 ### Deployed — a sent message is recorded with its proof, 2026-09-06
 
@@ -1560,7 +1578,7 @@ to notice.
 answer per Sales Order across every live invoice kind, so the Work item names the same figure
 the Invoice object, the Reports listing and the statement show — one row per SO however many
 invoices it holds. Its owner is the **Payment Approver** (§12: "void, reallocation, overpayment
-review"), never Payment Duty; an unassigned approver leaves it honestly ownerless rather than
+review"), never the collection owner; an unassigned approver leaves it honestly ownerless rather than
 borrowing somebody else's name. §10 gives the row no clock, so it opens with the overpayment
 and none is invented.
 
@@ -1862,6 +1880,28 @@ built. What keeps the module short of DELIVERED is not engineering:
 Until 1–3 are closed, several slices carry deployment and DB-layer evidence but no visual or
 authenticated-interaction acceptance — stated per slice in §14 rather than averaged away.
 
+### OWNER CORRECTION — one Sales Order keeps one collection owner, 2026-09-13
+
+BUILD. `Payment Duty` is replaced as the owner of ordinary customer-balance collection by the
+**Responsible Delivery Operation** (§10). Migration `0489_one_sales_order_keeps_one_collection_owner`
+— APPLIED through the governed door after a rolled-back probe in production that proved: no
+Delivery Duty holder → nothing established (`unresolved 2`); holder Shasha → `established 2`, the
+same day again → `kept 2`, a later day with Yu Jun holding the duty → `kept 2` (no rotation);
+cover 17 Sep → `normal Shasha · cover Yu Jun · acting Yu Jun`, 19 Sep → back to Shasha; handover →
+`Yu Jun`, previous `Shasha`, reason, changed by, changed on, effective from, two-row history.
+Shared engine: `WorkOwnerRule` `payment_duty` → `collection_owner` for `collect`,
+`payment.collect_customer_balance`, `payment.missed_promise` and `payment.send_storage_invoice`;
+unresolved fails closed under `Delivery Duty`. API Work feed: a probe pass learns today's
+actionable orders, the door establishes newcomers, `payment_collection_owner_context` answers the
+same owner for every later pass; `/api/finance/collection-owner` reads it and carries the formal
+handover. Web: the Monitor owner cell prints `Nobody holds Delivery Duty. Staff & Duties` when
+nothing is established and keeps `Normal owner · Today's cover` as two facts on the avatar; the
+collection workspace gains `Collection owner` (normal · cover · acting · history · `Hand over
+collection` for a principal/manager) and Communication History now carries the recorded results
+and promises beside the sent messages. `payment_duty` retired from the Workspace catalogue.
+Regression tests: `work.collection-owner.test.ts` (14), `collection-owner.test.ts` (5),
+`InvoiceCollectionOwner.test.tsx` (6), engine and Monitor suites updated.
+
 ## 15 · Migration and module done-when
 
 Adapt 2990's useful lineage: SO → DO → Sales Invoice → canonical Payment → Receipt, ledger-derived
@@ -1988,7 +2028,7 @@ Collection timing; WhatsApp templates; Invoice and Receipt numbers; Storage char
 payment provider. Default View uses readable summaries and focused Edit / Review changes, not raw
 fields. Numbering shows only next example and `Numbers are created automatically.` No prefix,
 sequence length, year/month toggle, reset or per-document number editing. No named approver,
-Payment Duty or staff roster in Payment Settings.
+collection owner or staff roster in Payment Settings.
 
 Storage cards are separate and each reads as one rule card with one governed `Edit`:
 

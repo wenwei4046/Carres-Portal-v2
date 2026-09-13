@@ -36,7 +36,7 @@
  * fact itself never moves — a deadline may stand on a Saturday; an Operation
  * action may not, because Operation does not work on Saturday. That is a
  * property of the OWNER's calendar (`OWNER_CALENDAR.offDays`), not a global
- * rule: a future Payment Duty holder who works Saturdays keeps a Saturday
+ * rule: a future collection owner who works Saturdays keeps a Saturday
  * action.
  *
  * The ANCHOR is the customer's confirmed delivery date when one exists —
@@ -101,7 +101,7 @@ export function collectionTimingFor(
 }
 
 /** The action owner's governed working days. Sunday AND Saturday off is the
- *  OPERATION week — the calendar every Operation-held duty (Payment Duty)
+ *  OPERATION week — the calendar every Operation-held owner (the collection owner)
  *  acts on. A duty whose holder works Saturdays passes `{ offDays: [0] }`. */
 export interface OwnerCalendar {
   /** Weekday numbers the owner does NOT work (0=Sun … 6=Sat). */
@@ -190,7 +190,7 @@ function stepBack(iso: IsoDate): IsoDate {
  * an off-day override for the COMPANY count); the default counting week is
  * Mon–Sat — the delivery week. `timing` is the effective Settings pair;
  * absent, the ruled default. `owner` is the action owner's governed working
- * days; absent, the Operation week (Payment Duty is an Operation duty).
+ * days; absent, the Operation week (the collection owner is Operation staff).
  */
 export function collectionClock(
   input: {

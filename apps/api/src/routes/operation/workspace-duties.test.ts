@@ -205,7 +205,6 @@ describe("GET /api/operation/workspace-duties", () => {
     expect(body.duties.map((d) => d.key)).toEqual([
       "po_duty",
       "grn_duty",
-      "payment_duty",
       "storage_waiver_approver",
       "purchasing_approver",
       "delivery_charge_approver",

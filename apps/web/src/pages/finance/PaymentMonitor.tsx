@@ -115,7 +115,6 @@ type MonitorRow = PaymentMonitorRow & { owner: OperationWorkItem["owner"] | null
 /** The duty word for the configuration exception — the Duty catalogue's own
  *  names, never a person. */
 const DUTY_WORD: Record<string, string> = {
-  payment_duty: "Payment Duty",
   payment_approver: "Payment Approver",
   storage_waiver_approver: "Storage Waiver Approver",
   delivery_duty: "Delivery Duty",
@@ -126,21 +125,32 @@ function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   if (!person?.userId) {
     // A governed configuration exception, never a blank or an invented owner
     // (owner ruling 2026-09-13): the action stays visible, management sees
-    // the duty is unassigned, and the one assignment door is linked.
+    // nobody holds the duty the owner is set from, and the one assignment
+    // door is linked. Ordinary collection is the Responsible Delivery
+    // Operation (0489) — established from Delivery Duty, so its failure is
+    // Delivery's governed sentence.
     const duty = DUTY_WORD[owner.dutyKey ?? owner.rule] ?? owner.dutyKey ?? owner.rule;
     return <span className="text-label font-normal text-kit-red-11" data-testid="monitor-owner-unassigned">
-      {duty} is not assigned · <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">Staff &amp; Duties</Link>
+      Nobody holds {duty}. <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">Staff &amp; Duties</Link>
     </span>;
   }
   const colors = avatarColor(person.userId);
   const label = personLabel(person.name, "");
+  // Normal owner and today's cover are DISTINCT facts: the avatar is the
+  // acting person; the title keeps the normal owner beside the cover.
+  const normal = owner.normal?.name ? personLabel(owner.normal.name, "") : null;
+  const title = owner.activeCover && normal && normal !== label
+    ? `Normal owner: ${normal} · Today's cover: ${label}`
+    : label;
   return <span
-    className="inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold"
+    className={`inline-grid h-5 w-5 shrink-0 place-items-center rounded-full text-label font-semibold${owner.activeCover ? " ring-2 ring-kit-amber-3" : ""}`}
     style={{ background: colors.bg, color: colors.fg }}
-    title={label}
+    title={title}
     role="img"
     aria-label={label}
     data-testid="monitor-owner-avatar"
+    data-normal-owner={normal ?? undefined}
+    data-cover={owner.activeCover ? label : undefined}
   >{personInitials(person.name, "")}</span>;
 }
 

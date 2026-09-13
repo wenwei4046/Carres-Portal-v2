@@ -798,7 +798,7 @@ Supplier Claim · Payment/Refund · Guarantee, as applicable.
 ### GLOBAL DUTY AND APPROVAL ROUTING — OWNER-APPROVED 2026-09-03
 
 Workspace owns one Staff & Duties registry for every ERP module. Each work/approval type maps to
-its own duty (for example Payment Duty, Storage Waiver Approver, Purchasing Approver); there is no
+its own duty (for example Delivery Duty, Storage Waiver Approver, Purchasing Approver); there is no
 universal ERP Manager owner. A duty has a primary holder and optional buddy cover. Resolution
 retains normal owner, today's cover and actual actor, so absence changes today's work without
 rewriting history. Reassignment is one Workspace change and never a module code change.

@@ -50,8 +50,13 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *                  governed proxy where the named rule's roster does not exist
  *                  yet (ACTION-FLOW Law 4 rung 2's own reasoning: a task owned
  *                  by a party with no login is one nobody can see or close)
- *   payment_duty   the effective Payment Duty resolution from Workspace;
- *                  unresolved fails closed and never borrows the order PIC
+ *   collection_owner  the Sales Order's ONE stable collection owner — the
+ *                  Responsible Delivery Operation (owner ruling 2026-09-13,
+ *                  Payment MASTER §10; 0489): established from the Delivery
+ *                  Duty holder on the first actionable day, kept until the
+ *                  balance is RM 0, changed only by governed cover or a formal
+ *                  handover. Supplied per order in `dutyResolutions`;
+ *                  unresolved fails closed under the Delivery Duty word
  *   payment_approver  the effective Payment Approver resolution from Workspace
  *                  — §12 gives void, reallocation and overpayment review to
  *                  this duty and to nobody else; unresolved fails closed
@@ -68,7 +73,7 @@ export type WorkOwnerRule =
   | "po_duty"
   | "salesperson"
   | "order_pic"
-  | "payment_duty"
+  | "collection_owner"
   | "payment_approver_duty"
   | "delivery_duty"
   | "warehouse_duty"
@@ -217,8 +222,8 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "orders",
     trigger: "outstanding > RM 0 with goods ready or arrival confirmed; collection survives delivery",
     owner:
-      "the effective Payment Duty holder from Workspace; unresolved fails closed and never borrows the order PIC",
-    ownerRule: "payment_duty",
+      "the Sales Order's stable collection owner — the Responsible Delivery Operation (0489); unresolved fails closed and never borrows the order PIC",
+    ownerRule: "collection_owner",
     action: orderActionQueue("collect"),
     dueRule:
       "T−2 working days before the delivery (confirmed, else promised) — the collection clock, deadline re-ruled 2026-08-19 (logistics takes the DO at T−1); T−3 attention",
@@ -319,8 +324,8 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "payment.collect_customer_balance",
     module: "payment",
     trigger: "an issued invoice has an outstanding balance, goods are ready or arrival is known, and the collection window is due or late",
-    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
-    ownerRule: "payment_duty",
+    owner: "the Responsible Delivery Operation — the Delivery Duty holder on the first actionable day, kept as the order's stable collection owner (0489); Buddy cover may act without replacing normal ownership",
+    ownerRule: "collection_owner",
     action: "Ask customer to pay",
     dueRule: "the shared collection clock: two working days before confirmed delivery, else requested delivery",
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
@@ -352,8 +357,8 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "payment.missed_promise",
     module: "payment",
     trigger: "the customer promised to pay on a named day, that day has passed and the balance is still outstanding",
-    owner: "the effective Payment Duty holder from Workspace; Buddy cover may act without replacing normal ownership",
-    ownerRule: "payment_duty",
+    owner: "the Responsible Delivery Operation — the Delivery Duty holder on the first actionable day, kept as the order's stable collection owner (0489); Buddy cover may act without replacing normal ownership",
+    ownerRule: "collection_owner",
     action: "Ask customer to pay",
     dueRule: "the day the customer promised, on the OFFICE calendar",
     completionFact: "the invoice/order outstanding balance is RM 0 after an atomic recorded payment allocation",
@@ -368,8 +373,8 @@ export const MODULE_WORK_RULES: readonly WorkRule[] = [
     key: "payment.send_storage_invoice",
     module: "payment",
     trigger: "an issued Storage or Additional Storage Invoice is live and its money has not been received",
-    owner: "the responsible Delivery Operation (the governed Delivery word; Workspace resolves the person when a Delivery duty exists)",
-    ownerRule: "delivery_duty",
+    owner: "the Responsible Delivery Operation — the same stable collection owner as the ordinary balance, established from the Delivery Duty holder (owner ruling 2026-09-13)",
+    ownerRule: "collection_owner",
     action: "Send the invoice and collect payment",
     dueRule: "the shared collection clock's deadline for the order's delivery, else no date",
     completionFact: "the order's live storage papers are fully allocated — storage owing is RM 0",
@@ -832,13 +837,16 @@ export function workItemsForOrder(
       }
       case "delivery_duty":
         // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): resolved by the
-        // Shared Duty Resolver like PO and Payment Duty; no holder → the duty
+        // Shared Duty Resolver like PO Duty; no holder → the duty
         // word stands, never the PIC and never a superuser fallback.
         return dutyOwner("delivery_duty", "delivery_duty", "Delivery Duty");
       case "finance_duty":
         return directOwner("finance_duty", null, "Finance");
-      case "payment_duty":
-        return dutyOwner("payment_duty", "payment_duty", "Payment");
+      case "collection_owner":
+        // The order's stable collection owner (0489) rides in per order; no
+        // owner yet (no Delivery Duty holder on the first actionable day) →
+        // the Delivery Duty word stands, never the PIC.
+        return dutyOwner("collection_owner", "delivery_duty", "Delivery Duty");
       case "system":
         return directOwner("system", null, "System");
       default:

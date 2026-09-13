@@ -32,7 +32,7 @@ import { qk, usePaymentSettings, type PaymentSettingsPayload } from "@/lib/queri
  *   Storage charges · Online payment provider
  *
  * Every effective change records old value · new value · effective from ·
- * changed by · changed on · reason. No approver name, Payment Duty or staff
+ * changed by · changed on · reason. No approver name, collection owner or staff
  * roster lives here (Workspace → Staff & Duties owns people). Numbering shows
  * only the next example and `Numbers are created automatically.`
  */
