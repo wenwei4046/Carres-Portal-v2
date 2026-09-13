@@ -14,7 +14,6 @@ import path from "node:path";
 
 const MIGRATIONS = path.resolve(__dirname, "../../../../supabase/migrations");
 const RETIRED = ["operation_warehouse_pick", "_operation_reserve_order", "operation_receive_po_line"];
-const DERIVED_SINCE = 366;
 const RETIRED_AT = 501;
 
 function numberOf(file: string): number {
@@ -46,10 +45,13 @@ describe("stock totals are derived, never written (0366 · 0501)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("no migration after 0366 writes stock_balances.qty or .reserved by hand outside the rollup guard", () => {
+  it("no migration after the retirement writes stock_balances.qty or .reserved by hand outside the rollup guard", () => {
+    /* Files between 0366 and 0501 are history the database already holds (0500
+       re-pins search_path on hundreds of live bodies, guard included); the
+       runtime guard is 0366's trigger. This scan keeps the door from returning. */
     const offenders: string[] = [];
     for (const m of migrations()) {
-      if (m.n <= DERIVED_SINCE || m.n === RETIRED_AT) continue;
+      if (m.n <= RETIRED_AT) continue;
       const writes = /update\s+(public\.)?stock_balances\s+set[\s\S]{0,200}?\b(qty|reserved)\s*=/i.test(m.sql);
       const inserts = /insert\s+into\s+(public\.)?stock_balances\s*\([^)]*\b(qty|reserved)\b/i.test(m.sql);
       const guarded = /carres\.stock_rollup/.test(m.sql);
