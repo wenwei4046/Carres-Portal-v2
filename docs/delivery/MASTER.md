@@ -743,6 +743,18 @@ History               the append-only audit of every object change and proxy rec
 Related records       doors to the Sales Order, Units, Payment, Service Case and sibling DOs
 ```
 
+**BUILT 2026-09-13 (Card 16):** `DeliveryOrderPage.tsx` is the seven sections above in order on
+kit `Panel`s — section one prints the customer, address, Warehouse, partner, arrangement (day,
+window, ETA, driver, vehicle from `ops_delivery_arrangements`), route, trip scope, site
+requirements (building, floor, lift, stairs, access, customer request, instruction for
+logistics), the goods and the live document rendered inline by the governed DO renderer;
+Delivery history lists `Delivery on {day} · {result}`; Exceptions lists failed and partial
+visits, the open Finance exception, the pending payment approval, a cancellation and the Work
+action lines with their owner (`No open problems` otherwise); History merges the issue, the
+handover chain, the attempts and the order's own History lines in time order; Related records
+doors to the Sales Order, the Order Route, Payments, every exact Unit, every Service Case and
+every sibling document. The Object Header keeps `Print` and the one primary operational act.
+
 Reference views a person opens rarely join the header's governed view mechanism only where the
 Object Detail Template already admits one. Delivery history is actual delivery execution; History
 is the audit trail; they are not the same section. Cross-module doors open the owner and never a

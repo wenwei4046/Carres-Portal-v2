@@ -7300,11 +7300,47 @@ export interface DeliveryOrderDetailPayload {
       do_number: string | null;
       /** 0156 — the order's Journey legs; a leg document names its own. */
       delivery_stops?: DeliveryStop[] | null;
+      /** Card 16 — the site facts and the source warehouse, Sales' own columns. */
+      warehouse_id?: string | null;
+      warehouses?: { name: string | null } | { name: string | null }[] | null;
+      delivery_floor?: number | null;
+      delivery_has_lift?: boolean | null;
+      delivery_stair_items?: string | null;
+      building_type?: string | null;
+      ops_order_control?:
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }[]
+        | null;
       order_lines: Array<{ sku: string; qty: number }>;
     };
   };
+  /** 0424 — the document's recorded exact-Unit scope, resolved to Unit IDs. */
+  scopeUnits?: Array<{ item_id: string; unit_code: string | null; sku: string | null }>;
+  handoverEventUnits?: Array<{ event_id: string; item_id: string; recorded_side: string; unit_code: string | null }>;
   attempts: DeliveryOrderAttemptRow[];
   lineDescriptions: Record<string, string>;
+  /** Card 16 (Delivery MASTER §9) — the seven sections' owned facts. All
+   *  optional: an older Worker answers without them, and the page states the
+   *  absence rather than inventing a value. */
+  arrangement?: {
+    id: string;
+    leg: number;
+    partner_id: string | null;
+    confirmed_date: string | null;
+    confirmed_time: string | null;
+    expected_arrival: string | null;
+    logistics_note: string | null;
+    driver_name: string | null;
+    vehicle: string | null;
+    condo_registration: string | null;
+    delivery_partners?: { id: string; name: string } | { id: string; name: string }[] | null;
+  } | null;
+  financeExceptions?: Array<{ id: string; status: "open" | "cleared"; reason: string; opened_at: string | null; cleared_at: string | null }>;
+  paymentApprovals?: Array<{ id: string; status: "pending" | "approved" | "refused"; request_reason: string; requested_at: string | null; decided_at: string | null; decision_reason: string | null }>;
+  siblingDocuments?: Array<{ id: string; do_number: string; leg?: number | null; issued_at: string; voided_at: string | null; void_reason: string | null }>;
+  /** null = the Cases could not be read (another module's table), never "none". */
+  serviceCases?: Array<{ id: string; case_no: string; status_id: string | null; opened_at: string | null }> | null;
+  history?: Array<{ id: string; text: string; by_role: string | null; occurred_at: string }>;
   /** §6.1 (0489) — the Evidence section's facts: every file bound to the
    *  attempt it proves (signed for viewing) and every review with its
    *  reviewer's name. */

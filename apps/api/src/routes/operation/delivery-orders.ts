@@ -216,6 +216,10 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
          do_file_path, do_uploaded_at,
          pod_signature_url, pod_signed_by, pod_signed_at,
          do_number, delivery_stops,
+         warehouse_id, warehouses(name),
+         delivery_floor, delivery_has_lift, delivery_stair_items,
+         building_type:entry_data->fields->>building_type,
+         ops_order_control(customer_request, action_for_logistic),
          order_lines(sku, qty))`,
     );
   query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
@@ -409,6 +413,32 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     }),
   }));
 
+  // Card 16 (Delivery MASTER §9) — the object's seven sections read the facts
+  // their owners hold: the scope's arrangement (0386), the two money records
+  // the gate reads (0355 · 0362), the order's sibling documents, its Service
+  // Cases and its append-only History. Every read is the owner's own table;
+  // nothing is derived here.
+  const legOfDoc = (row as { leg?: number | null }).leg ?? 0;
+  const [arrangementRes, feRes, paRes, siblingsRes, casesRes, historyRes] = await Promise.all([
+    sb
+      .from("ops_delivery_arrangements")
+      .select("id, leg, partner_id, confirmed_date, confirmed_time, expected_arrival, logistics_note, driver_name, vehicle, condo_registration, delivery_partners(id, name)")
+      .eq("order_id", orderId)
+      .eq("leg", legOfDoc)
+      .maybeSingle(),
+    sb.from("order_finance_exceptions").select("id, status, reason, opened_at, cleared_at").eq("order_id", orderId),
+    sb.from("order_delivery_payment_approvals").select("id, status, request_reason, requested_at, decided_at, decision_reason").eq("order_id", orderId),
+    sb.from("ops_delivery_orders").select("id, do_number, leg, issued_at, voided_at, void_reason").eq("order_id", orderId).order("issued_at", { ascending: true }),
+    sb.from("service_cases").select("id, case_no, status_id, opened_at").eq("order_id", orderId),
+    sb.from("order_history").select("id, text, by_role, occurred_at").eq("order_id", orderId).order("occurred_at", { ascending: true }).limit(200),
+  ]);
+  for (const r of [arrangementRes, feRes, paRes, siblingsRes, historyRes]) {
+    if (r.error) return c.json({ error: "delivery_order_sections_read_failed", message: r.error.message }, 500);
+  }
+  /* Service Cases are another module's table; an unreadable one is stated as
+     unknown by the page, never as "no cases". */
+  const serviceCases = casesRes.error ? null : (casesRes.data ?? []);
+
   // §6.1 (0489) — the Evidence section: every file bound to the attempt it
   // proves, signed for viewing, and Operation's reviews with their reviewer.
   const proof = await readProofRecords(sb, [row.do_number]);
@@ -454,6 +484,12 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
     handoverEventUnits,
     proofReviews,
     attemptEvidence,
+    arrangement: arrangementRes.data ?? null,
+    financeExceptions: feRes.data ?? [],
+    paymentApprovals: paRes.data ?? [],
+    siblingDocuments: siblingsRes.data ?? [],
+    serviceCases,
+    history: historyRes.data ?? [],
   });
 });
 

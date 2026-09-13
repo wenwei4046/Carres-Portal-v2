@@ -25,7 +25,7 @@
 
 ## Tasks
 
-- [ ] Section composition on kit `Panel`; the live document in section one
-- [ ] Exceptions and Related records sections
+- [x] Section composition on kit `Panel`; the live document in section one — seven `Panel`s in §9 order, no tab strip; the document is rendered by `renderDoPdf` from the same `print-do-data` read `Print` uses and shown in an inline viewer (`Rendering the document…` / stated failure); the detail read carries the arrangement, the site facts, the Warehouse name and the two money records
+- [x] Exceptions and Related records sections — failed/partial visits, open Finance exception, pending payment approval, cancellation and the Work action lines with owner (`No open problems`); doors to SO, Order Route, Payments, each exact Unit, each Service Case (unknown stated, never zero) and each sibling document
 - [ ] Tests, typecheck, design guard
 - [ ] PR → merge → deploy → authenticated production verification
