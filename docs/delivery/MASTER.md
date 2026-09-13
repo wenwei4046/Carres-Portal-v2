@@ -892,9 +892,13 @@ system.
 2026-09-13; Payment MASTER §10, migrations 0489 · 0495).** When a Sales Order's collection first
 becomes actionable, the order's recorded **contact owner** (§5.1 — the Operation person named on
 its earliest customer contact, else its partner arrangement) becomes that order's stable
-collection owner: the same person who has been contacting the customer about delivery asks for
-the money. Only when nobody has contacted that customer yet does the Delivery Duty NORMAL holder
-on that day stand in (§13.1). The owner stays until the balance is RM 0; later duty rotation or a
+collection owner — provided the record names an individual staff identity (a People record) who
+was not acting as Delivery Duty buddy cover that day: the same person who has been contacting the
+customer about delivery asks for the money. Otherwise the Delivery Duty NORMAL holder on that day
+stands in (§13.1), never the cover. **Measured gap (2026-09-13):** the one contact writer stores
+`contact_owner_user_id = recorded_by` (the signed-in subject) and resolves no cover; a proxy record
+names only the partner. A recorder cannot yet name a different responsible owner — Payment guards
+the seam (0498) until this writer separates the two. The owner stays until the balance is RM 0; later duty rotation or a
 later contact by someone else never moves it; only buddy cover (acting today) or a formal handover
 changes who acts. Delivery configures nothing extra for this: the Payment module reads the contact
 record and the resolver on the first actionable day and keeps its own append-only owner record.
