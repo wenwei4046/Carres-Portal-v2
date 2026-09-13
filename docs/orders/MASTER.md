@@ -4735,12 +4735,14 @@ only the current loan line. The offer record is not built yet.
 
 **THE REQUIRED SALES FACTS FOR A DELIVERY (Delivery Blueprint, owner ruling 2026-09-13).**
 Delivery address, state, building type, floor, lift, access and the requested delivery information
-are required Sales Portal facts of a valid new order. Measured 2026-09-12: the POS schema requires
-`floor`, `hasLift` and the requested date; `address` is nullable behind `addressUnknown`;
-`addressState` is optional; building type lives in `entry_data.fields` with no schema requirement.
-Closing that gate is Sales Orders' build and a named dependency of the Delivery Blueprint; until it
-lands, Monitor prints each gap as `Order details incomplete` with the door `Open Sales Order to
-change`, never as a normal empty delivery.
+are required Sales Portal facts of a valid new order. **BUILT 2026-09-13 (Delivery Card 18):**
+`createOrderInputSchema` and `rawCreateOrderInputSchema` refuse a missing address (the
+`addressUnknown` escape is retired at entry), state, building type (`entry_data.fields.building_type`),
+floor, lift and requested date with ONE wording per fact (`DELIVERY_FACT_REFUSALS`,
+`docs/COPY-STANDARD.md` entry-gate words); the POS wizard's address sub-step and the office create
+door (`PrincipalNewOrder`, now with its own Building type field) refuse the same facts before the
+round trip. Legacy rows keep `addressUnknown`/`Address not given yet` as read-only history; Monitor's
+`Order details incomplete` line therefore applies to legacy rows only.
 
 **`Resolve the payment exception`** — NEW, blueprint card §7 · trigger: an OPEN Finance
 exception holds the delivery (0355) · owner: the resolved `Payment Approver` Duty holder, with

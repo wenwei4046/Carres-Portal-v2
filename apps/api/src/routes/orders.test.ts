@@ -484,11 +484,14 @@ function validCreateBody(over: Record<string, unknown> = {}) {
       phone: "012-3456789",
       address: "123 Jalan Sample, 50000 KL",
       addressUnknown: false,
+      /* The required Sales facts (owner ruling 2026-09-13, Delivery Card 18). */
+      addressState: "Kuala Lumpur",
       billing: null,
       billingSame: true,
       emergency: "Tan Junior · 012-9988776 · Spouse",
     },
     delivery: { date: "2026-06-01", proceedDate: "2026-05-15", dateTbd: false, floor: 1, hasLift: false },
+    entryData: { fields: { building_type: "Condo" } },
     lines: [
       {
         sku: "mattress:carres-classic:queen",
@@ -5139,12 +5142,11 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     expect(sb._rpcCalls).toHaveLength(1);
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
     expect(payload.payment_method).toBe("cash");
-    // REGRESSION (2026-07-14): the key must be ABSENT, not `null` — a JSON
-    // null arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
-    // create_order's `entry_data must be a json object` guard, killing every
-    // order without entry extras (e.g. installment with only an approval
-    // code + EDC slip).
-    expect("entry_data" in payload).toBe(false);
+    // REGRESSION (2026-07-14): the key must never be `null` — a JSON null
+    // arrives in Postgres as jsonb 'null' (not SQL NULL) and trips
+    // create_order's `entry_data must be a json object` guard. Since Card 18
+    // every valid body carries the building type, so the key is an OBJECT.
+    expect(payload.entry_data).toEqual({ fields: { building_type: "Condo" } });
   });
 
   it("an unconfigured method → 422 invalid_payment_method, create_order never fires", async () => {
@@ -5173,12 +5175,12 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     const res = await post(
       validCreateBody({
         paymentMethod: "credit",
-        entryData: { payment: { bank: "Maybank" } },
+        entryData: { payment: { bank: "Maybank" }, fields: { building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(400); // stop-probe → gate passed
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
-    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" } });
+    expect(payload.entry_data).toEqual({ payment: { bank: "Maybank" }, fields: { building_type: "Condo" } });
   });
 
   it("credit + a bank NOT in the configured options → 422 payment_followup_invalid", async () => {
@@ -5187,7 +5189,7 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     const res = await post(
       validCreateBody({
         paymentMethod: "credit",
-        entryData: { payment: { bank: "Bank of Mars" } },
+        entryData: { payment: { bank: "Bank of Mars" }, fields: { building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(422);
@@ -5201,11 +5203,11 @@ describe("POST /api/orders — 0219 payment-method config gates", () => {
     vi.mocked(userClient).mockReturnValue(sb);
     const res = await post(
       validCreateBody({
-        entryData: { fields: { occupation: "Engineer" } },
+        entryData: { fields: { occupation: "Engineer", building_type: "Condo" } },
       }),
     );
     expect(res.status).toBe(400); // stop-probe → gate passed
     const payload = sb._rpcCalls[0]!.payload as Record<string, unknown>;
-    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer" } });
+    expect(payload.entry_data).toEqual({ fields: { occupation: "Engineer", building_type: "Condo" } });
   });
 });
