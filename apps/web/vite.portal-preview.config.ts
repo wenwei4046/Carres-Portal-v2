@@ -13,11 +13,29 @@
 import { mergeConfig } from "vite";
 import base from "./vite.config";
 
+/* `PORTABLE_FILE=1` builds the classic-script variant that opens from a
+   double-clicked file:// URL (browsers refuse ES modules from file://). The
+   PDF worker still needs http, so the GRN paper pane renders only when the
+   folder is served; everything else works from the file. */
+const asFile = process.env.PORTABLE_FILE === "1";
+
 export default mergeConfig(base, {
   base: "./",
   build: {
-    outDir: "dist-portal-preview",
+    outDir: asFile ? "dist-portal-preview-file" : "dist-portal-preview",
     emptyOutDir: true,
-    rollupOptions: { input: "portal-shell-preview.html" },
+    modulePreload: !asFile,
+    rollupOptions: {
+      input: "portal-shell-preview.html",
+      output: asFile ? { format: "iife", inlineDynamicImports: true } : {},
+    },
   },
+  plugins: asFile
+    ? [
+        {
+          name: "portable-file-html",
+          transformIndexHtml: (html: string) => html.replace(/ type="module"/g, "").replace(/ crossorigin/g, ""),
+        },
+      ]
+    : [],
 });
