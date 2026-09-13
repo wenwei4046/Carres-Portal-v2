@@ -53,6 +53,14 @@ re-spreads SYSTEM-assigned orders (`assigned_by` null) evenly across whoever is 
 member with no heartbeat counts as out and their system-assigned orders flow to whoever is in, then flow back*.
 Human-assigned orders (`assigned_by` set, `ops_manager` only, `order-control.ts`) never move.
 
+Measured in code (`staff.ts`): the pool is `ops_staff_settings` — a non-manager `operation` account is
+auto-enrolled on its FIRST login unless `isOpsGenericAccount(email)` matches (an email heuristic; the test
+account `operation-test@x.com` passed it, which is why it holds 100 orders); `available=false` is the existing
+PERSON-LEVEL planned-leave flag ("temporarily away — new orders skip them"); `countsAsInToday(last_seen_at)`
+is the 10:00 MYT heartbeat rule; the sweep (`POST /auto-assign`, fired by the web after each heartbeat)
+re-splits EVERY open system-assigned order plus the unassigned evenly across members in today, every run —
+so a system-assigned `assigned_staff` is an actor of the day, not a stable owner.
+
 **Measured 2026-09-13:** 101 controls, 101 `assigned_by` null (all system); 100 → `E2E Test · operation`
 (a test account, `staff_code` null), 1 → Shasha; `SO-1321`/`SO-1313` PIC = the test account.
 The Work engine already resolves `order_pic` from `assigned_staff` (`work.ts`, `work-engine.ts`).
