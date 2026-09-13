@@ -239,6 +239,13 @@ export default function DeliveryOrderPage() {
     !d.voided_at &&
     (data?.attempts ?? []).length === 0 &&
     (!d.trip_groups || d.trip_groups.length === 0);
+  /* 0491 — a Journey leg's document names its leg; the route prints without a
+     `Leg` word and an intermediate leg records an ARRIVAL, never a delivery. */
+  const leg = d.leg ?? 0;
+  const stops = order.delivery_stops ?? [];
+  const lastLeg = stops.reduce((max, stop) => Math.max(max, Number(stop.leg) || 0), 0);
+  const legStop = leg > 0 ? stops.find((stop) => Number(stop.leg) === leg) ?? null : null;
+  const legRoute = legStop ? [legStop.from_loc, legStop.to_loc].filter(Boolean).join(" → ") : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -256,7 +263,13 @@ export default function DeliveryOrderPage() {
               headerAction
             />
             {mayRecordResult ? (
-              <DeliveryResultAction order={order} lines={tripLines} />
+              <DeliveryResultAction
+                order={order}
+                lines={tripLines}
+                leg={leg}
+                lastLeg={lastLeg}
+                legDestination={legStop?.to_loc ?? null}
+              />
             ) : null}
             <button
               type="button"
@@ -353,6 +366,7 @@ export default function DeliveryOrderPage() {
                   Vehicle not recorded — the logistics partner assigns the vehicle on the day
                 </Absence>
               </Fact>
+              {legRoute ? <Fact label="Route">{legRoute}</Fact> : null}
               {d.trip_groups && d.trip_groups.length > 0 ? (
                 <Fact label="Trip scope">
                   {d.trip_groups

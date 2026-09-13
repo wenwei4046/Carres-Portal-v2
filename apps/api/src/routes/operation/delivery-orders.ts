@@ -74,7 +74,7 @@ const deliveryOrdersRouter = new Hono<AppEnv>();
  *  (`do_file_path`, the T6 photo ledger) and the trip's goods lines for the
  *  read-only ▸ expansion. All are existing canonical columns, read as-is. */
 const ORDER_EMBED =
-  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, do_uploaded_at, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
+  "orders!inner(id, so, customer_name, customer_address_city, customer_address_state, delivery_date, delivery_date_tbd, do_file_path, do_uploaded_at, delivery_stops, order_lines(id, sku, qty, attrs), ops_order_control(delivery_photos))";
 
 /**
  * §6.1 (0489) — the proof reviews and the attempt evidence of a set of
@@ -132,7 +132,7 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   let query = sb
     .from("ops_delivery_orders")
     .select(
-      `id, order_id, do_number, issued_at, trip_groups, delivery_date, time_slot,
+      `id, order_id, do_number, leg, issued_at, trip_groups, delivery_date, time_slot,
        logistics_partner, voided_at, void_reason, ${ORDER_EMBED}`,
     )
     .order("issued_at", { ascending: false })
@@ -154,7 +154,7 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
   if (numbers.length > 0) {
     const res = await sb
       .from("delivery_attempts")
-      .select("do_number, result, reason_key, recorded_at")
+      .select("do_number, leg, result, reason_key, recorded_at")
       .in("do_number", numbers);
     if (res.error) {
       return c.json(
@@ -209,13 +209,13 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   let query = sb
     .from("ops_delivery_orders")
     .select(
-      `id, order_id, do_number, issued_at, trip_groups, delivery_date, time_slot,
+      `id, order_id, do_number, leg, issued_at, trip_groups, delivery_date, time_slot,
        logistics_partner, voided_at, void_reason,
        orders!inner(id, so, customer_name, customer_phone, customer_emergency,
          customer_address, customer_address_city, customer_address_state,
          do_file_path, do_uploaded_at,
          pod_signature_url, pod_signed_by, pod_signed_at,
-         do_number,
+         do_number, delivery_stops,
          order_lines(sku, qty))`,
     );
   query = /^do-/i.test(id) ? query.eq("do_number", id.toUpperCase()) : query.eq("id", id);
@@ -235,7 +235,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
   const [attemptsRes, loansRes, eventsRes] = await Promise.all([
     sb
       .from("delivery_attempts")
-      .select("id, do_number, result, reason_key, note, where_goods, recorded_at, recorded_by")
+      .select("id, do_number, leg, result, reason_key, note, where_goods, recorded_at, recorded_by")
       .eq("do_number", row.do_number)
       .order("recorded_at", { ascending: true }),
     sb

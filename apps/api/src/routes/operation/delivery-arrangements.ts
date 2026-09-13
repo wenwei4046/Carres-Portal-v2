@@ -15,6 +15,7 @@ import {
 } from "@carres/shared";
 import { requireOperationOrPrincipal } from "../../lib/auth-guards";
 import { mapPgError } from "../../lib/route-helpers";
+import { attemptLegDocumentIssue } from "../../lib/delivery-order-issue";
 import { adminClient, userClient } from "../../lib/supabase";
 import type { AppEnv } from "../../types";
 
@@ -197,13 +198,15 @@ deliveryArrangementsRouter.get(
       return c.json(m.body, m.status);
     }
 
+    /* 0491 — a Journey leg joins the feed once it carries its OWN document
+       (whose 0424 scope names the exact Units); a leg with no document is
+       still absence, never an invented row. */
     const arrangements = (
       (arrangementsRes.data ?? []) as unknown as ArrangementRecord[]
     )
       .map(shape)
       .filter(
         (row) =>
-          row.leg === 0 &&
           Boolean(row.confirmed_date) &&
           Boolean(row.partner_name),
       );
@@ -219,7 +222,7 @@ deliveryArrangementsRouter.get(
         .in("id", orderIds),
       sb
         .from("ops_delivery_orders")
-        .select("id, order_id, do_number, trip_groups, voided_at")
+        .select("id, order_id, do_number, leg, trip_groups, voided_at")
         .in("order_id", orderIds),
     ]);
     const firstError = ordersRes.error ?? deliveryOrdersRes.error;
@@ -242,6 +245,7 @@ deliveryArrangementsRouter.get(
       id: string;
       order_id: string;
       do_number: string;
+      leg?: number | null;
       trip_groups: string[] | null;
       voided_at: string | null;
     };
@@ -399,7 +403,11 @@ deliveryArrangementsRouter.get(
       const order = orderById.get(arrangement.order_id);
       if (!order) return [];
       return deliveryOrders
-        .filter((row) => row.order_id === arrangement.order_id)
+        .filter(
+          (row) =>
+            row.order_id === arrangement.order_id &&
+            (row.leg ?? 0) === arrangement.leg,
+        )
         .flatMap((deliveryOrder) => {
           const doScope = scopeRows.filter(
             (row) => row.delivery_order_id === deliveryOrder.id,
@@ -862,7 +870,23 @@ deliveryArrangementsRouter.put("/:orderId", requireOperationOrPrincipal, async (
     contact = contactRow;
   }
 
-  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord), contact });
+  /* 0491 — A JOURNEY LEG ISSUES ITS OWN DOCUMENT the moment its partner and
+     its agreed day are both on record, through the ONE issuing discipline.
+     FAIL-SOFT: the arrangement just saved is never undone by an issuance
+     hiccup; the next save (or the manual backstop) tries again. */
+  let deliveryOrder: { do_number: string | null; issued: boolean } | null = null;
+  if (leg > 0 && nextPartner && input.confirmedDate) {
+    try {
+      const attempt = await attemptLegDocumentIssue(userClient(c.env, c.var.auth.jwt), orderId, leg);
+      if (attempt.outcome === "issued" || attempt.outcome === "already") {
+        deliveryOrder = { do_number: attempt.doNumber, issued: attempt.outcome === "issued" };
+      }
+    } catch {
+      /* not issued yet — the facts persist */
+    }
+  }
+
+  return c.json({ arrangement: shape(saved as unknown as ArrangementRecord), contact, deliveryOrder });
 });
 
 /**

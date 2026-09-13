@@ -119,7 +119,13 @@ export interface InboundArrival {
 /** The Document cell's own word for each source kind (docs/stock/MASTER.md).
  * The numbers are minted from real records — `TR-…`, `RO-…`, the Claim's or
  * Case's own number — so the word names the document the number belongs to. */
-export function inboundDocumentWordOf(kind: ArrivalSourceType): string {
+export function inboundDocumentWordOf(
+  kind: ArrivalSourceType,
+  source?: Pick<ArrivalSource, "attempt_id"> | null,
+): string {
+  /* 0490 — goods coming back from a failed Delivery Visit are named by the
+     Delivery Order they went out on; no Case exists for them. */
+  if (kind === "failed-delivery-return" && source?.attempt_id) return "DO No";
   switch (kind) {
     case "supplier-delivery":
       return "PO No";
@@ -419,7 +425,7 @@ export function inboundArrivals(input: InboundInput): InboundArrival[] {
           sourceId: source.id,
           sourceNo: source.source_no,
           sourceType: source.kind,
-          documentWord: inboundDocumentWordOf(source.kind),
+          documentWord: inboundDocumentWordOf(source.kind, source),
           documentNo: source.source_no,
           handoverGaps:
             source.kind === "transfer" || source.kind === "repair-return"

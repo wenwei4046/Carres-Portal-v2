@@ -130,6 +130,41 @@ describe("delivery scopes and journey legs", () => {
     expect(rows[0]!.key).not.toBe(rows[1]!.key);
   });
 
+  it("0491 — a leg with its OWN document takes the document's number, id and the shared ladder", () => {
+    const stops = [
+      { leg: 1, partner_id: "p-teow", partner_name: "TEOW", from_loc: "Klang WH", to_loc: "JB transit", scheduled_at: "2026-08-25T04:00:00.000Z", status: "pending" as const },
+      { leg: 2, partner_id: "p-ssy", partner_name: "SSY", from_loc: "JB transit", to_loc: "Singapore customer", scheduled_at: "2026-08-27T04:00:00.000Z", status: "pending" as const },
+    ];
+    const legDoc: DeliveryOrderRow = {
+      id: "do-leg-1",
+      order_id: "b",
+      do_number: "DO-250826-0001",
+      leg: 1,
+      issued_at: "2026-08-24T02:00:00Z",
+      trip_groups: null,
+      delivery_date: "2026-08-25",
+      time_slot: null,
+      logistics_partner: "TEOW",
+      voided_at: null,
+      void_reason: null,
+      orders: { id: "b", so: 1302, customer_name: "kong chai yin" },
+    };
+    const rows = buildDeliveryScopeRows({
+      orders: [order({ id: "b", so: 1302, delivery_stops: stops })],
+      deliveryOrders: [legDoc],
+      attempts: [],
+      handoverEvents: [{ delivery_order_id: "do-leg-1", kind: "received_by_logistics", recorded_at: "2026-08-25T03:00:00Z" }],
+      partnerNameById: NO_PARTNERS,
+    });
+    expect(rows.map((r) => r.doNumber)).toEqual(["DO-250826-0001", null]);
+    expect(rows[0]!.deliveryOrderId).toBe("do-leg-1");
+    /* The document's own handover facts speak: the partner collected. */
+    expect(rows[0]!.status.kind).toBe("collected");
+    expect(rows[0]!.receivedAt).toBe("2026-08-25T03:00:00Z");
+    /* Leg 2, no document yet: the chain's own words, as before. */
+    expect(rows[1]!.status.kind).toBe("partner_must_contact");
+  });
+
   it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
     // One vocabulary across the workspace: a leg and a whole-order scope must
     // not be readable on two different scales.

@@ -146,7 +146,13 @@ result, proof, problems and history.
 **One delivery TRIP = one DO.** Most orders: one trip, one DO. A split delivery or two
 destinations = one DO per trip, each with its own goods scope. The document rows live in
 `ops_delivery_orders`, materialised by ONE trigger on `orders.do_number` so every existing mint
-path produces the row; a Journey-leg or split-trip DO is approved target (§15.1).
+path produces the row. **A Journey leg's document is BUILT (Card 14, migration 0491):**
+`ops_delivery_orders.leg` names the scope (0 the whole order, 1..n a leg of
+`orders.delivery_stops`), one live document per scope; the leg document issues through the one
+issuing discipline (`attemptLegDocumentIssue` → `delivery_leg_document_mint`) the moment the
+leg's arrangement carries its partner and its agreed day and the order's money and Finance
+gate holds, numbered on the order and the leg; the customer leg's number mirrors onto the
+order for the legacy readers. A split-trip DO remains approved target (§15.1).
 
 - **Numbering** stays the locked `DO-DDMMYY-NNNN` scheme (`docNumber`, seeded on the order id):
   a retry, refresh or reprint returns the SAME number; a rebooked trip is a NEW document on its
@@ -196,7 +202,12 @@ holder and its original dated Warehouse work remains open. A discrepancy creates
 Work linked to the same Unit IDs and handover evidence; neither party's fact is edited to agree.
 
 Each Delivery Journey leg reconciles its own collected and arrived Unit facts. A two-leg journey
-completes neither leg, nor the whole journey, from a count recorded on the other leg.
+completes neither leg, nor the whole journey, from a count recorded on the other leg. **Built
+(0491):** every leg document snapshots the same exact Units (0424), and the one-live-claim guard
+refuses a second live claim only from ANOTHER order — a journey's own legs are the one journey.
+`delivery_attempts.leg` binds a result to its scope; an intermediate leg records its ARRIVAL
+(`delivered` on the leg, moving no Unit, mirrored as `handed_off` on the chain record), the
+customer leg's success still walks the delivery door.
 
 **DELIVERY-TO-OUTBOUND RECONCILIATION (owner-approved 2026-09-01).** The DO owns the exact
 required goods scope; Warehouse Outbound reads that scope and does not re-create it. For each DO
@@ -368,7 +379,15 @@ Every problem has one owner, due date, evidence and next action. Recording `Fail
 automatically creates the appropriate Work. A problem closes only when its fact, reason, affected
 goods, location, evidence and completed or cancelled next action are present. Field staff record
 observable facts; an authorised reviewer may append a root cause later without rewriting the
-observation. Returned goods enter Inbound as `Check required`, never Ready Stock.
+observation. Returned goods enter Inbound as `Check required`, never Ready Stock. **Built (Card
+14, migrations 0490/0491):** a failed or partially delivered result whose goods are
+`returned_to_warehouse` or `still_with_logistics` plans ONE `Failed Delivery return` arrival
+(`arrival_sources`, bound to the Delivery Visit by `attempt_id`, named by the DO the goods went out
+on, from the partner's operating party to the order's warehouse) for every required Unit that did
+not reach the customer and is still reserved to the order; the Warehouse's receipt through Inbound
+is what puts the Unit on `Check required` — the immediate inspection hold is retired because a
+Logistics report never substitutes for the Warehouse's actual receipt (§4). A plan that cannot be
+made is written to the order's history, never hidden.
 
 ## 8 · Information architecture: Monitor and Delivery Orders
 
@@ -883,9 +902,9 @@ or proof. The stable read contract is one row per assigned exact Unit and Delive
 Office working day before pickup; actual collection and actual customer arrival from their
 append-only event timestamps; the assigned Logistics Partner, DO number and source Sales Order; and
 admitted evidence with doors to the exact scope, DO and source order. The read feed is
-`/api/operation/delivery-arrangements/warehouse-schedule`. Journey legs are omitted until the
-arrangement/DO contract and Stock's Unit allocation contract bind one exact Unit to one leg;
-absence stays absence.
+`/api/operation/delivery-arrangements/warehouse-schedule`. A Journey leg joins the feed once it
+carries its own document (0491), whose 0424 scope names the exact Units; a leg with no document
+is absence, never an invented row.
 
 The same feed admits a Warehouse login only when its token is bound to a Warehouse and keeps only
 that Warehouse's Units. The Logistics Partner boundary is the same projection narrowed by
@@ -974,7 +993,7 @@ their absence as a design blind spot:
 | the loan offer record; the append-only Correction of saved delivery facts (§6.1) | new migrations under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
-| per-leg DO issuance and results, returned-goods receipt after a failed trip | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
+| the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
 | central Delivery reports | the Reports destination |
 | the POS required-facts gate for address, state, building type, floor, lift and access | Sales Orders' build, a dependency |
 

@@ -515,3 +515,39 @@ describe("POST /api/operation/orders/:id/loan-return", () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe("POST /:id/delivery-attempt — a Journey leg records its own result (0491)", () => {
+  const ORDER = "00000000-0000-0000-0000-00000000020a";
+  it("passes the leg to the governed door, and admits an intermediate leg's arrival", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { attempt: { leg: 1 } }, error: null });
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/delivery-attempt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ result: "delivered", leg: 1, note: "Reached JB" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(201);
+    expect(rpc).toHaveBeenCalledWith("delivery_attempt_record", expect.objectContaining({ p_order_id: ORDER, p_result: "delivered", p_leg: 1, p_reason_key: null, p_where_goods: null }));
+  });
+
+  it("a whole-order `delivered` is refused before any call — the delivery door owns it", async () => {
+    const rpc = vi.fn();
+    vi.mocked(userClient).mockReturnValue({ ...makeSb({ data: null, error: null }), rpc } as never);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request(`http://t/api/operation/orders/${ORDER}/delivery-attempt`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ result: "delivered" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(422);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});
+

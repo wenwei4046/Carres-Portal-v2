@@ -296,6 +296,31 @@ describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
     voided_at: null,
   };
 
+  it("0491 — a Journey leg joins the feed once it carries its OWN document; a leg without one stays absent", async () => {
+    const LEG_ARRANGEMENT = { ...ARRANGEMENT_ROW, id: "arr-2", leg: 1 };
+    const LEG_DO = { ...DO_ROW, id: "do-2", do_number: "DO-010926-0002", leg: 1 };
+    mockSb([
+      { data: [LEG_ARRANGEMENT, { ...ARRANGEMENT_ROW, id: "arr-3", leg: 2 }] },
+      { data: [ORDER_ROW] },
+      { data: [LEG_DO] },
+      { data: [{ delivery_order_id: "do-2", item_id: "item-1" }] },
+      { data: [{ id: "item-1", unit_code: "CAR-000123", warehouse_id: "wh-1", sku: "SOFA-X" }] },
+      { data: [] },
+      { data: [] },
+      { data: [] },
+      { data: [{ id: "wh-1", name: "Carres Klang" }] },
+      { data: [{ sku: "SOFA-X", variant: "Sofa X (Grey)" }] },
+    ]);
+    const res = await call("/warehouse-schedule", "operation");
+    expect(res.status).toBe(200);
+    const { events } = (await res.json()) as { events: Array<{ leg: number; doNumber: string; deliveryHref: string }> };
+    /* leg 1 has its document → projected (pickup + handover events, one Unit);
+       leg 2 has none → absent. */
+    expect(events.length).toBe(2);
+    expect(new Set(events.map((e) => `${e.leg}:${e.doNumber}`))).toEqual(new Set(["1:DO-010926-0002"]));
+    expect(events[0]!.deliveryHref).toContain("open=");
+  });
+
   it("projects the DO's recorded exact-Unit scope onto the real Saturday pickup with Friday readiness", async () => {
     const { inserts, upserts } = mockSb([
       { data: [ARRANGEMENT_ROW] },

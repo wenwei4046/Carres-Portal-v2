@@ -6963,6 +6963,8 @@ export interface DeliveryOrderRow {
   id: string;
   order_id?: string;
   do_number: string;
+  /** 0491 — 0 the whole-order trip; 1..n one leg of the order's Journey. */
+  leg?: number | null;
   issued_at: string;
   trip_groups: string[] | null;
   delivery_date: string | null;
@@ -6985,6 +6987,8 @@ export interface DeliveryOrderRow {
      *  clock, one of the §6.1 files that can reopen the review question. */
     do_file_path?: string | null;
     do_uploaded_at?: string | null;
+    /** 0156 — the order's Journey legs, when it travels in legs. */
+    delivery_stops?: DeliveryStop[] | null;
     /** The order's goods lines — the register expansion derives THIS TRIP's
      *  lines from them via `trip_groups` (one arithmetic with the DO page). */
     order_lines?: Array<{
@@ -7005,6 +7009,8 @@ export interface DeliveryOrderAttemptRow {
   /** 0344's row id — the Delivery Visit a §6.1 evidence file binds to. */
   id?: string;
   do_number: string | null;
+  /** 0491 — the scope the result belongs to. */
+  leg?: number | null;
   result: "delivered" | "partial" | "failed";
   reason_key: string | null;
   note?: string | null;
@@ -7277,6 +7283,8 @@ export interface DeliveryOrderDetailPayload {
       pod_signed_by: string | null;
       pod_signed_at: string | null;
       do_number: string | null;
+      /** 0156 — the order's Journey legs; a leg document names its own. */
+      delivery_stops?: DeliveryStop[] | null;
       order_lines: Array<{ sku: string; qty: number }>;
     };
   };
