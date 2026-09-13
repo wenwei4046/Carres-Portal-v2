@@ -25,7 +25,7 @@
 
 ## Tasks
 
-- [ ] Schema and wizard refusals with the governed words
-- [ ] Office create door parity
-- [ ] Tests, typecheck
-- [ ] PR → merge → deploy → authenticated production verification
+- [x] Schema and wizard refusals with the governed words — `DELIVERY_FACT_REFUSALS` (shared `sales-order-form.ts`); `createOrderInputSchema` refuses a missing address (the `addressUnknown` escape), state and building type; the wizard's `step1FirstIssue` drops the `or tick 'Unknown'` branch and `CustomerStep` no longer offers `Fill in address later`; stale drafts reload with the tick off
+- [x] Office create door parity — `rawCreateOrderInputSchema` refuses the same six facts with the same words; `PrincipalNewOrder` drops the `Fill in address later` tick, adds `Building type *` (rides `entry_data.fields.building_type`), requires the delivery date, and prints the first missing fact under the form (`raw-first-issue`) before the round trip
+- [x] Tests, typecheck — shared `orders.entry-gate.test.ts`; api `orders-raw.test.ts` refusal cases + fixture; web draft/CustomerStep/PrincipalNewOrder tests updated; tsc ×3
+- [x] PR → merge → deploy → authenticated production verification — PR #1273 squash-merged `4e944e51`; deploy converged (`erp` + Worker `/health` report `4e944e51c6c8682f65aec28c3a1d8c67158210f3`); walked as operation@carres.com against the office door `POST /api/orders/raw`: no building type → 400 `Building type — pick the building the goods go to` · `addressUnknown: true` → 400 `Delivery address — ask the customer for the address before you save the order` · no State → 400 `Delivery address — pick the State` · no date → 400 `Delivery date is required. Ask the customer for the date before you save the order.` · no lift answer → 400 `Lift — say whether the building has a lift`. A complete body (SO-1362, earlier the same day, pre-gate) created and reached Monitor with no `Order details incomplete` line. **Owner action:** the office form (`/principal?tab=new-order`, principal-only) and the dealer POS wizard are not reachable by operation@ — a principal/dealer walk of the `Building type *` field, the retired `Fill in address later` tick and the `raw-first-issue` line is owed.
