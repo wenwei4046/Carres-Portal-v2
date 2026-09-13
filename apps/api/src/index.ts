@@ -91,6 +91,8 @@ import financeReconciliationRouter from "./routes/finance/reconciliation";
 import financeOtherMoneyInRouter from "./routes/finance/other-money-in";
 // The read-only Finance Ledger — Journal, Trial Balance, Self-check.
 import financeLedgerRouter from "./routes/finance/ledger";
+// The manual journal door — the principal's one write to the ledger (0462).
+import financeManualJournalsRouter from "./routes/finance/manual-journals";
 import supplierActivityRouter from "./routes/supplier/activity";
 import supplierMeRouter from "./routes/supplier/me";
 import supplierPosRouter from "./routes/supplier/pos";
@@ -283,6 +285,8 @@ api.route("/finance/payables", financePayablesRouter);
 api.route("/finance/exceptions", financeExceptionsRouter);
 // The read-only Finance Ledger. Also before the catch-all `/finance` router.
 api.route("/finance/ledger", financeLedgerRouter);
+// The manual journal (principal only). Before the catch-all as well.
+api.route("/finance/manual-journals", financeManualJournalsRouter);
 api.route("/finance", financeReconciliationRouter);
 api.route("/supplier/activity", supplierActivityRouter);
 api.route("/supplier/me", supplierMeRouter);
