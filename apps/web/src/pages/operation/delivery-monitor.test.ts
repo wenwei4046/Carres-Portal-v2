@@ -99,6 +99,10 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Landed",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
     delivery_date: "2026-09-04",
     delivery_date_tbd: false,
@@ -587,6 +591,8 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     contactDueIso: null,
     contactOverdue: false,
     scope: { so: 0, refs: [] } as unknown as DeliveryScopeRow,
+    payment: { line1: "Paid", line2: null, tone: "green" },
+    stock: { line1: "Ready", line2: "1 of 1", ready: true },
     ...over,
   };
 }
@@ -823,7 +829,9 @@ describe("the work list's own words — never `scope` (owner correction 2026-09-
        {date}`); they are checked on a real date so the rule covers the words
        they produce, not just the plain strings beside them. */
     const words = Object.values(MONITOR_COPY).map((w) =>
-      typeof w === "function" ? w("Tue, 15 Sep") : w,
+      typeof w === "function"
+        ? (w as (...args: never[]) => string)("Tue, 15 Sep" as never, "NETS" as never)
+        : w,
     );
     for (const word of words) {
       expect(word).not.toMatch(/\bscopes?\b/i);

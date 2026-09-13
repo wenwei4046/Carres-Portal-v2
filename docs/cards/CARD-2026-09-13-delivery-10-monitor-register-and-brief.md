@@ -25,9 +25,9 @@
 
 ## Tasks
 
-- [ ] Column definitions and cell renderers for the twelve columns; storage key `workList.v5`
-- [ ] 72px parent row as the page exception on the shared engine; sticky identity list
-- [ ] The four panels on kit `Panel` with the connector; panel 1 two columns collapsing; panel 4 grid with Source, Status, Location
-- [ ] Chooser columns; retire `Actions` and `Edit Delivery` columns
-- [ ] Tests: columns, rows, panels, colour words, no icons, legacy problem line, responsive; typecheck; design guard
+- [x] Column definitions and cell renderers for the twelve columns; storage key `workList.v5`
+- [x] 72px parent row as the page exception on the shared engine; sticky identity list
+- [x] The four panels on kit `Panel` with the connector; panel 1 two columns collapsing; panel 4 grid with Source, Status, Location
+- [x] Chooser columns; retire `Actions` and `Edit Delivery` columns
+- [x] Tests: columns, rows, panels, colour words, no icons, legacy problem line, responsive; typecheck; design guard
 - [ ] PR → merge → deploy → authenticated production verification with screenshots

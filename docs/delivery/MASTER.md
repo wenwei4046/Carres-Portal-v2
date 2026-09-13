@@ -949,7 +949,7 @@ their absence as a design blind spot:
 
 | Gap | Where it lives today |
 |---|---|
-| Monitor columns, 72px rows, the four panels, in-panel editing, the chooser set | `apps/web/src/pages/operation/OperationDelivery.tsx`, `delivery-work.ts`, `delivery-monitor.ts` |
+| the in-panel edit states (`Update date and time`, `Assign logistics` / `Change logistics` inside the brief) | `apps/web/src/pages/operation/OperationDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the customer contact record, the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
 | fleet-template binding on the arrangement, partner coverage and schedule facts, the Delivery Settings surface | `ops_delivery_arrangements`, `delivery_partners`, `partner_fleet`, the Settings Workspace |

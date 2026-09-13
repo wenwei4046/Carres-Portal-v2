@@ -131,8 +131,21 @@ export const DW = {
   blockerNoBuilding: "No building or access facts",
   blockerNoGoods: "No goods to deliver",
   notYetHere: "Not delivery work yet",
-  /** The disclosure's hover — what OPENS, never the mechanic. */
-  showItems: "Show delivery items",
+  /** The disclosure's hover — what OPENS, never the mechanic (owner ruling
+   *  2026-09-13: the four-panel delivery brief). */
+  showItems: "Show delivery brief",
+  /* ── REQUIRED SALES FACTS (owner ruling 2026-09-13, Delivery MASTER §8.3) ──
+     A row that reaches Monitor with one of these missing is a DATA problem:
+     the status reads `Order details incomplete`, the panel names the fact in
+     orange, and the one door is `Open Sales Order to change`. */
+  stateNotRecorded: "State not recorded",
+  buildingNotRecorded: "Building type not recorded",
+  floorNotRecorded: "Floor not recorded",
+  liftNotRecorded: "Lift not recorded",
+  requestedDateNotRecorded: "Requested delivery date not recorded",
+  openSalesOrder: "Open Sales Order to change",
+  /** A goods line the register has allocated no Unit to yet. */
+  notAllocated: "Not allocated",
   /** The expansion's Loan block heading (owner wording 2026-08-24). */
   itemsToCollect: "Items to collect",
   /** The expansion's read-only physical facts (Stock and Warehouse own them). */
@@ -203,6 +216,18 @@ export interface DeliveryScopeRow {
   /** The evidence a RECORDED delivered result still lacks — the Delivery
    *  Orders register's own arithmetic over the SAME document row. */
   missingProof: MissingDeliveryProof;
+  /** Delivery's own arrangement for this scope (0386) — driver, vehicle,
+   *  ETA and condo registration ride the brief from it. */
+  arrangement: DeliveryArrangementRow | null;
+  /** The recorded handover clocks (0363) — panel 3's pickup fact. */
+  handedOverAt: string | null;
+  receivedAt: string | null;
+  /** The live document's id and issue day — `DO No` opens it, line two is
+   *  its `DO date`. */
+  deliveryOrderId: string | null;
+  doIssuedAt: string | null;
+  /** Required Sales facts this row lacks, in the operator's words (§8.3). */
+  missingFacts: string[];
   /** True once Delivery has recorded its own arrangement for this scope. */
   hasArrangement: boolean;
   /** The order behind the row — for the expansion's own reads. */
@@ -404,9 +429,31 @@ export function deliveryEntryBlockers(o: operationOrderListRow): string[] {
   return out;
 }
 
+/**
+ * ⭐ THE ENTRY RULE, re-ruled 2026-09-13 (Delivery MASTER §8.3): an order with
+ * NO delivery address at all is not a delivery and stays Sales-owned Work.
+ * Every OTHER missing required Sales fact — state, building type, floor,
+ * lift, the requested delivery information — is a DATA PROBLEM on a row that
+ * IS delivery work: the row enters Monitor reading `Order details incomplete`
+ * with the fact named in orange and the door `Open Sales Order to change`.
+ */
 export function entersDeliveryWork(o: operationOrderListRow): boolean {
   const f = deliveryEntryFactsOf(o);
-  return f.isTravelling && f.hasLocation && f.hasBuilding && f.hasGoods;
+  return f.isTravelling && f.hasLocation && f.hasGoods;
+}
+
+/** The required Sales facts this row lacks, in the operator's words. */
+export function requiredSalesFactsMissing(o: operationOrderListRow): string[] {
+  const out: string[] = [];
+  if (!o.customer_address_state?.trim()) out.push(DW.stateNotRecorded);
+  if (!o.building_type?.trim()) out.push(DW.buildingNotRecorded);
+  if (o.delivery_floor == null) out.push(DW.floorNotRecorded);
+  if (o.delivery_has_lift == null) out.push(DW.liftNotRecorded);
+  /* The customer WAS asked and answered "not yet" is recorded information;
+     a row nobody asked about is not. */
+  const requested = requestedDeliveryOf(o);
+  if (!requested.iso && !requested.tbd) out.push(DW.requestedDateNotRecorded);
+  return out;
 }
 
 /**
@@ -470,6 +517,8 @@ export function buildDeliveryScopeRows({
     attemptsByDo.set(a.do_number, [...(attemptsByDo.get(a.do_number) ?? []), a]);
   }
   const handoverByDoId = new Map<string, Array<{ kind: DeliveryHandoverKind; recordedAt: string | null }>>();
+  const handoverClockOf = (doc: DeliveryOrderRow | null, kind: DeliveryHandoverKind): string | null =>
+    doc ? handoverByDoId.get(doc.id)?.find((e) => e.kind === kind)?.recordedAt ?? null : null;
   for (const e of handoverEvents) {
     handoverByDoId.set(e.delivery_order_id, [
       ...(handoverByDoId.get(e.delivery_order_id) ?? []),
@@ -549,6 +598,7 @@ export function buildDeliveryScopeRows({
       customerDeliveryIso: requestedDeliveryOf(o).iso,
       customerDateTbd: requestedDeliveryOf(o).tbd,
       contactDueIso,
+      missingFacts: requiredSalesFactsMissing(o),
       location: conciseLocality(o.customer_address_city, o.customer_address_state),
       building: o.building_type?.trim() || DW.notGiven,
       goods: itemsSummary(o) || DW.noGoods,
@@ -568,6 +618,7 @@ export function buildDeliveryScopeRows({
       const facts = factsOf(doc);
       const missingProof = proofOf(doc, o);
       const logisticsName = arrangement?.partner_name ?? fallbackPartner.name;
+      const liveDoc = Boolean(doc) && docStatusOf(doc!).kind !== "cancelled";
       rows.push({
         ...base,
         key: o.id,
@@ -580,6 +631,11 @@ export function buildDeliveryScopeRows({
         doNumber: doc?.do_number ?? null,
         hasArrangement: Boolean(arrangement),
         missingProof,
+        arrangement,
+        handedOverAt: handoverClockOf(doc, "handed_over"),
+        receivedAt: handoverClockOf(doc, "received_by_logistics"),
+        deliveryOrderId: liveDoc ? doc!.id : null,
+        doIssuedAt: liveDoc ? doc!.issued_at : null,
         status: deliveryWorkStatusOf(
           {
             partnerName: logisticsName,
@@ -589,8 +645,9 @@ export function buildDeliveryScopeRows({
             /* A VOIDED document is not a live one: its scope is waiting to be
                re-planned, and naming a partner's pickup for it would point at
                a warehouse holding nothing. */
-            hasDeliveryOrder: Boolean(doc) && docStatusOf(doc!).kind !== "cancelled",
+            hasDeliveryOrder: liveDoc,
             expectedArrival: arrangement?.expected_arrival ?? null,
+            missingFacts: base.missingFacts,
             todayIso: todayIso ?? null,
             proof: {
               photoUploaded: missingProof.photo ? false : null,
@@ -630,6 +687,11 @@ export function buildDeliveryScopeRows({
         doNumber: null,
         hasArrangement: Boolean(arrangement),
         missingProof: proofOf(null, o),
+        arrangement,
+        handedOverAt: null,
+        receivedAt: null,
+        deliveryOrderId: null,
+        doIssuedAt: null,
         status: legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
       });
     }

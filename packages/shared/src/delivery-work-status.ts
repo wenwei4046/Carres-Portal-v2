@@ -182,8 +182,9 @@ export interface DeliveryWorkStatus {
   /** Line two — the date, window, deadline, ETA, proof state or reason; null
    *  when the fact needs no second line. */
   second: string | null;
-  /** Line two spends the attention colour only for a proof gap. */
-  secondTone: "orange" | null;
+  /** Line two spends a colour only for a proof gap (orange) or a contact
+   *  deadline that has passed (red). */
+  secondTone: "orange" | "red" | null;
   /** A failure's ONE reason, in the reason library's own words. */
   reasonLabel: string | null;
 }
@@ -240,7 +241,7 @@ export function deliveryWorkStatusOf(
   const say = (
     kind: DeliveryWorkStatusKind,
     second: string | null = null,
-    extra: { secondTone?: "orange" | null; reasonLabel?: string | null; day?: string | null } = {},
+    extra: { secondTone?: "orange" | "red" | null; reasonLabel?: string | null; day?: string | null } = {},
   ): DeliveryWorkStatus => ({
     kind,
     label: deliveryWorkStatusLabelOf(kind, partner, extra.day ?? null),
@@ -318,6 +319,10 @@ export function deliveryWorkStatusOf(
   }
 
   const callBy = input.callByDate ? `Call by ${spell.date(input.callByDate)}` : null;
-  if (input.contactBy === "operation") return say("operation_must_call", callBy);
-  return say("partner_must_contact", callBy);
+  /* A contact deadline behind us is red (§8.3 colour law) — and it keeps the
+     day it missed; the deadline never moves. */
+  const late = Boolean(input.callByDate && input.todayIso && input.callByDate < input.todayIso);
+  const tone = { secondTone: late ? ("red" as const) : null };
+  if (input.contactBy === "operation") return say("operation_must_call", callBy, tone);
+  return say("partner_must_contact", callBy, tone);
 }

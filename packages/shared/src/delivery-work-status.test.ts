@@ -48,6 +48,14 @@ describe("deliveryWorkStatusOf â€” the actor and the fact, never the document (Â
     expect(s.tone).toBe("orange");
   });
 
+  it("a contact deadline behind us turns line two red and keeps the day it missed", () => {
+    const s = status({ callByDate: "2026-09-01", todayIso: "2026-09-12" });
+    expect(s.label).toBe("NETS must contact the customer");
+    expect(s.second).toBe("Call by D(2026-09-01)");
+    expect(s.secondTone).toBe("red");
+    expect(status({ callByDate: "2026-09-20", todayIso: "2026-09-12" }).secondTone).toBeNull();
+  });
+
   it("Carres contacts the customer where the record says so", () => {
     const s = status({ contactBy: "operation", callByDate: "2026-09-10" });
     expect(s.label).toBe("Operation must call the customer");

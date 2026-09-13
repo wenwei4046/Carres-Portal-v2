@@ -21,6 +21,7 @@ import {
   confirmedDeliveryOf,
   legWorkStatusOf,
   entersDeliveryWork,
+  requiredSalesFactsMissing,
   deliveryEntryBlockers,
   regionBucketOf,
   SINGAPORE_KEY,
@@ -44,6 +45,10 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Landed",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
     delivery_date: "2026-08-30",
     delivery_date_tbd: false,
@@ -239,20 +244,32 @@ describe("the entry rule keeps Sales work out of Delivery Work", () => {
     expect(entersDeliveryWork(o)).toBe(true);
   });
 
-  it("refuses a scope with no building or access facts", () => {
-    const o = order({ id: "a", so: 1301, building_type: null });
-    expect(entersDeliveryWork(o)).toBe(false);
+  it("⭐ a scope with no building facts ENTERS as a data problem (owner ruling 2026-09-13)", () => {
+    /* Only a missing ADDRESS keeps an order out of Monitor. Every other
+       required Sales fact that is missing is named on the row: the status
+       reads `Order details incomplete` and the brief names the fact. */
+    const o = order({ id: "a", so: 1301, building_type: null, delivery_floor: null, delivery_has_lift: null });
+    expect(entersDeliveryWork(o)).toBe(true);
     expect(deliveryEntryBlockers(o)).toContain(DW.blockerNoBuilding);
+    expect(requiredSalesFactsMissing(o)).toEqual([
+      DW.buildingNotRecorded,
+      DW.floorNotRecorded,
+      DW.liftNotRecorded,
+    ]);
+    const rows = build([o]);
+    expect(rows[0]!.status.label).toBe("Order details incomplete");
+    expect(rows[0]!.status.second).toBe(DW.buildingNotRecorded);
+    expect(rows[0]!.missingFacts).toContain(DW.floorNotRecorded);
   });
 
-  it("accepts floor or lift as the building facts when `building_type` predates the field", () => {
-    expect(entersDeliveryWork(order({ id: "a", so: 1301, building_type: null, delivery_floor: 3 })))
-      .toBe(true);
+  it("a complete row lacks nothing — the requested-date answer `not yet` counts as recorded", () => {
+    expect(requiredSalesFactsMissing(order({ id: "a", so: 1301 }))).toEqual([]);
     expect(
-      entersDeliveryWork(
-        order({ id: "a", so: 1301, building_type: null, delivery_has_lift: false }),
-      ),
-    ).toBe(true);
+      requiredSalesFactsMissing(order({ id: "a", so: 1301, delivery_date: null, delivery_date_tbd: true })),
+    ).toEqual([]);
+    expect(
+      requiredSalesFactsMissing(order({ id: "a", so: 1301, delivery_date: null, delivery_date_tbd: false })),
+    ).toContain(DW.requestedDateNotRecorded);
   });
 
   it("⭐ refuses an order whose only line is a SERVICE — a truck carries goods", () => {
@@ -288,6 +305,8 @@ describe("the entry rule keeps Sales work out of Delivery Work", () => {
       customer_address_city: null,
       customer_address_state: null,
       building_type: null,
+      delivery_floor: null,
+      delivery_has_lift: null,
       order_lines: [],
     });
     expect(deliveryEntryBlockers(o)).toHaveLength(3);

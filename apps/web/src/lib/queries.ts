@@ -3053,6 +3053,10 @@ export interface operationOrderListRow {
    *  older Worker that does not select them raises nothing (UNKNOWN never
    *  accuses). */
   order_finance_exceptions?: { status: "open" | "cleared" }[];
+  /** 0362 — the delivery payment approvals; Monitor's `Payment` cell reads
+   *  `paymentApprovalOpensGate` over them for the authoritative COD line
+   *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
+  order_delivery_payment_approvals?: { status: string }[];
   ops_sofa_loans?: { status: "on_loan" | "returned" }[];
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */

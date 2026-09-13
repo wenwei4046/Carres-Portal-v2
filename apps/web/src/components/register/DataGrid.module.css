@@ -119,7 +119,8 @@
 }
 .rootReference .td {
   box-sizing: border-box;
-  height: 38px;
+  /* 38px baseline; a page with an owner-ruled exception sets --grid-row-h. */
+  height: var(--grid-row-h, 38px);
   padding: 0 8px;
   font-size: var(--fs-13);
   line-height: 18px;
