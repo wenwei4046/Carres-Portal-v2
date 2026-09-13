@@ -195,9 +195,7 @@ import {
   type TopUpOrderInput,
   type CreateStripeCheckoutInput,
   type StripeCheckoutSessionInfo,
-  type TransferReadyInput,
   type UpdateOrderInput,
-  type WarehousePickInput,
   type DeliveryStop,
   type SetDeliveryChainInput,
   type PatchDeliveryStopInput,
@@ -8128,30 +8126,6 @@ export function useRevertOrderDispatchMutation(
   });
 }
 
-/** Manual override of the auto-picked source warehouse (E1 in_production). */
-export function useWarehousePickMutation(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<operationOrderMutationResponse, ApiError, WarehousePickInput>
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<operationOrderMutationResponse, ApiError, WarehousePickInput>({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/warehouse`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
-  });
-}
-
 /** Pipeline v2 (C2 / migration 0024) — confirm a `confirmed` order.
  *  RPC `operation_confirm_proceed_request` decides in_production vs
  *  ready_to_dispatch based on shortage at the chosen warehouse. `warehouseId`
@@ -8310,49 +8284,6 @@ export function usePartnerIncomingOrders() {
     queryKey: qk.partner.incoming(),
     queryFn: () => apiFetch<PartnerIncomingResponse>("/api/partner/orders/incoming"),
     refetchInterval: 15_000,
-  });
-}
-
-/** Pipeline v2 (C2 / migration 0024) — flip a `confirmed` or
- *  `in_production` order directly to `ready_to_dispatch`. Wraps
- *  `operation_warehouse_pick` whose source-stage guard widens to permit both
- *  stages. `warehouseId` is REQUIRED here (the RPC raises 22023
- *  `warehouse_required` on NULL — confirm-proceed accepts NULL via a different
- *  RPC, do not conflate). Reserves stock; busts warehouse cache. */
-export function useTransferReady(
-  orderId: string,
-  opts?: Partial<
-    UseMutationOptions<
-      operationOrderMutationResponse,
-      ApiError,
-      TransferReadyInput
-    >
-  >,
-) {
-  const qc = useQueryClient();
-  return useMutation<
-    operationOrderMutationResponse,
-    ApiError,
-    TransferReadyInput
-  >({
-    mutationFn: (input) =>
-      apiFetch<operationOrderMutationResponse>(
-        `/api/operation/orders/${orderId}/transfer-ready`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
-    ...opts,
-    onSuccess: async (...args) => {
-      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
-      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
-      await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
-      await qc.invalidateQueries({ queryKey: qk.operation.warehouse(), exact: true });
-      // T42-pass3-C2 — stock-touching mutations must also bust the stock-alerts
-      // cache; otherwise the dashboard tile + CreatePOModal "Suggest from
-      // alerts" stay stale for up to 30s after qty/reserved change.
-      await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
-      await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
-      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
-    },
   });
 }
 
