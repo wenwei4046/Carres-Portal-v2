@@ -24,7 +24,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { groupWorkItemsByDay, workspaceDutyLabelOf } from "@carres/shared";
+import { groupWorkItemsByDay, orderActionLines, workspaceDutyLabelOf } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
@@ -50,6 +50,21 @@ function supportingLine(i: WorkRow): string {
   return i.dueIso ? `due ${fmtDate(i.dueIso)}` : "No date";
 }
 
+/**
+ * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+ * 2026-09-13, Delivery MASTER §10): the act with its recipient, then the
+ * required result — never joined with `—`. `Deliver on {weekday, date}` is
+ * spelled here through the one date home, because the engine spells no dates.
+ */
+function deliveryLines(item: WorkRow): { act: string; result: string | null } | null {
+  if (item.module !== "delivery") return null;
+  const act =
+    item.ruleKey === "deliver_today" && item.dueIso
+      ? orderActionLines("deliver_today", { deliveryDate: fmtDate(item.dueIso) }).act
+      : item.action;
+  return { act, result: item.requiredResult || null };
+}
+
 function WorkRowButton({
   item,
   onOpen,
@@ -57,6 +72,7 @@ function WorkRowButton({
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
 }) {
+  const delivery = deliveryLines(item);
   return (
     <button
       type="button"
@@ -79,8 +95,16 @@ function WorkRowButton({
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {item.action}
+          {delivery?.act ?? item.action}
         </span>
+        {delivery?.result ? (
+          <span
+            className="block truncate text-body text-base-700"
+            data-testid="work-row-result"
+          >
+            {delivery.result}
+          </span>
+        ) : null}
         <span
           className={`block truncate text-label font-normal ${
             item.workingDaysLate > 0 ? "text-danger" : "text-base-600"

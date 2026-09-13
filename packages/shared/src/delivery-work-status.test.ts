@@ -1,14 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
   deliveryWorkStatusOf,
-  DELIVERY_WORK_STATUS_LABEL,
+  deliveryWorkStatusLabelOf,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  type DeliveryStatusSpell,
   type DeliveryWorkStatusInput,
 } from "./delivery-work-status";
 import { DELIVERY_ORDER_STATUS_LABEL } from "./delivery-order-status";
 import type { DeliveryHandoverKind } from "./delivery-order-status";
 
+/** A test speller — the words are this module's, the spelling is the caller's. */
+const SPELL: DeliveryStatusSpell = {
+  date: (iso) => `D(${iso})`,
+  dateTime: (iso) => `T(${iso})`,
+};
+
 const base: DeliveryWorkStatusInput = {
+  partnerName: "NETS",
   confirmedDate: null,
+  confirmedTime: null,
   hasDeliveryOrder: false,
   handoverEvents: [],
   attempts: [],
@@ -19,91 +30,150 @@ const attempt = (
   reasonKey: string | null = null,
   recordedAt = "2026-08-24T10:00:00Z",
 ) => ({ result, reasonKey, recordedAt });
+const status = (over: Partial<DeliveryWorkStatusInput>) =>
+  deliveryWorkStatusOf({ ...base, ...over }, SPELL);
 
-describe("deliveryWorkStatusOf — the operator's ladder, not the document's", () => {
-  it("nothing agreed with the customer yet", () => {
-    expect(deliveryWorkStatusOf(base).label).toBe("Waiting for customer date");
+describe("deliveryWorkStatusOf — the actor and the fact, never the document (§8.4)", () => {
+  it("no partner on the scope → Operation must assign logistics, orange", () => {
+    const s = status({ partnerName: null });
+    expect(s.label).toBe("Operation must assign logistics");
+    expect(s.tone).toBe("orange");
+    expect(s.second).toBeNull();
   });
 
-  it("a day is agreed and no document exists yet", () => {
-    expect(deliveryWorkStatusOf({ ...base, confirmedDate: "2026-08-28" }).label).toBe(
-      "Delivery confirmed",
-    );
+  it("partner set, nothing agreed → the PARTNER must contact the customer, with the deadline", () => {
+    const s = status({ callByDate: "2026-09-10" });
+    expect(s.label).toBe("NETS must contact the customer");
+    expect(s.second).toBe("Call by D(2026-09-10)");
+    expect(s.tone).toBe("orange");
   });
 
-  it("⭐ a document with nothing physical recorded names the WAREHOUSE, never `Created`", () => {
-    const s = deliveryWorkStatusOf({
-      ...base,
-      confirmedDate: "2026-08-28",
-      hasDeliveryOrder: true,
+  it("Carres contacts the customer where the record says so", () => {
+    const s = status({ contactBy: "operation", callByDate: "2026-09-10" });
+    expect(s.label).toBe("Operation must call the customer");
+    expect(s.second).toBe("Call by D(2026-09-10)");
+  });
+
+  it("the latest contact waiting for a reply names that wait and the day asked", () => {
+    const s = status({
+      latestContact: { result: "waiting_customer_reply", recordedOn: "2026-09-08" },
     });
-    expect(s.label).toBe("Waiting for warehouse");
-    // The whole point of the correction: the document word must not leak here.
+    expect(s.label).toBe("Waiting for customer reply");
+    expect(s.second).toBe("Asked D(2026-09-08)");
+  });
+
+  it("⭐ a DAY without a WINDOW is still contact work — never Confirmed", () => {
+    const s = status({ confirmedDate: "2026-09-14" });
+    expect(s.label).toBe("NETS must contact the customer");
+  });
+
+  it("a day AND a window → Confirmed for the day, green, the window beneath", () => {
+    const s = status({ confirmedDate: "2026-09-14", confirmedTime: "2 PM to 5 PM" });
+    expect(s.label).toBe("Confirmed for D(2026-09-14)");
+    expect(s.second).toBe("2 PM to 5 PM");
+    expect(s.tone).toBe("green");
+  });
+
+  it("⭐ a live document with nothing physical recorded names the PARTNER's pickup, never `Created`", () => {
+    const s = status({
+      confirmedDate: "2026-09-14",
+      confirmedTime: "2 PM to 5 PM",
+      hasDeliveryOrder: true,
+      handoverDate: "2026-09-13",
+    });
+    expect(s.label).toBe("Waiting for NETS pickup");
+    expect(s.second).toBe("Handover D(2026-09-13)");
+    expect(s.tone).toBe("none");
     expect(s.label).not.toBe(DELIVERY_ORDER_STATUS_LABEL.created);
   });
 
-  it("the warehouse says the goods are ready", () => {
+  it("Ready for handover and Handed over WITHOUT the partner's receipt are still the pickup wait", () => {
     expect(
-      deliveryWorkStatusOf({
-        ...base,
-        hasDeliveryOrder: true,
-        handoverEvents: at("ready_for_handover"),
-      }).label,
-    ).toBe("Ready for handover");
+      status({ hasDeliveryOrder: true, handoverEvents: at("ready_for_handover", "handed_over") }).label,
+    ).toBe("Waiting for NETS pickup");
   });
 
-  it("handed over WITHOUT a logistics receipt is still only ready — half a handshake", () => {
-    expect(
-      deliveryWorkStatusOf({
-        ...base,
-        hasDeliveryOrder: true,
-        handoverEvents: at("ready_for_handover", "handed_over"),
-      }).label,
-    ).toBe("Ready for handover");
+  it("the partner's receipt → Goods collected by the partner, with its clock", () => {
+    const s = status({
+      hasDeliveryOrder: true,
+      handoverEvents: [
+        { kind: "ready_for_handover" },
+        { kind: "received_by_logistics", recordedAt: "2026-09-14T09:30:00Z" },
+      ],
+    });
+    expect(s.label).toBe("Goods collected by NETS");
+    expect(s.second).toBe("Collected T(2026-09-14T09:30:00Z)");
   });
 
-  it("only the logistics receipt puts the goods on the road", () => {
-    expect(
-      deliveryWorkStatusOf({
-        ...base,
-        hasDeliveryOrder: true,
-        handoverEvents: at("ready_for_handover", "handed_over", "received_by_logistics"),
-      }).label,
-    ).toBe("Out for delivery");
+  it("collected with an ETA → the partner is delivering, ETA beneath", () => {
+    const s = status({
+      hasDeliveryOrder: true,
+      handoverEvents: at("received_by_logistics"),
+      expectedArrival: "14:30",
+    });
+    expect(s.label).toBe("NETS is delivering to the customer");
+    expect(s.second).toBe("ETA 14:30");
   });
 
-  it("a recorded delivery outranks every derivation", () => {
-    expect(
-      deliveryWorkStatusOf({
-        ...base,
+  it("⭐ a confirmed day behind us with no result → Overdue, red, the partner must record it", () => {
+    const s = status({
+      confirmedDate: "2026-09-10",
+      confirmedTime: "9 AM to 12 PM",
+      hasDeliveryOrder: true,
+      handoverEvents: at("received_by_logistics"),
+      todayIso: "2026-09-12",
+    });
+    expect(s.label).toBe("Overdue");
+    expect(s.tone).toBe("red");
+    expect(s.second).toBe("NETS must record the result");
+  });
+
+  it("without today handed in, no row is ever Overdue — the arithmetic keeps no clock", () => {
+    expect(status({ confirmedDate: "2026-09-10", confirmedTime: "9 AM to 12 PM" }).label).toBe(
+      "Confirmed for D(2026-09-10)",
+    );
+  });
+
+  it("a recorded delivery outranks every derivation, and names its proof state", () => {
+    const delivered = (proof: DeliveryWorkStatusInput["proof"]) =>
+      status({
         hasDeliveryOrder: true,
         handoverEvents: at("received_by_logistics"),
         attempts: [attempt("delivered")],
-      }).label,
-    ).toBe("Delivered");
+        confirmedDate: "2026-08-20",
+        confirmedTime: "9 AM to 12 PM",
+        todayIso: "2026-09-12",
+        proof,
+      });
+    const accepted = delivered({ photoUploaded: true, signedDoUploaded: true, acceptedOn: "2026-08-25" });
+    expect(accepted.label).toBe("Delivered");
+    expect(accepted.tone).toBe("green");
+    expect(accepted.second).toBe("Proof accepted D(2026-08-25)");
+    const noPhoto = delivered({ photoUploaded: false, signedDoUploaded: true, acceptedOn: null });
+    expect(noPhoto.second).toBe("Delivery photo not uploaded");
+    expect(noPhoto.secondTone).toBe("orange");
+    const noSigned = delivered({ photoUploaded: true, signedDoUploaded: false, acceptedOn: null });
+    expect(noSigned.second).toBe("Upload signed Delivery Order");
+    expect(delivered(null).second).toBeNull();
   });
 
-  it("a failure is ONE Failed Delivery carrying ONE reason", () => {
-    const s = deliveryWorkStatusOf({
-      ...base,
-      hasDeliveryOrder: true,
-      attempts: [attempt("failed", "customer_unreachable")],
-    });
+  it("a failure is ONE Failed Delivery carrying ONE reason, red", () => {
+    const s = status({ hasDeliveryOrder: true, attempts: [attempt("failed", "customer_unreachable")] });
     expect(s.label).toBe("Failed Delivery");
+    expect(s.tone).toBe("red");
     expect(s.reasonLabel).toBeTruthy();
+    expect(s.second).toBe(s.reasonLabel);
   });
 
   it("a partial delivery is the same one failure word, never a third", () => {
-    expect(
-      deliveryWorkStatusOf({ ...base, hasDeliveryOrder: true, attempts: [attempt("partial")] })
-        .label,
-    ).toBe("Failed Delivery");
+    expect(status({ hasDeliveryOrder: true, attempts: [attempt("partial")] }).label).toBe(
+      "Failed Delivery",
+    );
   });
 
   it("the LATEST attempt decides — a redelivery after a failure reads Delivered", () => {
     expect(
-      deliveryWorkStatusOf({
-        ...base,
+      status({
         hasDeliveryOrder: true,
         attempts: [
           attempt("failed", "customer_unreachable", "2026-08-20T09:00:00Z"),
@@ -113,15 +183,44 @@ describe("deliveryWorkStatusOf — the operator's ladder, not the document's", (
     ).toBe("Delivered");
   });
 
-  it("⭐ the document's vocabulary and the operator's never overlap on `Created`", () => {
-    const operational = Object.values(DELIVERY_WORK_STATUS_LABEL);
-    expect(operational).not.toContain(DELIVERY_ORDER_STATUS_LABEL.created);
-    expect(operational).toHaveLength(7);
+  it("a required Sales fact missing → Order details incomplete, naming the fact", () => {
+    const s = status({ missingFacts: ["Building type not recorded"], callByDate: "2026-09-10" });
+    expect(s.label).toBe("Order details incomplete");
+    expect(s.second).toBe("Building type not recorded");
+    expect(s.tone).toBe("orange");
   });
 
-  it("no status word names a mood", () => {
-    for (const label of Object.values(DELIVERY_WORK_STATUS_LABEL)) {
-      expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked/i);
+  it("the role word stands in where the data names no partner — never an empty gap", () => {
+    expect(status({ partnerName: "  ", hasDeliveryOrder: true }).label).toBe(
+      "Waiting for logistics pickup",
+    );
+    expect(deliveryWorkStatusLabelOf("delivering", null)).toBe("Logistics is delivering to the customer");
+    expect(deliveryWorkStatusLabelOf("partner_must_contact", "")).toBe(
+      "Logistics must contact the customer",
+    );
+  });
+
+  it("⭐ the retired words never return, and no word names a mood", () => {
+    const every = DELIVERY_WORK_STATUS_KINDS.map((k) => deliveryWorkStatusLabelOf(k, "NETS", "Thu, 22 Oct"));
+    for (const retired of [
+      "Waiting for customer date",
+      "Delivery confirmed",
+      "Waiting for warehouse",
+      "Ready for handover",
+      "Out for delivery",
+      DELIVERY_ORDER_STATUS_LABEL.created,
+    ]) {
+      expect(every).not.toContain(retired);
     }
+    for (const label of every) {
+      expect(label).not.toMatch(/pending|awaiting|in progress|scheduled|booked|unscheduled/i);
+      expect(label).not.toMatch(/^Waiting$/);
+    }
+    expect(every).toHaveLength(12);
+  });
+
+  it("every kind carries a colour word, and only the two exceptions are red", () => {
+    const red = DELIVERY_WORK_STATUS_KINDS.filter((k) => DELIVERY_WORK_STATUS_TONE[k] === "red");
+    expect(red).toEqual(["overdue", "failed"]);
   });
 });

@@ -125,12 +125,17 @@ describe("delivery scopes and journey legs", () => {
     expect(rows[0]!.key).not.toBe(rows[1]!.key);
   });
 
-  it("speaks a leg's status in the SEVEN OPERATIONAL words, never `Pending`", () => {
+  it("speaks a leg's status in the shared ACTOR-FIRST words (§8.4), never `Pending`", () => {
     // One vocabulary across the workspace: a leg and a whole-order scope must
     // not be readable on two different scales.
-    expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Waiting for customer date");
-    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25").label).toBe("Delivery confirmed");
-    expect(legWorkStatusOf({ status: "picked_up" }, null).label).toBe("Out for delivery");
+    expect(legWorkStatusOf({ status: "pending" }, null).label).toBe("Operation must assign logistics");
+    expect(legWorkStatusOf({ status: "pending" }, null, "TEOW").label).toBe("TEOW must contact the customer");
+    /* A day alone is still contact work; a day AND a window is the booking. */
+    expect(legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW").label).toBe("TEOW must contact the customer");
+    const booked = legWorkStatusOf({ status: "pending" }, "2026-08-25", "TEOW", "9am–12pm");
+    expect(booked.label).toBe("Confirmed for Tue, 25 Aug");
+    expect(booked.second).toBe("9am–12pm");
+    expect(legWorkStatusOf({ status: "picked_up" }, null, "TEOW").label).toBe("Goods collected by TEOW");
     // Leg 1 handing over at the named JB warehouse IS that leg's delivery.
     expect(legWorkStatusOf({ status: "handed_off" }, null).label).toBe("Delivered");
     expect(legWorkStatusOf({ status: "delivered" }, null).label).toBe("Delivered");
@@ -140,7 +145,7 @@ describe("delivery scopes and journey legs", () => {
   it("⭐ never prints the DOCUMENT's `Created` on a leg or a scope", () => {
     const rows = build([order({ id: "a", so: 1301 })]);
     expect(rows[0]!.status.label).not.toBe("Created");
-    expect(rows[0]!.status.label).toBe("Waiting for customer date");
+    expect(rows[0]!.status.label).toBe("Operation must assign logistics");
   });
 
   it("leaves a delivered order out — that is history, not planning", () => {
@@ -345,7 +350,9 @@ describe("the arrangement is what Delivery wrote", () => {
     });
     expect(rows[0]!.confirmedIso).toBe("2026-08-28");
     expect(rows[0]!.confirmedTime).toBe("9am–12pm");
-    expect(rows[0]!.status.label).toBe("Delivery confirmed");
+    expect(rows[0]!.status.label).toBe("Confirmed for Fri, 28 Aug");
+    expect(rows[0]!.status.second).toBe("9am–12pm");
+    expect(rows[0]!.status.tone).toBe("green");
   });
 
   it("gives each Journey LEG its own arrangement", () => {

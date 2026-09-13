@@ -35,6 +35,8 @@ import {
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
   WAREHOUSE_OFF_DAYS,
+  orderActionLines,
+  type OrderActionKey,
 } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
@@ -128,6 +130,9 @@ export function projectSalesOrdersFromModuleFacts(input: {
   stock: Array<{ sku: string; available: number }>;
   staff: Array<{ user_id: string; name: string | null; email: string }>;
   dutyResolutions: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
+  /** Logistics Partner names by id — `Call NETS`, never `Call logistics`,
+   *  wherever the order names its company. */
+  partnerNameById?: ReadonlyMap<string, string>;
   today: string;
   safetyDays: number | null;
   /** Gate convergence (2026-09-07): Σ live ISSUED storage papers per order —
@@ -233,6 +238,8 @@ export function projectSalesOrdersFromModuleFacts(input: {
         ),
       },
       customer: row.customer_name,
+      logistics:
+        input.partnerNameById?.get(row.delivery_partner_id ?? row.ops_assigned_logistic ?? "") ?? null,
       deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
     });
@@ -744,6 +751,8 @@ export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
   customer: string | null;
+  /** The order's Logistics Partner, by name, for the Delivery lines. */
+  logistics?: string | null;
   deliveryOrderNumber?: string | null;
   today: string;
   workingDays?: WorkingDayOptions;
@@ -758,7 +767,18 @@ export function projectSalesOrderWork(input: {
   ).map((item) => {
     const deliveryOwned = item.module === "delivery";
     const deliveryOrder = input.deliveryOrderNumber ?? null;
-    return operationWorkItemFromProjection(item, {
+    /* ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+       2026-09-13, Delivery MASTER §10): the act with its recipient, then the
+       required result. The words come from the one word module; the day of
+       `Deliver on {weekday, date}` is spelled by the web, because the engine
+       spells no dates. */
+    const lines = deliveryOwned
+      ? orderActionLines(item.ruleKey as OrderActionKey, {
+          logistics: input.logistics ?? null,
+          dayAgreed: Boolean(input.context.confirmedDateIso),
+        })
+      : null;
+    return operationWorkItemFromProjection(lines ? { ...item, action: lines.act } : item, {
       object: deliveryOwned
         ? {
             kind: deliveryOrder ? "delivery_order" : "delivery_scope",
@@ -777,7 +797,8 @@ export function projectSalesOrderWork(input: {
         item.ruleKey === "collect"
           ? input.customer
           : null,
-      requiredResult: ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
+      requiredResult:
+        lines?.result ?? ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
       destination: deliveryOwned
         ? deliveryOrder && (item.ruleKey === "deliver_today" || item.ruleKey === "upload_delivery_photo")
           ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
@@ -1263,6 +1284,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     stock: stock.skus,
     staff: staff.staff,
     dutyResolutions,
+    partnerNameById: new Map((purchasingSettings.deliveryPartners ?? []).map((p) => [p.id, p.name])),
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
