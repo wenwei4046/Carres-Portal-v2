@@ -172,6 +172,13 @@ describe("Payment timing — two lines: the fact and the governed action", () =>
     expect(r.timing).toMatchObject({ kind: "due_today", fact: "Payment due today", action: "ask" });
     expect(MONITOR_ACTION_WORD[r.timing.action!]).toBe("Ask customer to pay");
   });
+  it("a Saturday deadline: Operation acts Friday, the fact still names Saturday; a Saturday worker acts Saturday", () => {
+    // Tue 15 Sep delivery: Mon 14 T−1, Sat 12 T−2 — today is Friday 11.
+    const op = build({ control: { ...ready, confirmed_date: "2026-09-15" } });
+    expect(op.timing).toMatchObject({ kind: "due_today", fact: "Payment due Saturday, 12 Sep", action: "ask", actionDueIso: "2026-09-11", dueIso: "2026-09-12" });
+    const sat = build({ control: { ...ready, confirmed_date: "2026-09-15" } }, { owner: { offDays: [0] } });
+    expect(sat.timing).toMatchObject({ kind: "ask_today", actionDueIso: "2026-09-12" });
+  });
   it("ask day → `Ask customer today`", () => {
     // Tue 15 Sep delivery: Mon 14 T−1, Sat 12 T−2 → Fri 11; Fri 11 T−3 → same day = deadline.
     // Use Wed 16: Tue 15 T−1, Mon 14 T−2, Sat 12 T−3 → Fri 11 is the ask day.

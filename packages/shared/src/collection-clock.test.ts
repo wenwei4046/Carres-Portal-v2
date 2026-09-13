@@ -4,6 +4,7 @@ import {
   collectionClock,
   collectionTimingFor,
   operationActionDay,
+  ownerActionDay,
   resolveCollectionAnchor,
 } from "./collection-clock";
 import { myHolidaySet } from "./my-holidays";
@@ -103,9 +104,10 @@ describe("collection timing is a SETTING (owner ruling 2026-09-12)", () => {
   it("a wider pair moves both days earlier and the attention windows follow the dates", () => {
     const c = collectionClock(F, "2026-08-14", HOLS, { askDaysBefore: 5, deadlineDaysBefore: 3 });
     // Mon–Sat week: Thu 20 T−1 · Wed 19 T−2 · Tue 18 T−3 · Mon 17 T−4 · Sat 15 T−5
-    // — and Sat 15 is not an Operation day, so asking starts Fri 14.
+    // — the ask FACT is Sat 15; Operation acts on it Fri 14.
     expect(c.dueIso).toBe("2026-08-18");
-    expect(c.askIso).toBe("2026-08-14");
+    expect(c.askIso).toBe("2026-08-15");
+    expect(c.actionAskIso).toBe("2026-08-14");
     expect(c.attention).toBe("t3");
     expect(collectionClock(F, "2026-08-18", HOLS, { askDaysBefore: 5, deadlineDaysBefore: 3 }).attention).toBe("t2");
     expect(collectionClock(F, "2026-08-19", HOLS, { askDaysBefore: 5, deadlineDaysBefore: 3 }).attention).toBe("late");
@@ -126,38 +128,53 @@ describe("collection timing is a SETTING (owner ruling 2026-09-12)", () => {
   });
 });
 
-describe("Operation has no Saturday work (owner ruling 2026-09-12)", () => {
-  it("a deadline that lands on Saturday moves to Friday; Saturday itself is already late", () => {
-    // Tue 2026-09-15 delivery, no holiday: Mon 14 is T−1, SAT 12 is T−2 on
-    // the delivery week — the office is shut, so the action is Friday 11.
-    const T = { confirmedDateIso: "2026-09-15" };
-    const fri = collectionClock(T, "2026-09-11", HOLS);
-    expect(fri.dueIso).toBe("2026-09-11");
-    expect(fri.attention).toBe("t2");
-    expect(collectionClock(T, "2026-09-12", HOLS).attention).toBe("late");
+describe("two calendars, one clock (owner ruling 2026-09-13)", () => {
+  // Tue 2026-09-15 delivery, no holiday: Mon 14 is T−1, SAT 12 is T−2 on the
+  // company (delivery) calendar — the deadline FACT stands on Saturday.
+  const T = { confirmedDateIso: "2026-09-15" };
+
+  it("the deadline is a company-calendar fact and never moves", () => {
+    const c = collectionClock(T, "2026-09-10", HOLS);
+    expect(c.dueIso).toBe("2026-09-12");
+    expect(c.askIso).toBe("2026-09-11");
+  });
+
+  it("Operation owner unavailable Saturday → the action moves to the previous working day", () => {
+    const c = collectionClock(T, "2026-09-11", HOLS); // default owner: the Operation week
+    expect(c.actionDueIso).toBe("2026-09-11");
+    expect(c.attention).toBe("t2"); // Friday is the day Operation must have collected
+    expect(collectionClock(T, "2026-09-12", HOLS).attention).toBe("t2"); // the deadline itself
     expect(collectionClock(T, "2026-09-14", HOLS).attention).toBe("late");
   });
 
-  it("the ask day never lands after the deadline once both are shifted", () => {
-    const T = { confirmedDateIso: "2026-09-15" };
-    const c = collectionClock(T, "2026-09-10", HOLS);
-    // T−3 is Fri 11 on the delivery week — the same day as the shifted deadline.
-    expect(c.askIso).toBe("2026-09-11");
-    expect(c.askIso! <= c.dueIso!).toBe(true);
-    expect(c.attention).toBe("none");
+  it("owner configured to work Saturday → the Saturday action remains", () => {
+    const sat = collectionClock(T, "2026-09-11", HOLS, DEFAULT_COLLECTION_TIMING, { offDays: [0] });
+    expect(sat.actionDueIso).toBe("2026-09-12");
+    expect(sat.attention).toBe("t3"); // Friday is only the ask window for this owner
+    expect(collectionClock(T, "2026-09-12", HOLS, DEFAULT_COLLECTION_TIMING, { offDays: [0] }).attention).toBe("t2");
   });
 
-  it("the date FACT stays — the anchor is untouched by the shift", () => {
-    const c = collectionClock({ confirmedDateIso: "2026-09-12" }, "2026-09-09", HOLS); // Saturday delivery
-    expect(c.anchorIso).toBe("2026-09-12");
-    // Fri 11 is T−1, Thu 10 is T−2, Wed 9 is T−3 — no shift needed.
-    expect(c.dueIso).toBe("2026-09-10");
-    expect(c.askIso).toBe("2026-09-09");
-  });
-
-  it("operationActionDay steps a Sunday or a holiday back to the previous office day", () => {
-    expect(operationActionDay("2026-09-13", HOLS)).toBe("2026-09-11"); // Sun → Fri
-    expect(operationActionDay("2026-08-31", HOLS)).toBe("2026-08-28"); // Merdeka (Mon) → Fri
+  it("Sunday / holiday → the governed calendar result for each owner", () => {
+    // A Sunday fact day (company calendar test override) steps back to Sat for a
+    // Saturday-working owner and to Fri for Operation.
+    expect(ownerActionDay("2026-09-13", HOLS, { offDays: [0] })).toBe("2026-09-12");
+    expect(ownerActionDay("2026-09-13", HOLS)).toBe("2026-09-11");
+    // Merdeka (Mon 08-31) is a holiday for every owner → the previous Friday.
+    expect(ownerActionDay("2026-08-31", HOLS)).toBe("2026-08-28");
+    expect(ownerActionDay("2026-08-31", HOLS, { offDays: [0] })).toBe("2026-08-29"); // Sat, for a Saturday worker
     expect(operationActionDay("2026-09-10", HOLS)).toBe("2026-09-10"); // Thu stays
+  });
+
+  it("a historical clock keeps its rule snapshot whatever calendar the owner has", () => {
+    const rules = [
+      { effectiveFrom: "2026-08-19", askDaysBefore: 3, deadlineDaysBefore: 2 },
+      { effectiveFrom: "2026-09-15", askDaysBefore: 5, deadlineDaysBefore: 4 },
+    ];
+    const old = collectionTimingFor(rules, "2026-09-01");
+    const fresh = collectionTimingFor(rules, "2026-09-20");
+    expect(collectionClock(T, "2026-09-10", HOLS, old).dueIso).toBe("2026-09-12");
+    expect(collectionClock(T, "2026-09-10", HOLS, fresh).dueIso).toBe("2026-09-10");
+    // The same snapshot answers the same way for an Operation owner and a Saturday worker.
+    expect(collectionClock(T, "2026-09-10", HOLS, old, { offDays: [0] }).dueIso).toBe("2026-09-12");
   });
 });

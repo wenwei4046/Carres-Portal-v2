@@ -327,8 +327,8 @@ honest Work for admitted modules.
   is the object/door (`/finance/monitor?invoice=`, the same collection workspace the Payment
   Monitor row opens), and only an atomic allocated payment reducing outstanding to RM 0 completes
   it. The clock's ask/deadline pair is `Settings → Payments → Collection timing` (0486),
-  snapshotted on the invoice's issue day, and an Operation contact action never lands on a
-  Saturday. A live unpaid Storage Invoice raises `Send the invoice and collect payment`
+  snapshotted on the invoice's issue day; the deadline is a company-calendar fact and the contact
+  action is scheduled on the resolved owner's governed working days (Operation: Mon–Fri). A live unpaid Storage Invoice raises `Send the invoice and collect payment`
   (`payment.send_storage_invoice`) under the governed Delivery owner word. The Payment Monitor is
   the full collection overview and reads these same items for its owner avatar — it creates no
   second action, completion, owner or `Done`. A sent message remains evidence and bank matching

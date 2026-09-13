@@ -28,12 +28,16 @@
  * Work engine's dues — reads this one function, so the deadline cannot exist
  * in two versions.
  *
- * ⭐ OPERATION HAS NO SATURDAY WORK (owner ruling 2026-09-12). The customer-
- * contact action belongs to a person who does not work on Saturday, so a
- * landed ask day or deadline that falls on Saturday, Sunday or a public
- * holiday MOVES TO THE PREVIOUS OPERATION WORKING DAY. The delivery date
- * itself stays exactly where the customer put it — a date FACT may stand on
- * a Saturday; an Operation ACTION may not.
+ * ⭐ TWO CALENDARS, ONE CLOCK (owner ruling 2026-09-13). The PAYMENT DEADLINE
+ * and the ask day are FACTS on the configured company calendar (the delivery
+ * week + Malaysian holidays). The customer-contact ACTION is scheduled on the
+ * resolved action owner's governed working days: when a fact day is not one
+ * the owner works, the action moves to the owner's previous working day. The
+ * fact itself never moves — a deadline may stand on a Saturday; an Operation
+ * action may not, because Operation does not work on Saturday. That is a
+ * property of the OWNER's calendar (`OWNER_CALENDAR.offDays`), not a global
+ * rule: a future Payment Duty holder who works Saturdays keeps a Saturday
+ * action.
  *
  * The ANCHOR is the customer's confirmed delivery date when one exists —
  * that is the day a truck moves — otherwise the promised date: collection
@@ -96,8 +100,15 @@ export function collectionTimingFor(
   return { askDaysBefore: best.askDaysBefore, deadlineDaysBefore: best.deadlineDaysBefore };
 }
 
-/** Sunday AND Saturday: the OPERATION week (the office does not work Saturday). */
+/** The action owner's governed working days. Sunday AND Saturday off is the
+ *  OPERATION week — the calendar every Operation-held duty (Payment Duty)
+ *  acts on. A duty whose holder works Saturdays passes `{ offDays: [0] }`. */
+export interface OwnerCalendar {
+  /** Weekday numbers the owner does NOT work (0=Sun … 6=Sat). */
+  offDays: readonly number[];
+}
 export const OPERATION_OFF_DAYS: readonly number[] = [0, 6];
+export const OPERATION_CALENDAR: OwnerCalendar = Object.freeze({ offDays: OPERATION_OFF_DAYS });
 
 /** Where the clock stands today. Ordered — each stage includes the urgency of
  *  the ones before it. `t1` is RETIRED with the 2026-08-19 ruling: one working
@@ -107,20 +118,26 @@ export const OPERATION_OFF_DAYS: readonly number[] = [0, 6];
  *  their MEANING is now date-based: `t3` = on or after the ask day and before
  *  the deadline · `t2` = the deadline day itself · `late` = after it. */
 export type CollectionAttention =
-  | "none" // before the ask day, or no anchor
-  | "t3" // the ask window — begin pressing
-  | "t2" // THE FINAL DEADLINE DAY
+  | "none" // before the owner's ask day, or no anchor
+  | "t3" // the owner's ask window — begin pressing
+  | "t2" // the owner's deadline action day up to the deadline itself
   | "late"; // past the deadline and still owing (T−1, delivery day, after)
 
 export interface CollectionClock {
   /** The delivery day the clock counts toward (confirmed, else promised). */
   anchorIso: IsoDate | null;
-  /** The day asking starts — `askDaysBefore` working days before the anchor,
-   *  moved off a non-Operation day. Null = no clock. */
+  /** The day asking starts — `askDaysBefore` working days before the anchor
+   *  on the company calendar. A FACT; never moved. Null = no clock. */
   askIso: IsoDate | null;
-  /** The final deadline — `deadlineDaysBefore` working days before the anchor,
-   *  moved off a non-Operation day. Null = no clock. */
+  /** The final deadline — `deadlineDaysBefore` working days before the anchor
+   *  on the company calendar. A FACT; never moved. Null = no clock. */
   dueIso: IsoDate | null;
+  /** The day the OWNER acts on the ask — `askIso`, or the owner's previous
+   *  working day when the owner does not work that day. Null = no clock. */
+  actionAskIso: IsoDate | null;
+  /** The day the OWNER must have collected — `dueIso`, or the owner's previous
+   *  working day. This is the Work item's due date. Null = no clock. */
+  actionDueIso: IsoDate | null;
   attention: CollectionAttention;
   /** True exactly when `attention === "late"`. */
   overdue: boolean;
@@ -141,16 +158,25 @@ export function resolveCollectionAnchor(input: {
 }
 
 /**
- * The previous OPERATION working day on or before `iso`: Saturday, Sunday and
- * public holidays step back. A customer-contact action never lands on a day
- * the office is shut.
+ * The owner's previous working day on or before `iso`: the owner's off days
+ * and public holidays step back. A customer-contact action never lands on a
+ * day its owner does not work.
  */
-export function operationActionDay(iso: IsoDate, opts: WorkingDayOptions = {}): IsoDate {
-  const office: WorkingDayOptions = { holidays: opts.holidays, offDays: OPERATION_OFF_DAYS };
+export function ownerActionDay(
+  iso: IsoDate,
+  opts: WorkingDayOptions = {},
+  owner: OwnerCalendar = OPERATION_CALENDAR,
+): IsoDate {
+  const week: WorkingDayOptions = { holidays: opts.holidays, offDays: owner.offDays };
   let day = iso;
   let guard = 0;
-  while (!isWorkingDay(day, office) && guard++ < 31) day = stepBack(day);
+  while (!isWorkingDay(day, week) && guard++ < 31) day = stepBack(day);
   return day;
+}
+
+/** The Operation week's action day — `ownerActionDay` with the Operation calendar. */
+export function operationActionDay(iso: IsoDate, opts: WorkingDayOptions = {}): IsoDate {
+  return ownerActionDay(iso, opts, OPERATION_CALENDAR);
 }
 
 function stepBack(iso: IsoDate): IsoDate {
@@ -161,9 +187,10 @@ function stepBack(iso: IsoDate): IsoDate {
 
 /**
  * The whole clock in one call. `opts` carries the holiday set (and, in tests,
- * an off-day override for the COUNT); the default counting week is Mon–Sat —
- * the delivery week. `timing` is the effective Settings pair; absent, the
- * ruled default.
+ * an off-day override for the COMPANY count); the default counting week is
+ * Mon–Sat — the delivery week. `timing` is the effective Settings pair;
+ * absent, the ruled default. `owner` is the action owner's governed working
+ * days; absent, the Operation week (Payment Duty is an Operation duty).
  */
 export function collectionClock(
   input: {
@@ -173,6 +200,7 @@ export function collectionClock(
   todayIso: string,
   opts: WorkingDayOptions = {},
   timing: CollectionTiming = DEFAULT_COLLECTION_TIMING,
+  owner: OwnerCalendar = OPERATION_CALENDAR,
 ): CollectionClock {
   const anchorIso = resolveCollectionAnchor(input);
   const today = todayIso.slice(0, 10);
@@ -181,20 +209,25 @@ export function collectionClock(
     deadlineDaysBefore: Math.max(0, Math.floor(timing.deadlineDaysBefore)),
   };
   if (!anchorIso || !ISO_DATE.test(today)) {
-    return { anchorIso, askIso: null, dueIso: null, attention: "none", overdue: false, timing: pair };
+    return {
+      anchorIso, askIso: null, dueIso: null, actionAskIso: null, actionDueIso: null,
+      attention: "none", overdue: false, timing: pair,
+    };
   }
 
-  // Count on the DELIVERY week (the anchor is a delivery), then land each
-  // Operation action on a day the office actually works.
-  const dueIso = operationActionDay(subtractWorkingDays(anchorIso, pair.deadlineDaysBefore, opts), opts);
+  // The FACTS, on the company calendar.
+  const dueIso = subtractWorkingDays(anchorIso, pair.deadlineDaysBefore, opts);
   const rawAsk = subtractWorkingDays(anchorIso, pair.askDaysBefore, opts);
-  // Asking can never start AFTER the deadline, whatever the shift did.
-  const askIso = operationActionDay(rawAsk < dueIso ? rawAsk : dueIso, opts);
+  const askIso = rawAsk < dueIso ? rawAsk : dueIso;
+  // The ACTIONS, on the owner's working days.
+  const actionDueIso = ownerActionDay(dueIso, opts, owner);
+  const rawActionAsk = ownerActionDay(askIso, opts, owner);
+  const actionAskIso = rawActionAsk < actionDueIso ? rawActionAsk : actionDueIso;
 
   if (today > dueIso) {
-    return { anchorIso, askIso, dueIso, attention: "late", overdue: true, timing: pair };
+    return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention: "late", overdue: true, timing: pair };
   }
   const attention: CollectionAttention =
-    today >= dueIso ? "t2" : today >= askIso ? "t3" : "none";
-  return { anchorIso, askIso, dueIso, attention, overdue: false, timing: pair };
+    today >= actionDueIso ? "t2" : today >= actionAskIso ? "t3" : "none";
+  return { anchorIso, askIso, dueIso, actionAskIso, actionDueIso, attention, overdue: false, timing: pair };
 }

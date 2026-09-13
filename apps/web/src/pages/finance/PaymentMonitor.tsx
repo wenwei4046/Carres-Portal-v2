@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { InvoiceRegisterRow } from "@carres/shared/payment-invoice-register";
 import { invoiceGoodsFacts } from "@carres/shared/payment-invoice-register";
 import {
@@ -112,10 +112,25 @@ function workOwnerFor(row: PaymentMonitorRow, items: readonly OperationWorkItem[
 /** A Monitor row with the Work feed's resolved owner riding on it. */
 type MonitorRow = PaymentMonitorRow & { owner: OperationWorkItem["owner"] | null };
 
+/** The duty word for the configuration exception — the Duty catalogue's own
+ *  names, never a person. */
+const DUTY_WORD: Record<string, string> = {
+  payment_duty: "Payment Duty",
+  payment_approver: "Payment Approver",
+  storage_waiver_approver: "Storage Waiver Approver",
+  delivery_duty: "Delivery Duty",
+};
+
 function OwnerChip({ owner }: { owner: OperationWorkItem["owner"] }) {
   const person = owner.acting ?? owner.normal;
   if (!person?.userId) {
-    return <span className="text-label font-normal text-kit-slate-9" data-testid="monitor-owner-unassigned">Not assigned</span>;
+    // A governed configuration exception, never a blank or an invented owner
+    // (owner ruling 2026-09-13): the action stays visible, management sees
+    // the duty is unassigned, and the one assignment door is linked.
+    const duty = DUTY_WORD[owner.dutyKey ?? owner.rule] ?? owner.dutyKey ?? owner.rule;
+    return <span className="text-label font-normal text-kit-red-11" data-testid="monitor-owner-unassigned">
+      {duty} is not assigned · <Link to="/operation?tab=staff-duties" className="underline underline-offset-2">Staff &amp; Duties</Link>
+    </span>;
   }
   const colors = avatarColor(person.userId);
   const label = personLabel(person.name, "");

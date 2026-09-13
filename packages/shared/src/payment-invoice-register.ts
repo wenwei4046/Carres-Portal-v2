@@ -11,7 +11,7 @@
  *   `Goods ready` · `Arriving Monday, 7 Sep` · `Arrival not confirmed`
  */
 import { z } from "zod";
-import { collectionClock, type CollectionClock, type CollectionTiming } from "./collection-clock";
+import { collectionClock, type CollectionClock, type CollectionTiming, type OwnerCalendar } from "./collection-clock";
 import { orderMoney } from "./order-money";
 import { paymentCollectionReadiness } from "./payment-collection";
 import type { WorkingDayOptions } from "./working-days";
@@ -268,6 +268,9 @@ export function invoicePaymentTiming(
   /** `Settings → Payments → Collection timing` — the effective pair for this
    *  invoice's clock (owner ruling 2026-09-12). Absent ⇒ the ruled default. */
   timing?: CollectionTiming,
+  /** The action owner's governed working days (owner ruling 2026-09-13).
+   *  Absent ⇒ the Operation week — Payment Duty is an Operation duty. */
+  owner?: OwnerCalendar,
 ): { timing: InvoiceTiming; clock: CollectionClock } {
   const goods = invoiceGoodsFacts(row);
   const clock = collectionClock(
@@ -278,6 +281,7 @@ export function invoicePaymentTiming(
     todayIso,
     opts,
     timing,
+    owner,
   );
   const money = rows ? soRemaining(rows, row.order_id) : invoiceNeeded(row);
   if (money.known && money.outstanding <= 0) return { timing: { kind: "paid" }, clock };

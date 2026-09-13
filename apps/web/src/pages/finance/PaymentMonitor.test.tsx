@@ -194,6 +194,25 @@ describe("Payment Monitor — the listing", () => {
     expect(late).toHaveTextContent("Ask customer to pay");
   });
 
+  it("an unassigned duty is a visible configuration exception with the one assignment door", () => {
+    state.work.data = { items: [{
+      id: "payment:i3:payment.collect_customer_balance", module: "payment",
+      ruleKey: "payment.collect_customer_balance",
+      object: { kind: "invoice", id: "i3", label: "INV-1" },
+      problem: "Customer payment should have been received", action: "Ask customer to pay",
+      recipient: "LIM KUAN YANG", requiredResult: "x", completionFact: "y",
+      owner: { rule: "payment_duty", dutyKey: "payment_duty", normal: null, activeCover: null, acting: null, state: "not_assigned" },
+      timing: { dueOn: iso(-5), workingDaysLate: 3, bucket: "overdue" },
+      destination: "/finance/monitor?invoice=i3", tone: "danger", locked: false, broken: false,
+    }] };
+    show();
+    const late = screen.getByTestId("monitor-timing-1302");
+    expect(within(late).getByTestId("monitor-owner-unassigned")).toHaveTextContent("Payment Duty is not assigned");
+    expect(within(late).getByRole("link", { name: "Staff & Duties" })).toHaveAttribute("href", "/operation?tab=staff-duties");
+    expect(late).toHaveTextContent("Ask customer to pay");
+    expect(screen.queryByTestId("monitor-owner-avatar")).not.toBeInTheDocument();
+  });
+
   it("no Work item for the SO → no invented owner", () => {
     state.work.data = { items: [] };
     show();
