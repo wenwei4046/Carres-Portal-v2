@@ -2119,6 +2119,8 @@ export {
   type ChangeLogisticsReasonKey,
   operationCannotDeliverInput,
   type OperationCannotDeliverInput,
+  type DeliveryCannotDeliverRow,
+  cannotDeliverReasonLabel,
 } from "./schemas/delivery-arrangement";
 // The §4 handover chain door inputs (0363) — one schema for Worker and web.
 export {

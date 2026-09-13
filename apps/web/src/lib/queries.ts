@@ -315,6 +315,7 @@ import {
   type PurchasingSupplierCollectionSetting,
   type OperationWorkResponse,
   type DeliveryContactRow,
+  type DeliveryCannotDeliverRow,
   type DeliveryContactInput,
   type OperationCannotDeliverInput,
   type PartnerCoverage,
@@ -7098,12 +7099,16 @@ export function useStockUnit(unitCode: string | undefined) {
  */
 export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
 export type { DeliveryProofReviewRow, DeliveryAttemptEvidenceRow } from "@carres/shared";
+export type { DeliveryCannotDeliverRow } from "@carres/shared";
 
 export interface DeliveryArrangementsPayload {
   arrangements: DeliveryArrangementRow[];
   /** Every customer-contact record (0487) — the status ladder reads the
    *  latest per scope. Optional: an older Worker carries none. */
   contacts?: DeliveryContactRow[];
+  /** Every recorded `Cannot Deliver` (0417) — Reports → Delivery's partner
+   *  measure. Absent = the read failed or an older Worker: `Not available`. */
+  cannotDeliver?: DeliveryCannotDeliverRow[];
 }
 
 export function useDeliveryArrangements() {

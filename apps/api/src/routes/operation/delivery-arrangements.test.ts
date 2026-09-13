@@ -258,6 +258,34 @@ describe("POST /assign — one partner onto one or many scopes", () => {
   });
 });
 
+describe("GET / — every arrangement, every contact, every Cannot Deliver (Card 17)", () => {
+  it("carries the Cannot Deliver records for the central Delivery report", async () => {
+    mockSb([
+      { data: [] }, // arrangements
+      { data: [] }, // contacts
+      { data: [{ id: "e1", order_id: ORDER_A, leg: 0, from_partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" }] },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { cannotDeliver?: Array<Record<string, unknown>> };
+    expect(body.cannotDeliver).toEqual([
+      { id: "e1", order_id: ORDER_A, leg: 0, partner_id: NETS, reason_key: "no_capacity", note: null, recorded_at: "2026-09-04T00:00:00Z" },
+    ]);
+  });
+
+  it("leaves the field ABSENT when that read fails — the report says Not available, never 0", async () => {
+    mockSb([
+      { data: [] },
+      { data: [] },
+      { error: { code: "42P01", message: "relation does not exist" } },
+    ]);
+    const res = await call("", "operation");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect("cannotDeliver" in body).toBe(false);
+  });
+});
+
 describe("GET /warehouse-schedule — Delivery's read-only feed", () => {
   /** The feed's fixed query order (0424): arrangements · orders ·
    *  delivery orders · SCOPE (delivery_order_units) · units · prep ·

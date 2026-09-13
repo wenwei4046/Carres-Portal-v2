@@ -25,7 +25,7 @@
 
 ## Tasks
 
-- [ ] Report reads on the shared arithmetics; the ten listings
-- [ ] Export; every row a door
-- [ ] Tests, typecheck, design guard
+- [x] Report reads on the shared arithmetics; the ten listings — `delivery-report.ts` (the ten listing arithmetics over `buildDoRegisterRow` rows and `buildDeliveryMonitorCards` cards; `rateWord` withholds below 5; `Not available` for an absent read) · `OperationDeliveryReport.tsx` mounted as `?tab=delivery-report` with the Delivery destination header · the arrangements read now carries `cannotDeliver` (0417 events) for the partner measure
+- [x] Export; every row a door — one Excel sheet per listing from the same reads; rows open the Delivery Order object, the Monitor row (`open=`), the Monitor day (`date=`), the Monitor partner filter (`logistics=`) or the Inbound arrival (`arrival-source`)
+- [x] Tests, typecheck, design guard — `delivery-report.test.ts` (14) + `OperationDeliveryReport.test.tsx` (6) green · api test for the `cannotDeliver` read · tsc ×3 clean · `pnpm --filter web lint` clean
 - [ ] PR → merge → deploy → authenticated production verification
