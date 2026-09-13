@@ -36,7 +36,7 @@
 --     are safe and are needed for policies to evaluate): app_dealer_id, app_partner_id, app_role, app_supplier_id, gl_may_read, is_internal, is_operation, is_principal.
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO
---   - Rewrites no function body. The NULL-blind role gates are fixed in 0499.
+--   - Rewrites no function body. The NULL-blind role gates are fixed in 0500.
 --   - Does not touch the eleven finance functions 0481 owns.
 --   - Does not ENABLE RLS or change any view's security_invoker.
 --
