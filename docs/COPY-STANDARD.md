@@ -663,7 +663,7 @@ table are one-to-one, so a queue and a row can never spell one action two ways.
 | `Confirm delivery date` — **the day is agreed, the window is not** (owner ruling 2026-09-12) | `Call {logistics}` over `Confirm the delivery time` | `Save confirmed delivery` | `Delivery confirmed {date} · {slot}` | *(same queue — a delivery is booked only with a day AND a window, so the row does not leave until both are recorded)* |
 | *(retired 2026-08-16 — the SYSTEM issues the DO; no tile, no button)* | — | — | `Delivery order issued` (history line only) | `Nothing waiting for a delivery order.` |
 | `Deliver on {weekday, date}` | `Deliver on {weekday, date}` | `Record Delivery Result` | `Delivered` | `No deliveries on {weekday, date}.` |
-| `Upload delivery photo` | `Upload delivery photo` | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
+| `Upload delivery photo` | `Upload the delivery photo` over `Attach the photo from {logistics}` (two lines, owner ruling 2026-09-13) | `Upload delivery photo` | `Delivery photo saved` | `Every delivery has its photo.` |
 | `Delay planning` | `Delay planning` | `Record the delay decision` | — (none: the row leaves by itself, and `Arrange new delivery date` says what happened) | `No supplier date lands after a promised date.` |
 | `Arrange new delivery date` | `Call {logistics}` over `Arrange a new delivery date` | `Record new date` | `New date recorded` | `No delayed order needs a new date.` |
 | `Collect RM {amount}` | `Collect RM {amount} from {customer}` | `Record payment` | `Payment recorded` | `Nothing outstanding.` |

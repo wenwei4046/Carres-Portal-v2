@@ -958,6 +958,8 @@ export {
   orderActionDone,
   orderActionForQueue,
   orderActionLine,
+  orderActionLines,
+  type OrderActionLines,
   orderActionQueue,
   purchasingActionButton,
   purchasingActionDone,
@@ -2078,10 +2080,15 @@ export {
 // `Created` belongs to the Register and may never appear on the workspace.
 export {
   deliveryWorkStatusOf,
-  DELIVERY_WORK_STATUS_LABEL,
+  deliveryWorkStatusLabelOf,
+  DELIVERY_WORK_STATUS_KINDS,
+  DELIVERY_WORK_STATUS_TONE,
+  LOGISTICS_ROLE_WORD,
   type DeliveryWorkStatus,
   type DeliveryWorkStatusKind,
   type DeliveryWorkStatusInput,
+  type DeliveryWorkStatusTone,
+  type DeliveryStatusSpell,
 } from "./delivery-work-status";
 // THE DELIVERY ARRANGEMENT (0379) — Delivery's own record of how a scope
 // travels, keyed by (order_id, leg). Overwrites the "Delivery Work writes

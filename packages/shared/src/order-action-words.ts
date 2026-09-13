@@ -11,8 +11,15 @@
  *           only possible where a single order is on screen.
  *
  * The law states that split explicitly for the delivery step: queue
- * `Confirm delivery date`, row line `Call {logistics} — confirm delivery date`.
- * Every action follows the same shape, so a new hire reads one grammar.
+ * `Confirm delivery date`, row line `Call {logistics}` over `Confirm the
+ * delivery date`. Every action follows the same shape, so a new hire reads one
+ * grammar.
+ *
+ * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+ * 2026-09-13, Delivery MASTER §10): line one is the ACT with its recipient,
+ * line two is the REQUIRED RESULT, and no `—` joins them. `orderActionLines`
+ * returns both; `orderActionLine` is line one, for the surfaces that print a
+ * single sentence.
  *
  * `Chase` is banned — it names a mood, not an outcome. So is any word that
  * hides a to-do inside a fact (`need booking`, `Unscheduled`, `Pending`).
@@ -67,6 +74,12 @@ export interface OrderActionParties {
   supplier?: string | null;
   logistics?: string | null;
   customer?: string | null;
+  /** `Confirm delivery date` — the DAY is agreed and only the WINDOW is
+   *  missing (owner ruling 2026-09-12), so line two asks for the time. */
+  dayAgreed?: boolean | null;
+  /** `Collect the loan item` — the exact Unit on loan, when the record names
+   *  one (Delivery MASTER §14.2). */
+  loanUnit?: string | null;
   /**
    * `Collect RM {amount}` — the amount owed, as a NUMBER.
    *
@@ -118,6 +131,9 @@ interface OrderActionWord {
    * therefore means "not mirrored yet", never "this action records nothing".
    */
   done: string | null;
+  /** Line two of a two-line Delivery Work sentence — the REQUIRED RESULT.
+   *  null for an action that is spoken on one line. */
+  result?: (p: OrderActionParties) => string;
 }
 
 /** Trim to a real name, else the role word — never an empty slot. */
@@ -205,8 +221,8 @@ const WORDS: readonly OrderActionWord[] = [
     // CONVERSATION is logistics'; the ACTION in this portal is ours.
     key: "arrange_new_delivery_date",
     queue: "Arrange new delivery date",
-    line: (p) =>
-      `Call ${party(p.logistics, "logistics")} — arrange new delivery date`,
+    line: (p) => `Call ${party(p.logistics, "logistics")}`,
+    result: () => "Arrange a new delivery date",
     button: "Record new date",
     done: null,
   },
@@ -216,15 +232,19 @@ const WORDS: readonly OrderActionWord[] = [
     key: "assign_logistics",
     queue: "Assign logistics",
     line: () => "Assign logistics",
+    result: () => "Choose the company that carries this delivery",
     button: "Assign logistics",
     done: null,
   },
   {
+    // ⭐ WHICH HALF IS MISSING DECIDES LINE TWO (owner ruling 2026-09-12): a
+    // row with a DAY and no window is missing a time, and sending the
+    // operator to confirm the date re-opens a question the customer answered.
     key: "confirm_delivery_date",
     queue: "Confirm delivery date",
-    line: (p) =>
-      `Call ${party(p.logistics, "logistics")} — confirm delivery date`,
-    button: "Confirm booking",
+    line: (p) => `Call ${party(p.logistics, "logistics")}`,
+    result: (p) => (p.dayAgreed ? "Confirm the delivery time" : "Confirm the delivery date"),
+    button: "Save confirmed delivery",
     done: null,
   },
   {
@@ -245,16 +265,24 @@ const WORDS: readonly OrderActionWord[] = [
     done: "Delivery order issued",
   },
   {
+    // The line names the actual weekday and date (the Delivery dictionary
+    // bans `Today`); the caller spells the day through the one date home and
+    // hands it in as `deliveryDate`. Without one the queue word stands.
     key: "deliver_today",
     queue: "Deliver today",
-    line: () => "Deliver today",
-    button: "Mark delivered",
+    line: (p) => {
+      const date = (p.deliveryDate ?? "").trim();
+      return date ? `Deliver on ${date}` : "Deliver today";
+    },
+    result: () => "Record the delivery result",
+    button: "Record Delivery Result",
     done: null,
   },
   {
     key: "upload_delivery_photo",
     queue: "Upload delivery photo",
-    line: () => "Upload delivery photo",
+    line: () => "Upload the delivery photo",
+    result: (p) => `Attach the photo from ${party(p.logistics, "logistics")}`,
     button: "Upload delivery photo",
     done: null,
   },
@@ -315,7 +343,8 @@ const WORDS: readonly OrderActionWord[] = [
     // (`Collect the loan item`, 2026-08-16): a loan is not always a sofa.
     key: "collect_loan_item",
     queue: "Collect the loan item",
-    line: (p) => `Collect the loan item from ${party(p.customer, "customer")}`,
+    line: () => "Collect the loan item",
+    result: (p) => `Bring back ${party(p.loanUnit, "the loan item")} on the delivery day`,
     button: "Record loan collected",
     // null = "not mirrored yet", never "records nothing" (C10's dead-code
     // rule): a DONE string joins when a surface actually renders it.
@@ -329,7 +358,8 @@ const WORDS: readonly OrderActionWord[] = [
     // derived state.
     key: "resolve_payment_exception",
     queue: "Resolve the payment exception",
-    line: () => "Resolve the payment exception — Finance clears it with evidence",
+    line: () => "Resolve the payment exception",
+    result: () => "Finance clears it with evidence",
     button: "Open Finance exceptions",
     done: null,
   },
@@ -378,6 +408,30 @@ export function orderActionLine(
     return money ? `Collect ${money} from ${who}` : `Collect from ${who}`;
   }
   return wordFor(key).line(parties);
+}
+
+/** The two structured lines of a Delivery Work sentence (owner ruling
+ *  2026-09-13): the ACT with its recipient, and the REQUIRED RESULT. */
+export interface OrderActionLines {
+  act: string;
+  /** null for an action spoken on one line (the non-Delivery keys). */
+  result: string | null;
+}
+
+/**
+ * Both lines — `Call NETS` over `Confirm the delivery date`. Surfaces that
+ * print a single sentence keep `orderActionLine` (line one); no surface joins
+ * the two with `—`.
+ */
+export function orderActionLines(
+  key: OrderActionKey,
+  parties: OrderActionParties = {},
+): OrderActionLines {
+  const word = wordFor(key);
+  return {
+    act: orderActionLine(key, parties),
+    result: word.result ? word.result(parties) : null,
+  };
 }
 
 /**

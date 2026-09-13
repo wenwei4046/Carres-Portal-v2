@@ -40,17 +40,18 @@
  * clock.
  */
 
-import type { DeliveryWorkStatusKind } from "@carres/shared";
+import type { DeliveryWorkStatusKind, DeliveryWorkStatusTone } from "@carres/shared";
 import {
-  DELIVERY_WORK_STATUS_LABEL,
+  DELIVERY_WORK_STATUS_KINDS,
   ARRIVAL_COPY,
   deliveryArrivalStateOf,
-  deliveryStepDueIso,
   deliveryStockReadinessOf,
+  deliveryWorkStatusLabelOf,
   goodsCategoryWordOf,
   lineKind,
   lineShortagesOf,
   myHolidaySet,
+  orderActionLines,
   type DeliveryArrivalState,
   type DeliveryQueueLeads,
   type DeliveryStockReadiness,
@@ -62,14 +63,7 @@ import {
   type DeliveryScopeRow,
   type ScopeInputs,
 } from "./delivery-work";
-import {
-  DOR_COPY,
-  driverSubmissionOf,
-  missingDeliveryProofOf,
-  tripLinesOf,
-  UNKNOWN_SUBMISSION,
-  type MissingDeliveryProof,
-} from "./delivery-orders-register";
+import { DOR_COPY, tripLinesOf, type MissingDeliveryProof } from "./delivery-orders-register";
 import { lineName } from "./sales-order-facts";
 
 /**
@@ -410,23 +404,17 @@ export const DEFAULT_TOP_TAB: MonitorTopTab = "work";
 export const DEFAULT_WORK_VIEW: MonitorWorkView = "all";
 
 /**
- * The DELIVERY STATUS group (owner correction 2026-09-07) — filters over the
- * shared operational ladder's three "arranged and moving" rungs. Not actions,
- * not document statuses, and never a WORK TO DO queue: `Waiting for warehouse`
- * means Delivery has arranged the trip and Warehouse has not yet recorded
- * `Ready for handover` — it never means missing stock.
+ * The DELIVERY STATUS group — a kit dropdown over the Monitor status words
+ * (Delivery MASTER §8.4, owner ruling 2026-09-13): the same actor-first
+ * dictionary the column prints, in the ladder's own order. Not actions, not
+ * document statuses, and never a WORK TO DO queue. The option words carry the
+ * role word where the column would carry the partner's name.
  */
-export type MonitorDeliveryStatus = "waiting_warehouse" | "ready_for_handover" | "out_for_delivery";
-export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] = [
-  "waiting_warehouse",
-  "ready_for_handover",
-  "out_for_delivery",
-];
-export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = {
-  waiting_warehouse: DELIVERY_WORK_STATUS_LABEL.waiting_warehouse,
-  ready_for_handover: DELIVERY_WORK_STATUS_LABEL.ready_for_handover,
-  out_for_delivery: DELIVERY_WORK_STATUS_LABEL.out_for_delivery,
-};
+export type MonitorDeliveryStatus = DeliveryWorkStatusKind;
+export const MONITOR_STATUS_FILTERS: readonly MonitorDeliveryStatus[] = DELIVERY_WORK_STATUS_KINDS;
+export const MONITOR_STATUS_LABEL: Record<MonitorDeliveryStatus, string> = Object.fromEntries(
+  DELIVERY_WORK_STATUS_KINDS.map((kind) => [kind, deliveryWorkStatusLabelOf(kind, null)]),
+) as Record<MonitorDeliveryStatus, string>;
 
 /** One calendar card / work-list row — a read-only mapping of recorded facts. */
 export interface DeliveryMonitorCard {
@@ -450,7 +438,13 @@ export interface DeliveryMonitorCard {
   logisticsPartnerName: string | null;
   region: string | null;
   statusKey: DeliveryWorkStatusKind;
+  /** Line one of the status — the actor and the fact (§8.4). */
   statusLabel: string;
+  /** Its text colour: green · orange · red · none. Never an icon. */
+  statusTone: DeliveryWorkStatusTone;
+  /** Line two — the day, window, deadline, ETA, proof state or reason. */
+  statusSecond: string | null;
+  statusSecondTone: "orange" | null;
   /**
    * The evidence a RECORDED delivered result still lacks — the Delivery
    * Orders register's own arithmetic, never from a planned window ending. Both
@@ -572,12 +566,6 @@ export interface DeliveryMonitorFilters {
    to notice `Clear filters`. Two NAMED tabs (`MonitorTopTab`) now decide which
    view is showing, and every narrowing applies to whichever one is open. */
 
-/** PostgREST may embed a to-one overlay as an object or a one-row array. */
-function overlayOf<T>(value: T | T[] | null | undefined): T | null {
-  if (value == null) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
-
 /**
  * Every open delivery row as one card. The rows, the entry rule and the
  * status ladder are `delivery-work.ts`'s — the ONE arithmetic — so Monitor
@@ -589,36 +577,13 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
   const rows = buildDeliveryScopeRows(input);
   const holidays = input.holidays ?? myHolidaySet();
   const docByNumber = new Map(input.deliveryOrders.map((d) => [d.do_number, d] as const));
-  /* The LATEST recorded attempt per document — the same "latest" the Delivery
-     Orders register reads (newest `recorded_at`). */
-  const latestByDo = new Map<string, { result: "delivered" | "partial" | "failed"; at: string }>();
-  for (const a of input.attempts) {
-    if (!a.do_number) continue;
-    const prev = latestByDo.get(a.do_number);
-    if (!prev || a.recorded_at > prev.at) {
-      latestByDo.set(a.do_number, { result: a.result, at: a.recorded_at });
-    }
-  }
 
   return rows.map((row): DeliveryMonitorCard => {
     const doc = row.doNumber ? docByNumber.get(row.doNumber) ?? null : null;
-    /* The T6 photo ledger rides the list on the ops_order_control overlay
-       (migration 0280) — the order's own embed first (what the workspace
-       read carries), the document's embed second. */
-    const control =
-      overlayOf(row.o.ops_order_control) ?? overlayOf(doc?.orders.ops_order_control ?? null);
-    const photos = control?.delivery_photos;
-    /* ⭐ SCOPED TO THE DOCUMENT (owner ruling 2026-09-11). The ledger belongs
-       to the Sales Order; the question is whether THIS trip came back with a
-       photo. Reading the whole order's ledger closed one document's work on
-       another document's file. driverSubmissionOf is the ONE reader of the
-       stamp (Law D) - no card computes the scope itself. */
-    const submission = doc ? driverSubmissionOf(photos, doc.do_number) : UNKNOWN_SUBMISSION;
-    const missingProof = missingDeliveryProofOf({
-      latestResult: doc ? latestByDo.get(doc.do_number)?.result ?? null : null,
-      photosPresent: submission.known ? submission.photos > 0 : null,
-      signedDoPresent: Boolean(doc?.orders.do_file_path),
-    });
+    /* The missing evidence and the contact deadline are the scope row's own
+       facts — counted once in `delivery-work.ts`, the same reading the status
+       line, the rail and the calendar share (Law D). */
+    const missingProof = row.missingProof;
     /* ── THE GOODS, THE STOCK AND THE ARRIVAL (owner ruling 2026-09-10) ────
        Every one of these comes from a shared arithmetic and none of them is
        recomputed here: the shortage is `lineShortagesOf` over the register
@@ -677,13 +642,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
         kind: "service",
       });
     }
-    /* ── THE CONTACT DEADLINE — the `chase` step, counted once ────────────── */
-    const contactDueIso = deliveryStepDueIso(
-      "chase",
-      row.customerDeliveryIso,
-      { holidays },
-      input.queueLeads,
-    );
+    const contactDueIso = row.contactDueIso;
     /* The arrangement is COMPLETE only with a day AND a window on it. */
     const booked = row.confirmedIso !== null && row.confirmedTime !== null;
     /* ⭐ THE VAN HAS ALREADY BEEN (owner correction 2026-09-11, found in the
@@ -715,6 +674,9 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       region: regionBucketOf(row),
       statusKey: row.status.kind,
       statusLabel: row.status.label,
+      statusTone: row.status.tone,
+      statusSecond: row.status.second,
+      statusSecondTone: row.status.secondTone,
       missingProof,
       items,
       extras,
@@ -846,31 +808,6 @@ export function monitorCardHref(card: DeliveryMonitorCard): string {
 /* ── THE CHASE — who must be called, and what the operator does next ────── */
 
 /**
- * `Call NETS — confirm delivery date` — the governed row line for the
- * `Confirm delivery date` queue (COPY-STANDARD, "The delivery queue words":
- * `Call {logistics} — confirm delivery date`). The partner NAME comes from
- * the row; no company is ever hard-coded, and a row with no partner never
- * reaches this sentence — it is asked to `Assign logistics` first.
- */
-export function callToConfirmDeliveryDate(partnerName: string): string {
-  return `Call ${partnerName} — confirm delivery date`;
-}
-
-/**
- * `Call NETS — confirm delivery time` — the same governed act about the OTHER
- * half of the appointment (owner ruling 2026-09-12, COPY-STANDARD "the seven
- * verbs": `Call {logistics} — confirm delivery time`).
- *
- * ⭐ IT IS A DIFFERENT SENTENCE BECAUSE IT IS A DIFFERENT JOB. When the day is
- * agreed and the window is not, asking the operator to `confirm delivery date`
- * sends them to re-open a question the customer already answered — and the
- * date is a real recorded fact that the row must keep, not overwrite.
- */
-export function callToConfirmDeliveryTime(partnerName: string): string {
-  return `Call ${partnerName} — confirm delivery time`;
-}
-
-/**
  * ⭐ ONE ROW, ONE NEXT ACT (the chase workflow, Delivery MASTER §8).
  *
  * ```
@@ -894,7 +831,7 @@ export function callToConfirmDeliveryTime(partnerName: string): string {
 export type MonitorRowAction =
   | { kind: "upload_proof"; label: string }
   | { kind: "assign_logistics"; label: string }
-  | { kind: "confirm_date"; call: string; label: string }
+  | { kind: "confirm_date"; call: string; result: string; label: string }
   | { kind: "edit_delivery"; label: string };
 
 export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
@@ -917,17 +854,18 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
     /* The partner's own name, from the row — never a hard-coded company. A
        partner id whose name has not resolved would print an id at the
        operator, so the governed absence word stands in for it. */
-    const partner = card.logisticsPartnerName ?? MONITOR_COPY.noLogistics;
-    /* ⭐ WHICH HALF IS MISSING DECIDES THE SENTENCE (owner ruling 2026-09-12).
-       A row with a DAY and no window is not missing a date — it is missing a
-       time, and sending the operator to confirm the date re-opens a question
-       the customer has already answered. */
+    /* ⭐ TWO STRUCTURED LINES from the one word module (owner ruling
+       2026-09-13): `Call {partner}` over `Confirm the delivery date` — or over
+       `Confirm the delivery time` when the DAY is agreed and only the window
+       is missing (owner ruling 2026-09-12). No carrier is ever hard-coded. */
+    const lines = orderActionLines("confirm_delivery_date", {
+      logistics: card.logisticsPartnerName,
+      dayAgreed: card.confirmedDate !== null,
+    });
     return {
       kind: "confirm_date",
-      call:
-        card.confirmedDate !== null
-          ? callToConfirmDeliveryTime(partner)
-          : callToConfirmDeliveryDate(partner),
+      call: lines.act,
+      result: lines.result ?? "",
       label: MONITOR_COPY.editDelivery,
     };
   }
@@ -938,7 +876,9 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
  *  the sheet and the screen never say two different things. */
 export function monitorRowActionText(card: DeliveryMonitorCard): string {
   const action = monitorRowAction(card);
-  return action.kind === "confirm_date" ? `${action.call} · ${action.label}` : action.label;
+  return action.kind === "confirm_date"
+    ? `${action.call} · ${action.result} · ${action.label}`
+    : action.label;
 }
 
 /* ── The filters — each one answers, and they COMBINE ──────────────────── */

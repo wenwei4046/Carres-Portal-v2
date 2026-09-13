@@ -33,16 +33,23 @@
 
 import {
   deliveryOrderStatusOf,
+  deliveryStepDueIso,
+  deliveryWorkStatusLabelOf,
   deliveryWorkStatusOf,
+  DELIVERY_WORK_STATUS_TONE,
   lineKind,
-  DELIVERY_WORK_STATUS_LABEL,
+  myHolidaySet,
   type DeliveryArrangementRow,
+  type DeliveryQueueLeads,
+  type DeliveryStatusSpell,
   type DeliveryWorkStatus,
+  type DeliveryWorkStatusKind,
   type DeliveryHandoverKind,
   type DeliveryOrderStatus,
   type DeliveryStop,
 } from "@carres/shared";
 import { displayCustomerName } from "@/lib/customer-name";
+import { fmtDate } from "@/lib/fmt-date";
 import { orderBookingDay } from "@/lib/order-booking";
 import { detectState } from "@/lib/region";
 import type {
@@ -53,6 +60,21 @@ import type {
 } from "@/lib/queries";
 import { conciseLocality, requestedDeliveryOf } from "./sales-order-columns";
 import { itemsSummary } from "./sales-order-facts";
+import {
+  driverSubmissionOf,
+  missingDeliveryProofOf,
+  UNKNOWN_SUBMISSION,
+  type MissingDeliveryProof,
+} from "./delivery-orders-register";
+
+/**
+ * ⭐ THE ONE DATE SPELLING, handed to the shared status arithmetic (the engine
+ * spells no dates — the Year Rule's one home is `fmtDate`).
+ */
+export const DELIVERY_STATUS_SPELL: DeliveryStatusSpell = {
+  date: (iso) => fmtDate(iso),
+  dateTime: (iso) => fmtDate(iso, { time: true }),
+};
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD).
@@ -92,8 +114,8 @@ export const DW = {
    * It used to double as the `Delivery Status` cell too. The owner overturned
    * that on 2026-08-24: a status column must say where the WORK is, and "there
    * is no document" says where the paperwork is. `Delivery Status` now runs
-   * the seven-rung operational ladder (`deliveryWorkStatusOf`) and this string
-   * went back to answering one question.
+   * the actor-first operational ladder (`deliveryWorkStatusOf`, Delivery
+   * MASTER §8.4) and this string went back to answering one question.
    */
   noDeliveryOrder: "No delivery order yet",
   noCustomerDate: "No delivery date",
@@ -170,11 +192,17 @@ export interface DeliveryScopeRow {
   doNumber: string | null;
   /**
    * ⭐ THE OPERATION'S progress, never the DOCUMENT's (owner ruling
-   * 2026-08-24). `Created` belongs to the Delivery Orders register; this
-   * column answers *where is the work*, and it always has an answer — even
-   * before any document exists.
+   * 2026-08-24, words re-ruled 2026-09-13). `Created` belongs to the Delivery
+   * Orders register; this column answers *who must act and what happened*,
+   * and it always has an answer — even before any document exists.
    */
   status: DeliveryWorkStatus;
+  /** The contact deadline — the shared `chase` step's own due day, counted
+   *  once here so the status line, the rail and the calendar agree. */
+  contactDueIso: string | null;
+  /** The evidence a RECORDED delivered result still lacks — the Delivery
+   *  Orders register's own arithmetic over the SAME document row. */
+  missingProof: MissingDeliveryProof;
   /** True once Delivery has recorded its own arrangement for this scope. */
   hasArrangement: boolean;
   /** The order behind the row — for the expansion's own reads. */
@@ -198,10 +226,19 @@ export interface DeliveryScopeRow {
 export function legWorkStatusOf(
   stop: Pick<DeliveryStop, "status">,
   confirmedIso: string | null,
+  partnerName: string | null = null,
+  confirmedTime: string | null = null,
 ): DeliveryWorkStatus {
-  const say = (kind: DeliveryWorkStatus["kind"]): DeliveryWorkStatus => ({
+  const say = (kind: DeliveryWorkStatusKind, second: string | null = null): DeliveryWorkStatus => ({
     kind,
-    label: DELIVERY_WORK_STATUS_LABEL[kind],
+    label: deliveryWorkStatusLabelOf(
+      kind,
+      partnerName,
+      kind === "confirmed" && confirmedIso ? DELIVERY_STATUS_SPELL.date(confirmedIso) : null,
+    ),
+    tone: DELIVERY_WORK_STATUS_TONE[kind],
+    second,
+    secondTone: null,
     reasonLabel: null,
   });
   switch (stop.status) {
@@ -213,13 +250,15 @@ export function legWorkStatusOf(
          their leg is its own row with its own status. */
       return say("delivered");
     case "picked_up":
-      return say("out_for_delivery");
+      return say("collected");
     case "issue":
       return say("failed");
     default:
-      /* A leg nobody has moved yet is exactly the two rungs the whole-order
-         scope uses: a day agreed, or not. */
-      return say(confirmedIso ? "confirmed" : "waiting_customer_date");
+      /* A leg nobody has moved yet is exactly the rungs the whole-order scope
+         uses: a day and a window agreed, a partner still to contact the
+         customer, or no partner at all. */
+      if (confirmedIso && confirmedTime) return say("confirmed", confirmedTime);
+      return say(partnerName ? "partner_must_contact" : "assign_logistics");
   }
 }
 
@@ -388,6 +427,21 @@ export interface ScopeInputs {
   partnerNameById: Map<string, string>;
   /** Delivery's OWN records (0379), keyed `${orderId}#${leg}`. */
   arrangements?: Map<string, DeliveryArrangementRow>;
+  /** Business today — `Overdue` is the one status rung about it. Absent, no
+   *  row reads `Overdue`. */
+  todayIso?: string;
+  /** Malaysian public holidays for the contact deadline's working-day clock.
+   *  Omitted → the live set, the same one every other delivery clock counts on. */
+  holidays?: ReadonlySet<string>;
+  /** The `Confirm delivery date` lead in working days (Purchasing → Settings,
+   *  `logistics_call_working_days`). Absent leaves the seed. */
+  queueLeads?: DeliveryQueueLeads;
+}
+
+/** PostgREST may embed a to-one overlay as an object or a one-row array. */
+function overlayOf<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
 }
 
 /**
@@ -405,19 +459,43 @@ export function buildDeliveryScopeRows({
   handoverEvents,
   partnerNameById,
   arrangements,
+  todayIso,
+  holidays,
+  queueLeads,
 }: ScopeInputs): DeliveryScopeRow[] {
+  const holidaySet = holidays ?? myHolidaySet();
   const attemptsByDo = new Map<string, DeliveryOrderAttemptRow[]>();
   for (const a of attempts) {
     if (!a.do_number) continue;
     attemptsByDo.set(a.do_number, [...(attemptsByDo.get(a.do_number) ?? []), a]);
   }
-  const handoverByDoId = new Map<string, DeliveryHandoverKind[]>();
+  const handoverByDoId = new Map<string, Array<{ kind: DeliveryHandoverKind; recordedAt: string | null }>>();
   for (const e of handoverEvents) {
     handoverByDoId.set(e.delivery_order_id, [
       ...(handoverByDoId.get(e.delivery_order_id) ?? []),
-      e.kind,
+      { kind: e.kind, recordedAt: e.recorded_at ?? null },
     ]);
   }
+  /* The proof a delivered trip still lacks is the Delivery Orders register's
+     arithmetic over the SAME document row (Law D): the latest recorded result,
+     the driver's photos scoped to THIS document, the signed file. */
+  const proofOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): MissingDeliveryProof => {
+    const latest = doc
+      ? [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
+          a.recorded_at.localeCompare(b.recorded_at),
+        ).at(-1) ?? null
+      : null;
+    const control =
+      overlayOf(o.ops_order_control) ?? overlayOf(doc?.orders.ops_order_control ?? null);
+    const submission = doc
+      ? driverSubmissionOf(control?.delivery_photos, doc.do_number)
+      : UNKNOWN_SUBMISSION;
+    return missingDeliveryProofOf({
+      latestResult: latest?.result ?? null,
+      photosPresent: submission.known ? submission.photos > 0 : null,
+      signedDoPresent: Boolean(doc?.orders.do_file_path),
+    });
+  };
   const docByNumber = new Map<string, DeliveryOrderRow>();
   for (const d of deliveryOrders) docByNumber.set(d.do_number, d);
 
@@ -430,9 +508,7 @@ export function buildDeliveryScopeRows({
           recordedAt: a.recorded_at,
         }))
       : [],
-    handoverEvents: doc
-      ? (handoverByDoId.get(doc.id) ?? []).map((kind) => ({ kind }))
-      : [],
+    handoverEvents: doc ? handoverByDoId.get(doc.id) ?? [] : [],
   });
 
   /* The DOCUMENT ladder is still run — it is what decides whether a voided
@@ -456,6 +532,13 @@ export function buildDeliveryScopeRows({
        own definition. A superseded or failed document keeps its history in the
        Delivery Orders register; it is not this scope's current trip. */
     const doc = o.do_number ? docByNumber.get(o.do_number) ?? null : null;
+    /* ── THE CONTACT DEADLINE — the `chase` step, counted once ────────────── */
+    const contactDueIso = deliveryStepDueIso(
+      "chase",
+      requestedDeliveryOf(o).iso,
+      { holidays: holidaySet },
+      queueLeads,
+    );
     const base = {
       orderId: o.id,
       so: o.so,
@@ -465,6 +548,7 @@ export function buildDeliveryScopeRows({
          arithmetic every surface reads it with (Architecture Law D). */
       customerDeliveryIso: requestedDeliveryOf(o).iso,
       customerDateTbd: requestedDeliveryOf(o).tbd,
+      contactDueIso,
       location: conciseLocality(o.customer_address_city, o.customer_address_state),
       building: o.building_type?.trim() || DW.notGiven,
       goods: itemsSummary(o) || DW.noGoods,
@@ -482,25 +566,41 @@ export function buildDeliveryScopeRows({
       const fallbackPartner = logisticsOf(o, partnerNameById);
       const confirmed = confirmedDeliveryOf(o, doc, arrangement);
       const facts = factsOf(doc);
+      const missingProof = proofOf(doc, o);
+      const logisticsName = arrangement?.partner_name ?? fallbackPartner.name;
       rows.push({
         ...base,
         key: o.id,
         leg: null,
         legRoute: null,
         logisticsId: arrangement?.partner_id ?? fallbackPartner.id,
-        logisticsName: arrangement?.partner_name ?? fallbackPartner.name,
+        logisticsName,
         confirmedIso: confirmed.iso,
         confirmedTime: confirmed.time,
         doNumber: doc?.do_number ?? null,
         hasArrangement: Boolean(arrangement),
-        status: deliveryWorkStatusOf({
-          confirmedDate: confirmed.iso,
-          /* A VOIDED document is not a live one: its scope is waiting to be
-             re-planned, and calling that `Waiting for warehouse` would point at
-             a warehouse holding nothing. */
-          hasDeliveryOrder: Boolean(doc) && docStatusOf(doc!).kind !== "cancelled",
-          ...facts,
-        }),
+        missingProof,
+        status: deliveryWorkStatusOf(
+          {
+            partnerName: logisticsName,
+            callByDate: contactDueIso,
+            confirmedDate: confirmed.iso,
+            confirmedTime: confirmed.time,
+            /* A VOIDED document is not a live one: its scope is waiting to be
+               re-planned, and naming a partner's pickup for it would point at
+               a warehouse holding nothing. */
+            hasDeliveryOrder: Boolean(doc) && docStatusOf(doc!).kind !== "cancelled",
+            expectedArrival: arrangement?.expected_arrival ?? null,
+            todayIso: todayIso ?? null,
+            proof: {
+              photoUploaded: missingProof.photo ? false : null,
+              signedDoUploaded: missingProof.signedDo ? false : null,
+              acceptedOn: null,
+            },
+            ...facts,
+          },
+          DELIVERY_STATUS_SPELL,
+        ),
       });
       continue;
     }
@@ -516,18 +616,21 @@ export function buildDeliveryScopeRows({
       const confirmedIso =
         arrangement?.confirmed_date ??
         (stop.scheduled_at ? stop.scheduled_at.slice(0, 10) : null);
+      const legPartner = arrangement?.partner_name ?? stop.partner_name ?? null;
+      const legTime = arrangement?.confirmed_time ?? null;
       rows.push({
         ...base,
         key: `${o.id}#leg${stop.leg}`,
         leg: stop.leg,
         legRoute: legRouteOf(stop),
         logisticsId: arrangement?.partner_id ?? stop.partner_id ?? null,
-        logisticsName: arrangement?.partner_name ?? stop.partner_name ?? null,
+        logisticsName: legPartner,
         confirmedIso,
-        confirmedTime: arrangement?.confirmed_time ?? null,
+        confirmedTime: legTime,
         doNumber: null,
         hasArrangement: Boolean(arrangement),
-        status: legWorkStatusOf(stop, confirmedIso),
+        missingProof: proofOf(null, o),
+        status: legWorkStatusOf(stop, confirmedIso, legPartner, legTime),
       });
     }
   }

@@ -355,8 +355,18 @@ describe("the shape", () => {
     fireEvent.click(
       within(screen.getByTestId("delivery-monitor-status-select")).getByRole("combobox"),
     );
-    for (const value of ["Waiting for warehouse", "Ready for handover", "Out for delivery"]) {
+    /* The dropdown lists the shared actor-first dictionary (§8.4), never the
+       retired seven words. */
+    for (const value of [
+      "Operation must assign logistics",
+      "Waiting for logistics pickup",
+      "Logistics is delivering to the customer",
+      "Order details incomplete",
+    ]) {
       expect(screen.getByRole("option", { name: new RegExp(`^${value}`) })).toBeTruthy();
+    }
+    for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery"]) {
+      expect(screen.queryByRole("option", { name: new RegExp(`^${retired}`) })).toBeNull();
     }
   });
 
@@ -591,7 +601,10 @@ describe("one card", () => {
     expect(within(card).getByText("No delivery order yet")).toBeTruthy();
     expect(within(card).getByText("Aida Rahim")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
-    expect(within(card).getByText("Delivery confirmed")).toBeTruthy();
+    /* A day AND a window: the pill names the day (§8.4), never the retired
+       `Delivery confirmed`. */
+    expect(within(card).getByText("Confirmed for Sat, 5 Sep")).toBeTruthy();
+    expect(within(card).queryByText("Delivery confirmed")).toBeNull();
     expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery/edit/b");
   });
 
@@ -739,10 +752,12 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(within(card).getByText("Fri, 4 Sep")).toBeTruthy();
     expect(within(card).getByText("No time agreed")).toBeTruthy();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
-    /* The footer carries the ACT, and it is about the TIME. */
-    expect(within(card).getByTestId("delivery-monitor-card-act-a").textContent).toBe(
-      "Call NETS — confirm delivery time",
-    );
+    /* The footer carries the ACT as two structured lines (owner ruling
+       2026-09-13), and it is about the TIME. */
+    const act = within(card).getByTestId("delivery-monitor-card-act-a");
+    expect(within(act).getByText("Call NETS")).toBeTruthy();
+    expect(within(act).getByText("Confirm the delivery time")).toBeTruthy();
+    expect(act.textContent).not.toContain("—");
   });
 
   it("a fully booked card keeps its window and its confirmed pill", () => {
@@ -829,15 +844,15 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     expect(screen.queryByText("SO-1322")).toBeNull();
   });
 
-  it("a DELIVERY STATUS pick is a filter over recorded progress — Waiting for warehouse lists the arranged-but-not-ready rows", () => {
+  it("a DELIVERY STATUS pick is a filter over recorded progress — the pickup wait lists the arranged-but-not-collected rows", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery");
-    pickRail("status", /^Waiting for warehouse/);
-    expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_warehouse");
+    pickRail("status", /^Waiting for logistics pickup/);
+    expect(screen.getByTestId("location-probe").textContent).toContain("status=waiting_pickup");
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
-    /* SO-1322 holds a live DO with no handover yet — Waiting for warehouse. */
+    /* SO-1322 holds a live DO with no handover yet — its partner's pickup. */
     expect(screen.getByText("SO-1322")).toBeTruthy();
     expect(screen.queryByText("SO-1323")).toBeNull();
-    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Waiting for warehouse");
+    expect(screen.getByTestId("delivery-monitor-filter-summary").textContent).toContain("Waiting for logistics pickup");
   });
 
   it("combined active filters print above the list, and Clear filters clears the NARROWINGS, not the tab", () => {
@@ -1024,7 +1039,7 @@ describe("the URL is the state", () => {
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(
       within(screen.getByTestId("delivery-monitor-status-select")).getByRole("combobox").textContent,
-    ).toContain("Waiting for warehouse");
+    ).toContain("Waiting for logistics pickup");
     expect(screen.getByText("SO-1322")).toBeTruthy();
     expect(screen.queryByText("SO-1323")).toBeNull();
   });
@@ -1254,13 +1269,16 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(within(dialog).getByText("1 delivery")).toBeTruthy();
   });
 
-  it("a row WITH a Logistics Partner says `Call {partner} — confirm delivery date`", () => {
+  it("a row WITH a Logistics Partner says `Call {partner}` over `Confirm the delivery date`", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     /* The QUEUE is named after the customer conversation; the ROW names who
        the operator actually dials (MASTER §2 — the partner arranges the day
-       with the customer), through the governed dictionary line. */
-    expect(screen.getByText("Call NETS — confirm delivery date")).toBeTruthy();
+       with the customer), through the governed dictionary's TWO lines (owner
+       ruling 2026-09-13) — never joined with `—`. */
+    expect(screen.getAllByText("Call NETS").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Confirm the delivery date").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Call NETS — /)).toBeNull();
     expect(screen.getByTestId("delivery-monitor-edit-early").textContent).toBe("Edit Delivery");
     /* No employee and no carrier is ever hard-coded into the sentence. */
     for (const name of ["Chan", "Tan Ah", "Khor Yee"]) {
@@ -1364,7 +1382,8 @@ describe("the phone's chase list", () => {
     expect(within(card).getByText("Thu, 10 Sep")).toBeTruthy();
     expect(within(card).getByText("Logistics Partner")).toBeTruthy();
     expect(within(card).getByText("NETS")).toBeTruthy();
-    expect(within(card).getByText("Call NETS — confirm delivery date")).toBeTruthy();
+    expect(within(card).getByText("Call NETS")).toBeTruthy();
+    expect(within(card).getByText("Confirm the delivery date")).toBeTruthy();
     expect(within(card).getByText("Edit Delivery")).toBeTruthy();
     /* Not the desktop sheet squeezed: no grid, no Columns control. */
     expect(screen.queryByRole("columnheader")).toBeNull();

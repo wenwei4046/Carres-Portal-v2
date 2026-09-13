@@ -25,9 +25,9 @@
 
 ## Tasks
 
-- [ ] Rewrite `deliveryWorkStatusOf` inputs and words; retire the seven words with a test that names them
-- [ ] Add `orderActionLines` and rewrite every Delivery key's line; keep `orderActionLine` for non-Delivery keys
-- [ ] Render two lines on Work rows, the Orders list Actions cell and the DO page for Delivery keys
-- [ ] Wire the `DELIVERY STATUS` dropdown and the calendar card to the new words
-- [ ] Tests: status arithmetic per state, word bans, two-line rendering; typecheck; design guard
+- [x] Rewrite `deliveryWorkStatusOf` inputs and words; retire the seven words with a test that names them
+- [x] Add `orderActionLines` and rewrite every Delivery key's line; keep `orderActionLine` for non-Delivery keys
+- [x] Render two lines on Work rows, the Orders list Actions cell and the DO page for Delivery keys
+- [x] Wire the `DELIVERY STATUS` dropdown and the calendar card to the new words
+- [x] Tests: status arithmetic per state, word bans, two-line rendering; typecheck; design guard
 - [ ] PR → merge → deploy → authenticated production verification on real rows

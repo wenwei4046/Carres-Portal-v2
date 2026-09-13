@@ -116,14 +116,15 @@ deliveryOrdersRouter.get("/", requireOperationOrPrincipal, async (c) => {
     attempts = res.data ?? [];
   }
 
-  // The §4 handover facts (0363) — kinds only; the register's arithmetic
-  // needs nothing more (Out for delivery derives from Received by Logistics).
+  // The §4 handover facts (0363) — the kind for the register's arithmetic
+  // (Out for delivery derives from Received by Logistics) and its clock for
+  // Monitor's `Collected {date} {time}` line (Delivery MASTER §8.4).
   const ids = (rows ?? []).map((r) => r.id);
-  let handoverEvents: Array<{ delivery_order_id: string; kind: string }> = [];
+  let handoverEvents: Array<{ delivery_order_id: string; kind: string; recorded_at: string | null }> = [];
   if (ids.length > 0) {
     const res = await sb
       .from("delivery_handover_events")
-      .select("delivery_order_id, kind")
+      .select("delivery_order_id, kind, recorded_at")
       .in("delivery_order_id", ids);
     if (res.error) {
       return c.json(

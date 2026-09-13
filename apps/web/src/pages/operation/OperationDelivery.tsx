@@ -66,7 +66,8 @@ import {
   PanelLeftOpen,
   Phone,
 } from "lucide-react";
-import type { DeliveryWorkStatusKind, OrderActionTone } from "@carres/shared";
+import type { DeliveryWorkStatusTone, OrderActionTone } from "@carres/shared";
+import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
 import {
   ARRIVAL_COPY,
   arrivalNoteOf,
@@ -169,18 +170,16 @@ const NARROW_VIEWPORT_PX = 1100;
 const WORK_LIST_STORAGE_KEY = "carres.deliveryMonitor.workList.v4";
 
 /**
- * The OPERATIONAL ladder's tones (owner ruling 2026-08-24): waiting is the
- * normal state of most rows, so only a recorded exception spends the
- * attention colour.
+ * The status word's TEXT COLOUR (owner ruling 2026-09-13): green for a settled
+ * good fact, orange for a fact that needs an act, red for `Overdue` and
+ * `Failed Delivery`, none while the goods move normally. The colour comes
+ * from the one arithmetic; this map only names the kit tone for it.
  */
-const STATUS_TONE: Record<DeliveryWorkStatusKind, OrderActionTone> = {
-  waiting_customer_date: "neutral",
-  confirmed: "info",
-  waiting_warehouse: "neutral",
-  ready_for_handover: "info",
-  out_for_delivery: "info",
-  delivered: "success",
-  failed: "warning",
+const PILL_TONE: Record<DeliveryWorkStatusTone, OrderActionTone> = {
+  green: "success",
+  orange: "warning",
+  red: "danger",
+  none: "neutral",
 };
 
 /**
@@ -517,15 +516,25 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
             carries the ACT instead — about the TIME, never asking again for a
             date the customer has already given. */}
         {card.booked || card.settled ? (
-          <StatusPill tone={STATUS_TONE[card.statusKey]}>{card.statusLabel}</StatusPill>
+          <StatusPill tone={PILL_TONE[card.statusTone]}>{card.statusLabel}</StatusPill>
         ) : (
           <span
-            className="block truncate text-label text-kit-slate-12"
+            className="block text-label text-kit-slate-12"
             data-testid={"delivery-monitor-card-act-" + card.scopeId}
           >
-            {monitorRowAction(card).kind === "confirm_date"
-              ? (monitorRowAction(card) as { call: string }).call
-              : monitorRowActionText(card)}
+            {(() => {
+              const action = monitorRowAction(card);
+              /* Two structured lines, never joined with `—` (owner ruling
+                 2026-09-13): the act with its recipient, then the result. */
+              return action.kind === "confirm_date" ? (
+                <>
+                  <span className="block truncate">{action.call}</span>
+                  <span className="block truncate text-kit-slate-11">{action.result}</span>
+                </>
+              ) : (
+                <span className="block truncate">{monitorRowActionText(card)}</span>
+              );
+            })()}
           </span>
         )}
       </div>
@@ -600,7 +609,10 @@ function MonitorWorkCard({
       </div>
       <div className="flex flex-col gap-1 border-t border-kit-slate-4 px-2.5 py-2">
         {action.kind === "confirm_date" ? (
-          <span className="text-body text-kit-slate-12">{action.call}</span>
+          <span className="text-body text-kit-slate-12">
+            <span className="block">{action.call}</span>
+            <span className="block text-kit-slate-11">{action.result}</span>
+          </span>
         ) : action.kind === "upload_proof" ? (
           /* The EXACT missing evidence — the act, then the door below it. */
           <span className="text-body text-kit-slate-12">{action.label}</span>
@@ -802,13 +814,15 @@ export default function OperationDelivery() {
   const q = searchParams.get("q") ?? "";
   const region = searchParams.get("region");
   const logistics = searchParams.get("logistics");
-  const statusParam = searchParams.get("status") ?? (viewParam === "waiting_warehouse" ? "waiting_warehouse" : null);
-  const status: MonitorDeliveryStatus | null =
-    statusParam === "waiting_warehouse" ||
-    statusParam === "ready_for_handover" ||
-    statusParam === "out_for_delivery"
-      ? statusParam
-      : null;
+  /* The retired `?view=waiting_warehouse` URL (and its retired word) lands on
+     the rung that replaced it — the partner's pickup wait (§8.4). */
+  const statusParam =
+    searchParams.get("status") ?? (viewParam === "waiting_warehouse" ? "waiting_pickup" : null);
+  const status: MonitorDeliveryStatus | null = (DELIVERY_WORK_STATUS_KINDS as readonly string[]).includes(
+    statusParam ?? "",
+  )
+    ? (statusParam as MonitorDeliveryStatus)
+    : null;
 
   /* THE RESOLVED VIEW, as ONE word. A URL that arrived in a retired spelling
      (`?day=`, `?start=`, `?view=calendar`, `?schedule=`) is normalised to it on
@@ -1536,17 +1550,20 @@ export default function OperationDelivery() {
         /* ⭐ THE OPERATION'S progress, not the DOCUMENT's (owner ruling
            2026-08-24) — it always has an answer, and it is never `Created`. */
         accessor: (r) => {
-          /* The result stays `Delivered`; the row names the EXACT missing
-             evidence beneath it — `Upload delivery photo` and/or `Upload
-             signed Delivery Order` (owner correction 2026-09-07). */
+          /* Line one names the actor and the fact; line two carries the day,
+             window, deadline, ETA, proof state or reason — both from the one
+             arithmetic (Delivery MASTER §8.4). A proof gap under `Delivered`
+             is the only second line that spends the attention colour. */
           const missing = missingProofLabels(r);
-          const second = r.scope.status.reasonLabel ?? (missing.length ? missing.join(" · ") : null);
+          const second = r.statusSecond;
           return (
             <span className="block min-w-0">
-              <StatusPill tone={STATUS_TONE[r.statusKey]}>{r.statusLabel}</StatusPill>
+              <StatusPill tone={PILL_TONE[r.statusTone]}>{r.statusLabel}</StatusPill>
               {second ? (
                 <span
-                  className="block truncate text-label font-normal text-base-600"
+                  className={`block truncate text-label font-normal ${
+                    r.statusSecondTone === "orange" ? "text-kit-amber-11" : "text-base-600"
+                  }`}
                   title={second}
                   data-testid={missing.length ? "delivery-monitor-missing-proof" : undefined}
                 >
@@ -1556,7 +1573,7 @@ export default function OperationDelivery() {
             </span>
           );
         },
-        searchValue: (r) => [r.statusLabel, ...missingProofLabels(r)].join(" "),
+        searchValue: (r) => [r.statusLabel, r.statusSecond ?? "", ...missingProofLabels(r)].join(" "),
         filterValue: (r) => r.statusLabel,
       },
       {
@@ -1566,8 +1583,8 @@ export default function OperationDelivery() {
            `monitorRowAction` arithmetic:
 
              no Logistics Partner   `Assign logistics` — the governed door
-             partner, no date       `Call {partner} — confirm delivery date`,
-                                    then `Edit Delivery` records what they said
+             partner, no date       `Call {partner}` over `Confirm the delivery
+                                    date`, then `Edit Delivery` records what they said
              everything agreed      `Edit Delivery`
 
            The partner's NAME comes from the row; no carrier and no employee
@@ -1599,8 +1616,9 @@ export default function OperationDelivery() {
                    LOGISTICS PARTNER, who arranges the day with the customer
                    (MASTER §2). The QUEUE is named after the customer
                    conversation that must happen; the ROW names who to dial. */
-                <span className="block max-w-full truncate text-kit-slate-12" title={action.call}>
-                  {action.call}
+                <span className="block max-w-full text-kit-slate-12" title={`${action.call} · ${action.result}`}>
+                  <span className="block truncate">{action.call}</span>
+                  <span className="block truncate text-kit-slate-11">{action.result}</span>
                 </span>
               ) : action.kind === "upload_proof" ? (
                 <span

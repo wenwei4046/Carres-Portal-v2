@@ -6989,10 +6989,12 @@ export interface DeliveryOrderAttemptRow {
   recorded_at: string;
   recorded_by?: string | null;
 }
-/** One §4 handover fact (0363) as the register needs it — the kind alone. */
+/** One §4 handover fact (0363) as the register needs it — the kind, and its
+ *  clock for Monitor's `Collected {date} {time}` line (§8.4). */
 export interface DeliveryHandoverKindRow {
   delivery_order_id: string;
   kind: DeliveryHandoverKind;
+  recorded_at?: string | null;
 }
 
 export interface DeliveryOrdersRegisterPayload {
