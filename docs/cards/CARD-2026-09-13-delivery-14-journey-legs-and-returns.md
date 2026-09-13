@@ -62,3 +62,28 @@ trip the later-date proof rule.
 null`) and the Monitor row reads only `No delivery order yet`. Fix: return the blocked reasons from
 the PUT hook and print them on the leg row's brief exactly as the whole-order `Delivery Order`
 panel prints them — one gate, one set of words.
+
+### Walk continuation — the governed fixture SO-1362 (2026-09-13)
+
+A fully governed fixture was built through the normal doors, nothing faked: `POST /api/orders/raw`
+(dealer Carres Kelana Jaya · customer signature uploaded to `orders-attachments` · terms accepted ·
+RM 1,200 paid in full · JAGER-SS ×1 · address, State, building type, floor, lift, requested date
+2026-09-18) → `POST /api/orders/{id}/proceed` → `POST …/ready-stock/reserve` (Unit
+`id-dtd627907`) → `PUT …/delivery-chain` (NETS `Carres Klang Warehouse → JB transit warehouse`,
+AL `JB transit warehouse → Customer (Singapore)`) → `PUT …/delivery-arrangements/{id}?leg=1`.
+The leg 1 save issued **DO-130926-0842** through the one gate (`deliveryOrder: {issued: true}`):
+`ops_delivery_orders.leg = 1`, NETS, Tue 15 Sep · 10 AM to 1 PM, `delivery_order_units` holds
+exactly `id-dtd627907`, History `DO-130926-0842 issued for leg 1 · Carres Klang Warehouse → JB
+transit warehouse`, `orders.do_number` left null (only the customer leg mirrors). Monitor prints
+`Waiting for NETS pickup · SO-1362 · Carres Klang Warehouse → JB transit warehouse · … · Ready 1 of
+1 · Paid · DO-130926-0842` and `AL must contact the customer · … · No delivery order yet`.
+
+🔴 **Found and fixed — 0494.** `ready_for_handover`, `scanned`, `checked`, `packed` recorded on the
+leg document, but `handed_over` refused with `partner_holder_not_recorded`: the handover door
+(0424/0440) resolved the goods-holder from the arrangement at **leg 0**, so a Journey leg's document
+could never hand over. **0494** re-creates `delivery_handover_record` reading the DOCUMENT's own
+scope (`a.leg = coalesce(v_do.leg, 0)`); a whole-order document is unchanged. Rolled-back probe on
+DO-130926-0842: `handed_over` OK (accepted 1 of 1, counterparty NETS, holder → NETS Delivery),
+`received_by_logistics` OK, a second handover of the same Unit REFUSED (`unit_already_handed_over`).
+The SO-1361 fixture created without a signature was cancelled through the cancel door and its
+reservation released through the release door.
