@@ -603,7 +603,13 @@ describe("CustomerStep — clickable step pills", () => {
     d.customer.race = "Chinese";
     d.customer.gender = "Female";
     d.customer.birthday = "1990-01-01";
-    d.customer.addressUnknown = true; // address gate satisfied
+    /* The address gate has no escape since 2026-09-13 — it is satisfied by
+       the facts themselves. */
+    d.customer.addressLine1 = "12 Jalan Besar";
+    d.customer.addressState = "Selangor";
+    d.customer.addressCity = "Petaling Jaya";
+    d.customer.addressPostcode = "46200";
+    d.customer.buildingType = "Condo";
     wrap(
       <CustomerStep
         draft={d}

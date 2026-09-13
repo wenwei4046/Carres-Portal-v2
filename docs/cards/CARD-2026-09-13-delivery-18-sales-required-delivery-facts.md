@@ -25,7 +25,7 @@
 
 ## Tasks
 
-- [ ] Schema and wizard refusals with the governed words
-- [ ] Office create door parity
-- [ ] Tests, typecheck
+- [x] Schema and wizard refusals with the governed words — `DELIVERY_FACT_REFUSALS` (shared `sales-order-form.ts`); `createOrderInputSchema` refuses a missing address (the `addressUnknown` escape), state and building type; the wizard's `step1FirstIssue` drops the `or tick 'Unknown'` branch and `CustomerStep` no longer offers `Fill in address later`; stale drafts reload with the tick off
+- [x] Office create door parity — `rawCreateOrderInputSchema` refuses the same six facts with the same words; `PrincipalNewOrder` drops the `Fill in address later` tick, adds `Building type *` (rides `entry_data.fields.building_type`), requires the delivery date, and prints the first missing fact under the form (`raw-first-issue`) before the round trip
+- [x] Tests, typecheck — shared `orders.entry-gate.test.ts`; api `orders-raw.test.ts` refusal cases + fixture; web draft/CustomerStep/PrincipalNewOrder tests updated; tsc ×3
 - [ ] PR → merge → deploy → authenticated production verification

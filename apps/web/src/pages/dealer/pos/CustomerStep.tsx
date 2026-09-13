@@ -257,7 +257,6 @@ export default function CustomerStep({
     }
     if (idx === 1) {
       const addressOk =
-        c.addressUnknown ||
         (c.addressLine1.trim().length >= 5 &&
           !!c.addressState &&
           !!c.addressCity &&
@@ -630,40 +629,10 @@ export default function CustomerStep({
             {/* ── 2 · Address ── */}
             {stepIdx === 1 && (
               <div className="fade-in">
-                <label className={`addr-toggle ${c.addressUnknown ? "is-on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={c.addressUnknown}
-                    onChange={(e) =>
-                      setC({
-                        addressUnknown: e.target.checked,
-                        // Wipe structured fields when toggled on so a later
-                        // un-toggle doesn't surface stale data.
-                        ...(e.target.checked
-                          ? {
-                              addressLine1: "",
-                              addressLine2: "",
-                              addressState: "",
-                              addressCity: "",
-                              addressPostcode: "",
-                            }
-                          : {}),
-                      })
-                    }
-                  />
-                  <span className="addr-toggle__box">
-                    {c.addressUnknown && <Check size={12} strokeWidth={3} />}
-                  </span>
-                  <span>
-                    <strong>Fill in address later</strong>
-                    <span className="addr-toggle__hint">
-                      Customer hasn't confirmed the delivery address yet — it's required before
-                      the order can move to operation.
-                    </span>
-                  </span>
-                </label>
-
-                {!c.addressUnknown && (
+                {/* The "Fill in address later" tick is RETIRED (owner ruling
+                    2026-09-13, Delivery Card 18): a valid new order carries its
+                    delivery address — Sales asks before the sale is filed. */}
+                {(
                   <div style={{ marginTop: 22 }}>
                     <div
                       style={{

@@ -1001,7 +1001,7 @@ their absence as a design blind spot:
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |
 | central Delivery reports | the Reports destination |
-| the POS required-facts gate for address, state, building type, floor, lift and access | Sales Orders' build, a dependency |
+| the POS required-facts gate for address, state, building type, floor, lift and access | **BUILT 2026-09-13 (Delivery Card 18)** — `createOrderInputSchema`, `rawCreateOrderInputSchema`, the POS wizard and the office create door refuse the facts with one wording; `Order details incomplete` now names legacy rows only |
 
 ### 15.2 · Whole-domain closure
 
