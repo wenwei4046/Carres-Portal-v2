@@ -1433,3 +1433,8 @@ window · plain REGION rows) were fixed before merge. Named follow-ups, not acci
 `Assign logistics` surface (the retired listing's door), the Delivery Orders register's own
 redesign Card, and owner acceptance of the PROPOSAL copy (`Monitor` · `Calendar` ·
 `NEEDS CHECKING` · `Search deliveries…`).
+
+
+### Supplemental production acceptance · 2026-09-13 23:32 MYT
+
+Card 12’s representative manager save is now verified as principal on the existing E2E LP-X fixture, persisted after reload and restored to its original value with both audit entries retained. Card 18’s office form was walked as principal: Building type is required, the retired address-later control is absent, and missing address/building/date facts disable Create order with the governed message. These are authenticated observations on `f2fb3efeb89c395dd9f7ee96cdc49d60e6e103ff`; see the supplemental sections of Cards 12 and 18 for exact test facts. Dealer POS remains open: the working dealer-test login reaches first-time staff PIN setup, not the wizard. No identity/security setup was changed. Cards 19/20 are being handled in their existing Delivery workspaces; Card 21 owns only legacy warehouse-pick application retirement, with database retirement explicitly still outstanding.

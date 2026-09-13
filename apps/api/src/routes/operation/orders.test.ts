@@ -1289,80 +1289,25 @@ describe("POST /api/operation/orders/:id/abandon", () => {
   });
 });
 
-describe("POST /api/operation/orders/:id/warehouse", () => {
-  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
-
-  it("returns 200 on success", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { id: ORDER_ID, warehouse_id: WAREHOUSE_ID, operation_stage: "ready_to_dispatch" }, error: null });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_warehouse_pick", {
-      p_order_id: ORDER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-    });
-    assertRpcCallShape(rpc, "operation_warehouse_pick", ["p_order_id", "p_warehouse_id"]);
-  });
-
-  it("returns 422 when warehouseId is not uuid", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc: vi.fn() } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: "not-a-uuid" }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-  });
-
-  it("maps P0001 has_open_pos → 422 with code", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "P0001", message: "PO already issued", details: "has_open_pos" } });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("has_open_pos");
-  });
-
-  it("returns 403 for non-operation (no rpc call)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+describe("retired POST /api/operation/orders/:id/warehouse", () => {
+  it.each([{}, { warehouseId: "00000000-0000-0000-0000-000000000c02" }, { warehouseId: "not-a-uuid" }])(
+    "refuses stale requests before opening a database client: %j", async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/warehouse", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }), env);
+      expect(res.status).toBe(410);
+      expect(await res.json()).toMatchObject({ code: "warehouse_pick_retired" });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
+  it("preserves the Operation permission boundary", async () => {
     const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/warehouse`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
+    const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/warehouse", {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: "{}",
+    }), env);
     expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
@@ -1731,124 +1676,25 @@ describe("POST /api/operation/orders/:id/reselect-partner (migration 0147 — it
   });
 });
 
-describe("POST /api/operation/orders/:id/transfer-ready", () => {
-  const ORDER_ID = "00000000-0000-0000-0000-000000000a01";
-  const WAREHOUSE_ID = "00000000-0000-0000-0000-000000000c02";
-
-  it("returns 200 on happy path with warehouseId", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: { id: ORDER_ID, warehouse_id: WAREHOUSE_ID, operation_stage: "ready_to_dispatch", shortages: 0 },
-      error: null,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("operation_warehouse_pick", {
-      p_order_id: ORDER_ID,
-      p_warehouse_id: WAREHOUSE_ID,
-    });
-    assertRpcCallShape(rpc, "operation_warehouse_pick", ["p_order_id", "p_warehouse_id"]);
-  });
-
-  it("returns 422 from zod when warehouseId is missing (empty body)", async () => {
-    // Pipeline v2 reviewer fix: transfer-ready REQUIRES warehouseId. The
-    // underlying RPC `operation_warehouse_pick` raises 22023 `warehouse_required`
-    // on NULL, so zod must reject empty bodies up-front rather than letting
-    // the request reach Postgres. (confirm-proceed has a different RPC that
-    // accepts NULL — do not conflate.)
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("invalid_param");
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("returns 422 with code='wrong_stage' when not in confirmed/in_production", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: { code: "22023", message: "order not in confirmed/in_production state", details: "wrong_stage" },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("wrong_stage");
-  });
-
-  it("returns 422 with code='insufficient_stock_for_reserve' + hint passthrough", async () => {
-    const rpc = vi.fn().mockResolvedValue({
-      data: null,
-      error: {
-        code: "P0001",
-        message: "cannot reserve",
-        details: "insufficient_stock_for_reserve",
-        hint: "sku=BED-K-002 warehouse_id=00000000-0000-0000-0000-000000000c02",
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
-    const jwt = await makeJwt("operation");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ warehouseId: WAREHOUSE_ID }),
-      }),
-      env,
-    );
-    expect(res.status).toBe(422);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body = (await res.json()) as any;
-    expect(body.code).toBe("insufficient_stock_for_reserve");
-    expect(body.hint).toBe("sku=BED-K-002 warehouse_id=00000000-0000-0000-0000-000000000c02");
-  });
-
-  it("returns 403 for non-operation role (no rpc call)", async () => {
-    const rpc = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(userClient).mockReturnValue({ rpc } as any);
+describe("retired POST /api/operation/orders/:id/transfer-ready", () => {
+  it.each([{}, { warehouseId: "00000000-0000-0000-0000-000000000c02" }, { warehouseId: "not-a-uuid" }])(
+    "refuses stale requests before opening a database client: %j", async (body) => {
+      const jwt = await makeJwt("operation");
+      const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/transfer-ready", {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }), env);
+      expect(res.status).toBe(410);
+      expect(await res.json()).toMatchObject({ code: "warehouse_pick_retired" });
+      expect(userClient).not.toHaveBeenCalled();
+    },
+  );
+  it("preserves the Operation permission boundary", async () => {
     const jwt = await makeJwt("finance");
-    const res = await app.fetch(
-      new Request(`http://t/api/operation/orders/${ORDER_ID}/transfer-ready`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      }),
-      env,
-    );
+    const res = await app.fetch(new Request("http://t/api/operation/orders/00000000-0000-0000-0000-000000000a01/transfer-ready", {
+      method: "POST", headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: "{}",
+    }), env);
     expect(res.status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(userClient).not.toHaveBeenCalled();
   });
 });
 
