@@ -34,7 +34,7 @@ export default mergeConfig(base, {
     ? [
         {
           name: "portable-file-html",
-          transformIndexHtml: (html: string) => html.replace(/ type="module"/g, "").replace(/ crossorigin/g, ""),
+          transformIndexHtml: (html: string) => html.replace(/ type="module"/g, " defer").replace(/ crossorigin/g, ""),
         },
       ]
     : [],
