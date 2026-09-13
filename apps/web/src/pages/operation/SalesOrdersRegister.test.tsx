@@ -30,6 +30,7 @@ let expansionHookState: {
       sku: string;
       unitIds: string[];
       unverifiedUnitIds?: string[];
+      verifiedUnitIds?: string[];
       unitQuantityMismatch?: boolean;
       deliverTo: Array<{ name: string; qty: number }>;
     }>;
@@ -156,7 +157,7 @@ describe("FIX 1 · the register asks the SERVER", () => {
 
   it("keeps fourteen uncertain IDs inspectable without claiming they belong to the Qty 1 line", () => {
     listHookState.data = { orders: [order({ order_lines: [{ id: "l1", sku: "H1401F-K", qty: 1, unit_price: 100 }] })] };
-    expansionHookState.data = { lines: [{ lineId: "l1", sku: "H1401F-K", unitIds: [], unverifiedUnitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), deliverTo: [] }] };
+    expansionHookState.data = { lines: [{ lineId: "l1", sku: "H1401F-K", unitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), verifiedUnitIds: [], unverifiedUnitIds: Array.from({ length: 14 }, (_, i) => `ID-${i}`), deliverTo: [] }] };
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Expand row" }));
     expect(screen.getByText("Unit ID link not verified")).toBeInTheDocument();

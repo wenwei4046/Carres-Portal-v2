@@ -928,7 +928,7 @@ describe("Sales Order object page — one form grammar", () => {
        registered answer is the count and then what is being waited on, and it
        is written ONCE in shared so the Goods table, the Order Route STOCK node
        and the register expansion cannot drift into three spellings. */
-    expect(workspace).toContain("unitsShortWords(truth?.unitIds.length ?? 0, r.qty)");
+    expect(workspace).toContain("unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty)");
     /* The rendered STRING is gone; the governance comment recording WHY it
        went stays, which is why this pins the quoted literal. */
     expect(workspace).not.toContain('"Not allocated"');

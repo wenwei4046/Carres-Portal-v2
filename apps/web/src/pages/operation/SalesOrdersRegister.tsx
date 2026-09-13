@@ -414,9 +414,9 @@ function ExpandedLines({ row }: { row: RegisterRow }) {
         key: line.id ?? `${line.sku}-${index}`,
         testId: `expanded-good-${line.sku}`,
         category: goodsCategoryOf(line),
-        unitIds: fact?.unitIds ?? [],
+        unitIds: fact?.verifiedUnitIds ?? fact?.unitIds ?? [],
         unitNode: unavailable ? <span role={expansion.isError ? "alert" : "status"}>{unavailable}</span> : (
-          <UnitEvidence ids={fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
+          <UnitEvidence ids={fact?.verifiedUnitIds ?? fact?.unitIds ?? []} unverified={fact?.unverifiedUnitIds ?? []} mismatch={Boolean(fact?.unitQuantityMismatch)} />
         ),
         unitAbsence: "Not allocated",
         /* A single destination prints its name alone; only a SPLIT earns the

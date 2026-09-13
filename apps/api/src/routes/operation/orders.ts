@@ -1356,14 +1356,18 @@ operationOrdersRouter.get("/:id/expansion", requireOperation, async (c) => {
         ...(verifiedByLine.get(line.id) ?? []),
         ...(incomingByLine.get(line.id) ?? []),
       ])].sort();
+      const unverifiedUnitIds = [...new Set(unverifiedBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? [])].sort();
+      const physical = (code: string) => (unitScopes[code] ?? "unit") === "unit";
+      const verifiedUnitIds = unitIds.filter(physical);
       return {
         lineId: line.id,
         sku: line.sku,
-        unitIds,
-        // Keep order/SKU associations inspectable, but never present them as
-        // proven allocation to this particular configured goods line.
-        unverifiedUnitIds: [...new Set(unverifiedBySku.get(normalizeSkuKey(line.sku) || line.sku) ?? [])].sort(),
-        unitQuantityMismatch: unitIds.length > Math.max(0, Number(line.qty) || 0),
+        // Preserve the existing fan-in contract for Purchasing/Delivery; their
+        // readers use unitLines/unitScopes to distinguish binding and identity.
+        unitIds: [...new Set([...unitIds, ...unverifiedUnitIds])].sort(),
+        verifiedUnitIds,
+        unverifiedUnitIds: unverifiedUnitIds.filter(physical),
+        unitQuantityMismatch: verifiedUnitIds.length > Math.max(0, Number(line.qty) || 0),
         deliverTo,
       };
     }),

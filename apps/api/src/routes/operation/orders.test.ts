@@ -2833,9 +2833,9 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(new Request(`http://t/api/operation/orders/${ORDER_ID}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
     expect(res.status).toBe(200);
-    const body = await res.json() as { lines: Array<{ unitIds: string[]; unverifiedUnitIds: string[] }> };
-    expect(body.lines[0].unitIds).toEqual([]);
-    expect(body.lines[1].unitIds).toEqual(["EXACT"]);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; verifiedUnitIds: string[]; unverifiedUnitIds: string[] }> };
+    expect(body.lines[0].verifiedUnitIds).toEqual([]);
+    expect(body.lines[1].verifiedUnitIds).toEqual(["EXACT"]);
     expect(body.lines[0].unverifiedUnitIds).toEqual(["UNKNOWN"]);
   });
 
@@ -2848,7 +2848,7 @@ describe("GET /api/operation/orders/:id/expansion", () => {
       if (table === "order_lines") data = [{ id: "l1", sku: "H1401F-K", qty: 1 }, { id: "l2", sku: "H1401F-K", qty: 1 }];
       if (table === "purchasing_destinations") data = [{ id: "default", name: "Carres Klang", is_default: true }];
       if (table === "po_line_sources" && verified) data = [{ po_line_id: "p1", po_id: "po1", order_id: orderId, order_line_id: "l1", qty: 1 }];
-      if (table === "ops_stock_items" && columns.includes("warehouse_id")) data = ids.map((unit_code) => ({ unit_code, sku: "H1401F-K", po_line_id: verified ? "p1" : null }));
+      if (table === "ops_stock_items" && columns.includes("warehouse_id")) data = ids.map((unit_code) => ({ unit_code, sku: "H1401F-K", po_line_id: verified ? "p1" : null, reserved_order_line_id: verified ? "l1" : null }));
       const chain: Record<string, unknown> = {};
       for (const method of ["eq", "in", "or"]) chain[method] = () => chain;
       chain.maybeSingle = () => Promise.resolve({ data, error: null });
@@ -2859,11 +2859,11 @@ describe("GET /api/operation/orders/:id/expansion", () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(new Request(`http://t/api/operation/orders/${orderId}/expansion`, { headers: { Authorization: `Bearer ${jwt}` } }), env);
     expect(res.status).toBe(200);
-    const body = await res.json() as { lines: Array<{ unitIds: string[]; unverifiedUnitIds: string[]; unitQuantityMismatch: boolean; deliverTo: unknown[] }> };
-    expect(body.lines[0].unitIds).toHaveLength(verified ? 14 : 0);
+    const body = await res.json() as { lines: Array<{ unitIds: string[]; verifiedUnitIds: string[]; unverifiedUnitIds: string[]; unitQuantityMismatch: boolean; deliverTo: unknown[] }> };
+    expect(body.lines[0].verifiedUnitIds).toHaveLength(verified ? 14 : 0);
     expect(body.lines[0].unverifiedUnitIds).toHaveLength(verified ? 0 : 14);
     expect(body.lines[0].unitQuantityMismatch).toBe(verified);
-    expect(body.lines[1].unitIds).toEqual([]);
+    expect(body.lines[1].verifiedUnitIds).toEqual([]);
     // No PO destination exists: a current default is never a historical fact.
     expect(body.lines.every((line) => line.deliverTo.length === 0)).toBe(true);
   });
@@ -3031,7 +3031,8 @@ describe("GET /api/operation/orders/:id/expansion", () => {
         lineId: "line-1",
         sku: "B1201S-K",
         unitIds: ["id-001", "id-002"],
-        unverifiedUnitIds: [],
+        verifiedUnitIds: [],
+        unverifiedUnitIds: ["id-001", "id-002"],
         unitQuantityMismatch: false,
         deliverTo: [
           { name: "Carres Klang", qty: 10 },

@@ -3102,6 +3102,7 @@ export interface SalesOrderExpansionResponse {
     unitIds: string[];
     /** Order/SKU evidence without a proven link to this configured line. */
     unverifiedUnitIds?: string[];
+    verifiedUnitIds?: string[];
     unitQuantityMismatch?: boolean;
     deliverTo: Array<{ name: string; qty: number }>;
   }>;

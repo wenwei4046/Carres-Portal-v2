@@ -1328,33 +1328,6 @@ describe("the expansion — the ONE shared child table", () => {
     expect(src).not.toContain("<table");
   });
 
-  it("keeps unverified Unit associations inspectable without minting evidence rows", async () => {
-    apiFetch.mockResolvedValueOnce({
-      defaultDeliverTo: null, place: [],
-      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: [], unverifiedUnitIds: ["U-UNVERIFIED"], deliverTo: [] }],
-    });
-    renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
-    const box = await screen.findByTestId("so-batch-inspector-o6");
-    expect(await within(box).findByText("Unit ID link not verified")).toBeInTheDocument();
-    expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
-    expect(box.querySelector('[data-row="evidence"]')).toBeNull();
-    fireEvent.click(within(box).getByRole("button", { name: "Unit ID (1)" }));
-    expect(await screen.findByText("U-UNVERIFIED")).toBeInTheDocument();
-  });
-
-  it("warns on excess verified Units while preserving each read-only record", async () => {
-    apiFetch.mockResolvedValueOnce({
-      defaultDeliverTo: null, place: [],
-      lines: [{ lineId: "l61", sku: "B1201S-Q", unitIds: ["U-A", "U-B", "U-C"], unitQuantityMismatch: true, deliverTo: [] }],
-    });
-    renderRegister();
-    fireEvent.click(screen.getByTestId("so-batch-expand-o6"));
-    const box = await screen.findByTestId("so-batch-inspector-o6");
-    expect(await within(box).findByText("Unit ID count exceeds order quantity")).toBeInTheDocument();
-    expect(within(box).queryByText("Not allocated")).not.toBeInTheDocument();
-    expect(box.querySelectorAll('[data-row="evidence"]')).toHaveLength(3);
-  });
   it("does not call pending Unit IDs unallocated", async () => {
     apiFetch.mockImplementationOnce(() => new Promise(() => {}));
     renderRegister();

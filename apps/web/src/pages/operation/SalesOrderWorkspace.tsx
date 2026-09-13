@@ -2728,14 +2728,14 @@ export default function SalesOrderWorkspace() {
                         <span className="text-meta">The goods could not be opened.</span>
                       ) : goodsTruthQ.isLoading && !truth ? (
                         <span className="font-mono text-meta">Loading…</span>
-                      ) : truth && (truth.unitIds.length > 0 || (truth.unverifiedUnitIds?.length ?? 0) > 0 || truth.unitQuantityMismatch) ? (
+                      ) : truth && ((truth.verifiedUnitIds ?? truth.unitIds).length > 0 || (truth.unverifiedUnitIds?.length ?? 0) > 0 || truth.unitQuantityMismatch) ? (
                         <div className="font-mono text-meta">
-                          <UnitEvidence ids={truth.unitIds} unverified={truth.unverifiedUnitIds ?? []} mismatch={truth.unitQuantityMismatch ?? false} />
-                          {truth.unitIds.length < r.qty && <div className="mt-1 text-base-600">{unitsShortWords(truth.unitIds.length, r.qty).join(" · ")}</div>}
+                          <UnitEvidence ids={truth.verifiedUnitIds ?? truth.unitIds} unverified={truth.unverifiedUnitIds ?? []} mismatch={truth.unitQuantityMismatch ?? false} />
+                          {(truth.verifiedUnitIds ?? truth.unitIds).length < r.qty && <div className="mt-1 text-base-600">{unitsShortWords((truth.verifiedUnitIds ?? truth.unitIds).length, r.qty).join(" · ")}</div>}
                         </div>
                       ) : (
                         (() => {
-                          const [count, waiting] = unitsShortWords(truth?.unitIds.length ?? 0, r.qty);
+                          const [count, waiting] = unitsShortWords((truth?.verifiedUnitIds ?? truth?.unitIds)?.length ?? 0, r.qty);
                           return (
                             <div className="font-mono text-meta">
                               <div>{count}</div>

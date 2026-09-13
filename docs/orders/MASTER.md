@@ -237,11 +237,15 @@ It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or w
 **Register correction — owner approved 2026-09-11; implemented in [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227).**
 The delivery PR carries the exact release SHA, check results and authenticated read-only closure;
 implementation or a sample browser walk alone is not deployment proof.
-Unit IDs with an exclusive PO-source-to-order-line relationship are shown as line evidence.
+Incoming Unit IDs with an exclusive PO-source-to-order-line relationship are shown as line evidence.
+Reserved/sold Units require Stock’s stored line binding; their original PO is not a substitute.
 Order/SKU-only links remain inspectable but say `Unit ID link not verified`; matching a SKU
 does not assign an exact Unit to a configured line. Proven IDs exceeding the order-line Qty
 say `Unit ID count exceeds order quantity`; never truncate the IDs to make the counts agree.
-One verified ID prints directly; multiple IDs open a read-only kit Popover with the full list. The shared SO Batch reader preserves unverified associations in the same inspection surface, never as allocated Unit rows or as Not allocated; excess verified Units keep their quantity warning. Unit-to-PO coverage from the current Purchasing implementation is preserved.
+One verified ID prints directly; multiple IDs open a read-only kit Popover with the full list. The current SO Batch and Delivery readers retain their existing `unitIds`, `unitLines`,
+`unitScopes` and Unit-to-PO evidence contract. Sales Orders uses the additional `verifiedUnitIds`
+projection for allocation counts and excludes counted stock keys from physical Unit labels.
+The newer Purchasing details table remains unchanged by this takeover.
 Deliver To uses actual `po_line_sources` quantities and the corresponding PO-line destination,
 falling back only to that PO's recorded destination. A current default destination is not an
 order fact. Missing line provenance renders `Not recorded`. Loading, failed reads and verified
