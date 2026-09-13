@@ -278,6 +278,14 @@ export type DataGridProps<T> = {
    * first-data-column behaviour byte-identical for every existing caller.
    */
   stickyIdentity?: boolean | { columnKey: string | readonly string[] };
+  /**
+   * ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5, owner ruling
+   * 2026-09-12): the Delivery Monitor work list's parent row is 72px because
+   * every cell carries one primary fact and one supporting line. Omitted =
+   * the Register baseline (38px), byte-identical for every other caller. A
+   * page passes the governed number; the engine never invents a third.
+   */
+  rowHeight?: 38 | 72;
   /** show "Drag a column header here to group by that column" banner */
   groupBanner?: boolean;
   emptyMessage?: string;
@@ -523,6 +531,7 @@ function DataGridInner<T>({
   focusSearchNonce,
   collapseAllNonce,
   stickyIdentity = false,
+  rowHeight,
   groupBanner = true,
   emptyMessage = "No data.",
   isLoading = false,
@@ -1774,6 +1783,8 @@ function DataGridInner<T>({
         .filter(Boolean)
         .join(" ")}
       data-testid={isReference ? "sales-orders-grid" : undefined}
+      style={rowHeight ? ({ "--grid-row-h": `${rowHeight}px` } as CSSProperties) : undefined}
+      data-row-height={rowHeight}
     >
       {/* Toolbar — search LEFT (REGISTER LAW 2: always left, compact ~200px;
           2990 kept it right — that is the one composition change the laws

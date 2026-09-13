@@ -89,8 +89,15 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Condominium",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
-    delivery_date: null,
+    /* A requested delivery day is a required Sales fact (owner ruling
+       2026-09-13); the default fixture carries one so a test about a missing
+       day names it deliberately. */
+    delivery_date: "2026-09-25",
     delivery_date_tbd: false,
     source_system: null,
     source_ref: ["CR0854"],
@@ -721,8 +728,11 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
       handoverEvents: [],
     };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
-    const cell = screen.getByText("No time agreed");
-    expect(cell.getAttribute("data-absence")).toBe("true");
+    /* `Confirmed Delivery` states the half booking on its second line (§8.3):
+       `Fri, 4 Sep · No time agreed` under `Not confirmed`. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getByText("Fri, 4 Sep · No time agreed")).toBeTruthy();
+    expect(within(list).getAllByText("Not confirmed").length).toBeGreaterThan(0);
     /* And the row KEEPS ITS WORK: the conversation is not finished, so the
        document still sits in the queue that finishes it. */
     fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
@@ -787,22 +797,29 @@ describe("the two top-level views (owner ruling 2026-09-10)", () => {
     fireEvent.click(screen.getByTestId("delivery-monitor-work-no_confirmed_date"));
     expect(screen.getByTestId("delivery-monitor-work-list")).toBeTruthy();
     expect(screen.queryByTestId("delivery-monitor-day-2026-09-04")).toBeNull();
+    /* The twelve ruled columns (Delivery MASTER §8.3): checkbox · expand ·
+       these ten headings, in order. `Actions` and `Edit Delivery` are retired. */
     for (const label of [
+      "Delivery Status",
       "SO No",
       "Customer",
-      "State",
+      "Delivery Location",
       "Requested Delivery Date",
-      "Items",
-      "Accessories & services",
-      "Expected arrival",
-      "Stock",
-      "Actions",
-      "Edit Delivery",
+      "Confirmed Delivery",
+      "Logistics",
+      "Items & Stock",
+      "Payment",
+      "DO No",
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
+    for (const retired of ["Actions", "Edit Delivery"]) {
+      expect(screen.queryByRole("columnheader", { name: retired })).toBeNull();
+    }
     expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(0);
-    expect(screen.getAllByTitle("Show delivery items").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("Show delivery brief").length).toBeGreaterThan(0);
+    /* 72px rows — the one page-specific exception (ui MASTER §6.5). */
+    expect(screen.getByTestId("sales-orders-grid").getAttribute("data-row-height")).toBe("72");
   });
 
   it("`All delivery work` lists every open row — dated, DO-less and dateless — and its footer counts deliveries", () => {
@@ -919,10 +936,12 @@ describe("Upload delivery proof (owner correction 2026-09-07)", () => {
        2026-09-10 moved it into `Actions`, where the row's one job lives) — and
        a RECORDED result outranks an unassigned partner, so a delivered row
        never asks for a carrier it no longer needs. */
+    /* The status's second line names the proof gap (§8.4): the photo first,
+       else the signed document; the queue row still counts both. */
     const acts = within(list)
       .getAllByTestId("delivery-monitor-missing-proof")
       .map((el) => el.textContent);
-    expect(acts).toContain("Upload delivery photo · Upload signed Delivery Order");
+    expect(acts).toContain("Delivery photo not uploaded");
     expect(acts).toContain("Upload signed Delivery Order");
     /* The recorded result word never changes — it is still `Delivered`, in
        the chooser's own Delivery Status column and in the row's search text. */
@@ -960,7 +979,7 @@ describe("bulk logistics assignment on the work list", () => {
     /* Every one of them is unassigned and dateless — the population the bulk
        journey exists for. `DO No` now answers from the Columns chooser. */
     expect(screen.getAllByText(MONITOR_COPY.noLogistics).length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText(MONITOR_COPY.noConfirmedDate).length).toBe(3);
+    expect(screen.getAllByText(MONITOR_COPY.notConfirmed).length).toBe(3);
   });
 
   it("one unassigned row offers Assign logistics AND Edit Delivery; many rows never offer Edit Delivery", () => {
@@ -1216,37 +1235,38 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
        for, and has anybody agreed a day?* is still one glance. The sortable
        columns stay in the chooser for the sheet's own filtering and export. */
     const grid = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(grid).getAllByText("No confirmed date").length).toBeGreaterThan(0);
+    expect(within(grid).getAllByText("Not confirmed").length).toBeGreaterThan(0);
     const found = headers();
     expect(found.some((h) => h.includes("Requested Delivery Date"))).toBe(true);
+    expect(found.some((h) => h.includes("Confirmed Delivery"))).toBe(true);
     for (const retired of ["Customer Delivery", "Promised Delivery", "Deliver By"]) {
       expect(found.some((h) => h.includes(retired))).toBe(false);
     }
   });
 
-  it("prints the ruled default column order (owner ruling 2026-09-10)", () => {
+  it("prints the ruled default column order (owner ruling 2026-09-12, Delivery MASTER §8.3)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     const ruled = [
+      "Delivery Status",
       "SO No",
       "Customer",
-      "State",
+      "Delivery Location",
       "Requested Delivery Date",
-      "Items",
-      "Accessories & services",
-      "Expected arrival",
-      "Stock",
-      "Actions",
-      "Edit Delivery",
+      "Confirmed Delivery",
+      "Logistics",
+      "Items & Stock",
+      "Payment",
+      "DO No",
     ];
     const found = headers();
-    const at = (label: string) => found.findIndex((h) => h.includes(label));
+    const at = (label: string) => found.findIndex((h) => h === label || h.startsWith(label));
     expect(ruled.every((label) => at(label) >= 0)).toBe(true);
     expect(ruled.map(at)).toEqual([...ruled.map(at)].sort((a, b) => a - b));
-    /* The six superseded columns are in the CHOOSER, not deleted — a document
-       register must still be able to sort and export by them. */
-    for (const chooserOnly of ["Confirmed Delivery", "DO No", "Delivery Location", "Goods"]) {
-      expect(found.some((h) => h.includes(chooserOnly))).toBe(false);
+    /* The six chooser columns are OFF by default, not deleted — the sheet can
+       still sort, filter and export by them. */
+    for (const chooserOnly of ["State", "Expected arrival", "Accessories & services", "Confirmed Time", "Building", "Phone"]) {
+      expect(found.some((h) => h === chooserOnly)).toBe(false);
     }
   });
 
@@ -1259,37 +1279,42 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(seen).toEqual([...seen].sort((a, b) => a - b));
   });
 
-  it("a row with NO Logistics Partner offers `Assign logistics`", () => {
+  it("a row with NO Logistics Partner offers `Assign logistics` inside its brief (§8.5 panel 3)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    const button = screen.getByTestId("delivery-monitor-action-assign_logistics-mid");
+    /* The rows sort by requested day: early · mid · late · none. Expand `mid`. */
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[1]!);
+    const button = screen.getByTestId("delivery-brief-logistics-act");
     expect(button.textContent).toBe("Assign logistics");
     fireEvent.click(button);
     const dialog = screen.getByTestId("assign-logistics-dialog");
     expect(within(dialog).getByText("1 delivery")).toBeTruthy();
   });
 
-  it("a row WITH a Logistics Partner says `Call {partner}` over `Confirm the delivery date`", () => {
+  it("a row WITH a Logistics Partner names that partner as the actor — `NETS must contact the customer`", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
-    /* The QUEUE is named after the customer conversation; the ROW names who
-       the operator actually dials (MASTER §2 — the partner arranges the day
-       with the customer), through the governed dictionary's TWO lines (owner
-       ruling 2026-09-13) — never joined with `—`. */
-    expect(screen.getAllByText("Call NETS").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Confirm the delivery date").length).toBeGreaterThan(0);
+    /* The register carries no Actions column (owner ruling 2026-09-12); the
+       STATUS names who must act (§8.4), and the brief's Change logistics act
+       names the partner. Never `Call NETS — …`. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    expect(within(list).getAllByText("NETS must contact the customer").length).toBeGreaterThan(0);
+    expect(within(list).getAllByText(/^Call by /).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Call NETS — /)).toBeNull();
-    expect(screen.getByTestId("delivery-monitor-edit-early").textContent).toBe("Edit Delivery");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByTestId("delivery-brief-logistics-act").textContent).toBe("Change logistics");
     /* No employee and no carrier is ever hard-coded into the sentence. */
     for (const name of ["Chan", "Tan Ah", "Khor Yee"]) {
       expect(screen.queryByText(new RegExp(`Call ${name}`))).toBeNull();
     }
   });
 
-  it("`Edit Delivery` opens THIS order and carries the queue back with it", () => {
+  it("`Update date and time` opens THIS order's date door and carries the queue back with it", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
-    fireEvent.click(screen.getByTestId("delivery-monitor-edit-early"));
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    expect(screen.getByTestId("delivery-brief-update-dates").textContent).toBe("Update date and time");
+    fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
     const url = screen.getByTestId("location-probe").textContent ?? "";
     expect(url).toContain("/operation/delivery/edit/early");
     expect(url).toContain("view%3Dno_confirmed_date");
@@ -1505,19 +1530,17 @@ describe("Call customer — the contact week", () => {
   it("prints the deadline on the row, and the LATE one keeps the day it missed", () => {
     seedContacts();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&late=1");
-    const late = screen.getByTestId("delivery-monitor-contact-late");
-    /* ⭐ THE COMPACT CELL IS A PHONE AND A DATE (owner ruling 2026-09-11) —
-       `Call by` and `Late — was due` repeated the same two phrases down a
-       whole column, and the icon plus its colour already carry both. */
-    expect(late.textContent).toBe("Mon, 24 Aug");
-    /* The WORDS did not disappear: the tooltip and the accessible name say
-       what the date means AND that the deadline does not move. */
-    const sentence = "Contact deadline Mon, 24 Aug — overdue, the deadline does not move";
-    expect(late.getAttribute("title")).toBe(sentence);
-    expect(late.getAttribute("aria-label")).toBe(sentence);
-    /* ONE accessible name for the cell — the icon inside it is decorative, so
-       a screen reader never reads the same sentence twice. */
-    expect(late.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    /* The deadline lives on `Confirmed Delivery`'s second line (§8.3):
+       `Call by {date}` — red once the day has passed, and the day it missed
+       is the day it keeps. */
+    const list = screen.getByTestId("delivery-monitor-work-list");
+    /* Both the status's second line and `Confirmed Delivery`'s carry it. */
+    const late = within(list).getAllByText("Call by Mon, 24 Aug");
+    expect(late.length).toBe(2);
+    for (const el of late) expect(el.className).toContain("text-kit-red-11");
+    for (const el of within(list).getAllByText(/^Call by /)) {
+      if (el.textContent !== "Call by Mon, 24 Aug") expect(el.className).not.toContain("text-kit-red-11");
+    }
   });
 
   it("an order with NO confirmed delivery date stays in the queue", () => {
@@ -1537,6 +1560,13 @@ describe("Call customer — the contact week", () => {
     expect(text).not.toMatch(/Customer did not/i);
   });
 });
+
+/** Reveal an off-by-default column through the sheet's own Columns chooser. */
+function showColumn(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+  fireEvent.click(screen.getByLabelText(label));
+  fireEvent.keyDown(document.body, { key: "Escape" });
+}
 
 describe("the row's goods, arrival and stock cells", () => {
   function seedGoods(over: Partial<operationOrderListRow> = {}) {
@@ -1564,14 +1594,21 @@ describe("the row's goods, arrival and stock cells", () => {
     seedGoods();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
     const list = screen.getByTestId("delivery-monitor-work-list");
-    expect(within(list).getByText(/Serena · King/)).toBeTruthy();
-    /* ONE piece missing on the mattress line, TWO on the pillows — the exact
-       number, on the line it belongs to. */
-    expect(within(list).getByText(/Serena · King × 2/).textContent).toContain("1 short");
-    expect(within(list).getByText(/Pillow/).textContent).toContain("2 short");
-    /* The site the crew meets rides the services cell — it is what decides
-       whether the job needs more people. */
-    expect(within(list).getByText("Floor 3 · No lift")).toBeTruthy();
+    /* The register's cell is `Items & Stock` (§8.3): the readiness word and
+       the exact count — 1 of 4 pieces held, 3 short across the shipment. */
+    expect(within(list).getByText("Not ready")).toBeTruthy();
+    expect(within(list).getByText("1 of 4 · 3 short")).toBeTruthy();
+    /* The goods themselves live in the brief's fourth panel, one line each. */
+    fireEvent.click(within(list).getAllByTitle("Show delivery brief")[0]!);
+    const items = screen.getByTestId("delivery-brief-items");
+    expect(within(items).getByText("Serena · King")).toBeTruthy();
+    expect(within(items).getByText(/Pillow/)).toBeTruthy();
+    expect(within(items).getByText(/dispose mattress|Dispose/i)).toBeTruthy();
+    /* The site the crew meets is panel 1's own facts — floor and lift, each
+       its own line, never a joined sentence. */
+    const customer = screen.getByTestId("delivery-brief-customer");
+    expect(within(customer).getByText("No lift")).toBeTruthy();
+    expect(within(customer).getByText("3")).toBeTruthy();
   });
 
   it("Expected arrival keeps the DATE first and the original beside a revision", () => {
@@ -1594,6 +1631,7 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
     const cell = screen.getByTestId("delivery-monitor-arrival-moved");
     /* ⭐ THE DATE IS THE CELL (owner ruling 2026-09-11). The NEW date leads,
        the original sits under it as context, and `Delayed` no longer repeats
@@ -1621,6 +1659,7 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
     /* ⭐ THREE DIFFERENT ABSENCES, NEVER ONE (owner ruling 2026-09-11). Nobody
        asked and nobody could compute a date: the gap is OURS, and blaming a
        factory nobody contacted is the lie the single old state used to tell. */
@@ -1651,6 +1690,7 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
     const cell = screen.getByTestId("delivery-monitor-arrival-late_no_date");
     expect(cell.textContent).toBe("The factory has not given a date");
   });
@@ -1669,6 +1709,7 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
     const cell = screen.getByTestId("delivery-monitor-arrival-passed");
     /* Compact: the amber icon and the date. The fact is in the sentence. */
     expect(cell.textContent).toBe("Sat, 1 Aug");
@@ -1688,7 +1729,7 @@ describe("the row's goods, arrival and stock cells", () => {
     expect(within(list).getByText("Not ready")).toBeTruthy();
     /* The whole delivery is three pieces short — the shipment scope, never
        the main goods alone, and never a service that moves no Unit. */
-    expect(within(list).getByText("3 short")).toBeTruthy();
+    expect(within(list).getByText(/3 short/)).toBeTruthy();
   });
 
   it("the arrival icons carry real labels, so colour is never the only signal", () => {
@@ -1705,6 +1746,7 @@ describe("the row's goods, arrival and stock cells", () => {
       ],
     });
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    showColumn("Expected arrival");
     /* ⭐ ONE accessible name per cell, not one per glyph. The icon is
        decorative; the CELL carries the sentence, so a screen reader reads the
        meaning once instead of hearing it twice. */

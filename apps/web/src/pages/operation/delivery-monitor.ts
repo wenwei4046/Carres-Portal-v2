@@ -64,7 +64,8 @@ import {
   type ScopeInputs,
 } from "./delivery-work";
 import { DOR_COPY, tripLinesOf, type MissingDeliveryProof } from "./delivery-orders-register";
-import { lineName } from "./sales-order-facts";
+import { lineName, moneyOfOrder } from "./sales-order-facts";
+import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
 
 /**
  * ⭐ EVERY VISIBLE WORD, IN ONE PLACE (COPY-STANDARD, Delivery section).
@@ -124,6 +125,60 @@ export const MONITOR_COPY = {
   noDeliveryOrder: "No delivery order yet",
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
+  /* ── THE TWELVE-COLUMN REGISTER (owner ruling 2026-09-12, MASTER §8.3) ── */
+  confirmed: "Confirmed",
+  notConfirmed: "Not confirmed",
+  paid: "Paid",
+  doNotDeliver: "Do not deliver",
+  stillToCollect: (amount: string) => `${amount} still to collect`,
+  financeHolding: "Finance is holding this delivery",
+  collect: (amount: string) => `Collect ${amount}`,
+  cashOnDelivery: "Cash on delivery",
+  ofPieces: (have: number, total: number) => `${have} of ${total}`,
+  arrivingAfterRequested: "Arriving after the requested date",
+  doDate: (date: string) => `DO date ${date}`,
+  /* ── THE FOUR PANELS (owner ruling 2026-09-12, MASTER §8.5) ─────────────── */
+  panelCustomer: "Customer, Address & Access",
+  panelDates: "Delivery Dates",
+  panelLogistics: "Logistics Details",
+  panelItems: "Items, Services & Stock",
+  updateDateTime: "Update date and time",
+  changeLogistics: "Change logistics",
+  customer: "Customer",
+  phone: "Phone",
+  emergencyContact: "Emergency contact",
+  address: "Address",
+  buildingType: "Building type",
+  lift: "Lift",
+  access: "Access",
+  customerRequested: "Customer requested",
+  confirmedDate: "Confirmed delivery date",
+  confirmedTime: "Confirmed delivery time",
+  partner: "Logistics Partner",
+  driver: "Driver",
+  driverPhone: "Driver phone",
+  vehiclePlate: "Vehicle plate",
+  pickup: "Pickup",
+  eta: "ETA",
+  pickupNotRecorded: "Pickup not recorded",
+  handedOver: (at: string) => `Handed over ${at}`,
+  receivedBy: (partner: string, at: string) => `Received by ${partner} ${at}`,
+  condoRegistration: "Condo registration",
+  stairCarry: (n: number, floor: number | null) =>
+    floor == null ? `Stair carry · ${n} items` : `Stair carry · ${n} items · floor ${floor}`,
+  item: "Item",
+  qty: "Qty",
+  source: "Source",
+  status: "Status",
+  location: "Location",
+  countedStock: "Counted stock",
+  arriving: (date: string) => `Arriving ${date}`,
+  notReceivedYet: "Not received yet",
+  withHolder: (holder: string) => `With ${holder}`,
+  loanLine: (unit: string | null) =>
+    unit ? `Loan ${unit} · collect back on delivery day` : `Loan item · collect back on delivery day`,
+  services: "Services",
+  accessories: "Accessories",
   /** The first carrier on a scope — the governed word, never `Set partner`. */
   assignLogistics: "Assign logistics",
   hideFilters: "Hide filters",
@@ -206,6 +261,8 @@ export const MONITOR_COLUMN = {
   state: "State",
   requestedDelivery: "Requested Delivery Date",
   logisticsPartner: "Logistics Partner",
+  /** The register's own heading for the partner column (§8.3 column 9). */
+  logistics: "Logistics",
   confirmedDelivery: "Confirmed Delivery",
   confirmedTime: "Confirmed Time",
   doNumber: "DO No",
@@ -218,6 +275,10 @@ export const MONITOR_COLUMN = {
   expectedArrival: ARRIVAL_COPY.column,
   /** Whether the register already holds the goods. */
   stock: MONITOR_COPY.stock,
+  /** §8.3 column 10 — readiness and the exact count, one cell. */
+  itemsStock: "Items & Stock",
+  /** §8.3 column 11 — the one money rule's answer, never a door. */
+  payment: "Payment",
   goods: "Goods",
   deliveryStatus: "Delivery Status",
   /** The ROW's open-action list — the governed word (COPY-STANDARD). */
@@ -444,7 +505,7 @@ export interface DeliveryMonitorCard {
   statusTone: DeliveryWorkStatusTone;
   /** Line two — the day, window, deadline, ETA, proof state or reason. */
   statusSecond: string | null;
-  statusSecondTone: "orange" | null;
+  statusSecondTone: "orange" | "red" | null;
   /**
    * The evidence a RECORDED delivered result still lacks — the Delivery
    * Orders register's own arithmetic, never from a planned window ending. Both
@@ -495,11 +556,100 @@ export interface DeliveryMonitorCard {
   /** The full row behind the card — the work list's own columns and the
    *  governed `Assign logistics` door read it; the calendar card never does. */
   scope: DeliveryScopeRow;
+  /** §8.3 `Payment` — the one money rule's two lines and their colour. */
+  payment: MonitorPayment;
+  /** §8.3 `Items & Stock` — line one the readiness word, line two the count. */
+  stock: MonitorStock;
+}
+
+export interface MonitorPayment {
+  line1: string;
+  line2: string | null;
+  tone: "green" | "red" | "none";
+}
+
+export interface MonitorStock {
+  line1: string;
+  line2: string | null;
+  ready: boolean;
+}
+
+/**
+ * ⭐ `Payment` ARITHMETIC (Delivery MASTER §8.3): `orderMoney.outstanding`
+ * through the one money rule and the OPEN Finance exception — the same
+ * predicate the DO gate asks. `Paid` when nothing is outstanding and no
+ * exception holds; `Do not deliver` over `RM {amount} still to collect` while
+ * money is owed, or over `Finance is holding this delivery` while an exception
+ * is open; `Collect RM {amount}` over `Cash on delivery` only when an approval
+ * opened the gate. Monitor adds no payment door.
+ */
+export function monitorPaymentOf(o: DeliveryScopeRow["o"]): MonitorPayment {
+  const money = moneyOfOrder(o);
+  const financeHolds = (o.order_finance_exceptions ?? []).some((e) => e.status === "open");
+  const owed = money.known ? money.outstanding : 0;
+  if (financeHolds) {
+    return { line1: MONITOR_COPY.doNotDeliver, line2: MONITOR_COPY.financeHolding, tone: "red" };
+  }
+  if (owed <= 0) return { line1: MONITOR_COPY.paid, line2: null, tone: "green" };
+  const approvals = (o.order_delivery_payment_approvals ?? []).map((a) => ({
+    status: a.status as "pending" | "approved" | "refused",
+  }));
+  if (paymentApprovalOpensGate(approvals)) {
+    return {
+      line1: MONITOR_COPY.collect(fmtMoney(owed)),
+      line2: MONITOR_COPY.cashOnDelivery,
+      tone: "none",
+    };
+  }
+  return {
+    line1: MONITOR_COPY.doNotDeliver,
+    line2: MONITOR_COPY.stillToCollect(fmtMoney(owed)),
+    tone: "red",
+  };
+}
+
+/** The arrival's own day, when the shared reader names one. */
+export function arrivalDayOf(arrival: DeliveryArrivalState): string | null {
+  return "dateIso" in arrival ? arrival.dateIso : null;
+}
+
+/**
+ * ⭐ `Items & Stock` ARITHMETIC (§8.3): `deliveryStockReadinessOf` over THIS
+ * shipment's goods (`tripLinesOf`); the count is the committed pieces the
+ * register holds against the total; `Arriving after the requested date` is
+ * `deliveryArrivalStateOf`'s day against Sales' requested day. Delivery
+ * computes no arrival of its own.
+ */
+export function monitorStockOf(input: {
+  readiness: DeliveryStockReadiness;
+  totalQty: number;
+  arrival: DeliveryArrivalState;
+  requestedIso: string | null;
+}): MonitorStock {
+  const { readiness, totalQty } = input;
+  const have = Math.max(0, totalQty - readiness.shortQty);
+  if (readiness.ready) {
+    return { line1: ARRIVAL_COPY.stockReady, line2: totalQty > 0 ? MONITOR_COPY.ofPieces(have, totalQty) : null, ready: true };
+  }
+  const arrivalDay = arrivalDayOf(input.arrival);
+  if (arrivalDay && input.requestedIso && arrivalDay > input.requestedIso) {
+    return { line1: ARRIVAL_COPY.stockNotReady, line2: MONITOR_COPY.arrivingAfterRequested, ready: false };
+  }
+  const count = MONITOR_COPY.ofPieces(have, totalQty);
+  return {
+    line1: ARRIVAL_COPY.stockNotReady,
+    line2: readiness.shortQty > 0 ? `${count} · ${ARRIVAL_COPY.short(readiness.shortQty)}` : count,
+    ready: false,
+  };
 }
 
 /** One goods line as the work list prints it. */
 export interface MonitorGoodsLine {
   key: string;
+  /** The order line's own id — the brief's Unit and PO facts are read by it
+   *  from the Sales Order expansion (Stock owns the Unit, Purchasing the PO). */
+  lineId: string | null;
+  sku: string;
   /** `Trion · Queen` — the catalog's own resolved name (model AND size), or
    *  the text the order carries when the catalog does not know the SKU. */
   name: string;
@@ -609,6 +759,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       .filter((l) => lineKind(l.sku) !== "service");
     const units = row.o.allocated_units ?? [];
     const readiness = deliveryStockReadinessOf(physical, units);
+    const totalQty = physical.reduce((sum, l) => sum + Number(l.qty || 0), 0);
     const shortByLineIndex = new Map<number, number>();
     lineShortagesOf(physical, units).forEach((s, i) => {
       shortByLineIndex.set(physical[i]!.index, s.shortQty);
@@ -619,6 +770,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       const kind = lineKind(line.sku);
       const entry: MonitorGoodsLine = {
         key: line.id ?? `${line.sku}-${index}`,
+        lineId: line.id ?? null,
+        sku: line.sku,
         name: lineName(line),
         category: goodsCategoryWordOf(line),
         qty: line.qty,
@@ -635,6 +788,8 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       const key = addon.addon_key ?? "";
       extras.push({
         key: `addon-${index}-${key}`,
+        lineId: null,
+        sku: key,
         name: addonName(key, input.addonNameByKey),
         category: "Service",
         qty: addon.qty,
@@ -704,6 +859,18 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       contactOverdue:
         contactDueIso !== null && contactDueIso < input.todayIso && !booked && !settled,
       scope: row,
+      payment: monitorPaymentOf(row.o),
+      stock: monitorStockOf({
+        readiness,
+        totalQty,
+        arrival: deliveryArrivalStateOf({
+          arrivals: row.o.po_arrivals ?? [],
+          readiness,
+          todayIso: input.todayIso,
+          holidays,
+        }),
+        requestedIso: row.customerDeliveryIso,
+      }),
     };
   });
 }

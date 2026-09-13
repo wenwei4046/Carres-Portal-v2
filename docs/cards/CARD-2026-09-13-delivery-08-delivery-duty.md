@@ -30,4 +30,6 @@
 - [x] Resolve `delivery_duty` in the Work feed and pass it to the projections; the storage-invoice item reads the same resolution
 - [x] Team Work prints `Nobody holds Delivery Duty.` with `Set the holder in Workspace → Staff & Duties` for an unresolved duty group
 - [x] Tests: engine ownership, feed resolution, catalogue list, Team Work door; typecheck; design guard
-- [ ] PR → merge → deploy → authenticated production verification of the catalogue and the Team group
+- [x] PR → merge → deploy → authenticated production verification of the catalogue and the Team group
+
+**Evidence (2026-09-13):** PR #1260 squash-merged as `fc61a069`; Pages `/__carres_deploy.json` and Worker `/health` both report `fc61a069`. Authenticated as operation@carres.com: `Workspace → Staff & Duties` lists `Delivery Duty · Not assigned · Nobody holds Delivery Duty.`; `Work → Team Work` groups 99 Delivery actions under `Delivery Duty` with `Nobody holds Delivery Duty. Set the holder in Workspace → Staff & Duties` linking to `/operation?tab=staff-duties`. Holder assignment remains the owner's action.
