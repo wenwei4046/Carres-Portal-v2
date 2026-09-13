@@ -22,7 +22,7 @@ vi.mock("../../lib/supabase", () => ({
   userClient: vi.fn(),
   adminClient: vi.fn(),
 }));
-import { userClient } from "../../lib/supabase";
+import { adminClient, userClient } from "../../lib/supabase";
 
 /**
  * R6 — /api/operation/warehouse-receipts (the ops half).
@@ -481,13 +481,22 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, never>;
-    expect(body.page).toEqual({ offset: 0, limit: 50, total: 1 });
+    // `total_all` = every GRN before narrowing — the footer's other number.
+    expect(body.page).toEqual({ offset: 0, limit: 50, total: 1, total_all: 1 });
     const rows = body.receipts as Array<Record<string, unknown>>;
     expect(rows).toHaveLength(1);
     // The governed Supplier Delivery Date — the ONE reply arithmetic, and the
     // GRN paper's own product word — never a second spelling.
     expect(rows[0]!.supplier_delivery_date).toBe("2026-09-08");
-    expect(rows[0]!.product_labels).toEqual(["Dream King"]);
+    // The goods' FULL name — the ONE `Model · Variant` ladder (`grnLineName`,
+    // 2026-09-13): the fixture's catalog names no model, so the current
+    // catalog word alone cannot be a name and the SKU is printed, labelled
+    // as such — never the variant alone.
+    const labels = rows[0]!.line_labels as Record<string, { name: string; source: string }>;
+    expect(Object.values(labels)[0]).toMatchObject({ name: "MS01-K", source: "sku" });
+    expect(rows[0]!.grn_date).toBe(null);
+    expect(rows[0]!.source_kind).toBe("PO");
+    expect(rows[0]!.items).toBe(1);
     expect(rows[0]!.supplier_name).toBe("Ohana");
     const facets = body.facets as Record<string, Record<string, number>>;
     expect(facets.supplier).toEqual({ Ohana: 1 });
@@ -522,7 +531,7 @@ describe("GET /?scope=grn — the paged GRN Register", () => {
     const body = (await res.json()) as Record<string, never>;
     // No evidenced supplier reply → no GRN carries that date; the register
     // answers honestly rather than ignoring the filter.
-    expect(body.page).toEqual({ offset: 0, limit: 50, total: 0 });
+    expect(body.page).toEqual({ offset: 0, limit: 50, total: 0, total_all: 1 });
     expect(body.receipts).toEqual([]);
   });
 });
@@ -820,7 +829,7 @@ describe("GET /:id — one Receiving Session / GRN record", () => {
       posted_duty_holder_name: "Klang counter",
       posted_duty_cover_name: "Buddy cover",
     });
-    expect(body.receipt.unit_results).toEqual([
+    expect(body.receipt.unit_results).toMatchObject([
       {
         stock_item_id: "si1",
         unit_code: "MS01-K-0001",
@@ -1123,6 +1132,9 @@ describe("GET /:id — the GRN document's product facts (line_info)", () => {
     // route does against the real table.
     expect(body.line_info["MS01-K"]).toEqual({
       description: "Mattress Forte K",
+      // The FULL name needs a model; the fixture's catalog names none, so
+      // there is no catalog name to fall back to (never the variant alone).
+      label: null,
       category: "Mattress",
     });
   });
@@ -1170,5 +1182,198 @@ describe("the Warehouse boundary — it counts; it never posts, amends or voids"
       );
       expect(res.status).toBe(403);
     }
+  });
+});
+
+
+/* ═══ 0493 · EXCEPTION EVIDENCE — the scoped viewer read and the append door ═══ */
+
+describe("GET /:id/evidence — ONE viewer's files, each with its own state (0493)", () => {
+  const EVIDENCE_ROWS = [
+    { id: "e1", exception_type: "damaged", line_key: "l1", media_kind: "photo", bucket: "delivery-orders", path: "PO-1001/a-claim.jpg", source: "posting", added_by: USER, added_at: "2026-09-13T01:00:00Z" },
+    { id: "e2", exception_type: "damaged", line_key: "l1", media_kind: "photo", bucket: "delivery-orders", path: "PO-1001/b-claim.jpg", source: "amend", added_by: null, added_at: "2026-09-13T02:00:00Z" },
+    { id: "e3", exception_type: "damaged", line_key: "l1", media_kind: "photo", bucket: "delivery-orders", path: "PO-1001/c-claim.jpg", source: "amend", added_by: null, added_at: "2026-09-13T03:00:00Z" },
+  ];
+
+  it("asks the table for exactly GRN + type + kind + line keys, signs through the service key, and names ok / missing / unsigned per file", async () => {
+    const sb = makeSb({
+      ...opsTables(),
+      receiving_line_evidence: { list: { data: EVIDENCE_ROWS, error: null } },
+    });
+    const inCalls: unknown[][] = [];
+    const eqCalls: unknown[][] = [];
+    const origFrom = sb.from.bind(sb);
+    sb.from = (table: string) => {
+      const b = origFrom(table);
+      if (table === "receiving_line_evidence") {
+        const origIn = b.in as (...a: unknown[]) => unknown;
+        const origEq = b.eq as (...a: unknown[]) => unknown;
+        b.in = vi.fn((...a: unknown[]) => { inCalls.push(a); return origIn(...a); });
+        b.eq = vi.fn((...a: unknown[]) => { eqCalls.push(a); return origEq(...a); });
+      }
+      return b;
+    };
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const createSignedUrls = vi.fn().mockResolvedValue({
+      data: [
+        { path: "PO-1001/a-claim.jpg", signedUrl: "https://signed/a", error: null },
+        { path: "PO-1001/b-claim.jpg", signedUrl: null, error: "Object not found" },
+        // c-claim.jpg is absent from the answer entirely — unsigned.
+      ],
+      error: null,
+    });
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrls })) } } as never);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/evidence?type=damaged&kind=photo&line=l1,l9`,
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { verified: boolean; files: Array<Record<string, unknown>> };
+    expect(body.verified).toBe(true);
+    expect(eqCalls).toContainEqual(["receipt_id", RECEIPT]);
+    expect(eqCalls).toContainEqual(["exception_type", "damaged"]);
+    expect(eqCalls).toContainEqual(["media_kind", "photo"]);
+    expect(inCalls).toContainEqual(["line_key", ["l1", "l9"]]);
+    expect(createSignedUrls).toHaveBeenCalledWith(["PO-1001/a-claim.jpg", "PO-1001/b-claim.jpg", "PO-1001/c-claim.jpg"], 3600);
+    expect(body.files.map((f) => [f.path, f.status, f.url, f.added_by_name])).toEqual([
+      ["PO-1001/a-claim.jpg", "ok", "https://signed/a", "Klang counter"],
+      ["PO-1001/b-claim.jpg", "missing", null, null],
+      ["PO-1001/c-claim.jpg", "unsigned", null, null],
+    ]);
+  });
+
+  it("answers `verified: false` — not an empty list — while 0493 is not applied", async () => {
+    const sb = makeSb({
+      ...opsTables(),
+      receiving_line_evidence: { list: { data: null, error: { code: "42P01", message: "relation does not exist" } } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/evidence?type=extra&kind=video`,
+      "GET",
+      await makeJwt("operation"),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ receipt_id: RECEIPT, verified: false, files: [] });
+  });
+
+  it("refuses a viewer with no exception type or media kind, and the warehouse role", async () => {
+    const sb = makeSb(opsTables());
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    expect((await req(`/api/operation/warehouse-receipts/${RECEIPT}/evidence?type=damaged`, "GET", await makeJwt("operation"))).status).toBe(422);
+    expect((await req(`/api/operation/warehouse-receipts/${RECEIPT}/evidence?type=lost&kind=photo`, "GET", await makeJwt("operation"))).status).toBe(422);
+    expect((await req(`/api/operation/warehouse-receipts/${RECEIPT}/evidence?type=damaged&kind=photo`, "GET", await makeJwt("warehouse"))).status).toBe(403);
+  });
+});
+
+describe("POST /:id/amend — exception evidence appends through its own door (0493)", () => {
+  it("routes lineEvidenceAdd to receiving_line_evidence_add FIRST, then the other changes to receiving_amend", async () => {
+    const sb = makeSb(opsTables(), { data: { added: 1 } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "found the damage video later",
+        goodsReceivedAt: "2026-09-02",
+        lineEvidenceAdd: [
+          { lineKey: "l1", exceptionType: "damaged", kind: "video", path: "PO-1001/v-claim.mp4" },
+        ],
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc.mock.calls[0]).toEqual([
+      "receiving_line_evidence_add",
+      {
+        p_receipt_id: RECEIPT,
+        p_entries: [{ line_key: "l1", exception_type: "damaged", kind: "video", path: "PO-1001/v-claim.mp4" }],
+        p_reason: "found the damage video later",
+      },
+    ]);
+    expect(sb.rpc.mock.calls[1]![0]).toBe("receiving_amend");
+    expect((sb.rpc.mock.calls[1]![1] as { p_changes: unknown }).p_changes).toEqual({ goods_received_at: "2026-09-02" });
+  });
+
+  it("evidence alone is a complete amendment — receiving_amend is not called for nothing", async () => {
+    const sb = makeSb(opsTables(), { data: { added: 2, before: 1, after: 3 } });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "extra goods photographed",
+        lineEvidenceAdd: [
+          { lineKey: "11111111-1111-1111-1111-111111111111", exceptionType: "extra", kind: "photo", path: "PO-1001/x-claim.jpg" },
+          { lineKey: "11111111-1111-1111-1111-111111111111", exceptionType: "extra", kind: "video", path: "PO-1001/x-claim.mp4" },
+        ],
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc.mock.calls[0]![0]).toBe("receiving_line_evidence_add");
+    expect(await res.json()).toEqual({ receipt_id: RECEIPT, evidence: { added: 2, before: 1, after: 3 } });
+  });
+
+  it("a refusal from the evidence door stops the correction before any other fact moves", async () => {
+    const sb = makeSb(opsTables(), {
+      error: { code: "P0001", message: "line l1 records no wrong item on this receiving", details: "evidence_exception_zero" },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    const res = await req(
+      `/api/operation/warehouse-receipts/${RECEIPT}/amend`,
+      "POST",
+      await makeJwt("operation"),
+      {
+        reason: "wrong photo",
+        goodsReceivedAt: "2026-09-02",
+        lineEvidenceAdd: [{ lineKey: "l1", exceptionType: "wrong_item", kind: "photo", path: "PO-1001/w-claim.jpg" }],
+      },
+    );
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GET /:id — the GRN object's own sections (2026-09-13)", () => {
+  it("carries the exact claims, the related receipts on the source, the evidence rows and the GRN Date", async () => {
+    const posted = { ...RECEIPT_ROW, status: "posted", grn_no: "GRN-20260906-1234", posted_at: "2026-09-05T17:30:00Z", posted_by: USER };
+    const sibling = { ...RECEIPT_ROW, id: "33333333-3333-3333-3333-333333333333", status: "posted", grn_no: "GRN-20260901-0001", do_number: "DO-5500", posted_at: "2026-09-01T02:00:00Z", lines: [{ id: "l1", sku: "MS01-K", received_now: 2, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null }] };
+    const sb = makeSb({
+      ...opsTables(posted),
+      warehouse_receipts: { single: { data: posted, error: null }, list: { data: [posted, sibling], error: null }, count: 0 },
+      purchase_orders: {
+        single: {
+          data: {
+            id: "PO-1001", status: "open", supplier_id: "s1", warehouse_id: WH, destination_id: null, is_consignment: false,
+            suppliers: { name: "Ohana" },
+            purchase_order_lines: [{ id: "l1", sku: "MS01-K", qty: 6, received_qty: 6, damaged_qty: 1, wrong_item_qty: 0, attrs: { color: "Grey", gap: "5\"" } }],
+          },
+          error: null,
+        },
+      },
+      supplier_claims: { list: { data: [{ id: "c1", claim_no: "SC-1014", status: "closed", claim_type: "damaged", sku: "MS01-K", qty: 1, po_line_id: "l1", requested_action: "replace", supplier_response: "replacement", created_at: "2026-09-05T18:00:00Z" }], error: null } },
+      receiving_line_evidence: { list: { data: [{ id: "e1", exception_type: "damaged", line_key: "l1", media_kind: "photo", path: "PO-1001/a-claim.jpg", source: "projection", added_by: USER, added_at: "2026-09-05T18:00:00Z" }], error: null } },
+      receiving_unit_results: { list: { data: [], error: null } },
+      receiving_events: { list: { data: [], error: null } },
+      product_skus: { list: { data: [{ sku: "MS01-K", variant: "King", product_models: { name: "Forte" } }], error: null } },
+      ops_stock_items: { list: { data: [], error: null } },
+    });
+    vi.mocked(userClient).mockReturnValue(sb as never);
+    vi.mocked(adminClient).mockReturnValue({ storage: { from: vi.fn(() => ({ createSignedUrl: vi.fn().mockResolvedValue({ data: null }), createSignedUrls: vi.fn().mockResolvedValue({ data: [] }) })) } } as never);
+    const res = await req(`/api/operation/warehouse-receipts/${RECEIPT}`, "GET", await makeJwt("operation"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, never>;
+    // GRN Date = the posting's stamp in MYT: 17:30Z on 5 Sep is 6 Sep in KL.
+    expect((body.receipt as { grn_date: string }).grn_date).toBe("2026-09-06");
+    expect(body.claims).toMatchObject([{ id: "c1", claim_no: "SC-1014", status: "closed" }]);
+    // The sibling GRN, never this one, with its own totals.
+    expect(body.related_receipts).toMatchObject([{ id: "33333333-3333-3333-3333-333333333333", grn_no: "GRN-20260901-0001", received_qty: 2, damaged_qty: 0 }]);
+    expect(body.line_evidence).toMatchObject([{ id: "e1", added_by_name: "Klang counter" }]);
+    // The goods' full name and the PO line's configuration words.
+    expect(body.line_info).toMatchObject({ "MS01-K": { label: "Forte · King", category: "Mattress" } });
+    expect(body.line_config).toEqual({ l1: ["Grey", "Gap 5\""] });
   });
 });

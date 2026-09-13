@@ -390,6 +390,14 @@ export type DataGridProps<T> = {
    *  so one click really does clear everything the strip listed. */
   onClearConditions?: () => void;
   /**
+   * ⭐ A REGISTER WITH NO `Clear filters` ANYWHERE (Receiving, owner instruction
+   * 2026-09-13). The active-condition strip still lists every live column
+   * condition as its own removable chip — a condition clears where it was
+   * set, in its menu or on its chip — but the one-click `Clear filters`
+   * button is not drawn. Absent = the strip renders byte-identically.
+   */
+  hideClearFilters?: boolean;
+  /**
    * Compact mode for grids embedded inside another grid's expansion row
    * (the SO drill-down). Suppresses the search box and the bottom
    * "N of M rows / Reset layout" status line — both read as heavy chrome
@@ -541,6 +549,7 @@ function DataGridInner<T>({
   chooserGroupOrder,
   activeConditions,
   onClearConditions,
+  hideClearFilters = false,
   embedded = false,
 }: DataGridProps<T>) {
   /* HOUZS-style inline expansion (PR so-list-houzs-port). Tracks the set of
@@ -2151,20 +2160,22 @@ function DataGridInner<T>({
                 </button>
               </span>
             ))}
-            <button
-              type="button"
-              className={styles.conditionClear}
-              data-testid="clear-filters"
-              onClick={() => {
-                setFilters({});
-                setDateFilters({});
-                setNumberFilters({});
-                setDateRangeFilters({});
-                onClearConditions?.();
-              }}
-            >
-              Clear filters
-            </button>
+            {!hideClearFilters && (
+              <button
+                type="button"
+                className={styles.conditionClear}
+                data-testid="clear-filters"
+                onClick={() => {
+                  setFilters({});
+                  setDateFilters({});
+                  setNumberFilters({});
+                  setDateRangeFilters({});
+                  onClearConditions?.();
+                }}
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         );
       })()}

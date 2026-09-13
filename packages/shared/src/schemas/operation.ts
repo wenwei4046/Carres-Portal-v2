@@ -341,9 +341,16 @@ export const officeReceiveInput = z.object({
   extraLines: z
     .array(
       z.object({
+        /** 0493 — the extra line's stable identity; the client may mint it so
+         *  evidence can be attached before Save. The validator keeps a valid
+         *  uuid and mints one otherwise. */
+        id: z.string().uuid().optional(),
         sku: z.string().min(1).max(120),
         qty: z.number().int().positive(),
         note: z.string().max(300).optional(),
+        /** 0493 — Extra Photos / Extra Videos. */
+        photos: CLAIM_PHOTO_PATHS.optional(),
+        videos: CLAIM_PHOTO_PATHS.optional(),
       }),
     )
     .max(50)
@@ -357,8 +364,12 @@ export const officeReceiveInput = z.object({
     damagedQty: z.number().int().nonnegative().optional(),
     wrongItemQty: z.number().int().nonnegative().optional(),
     damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
+    /** 0493 — Damaged Videos beside the required photo. */
+    damagedVideos: CLAIM_PHOTO_PATHS.optional(),
     wrongItemClaimType: z.string().min(1).max(40).optional(),
     wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+    /** 0493 — Wrong Item Videos beside the required photo. */
+    wrongItemVideos: CLAIM_PHOTO_PATHS.optional(),
     /** 0426 — one physical result per governed expected Unit
      *  (ERP-ARCHITECTURE §3.4). Quantity-only lines stay legal for
      *  governed interchangeable goods. */
@@ -409,6 +420,20 @@ export const receivingAmendInput = z
         }),
       )
       .max(200)
+      .optional(),
+    /** 0493 — exception evidence appended to a posted GRN (`receiving_line_evidence_add`):
+     *  one entry per file, scoped by the line's stable key, the exception and
+     *  the media kind. APPEND-ONLY. */
+    lineEvidenceAdd: z
+      .array(
+        z.object({
+          lineKey: z.string().min(1).max(80),
+          exceptionType: z.enum(["damaged", "wrong_item", "extra"]),
+          kind: z.enum(["photo", "video"]),
+          path: z.string().min(3).max(400),
+        }),
+      )
+      .max(60)
       .optional(),
   })
   .strict();

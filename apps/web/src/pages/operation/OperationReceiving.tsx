@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { PanelLeftOpen } from "lucide-react";
 import {
   expectedArrivalCounts,
+  grnExceptionFacts,
+  grnExceptionSummary,
+  grnLineItemWords,
+  grnLineName,
   receivingDisplayNo,
   receivingExtraQty,
   RECEIVING_CATEGORY_ROWS,
   warehouseReceiptStatusLabel,
   warehouseReceiptTotals,
+  type ReceivingExtraLine,
   type WarehouseReceiptLine,
 } from "@carres/shared";
 import {
@@ -27,6 +33,12 @@ import {
   FilterRailGroup,
   FilterRailRow,
 } from "./components/workspace-rail";
+import GoodsMiniTable, { type GoodsMiniLine } from "./components/GoodsMiniTable";
+import {
+  ExceptionEvidenceDoors,
+  ExceptionEvidenceViewer,
+  type EvidenceScope,
+} from "./components/ExceptionEvidence";
 import ReceivingWorkspace from "./components/ReceivingWorkspace";
 import ReceivingRecord from "./components/ReceivingRecord";
 import PurchasingTabs from "./PurchasingTabs";
@@ -34,80 +46,182 @@ import ArrivalSourceWorkspace from "./ArrivalSourceWorkspace";
 
 /**
  * OperationReceiving — the ONE Receiving destination
- * (owner corrections 2026-09-06; purchasing/MASTER.md §9.4; UI MASTER §6.7).
+ * (owner instruction 2026-09-13, superseding the 2026-09-06 corrections where
+ * they differ; purchasing/MASTER.md §9.4; UI MASTER §6.7).
  *
  * ```
  * My Work / Team Work   =  what staff must receive or review
  * Receiving             =  the complete GRN Register, beside its rail
  * ```
  *
- * ONE PAGE. No Receiving Monitor, no `Calendar View / GRN Register View`
- * switch, no permanent tabs, no second Receiving destination — the earlier
- * two-view proposal is superseded. The left 240px rail holds the full month
- * Calendar FIXED on top and the business filters scrolling beneath it; the
- * right side is always the complete GRN Register.
+ * ONE PAGE. No Receiving Monitor, no view switch, no permanent tabs, no KPI
+ * cards, no duplicate headings. Left: the 240px filter rail — the two-month
+ * EXPECTED-ARRIVAL display on top (current month + next, display-only, counts
+ * never colour alone, today a thin outline; it filters nothing and hides no
+ * historical GRN), then only the facet groups that can still narrow the
+ * result. Right: always the complete GRN Register.
  *
  * THE REGISTER BOUNDARY: a row exists only once `Save Receiving` created the
- * GRN — the Register lists `Valid` and `Cancelled` GRNs, nothing else. A
+ * GRN — the Register lists `Confirmed` and `Cancelled` GRNs, nothing else. A
  * Warehouse count awaiting Carres action lives in My Work / Team Work and
- * deep-links (`?session=`) to its Receiving review; it never becomes a
- * Register row.
+ * deep-links (`?session=`) to its Receiving review.
  *
- * THE RAIL CALENDAR (owner correction 2026-09-06):
- *   · one month at a time, ‹ › exactly one month; Sunday visible but muted —
- *     Receiving follows the Warehouse working calendar, Monday–Saturday,
- *   · a date with expected supplier arrivals prints a COUNT (never colour
- *     alone), from the linked POs' governed `Supplier Delivery Date`
- *     (`expectedArrivalCounts` — the ONE reply arithmetic; our own estimate
- *     never marks a day),
- *   · picking a date filters the SAME register by that Supplier Delivery
- *     Date; picking it again — or `Clear filters` — restores the whole list,
- *   · the right side never becomes a weekly calendar and never shows work
- *     cards — daily Receiving actions stay in My Work / Team Work.
+ * DEFAULT COLUMNS, in this order and no other:
+ *   ▸ · GRN No · GRN Date · Supplier DO No · Supplier · PO No · Items ·
+ *   Received Qty · Exceptions · GRN Status
+ * Every other fact is a governed OPTIONAL column (Columns) or lives in the
+ * expansion / the GRN object. `GRN Date` is the posting's date (the document's
+ * birth, MYT) — never parsed from the number; `Goods received on` stays its own
+ * optional column. `Received Qty` is the good count only.
  *
- * The filters below it: CATEGORY (only governed rows present in the result
- * set) · SUPPLIER · GOODS ARRIVED AT · Clear filters. No `Any`, no `All …`;
- * re-clicking the active row clears its section. Detailed received-date
- * filtering is the TABLE's `Goods received on` column — the rail carries no
- * second received-date filter.
+ * ▸ EXPANDS to this GRN's own counted lines — `Item · Received · Damaged ·
+ * Wrong Item · Extra` in the shared child table — never the whole PO. `Item`
+ * is the goods' FULL name (`grnLineName`: the posting-time snapshot, else the
+ * current catalog — flagged — else the SKU; never the variant alone) with its
+ * configuration. A positive exception carries its own Photos / Videos doors.
  *
- * THE REGISTER PAGINATES ON THE SERVER: `Showing 1–50 of {total}` with
- * Previous/Next — the browser never renders the whole history, and every
- * rail count is computed over the COMPLETE filtered result set by the one
- * shared arithmetic (`buildGrnRegisterView`, behind `?scope=grn`).
- *
- *   [Start Receiving]  →  Find PO or CO  →  pre-start object  →  Session
- *   `?session=` (Work) →  the count review (Save Receiving / Return count)
- *   a Register row     →  the formal GRN object (50/50, Amend / More ▾)
+ * TOOLBAR: `Start Receiving` (and `Show filters` while the rail is hidden) on
+ * the left; Search · Export · Columns on the right. NO `Clear filters`
+ * anywhere: re-clicking a rail row clears that section, Search clears in
+ * Search, a column condition clears in its menu or on its own chip. The pager
+ * sits in the top control area and only when there is more than one page;
+ * the footer is information only.
  *
  * THE REGISTER STAYS MOUNTED under an open object (`invisible`, never
- * display:none) so Back restores rail filters, search, sort and scroll — the
- * Manual Purchase / SO object law.
- *
- * No `Work` column, no owner avatar on rows, no local duty arithmetic: the
- * resolved GRN authority comes from the ONE shared resolver
- * (`useReceivingDuty` → 0425 `receiving_actor_context`), and it appears only
- * where an action needs it.
+ * display:none) so Back restores rail filters, search, sort, page and scroll.
  */
 
 // design-standard: not-a-list-page — the Receiving Register renders through
 // the shared register DataGrid engine (UI MASTER §6.7), not ListPageShell.
 
-/** Rows still owing goods — the Find PO or CO population. The search is
- *  CONTROLLED: the user must select an existing PO before starting Receiving
- *  (an unknown delivery never invents a source). */
+/** Rows still owing goods — the Find PO or CO population. */
 function poStillOwes(po: operationPoListRow): boolean {
   if (po.status !== "open") return false;
   const lines = po.purchase_order_lines ?? [];
   return lines.some((l) => (l.received_qty ?? 0) < (l.qty ?? 0));
 }
 
-/** Today in the business timezone — the Calendar opens on the month the
- *  operator is standing in, wherever the machine thinks it is. */
+/** Today in the business timezone. */
 function todayMYT(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kuala_Lumpur",
   }).format(new Date());
+}
+
+/** The rail's remembered open/closed choice (UI MASTER: the browser remembers). */
+const RAIL_STORAGE_KEY = "carres.receiving.rail.v1";
+/** 768–1129px: the rail opens CLOSED unless the browser remembers otherwise;
+ *  when opened it keeps its full 240px (owner instruction 2026-09-13 §4). */
+const NARROW_DESKTOP = "(min-width: 768px) and (max-width: 1129px)";
+
+function initialRailOpen(): boolean {
+  try {
+    const stored = localStorage.getItem(RAIL_STORAGE_KEY);
+    if (stored === "0") return false;
+    if (stored === "1") return true;
+  } catch {
+    /* storage unavailable — fall through to the width rule */
+  }
+  try {
+    return !window.matchMedia(NARROW_DESKTOP).matches;
+  } catch {
+    return true;
+  }
+}
+
+export const RECEIVING_WORDS = {
+  noExceptions: "No exceptions",
+  itemsNotResolved: "no catalog name",
+  catalogName: "name from the current catalog",
+  expectedEmpty: (month: string) => `No supplier arrivals expected in ${month}`,
+  expectedArrival: "expected supplier arrival",
+  railExpected: "EXPECTED ARRIVALS",
+} as const;
+
+/** The expansion's one row per counted line, then one per extra line. */
+function miniLinesOf(r: WarehouseReceiptQueueRow, onOpen: (s: EvidenceScope) => void): GoodsMiniLine[] {
+  const grn = receivingDisplayNo(r);
+  const lines = (r.lines ?? []) as WarehouseReceiptLine[];
+  const extras = (r.extra_lines ?? []) as ReceivingExtraLine[];
+  const facts = grnExceptionFacts(lines, extras);
+  const labels = r.line_labels ?? {};
+  const nameOf = (key: string, sku: string): string => {
+    const lab = labels[key];
+    const named = lab
+      ? { name: lab.name, source: lab.source }
+      : grnLineName({ sku });
+    return grnLineItemWords(named.name, lab?.config);
+  };
+  const doors = (key: string, type: "damaged" | "wrong_item" | "extra") => (
+    <ExceptionEvidenceDoors
+      receiptId={r.id}
+      grnNo={grn}
+      type={type}
+      facts={facts.filter((f) => f.lineKey === key)}
+      nameOf={nameOf}
+      counts={r.line_evidence_counts}
+      onOpen={onOpen}
+      testId={`line-evidence-${key}`}
+    />
+  );
+  const out: GoodsMiniLine[] = lines.map((l) => {
+    const lab = labels[l.id];
+    const named = lab ? { name: lab.name, source: lab.source } : grnLineName({ sku: l.sku, item_label: l.item_label });
+    return {
+      key: l.id,
+      testId: `expanded-line-${l.id}`,
+      category: "",
+      unitIds: [],
+      unitAbsence: "",
+      deliverTo: [],
+      deliverToAbsence: "",
+      sku: l.sku,
+      qty: l.received_now,
+      item: named.name,
+      itemDetail:
+        [
+          ...(lab?.config ?? []),
+          named.source === "catalog" ? RECEIVING_WORDS.catalogName : null,
+          named.source === "sku" ? RECEIVING_WORDS.itemsNotResolved : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+      received: Math.max(0, l.received_now),
+      damaged: Math.max(0, l.damaged_qty),
+      wrongItem: Math.max(0, l.wrong_item_qty),
+      extra: 0,
+      damagedNode: doors(l.id, "damaged"),
+      wrongItemNode: doors(l.id, "wrong_item"),
+      selectable: false,
+    };
+  });
+  for (const [i, x] of extras.entries()) {
+    const key = (x.id ?? "").trim();
+    const lab = key ? labels[key] : undefined;
+    const named = lab ? { name: lab.name, source: lab.source } : grnLineName({ sku: x.sku });
+    out.push({
+      key: key || `extra-${i}`,
+      testId: `expanded-extra-${key || i}`,
+      category: "",
+      unitIds: [],
+      unitAbsence: "",
+      deliverTo: [],
+      deliverToAbsence: "",
+      sku: x.sku,
+      qty: x.qty,
+      item: named.name,
+      itemDetail:
+        [named.source === "catalog" ? RECEIVING_WORDS.catalogName : null, named.source === "sku" ? RECEIVING_WORDS.itemsNotResolved : null]
+          .filter(Boolean)
+          .join(" · ") || undefined,
+      damaged: 0,
+      wrongItem: 0,
+      extra: Math.max(0, x.qty),
+      extraNode: key ? doors(key, "extra") : undefined,
+      selectable: false,
+    });
+  }
+  return out;
 }
 
 export default function OperationReceiving() {
@@ -125,18 +239,24 @@ export default function OperationReceiving() {
   const categorySel = params.get("category");
   const supplierSel = params.get("supplier");
   const siteSel = params.get("site");
-  /** The rail Calendar's picked `Supplier Delivery Date`. */
-  const expectedSel = params.get("expected");
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
-  /** The visible Calendar month — opens on the picked date's month, else
-   *  today's (MYT). The ‹ › arrows move exactly one month. */
-  const [month, setMonth] = useState(() =>
-    (expectedSel ?? todayMYT()).slice(0, 7),
-  );
+  const [railOpen, setRailOpen] = useState<boolean>(initialRailOpen);
+  const setRail = (open: boolean) => {
+    setRailOpen(open);
+    try {
+      localStorage.setItem(RAIL_STORAGE_KEY, open ? "1" : "0");
+    } catch {
+      /* the live state still works for this visit */
+    }
+  };
+  const [viewer, setViewer] = useState<EvidenceScope | null>(null);
+  /** The first of the two displayed months — opens on today's (MYT). */
+  const today = useMemo(todayMYT, []);
+  const [month, setMonth] = useState(() => today.slice(0, 7));
 
   // A changed filter or search term starts the result set over — page 1.
-  const filterKey = [categorySel, supplierSel, siteSel, expectedSel, search].join("|");
+  const filterKey = [categorySel, supplierSel, siteSel, search].join("|");
   useEffect(() => {
     setOffset(0);
   }, [filterKey]);
@@ -146,39 +266,27 @@ export default function OperationReceiving() {
     category: categorySel,
     supplier: supplierSel,
     site: siteSel,
-    expected: expectedSel,
+    expected: null,
     q: search,
   });
 
-  const rows = useMemo(
-    () => registerQ.data?.receipts ?? [],
-    [registerQ.data],
-  );
+  const rows = useMemo(() => registerQ.data?.receipts ?? [], [registerQ.data]);
   const page = registerQ.data?.page ?? { offset: 0, limit: 50, total: 0 };
-  const facets = registerQ.data?.facets ?? {
-    category: {},
-    supplier: {},
-    site: {},
-  };
+  const facets = registerQ.data?.facets ?? { category: {}, supplier: {}, site: {} };
 
-  const suppliers = useMemo(
-    () => suppliersQ.data?.suppliers ?? [],
-    [suppliersQ.data],
-  ) as SupplierRow[];
-  const warehouses = useMemo(
-    () => warehouseQ.data?.warehouses ?? [],
-    [warehouseQ.data],
-  );
+  const suppliers = useMemo(() => suppliersQ.data?.suppliers ?? [], [suppliersQ.data]) as SupplierRow[];
+  const warehouses = useMemo(() => warehouseQ.data?.warehouses ?? [], [warehouseQ.data]);
   const pos = useMemo(() => posQ.data?.pos ?? [], [posQ.data]);
-  const supplierById = useMemo(
-    () => new Map(suppliers.map((s) => [s.id, s])),
-    [suppliers],
-  );
+  const supplierById = useMemo(() => new Map(suppliers.map((s) => [s.id, s])), [suppliers]);
 
-  /** The Calendar's markers — expected supplier arrivals per governed
-   *  `Supplier Delivery Date`, the ONE shared arithmetic over the same PO
-   *  list Find PO already reads. */
+  /** The expected-arrival display: supplier-CONFIRMED dates on open orders
+   *  still owing goods (`expectedArrivalCounts` — the ONE reply arithmetic).
+   *  A date behind today is marked overdue — in words and ink, never invented. */
   const markers = useMemo(() => expectedArrivalCounts(pos), [pos]);
+  const overdue = useMemo(
+    () => Object.fromEntries(Object.keys(markers).filter((iso) => iso < today).map((iso) => [iso, true])),
+    [markers, today],
+  );
 
   function setFacet(key: string, value: string | null) {
     const next = new URLSearchParams(params);
@@ -187,14 +295,14 @@ export default function OperationReceiving() {
     setParams(next, { replace: true });
   }
 
-  /** Only the governed rows PRESENT in the result set appear (owner
-   *  correction 2026-09-06) — plus the active pick, so a row narrowed to
-   *  zero elsewhere can still be cleared. Ladder order always. */
+  /** A facet group is drawn only when it can still NARROW the result: at
+   *  least one option covers fewer rows than the current total, or the
+   *  section is active (so it can be cleared). */
+  const canNarrow = (counts: Record<string, number>, active: string | null) =>
+    active !== null || Object.values(counts).some((n) => n > 0 && n < page.total);
+
   const categoryRows = useMemo(
-    () =>
-      RECEIVING_CATEGORY_ROWS.filter(
-        (w) => (facets.category[w] ?? 0) > 0 || categorySel === w,
-      ),
+    () => RECEIVING_CATEGORY_ROWS.filter((w) => (facets.category[w] ?? 0) > 0 || categorySel === w),
     [facets.category, categorySel],
   );
   const supplierNames = useMemo(() => {
@@ -213,164 +321,94 @@ export default function OperationReceiving() {
       {
         key: "grn",
         label: "GRN No",
-        width: 168,
+        width: 152,
         sortable: true,
-        /* Every Register row IS a GRN (the boundary above) — the formal
-           number exists by construction (purchasing/MASTER.md §7.3). */
         searchValue: (r) => receivingDisplayNo(r),
         exportValue: (r) => receivingDisplayNo(r),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
-            {receivingDisplayNo(r)}
-          </span>
+          <span className="font-mono text-meta text-base-900">{receivingDisplayNo(r)}</span>
         ),
       },
       {
-        key: "supplierDeliveryDate",
-        label: "Supplier Delivery Date",
-        width: 166,
+        key: "grnDate",
+        label: "GRN Date",
+        width: 106,
         sortable: true,
-        /* The linked PO's governed supplier answer (`poSupplierDeliveryDateOf`,
-           server-resolved) — the SAME date the rail Calendar filters by, so
-           the picked day and this cell can never disagree. `Not confirmed`
-           while the supplier has not evidenced one. */
-        searchValue: (r) => r.supplier_delivery_date ?? "Not confirmed",
-        exportValue: (r) =>
-          r.supplier_delivery_date
-            ? fmtDate(r.supplier_delivery_date)
-            : "Not confirmed",
+        /* The document's date — the posting's stamp in MYT (`grnDateOf`,
+           server-resolved). Never parsed from the number. */
+        searchValue: (r) => r.grn_date ?? "",
+        exportValue: (r) => (r.grn_date ? fmtDate(r.grn_date) : ""),
         filterType: "date",
-        dateValue: (r) => r.supplier_delivery_date,
-        sortFn: (a, b) =>
-          (a.supplier_delivery_date ?? "").localeCompare(
-            b.supplier_delivery_date ?? "",
-          ),
-        accessor: (r) =>
-          r.supplier_delivery_date ? (
-            <span className="tabular-nums text-body text-base-900">
-              {fmtDate(r.supplier_delivery_date)}
-            </span>
-          ) : (
-            <span className="text-body text-kit-slate-9">Not confirmed</span>
-          ),
-      },
-      {
-        key: "receivedAt",
-        label: "Goods received on",
-        width: 150,
-        sortable: true,
-        searchValue: (r) => r.goods_received_at ?? "",
-        exportValue: (r) =>
-          r.goods_received_at ? fmtDate(r.goods_received_at) : "",
-        /* The table's date column OWNS detailed date filtering (owner
-           correction 2026-09-06) — the rail carries no second one. */
-        filterType: "date",
-        dateValue: (r) => r.goods_received_at,
-        sortFn: (a, b) =>
-          (a.goods_received_at ?? "").localeCompare(b.goods_received_at ?? ""),
+        dateValue: (r) => r.grn_date,
+        sortFn: (a, b) => (a.grn_date ?? "").localeCompare(b.grn_date ?? ""),
         accessor: (r) => (
-          <span className="tabular-nums text-body text-base-900">
-            {r.goods_received_at ? fmtDate(r.goods_received_at) : ""}
-          </span>
+          <span className="tabular-nums text-body text-base-900">{r.grn_date ? fmtDate(r.grn_date) : ""}</span>
         ),
       },
       {
-        key: "po",
-        label: "PO/CO No",
-        width: 150,
+        key: "doNo",
+        label: "Supplier DO No",
+        width: 132,
         sortable: true,
-        /* An arrival-source receipt has no PO — the cell stays honest-empty. */
-        searchValue: (r) => r.po_id ?? "",
-        exportValue: (r) => r.po_id ?? "",
-        accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">{r.po_id}</span>
-        ),
+        searchValue: (r) => r.do_number ?? "",
+        exportValue: (r) => r.do_number ?? "",
+        accessor: (r) => <span className="font-mono text-meta text-base-900">{r.do_number}</span>,
       },
       {
         key: "supplier",
         label: "Supplier",
-        minWidth: 140,
+        minWidth: 120,
         sortable: true,
         searchValue: (r) => r.supplier_name ?? "",
         exportValue: (r) => r.supplier_name ?? "",
+        accessor: (r) => <span className="truncate text-body text-base-900">{r.supplier_name ?? ""}</span>,
+      },
+      {
+        key: "po",
+        label: "PO No",
+        width: 156,
+        sortable: true,
+        /* A consignment source is IDENTIFIED as a CO on its own row — never
+           silently relabelled a PO (owner instruction 2026-09-13 §3). */
+        searchValue: (r) => `${r.po_id ?? ""} ${r.source_kind ?? ""}`,
+        exportValue: (r) => (r.source_kind === "CO" ? `${r.po_id ?? ""} (CO)` : (r.po_id ?? "")),
         accessor: (r) => (
-          <span className="truncate text-body text-base-900">
-            {r.supplier_name ?? ""}
+          <span className="font-mono text-meta text-base-900">
+            {r.po_id}
+            {r.source_kind === "CO" ? (
+              <span className="ml-1.5 font-sans text-label text-kit-slate-11" data-testid="source-co">
+                CO
+              </span>
+            ) : null}
           </span>
         ),
       },
       {
-        key: "product",
-        label: "Product",
-        minWidth: 160,
+        key: "items",
+        label: "Items",
+        width: 64,
+        align: "right",
         sortable: true,
-        /* The GRN PAPER's own line words (`product_skus.variant`, else the
-           SKU — server-resolved), first label plus a truthful `+n`. */
-        searchValue: (r) => (r.product_labels ?? []).join(" "),
-        exportValue: (r) => (r.product_labels ?? []).join(" · "),
-        accessor: (r) => {
-          const labels = r.product_labels ?? [];
-          const text =
-            labels.length === 0
-              ? ""
-              : labels.length === 1
-                ? labels[0]!
-                : `${labels[0]} +${labels.length - 1}`;
-          return (
-            <span
-              className="truncate text-body text-base-900"
-              title={labels.join(" · ")}
-            >
-              {text}
-            </span>
-          );
-        },
-      },
-      {
-        key: "deliverTo",
-        label: "Deliver To",
-        width: 150,
-        sortable: true,
-        searchValue: (r) => r.warehouse_name ?? "",
-        exportValue: (r) => r.warehouse_name ?? "",
+        searchValue: () => "",
+        exportValue: (r) => String(r.items ?? (r.lines ?? []).length),
+        numberValue: (r) => r.items ?? (r.lines ?? []).length,
+        sortFn: (a, b) => (a.items ?? 0) - (b.items ?? 0),
         accessor: (r) => (
-          <span className="truncate text-body text-base-900">
-            {r.warehouse_name ?? ""}
-          </span>
+          <span className="tabular-nums text-body text-base-900">{r.items ?? (r.lines ?? []).length}</span>
         ),
-      },
-      {
-        key: "actualSite",
-        label: "Goods arrived at",
-        width: 150,
-        sortable: true,
-        searchValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
-        exportValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
-        accessor: (r) =>
-          r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
-            /* The physical truth, preserved BESIDE the instruction — never
-               overwriting `Deliver To` (owner correction 2026-09-06). Amber
-               only when the goods landed somewhere other than instructed. */
-            <span className="truncate text-body text-kit-amber-11">
-              {r.actual_site_name}
-            </span>
-          ) : (
-            <span className="truncate text-body text-base-900">
-              {r.actual_site_name ?? r.warehouse_name ?? ""}
-            </span>
-          ),
       },
       {
         key: "receivedQty",
         label: "Received Qty",
-        width: 110,
+        width: 104,
         align: "right",
         sortable: true,
         searchValue: () => "",
-        exportValue: (r) =>
-          String(
-            warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).received,
-          ),
+        exportValue: (r) => String(warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).received),
+        numberValue: (r) => warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).received,
+        sortFn: (a, b) =>
+          warehouseReceiptTotals(a.lines as WarehouseReceiptLine[]).received -
+          warehouseReceiptTotals(b.lines as WarehouseReceiptLine[]).received,
         accessor: (r) => (
           <span className="tabular-nums text-body text-base-900">
             {warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).received}
@@ -378,38 +416,134 @@ export default function OperationReceiving() {
         ),
       },
       {
-        key: "status",
-        label: "Status",
-        width: 110,
+        key: "exceptions",
+        label: "Exceptions",
+        /* The summary AND up to six doors on one 38px line: a narrower cell
+           clips the doors behind the cell edge, which hides an action the
+           owner ruled must sit on the row. The sheet scrolls; the identity
+           column stays pinned. */
+        minWidth: 540,
         sortable: true,
-        /* Document status words — `Valid` / `Cancelled` (owner correction
-           2026-09-06). `Posted`/`Voided` stay internal database statuses. */
+        searchValue: (r) => grnExceptionSummary(grnExceptionFacts(r.lines as WarehouseReceiptLine[], r.extra_lines)),
+        exportValue: (r) => grnExceptionSummary(grnExceptionFacts(r.lines as WarehouseReceiptLine[], r.extra_lines)),
+        sortFn: (a, b) =>
+          grnExceptionSummary(grnExceptionFacts(a.lines as WarehouseReceiptLine[], a.extra_lines)).localeCompare(
+            grnExceptionSummary(grnExceptionFacts(b.lines as WarehouseReceiptLine[], b.extra_lines)),
+          ),
+        accessor: (r) => {
+          const facts = grnExceptionFacts(r.lines as WarehouseReceiptLine[], r.extra_lines);
+          const summary = grnExceptionSummary(facts);
+          if (!summary)
+            return (
+              <span className="text-body text-kit-slate-9" data-absence="true">
+                {RECEIVING_WORDS.noExceptions}
+              </span>
+            );
+          const labels = r.line_labels ?? {};
+          const nameOf = (key: string, sku: string) => {
+            const lab = labels[key];
+            return grnLineItemWords(lab ? lab.name : grnLineName({ sku }).name, lab?.config);
+          };
+          return (
+            <span className="flex items-center gap-1.5 whitespace-nowrap" data-testid={`exceptions-${r.id}`}>
+              <span className="text-body text-kit-red-11">{summary}</span>
+              {(["damaged", "wrong_item", "extra"] as const).map((type) => (
+                <ExceptionEvidenceDoors
+                  key={type}
+                  receiptId={r.id}
+                  grnNo={receivingDisplayNo(r)}
+                  type={type}
+                  facts={facts}
+                  nameOf={nameOf}
+                  counts={r.line_evidence_counts}
+                  onOpen={setViewer}
+                  compact
+                  testId={`row-evidence-${r.id}`}
+                />
+              ))}
+            </span>
+          );
+        },
+      },
+      {
+        key: "status",
+        label: "GRN Status",
+        width: 100,
+        sortable: true,
+        /* Document words — `Confirmed` / `Cancelled` — mapped onto the
+           existing internal states; nothing new was invented. */
         searchValue: (r) => warehouseReceiptStatusLabel(r.status),
         exportValue: (r) => warehouseReceiptStatusLabel(r.status),
+        filterType: "enum",
+        filterValue: (r) => warehouseReceiptStatusLabel(r.status),
         accessor: (r) => (
-          <span
-            className={
-              r.status === "voided"
-                ? "text-body text-base-500 line-through"
-                : "text-body text-base-900"
-            }
-          >
+          <span className={r.status === "voided" ? "text-body text-base-500 line-through" : "text-body text-base-900"}>
             {warehouseReceiptStatusLabel(r.status)}
           </span>
         ),
       },
+      /* ── governed OPTIONAL columns — secondary facts, off by default ── */
       {
-        key: "doNo",
-        label: "Supplier DO No.",
-        width: 140,
+        key: "receivedAt",
+        label: "Goods received on",
+        width: 150,
         sortable: true,
-        searchValue: (r) => r.do_number ?? "",
-        exportValue: (r) => r.do_number ?? "",
+        defaultHidden: true,
+        chooserGroup: "Dates",
+        searchValue: (r) => r.goods_received_at ?? "",
+        exportValue: (r) => (r.goods_received_at ? fmtDate(r.goods_received_at) : ""),
+        filterType: "date",
+        dateValue: (r) => r.goods_received_at,
+        sortFn: (a, b) => (a.goods_received_at ?? "").localeCompare(b.goods_received_at ?? ""),
         accessor: (r) => (
-          <span className="font-mono text-meta text-base-900">
-            {r.do_number}
-          </span>
+          <span className="tabular-nums text-body text-base-900">{r.goods_received_at ? fmtDate(r.goods_received_at) : ""}</span>
         ),
+      },
+      {
+        key: "supplierDeliveryDate",
+        label: "Supplier Delivery Date",
+        width: 166,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Dates",
+        searchValue: (r) => r.supplier_delivery_date ?? "Not confirmed",
+        exportValue: (r) => (r.supplier_delivery_date ? fmtDate(r.supplier_delivery_date) : "Not confirmed"),
+        filterType: "date",
+        dateValue: (r) => r.supplier_delivery_date,
+        sortFn: (a, b) => (a.supplier_delivery_date ?? "").localeCompare(b.supplier_delivery_date ?? ""),
+        accessor: (r) =>
+          r.supplier_delivery_date ? (
+            <span className="tabular-nums text-body text-base-900">{fmtDate(r.supplier_delivery_date)}</span>
+          ) : (
+            <span className="text-body text-kit-slate-9">Not confirmed</span>
+          ),
+      },
+      {
+        key: "deliverTo",
+        label: "Deliver To",
+        width: 150,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Location",
+        searchValue: (r) => r.warehouse_name ?? "",
+        exportValue: (r) => r.warehouse_name ?? "",
+        accessor: (r) => <span className="truncate text-body text-base-900">{r.warehouse_name ?? ""}</span>,
+      },
+      {
+        key: "actualSite",
+        label: "Goods arrived at",
+        width: 150,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Location",
+        searchValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
+        exportValue: (r) => r.actual_site_name ?? r.warehouse_name ?? "",
+        accessor: (r) =>
+          r.actual_site_name && r.actual_site_name !== r.warehouse_name ? (
+            <span className="truncate text-body text-kit-amber-11">{r.actual_site_name}</span>
+          ) : (
+            <span className="truncate text-body text-base-900">{r.actual_site_name ?? r.warehouse_name ?? ""}</span>
+          ),
       },
       {
         key: "damagedQty",
@@ -417,26 +551,14 @@ export default function OperationReceiving() {
         width: 110,
         align: "right",
         sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Quantities",
         searchValue: () => "",
-        exportValue: (r) =>
-          String(
-            warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).damaged,
-          ),
+        exportValue: (r) => String(warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).damaged),
+        numberValue: (r) => warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).damaged,
         accessor: (r) => {
-          const n = warehouseReceiptTotals(
-            r.lines as WarehouseReceiptLine[],
-          ).damaged;
-          return (
-            <span
-              className={
-                n > 0
-                  ? "tabular-nums text-body text-kit-red-11"
-                  : "tabular-nums text-body text-base-500"
-              }
-            >
-              {n}
-            </span>
-          );
+          const n = warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).damaged;
+          return <span className={n > 0 ? "tabular-nums text-body text-kit-red-11" : "tabular-nums text-body text-base-500"}>{n}</span>;
         },
       },
       {
@@ -445,26 +567,14 @@ export default function OperationReceiving() {
         width: 120,
         align: "right",
         sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Quantities",
         searchValue: () => "",
-        exportValue: (r) =>
-          String(
-            warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).wrongItem,
-          ),
+        exportValue: (r) => String(warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).wrongItem),
+        numberValue: (r) => warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).wrongItem,
         accessor: (r) => {
-          const n = warehouseReceiptTotals(
-            r.lines as WarehouseReceiptLine[],
-          ).wrongItem;
-          return (
-            <span
-              className={
-                n > 0
-                  ? "tabular-nums text-body text-kit-red-11"
-                  : "tabular-nums text-body text-base-500"
-              }
-            >
-              {n}
-            </span>
-          );
+          const n = warehouseReceiptTotals(r.lines as WarehouseReceiptLine[]).wrongItem;
+          return <span className={n > 0 ? "tabular-nums text-body text-kit-red-11" : "tabular-nums text-body text-base-500"}>{n}</span>;
         },
       },
       {
@@ -473,33 +583,32 @@ export default function OperationReceiving() {
         width: 100,
         align: "right",
         sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Quantities",
         searchValue: () => "",
         exportValue: (r) => String(receivingExtraQty(r.extra_lines)),
+        numberValue: (r) => receivingExtraQty(r.extra_lines),
         accessor: (r) => {
           const n = receivingExtraQty(r.extra_lines);
-          return (
-            <span
-              className={
-                n > 0
-                  ? "tabular-nums text-body text-kit-amber-11"
-                  : "tabular-nums text-body text-base-500"
-              }
-            >
-              {n}
-            </span>
-          );
+          return <span className={n > 0 ? "tabular-nums text-body text-kit-amber-11" : "tabular-nums text-body text-base-500"}>{n}</span>;
         },
+      },
+      {
+        key: "category",
+        label: "Category",
+        width: 150,
+        sortable: true,
+        defaultHidden: true,
+        chooserGroup: "Goods",
+        searchValue: (r) => (r.categories ?? []).join(" "),
+        exportValue: (r) => (r.categories ?? []).join(" · "),
+        accessor: (r) => <span className="truncate text-body text-base-900">{(r.categories ?? []).join(" · ")}</span>,
       },
     ],
     [],
   );
 
-  const narrowed =
-    categorySel !== null ||
-    supplierSel !== null ||
-    siteSel !== null ||
-    expectedSel !== null;
-
+  const narrowed = categorySel !== null || supplierSel !== null || siteSel !== null || search.trim() !== "";
   const openObject = arrivalId ?? sessionId ?? poId ?? (finding ? "find" : null);
 
   function openSession(id: string) {
@@ -519,17 +628,32 @@ export default function OperationReceiving() {
     setParams(next);
   }
 
+  const expandable = useMemo(
+    () => ({
+      flush: true,
+      fitExpansionToViewport: true,
+      testId: (r: WarehouseReceiptQueueRow) => `expand-${r.id}`,
+      renderExpansion: (r: WarehouseReceiptQueueRow) => (
+        <div data-testid={`row-expansion-${r.id}`}>
+          <GoodsMiniTable label={`Goods on ${receivingDisplayNo(r)}`} lines={miniLinesOf(r, setViewer)} receivingLayout />
+        </div>
+      ),
+    }),
+    [],
+  );
+
+  const pageFrom = page.total === 0 ? 0 : page.offset + 1;
+  const pageTo = Math.min(page.offset + page.limit, page.total);
+  const multiPage = page.total > page.limit;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="receiving-page">
       <PurchasingTabs />
 
-      {/* ── The open object takes the stage; the Register stays MOUNTED
-             underneath (`invisible`, never display:none) so Back restores the
-             complete listing state. ─────────────────────────────────────── */}
       {arrivalId ? (
         <ArrivalSourceWorkspace receiving sourceId={arrivalId} />
       ) : sessionId ? (
-        <ReceivingRecord sessionId={sessionId} onBack={closeObject} />
+        <ReceivingRecord sessionId={sessionId} onBack={closeObject} onOpenReceipt={openSession} />
       ) : poId ? (
         <PoReceivingView
           poId={poId}
@@ -557,102 +681,93 @@ export default function OperationReceiving() {
       ) : null}
 
       <div
-        className={[
-          "flex min-h-0 flex-1 gap-0 p-2",
-          openObject ? "invisible h-0 flex-none overflow-hidden p-0" : "",
-        ].join(" ")}
+        className={["flex min-h-0 flex-1 gap-0 p-2", openObject ? "invisible h-0 flex-none overflow-hidden p-0" : ""].join(" ")}
         data-testid="receiving-register"
       >
-        <FilterRail
-          testId="receiving-rail"
-          header={
-            /* The full month Calendar, FIXED at the top of the rail while the
-               business filters scroll beneath it (owner correction
-               2026-09-06). Picking a date filters the SAME register by that
-               Supplier Delivery Date; picking it again clears. */
-            <MonthCalendar
-              testId="receiving-calendar"
-              month={month}
-              onMonthChange={setMonth}
-              selected={expectedSel}
-              onSelect={(iso) => setFacet("expected", iso)}
-              markers={markers}
-              markerWord="expected supplier arrival"
-            />
-          }
-        >
-          {/* Only the governed category rows PRESENT in the result set, in
-              the shared ladder's order — no `Any`, no `All …`, no invented
-              category. Counts speak for the COMPLETE filtered result set;
-              re-clicking the active row clears the section. */}
-          <FilterRailGroup title="CATEGORY">
-            {categoryRows.map((word) => (
-              <FilterRailRow
-                key={word}
-                label={word}
-                count={facets.category[word] ?? 0}
-                active={categorySel === word}
-                onClick={() => setFacet("category", word)}
-                testId={`rail-category-${word}`}
-              />
-            ))}
-          </FilterRailGroup>
+        {railOpen && (
+          <FilterRail testId="receiving-rail" onHide={() => setRail(false)} ariaLabel="Receiving filters">
+            {/* ── the two-month EXPECTED-ARRIVAL display — supplier-confirmed
+                   dates on open orders still owing goods. It filters nothing
+                   and carries no work; daily Receiving work stays in My Work /
+                   Team Work. It scrolls WITH the filters so two complete months
+                   never push the filters out of reach (13 Sep review refinement,
+                   pending owner acceptance). ────────────────────────────── */}
+            <div data-testid="receiving-expected" className="pt-6">
+              <div className="flex items-center px-1.5">
+                <span className="text-label font-semibold uppercase tracking-wide text-kit-slate-9">
+                  {RECEIVING_WORDS.railExpected}
+                </span>
+              </div>
+              <div className="mt-2">
+                <MonthCalendar
+                  testId="receiving-calendar"
+                  month={month}
+                  onMonthChange={setMonth}
+                  months={2}
+                  selectable={false}
+                  markers={markers}
+                  overdue={overdue}
+                  markerWord={RECEIVING_WORDS.expectedArrival}
+                  emptyWord={RECEIVING_WORDS.expectedEmpty}
+                />
+              </div>
+            </div>
 
-          {/* The suppliers actually present in Receiving records. */}
-          <FilterRailGroup title="SUPPLIER">
-            {supplierNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.supplier[name] ?? 0}
-                active={supplierSel === name}
-                onClick={() => setFacet("supplier", name)}
-                testId={`rail-supplier-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
+            {canNarrow(facets.category, categorySel) && categoryRows.length > 0 && (
+              <FilterRailGroup title="CATEGORY">
+                {categoryRows.map((word) => (
+                  <FilterRailRow
+                    key={word}
+                    label={word}
+                    count={facets.category[word] ?? 0}
+                    active={categorySel === word}
+                    onClick={() => setFacet("category", word)}
+                    testId={`rail-category-${word}`}
+                  />
+                ))}
+              </FilterRailGroup>
+            )}
 
-          {/* The receiving locations actually present in the records —
-              where the goods PHYSICALLY arrived. */}
-          <FilterRailGroup title="GOODS ARRIVED AT">
-            {siteNames.map((name) => (
-              <FilterRailRow
-                key={name}
-                label={name}
-                count={facets.site[name] ?? 0}
-                active={siteSel === name}
-                onClick={() => setFacet("site", name)}
-                testId={`rail-site-${name}`}
-              />
-            ))}
-          </FilterRailGroup>
+            {canNarrow(facets.supplier, supplierSel) && supplierNames.length > 0 && (
+              <FilterRailGroup title="SUPPLIER">
+                {supplierNames.map((name) => (
+                  <FilterRailRow
+                    key={name}
+                    label={name}
+                    count={facets.supplier[name] ?? 0}
+                    active={supplierSel === name}
+                    onClick={() => setFacet("supplier", name)}
+                    testId={`rail-supplier-${name}`}
+                  />
+                ))}
+              </FilterRailGroup>
+            )}
 
-          <button
-            type="button"
-            disabled={!narrowed}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.delete("category");
-              next.delete("supplier");
-              next.delete("site");
-              next.delete("expected");
-              setParams(next, { replace: true });
-            }}
-            data-testid="rail-clear-filters"
-            className="self-start rounded-control px-2 py-1.5 text-left text-body text-kit-blue-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9"
-          >
-            Clear filters
-          </button>
-        </FilterRail>
+            {canNarrow(facets.site, siteSel) && siteNames.length > 0 && (
+              <FilterRailGroup title="GOODS ARRIVED AT">
+                {siteNames.map((name) => (
+                  <FilterRailRow
+                    key={name}
+                    label={name}
+                    count={facets.site[name] ?? 0}
+                    active={siteSel === name}
+                    onClick={() => setFacet("site", name)}
+                    testId={`rail-site-${name}`}
+                  />
+                ))}
+              </FilterRailGroup>
+            )}
+          </FilterRail>
+        )}
 
-        <div className="flex min-h-0 flex-1 flex-col pl-2" data-testid="receiving-register-column">
+        {/* `min-w-0`: the column is a flex child, and without it the sheet's
+            own width would widen the column instead of scrolling inside it —
+            which pushes Search · Export · Columns off the viewport at 831px.
+            The toolbar and footer stay put; only the table scrolls sideways. */}
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${railOpen ? "pl-2" : ""}`} data-testid="receiving-register-column">
           {registerQ.isError ? (
-            /* A failure sentence is never the empty sentence (COPY-STANDARD
-               2026-08-28): what broke, then the act that fixes it. */
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 bg-white">
-              <p className="text-body text-base-700">
-                Receiving could not be opened
-              </p>
+              <p className="text-body text-base-700">Receiving could not be opened</p>
               <button
                 type="button"
                 className="rounded-control border border-base-200 bg-white px-3 py-1.5 text-meta font-medium text-base-700 hover:bg-hovertint"
@@ -666,56 +781,62 @@ export default function OperationReceiving() {
               appearance="reference"
               rows={rows}
               columns={columns}
-              storageKey="carres.receiving.register.v1"
+              storageKey="carres.receiving.register.v3"
               rowKey={(r) => r.id}
               exportName="Receiving"
-              searchPlaceholder="GRN, PO, supplier or DO number…"
+              searchPlaceholder="GRN, PO, supplier, DO number or item…"
               isLoading={registerQ.isLoading}
               onSearchChange={setSearch}
               stickyIdentity
               groupBanner={false}
+              hideClearFilters
+              expandable={expandable}
+              expandTitle="This receipt's lines"
+              chooserGroupOrder={["Dates", "Location", "Quantities", "Goods"]}
               onRowClick={(r) => openSession(r.id)}
+              rowTestId={(r) => `grn-row-${r.id}`}
               toolbarStart={
-                <button
-                  type="button"
-                  data-testid="start-receiving-door"
-                  onClick={() => {
-                    // A PUSH, not a replace — Back from the Find step returns
-                    // to the Register, the same way an open object does.
-                    const next = new URLSearchParams(params);
-                    next.set("find", "1");
-                    setParams(next);
-                  }}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-medium text-white hover:brightness-95"
-                >
-                  Start Receiving
-                </button>
+                <>
+                  {!railOpen && (
+                    <button
+                      type="button"
+                      aria-label="Show filters"
+                      title="Show filters"
+                      data-testid="receiving-show-filters"
+                      onClick={() => setRail(true)}
+                      className="grid h-7 w-7 place-items-center rounded-control border border-kit-slate-6 bg-white text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
+                    >
+                      <PanelLeftOpen size={16} strokeWidth={1.75} aria-hidden />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-testid="start-receiving-door"
+                    onClick={() => {
+                      const next = new URLSearchParams(params);
+                      next.set("find", "1");
+                      setParams(next);
+                    }}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-kit-blue-9 px-3 text-body font-medium text-white hover:brightness-95"
+                  >
+                    Start Receiving
+                  </button>
+                </>
               }
-              emptyMessage={
-                !narrowed && search.trim() === ""
-                  ? // The record is what is empty — never "the goods have not
-                    // come" (Jess, 2026-08-03).
-                    "No receiving activity yet."
-                  : "No receiving matches these filters."
-              }
-              statusSummary={() => {
-                /* SERVER-SIDE PAGINATION (owner correction 2026-09-06):
-                   `Showing 1–50 of 10,000` speaks for the WHOLE filtered
-                   result set; Previous/Next move one server page. */
-                const from = page.total === 0 ? 0 : page.offset + 1;
-                const to = Math.min(page.offset + page.limit, page.total);
-                return (
-                  <span className="flex items-center gap-3">
-                    <span data-testid="grn-page-range" className="truncate">
-                      Showing {from}–{to} of {page.total}
+              toolbarEnd={
+                multiPage ? (
+                  /* The pager lives in the TOP control area and only when
+                     there is more than one page — the footer never holds a
+                     control (owner instruction 2026-09-13 §4). */
+                  <span className="ml-2 flex items-center gap-2 whitespace-nowrap" data-testid="grn-pager">
+                    <span className="text-meta text-kit-slate-11" data-testid="grn-page-range">
+                      {pageFrom}–{pageTo} of {page.total}
                     </span>
                     <button
                       type="button"
                       data-testid="grn-page-previous"
                       disabled={page.offset === 0}
-                      onClick={() =>
-                        setOffset(Math.max(0, offset - page.limit))
-                      }
+                      onClick={() => setOffset(Math.max(0, offset - page.limit))}
                       className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
                     >
                       Previous
@@ -723,12 +844,29 @@ export default function OperationReceiving() {
                     <button
                       type="button"
                       data-testid="grn-page-next"
-                      disabled={to >= page.total}
+                      disabled={pageTo >= page.total}
                       onClick={() => setOffset(offset + page.limit)}
                       className="rounded-control border border-kit-slate-5 bg-white px-2 py-0.5 text-meta text-kit-slate-11 hover:bg-kit-slate-3 disabled:text-kit-slate-9 disabled:hover:bg-white"
                     >
                       Next
                     </button>
+                  </span>
+                ) : null
+              }
+              emptyMessage={!narrowed ? "No receiving activity yet." : "No receiving matches these filters."}
+              statusSummary={() => {
+                /* Information only: the COMPLETE matching count, and the
+                   narrowed-versus-total state when a filter or search is on. */
+                const all = page.total_all;
+                const narrowedWord =
+                  narrowed && all != null && all !== page.total
+                    ? ` · ${page.total} of ${all} match the filters`
+                    : "";
+                return (
+                  <span data-testid="grn-footer-summary" className="truncate">
+                    {page.total} {page.total === 1 ? "GRN" : "GRNs"}
+                    {multiPage ? ` · showing ${pageFrom}–${pageTo}` : ""}
+                    {narrowedWord}
                   </span>
                 );
               }}
@@ -736,6 +874,8 @@ export default function OperationReceiving() {
           )}
         </div>
       </div>
+
+      {viewer ? <ExceptionEvidenceViewer scope={viewer} onClose={() => setViewer(null)} /> : null}
     </div>
   );
 }

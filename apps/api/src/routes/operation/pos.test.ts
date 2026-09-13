@@ -938,6 +938,59 @@ describe("the Office has exactly ONE receiving door", () => {
       rpc.mock.calls.some((c: unknown[]) => c[0] === "operation_receive_po_with_do"),
     ).toBe(false);
   });
+
+  it("0493 — damaged/wrong VIDEOS and an extra line's identity + evidence reach the door in the validator's own keys", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { receipt_id: "r1", status: "posted" }, error: null });
+    const from = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          in: vi.fn().mockResolvedValue({ data: [], error: null }),
+        }),
+      }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue({ rpc, from } as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/operation/pos/PO-2050/office-receive", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doNumber: "DO-1234",
+          doFilePath: "PO-2050/do.pdf",
+          extraLines: [
+            { id: "11111111-1111-1111-1111-111111111111", sku: "PILLOW-X", qty: 1, photos: ["PO-2050/x-claim.jpg"], videos: ["PO-2050/x-claim.mp4"] },
+          ],
+          lines: [
+            {
+              id: LINE,
+              receivedNow: 1,
+              damagedQty: 1,
+              damagedPhotos: ["PO-2050/a-claim.jpg"],
+              damagedVideos: ["PO-2050/a-claim.mp4"],
+              wrongItemQty: 1,
+              wrongItemClaimType: "wrong_spec",
+              wrongItemPhotos: ["PO-2050/b-claim.jpg"],
+              wrongItemVideos: ["PO-2050/b-claim.mov"],
+            },
+          ],
+        }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const args = rpc.mock.calls[0][1] as { p_extra_lines: unknown; p_lines: Array<Record<string, unknown>> };
+    expect(args.p_extra_lines).toEqual([
+      { id: "11111111-1111-1111-1111-111111111111", sku: "PILLOW-X", qty: 1, note: null, photos: ["PO-2050/x-claim.jpg"], videos: ["PO-2050/x-claim.mp4"] },
+    ]);
+    expect(args.p_lines[0]).toMatchObject({
+      damaged_photos: ["PO-2050/a-claim.jpg"],
+      damaged_videos: ["PO-2050/a-claim.mp4"],
+      wrong_item_photos: ["PO-2050/b-claim.jpg"],
+      wrong_item_videos: ["PO-2050/b-claim.mov"],
+    });
+  });
 });
 
 describe("POST /api/operation/pos/:id/cancel", () => {

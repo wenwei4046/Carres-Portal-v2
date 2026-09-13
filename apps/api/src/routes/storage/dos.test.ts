@@ -116,6 +116,38 @@ describe("POST /api/storage/dos/sign-upload", () => {
     expect(key).toMatch(/^PO-100\/[0-9a-f-]+-claim-DO-1\.jpg$/);
   });
 
+  it("0493 — kind:claim takes a VIDEO too (Damaged / Wrong Item / Extra Videos), under the same claim- name", async () => {
+    const createSignedUploadUrl = vi.fn().mockResolvedValue({
+      data: { token: "tok", path: "PO-100/abc-claim-DO-1.mp4" },
+      error: null,
+    });
+    const sb = { storage: { from: vi.fn(() => ({ createSignedUploadUrl })) } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(userClient).mockReturnValue(sb as any);
+    const jwt = await makeJwt("operation");
+    const res = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ po_id: "PO-100", do_number: "DO-1", mime_type: "video/mp4", size_bytes: 4096, kind: "claim" }),
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const key = createSignedUploadUrl.mock.calls[0][0] as string;
+    expect(key).toMatch(/^PO-100\/[0-9a-f-]+-claim-DO-1\.mp4$/);
+    // The signed DO itself stays a document/image.
+    const doRes = await app.fetch(
+      new Request("http://t/api/storage/dos/sign-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ po_id: "PO-100", do_number: "DO-1", mime_type: "video/mp4", size_bytes: 4096, kind: "do" }),
+      }),
+      env,
+    );
+    expect(doRes.status).toBe(422);
+  });
+
   it("R2 — an unknown kind is refused rather than silently treated as a DO", async () => {
     const jwt = await makeJwt("operation");
     const res = await app.fetch(

@@ -120,7 +120,7 @@ describe("grnTemplateDataOf — the saved document", () => {
   it("carries the number, source, supplier and the three location/date facts", () => {
     const d = grnTemplateDataOf(detail());
     expect(d.grn_no).toBe("GRN-20260901-1234");
-    expect(d.status_label).toBe("Valid");
+    expect(d.status_label).toBe("Confirmed");
     expect(d.source.po_number).toBe("PO-2001");
     expect(d.supplier.name).toBe("Nice Future");
     expect(d.supplier_do_no).toBe("DO-5512");

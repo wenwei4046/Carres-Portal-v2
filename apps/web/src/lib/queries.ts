@@ -7,6 +7,9 @@ import {
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import {
+  type GrnExceptionType,
+  type GrnLineNameSource,
+  type GrnMediaKind,
   type AbandonOrderInput,
   type AssignPartnerInput,
   type AssignPickupPartnerInput,
@@ -546,6 +549,11 @@ export const qk = {
     receivingDuty: () => ["operation", "receiving-duty"] as const,
     receivingSession: (id: string) =>
       ["operation", "warehouse-receipts", "session", id] as const,
+    /** 0493 — ONE viewer's exception evidence: GRN + line key(s) + exception
+     *  type + media kind. Under the session root so an amend that appends
+     *  evidence invalidates the viewer with the record. */
+    receivingEvidence: (id: string, scope: Record<string, string>) =>
+      ["operation", "warehouse-receipts", "session", id, "evidence", scope] as const,
     supplierClaimPhotos: (id: string) =>
       ["operation", "supplier-claims", "photos", id] as const,
     warehouse: () => ["operation", "warehouse"] as const,
@@ -4342,11 +4350,37 @@ export interface WarehouseReceiptQueueRow {
     kind: "photo" | "video";
     url: string | null;
   }>;
-  extra_lines?: Array<{ sku: string; qty: number; note?: string | null }>;
+  extra_lines?: Array<{
+    /** 0493 — the extra line's stable identity; absent on pre-0493 GRNs. */
+    id?: string | null;
+    sku: string;
+    qty: number;
+    note?: string | null;
+    photos?: string[];
+    videos?: string[];
+  }>;
   void_at?: string | null;
   void_by_name?: string | null;
   void_reason?: string | null;
   do_file_url?: string | null;
+  /** ── 2026-09-13 GRN Register facts (server-computed, `?scope=grn`) ── */
+  /** The GRN DOCUMENT's date — the posting's stamp in MYT (`grnDateOf`);
+   *  never parsed from the number. */
+  grn_date?: string | null;
+  /** `PO` or `CO` — a consignment source is identified, never relabelled. */
+  source_kind?: "PO" | "CO";
+  /** Counted lines on THIS GRN. */
+  items?: number;
+  received_qty?: number;
+  damaged_qty?: number;
+  wrong_item_qty?: number;
+  extra_qty?: number;
+  /** By line key (PO line id / extra id): the goods' full name, where it
+   *  came from, and the PO line's configuration facts. */
+  line_labels?: Record<string, { name: string; source: GrnLineNameSource; config: string[] }>;
+  /** Exception evidence COUNTS by line/type/kind. ABSENT = not verified
+   *  (the evidence table did not answer); `[]` = verified none. */
+  line_evidence_counts?: GrnEvidenceCount[];
   /** The governed category words this receiving answers to (owner correction
    *  2026-09-06) — computed server-side through the ONE shared ladder from
    *  the catalog's answer; the rail only counts them. */
@@ -4515,6 +4549,25 @@ export function useReceivingDuty(
   });
 }
 
+export interface GrnEvidenceCount {
+  exception_type: GrnExceptionType;
+  line_key: string;
+  media_kind: GrnMediaKind;
+  count: number;
+}
+
+/** One exception evidence file on a GRN (0493 `receiving_line_evidence`). */
+export interface GrnLineEvidenceRow {
+  id: string;
+  exception_type: GrnExceptionType;
+  line_key: string;
+  media_kind: GrnMediaKind;
+  path: string;
+  source: "posting" | "amend" | "projection";
+  added_at: string;
+  added_by_name: string | null;
+}
+
 /** GET /api/operation/warehouse-receipts/:id — one Receiving Session / GRN
  *  record: the row, its per-Unit results, its source PO and its events. */
 export interface ReceivingSessionDetail {
@@ -4525,12 +4578,18 @@ export interface ReceivingSessionDetail {
       outcome: "received" | "received_with_issue" | "not_received";
       issue_kind: "damaged" | "wrong_item" | null;
       note: string | null;
+      /** 0493 detail read — the Unit's CURRENT register state, read from the
+       *  register itself. Null = the register did not answer for it. */
+      current_status?: string | null;
+      current_site_name?: string | null;
     }>;
   };
   po: {
     id: string;
+    status?: string;
     supplier_id: string;
     warehouse_id: string;
+    is_consignment?: boolean;
     purchase_order_lines: Array<{
       id: string;
       sku: string;
@@ -4540,10 +4599,89 @@ export interface ReceivingSessionDetail {
       wrong_item_qty: number;
     }>;
   } | null;
-  /** The formal GRN document's product facts — catalog description + the
-   *  governed category word, resolved server-side (2026-09-06). */
-  line_info?: Record<string, { description: string | null; category: string }>;
+  /** The formal GRN document's product facts — catalog description, the
+   *  goods' FULL name (`Model · Variant`, null when the catalog names no
+   *  model) and the governed category word, resolved server-side. */
+  line_info?: Record<string, { description: string | null; label?: string | null; category: string }>;
+  /** The PO line's configuration facts, by PO line id (2026-09-13). */
+  line_config?: Record<string, string[]>;
+  /** The exact Claims THIS receipt opened (`supplier_claims.warehouse_receipt_id`). */
+  claims?: Array<{
+    id: string;
+    claim_no: string | null;
+    status: string;
+    claim_type: string;
+    sku: string;
+    qty: number;
+    po_line_id: string | null;
+    requested_action: string | null;
+    supplier_response: string | null;
+  }>;
+  /** The OTHER GRNs on the same source, oldest first. */
+  related_receipts?: Array<{
+    id: string;
+    grn_no: string;
+    do_number: string;
+    status: string;
+    goods_received_at: string | null;
+    grn_date: string | null;
+    received_qty: number;
+    damaged_qty: number;
+    wrong_item_qty: number;
+    extra_qty: number;
+  }>;
+  /** Exception evidence rows. NULL = not verified (0493 not applied). */
+  line_evidence?: GrnLineEvidenceRow[] | null;
   events: ReceivingEvent[];
+}
+
+/** GET /:id/evidence — ONE viewer's files, each with its own state. */
+export interface ReceivingEvidenceFile {
+  id: string;
+  line_key: string;
+  path: string;
+  kind: GrnMediaKind;
+  url: string | null;
+  /** `ok` = signed, exists · `missing` = recorded path the bucket lacks ·
+   *  `unsigned` = storage did not answer; existence not verified. */
+  status: "ok" | "missing" | "unsigned";
+  source: "posting" | "amend" | "projection";
+  added_at: string;
+  added_by_name: string | null;
+}
+export interface ReceivingEvidenceResponse {
+  receipt_id: string;
+  /** false = the evidence table did not answer (0493 not applied): the files
+   *  are NOT VERIFIED, which is a different fact from none. */
+  verified: boolean;
+  files: ReceivingEvidenceFile[];
+}
+
+export function useReceivingLineEvidence(
+  receiptId: string | null,
+  scope: { type: GrnExceptionType; kind: GrnMediaKind; lineKeys: readonly string[] } | null,
+  opts?: Partial<UseQueryOptions<ReceivingEvidenceResponse, ApiError>>,
+) {
+  const params = new URLSearchParams();
+  if (scope) {
+    params.set("type", scope.type);
+    params.set("kind", scope.kind);
+    if (scope.lineKeys.length) params.set("line", scope.lineKeys.join(","));
+  }
+  return useQuery<ReceivingEvidenceResponse, ApiError>({
+    queryKey: qk.operation.receivingEvidence(receiptId ?? "", {
+      type: scope?.type ?? "",
+      kind: scope?.kind ?? "",
+      line: scope?.lineKeys.join(",") ?? "",
+    }),
+    queryFn: () =>
+      apiFetch<ReceivingEvidenceResponse>(
+        `/api/operation/warehouse-receipts/${receiptId}/evidence?${params.toString()}`,
+      ),
+    enabled: !!receiptId && !!scope,
+    staleTime: 30_000,
+    ...opts,
+  });
 }
 
 export function useReceivingSessionDetail(id: string | null) {
@@ -4570,6 +4708,13 @@ export interface ReceivingAmendBody {
   /** 0427 — additional arrival evidence; append-only. */
   arrivalEvidenceAdd?: Array<{ path: string; kind: "photo" | "video" }>;
   lines?: Array<{ id: string; receivedNow: number }>;
+  /** 0493 — exception evidence appended as rows (`receiving_line_evidence_add`). */
+  lineEvidenceAdd?: Array<{
+    lineKey: string;
+    exceptionType: GrnExceptionType;
+    kind: GrnMediaKind;
+    path: string;
+  }>;
 }
 
 export function useReceivingAmendMutation(
@@ -4654,7 +4799,9 @@ export interface GrnRegisterFilters {
 }
 export interface GrnRegisterResponse {
   receipts: WarehouseReceiptQueueRow[];
-  page: { offset: number; limit: number; total: number };
+  /** `total` = the complete FILTERED result; `total_all` = every GRN on the
+   *  Register (optional — an older Worker omits it). */
+  page: { offset: number; limit: number; total: number; total_all?: number };
   facets: {
     category: Record<string, number>;
     supplier: Record<string, number>;

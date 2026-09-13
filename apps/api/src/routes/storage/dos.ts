@@ -60,7 +60,11 @@ const signUploadSchema = z
     kind: z.enum(["do", "claim", "arrival"]).default("do"),
   })
   .superRefine((v, ctx) => {
-    const pool: readonly string[] = v.kind === "arrival" ? ARRIVAL_MIMES : ALLOWED_MIMES;
+    // 0493 — an exception's evidence is photo AND video (Damaged / Wrong Item /
+    // Extra × Photos / Videos), so the `claim` kind takes the same pool as
+    // `arrival`. The signed DO (`do`) stays a document/image.
+    const pool: readonly string[] =
+      v.kind === "arrival" || v.kind === "claim" ? ARRIVAL_MIMES : ALLOWED_MIMES;
     if (!pool.includes(v.mime_type)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

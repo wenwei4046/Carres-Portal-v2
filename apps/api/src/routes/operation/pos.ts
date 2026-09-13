@@ -1605,7 +1605,16 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
     // idempotency key. All optional; the RPC owns every rule.
     p_actual_site_id: parsed.data.actualSiteId ?? null,
     p_arrival_evidence: parsed.data.arrivalEvidence ?? [],
-    p_extra_lines: parsed.data.extraLines ?? [],
+    // 0493 — an extra line carries its own id and evidence; the validator
+    // keeps a valid id and mints one otherwise.
+    p_extra_lines: (parsed.data.extraLines ?? []).map((x) => ({
+      id: x.id ?? null,
+      sku: x.sku,
+      qty: x.qty,
+      note: x.note ?? null,
+      photos: x.photos ?? [],
+      videos: x.videos ?? [],
+    })),
     p_save_key: parsed.data.saveKey ?? null,
     p_lines: parsed.data.lines.map((l) => ({
       id: l.id,
@@ -1613,8 +1622,10 @@ operationPosRouter.post("/:id/office-receive", requireOperation, async (c) => {
       damaged_qty: l.damagedQty ?? 0,
       wrong_item_qty: l.wrongItemQty ?? 0,
       damaged_photos: l.damagedPhotos ?? [],
+      damaged_videos: l.damagedVideos ?? [],
       wrong_item_claim_type: l.wrongItemClaimType ?? null,
       wrong_item_photos: l.wrongItemPhotos ?? [],
+      wrong_item_videos: l.wrongItemVideos ?? [],
       // 0426 — per-Unit outcomes (ERP-ARCHITECTURE §3.4); absent = the
       // quantity line the validator already governs.
       units: (l.units ?? []).map((u) => ({

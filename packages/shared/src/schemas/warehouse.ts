@@ -40,9 +40,13 @@ export const warehouseSubmitReceiptInput = z
     extraLines: z
       .array(
         z.object({
+          /** 0493 — stable identity + Extra Photos / Videos. */
+          id: z.string().uuid().optional(),
           sku: z.string().min(1).max(120),
           qty: z.number().int().positive(),
           note: z.string().max(300).optional(),
+          photos: CLAIM_PHOTO_PATHS.optional(),
+          videos: CLAIM_PHOTO_PATHS.optional(),
         }),
       )
       .max(50)
@@ -57,8 +61,11 @@ export const warehouseSubmitReceiptInput = z
           damagedQty: z.number().int().nonnegative().optional(),
           wrongItemQty: z.number().int().nonnegative().optional(),
           damagedPhotos: CLAIM_PHOTO_PATHS.optional(),
+          /** 0493 — videos beside the required photos. */
+          damagedVideos: CLAIM_PHOTO_PATHS.optional(),
           wrongItemClaimType: z.string().min(1).max(40).optional(),
           wrongItemPhotos: CLAIM_PHOTO_PATHS.optional(),
+          wrongItemVideos: CLAIM_PHOTO_PATHS.optional(),
           /** 0426 — one physical result per governed expected Unit
            *  (ERP-ARCHITECTURE §3.4). */
           units: z

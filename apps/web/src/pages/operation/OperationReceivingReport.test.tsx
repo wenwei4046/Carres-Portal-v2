@@ -378,6 +378,8 @@ describe("the governed spellings", () => {
   it("no money anywhere", () => {
     mockData();
     const { container } = render(wrap(<OperationReceivingReport />));
-    expect(container.textContent).not.toMatch(/RM|cost|price|amount|MYR|\$/i);
+    // `RM` as a WORD — the governed GRN word `Confirmed` carries the letters
+    // r-m and is not money.
+    expect(container.textContent).not.toMatch(/\bRM\b|cost|price|amount|MYR|\$/i);
   });
 });

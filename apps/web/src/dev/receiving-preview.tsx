@@ -62,25 +62,54 @@ const POSTED_ROW = {
     { path: "PO-20260901-4827/a-arrival.jpg", kind: "photo" },
     { path: "PO-20260901-4827/a-arrival.mp4", kind: "video" },
   ],
-  extra_lines: [],
+  extra_lines: [
+    { id: "x1", sku: "PILLOW-STD", qty: 2, note: "not on this PO", photos: ["PO-20260901-4827/x1-claim.jpg"], videos: [] },
+  ],
   void_at: null,
   void_by_name: null,
   void_reason: null,
   lines: [
     {
       id: "l1",
-      sku: "MS01-K King Mattress",
+      sku: "MS01-K",
       received_now: 3,
       damaged_qty: 1,
       wrong_item_qty: 0,
       wrong_item_claim_type: null,
+      damaged_photos: ["PO-20260901-4827/a-claim.jpg", "PO-20260901-4827/b-claim.jpg"],
+      damaged_videos: ["PO-20260901-4827/c-claim.mp4"],
+      item_label: "Forte · King",
+    },
+    {
+      id: "l5",
+      sku: "BF07-K",
+      received_now: 1,
+      damaged_qty: 0,
+      wrong_item_qty: 1,
+      wrong_item_claim_type: "wrong_colour",
+      wrong_item_photos: ["PO-20260901-4827/d-claim.jpg"],
+      item_label: null,
     },
   ],
-  summary: "3 good · 1 damaged",
+  summary: "4 good · 1 damaged · 1 wrong item",
   opens_claims: true,
-  categories: ["Mattress"],
+  categories: ["Mattress", "Bedframe"],
   supplier_delivery_date: "2026-09-08",
-  product_labels: ["Mattress Forte King"],
+  /* 2026-09-13 register facts */
+  grn_date: "2026-09-03",
+  source_kind: "PO",
+  items: 2,
+  line_labels: {
+    l1: { name: "Forte · King", source: "snapshot", config: ["Firmness Medium"] },
+    l5: { name: "Quinn · King", source: "catalog", config: ["BF-03"] },
+    x1: { name: "PILLOW-STD", source: "sku", config: [] },
+  },
+  line_evidence_counts: [
+    { exception_type: "damaged", line_key: "l1", media_kind: "photo", count: 2 },
+    { exception_type: "damaged", line_key: "l1", media_kind: "video", count: 1 },
+    { exception_type: "wrong_item", line_key: "l5", media_kind: "photo", count: 1 },
+    { exception_type: "extra", line_key: "x1", media_kind: "photo", count: 1 },
+  ],
 };
 
 const SUBMITTED_ROW = {
@@ -114,7 +143,11 @@ const SUBMITTED_ROW = {
   opens_claims: false,
   categories: ["Bedframe"],
   supplier_delivery_date: "2026-09-04",
-  product_labels: ["Bedframe Quinn Queen"],
+  grn_date: null,
+  items: 1,
+  extra_lines: [],
+  line_labels: { l2: { name: "Quinn · Queen", source: "catalog", config: [] } },
+  line_evidence_counts: [],
 };
 
 const VOIDED_ROW = {
@@ -143,7 +176,58 @@ const VOIDED_ROW = {
   opens_claims: false,
   categories: ["Sofa"],
   supplier_delivery_date: null,
-  product_labels: ["Jager Sofa 3-seater"],
+  grn_date: "2026-08-30",
+  source_kind: "CO",
+  items: 1,
+  extra_lines: [],
+  line_labels: { l3: { name: "Jager Sofa · 3-seater", source: "snapshot", config: ["Fabric BF-11"] } },
+  line_evidence_counts: [],
+};
+
+/** A CLEAN GRN — no exceptions, one line, so the register shows the
+ *  governed absence and offers no evidence door. */
+const CLEAN_ROW = {
+  ...POSTED_ROW,
+  id: "66666666-6666-6666-6666-666666666666",
+  po_id: "PO-20260905-0912",
+  supplier_name: "Ohana",
+  do_number: "OH-2301",
+  goods_received_at: "2026-09-05",
+  posted_at: "2026-09-05T06:00:00Z",
+  grn_date: "2026-09-05",
+  grn_no: "GRN-20260905-2210",
+  arrival_evidence: [],
+  extra_lines: [],
+  lines: [
+    { id: "l6", sku: "PIL-01", received_now: 6, damaged_qty: 0, wrong_item_qty: 0, wrong_item_claim_type: null, item_label: "Cloud Pillow · Standard" },
+  ],
+  summary: "6 good",
+  opens_claims: false,
+  categories: ["Pillow"],
+  supplier_delivery_date: "2026-09-05",
+  items: 1,
+  line_labels: { l6: { name: "Cloud Pillow · Standard", source: "snapshot", config: [] } },
+  line_evidence_counts: [],
+};
+
+/** A 1×1 PNG and a tiny MP4-less stand-in — the preview shows the VIEWER,
+ *  never real evidence (a decoded PNG proves nothing about Storage). */
+const PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+const EVIDENCE_FILES: Record<string, unknown[]> = {
+  "damaged|photo": [
+    { id: "ev1", line_key: "l1", path: "PO-20260901-4827/a-claim.jpg", kind: "photo", url: PNG, status: "ok", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+    { id: "ev2", line_key: "l1", path: "PO-20260901-4827/b-claim.jpg", kind: "photo", url: null, status: "missing", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+  ],
+  "damaged|video": [
+    { id: "ev3", line_key: "l1", path: "PO-20260901-4827/c-claim.mp4", kind: "video", url: null, status: "unsigned", source: "amend", added_at: "2026-09-04T01:30:00Z", added_by_name: "Khor Yee" },
+  ],
+  "wrong_item|photo": [
+    { id: "ev4", line_key: "l5", path: "PO-20260901-4827/d-claim.jpg", kind: "photo", url: PNG, status: "ok", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+  ],
+  "extra|photo": [
+    { id: "ev5", line_key: "x1", path: "PO-20260901-4827/x1-claim.jpg", kind: "photo", url: PNG, status: "ok", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+  ],
 };
 
 /** An EVIDENCED supplier reply — what the rail Calendar's markers read. */
@@ -184,6 +268,33 @@ const PO_OPEN = {
     },
   ],
 };
+/** An arrival the supplier confirmed for 1 Sep that never came — OVERDUE. */
+const PO_LATE = {
+  id: "PO-20260825-1180",
+  supplier_id: "sup-dorsett",
+  warehouse_id: WH,
+  status: "open",
+  version: 1,
+  promises: [reply("2026-09-01")],
+  placed_at: "2026-08-25T01:00:00Z",
+  eta_date: "2026-09-01",
+  purchase_order_lines: [
+    { id: "l7", sku: "SOFA-3", qty: 1, received_qty: 0, damaged_qty: 0, wrong_item_qty: 0 },
+  ],
+};
+const PO_NEXT_MONTH = {
+  id: "PO-20260910-0402",
+  supplier_id: "sup-ohana",
+  warehouse_id: WH,
+  status: "open",
+  version: 1,
+  promises: [reply("2026-10-06")],
+  placed_at: "2026-09-10T01:00:00Z",
+  eta_date: "2026-10-06",
+  purchase_order_lines: [
+    { id: "l8", sku: "BF02-Q", qty: 3, received_qty: 0, damaged_qty: 0, wrong_item_qty: 0 },
+  ],
+};
 const PO_OPEN_2 = {
   id: "PO-20260904-2210",
   supplier_id: "sup-hooka",
@@ -215,6 +326,8 @@ const DETAIL = {
         outcome: "received",
         issue_kind: null,
         note: null,
+        current_status: "reserved",
+        current_site_name: "Carres Klang",
       },
       {
         stock_item_id: "u2",
@@ -241,25 +354,35 @@ const DETAIL = {
   },
   po: {
     id: "PO-20260901-4827",
+    status: "open",
     supplier_id: "sup-hooka",
     warehouse_id: WH,
+    is_consignment: false,
     purchase_order_lines: [
-      {
-        id: "l1",
-        sku: "MS01-K King Mattress",
-        qty: 5,
-        received_qty: 4,
-        damaged_qty: 1,
-        wrong_item_qty: 0,
-      },
+      { id: "l1", sku: "MS01-K", qty: 5, received_qty: 4, damaged_qty: 1, wrong_item_qty: 0, attrs: { firmness: "Medium" } },
+      { id: "l5", sku: "BF07-K", qty: 2, received_qty: 1, damaged_qty: 0, wrong_item_qty: 1, attrs: { fabric_name: "BF-03" } },
     ],
   },
   line_info: {
-    "MS01-K King Mattress": {
-      description: "Mattress Forte King",
-      category: "Mattress",
-    },
+    "MS01-K": { description: "Forte · King", label: "Forte · King", category: "Mattress" },
+    "BF07-K": { description: "Quinn · King", label: "Quinn · King", category: "Bedframe" },
+    "PILLOW-STD": { description: null, label: null, category: "Pillow" },
   },
+  line_config: { l1: ["Firmness Medium"], l5: ["BF-03"] },
+  claims: [
+    { id: "cl-1", claim_no: "SC-1032", status: "open", claim_type: "damaged", sku: "MS01-K", qty: 1, po_line_id: "l1", requested_action: "replace", supplier_response: null },
+    { id: "cl-2", claim_no: "SC-1033", status: "closed", claim_type: "wrong_item", sku: "BF07-K", qty: 1, po_line_id: "l5", requested_action: "collect", supplier_response: "collected" },
+  ],
+  related_receipts: [
+    { id: "77777777-7777-7777-7777-777777777777", grn_no: "GRN-20260828-0410", do_number: "HK-5480", status: "posted", goods_received_at: "2026-08-28", grn_date: "2026-08-28", received_qty: 1, damaged_qty: 0, wrong_item_qty: 0, extra_qty: 0 },
+  ],
+  line_evidence: [
+    { id: "ev1", exception_type: "damaged", line_key: "l1", media_kind: "photo", path: "PO-20260901-4827/a-claim.jpg", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+    { id: "ev2", exception_type: "damaged", line_key: "l1", media_kind: "photo", path: "PO-20260901-4827/b-claim.jpg", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+    { id: "ev3", exception_type: "damaged", line_key: "l1", media_kind: "video", path: "PO-20260901-4827/c-claim.mp4", source: "amend", added_at: "2026-09-04T01:30:00Z", added_by_name: "Khor Yee" },
+    { id: "ev4", exception_type: "wrong_item", line_key: "l5", media_kind: "photo", path: "PO-20260901-4827/d-claim.jpg", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+    { id: "ev5", exception_type: "extra", line_key: "x1", media_kind: "photo", path: "PO-20260901-4827/x1-claim.jpg", source: "posting", added_at: "2026-09-03T02:05:00Z", added_by_name: "Shasha" },
+  ],
   events: [
     {
       id: "e2",
@@ -411,6 +534,15 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/operation/workspace-duties")) return json(WORKSPACE_DUTIES);
   if (url.includes("/api/warehouse/incoming")) return json(WAREHOUSE_INCOMING);
   if (url.includes("/api/operation/warehouse-receipts/duty")) return json(DUTY);
+  if (url.includes("/evidence?")) {
+    const params = new URLSearchParams(url.split("?")[1] ?? "");
+    const key = `${params.get("type")}|${params.get("kind")}`;
+    const lines = (params.get("line") ?? "").split(",").filter(Boolean);
+    const files = (EVIDENCE_FILES[key] ?? []).filter(
+      (f) => lines.length === 0 || lines.includes((f as { line_key: string }).line_key),
+    );
+    return json({ receipt_id: POSTED, verified: true, files });
+  }
   if (url.includes(`/api/operation/warehouse-receipts/${POSTED}`)) return json(DETAIL);
   if (url.includes(`/api/operation/warehouse-receipts/${SUBMITTED}`))
     return json({
@@ -431,7 +563,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.includes("/api/operation/warehouse-receipts") && url.includes("scope=grn")) {
     // The paged GRN Register — the SAME shared arithmetic the Worker runs.
     const params = new URLSearchParams(url.split("?")[1] ?? "");
-    const grn = [POSTED_ROW, VOIDED_ROW];
+    const grn = [CLEAN_ROW, POSTED_ROW, VOIDED_ROW];
     const view = buildGrnRegisterView(
       grn.map((r) => ({
         id: r.id,
@@ -439,7 +571,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         supplierName: r.supplier_name,
         siteName: r.actual_site_name ?? r.warehouse_name,
         supplierDeliveryDateIso: r.supplier_delivery_date,
-        searchText: [r.grn_no, r.po_id, r.do_number, r.supplier_name]
+        searchText: [
+          r.grn_no,
+          r.po_id,
+          r.do_number,
+          r.supplier_name,
+          ...Object.values(r.line_labels ?? {}).map((l) => (l as { name: string }).name),
+        ]
           .filter(Boolean)
           .join(" "),
       })),
@@ -456,7 +594,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const byId = new Map(grn.map((r) => [r.id, r]));
     return json({
       receipts: view.pageIds.map((id) => byId.get(id)),
-      page: { offset: Number(params.get("offset") ?? 0), limit: 50, total: view.total },
+      page: { offset: Number(params.get("offset") ?? 0), limit: 50, total: view.total, total_all: grn.length },
       facets: view.facets,
       counts: { waiting: 1 },
     });
@@ -468,7 +606,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     });
   if (url.includes("/receiving") && url.includes("/api/operation/pos/"))
     return json(PO_RECEIVING);
-  if (url.includes("/api/operation/pos")) return json({ pos: [PO_OPEN, PO_OPEN_2] });
+  if (url.includes("/api/operation/pos")) return json({ pos: [PO_OPEN, PO_OPEN_2, PO_LATE, PO_NEXT_MONTH] });
   if (url.includes("/api/operation/suppliers"))
     return json({
       suppliers: [
@@ -496,6 +634,11 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <BrowserRouter>
+        {/* The shell's own bounded frame: the portal main area is a fixed
+            viewport-height flex column, which is what lets the Register's
+            32px footer sit at the bottom of the frame instead of below the
+            fold. The preview reproduces that frame so geometry can be read. */}
+        <div className="flex h-screen min-h-0 flex-col">
         <Routes>
           <Route
             path="*"
@@ -512,6 +655,7 @@ createRoot(document.getElementById("root")!).render(
             }
           />
         </Routes>
+        </div>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

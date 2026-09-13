@@ -2025,7 +2025,15 @@ History, Order Route.
 overdelivery, price change, cancellation and post-send destination change.
 **Connections:** demand, supplier, GRN, Stock, claims, Finance read-only.
 
-### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner correction 2026-09-06, PRODUCTION-VERIFIED
+### 9.4 Receiving / GRN — owner instruction 2026-09-04 + owner corrections 2026-09-06 + owner instruction 2026-09-13 (GRN Register redesign, BUILD / owner review)
+
+**State 2026-09-13 — BUILD, LOCAL, NOT MERGED, NOT DEPLOYED, migration 0493 NOT APPLIED.** The
+2026-09-13 owner instruction (GRN Register redesign · exception evidence · GRN detail) is
+implemented on branch `build/receiving-grn-redesign` and prepared for owner review
+(`docs/cards/CARD-2026-09-13-receiving-02-grn-register-redesign.md` carries the delivery matrix,
+the screenshots and every `NOT VERIFIED` row). Where the paragraphs below name the 2026-09-13
+law, the earlier 2026-09-06 wording they replace is DELETED here (Constitution Law 3); the
+production page still shows the 2026-09-06 build until the branch is merged and deployed.
 
 The 2026-08-29 seam record is superseded by the approved Receiving & GRN build
 (CARD-2026-09-04-receiving-01, continued by the 2026-09-06 owner production-UI correction).
@@ -2053,54 +2061,95 @@ Warehouse submits count                (or Operation enters goods directly)
 → Inventory updated automatically at Goods arrived at
 ```
 
-- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling).** `Purchasing →
-  Receiving` is the only Receiving page. No Receiving Monitor, no `Calendar View / GRN Register
-  View` switch, no permanent tabs, no second Receiving destination — the earlier two-view
-  proposal is superseded. The page is: left, the 240px rail with the full month Calendar FIXED
-  on top and the business filters scrolling independently beneath it; right, always the complete
-  GRN Register. The right side never becomes a weekly calendar and never shows work cards —
-  daily Receiving actions stay in My Work / Team Work.
+- **ONE RECEIVING DESTINATION (owner correction 2026-09-06, second ruling; geometry per owner
+  instruction 2026-09-13).** `Purchasing → Receiving` is the only Receiving page. No Receiving
+  Monitor, no view switch, no permanent tabs, no KPI cards, no duplicate headings, no second
+  Receiving destination. The page is: the 50px destination header · one 45px work toolbar · the
+  240px filter rail (left) beside the complete GRN Register (right) with its 36px header, 38px
+  single-line parent rows and 32px information-only footer; expanded content grows naturally.
+  The rail holds the two-month EXPECTED ARRIVALS display on top and, beneath it, only the facet
+  groups that can still narrow the result; the whole rail scrolls as one column so two complete
+  months never push the filters out of reach. The right side never becomes a calendar and never
+  shows work cards — daily Receiving actions stay in My Work / Team Work.
 - **THE REGISTER BOUNDARY (owner correction 2026-09-06 §1).** `Receiving` is the formal GRN
   Register, not the daily work queue: `My Work` / `Team Work` hold what staff must receive or
   review; the Register holds formal GRN records. A Warehouse count awaiting Carres action appears
   in Work and deep-links to its Receiving review; it becomes a Register row only when
   `Save Receiving` creates the GRN. The old permanent state rows (`All receiving` · `Count
   waiting for check` · `Sent back to recount` · `Posted` · `Voided`) are retired.
-- **Document status words are `Valid` / `Cancelled`.** `Posted`/`Voided` remain internal
-  database statuses and never reach a normal user's screen; `Void Receiving` stays the act's
-  name.
-- **THE RAIL MONTH CALENDAR (owner correction 2026-09-06, second ruling).** The full month
-  Calendar stays fixed at the top of the rail; the ‹ › arrows move exactly one month. Sunday
-  stays visible for understanding the month and wears the muted non-working state — Receiving
-  follows the Warehouse working calendar, Monday–Saturday. A date with expected supplier
-  arrivals prints a visible COUNT (colour is never the only signal, and the day's aria sentence
-  says it in words); expected dates come from the linked POs' governed `Supplier Delivery Date`
-  (`poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
-  marks a day, and a fully received or closed PO stops being expected). Selecting a date filters
-  the SAME right-hand GRN Register by that Supplier Delivery Date; selecting it again, or
-  `Clear filters`, restores the complete listing. The Calendar shows no work cards.
-- **The Filter Rail (owner correction §2)** holds, beneath the Calendar: `CATEGORY` ·
-  `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED AT` (the receiving
-  locations present in the records) · `Clear filters`. CATEGORY shows ONLY the governed rows
-  actually present in the Receiving result set, in the shared display order (`Mattress` ·
-  `Bedframe` · `Sofa` · `Pillow` · `Mattress protector`; `MP` always prints as `Mattress
-  protector`). No `Any`, no `All …`, no invented category, no second received-date filter — the
-  table's `Goods received on` column owns detailed date filtering. Re-clicking the active row
-  clears its section. Category comes from the governed catalog truth through the ONE shared
-  ladder (`goodsCategoryWordOf`, the same rule the Sales Orders register speaks); Receiving
-  never derives its own category from SKU text.
-- **SERVER-SIDE PAGINATION (owner correction 2026-09-06, second ruling).** The Register never
-  renders the whole GRN history: the server pages it (default `Showing 1–50 of {total}`,
-  Previous/Next), and the footer total plus every rail count speak for the COMPLETE filtered
-  result set — computed by the ONE shared arithmetic (`buildGrnRegisterView`, behind
-  `GET /api/operation/warehouse-receipts?scope=grn`), never by the loaded page. Search, column
-  filters, Columns and Export stay; a changed filter or search term returns to page 1.
-- **Register columns** lead with identity and the arrival story: `GRN No` · `Supplier Delivery
-  Date` (the linked PO's governed supplier answer — the same date the Calendar filters by;
-  `Not confirmed` while no evidenced reply exists) · `Goods received on` · `PO/CO No` ·
-  `Supplier` · `Product` (the GRN paper's own line words — `product_skus.variant`, else the
-  SKU) · `Deliver To` · `Goods arrived at` · `Received Qty` · `Status`, with `Supplier DO No.`
-  and the damaged/wrong/extra quantity facts behind them.
+- **GRN Status words are `Confirmed` / `Cancelled` (owner instruction 2026-09-13, replacing
+  the 2026-09-06 `Valid`).** They are DOCUMENT labels mapped onto the EXISTING internal states
+  `posted` / `voided` — no new workflow state exists, `Posted`/`Voided` never reach a normal
+  user's screen, and `Void Receiving` stays the act's name.
+- **THE EXPECTED-ARRIVAL DISPLAY (owner instruction 2026-09-13, replacing the 2026-09-06
+  single-month filter calendar).** The rail's `EXPECTED ARRIVALS` block shows the CURRENT month
+  and the NEXT month, built from the kit `MonthCalendar` (`months={2}`, `selectable={false}`).
+  It is DISPLAY-ONLY: a day filters nothing, hides no historical GRN and carries no work cards —
+  operational follow-up stays in My Work / Team Work. The ‹ › arrows move exactly one month
+  while two complete months stay on screen. A date with supplier-CONFIRMED arrivals on open
+  orders still owing goods prints a visible COUNT (`expectedArrivalCounts` over
+  `poSupplierDeliveryDateOf` — the evidenced supplier reply; a date only Carres computed never
+  marks a day; a fully received or closed PO stops being expected); the day's aria sentence
+  says it in words. Today wears a THIN OUTLINE, never a fill. Sunday stays visible and muted
+  (Warehouse working calendar Monday–Saturday). Nothing here invents a date, an arrival or a
+  count. Two months is Carres' own choice for its supplier lead times; it is not claimed as an
+  international standard. **PENDING OWNER ACCEPTANCE (13 Sep review refinements, shown in the
+  build):** a confirmed date already behind today is marked `overdue` in words and red ink; a
+  month expecting nothing prints `No supplier arrivals expected in {Month YYYY}` under its
+  grid; the count unit reads `expected supplier arrival(s)`; the calendar scrolls with the
+  filters rather than sitting fixed.
+- **The Filter Rail (owner correction §2 · owner instruction 2026-09-13 §4)** holds, beneath
+  the display: `CATEGORY` · `SUPPLIER` (the suppliers present in the records) · `GOODS ARRIVED
+  AT` (the receiving locations present in the records). **There is NO `Clear filters` anywhere
+  — rail, toolbar, footer or empty state:** re-clicking the selected rail row clears that
+  section; Search clears within Search; a column condition clears in its own menu or on its own
+  chip (the engine's `hideClearFilters` power). A facet group that cannot narrow the current
+  result (every row shares its one value) is not drawn. CATEGORY shows ONLY the governed rows
+  actually present, in the shared display order (`Mattress` · `Bedframe` · `Sofa` · `Pillow` ·
+  `Mattress protector`; `MP` always prints as `Mattress protector`). No `Any`, no `All …`, no
+  invented category, no rail date filter — the table's optional `Goods received on` column owns
+  detailed date filtering. Category comes from the governed catalog truth through the ONE shared
+  ladder (`goodsCategoryWordOf`). The rail carries the standard `Hide filters` control and the
+  toolbar `Show filters`; the browser remembers the choice; **at 768–1129px the rail opens
+  CLOSED unless remembered otherwise, and keeps its full 240px when opened.**
+- **SERVER-SIDE PAGINATION (owner correction 2026-09-06; placement per owner instruction
+  2026-09-13 §4).** The Register never renders the whole GRN history: the server pages it
+  (default 50), and every count — the footer total, the rail counts, the narrowed-versus-total
+  sentence — speaks for the COMPLETE filtered result set through the ONE shared arithmetic
+  (`buildGrnRegisterView`, behind `GET /api/operation/warehouse-receipts?scope=grn`, which also
+  answers `total_all`). The pager (`{from}–{to} of {total}` · Previous · Next) lives in the TOP
+  control area and only when more than one page exists; the 32px footer is information only
+  (`{n} GRNs` · `showing {from}–{to}` · `{n} of {all} match the filters`) and never holds a
+  control. Search, column conditions, sorting, page and scroll are preserved when the operator
+  returns from a GRN (the Register stays mounted). Search runs server-side over GRN No, PO/CO
+  No, Supplier DO No, supplier and the goods' full names (snapshot and current catalog alike).
+- **Register columns (owner instruction 2026-09-13 §3) — the DEFAULT, exactly and in this
+  order:** `▸` (expand) · `GRN No` · `GRN Date` · `Supplier DO No` · `Supplier` · `PO No` ·
+  `Items` · `Received Qty` · `Exceptions` · `GRN Status`. Every other fact is a governed
+  OPTIONAL column behind Columns (`Goods received on` · `Supplier Delivery Date` · `Deliver To`
+  · `Goods arrived at` · `Damaged Qty` · `Wrong Item Qty` · `Extra Qty` · `Category`) or lives in
+  the expansion and the GRN object; the former 14-column default is retired.
+  · `GRN Date` is the date the GRN DOCUMENT came into being — the posting's stamp read in MYT
+    (`grnDateOf(posted_at)`; the formal number exists FROM the posted session, §7.3). It is
+    never parsed from the number and never substitutes `Goods received on`, which stays the
+    physical-arrival fact in its own optional column.
+  · `PO No` prints the source number; a consignment source is IDENTIFIED with a `CO` marker on
+    its row and in export (`source_kind`) — never silently relabelled a PO.
+  · `Items` counts the lines THIS GRN counted. `Received Qty` is the good count only — damaged,
+    wrong and extra never sit inside it.
+  · `Exceptions` prints `{n} damaged · {n} wrong item · {n} extra` (`grnExceptionSummary`) with
+    the evidence doors beside it, or the governed absence `No exceptions` — never a `0`.
+  · **`▸` expands to THIS GRN's own counted lines — never the whole PO — in the shared child
+    table's receiving layout: `Item · Received · Damaged · Wrong Item · Extra`.** `Item` is the
+    goods' FULL name with its configuration facts; there is no separate SKU column and no SKU
+    repeated under a resolved name; no `Receiving Result` heading; never the variant alone
+    (`Super Single` names a size, not goods). An extra line is its own row with `Received`
+    printed as an absence.
+  · **THE GOODS' NAME — ONE LADDER (`grnLineName`):** the `item_label` SNAPSHOTTED with the
+    receipt at posting (`Model · Variant` from the catalog that day, 0493) → the CURRENT
+    catalog's full name (`resolveGoodsFullNames`, which requires a model; labelled `name from
+    the current catalog`) → the SKU (labelled `no catalog name`). Internal SKU, line and Unit
+    identities are preserved throughout; a name is never fabricated.
 - **The corrected location/date words (owner correction §3):** `Deliver To` = where the PO
   instructed the supplier to deliver · `Goods arrived at` = where the goods physically arrived ·
   `Goods received on` = the physical arrival date and time. `Actual Site`, `Delivery Location`
@@ -2113,12 +2162,22 @@ Warehouse submits count                (or Operation enters goods directly)
   quantity words, exact-Unit outcomes, extra goods, evidence references, the duty-evidence trio
   with dated cover and actual actor, and amendment/cancellation marking printed ON the paper. A
   GRN number without this document is not sufficient.
-- **The GRN object is 50/50 (owner correction §5)** — the shared Sales Order formal-object
-  grammar adapted for GRN facts: left = Receiving Record (facts · Unit results · Receiving
-  Summary · Evidence · History · `[Amend Receiving]` `[More ▾]`); right = the OFFICIAL GRN
-  PREVIEW through the real renderer, with `[Print]` `[Download PDF]`. One Object Header (GRN
-  number · supplier/source · status), no duplicated title. Mobile stacks Record above Preview.
-  `Void Receiving` lives in `More ▾` — not a normal primary action.
+- **The GRN object is 50/50 (owner correction §5 · sections per owner instruction 2026-09-13
+  §7)** — the shared record/document workspace: left = the Receiving Record in SIX separated
+  sections, right = the OFFICIAL GRN PREVIEW through the real renderer with `[Print]`
+  `[Download PDF]`; narrower widths stack Record above Preview. One Object Header (GRN number ·
+  supplier/source · `Confirmed`/`Cancelled`), no duplicated title. The sections, in order:
+  `This receipt` (its own facts, its own lines in the receiving layout with the evidence doors,
+  its own totals) · `Current PO balance` (`Ordered` · `Received (all receipts)` · `Outstanding`,
+  labelled AS OF NOW across every receipt — never presented as the balance at the time of this
+  receipt) · `Related receipts` (the other GRNs on the same source, each a door) · `Exception
+  follow-up` (the EXACT Claim(s) this receipt opened, by number and the Claim's own state, each a
+  link to that Claim — `No Claim is linked to this receiving.` when none; a closed source balance
+  never closes a Claim) · `Inventory Result` (the named Units' CURRENT register state read from
+  the register; a quantity line's counted posting; `Unit outcomes were not recorded` for a
+  pre-Unit-tracking receipt; a cancelled GRN's reversal — never inferred availability) ·
+  `Evidence and audit history` (the papers, the exception-evidence doors, the append-only events).
+  The former `What this saving did` prose is retired. `Void Receiving` lives in `More ▾`.
 - **Amend Receiving is 50/50 with a LIVE preview (owner correction §6).** The left half becomes
   the governed correction form (`Original → Corrected` · reason · evidence) while the right half
   previews the proposed document — same GRN number, amendment clearly marked, `UNSAVED`
@@ -2175,6 +2234,24 @@ Warehouse submits count                (or Operation enters goods directly)
   marks the source; received Units enter Inventory as `supplier_consignment` with the supplier
   named, and the posting creates no AP consequence — supplier ownership is preserved, never
   silently converted to Carres-owned.
+- **EXCEPTION EVIDENCE — SIX DOORS, ONE RECORD (owner instruction 2026-09-13 §6, migration
+  0493).** `Damaged` · `Wrong Item` · `Extra`, each with `Photos` and `Videos`, on every
+  positive exception — in the expanded cell and beside the main-row summary. Evidence is a
+  RECORD with its line: `receiving_line_evidence` holds one row per file (receipt · exception
+  type · stable line key — the PO line id, or the extra line's own uuid that 0493 mints at
+  validation · media kind · storage path), written only by the receiving doors, appended as
+  INSERTs (never a rebuilt JSON array), read under RLS by Operation. The line validator accepts
+  `damaged_videos` / `wrong_item_videos` beside the still-required photos, validates every path
+  (object-key shape · kind by extension · exists in `delivery-orders` · under the PO's own
+  prefix), and a zero exception carries no evidence and earns no door. A posted GRN takes more
+  evidence only through `receiving_line_evidence_add` (GRN Duty / cover / superuser; the line
+  must be on THIS receipt with a positive quantity of THAT exception; one append-only `amended`
+  event). Each viewer is scoped by GRN + line key(s) + exception + kind and names the lines it
+  covers; it distinguishes loading · verified no files · records not verified (the store did not
+  answer) · permission denied · load failure with `Try again`; a recorded path the bucket lacks
+  is named `Recorded file is not in storage`, never hidden; a count is the server's verified
+  number or `Not verified` — never a reassuring `0`. Photos enlarge with ‹ › and the arrow
+  keys; videos play in a real player.
 - **`Goods arrived at` never overwrites `Deliver To`.** Both facts are stored and displayed;
   valid received Units enter Inventory at Goods arrived at. `Arrival evidence` supports photo
   AND video beside the `Signed DO photo`. `Extra Qty` is recorded separately and never enters
