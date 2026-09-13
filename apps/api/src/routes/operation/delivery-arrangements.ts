@@ -103,13 +103,23 @@ const shape = (r: ArrangementRecord) => ({
 });
 
 const CONTACT_SELECT =
-  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, contacted_at, " +
+  "id, order_id, leg, purpose_key, channel, contacted_person, contact_owner_user_id, acting_user_id, contacted_at, " +
   "result_key, reply_evidence_path, next_action, note, on_behalf_of_partner_id, recorded_by, recorded_at";
 
 /**
  * THE ONE CONTACT WRITER (0487, Delivery MASTER §5.1). Both the standalone
  * contact door and the arrangement save that carries a contact land here, so
  * a record can never be written two ways.
+ *
+ * FOUR IDENTITIES, SEPARATELY (0499, owner ruling 2026-09-13): the NORMAL
+ * responsible Operation person for this order and today's ACTING person
+ * (buddy cover) come from the one responsibility read
+ * (`delivery_responsible_operation` — the order's collection-owner ledger,
+ * else the individual on its earliest contact, else the configured normal
+ * Delivery Duty holder); the actual RECORDER is the signed-in account, which
+ * may be a shared login or a cover and is evidence, never responsibility;
+ * PARTNER provenance is the caller's `onBehalfOfPartnerId`. A recorder is
+ * never written as the responsible person merely because they recorded.
  */
 async function recordContact(
   sb: ReturnType<typeof adminClient>,
@@ -117,6 +127,11 @@ async function recordContact(
   input: DeliveryContactInput,
   userId: string | null,
 ) {
+  const responsibility = await sb.rpc("delivery_responsible_operation", {
+    p_order_id: scope.orderId, p_on: null,
+  });
+  if (responsibility.error) return { data: null, error: responsibility.error };
+  const who = (responsibility.data ?? {}) as { normal_user_id?: string | null; acting_user_id?: string | null };
   return sb
     .from("ops_delivery_contacts")
     .insert({
@@ -125,7 +140,8 @@ async function recordContact(
       purpose_key: input.purpose,
       channel: input.channel,
       contacted_person: input.contactedPerson,
-      contact_owner_user_id: userId,
+      contact_owner_user_id: who.normal_user_id ?? null,
+      acting_user_id: who.acting_user_id ?? null,
       contacted_at: new Date().toISOString(),
       result_key: input.result,
       reply_evidence_path: input.replyEvidencePath ?? null,
