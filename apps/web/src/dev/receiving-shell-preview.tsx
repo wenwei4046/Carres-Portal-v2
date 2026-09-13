@@ -30,6 +30,14 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/operation/*" element={<OperationApp />} />
         </Routes>
+        {/* The label the reviewer sees: this is the card FIXTURE, not a record.
+            Fixed at the foot so it shifts no measured geometry. */}
+        <div
+          data-testid="fixture-label"
+          className="pointer-events-none fixed bottom-2 right-2 z-50 rounded-card border border-kit-amber-11 bg-kit-amber-3 px-2 py-1 text-label text-kit-amber-11"
+        >
+          FIXTURE DATA · dev preview · no production record is read or written
+        </div>
       </MemoryRouter>
     </QueryClientProvider>
   </StrictMode>,

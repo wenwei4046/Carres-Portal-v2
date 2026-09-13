@@ -110,7 +110,9 @@ real-record evidence for the Storage round-trips does not exist yet (R12).
 
 ## Second pass — 2026-09-13, after the first draft PR (#1274)
 
-**Blueprint comparison (step 1): STILL BLOCKED — the files have not reached this machine.** The
+**Historical prototype comparison not performed** (owner ruling 2026-09-13, fourth pass: the unavailable `receiving-proposal.html` / handoff comparison is WAIVED as a prerequisite; the complete written requirements in the instruction are the acceptance baseline; no visual equivalence to the unseen file is claimed). The paragraph below records why the files were never compared.
+
+**Blueprint comparison (step 1): the files never reached this machine.** The
 first follow-up said `receiving-proposal.html` and `CLAUDE-HANDOFF.md` were attached; the second
 said a ZIP containing them was attached. Neither message carried attachment content into the
 session, and no such file exists on disk (session scratchpad, the desktop app's data folder,
@@ -141,7 +143,7 @@ marked NOT RECEIVED.
 | §7 GRN detail 50/50 with the six named sections; PO-2054 facts; exact Claim link; `What this saving did` replaced | As specified; the phrase is absent from the surfaces | none | — | page tests `the PO-2054 example…`, `a Valid GRN is 50/50…`; grep of the surfaces |
 | §8 Reviewed DB defects closed and proven | Designed out of 0493; PGlite 15 cases; full-chain replay; real multi-connection PostgreSQL 7 cases | none | — | see the corrected migration report below |
 | §9 Whole workflow; SMOKE rows investigated, never deleted | Suites + shell walk + real-Postgres doors; four `PO-SMOKE-*` GRNs counted, none touched | none | — | card R15 |
-| Prototype `receiving-proposal.html` / handoff precedence rules | — | **NOT RECEIVED** | — | owed on receipt |
+| Prototype `receiving-proposal.html` / handoff precedence rules | — | **historical prototype comparison not performed** (waived by the owner as a prerequisite) | — | — |
 
 **Agreed design discrepancies still requiring fixes: none found against the written requirements.**
 The one defect the second pass found (the shell frame) is fixed at the head of this PR.

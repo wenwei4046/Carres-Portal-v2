@@ -26,3 +26,11 @@ Storage round-trips does not exist yet — see the card's verification matrix.
 Measured on the shell entry (both widths): module header 50 · toolbar 45 · table header 36 · body
 row 38 · footer 32 · rail 240 when open · no `Clear filters` text anywhere · `bodyScrollX: false`.
 The numbers are in the card, `docs/cards/CARD-2026-09-13-receiving-02-grn-register-redesign.md`.
+
+## Review captures (fourth pass, head of PR #1274)
+`review-01…08.png` — the same shell entry with a visible `FIXTURE DATA` label at the foot of the
+page: Register with the two-month calendar (1440) · the expanded exceptions GRN with its per-line
+quantities and separate Photos / Videos doors · the Damaged Photos viewer · the Damaged Videos
+viewer (an unsigned record, named as not verified) · GRN detail and its lower sections · 831 with
+the rail closed · 831 with the rail open and the row expanded. Fixture data throughout.
+
