@@ -656,6 +656,14 @@ applied — the instruction authorised implementation and non-production verific
 `docs/cards/CARD-2026-09-13-receiving-02-grn-register-redesign.md` carries the delivery matrix,
 the screenshots and every `NOT VERIFIED` row. What the owner is asked to rule on:
 
+0. **Second pass (same day):** draft PR #1274 is open. The instruction's attachments
+   (`receiving-proposal.html`, `CLAUDE-HANDOFF.md`) did NOT reach the build machine, so the
+   blueprint difference table is still owed. The page was walked INSIDE the real Portal shell (a
+   frame defect found and fixed), `0493` replayed on the full chain, and the duplicate-Unit,
+   void-blocker, duty-gate and concurrency paths were proven on a real multi-connection PostgreSQL
+   (`apps/api/src/test/receiving-postgres.integration.test.ts`). The Storage round-trips remain NOT
+   VERIFIED for want of a non-production Supabase project; the runnable test names its
+   prerequisites (`receiving-evidence-storage.integration.test.ts`).
 1. **Design refinements shown in the build, PENDING ACCEPTANCE (13 September review, not owner
    decisions):** the overdue word and red count on a confirmed date already behind today · the
    per-month sentence `No supplier arrivals expected in {Month YYYY}` · the count unit `expected

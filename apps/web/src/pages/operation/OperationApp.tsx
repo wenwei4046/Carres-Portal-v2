@@ -388,7 +388,15 @@ export default function OperationApp() {
           className={`flex-1 min-h-0 ${
             isSalesOrdersRegisterUrl || isDeliveryOrdersRegisterUrl
               ? "overflow-hidden"
-              : "overflow-auto"
+              : /* 【RECEIVING】 CARD 02 — the GRN Register owns a bounded
+                   frame (toolbar · sheet · 32px footer at the foot). Measured
+                   inside this shell on the card's walk: as a block child the
+                   page ran 50px past the frame and the footer sat below the
+                   fold. The frame is flex so the page's `flex-1 min-h-0`
+                   bounds it, exactly as the standalone preview does. */
+                tab === "receiving"
+                ? "flex flex-col overflow-hidden"
+                : "overflow-auto"
           }`}
           data-testid={isSalesOrdersRegisterUrl ? "sales-orders-work-surface" : undefined}
         >
