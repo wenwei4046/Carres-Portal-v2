@@ -203,32 +203,50 @@ describe("a module is an expandable PARENT ROW, never a heading", () => {
     }
   });
 
-  it("Payments keeps its own plain row — one page may not hide behind a chevron", () => {
-    renderAt("/operation");
-    const row = child("payments");
-    expect(row.tagName).toBe("A");
+  /* ⭐ PAYMENTS → Monitor · Payment Records (owner ruling 2026-09-12). A
+     module of two destinations, no `Payments · Invoices` tabs, no standalone
+     Invoices or Receipts row, no clickable parent — and the rail is tested for
+     its DESTINATIONS, not only its shape (the 2026-09-09 lesson). */
+  it("Payments is a module with exactly Monitor and Payment Records beneath it", () => {
+    renderAt("/finance/monitor");
+    const parent = module_("payments");
+    expect(parent.tagName).toBe("BUTTON");
+    expect(parent).toHaveAttribute("aria-expanded", "true");
+    const children = screen.getByTestId("nav-children-payments");
+    const rows = within(children).getAllByRole("link");
+    expect(rows.map((r) => r.textContent?.trim())).toEqual(["Monitor", "Payment Records"]);
+    expect(child("payments")).toHaveAttribute("href", "/finance/monitor");
+    expect(child("payment-records")).toHaveAttribute("href", "/finance/payments");
+    expect(screen.queryByText("Invoices")).not.toBeInTheDocument();
+    expect(screen.queryByText("Receipts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Order Payments")).not.toBeInTheDocument();
     expect(screen.queryByTestId("nav-module-finance")).not.toBeInTheDocument();
   });
 
-  /* ⭐ THE EVERYDAY PAYMENTS ROW OPENS THE CANONICAL REGISTER (2026-09-09).
-     The row pointed at `/operation?tab=payments` — the Master-Sheet Balance
-     desk with its own Summary, queues and editable balance/storage fields —
-     for the whole time the approved Register lived at `/finance/payments`.
-     This is the assertion that failed to exist: the rail was tested for its
-     SHAPE and never for its DESTINATION. */
-  it("Payments opens the collection listing first, never the retired desk", () => {
+  it("the parent row is not a page of its own — it opens the named landing, Monitor", () => {
     renderAt("/operation");
-    const row = child("payments");
-    expect(row).toHaveAttribute("href", "/finance/invoices");
-    expect(row.getAttribute("href")).not.toContain("tab=payments");
+    fireEvent.click(module_("payments"));
+    // The shipped shell rule: expanding a module opens its landing page.
+    // Payments names it (Monitor); there is no parent page to land on.
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/finance/monitor");
+    expect(screen.getByTestId("nav-children-payments")).toBeInTheDocument();
   });
 
-  it("the Payments row stays lit on both Register listings", () => {
-    for (const path of ["/finance/payments", "/finance/invoices"]) {
-      const { unmount } = renderAt(path);
-      expect(child("payments").className).toContain("bg-kit-blue-3");
-      unmount();
-    }
+  it("the Monitor row stays lit on the retired Invoices address while it forwards", () => {
+    renderAt("/finance/invoices?invoice=abc");
+    expect(child("payments").className).toContain("bg-kit-blue-3");
+  });
+
+  it("finance sees the same two Payments destinations — never a second Payment IA", () => {
+    mockRole = "finance";
+    renderAt("/finance/payments");
+    expect(child("payments")).toHaveAttribute("href", "/finance/monitor");
+    expect(child("payment-records")).toHaveAttribute("href", "/finance/payments");
+    expect(child("payment-records").className).toContain("bg-kit-blue-3");
+    expect(screen.queryByText("Refunds & Credits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Invoices")).not.toBeInTheDocument();
+    // Genuine finance-only capability keeps its own rows.
+    expect(screen.getByText("AR · Receivables")).toBeInTheDocument();
   });
 });
 

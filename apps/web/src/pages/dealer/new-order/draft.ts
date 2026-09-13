@@ -340,6 +340,9 @@ export function loadDraft(storageKey: string = DRAFT_STORAGE_KEY): WizardDraft |
       addressState: parsed.customer.addressState ?? empty.customer.addressState,
       addressCity: parsed.customer.addressCity ?? empty.customer.addressCity,
       addressPostcode: parsed.customer.addressPostcode ?? empty.customer.addressPostcode,
+      /* The "Fill in address later" tick is retired (2026-09-13): a saved
+         draft that carried it comes back asking for the address. */
+      addressUnknown: false,
     };
     // Only backfill the new stairItems field for old drafts; don't merge in
     // empty.delivery (that would inject defaults like asap=false the original
@@ -415,7 +418,8 @@ export function clearDraft(storageKey: string = DRAFT_STORAGE_KEY): void {
  *   - Phone matches /^[0-9-+\s]{8,}/  (8+ chars, only digits/dash/plus/space)
  *   - Emergency name ≥ 2 chars + phone matches same
  *   - Emergency relationship picked AND ("Others" only valid with relOther ≥ 2)
- *   - Either addressUnknown OR address ≥ 5 chars
+ *   - The delivery address, state, city, postcode and building type (the
+ *     `addressUnknown` escape is retired — owner ruling 2026-09-13)
  *   - Either billingSame OR the billing MY cascade complete (Line 1 ≥ 5 chars
  *     + state + city + postcode — same rule as delivery)
  *   - Either delivery.dateTbd OR delivery.date is set
@@ -471,19 +475,20 @@ export function step1FirstIssue(
       return "Emergency Contact — describe the 'Other' relationship";
     }
   }
-  if (!c.addressUnknown) {
-    if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars), or tick 'Unknown'";
-    if (!c.addressState)                    return "Address — State, or tick 'Unknown'";
-    if (!c.addressCity)                     return "Address — City, or tick 'Unknown'";
-    if (!c.addressPostcode)                 return "Address — Postcode, or tick 'Unknown'";
-    /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
-     * access and van parking all hang off it, and Operations was chasing the
-     * shop for it after the sale. The office door began refusing a create
-     * without it the same day; this is the POS half, and it sits INSIDE the
-     * address branch for the same reason the office one does — an address
-     * nobody has yet cannot be asked what kind of building it is. */
-    if (!c.buildingType)                    return "Address — Building type, or tick 'Unknown'";
-  }
+  /* ⛔ THE REQUIRED SALES FACTS FOR A DELIVERY (owner ruling 2026-09-13,
+   * Delivery Card 18): the "Fill in address later" escape is RETIRED. A valid
+   * new order carries its delivery address, state, building type, floor,
+   * lift and requested date — an address nobody has yet is a Sales conversation
+   * still open, not an order Operation can plan. `createOrderInputSchema`
+   * refuses the same facts at the door with the governed words. */
+  if (c.addressLine1.trim().length < 5)   return "Address — Line 1 (≥5 chars)";
+  if (!c.addressState)                    return "Address — State";
+  if (!c.addressCity)                     return "Address — City";
+  if (!c.addressPostcode)                 return "Address — Postcode";
+  /* 2026-08-21 (Jess) — building type is DELIVERY's fact: stairs, lift
+   * access and van parking all hang off it, and Operations was chasing the
+   * shop for it after the sale. */
+  if (!c.buildingType)                    return "Address — Building type";
   // 2026-07-19 (Loo) — billing keys in with the SAME MY cascade as delivery,
   // so the gate mirrors the delivery rules field-for-field.
   if (!c.billingSame) {

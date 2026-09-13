@@ -68,6 +68,7 @@ import {
   DELIVERY_RESULT_LABEL,
   DOR_COPY,
   DO_QUEUE_LABEL,
+  groupProofRecords,
   DO_STATUS_KEYS,
   DO_WORK_QUEUES,
   buildDoRegisterRails,
@@ -382,28 +383,31 @@ function DriverSubmissionCell({
  *   Upload delivery photo         `DeliveryProofUploadButton` - the same
  *                                 uploader the Sales Order drawer renders,
  *                                 stamped with THIS document's number
- *   Upload signed Delivery Order  a door to the Sales Order, which owns the
- *                                 order's documents. The one existing writer
- *                                 (`operation_attach_do_and_deliver`) also
- *                                 marks the whole order delivered, so it is
- *                                 NOT offered against a partial trip: a button
- *                                 that would record a falsehood is worse than
- *                                 a link. The gap is named in the MASTER.
+ *   Upload signed Delivery Order  a door to the DO object's Evidence section,
+ *                                 whose own attach door (Card 13, §6.1) files
+ *                                 the paper against the latest recorded
+ *                                 attempt without re-recording the delivery —
+ *                                 so a partial trip is served truthfully.
+ *   Check delivery proof          the same door: the three review acts live
+ *                                 on the Evidence section (§6.1).
  */
 function QueueAction({
   row,
   queue,
-  onOpenOrder,
+  onOpenDeliveryOrder,
 }: {
   row: DoRegisterRow;
   queue: DoWorkQueue;
-  onOpenOrder: (row: DoRegisterRow) => void;
+  onOpenDeliveryOrder: (row: DoRegisterRow) => void;
 }) {
   if (queue === "record_result") {
     return (
       <DeliveryResultAction
         order={{ id: row.orderId, so: row.so, do_number: row.doNumber }}
         lines={row.lines}
+        leg={row.leg}
+        lastLeg={row.lastLeg}
+        legDestination={row.legRoute?.split(" → ").at(-1) ?? null}
       />
     );
   }
@@ -419,15 +423,15 @@ function QueueAction({
   return (
     <button
       type="button"
-      data-testid="do-queue-open-order"
+      data-testid={queue === "check_proof" ? "do-queue-check-proof" : "do-queue-open-delivery-order"}
       className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control border border-kit-slate-6 bg-white px-2 text-label font-medium text-kit-slate-11 hover:bg-kit-slate-3 hover:text-kit-slate-12"
       onClick={(event) => {
         event.stopPropagation();
-        onOpenOrder(row);
+        onOpenDeliveryOrder(row);
       }}
     >
       <ExternalLink size={13} strokeWidth={1.75} aria-hidden />
-      <span className="truncate">Open SO-{row.so}</span>
+      <span className="truncate">{queue === "check_proof" ? DOR_COPY.checkProof : DOR_COPY.uploadSignedDo}</span>
     </button>
   );
 }
@@ -520,8 +524,10 @@ export default function DeliveryOrdersRegister() {
       list.push(e.kind);
       handoverByDoId.set(e.delivery_order_id, list);
     }
+    // §6.1 (0489) — the review and evidence records, grouped once.
+    const proofRecords = groupProofRecords(data?.proofReviews, data?.attemptEvidence);
     return (data?.deliveryOrders ?? []).map((r) =>
-      buildDoRegisterRow(r, attemptsByDo, handoverByDoId),
+      buildDoRegisterRow(r, attemptsByDo, handoverByDoId, proofRecords),
     );
   }, [data]);
 
@@ -881,7 +887,7 @@ export default function DeliveryOrdersRegister() {
                 <QueueAction
                   row={r}
                   queue={filters.queue as DoWorkQueue}
-                  onOpenOrder={openSalesOrder}
+                  onOpenDeliveryOrder={openDeliveryOrder}
                 />
               ),
               /* A door is not a fact: it never joins the search, the export or

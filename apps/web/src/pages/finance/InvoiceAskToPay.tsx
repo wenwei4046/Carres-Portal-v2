@@ -22,7 +22,7 @@ import {
 import { waLink } from "@/lib/wa-link";
 import { toast } from "sonner";
 
-/** Ask the customer to pay — the §16 message composition on the Invoice.
+/** Ask customer to pay — the §16 message composition on the Invoice.
  *
  *  50/50: editable ordinary wording first, the real message the customer
  *  receives beside it (stacked action-first at narrow widths). The sending
@@ -158,7 +158,7 @@ export default function InvoiceAskToPay({ invoice, rows, tone, onClose }: {
   return <div className="flex-1 overflow-auto p-4" data-testid="invoice-ask-to-pay">
     <div className="grid gap-4 md:grid-cols-2">
       <SectionCard><div className="p-4">
-        <h2 className="text-strong mb-2">Ask the customer to pay</h2>
+        <h2 className="text-strong mb-2">Ask customer to pay</h2>
         <div className="space-y-2 text-body">
           {activeHeads.length > 0 && <label className="block">
             <span className="text-label">Template</span>

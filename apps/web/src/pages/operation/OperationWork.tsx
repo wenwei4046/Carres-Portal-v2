@@ -22,9 +22,9 @@
  * There is no Done button anywhere, structurally.
  */
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
-import { groupWorkItemsByDay } from "@carres/shared";
+import { groupWorkItemsByDay, orderActionLines, workspaceDutyLabelOf } from "@carres/shared";
 import { cjkClassName } from "@/lib/cjk";
 import { fmtDate } from "@/lib/fmt-date";
 import { avatarColor, personInitials, personLabel } from "@/lib/staff-avatar";
@@ -50,6 +50,21 @@ function supportingLine(i: WorkRow): string {
   return i.dueIso ? `due ${fmtDate(i.dueIso)}` : "No date";
 }
 
+/**
+ * ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+ * 2026-09-13, Delivery MASTER §10): the act with its recipient, then the
+ * required result — never joined with `—`. `Deliver on {weekday, date}` is
+ * spelled here through the one date home, because the engine spells no dates.
+ */
+function deliveryLines(item: WorkRow): { act: string; result: string | null } | null {
+  if (item.module !== "delivery") return null;
+  const act =
+    item.ruleKey === "deliver_today" && item.dueIso
+      ? orderActionLines("deliver_today", { deliveryDate: fmtDate(item.dueIso) }).act
+      : item.action;
+  return { act, result: item.requiredResult || null };
+}
+
 function WorkRowButton({
   item,
   onOpen,
@@ -57,6 +72,7 @@ function WorkRowButton({
   item: WorkRow;
   onOpen: (i: WorkRow) => void;
 }) {
+  const delivery = deliveryLines(item);
   return (
     <button
       type="button"
@@ -79,8 +95,16 @@ function WorkRowButton({
           {item.locked && (
             <Lock size={11} strokeWidth={2.5} className="inline mr-1 -mt-0.5" aria-label="Held by Finance" />
           )}
-          {item.action}
+          {delivery?.act ?? item.action}
         </span>
+        {delivery?.result ? (
+          <span
+            className="block truncate text-body text-base-700"
+            data-testid="work-row-result"
+          >
+            {delivery.result}
+          </span>
+        ) : null}
         <span
           className={`block truncate text-label font-normal ${
             item.workingDaysLate > 0 ? "text-danger" : "text-base-600"
@@ -168,11 +192,18 @@ export default function OperationWork() {
         : key.startsWith("person:")
           ? key.slice(7)
           : (items[0]?.ownerName ?? null);
-      const dutyWord = key.startsWith("duty:") ? key.slice(5) : null;
+      // A duty group carries the duty KEY from the feed; the governed word
+      // comes from the shared catalogue (`PO Duty` · `Delivery Duty`), and a
+      // keyed duty with no holder prints the Staff & Duties door below.
+      const dutyKey = key.startsWith("duty:") && items[0]?.ownerDutyKey ? items[0].ownerDutyKey : null;
+      const dutyWord = key.startsWith("duty:")
+        ? dutyKey ? workspaceDutyLabelOf(dutyKey) : key.slice(5)
+        : null;
       return {
         key,
         person: personName !== null,
         userId: staffMember ? key : null,
+        dutyKey,
         name: personName ?? dutyWord ?? "No owner yet",
         items: [...items].sort((a, b) =>
           (a.dueIso ?? "9999").localeCompare(b.dueIso ?? "9999"),
@@ -317,6 +348,17 @@ export default function OperationWork() {
                   </span>
                 )}
               </h2>
+              {g.dutyKey && (
+                // The governed configuration failure with its ONE door
+                // (workspace/MASTER §4 · Delivery MASTER §13.1): never a
+                // fallback person, never a Work-local assignment control.
+                <p className="mb-1.5 text-label text-base-500" data-testid={`work-duty-unassigned-${g.dutyKey}`}>
+                  Nobody holds {g.name}.{" "}
+                  <Link className="text-kit-blue-11 underline" to="/operation?tab=staff-duties">
+                    Set the holder in Workspace → Staff &amp; Duties
+                  </Link>
+                </p>
+              )}
               <div className="border border-base-200 rounded-md divide-y divide-base-100 bg-white">
                 {g.items.map((i) => (
                   <WorkRowButton key={`${i.orderId}:${i.ruleKey}`} item={i} onOpen={openRow} />

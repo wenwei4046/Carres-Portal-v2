@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import {
+  WORKSPACE_DUTIES,
   workspaceAssignDutyInput,
   workspaceCoverDutyInput,
 } from "@carres/shared";
@@ -27,21 +28,9 @@ import type { AppEnv } from "../../types";
  */
 const workspaceDutiesRouter = new Hono<AppEnv>();
 
-/** The duties this surface manages today. A new duty joins by adding a row
- *  here AND its consumer module — never by a module keeping its own list. */
-const DUTIES = [
-  { key: "po_duty", label: "PO Duty" },
-  { key: "grn_duty", label: "GRN Duty" },
-  { key: "payment_duty", label: "Payment Duty" },
-  { key: "storage_waiver_approver", label: "Storage Waiver Approver" },
-  { key: "purchasing_approver", label: "Purchasing Approver" },
-  { key: "delivery_charge_approver", label: "Delivery Charge Approver" },
-  { key: "payment_approver", label: "Payment Approver" },
-  { key: "stock_adjustment_approver", label: "Stock Adjustment Approver" },
-  { key: "service_case_approver", label: "Service Case Approver" },
-  { key: "issue_triage_duty", label: "Issue Triage Duty" },
-  { key: "issue_review_approver", label: "Issue Review Approver" },
-] as const;
+/** The duties this surface manages today — the shared catalogue, so the web
+ *  prints the same duty word (`workspaceDutyLabelOf`). */
+const DUTIES = WORKSPACE_DUTIES;
 
 workspaceDutiesRouter.get("/", requireOperation, async (c) => {
   const sb = userClient(c.env, c.var.auth.jwt);

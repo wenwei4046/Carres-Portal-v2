@@ -35,7 +35,10 @@ import {
   type WorkspaceDutyResolution,
   type WorkingDayOptions,
   WAREHOUSE_OFF_DAYS,
+  orderActionLines,
+  type OrderActionKey,
 } from "@carres/shared";
+import { collectionOwnerResolution, type CollectionOwnerContextRow } from "@carres/shared";
 import { requireOperation } from "../../lib/auth-guards";
 import { loadPurchasingSettings } from "../../lib/purchasing-settings";
 import { userClient } from "../../lib/supabase";
@@ -58,11 +61,20 @@ import {
   type InvoiceRegisterRow,
 } from "@carres/shared/payment-invoice-register";
 import {
+  collectionTimingFor,
+  type CollectionTimingRule,
+} from "@carres/shared/collection-clock";
+import {
   latestOutcomeOf,
   missedPromise,
   type CollectionOutcomeRow,
 } from "@carres/shared/payment-collection-outcome";
 import { storageCheckDue } from "@carres/shared/payment-storage";
+import {
+  latestEvidenceAtOf,
+  proofReviewStateOf,
+  type ProofDecisionKey,
+} from "@carres/shared/delivery-proof";
 
 export interface OperationWorkStaff {
   userId: string;
@@ -81,6 +93,9 @@ interface SalesOrderModuleRow {
   placed_at: string;
   delivered_at?: string | null;
   do_number?: string | null;
+  /** The signed paper on file and its clock (0087) — one of the §6.1 proof
+   *  files whose arrival can reopen the review question. */
+  do_uploaded_at?: string | null;
   paid?: number | string | null;
   ops_assigned_logistic?: string | null;
   delivery_partner_id?: string | null;
@@ -114,6 +129,42 @@ interface SalesOrderControlFacts {
   storage_waiver_status?: string | null;
 }
 
+/** §6.1 (0489) — what Operation has said about a document's proof, and when
+ *  files last arrived for it. Keyed by DO number. */
+export interface ProofFactsByDo {
+  reviews: ReadonlyMap<string, Array<{ decision: ProofDecisionKey; reviewed_at: string }>>;
+  evidenceAt: ReadonlyMap<string, string[]>;
+}
+
+/** The engine's two composed §6.1 flags — ONE arithmetic with the Monitor and
+ *  the register (`proofReviewStateOf` over `latestEvidenceAtOf`). Only a
+ *  delivered or partially delivered order can owe a review. */
+export function proofReviewFlagsOf(
+  row: SalesOrderModuleRow,
+  control: SalesOrderControlFacts | null,
+  facts: ProofFactsByDo | null,
+): { proofReviewPending: boolean; proofReopened: boolean } {
+  const none = { proofReviewPending: false, proofReopened: false };
+  const doNumber = row.do_number?.trim();
+  if (!facts || !doNumber) return none;
+  const reached = row.status === "delivered" || row.operation_stage === "delivered" || Boolean(row.delivered_at);
+  if (!reached) return none;
+  const latestEvidenceAt = latestEvidenceAtOf({
+    ledger: (control?.delivery_photos ?? []) as Array<{ doNumber?: string | null; at: string }>,
+    doNumber,
+    attemptEvidence: (facts.evidenceAt.get(doNumber) ?? []).map((recorded_at) => ({ recorded_at })),
+    signedDoUploadedAt: row.do_uploaded_at ?? null,
+  });
+  const { state } = proofReviewStateOf({
+    latestEvidenceAt,
+    reviews: facts.reviews.get(doNumber) ?? [],
+  });
+  return {
+    proofReviewPending: state === "pending",
+    proofReopened: state === "rejected" || state === "more_required",
+  };
+}
+
 function orderControl(row: SalesOrderModuleRow): SalesOrderControlFacts | null {
   const raw = row.ops_order_control;
   return (Array.isArray(raw) ? raw[0] : raw) ?? null;
@@ -124,11 +175,22 @@ export function projectSalesOrdersFromModuleFacts(input: {
   stock: Array<{ sku: string; available: number }>;
   staff: Array<{ user_id: string; name: string | null; email: string }>;
   dutyResolutions: Partial<Record<WorkOwnerRule, WorkspaceDutyResolution>>;
+  /** 0489 — the order's stable collection owner, per order; absent ⇒ the
+   *  `collect` rule fails closed under the Delivery Duty word. */
+  collectionOwnerFor?: (orderId: string) => WorkspaceDutyResolution | null;
+  /** Logistics Partner names by id — `Call NETS`, never `Call logistics`,
+   *  wherever the order names its company. */
+  partnerNameById?: ReadonlyMap<string, string>;
   today: string;
   safetyDays: number | null;
   /** Gate convergence (2026-09-07): Σ live ISSUED storage papers per order —
    *  the canonical §2 storage obligation. Absent ⇒ legacy C9 only. */
   invoiceStorageByOrder?: ReadonlyMap<string, number>;
+  /** 0486 — the effective collection timing for the SO ladder's DO clock. */
+  timingRules?: readonly CollectionTimingRule[] | null;
+  /** §6.1 (0489) — the proof reviews and attempt evidence per document
+   *  number, read once. Absent ⇒ no review work is composed. */
+  proofFacts?: ProofFactsByDo | null;
 }): OperationWorkItem[] {
   const availableBySku = Object.fromEntries(
     input.stock.map((row) => [row.sku, row.available]),
@@ -208,7 +270,10 @@ export function projectSalesOrdersFromModuleFacts(input: {
         so: row.so,
         picName: pic?.name ?? pic?.email ?? null,
         picUserId: picId,
-        dutyResolutions: input.dutyResolutions,
+        dutyResolutions: {
+          ...input.dutyResolutions,
+          ...(input.collectionOwnerFor?.(row.id) ? { collection_owner: input.collectionOwnerFor(row.id)! } : {}),
+        },
         salespersonName: row.salespersons?.name ?? null,
         askDeliveryDate:
           !row.delivery_date &&
@@ -225,8 +290,11 @@ export function projectSalesOrdersFromModuleFacts(input: {
         loanOutstanding: (row.ops_sofa_loans ?? []).some(
           (loan) => loan.status === "on_loan",
         ),
+        ...proofReviewFlagsOf(row, control, input.proofFacts ?? null),
       },
       customer: row.customer_name,
+      logistics:
+        input.partnerNameById?.get(row.delivery_partner_id ?? row.ops_assigned_logistic ?? "") ?? null,
       deliveryOrderNumber: row.do_number ?? null,
       today: input.today,
     });
@@ -387,17 +455,25 @@ export function projectPurchaseOrderArrivalCheckWork(input: {
 
 export function projectPaymentCollectionWork(input: {
   invoices: readonly InvoiceRegisterRow[];
-  paymentDuty: WorkspaceDutyResolution | null;
+  /** 0489 — the order's stable collection owner (Responsible Delivery
+   *  Operation). Called once per admitted order, so a caller may also use
+   *  it to LEARN which orders are actionable today. */
+  ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
   today: string;
   /** §10 row 2 (0446): the recorded conversations. A promise the customer has
    *  already broken outranks the delivery window — the item then hangs off the
    *  day the CUSTOMER chose, not the day the clock would have chosen. */
   outcomes?: readonly CollectionOutcomeRow[];
+  /** `Settings → Payments → Collection timing` (0486). The clock an invoice
+   *  runs under is the rule in force on its issue day — a snapshot by
+   *  construction. Absent ⇒ the ruled default (3 · 2). */
+  timingRules?: readonly CollectionTimingRule[] | null;
 }): OperationWorkItem[] {
   const holidays = myHolidaySet();
   return input.invoices.flatMap((invoice) => {
     if (invoice.status !== "issued" || !invoice.orders) return [];
-    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays });
+    const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
+    const { timing, clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
     const money = invoiceNeeded(invoice);
     const owing = money.known && money.outstanding > 0;
     const latest = latestOutcomeOf(input.outcomes, invoice.order_id);
@@ -407,24 +483,27 @@ export function projectPaymentCollectionWork(input: {
     if (!broken && timing.kind !== "due" && timing.kind !== "late") return [];
     if (!owing) return [];
     const promisedIso = broken ? latest!.promised_date! : null;
-    const dueIso = promisedIso ?? clock.dueIso;
+    // The item is due the day the OWNER acts (their working day on or before
+    // the company-calendar deadline — owner ruling 2026-09-13); a promise is
+    // the customer's own day.
+    const dueIso = promisedIso ?? clock.actionDueIso;
     const late = broken || timing.kind === "late";
-    const owner = input.paymentDuty;
+    const owner = input.ownerFor(invoice.order_id);
     const workItem: WorkItem = {
       ruleKey: broken ? "payment.missed_promise" : "payment.collect_customer_balance",
       module: "payment",
       soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
       orderId: invoice.id,
-      action: "Ask the customer to pay",
-      ownerRule: "payment_duty",
-      ownerDutyKey: "payment_duty",
+      action: "Ask customer to pay",
+      ownerRule: "collection_owner",
+      ownerDutyKey: "delivery_duty",
       normalOwner: owner?.normalOwner ?? null,
       activeCover: owner?.activeCover ?? null,
       actingPerson: owner?.actingPerson ?? null,
       ownerState: owner?.state ?? "not_assigned",
       ownerName: owner?.actingPerson?.name ?? null,
       ownerUserId: owner?.actingPerson?.userId ?? null,
-      ...(owner?.actingPerson ? {} : { ownerDuty: "Payment Duty" }),
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
       tone: late ? "danger" : "warning",
       locked: false,
       broken: false,
@@ -444,7 +523,71 @@ export function projectPaymentCollectionWork(input: {
         : timing.kind === "late" ? "Customer payment should have been received" : "Customer balance due",
       recipient: invoice.orders.customer_name,
       requiredResult: `Outstanding balance reduced from RM ${money.outstanding.toFixed(2)} to RM 0`,
-      destination: `/finance/invoices?invoice=${encodeURIComponent(invoice.id)}`,
+      destination: `/finance/monitor?invoice=${encodeURIComponent(invoice.id)}`,
+      today: input.today,
+    })];
+  });
+}
+
+/**
+ * §10 — `Storage invoice live | responsible Delivery Operation | Send the
+ * invoice and collect payment | invoice fully paid` (owner ruling 2026-09-12).
+ *
+ * One item per SO whose live ISSUED storage papers still ask for money — the
+ * figure is the shared `soRemaining().storageOwing`, so this raises exactly
+ * what the Monitor's Storage cell and the DO gate read. The due is the same
+ * collection deadline the balance item uses (one clock); an order with no
+ * delivery anchor carries the governed `No date`.
+ */
+export function projectStorageInvoiceWork(input: {
+  invoices: readonly InvoiceRegisterRow[];
+  today: string;
+  timingRules?: readonly CollectionTimingRule[] | null;
+  /** 0489 — the SAME stable collection owner the ordinary balance uses
+   *  (owner ruling 2026-09-13). Absent or unassigned ⇒ the Delivery Duty
+   *  word stands; never the PIC. */
+  ownerFor: (orderId: string) => WorkspaceDutyResolution | null;
+}): OperationWorkItem[] {
+  const holidays = myHolidaySet();
+  const seen = new Set<string>();
+  return input.invoices.flatMap((invoice) => {
+    if (invoice.kind === "sales" || invoice.status !== "issued" || !invoice.orders) return [];
+    if (seen.has(invoice.order_id)) return [];
+    const money = soRemaining(input.invoices as InvoiceRegisterRow[], invoice.order_id);
+    if (!money.known || money.storageOwing <= 0 || money.outstanding <= 0) return [];
+    seen.add(invoice.order_id);
+    const timingRule = collectionTimingFor(input.timingRules, invoice.issued_at?.slice(0, 10) ?? input.today);
+    const { clock } = invoicePaymentTiming(invoice, input.today, { holidays }, undefined, timingRule);
+    const dueIso = clock.actionDueIso;
+    const late = !!clock.dueIso && input.today > clock.dueIso;
+    const owner = input.ownerFor(invoice.order_id);
+    const workItem: WorkItem = {
+      ruleKey: "payment.send_storage_invoice",
+      module: "payment",
+      soRef: invoice.invoice_no ?? `SO-${invoice.orders.so}`,
+      orderId: invoice.id,
+      action: "Send the invoice and collect payment",
+      ownerRule: "collection_owner",
+      ownerDutyKey: "delivery_duty",
+      normalOwner: owner?.normalOwner ?? null,
+      activeCover: owner?.activeCover ?? null,
+      actingPerson: owner?.actingPerson ?? null,
+      ownerState: owner?.state ?? "not_assigned",
+      ownerName: owner?.actingPerson?.name ?? null,
+      ownerUserId: owner?.actingPerson?.userId ?? null,
+      ...(owner?.actingPerson ? {} : { ownerDuty: "Delivery Duty" }),
+      tone: late ? "danger" : "warning",
+      locked: false,
+      broken: false,
+      dueIso,
+      workingDaysLate: late && dueIso ? countWorkingDays(dueIso, input.today, { holidays }) : 0,
+    };
+    return [operationWorkItemFromProjection(workItem, {
+      object: { kind: "invoice", id: invoice.id, label: invoice.invoice_no ?? `SO-${invoice.orders.so} storage invoice` },
+      problem: "Storage Invoice not paid",
+      recipient: invoice.orders.customer_name,
+      requiredResult: `Storage owing reduced from RM ${money.storageOwing.toFixed(2)} to RM 0`,
+      destination: `/finance/monitor?invoice=${encodeURIComponent(invoice.id)}`,
       today: input.today,
     })];
   });
@@ -642,6 +785,7 @@ const ORDER_PROBLEM: Record<string, string> = {
   confirm_delivery_date: "Customer delivery booking not confirmed",
   deliver_today: "Delivery due today",
   upload_delivery_photo: "Delivery proof missing",
+  check_delivery_proof: "Delivery proof not reviewed",
   collect: "Customer balance due",
   collect_loan_item: "Loan item still out",
   resolve_payment_exception: "Finance exception holding delivery",
@@ -657,6 +801,7 @@ const ORDER_RESULT: Record<string, string> = {
   confirm_delivery_date: "Customer-confirmed date and slot recorded",
   deliver_today: "Delivery result recorded",
   upload_delivery_photo: "Delivery photo recorded",
+  check_delivery_proof: "Proof Accepted, More Proof Required or Proof Rejected recorded with its reason",
   collect: "Outstanding balance is RM 0",
   collect_loan_item: "Loan item recorded as returned",
   resolve_payment_exception: "Finance exception cleared with evidence",
@@ -667,6 +812,8 @@ export function projectSalesOrderWork(input: {
   open: readonly OrderOpenAction[];
   context: OrderWorkContext;
   customer: string | null;
+  /** The order's Logistics Partner, by name, for the Delivery lines. */
+  logistics?: string | null;
   deliveryOrderNumber?: string | null;
   today: string;
   workingDays?: WorkingDayOptions;
@@ -681,7 +828,18 @@ export function projectSalesOrderWork(input: {
   ).map((item) => {
     const deliveryOwned = item.module === "delivery";
     const deliveryOrder = input.deliveryOrderNumber ?? null;
-    return operationWorkItemFromProjection(item, {
+    /* ⭐ A DELIVERY WORK SENTENCE IS TWO STRUCTURED LINES (owner ruling
+       2026-09-13, Delivery MASTER §10): the act with its recipient, then the
+       required result. The words come from the one word module; the day of
+       `Deliver on {weekday, date}` is spelled by the web, because the engine
+       spells no dates. */
+    const lines = deliveryOwned
+      ? orderActionLines(item.ruleKey as OrderActionKey, {
+          logistics: input.logistics ?? null,
+          dayAgreed: Boolean(input.context.confirmedDateIso),
+        })
+      : null;
+    return operationWorkItemFromProjection(lines ? { ...item, action: lines.act } : item, {
       object: deliveryOwned
         ? {
             kind: deliveryOrder ? "delivery_order" : "delivery_scope",
@@ -700,9 +858,13 @@ export function projectSalesOrderWork(input: {
         item.ruleKey === "collect"
           ? input.customer
           : null,
-      requiredResult: ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
+      requiredResult:
+        lines?.result ?? ORDER_RESULT[item.ruleKey] ?? "Owning module fact recorded",
       destination: deliveryOwned
-        ? deliveryOrder && (item.ruleKey === "deliver_today" || item.ruleKey === "upload_delivery_photo")
+        ? deliveryOrder &&
+          (item.ruleKey === "deliver_today" ||
+            item.ruleKey === "upload_delivery_photo" ||
+            item.ruleKey === "check_delivery_proof")
           ? `/operation/delivery-orders/${encodeURIComponent(deliveryOrder)}`
           : `/operation/delivery/edit/${encodeURIComponent(input.context.orderId)}`
         : `/operation/orders/so/${encodeURIComponent(input.context.orderId)}`,
@@ -812,6 +974,28 @@ export function projectReceivingWork(input: {
   });
 }
 
+/**
+ * 0486 — `Settings → Payments → Collection timing`, every effective row. The
+ * shared `collectionTimingFor` picks the rule in force on a clock's start day,
+ * so a read here is the snapshot every Payment item runs under. A read
+ * failure throws — a clock that silently fell back to the default would be a
+ * second arithmetic the Monitor does not run.
+ */
+async function readCollectionTimingRules(c: Context<AppEnv>): Promise<CollectionTimingRule[]> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const { data, error } = await sb
+    .from("payment_collection_timing_rules")
+    .select("ask_days_before,deadline_days_before,effective_from")
+    .order("effective_from", { ascending: false });
+  if (error) throw new Error("Workspace collection-timing source could not be read");
+  return ((data ?? []) as Array<{ ask_days_before: number; deadline_days_before: number; effective_from: string }>)
+    .map((r) => ({
+      askDaysBefore: r.ask_days_before,
+      deadlineDaysBefore: r.deadline_days_before,
+      effectiveFrom: r.effective_from,
+    }));
+}
+
 /** The one response boundary. Module loaders remain responsible for producing
  * valid projections; invalid input fails the request instead of presenting a
  * false clear desk. Stable identity is the only deduplication key. */
@@ -919,6 +1103,32 @@ async function readAllInvoices(app: Hono<AppEnv>, c: Context<AppEnv>): Promise<I
  * fabricated empty answer: a missed promise that cannot be read must not
  * quietly turn back into an ordinary balance.
  */
+/**
+ * 0489 — establish, then read, the stable collection owner of every order
+ * whose collection is actionable today. `establish` is idempotent (an order
+ * that has an owner is never touched) and writes nothing when Delivery Duty
+ * has no holder; `context` returns normal owner · today's cover · acting
+ * person · history. Both are the ONE door; no owner is computed here.
+ */
+async function establishAndReadCollectionOwners(
+  c: Context<AppEnv>,
+  orderIds: readonly string[],
+  today: string,
+): Promise<Map<string, CollectionOwnerContextRow>> {
+  if (orderIds.length === 0) return new Map();
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const established = await sb.rpc("payment_collection_owner_establish", {
+    p_order_ids: [...orderIds], p_on: today,
+  });
+  if (established.error) throw new Error("Workspace collection-owner source could not be established");
+  const context = await sb.rpc("payment_collection_owner_context", {
+    p_order_ids: [...orderIds], p_on: today,
+  });
+  if (context.error) throw new Error("Workspace collection-owner source could not be read");
+  const rows = (context.data ?? []) as CollectionOwnerContextRow[];
+  return new Map(rows.map((row) => [row.order_id, row]));
+}
+
 async function readCollectionOutcomes(c: Context<AppEnv>): Promise<CollectionOutcomeRow[]> {
   const sb = userClient(c.env, c.var.auth.jwt);
   const { data, error } = await sb
@@ -964,6 +1174,32 @@ export interface StorageCheckSource {
   storageStart: string;
   lastCheckedOn: string | null;
   inspectionDays: number;
+}
+
+/**
+ * §6.1 (0489) — every proof review and every attempt-evidence clock, read
+ * under the caller's own RLS. Both tables are append-only records; a read
+ * failure throws (Work that silently forgot a review would hide a delivered
+ * order whose proof nobody has looked at).
+ */
+async function readProofFacts(c: Context<AppEnv>): Promise<ProofFactsByDo> {
+  const sb = userClient(c.env, c.var.auth.jwt);
+  const [reviewsRes, evidenceRes] = await Promise.all([
+    sb.from("delivery_proof_reviews").select("do_number, decision, reviewed_at"),
+    sb.from("delivery_attempt_evidence").select("do_number, recorded_at"),
+  ]);
+  if (reviewsRes.error) throw new Error("Workspace proof-review source could not be read");
+  if (evidenceRes.error) throw new Error("Workspace attempt-evidence source could not be read");
+  const reviews = new Map<string, Array<{ decision: ProofDecisionKey; reviewed_at: string }>>();
+  for (const r of (reviewsRes.data ?? []) as Array<{ do_number: string; decision: ProofDecisionKey; reviewed_at: string }>) {
+    reviews.set(r.do_number, [...(reviews.get(r.do_number) ?? []), { decision: r.decision, reviewed_at: r.reviewed_at }]);
+  }
+  const evidenceAt = new Map<string, string[]>();
+  for (const e of (evidenceRes.data ?? []) as Array<{ do_number: string | null; recorded_at: string }>) {
+    if (!e.do_number) continue;
+    evidenceAt.set(e.do_number, [...(evidenceAt.get(e.do_number) ?? []), e.recorded_at]);
+  }
+  return { reviews, evidenceAt };
 }
 
 async function readStorageChecks(c: Context<AppEnv>): Promise<StorageCheckSource[]> {
@@ -1046,7 +1282,7 @@ export function projectStorageCheckWork(input: {
       action: "Check the stored furniture",
       ownerRule: "warehouse_duty",
       // No warehouse duty roster exists (§6 names none), so there is no duty
-      // KEY to resolve — the word stands, exactly as delivery_duty does.
+      // KEY to resolve — the word stands.
       ownerDutyKey: null,
       normalOwner: null,
       activeCover: null,
@@ -1094,7 +1330,7 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   internal.route("/issues", issuesRouter);
 
   const [orders, stock, manual, receipts, pos, suppliers, duties, staff, purchasingSettings,
-         invoices, outcomes, refunds, storageChecks, issueSource] =
+         invoices, outcomes, refunds, storageChecks, issueSource, timingRules, proofFacts] =
     await Promise.all([
       readInternal<{ orders: SalesOrderModuleRow[] }>(internal, "/orders", c),
       readInternal<{ skus: Array<{ sku: string; available: number }> }>(internal, "/stock", c),
@@ -1129,19 +1365,23 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       readRefunds(c),
       readStorageChecks(c),
       readInternal<{ actions: Parameters<typeof projectIssueActionWork>[0]["actions"] }>(internal, "/issues/work-source", c),
+      readCollectionTimingRules(c),
+      readProofFacts(c),
     ]);
   const today = manual.todayIso ?? malaysiaToday();
   const poDuty = dutyResolution(duties, "po_duty", today);
   const grnDuty = dutyResolution(duties, "grn_duty", today);
-  const paymentDuty = dutyResolution(duties, "payment_duty", today);
   // §12 gives overpayment review to the Payment Approver, never to Payment
   // Duty — an unassigned approver leaves the item honestly ownerless.
   const paymentApprover = dutyResolution(duties, "payment_approver", today);
   const issueTriageDuty = dutyResolution(duties, "issue_triage_duty", today);
   const issueReviewApprover = dutyResolution(duties, "issue_review_approver", today);
+  // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): every routine Delivery
+  // action resolves through the same shared resolver as PO Duty.
+  const deliveryDuty = dutyResolution(duties, "delivery_duty", today);
   const dutyResolutions = {
     ...(poDuty ? { po_duty: poDuty } : {}),
-    ...(paymentDuty ? { payment_duty: paymentDuty } : {}),
+    ...(deliveryDuty ? { delivery_duty: deliveryDuty } : {}),
   };
   // Gate convergence (2026-09-07): the same invoices read that feeds the
   // collection work also answers the §2 storage obligation per order.
@@ -1154,14 +1394,29 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
       );
     }
   }
+  // 0489 — which orders' collection is actionable today is the projections'
+  // own admission; a probe pass learns the set, the door establishes the
+  // owner for any newcomer (Delivery Duty holder today) and the read answers
+  // the same stable owner for every later pass.
+  const actionable = new Set<string>();
+  const probe = (orderId: string) => { actionable.add(orderId); return null; };
+  projectPaymentCollectionWork({ invoices, ownerFor: probe, today, outcomes, timingRules });
+  projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: probe });
+  const ownerRows = await establishAndReadCollectionOwners(c, [...actionable], today);
+  const collectionOwnerFor = (orderId: string) =>
+    collectionOwnerResolution(ownerRows.get(orderId) ?? null, today);
   const orderItems = projectSalesOrdersFromModuleFacts({
     orders: orders.orders,
     stock: stock.skus,
     staff: staff.staff,
     dutyResolutions,
+    collectionOwnerFor,
+    partnerNameById: new Map((purchasingSettings.deliveryPartners ?? []).map((p) => [p.id, p.name])),
     today,
     safetyDays: purchasingSettings.orderByBufferDays,
     invoiceStorageByOrder,
+    timingRules,
+    proofFacts,
   });
   const manualItems = projectManualPurchaseWork({
     requests: manualPurchaseWorkInputsFromRegister(manual),
@@ -1196,7 +1451,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
     poDuty,
     today,
   });
-  const paymentItems = projectPaymentCollectionWork({ invoices, paymentDuty, today, outcomes });
+  const paymentItems = projectPaymentCollectionWork({ invoices, ownerFor: collectionOwnerFor, today, outcomes, timingRules });
+  const storageInvoiceItems = projectStorageInvoiceWork({ invoices, today, timingRules, ownerFor: collectionOwnerFor });
   const overpaymentItems = projectOverpaymentReviewWork({
     invoices, refunds, approver: paymentApprover, today,
   });
@@ -1211,8 +1467,8 @@ export async function loadOperationWork(c: Context<AppEnv>): Promise<OperationWo
   });
   return composeOperationWorkResponse(
     [orderItems.filter((item) => item.ruleKey !== "collect"), manualItems, purchaseOrderItems,
-     arrivalCheckItems, receivingItems, paymentItems, overpaymentItems, storageCheckItems,
-     issueItems],
+     arrivalCheckItems, receivingItems, paymentItems, storageInvoiceItems, overpaymentItems,
+     storageCheckItems, issueItems],
     staff.staff.map((row) => ({
       userId: row.user_id,
       name: row.name,

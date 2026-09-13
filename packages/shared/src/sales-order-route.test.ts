@@ -289,6 +289,40 @@ describe("LOAN", () => {
     expect(edge(map, "loan:L1", "delivery-order")).toBeUndefined();
   });
 
+  it("0492 — an OPEN offer is the loan's current state before any item is out; a decline renders nothing", () => {
+    const offered = resolveSalesOrderRoute(
+      input({ loanOffers: [{ id: "O1", event: "offered", label: "Display sofa · HK55-3S", reason: null, recordedAt: "2026-09-13T01:00:00Z" }] }),
+    );
+    const node1 = node(offered, "loan-offer:O1");
+    expect(node1.lines).toEqual(["Loan offered · Display sofa · HK55-3S", "Waiting for the customer's answer"]);
+    /* A loan is an obligation, not a position: it never takes CURRENT and so
+       never carries the action line — its door names where the answer is recorded. */
+    expect(node1.action).toBeNull();
+    expect(node1.door?.label).toBe("Open Sales Order →");
+    expect(node1.mark).toBe("blocked");
+    const accepted = resolveSalesOrderRoute(
+      input({
+        loanOffers: [
+          { id: "O1", event: "offered", label: "Display sofa · HK55-3S", reason: null, recordedAt: "2026-09-13T01:00:00Z", seq: 1 },
+          { id: "O2", event: "accepted", label: "Display sofa · HK55-3S", reason: null, recordedAt: "2026-09-13T01:00:00Z", seq: 2 },
+        ],
+      }),
+    );
+    expect(node(accepted, "loan-offer:O2").lines).toEqual(["Customer accepted the loan · Display sofa · HK55-3S", "Prepare the loan Unit"]);
+    const declined = resolveSalesOrderRoute(
+      input({ loanOffers: [{ id: "O3", event: "declined", label: "Display sofa", reason: "Will wait", recordedAt: "2026-09-13T01:00:00Z" }] }),
+    );
+    expect(kinds(declined, "loan")).toHaveLength(0);
+    /* Once the item is OUT, the loan row itself is the node — never both. */
+    const out = resolveSalesOrderRoute(
+      input({
+        loans: [{ id: "L1", label: "sofa", qty: 1, returned: false }],
+        loanOffers: [{ id: "O2", event: "accepted", label: "sofa", reason: null, recordedAt: "2026-09-13T01:00:00Z" }],
+      }),
+    );
+    expect(kinds(out, "loan").map((n) => n.id)).toEqual(["loan:L1"]);
+  });
+
   it("disappears once the item is collected back", () => {
     const map = resolveSalesOrderRoute(
       input({ loans: [{ id: "L1", label: "sofa", qty: 1, returned: true }] }),

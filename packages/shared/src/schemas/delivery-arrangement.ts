@@ -137,8 +137,19 @@ export const saveDeliveryArrangementInputSchema = z.object({
   condoRegistration: z.string().trim().max(2000).nullish(),
   /** Required when the save CHANGES an existing partner. */
   reason: z.enum(CHANGE_LOGISTICS_REASON_KEYS).nullish(),
+  /**
+   * ⭐ THE CONTACT THAT PRODUCED THIS SAVE (Delivery MASTER §8.6, CARD 11).
+   * `Information received from` — the partner, the customer, or Operation on
+   * behalf of the partner. When present the door records a customer contact
+   * beside the arrangement in the same request; when the new day is later
+   * than the requested day the record must carry the WhatsApp reply
+   * (`replyProofPath`), or the save is refused.
+   */
+  informationReceivedFrom: z.enum(["partner", "customer", "operation_on_behalf"]).nullish(),
 });
 export type SaveDeliveryArrangementInput = z.infer<typeof saveDeliveryArrangementInputSchema>;
+
+
 
 /** One arrangement as the API returns it. */
 export interface DeliveryArrangementRow {
@@ -247,6 +258,22 @@ export const partnerCannotDeliverInput = z
   });
 export type PartnerCannotDeliverInput = z.infer<typeof partnerCannotDeliverInput>;
 
+/** One recorded `Cannot Deliver` (0417) as the central Delivery report reads
+ *  it — the partner that said so, its governed reason and the clock. Read-only
+ *  everywhere; the two doors (partner portal, Operation proxy) are the writers. */
+export interface DeliveryCannotDeliverRow {
+  id: string;
+  order_id: string;
+  leg: number;
+  partner_id: string | null;
+  reason_key: CannotDeliverReasonKey | string | null;
+  note: string | null;
+  recorded_at: string;
+}
+export function cannotDeliverReasonLabel(key: string | null | undefined): string | null {
+  return CANNOT_DELIVER_REASONS.find((r) => r.key === key)?.label ?? null;
+}
+
 /** One card on the partner's arrange screen — the ruled minimum facts only. */
 export interface PartnerDeliveryCard {
   orderId: string;
@@ -269,3 +296,21 @@ export interface PartnerDeliveryCard {
    *  Operations has not yet re-arranged it. */
   cannotDeliverReported: boolean;
 }
+
+/** POST /:orderId/cannot-deliver?leg= — Operation records the partner's
+ *  Cannot Deliver on its behalf (§8.6): the same governed reason list the
+ *  partner's own door uses, the partner named, the proxy recorded. */
+export const operationCannotDeliverInput = z
+  .object({
+    partnerId: z.string().uuid(),
+    reason: z.enum(CANNOT_DELIVER_REASON_KEYS),
+    note: z.string().trim().max(2000).nullish(),
+    /** Storage path of the partner's message, when Operation has it. */
+    evidencePath: z.string().trim().max(400).nullish(),
+  })
+  .strict()
+  .refine((v) => v.reason !== "other" || Boolean(v.note && v.note.trim()), {
+    message: "Another reason needs the note filled in",
+    path: ["note"],
+  });
+export type OperationCannotDeliverInput = z.infer<typeof operationCannotDeliverInput>;

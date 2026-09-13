@@ -25,9 +25,10 @@
  *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
  *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
  */
+import { NO_PROOF_REVIEW } from "./delivery-orders-register";
 import { describe, it, expect } from "vitest";
-import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
-import type { DeliveryArrangementRow } from "@carres/shared";
+import type { DeliveryOrderRow, DeliveryProofReviewRow, operationOrderListRow } from "@/lib/queries";
+import { orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
   operatingDaysFrom,
@@ -51,7 +52,6 @@ import {
   missingProofLabels,
   monitorRowAction,
   monitorRowActionText,
-  callToConfirmDeliveryDate,
   sortByRequestedDeliveryDate,
   needsProof,
   overdueContactCards,
@@ -100,6 +100,10 @@ function order(
     customer_address_city: "Klang",
     customer_address_state: "Selangor",
     building_type: "Landed",
+    /* The required Sales facts (owner ruling 2026-09-13) — carried by the
+       default fixture so each test is about the ONE thing it names. */
+    delivery_floor: 0,
+    delivery_has_lift: true,
     placed_at: "2026-08-01T00:00:00Z",
     delivery_date: "2026-09-04",
     delivery_date_tbd: false,
@@ -167,6 +171,7 @@ function cards(
     deliveryOrders?: DeliveryOrderRow[];
     arrangements?: DeliveryArrangementRow[];
     attempts?: { do_number: string | null; result: "delivered" | "partial" | "failed"; reason_key: string | null; recorded_at: string }[];
+    proofReviews?: DeliveryProofReviewRow[];
   },
 ): DeliveryMonitorCard[] {
   const byScope = new Map<string, DeliveryArrangementRow>();
@@ -176,10 +181,25 @@ function cards(
     deliveryOrders: opts?.deliveryOrders ?? [],
     attempts: opts?.attempts ?? [],
     handoverEvents: [],
+    proofReviews: opts?.proofReviews ?? [],
     partnerNameById: new Map(),
     arrangements: byScope,
     todayIso: TODAY,
   });
+}
+
+/** One §6.1 review row (0489). */
+function review(over: Partial<DeliveryProofReviewRow> & { decision: DeliveryProofReviewRow["decision"] }): DeliveryProofReviewRow {
+  return {
+    id: `r-${over.decision}`,
+    order_id: "a",
+    do_number: "DO-1",
+    attempt_id: null,
+    reason: null,
+    reviewed_by: null,
+    reviewed_at: "2026-09-04T01:00:00Z",
+    ...over,
+  };
 }
 
 const noFilters: DeliveryMonitorFilters = {
@@ -333,11 +353,29 @@ describe("buildDeliveryMonitorCards", () => {
     const out = cards(
       [order({ id: "a", so: 1301 })],
       {
-        arrangements: [arrangement({ order_id: "a", confirmed_date: "2026-09-04" })],
+        arrangements: [
+          arrangement({
+            order_id: "a",
+            partner_id: "p-nets",
+            partner_name: "NETS",
+            confirmed_date: "2026-09-04",
+            confirmed_time: "09:00–11:00",
+          }),
+        ],
       },
     );
     expect(out[0]!.statusKey).toBe("confirmed");
-    expect(out[0]!.statusLabel).toBe("Delivery confirmed");
+    expect(out[0]!.statusLabel).toBe("Confirmed for Fri, 4 Sep");
+    expect(out[0]!.statusTone).toBe("green");
+    expect(out[0]!.statusSecond).toBe("09:00–11:00");
+    /* A DAY alone is still contact work (owner ruling 2026-09-11): the card
+       names who must contact the customer, never `Confirmed`. */
+    const dayOnly = cards(
+      [order({ id: "a", so: 1301 })],
+      { arrangements: [arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-04" })] },
+    );
+    expect(dayOnly[0]!.statusKey).toBe("partner_must_contact");
+    expect(dayOnly[0]!.statusLabel).toBe("NETS must contact the customer");
   });
 
   describe("the missing evidence — the Delivery Orders register's own arithmetic", () => {
@@ -429,6 +467,57 @@ describe("buildDeliveryMonitorCards", () => {
       expect(c.missingProof.photo).toBe(false);
     });
 
+    /* ── §6.1 (0489) — the review, over the SAME document row ─────────── */
+    const withFile = { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" as const }] } };
+    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
+    const reviewed = (reviews: DeliveryProofReviewRow[]) =>
+      cards([order({ id: "a", so: 1301, do_number: "DO-1", ...withFile })], {
+        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
+        attempts: [{ do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" }],
+        proofReviews: reviews,
+      })[0]!;
+
+    it("both files on record and no review yet → `Check delivery proof`, and Delivered stays ORANGE", () => {
+      const c = reviewed([]);
+      expect(c.proofReview.state).toBe("pending");
+      expect(needsProof(c)).toBe(false);
+      expect(monitorRowAction(c)).toEqual({ kind: "check_proof", label: "Check delivery proof" });
+      expect(c.statusTone).toBe("orange");
+      expect(c.statusSecond).toBe("Check delivery proof");
+      expect(buildMonitorRails([c], noFilters, []).work.check_proof).toBe(1);
+      expect(buildMonitorRails([c], noFilters, []).work.upload_proof).toBe(0);
+    });
+
+    it("`Proof Accepted` is the ONE fact that turns Delivered green, and the row leaves every proof queue", () => {
+      const c = reviewed([review({ decision: "accepted", reviewed_at: "2026-09-04T01:00:00Z" })]);
+      expect(c.proofReview.state).toBe("accepted");
+      expect(c.statusTone).toBe("green");
+      expect(c.statusSecond).toContain("Proof accepted");
+      expect(needsProof(c)).toBe(false);
+      expect(monitorRowAction(c).kind).not.toBe("check_proof");
+      expect(buildMonitorRails([c], noFilters, []).work.check_proof).toBe(0);
+    });
+
+    it("`Proof Rejected` reopens `Upload delivery proof` with the reason, although a file is on record", () => {
+      const c = reviewed([review({ decision: "rejected", reason: "The photo shows the lobby", reviewed_at: "2026-09-04T01:00:00Z" })]);
+      expect(c.proofReview).toMatchObject({ state: "rejected", reason: "The photo shows the lobby" });
+      expect(needsProof(c)).toBe(true);
+      expect(missingProofLabels(c)).toEqual(["Upload delivery photo"]);
+      expect(c.statusSecond).toBe("Proof Rejected · The photo shows the lobby");
+      expect(c.statusTone).toBe("orange");
+      expect(buildMonitorRails([c], noFilters, []).work.upload_proof).toBe(1);
+    });
+
+    it("a NEWER file after a rejection reopens the review — the question is pending again", () => {
+      const c = cards([order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [{ path: "p2.jpg", at: "2026-09-05T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" }] } })], {
+        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
+        attempts: [{ do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" }],
+        proofReviews: [review({ decision: "rejected", reason: "Lobby", reviewed_at: "2026-09-04T01:00:00Z" })],
+      })[0]!;
+      expect(c.proofReview.state).toBe("pending");
+      expect(monitorRowAction(c).kind).toBe("check_proof");
+    });
+
     it("a result that never reached the customer owes no proof", () => {
       const c = cards(
         [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [] } })],
@@ -458,7 +547,7 @@ describe("monitorCardHref", () => {
 
   it("no DO yet opens Edit Delivery — Monitor never issues the document", () => {
     const out = cards([order({ id: "a", so: 1301 })]);
-    expect(monitorCardHref(out[0]!)).toBe("/operation/delivery/edit/a");
+    expect(monitorCardHref(out[0]!)).toBe("/operation?tab=delivery&view=all&open=a");
   });
 
   it("a Journey row's door carries its leg in the URL only", () => {
@@ -473,20 +562,28 @@ describe("monitorCardHref", () => {
       }),
     ]);
     expect(out).toHaveLength(2);
-    expect(monitorCardHref(out[0]!)).toBe("/operation/delivery/edit/b?leg=1");
+    expect(monitorCardHref(out[0]!)).toBe("/operation?tab=delivery&view=all&open=b%23leg1");
   });
 });
 
 /* ── 4 · An expired window proves nothing ──────────────────────────────── */
 
 describe("expired planned time", () => {
-  it("a confirmed date behind us with no recorded result keeps its status", () => {
+  it("⭐ a confirmed date behind us with no recorded result reads Overdue, naming who must record it (§8.4)", () => {
     const out = cards(
       [order({ id: "a", so: 1301 })],
-      { arrangements: [arrangement({ order_id: "a", confirmed_date: "2026-09-01" })] },
+      {
+        arrangements: [
+          arrangement({ order_id: "a", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-01", confirmed_time: "09:00–11:00" }),
+        ],
+      },
     );
-    // Not failed, not "result needed" — the calendar passing records nothing.
-    expect(out[0]!.statusKey).toBe("confirmed");
+    // Not failed — the calendar passing records no result; it records that
+    // the partner still owes one, in red.
+    expect(out[0]!.statusKey).toBe("overdue");
+    expect(out[0]!.statusLabel).toBe("Overdue");
+    expect(out[0]!.statusTone).toBe("red");
+    expect(out[0]!.statusSecond).toBe("NETS must record the result");
     expect(out[0]!.missingProof).toEqual(NO_PROOF_MISSING);
   });
 });
@@ -549,8 +646,12 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     logisticsPartnerName: null,
     region: "Selangor",
     statusKey: "confirmed",
-    statusLabel: "Delivery confirmed",
+    statusLabel: "Confirmed for Fri, 4 Sep",
+    statusTone: "green",
+    statusSecond: "09:00–11:00",
+    statusSecondTone: null,
     missingProof: NO_PROOF_MISSING,
+    proofReview: NO_PROOF_REVIEW,
     items: [],
     extras: [],
     siteAccess: null,
@@ -559,6 +660,8 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     contactDueIso: null,
     contactOverdue: false,
     scope: { so: 0, refs: [] } as unknown as DeliveryScopeRow,
+    payment: { line1: "Paid", line2: null, tone: "green" },
+    stock: { line1: "Ready", line2: "1 of 1", ready: true },
     ...over,
   };
 }
@@ -690,10 +793,10 @@ describe("filterMonitorListRows", () => {
     ).toEqual(["nets"]);
     const withWh = [
       ...SET,
-      datedCard({ scopeId: "wh", statusKey: "waiting_warehouse", statusLabel: "Waiting for warehouse" }),
+      datedCard({ scopeId: "wh", statusKey: "waiting_pickup", statusLabel: "Waiting for logistics pickup" }),
     ];
     expect(
-      filterMonitorListRows(withWh, { ...noFilters, status: "waiting_warehouse" }).map((c) => c.scopeId),
+      filterMonitorListRows(withWh, { ...noFilters, status: "waiting_pickup" }).map((c) => c.scopeId),
     ).toEqual(["wh"]);
   });
 
@@ -795,7 +898,9 @@ describe("the work list's own words — never `scope` (owner correction 2026-09-
        {date}`); they are checked on a real date so the rule covers the words
        they produce, not just the plain strings beside them. */
     const words = Object.values(MONITOR_COPY).map((w) =>
-      typeof w === "function" ? w("Tue, 15 Sep") : w,
+      typeof w === "function"
+        ? (w as (...args: never[]) => string)("Tue, 15 Sep" as never, "NETS" as never)
+        : w,
     );
     for (const word of words) {
       expect(word).not.toMatch(/\bscopes?\b/i);
@@ -808,7 +913,7 @@ describe("activeFilterLabels", () => {
   it("names every active pick in rail order — the combined narrowing is visible", () => {
     expect(
       activeFilterLabels(
-        { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none", status: "waiting_warehouse" },
+        { ...noFilters, view: "no_confirmed_date", logisticsPartnerId: "none", status: "waiting_pickup" },
         () => null,
       ),
     ).toEqual([
@@ -816,7 +921,7 @@ describe("activeFilterLabels", () => {
          summary names the queue the operator clicked, not the cell word. */
       MONITOR_COPY.callCustomer,
       MONITOR_COPY.noLogistics,
-      MONITOR_STATUS_LABEL.waiting_warehouse,
+      MONITOR_STATUS_LABEL.waiting_pickup,
     ]);
   });
 
@@ -852,9 +957,9 @@ describe("buildMonitorRails", () => {
       statusLabel: "Delivered",
       missingProof: { photo: true, signedDo: false },
     }),
-    datedCard({ scopeId: "wh", statusKey: "waiting_warehouse", statusLabel: "Waiting for warehouse" }),
-    datedCard({ scopeId: "ready", statusKey: "ready_for_handover", statusLabel: "Ready for handover" }),
-    datedCard({ scopeId: "nets", logisticsPartnerId: "p-nets", logisticsPartnerName: "NETS", region: "Kuala Lumpur", statusKey: "out_for_delivery", statusLabel: "Out for delivery" }),
+    datedCard({ scopeId: "wh", statusKey: "waiting_pickup", statusLabel: "Waiting for logistics pickup" }),
+    datedCard({ scopeId: "ready", statusKey: "collected", statusLabel: "Goods collected by logistics" }),
+    datedCard({ scopeId: "nets", logisticsPartnerId: "p-nets", logisticsPartnerName: "NETS", region: "Kuala Lumpur", statusKey: "delivering", statusLabel: "NETS is delivering to the customer" }),
   ];
   const partners = [
     { id: "p-nets", name: "NETS" },
@@ -877,11 +982,12 @@ describe("buildMonitorRails", () => {
     expect(Object.keys(rails.work).sort()).toEqual([...MONITOR_WORK_VIEWS].sort());
   });
 
-  it("DELIVERY STATUS counts the three fixed rungs, zero printed", () => {
+  it("DELIVERY STATUS counts every rung of the shared dictionary, zero printed", () => {
     const rails = buildMonitorRails(set, noFilters, partners);
-    expect(rails.status).toEqual({ waiting_warehouse: 1, ready_for_handover: 1, out_for_delivery: 1 });
+    expect(rails.status).toMatchObject({ waiting_pickup: 1, collected: 1, delivering: 1, assign_logistics: 0 });
+    expect(Object.keys(rails.status)).toHaveLength(12);
     const narrowed = buildMonitorRails(set, { ...noFilters, region: "Selangor" }, partners);
-    expect(narrowed.status.out_for_delivery).toBe(0);
+    expect(narrowed.status.delivering).toBe(0);
   });
 
   it("a picked partner narrows the state counts but not its own group", () => {
@@ -898,7 +1004,7 @@ describe("buildMonitorRails", () => {
   });
 
   it("a picked status narrows the work counts", () => {
-    const rails = buildMonitorRails(set, { ...noFilters, status: "waiting_warehouse" }, partners);
+    const rails = buildMonitorRails(set, { ...noFilters, status: "waiting_pickup" }, partners);
     expect(rails.work.all).toBe(1);
     expect(rails.work.no_logistics).toBe(1);
     expect(rails.work.failed).toBe(0);
@@ -948,7 +1054,7 @@ describe("buildMonitorRails", () => {
 });
 
 describe("the ruled rail groups (owner correction 2026-09-07)", () => {
-  it("WORK TO DO is the six queues in the ruled order — no Calendar, no Waiting for warehouse, no Proof Required", () => {
+  it("WORK TO DO is the seven queues in the ruled order — `Check delivery proof` joined with the §6.1 record (0489)", () => {
     expect(MONITOR_WORK_VIEWS).toEqual([
       "all",
       "no_logistics",
@@ -956,7 +1062,9 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
       "overdue",
       "failed",
       "upload_proof",
+      "check_proof",
     ]);
+    expect(MONITOR_VIEW_LABEL.check_proof).toBe("Check delivery proof");
     expect(MONITOR_VIEW_LABEL.all).toBe(MONITOR_COPY.allDeliveryWork);
     expect(MONITOR_VIEW_LABEL.no_logistics).toBe(MONITOR_COPY.noLogistics);
     expect(MONITOR_VIEW_LABEL.upload_proof).toBe("Upload delivery proof");
@@ -964,11 +1072,19 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
     expect(Object.values(MONITOR_VIEW_LABEL)).not.toContain("Delivered — Proof Required");
   });
 
-  it("DELIVERY STATUS is the three fixed rungs in the shared words", () => {
-    expect(MONITOR_STATUS_FILTERS).toEqual(["waiting_warehouse", "ready_for_handover", "out_for_delivery"]);
-    expect(MONITOR_STATUS_LABEL.waiting_warehouse).toBe("Waiting for warehouse");
-    expect(MONITOR_STATUS_LABEL.ready_for_handover).toBe("Ready for handover");
-    expect(MONITOR_STATUS_LABEL.out_for_delivery).toBe("Out for delivery");
+  it("DELIVERY STATUS is the shared actor-first dictionary in ladder order (§8.4)", () => {
+    expect(MONITOR_STATUS_FILTERS).toEqual([
+      "assign_logistics", "partner_must_contact", "operation_must_call", "waiting_customer_reply",
+      "confirmed", "waiting_pickup", "collected", "delivering", "overdue", "delivered", "failed",
+      "details_incomplete",
+    ]);
+    expect(MONITOR_STATUS_LABEL.assign_logistics).toBe("Operation must assign logistics");
+    expect(MONITOR_STATUS_LABEL.waiting_pickup).toBe("Waiting for logistics pickup");
+    expect(MONITOR_STATUS_LABEL.delivering).toBe("Logistics is delivering to the customer");
+    expect(MONITOR_STATUS_LABEL.details_incomplete).toBe("Order details incomplete");
+    for (const retired of ["Waiting for warehouse", "Ready for handover", "Out for delivery", "Delivery confirmed", "Waiting for customer date"]) {
+      expect(Object.values(MONITOR_STATUS_LABEL)).not.toContain(retired);
+    }
   });
 
   it("the group headings are the owner's words", () => {
@@ -1067,11 +1183,18 @@ describe("monitorRowAction — one row, one next act", () => {
     expect(action.label).toBe("Assign logistics");
   });
 
+  it("keeps a known day and asks only for the missing time", () => {
+    const card = chase({ partner_id: "p-al", partner_name: "AL" });
+    const action = monitorRowAction({ ...card, confirmedDate: "2026-09-04", confirmedTime: null, booked: false });
+    expect(action).toEqual({ kind: "confirm_date", call: "Call AL", result: "Confirm the delivery time", label: "Edit Delivery" });
+  });
+
   it("a partner carries it but no date is agreed → call THAT partner, then Edit Delivery", () => {
     const action = monitorRowAction(chase({ partner_id: "p-al", partner_name: "AL" }));
     expect(action).toEqual({
       kind: "confirm_date",
-      call: "Call AL — confirm delivery date",
+      call: "Call AL",
+      result: "Confirm the delivery date",
       label: "Edit Delivery",
     });
   });
@@ -1079,11 +1202,13 @@ describe("monitorRowAction — one row, one next act", () => {
   it("the partner NAME comes from the row — no carrier is ever hard-coded", () => {
     const nets = monitorRowAction(chase({ partner_id: "p-nets", partner_name: "NETS" }));
     const teow = monitorRowAction(chase({ partner_id: "p-teow", partner_name: "TEOW" }));
-    expect(nets.kind === "confirm_date" && nets.call).toBe("Call NETS — confirm delivery date");
-    expect(teow.kind === "confirm_date" && teow.call).toBe("Call TEOW — confirm delivery date");
-    expect(callToConfirmDeliveryDate("Chan Logistics")).toBe(
-      "Call Chan Logistics — confirm delivery date",
-    );
+    expect(nets.kind === "confirm_date" && nets.call).toBe("Call NETS");
+    expect(teow.kind === "confirm_date" && teow.call).toBe("Call TEOW");
+    /* The words are the shared word module's — one home, two lines. */
+    expect(orderActionLines("confirm_delivery_date", { logistics: "Chan Logistics" })).toEqual({
+      act: "Call Chan Logistics",
+      result: "Confirm the delivery date",
+    });
   });
 
   it("a carrier AND a FINISHED arrangement → the one Delivery-owned editor", () => {
@@ -1103,7 +1228,7 @@ describe("monitorRowAction — one row, one next act", () => {
   it("the exported words are the words on the screen", () => {
     expect(monitorRowActionText(chase({}))).toBe("Assign logistics");
     expect(monitorRowActionText(chase({ partner_id: "p-al", partner_name: "AL" }))).toBe(
-      "Call AL — confirm delivery date · Edit Delivery",
+      "Call AL · Confirm the delivery date · Edit Delivery",
     );
   });
 
@@ -1479,14 +1604,16 @@ describe("the chase names the half that is missing", () => {
     const action = monitorRowAction(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
     expect(action.kind).toBe("confirm_date");
     if (action.kind !== "confirm_date") throw new Error("unreachable");
-    expect(action.call).toBe("Call NETS — confirm delivery time");
-    expect(action.call).not.toContain("delivery date");
+    expect(action.call).toBe("Call NETS");
+    expect(action.result).toBe("Confirm the delivery time");
+    expect(action.result).not.toContain("delivery date");
   });
 
   it("no day at all still asks for the DATE", () => {
     const action = monitorRowAction(chasing({ confirmedDate: null, confirmedTime: null }));
     if (action.kind !== "confirm_date") throw new Error("unreachable");
-    expect(action.call).toBe("Call NETS — confirm delivery date");
+    expect(action.call).toBe("Call NETS");
+    expect(action.result).toBe("Confirm the delivery date");
   });
 
   it("the partner's own name is used, never a hard-coded company", () => {
@@ -1494,14 +1621,15 @@ describe("the chase names the half that is missing", () => {
       chasing({ confirmedDate: "2026-09-04", confirmedTime: null, logisticsPartnerName: "HOUZS" }),
     );
     if (action.kind !== "confirm_date") throw new Error("unreachable");
-    expect(action.call).toBe("Call HOUZS — confirm delivery time");
+    expect(action.call).toBe("Call HOUZS");
+    expect(action.result).toBe("Confirm the delivery time");
   });
 
   it("both sentences reach the export as one spelling", () => {
     const time = monitorRowActionText(chasing({ confirmedDate: "2026-09-04", confirmedTime: null }));
-    expect(time).toContain("confirm delivery time");
+    expect(time).toContain("Confirm the delivery time");
     const date = monitorRowActionText(chasing({ confirmedDate: null, confirmedTime: null }));
-    expect(date).toContain("confirm delivery date");
+    expect(date).toContain("Confirm the delivery date");
   });
 });
 

@@ -53,7 +53,7 @@ beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
 });
 
-describe("Ask the customer to pay (§16)", () => {
+describe("Ask customer to pay (§16)", () => {
   it("prepares the locked customer message with the REF, never the SO number", () => {
     show();
     const preview = screen.getByTestId("ask-message-preview");

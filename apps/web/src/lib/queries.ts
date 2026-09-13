@@ -15,6 +15,12 @@ import {
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type DeliveryProofReviewRow,
+  type DeliveryAttemptEvidenceRow,
+  type ProofReviewInput,
+  type SignedDoAttachInput,
+  type LoanOfferRow,
+  type LoanOfferRecordInput,
   type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
@@ -308,6 +314,16 @@ import {
   type SupplierCreateInput,
   type PurchasingSupplierCollectionSetting,
   type OperationWorkResponse,
+  type DeliveryContactRow,
+  type DeliveryCannotDeliverRow,
+  type DeliveryContactInput,
+  type OperationCannotDeliverInput,
+  type PartnerCoverage,
+  type HandoverPoint,
+  type PartnerServices,
+  type ProofRules,
+  type DeliveryTemplateRow,
+  type DeliverySettingChangeRow,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -596,6 +612,14 @@ export const qk = {
       ["finance", "payments", filters ?? {}] as const,
     paymentRegister: () => ["finance", "payment-register"] as const,
     invoiceRegister: () => ["finance", "invoice-register"] as const,
+    /** Every open storage case (the Monitor's Storage cell). */
+    storageCases: () => ["finance", "storage-cases", "all"] as const,
+    /** Every customer later-date request (the Monitor's pending free request). */
+    laterDeliveryRequests: () => ["finance", "later-delivery-requests", "all"] as const,
+    /** Settings → Payments (banks · methods · timing · storage · changes). */
+    paymentSettings: () => ["finance", "payment-settings"] as const,
+    /** 0489 — one order's collection owner (normal · cover · history). */
+    collectionOwner: (orderId: string) => ["finance", "collection-owner", orderId] as const,
     invoices:         (filters?: FinanceInvoicesFilters) =>
       ["finance", "invoices", filters ?? {}] as const,
     refunds:          (filters?: FinanceRefundsFilters) =>
@@ -3047,7 +3071,17 @@ export interface operationOrderListRow {
    *  older Worker that does not select them raises nothing (UNKNOWN never
    *  accuses). */
   order_finance_exceptions?: { status: "open" | "cleared" }[];
-  ops_sofa_loans?: { status: "on_loan" | "returned" }[];
+  /** 0362 — the delivery payment approvals; Monitor's `Payment` cell reads
+   *  `paymentApprovalOpensGate` over them for the authoritative COD line
+   *  (Delivery MASTER §8.3). Optional: absent = no approval carried. */
+  order_delivery_payment_approvals?: { status: string }[];
+  ops_sofa_loans?: {
+    status: "on_loan" | "returned";
+    /** 0492 (Card 15) — the loaned Unit, for `Loan {Unit ID} · collect back on delivery day`. */
+    item_id?: string | null;
+    loan_note_no?: string | null;
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
+  }[];
   /** Phase B (migration 0138) — latest annotation snippet for kanban card.
    *  PostgREST returns all annotations; card picks newest by created_at. */
   order_annotations: { content: string; tag: string | null; created_at: string }[];
@@ -3094,6 +3128,10 @@ export interface SalesOrderExpansionResponse {
     lineId: string;
     sku: string;
     unitIds: string[];
+    /** Order/SKU evidence without a proven link to this configured line. */
+    unverifiedUnitIds?: string[];
+    verifiedUnitIds?: string[];
+    unitQuantityMismatch?: boolean;
     deliverTo: Array<{ name: string; qty: number }>;
   }>;
 }
@@ -3284,6 +3322,11 @@ export interface operationOrderDetailOrder {
    *  ready_to_dispatch / dispatched stages (operation records the customer's
    *  final balance payment at delivery). */
   paid: number;
+  /** Saved at-sale facts; never synthesized into a ledger transaction. */
+  payment_method?: string | null;
+  installment_months?: number | null;
+  approval_code?: string | null;
+  payment_slip_url?: string | null;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
   /** STAGE 1 — who sold it. The Sales Order workspace names the salesperson on
@@ -5751,7 +5794,12 @@ export interface SalesOrderRouteFactsResponse {
   claims: SalesOrderRouteClaim[];
   financeExceptions: SalesOrderRouteFinanceException[];
   paymentApprovals: DeliveryPaymentApprovalRow[];
+  /** 0492 (Card 15) — the loan offer conversation on the Sales Order. */
+  loanOffers: LoanOfferView[];
 }
+
+/** One loan-offer record as the API returns it, with the offered Unit's ID. */
+export type LoanOfferView = LoanOfferRow & { unit_id: string | null };
 
 /**
  * The Order Route's read fan-in. Every request goes to the existing owning
@@ -5774,7 +5822,7 @@ export function useSalesOrderRouteFacts(
           `/api/operation/pos/${encodeURIComponent(poId)}/receiving`,
         ),
       ));
-      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals] =
+      const [allocation, booking, attempts, loans, refunds, cases, claims, financeExceptions, paymentApprovals, loanOffers] =
         await Promise.all([
           apiFetch<{ allocation: SalesOrderAllocation }>(`/api/operation/orders/${id}/allocation`),
           apiFetch<{ brief: BookingBrief }>(`/api/operation/orders/${id}/booking-brief`),
@@ -5788,6 +5836,7 @@ export function useSalesOrderRouteFacts(
           // reads, so the canvas and the refusal can never disagree (Law D).
           apiFetch<SalesOrderRouteFinanceException[]>(`/api/finance/exceptions/${id}`),
           apiFetch<DeliveryPaymentApprovalRow[]>(`/api/operation/payment-approvals/${id}`),
+          apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${id}/loan-offers`),
         ]);
       const receiving = await receivingPromise;
       return {
@@ -5801,6 +5850,7 @@ export function useSalesOrderRouteFacts(
         claims: claims.claims.filter((claim) => poIds.includes(claim.po_id)),
         financeExceptions,
         paymentApprovals,
+        loanOffers: loanOffers.offers,
       };
     },
     enabled: !!orderId && open,
@@ -6929,6 +6979,8 @@ export interface DeliveryOrderRow {
   id: string;
   order_id?: string;
   do_number: string;
+  /** 0491 — 0 the whole-order trip; 1..n one leg of the order's Journey. */
+  leg?: number | null;
   issued_at: string;
   trip_groups: string[] | null;
   delivery_date: string | null;
@@ -6947,8 +6999,12 @@ export interface DeliveryOrderRow {
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
     /** The signed DO on file (0087) — the `Upload signed Delivery Order`
-     *  queue's canonical fact (register correction 2026-09-06). */
+     *  queue's canonical fact (register correction 2026-09-06) — and its
+     *  clock, one of the §6.1 files that can reopen the review question. */
     do_file_path?: string | null;
+    do_uploaded_at?: string | null;
+    /** 0156 — the order's Journey legs, when it travels in legs. */
+    delivery_stops?: DeliveryStop[] | null;
     /** The order's goods lines — the register expansion derives THIS TRIP's
      *  lines from them via `trip_groups` (one arithmetic with the DO page). */
     order_lines?: Array<{
@@ -6966,7 +7022,11 @@ export interface DeliveryOrderRow {
   };
 }
 export interface DeliveryOrderAttemptRow {
+  /** 0344's row id — the Delivery Visit a §6.1 evidence file binds to. */
+  id?: string;
   do_number: string | null;
+  /** 0491 — the scope the result belongs to. */
+  leg?: number | null;
   result: "delivered" | "partial" | "failed";
   reason_key: string | null;
   note?: string | null;
@@ -6974,16 +7034,22 @@ export interface DeliveryOrderAttemptRow {
   recorded_at: string;
   recorded_by?: string | null;
 }
-/** One §4 handover fact (0363) as the register needs it — the kind alone. */
+/** One §4 handover fact (0363) as the register needs it — the kind, and its
+ *  clock for Monitor's `Collected {date} {time}` line (§8.4). */
 export interface DeliveryHandoverKindRow {
   delivery_order_id: string;
   kind: DeliveryHandoverKind;
+  recorded_at?: string | null;
 }
 
 export interface DeliveryOrdersRegisterPayload {
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
+  /** §6.1 (0489) — Operation's reviews and the per-attempt evidence clocks.
+   *  Absent on an older Worker = unknown, read as no review recorded. */
+  proofReviews?: DeliveryProofReviewRow[];
+  attemptEvidence?: DeliveryAttemptEvidenceRow[];
 }
 /**
  * THE STOCK REGISTER — the one current listing of controlled Units
@@ -7032,9 +7098,17 @@ export function useStockUnit(unitCode: string | undefined) {
  * window, in one read. The workspace joins them by `${order_id}#${leg}`.
  */
 export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
+export type { DeliveryProofReviewRow, DeliveryAttemptEvidenceRow } from "@carres/shared";
+export type { DeliveryCannotDeliverRow } from "@carres/shared";
 
 export interface DeliveryArrangementsPayload {
   arrangements: DeliveryArrangementRow[];
+  /** Every customer-contact record (0487) — the status ladder reads the
+   *  latest per scope. Optional: an older Worker carries none. */
+  contacts?: DeliveryContactRow[];
+  /** Every recorded `Cannot Deliver` (0417) — Reports → Delivery's partner
+   *  measure. Absent = the read failed or an older Worker: `Not available`. */
+  cannotDeliver?: DeliveryCannotDeliverRow[];
 }
 
 export function useDeliveryArrangements() {
@@ -7072,6 +7146,8 @@ export interface DeliveryArrangementDetail {
   };
   arrangement: DeliveryArrangementRow | null;
   history: DeliveryArrangementEventRow[];
+  /** This scope's contact records, newest first (0487). */
+  contacts?: DeliveryContactRow[];
 }
 
 export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
@@ -7083,6 +7159,83 @@ export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
       ),
     enabled: Boolean(orderId),
     staleTime: 10_000,
+  });
+}
+
+/* ── DELIVERY SETTINGS (0488, Delivery MASTER §11) — one read, section doors ── */
+export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
+  active?: boolean;
+  address?: string | null;
+  customer_phone?: string | null;
+  office_contact?: string | null;
+  coverage?: PartnerCoverage | null;
+  kv_default?: boolean;
+  cutoff_time?: string | null;
+  handover_points?: HandoverPoint[] | null;
+  services?: PartnerServices | null;
+  customer_contact_by?: "partner" | "operation";
+  record_on_behalf_allowed?: boolean;
+  proof_rules?: ProofRules | null;
+  operating_party_id?: string | null;
+}
+export interface DeliverySettingsResponse {
+  partners: DeliverySettingsPartnerRow[];
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  vehicles: Array<{
+    id: string;
+    partner_id: string;
+    plate: string;
+    vehicle_type: string;
+    capacity: string | null;
+    driver_name: string | null;
+    driver_phone: string | null;
+    active: boolean;
+  }>;
+  templates: DeliveryTemplateRow[];
+  changes: DeliverySettingChangeRow[];
+  partnerAccounts: Array<{ id: string; name: string | null; email: string; partner_id: string | null; status: string }>;
+  canEdit: boolean;
+  contactLeadWorkingDays: number | null;
+}
+export const DELIVERY_SETTINGS_QUERY_KEY = ["operation", "delivery-settings"] as const;
+export function useDeliverySettings() {
+  return useQuery<DeliverySettingsResponse, ApiError>({
+    queryKey: DELIVERY_SETTINGS_QUERY_KEY,
+    queryFn: () => apiFetch<DeliverySettingsResponse>("/api/operation/delivery-settings"),
+    staleTime: 30_000,
+  });
+}
+
+/** The ONE customer-contact door (0487, Delivery MASTER §5.1). */
+export function useRecordDeliveryContact(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeliveryContactInput) =>
+      apiFetch<{ contact: DeliveryContactRow }>(
+        `/api/operation/delivery-arrangements/${orderId}/contacts?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+    },
+  });
+}
+
+/** Operation records the partner's Cannot Deliver on its behalf (§8.6). */
+export function useRecordCannotDeliver(orderId: string | undefined, leg = 0) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: OperationCannotDeliverInput) =>
+      apiFetch<{ reported: boolean }>(
+        `/api/operation/delivery-arrangements/${orderId}/cannot-deliver?leg=${leg}`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangements"] });
+      void qc.invalidateQueries({ queryKey: ["operation", "delivery-arrangement", orderId ?? ""] });
+      void qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+    },
   });
 }
 
@@ -7150,11 +7303,54 @@ export interface DeliveryOrderDetailPayload {
       pod_signed_by: string | null;
       pod_signed_at: string | null;
       do_number: string | null;
+      /** 0156 — the order's Journey legs; a leg document names its own. */
+      delivery_stops?: DeliveryStop[] | null;
+      /** Card 16 — the site facts and the source warehouse, Sales' own columns. */
+      warehouse_id?: string | null;
+      warehouses?: { name: string | null } | { name: string | null }[] | null;
+      delivery_floor?: number | null;
+      delivery_has_lift?: boolean | null;
+      delivery_stair_items?: string | null;
+      building_type?: string | null;
+      ops_order_control?:
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }
+        | { delivery_photos?: DeliveryLedgerEntry[] | null; customer_request?: string | null; action_for_logistic?: string | null }[]
+        | null;
       order_lines: Array<{ sku: string; qty: number }>;
     };
   };
+  /** 0424 — the document's recorded exact-Unit scope, resolved to Unit IDs. */
+  scopeUnits?: Array<{ item_id: string; unit_code: string | null; sku: string | null }>;
+  handoverEventUnits?: Array<{ event_id: string; item_id: string; recorded_side: string; unit_code: string | null }>;
   attempts: DeliveryOrderAttemptRow[];
   lineDescriptions: Record<string, string>;
+  /** Card 16 (Delivery MASTER §9) — the seven sections' owned facts. All
+   *  optional: an older Worker answers without them, and the page states the
+   *  absence rather than inventing a value. */
+  arrangement?: {
+    id: string;
+    leg: number;
+    partner_id: string | null;
+    confirmed_date: string | null;
+    confirmed_time: string | null;
+    expected_arrival: string | null;
+    logistics_note: string | null;
+    driver_name: string | null;
+    vehicle: string | null;
+    condo_registration: string | null;
+    delivery_partners?: { id: string; name: string } | { id: string; name: string }[] | null;
+  } | null;
+  financeExceptions?: Array<{ id: string; status: "open" | "cleared"; reason: string; opened_at: string | null; cleared_at: string | null }>;
+  paymentApprovals?: Array<{ id: string; status: "pending" | "approved" | "refused"; request_reason: string; requested_at: string | null; decided_at: string | null; decision_reason: string | null }>;
+  siblingDocuments?: Array<{ id: string; do_number: string; leg?: number | null; issued_at: string; voided_at: string | null; void_reason: string | null }>;
+  /** null = the Cases could not be read (another module's table), never "none". */
+  serviceCases?: Array<{ id: string; case_no: string; status_id: string | null; opened_at: string | null }> | null;
+  history?: Array<{ id: string; text: string; by_role: string | null; occurred_at: string }>;
+  /** §6.1 (0489) — the Evidence section's facts: every file bound to the
+   *  attempt it proves (signed for viewing) and every review with its
+   *  reviewer's name. */
+  proofReviews?: Array<DeliveryProofReviewRow & { reviewed_by_name: string | null }>;
+  attemptEvidence?: Array<DeliveryAttemptEvidenceRow & { url: string | null }>;
   loans: Array<{
     id: string;
     item_id: string | null;
@@ -7163,6 +7359,8 @@ export interface DeliveryOrderDetailPayload {
     loaned_at: string | null;
     returned_at: string | null;
     loan_note_no: string | null;
+    /** 0492 (Card 15) — the loaned Unit's identity. */
+    ops_stock_items?: { unit_code: string | null; identity_scope: string | null } | { unit_code: string | null; identity_scope: string | null }[] | null;
   }>;
   handoverEvents: DeliveryHandoverEventRow[];
 }
@@ -7260,6 +7458,54 @@ export function useRecordDeliveryAttempt(
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (0489) — the three review acts, through the governed door. The DO
+ *  page, the register and Monitor all re-read: a review moves the row's
+ *  queue and its status colour. */
+export function useReviewDeliveryProof(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ review: unknown }, ApiError, ProofReviewInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ review: unknown }, ApiError, ProofReviewInput>({
+    mutationFn: (input) =>
+      apiFetch<{ review: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/proof-review`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (Card 13) — the signed Delivery Order filed against a delivered or
+ *  partially delivered document. Touches no status and no stock, so only the
+ *  document reads and the order tree are re-read. */
+export function useAttachSignedDeliveryOrder(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ attached: unknown }, ApiError, SignedDoAttachInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ attached: unknown }, ApiError, SignedDoAttachInput>({
+    mutationFn: (input) =>
+      apiFetch<{ attached: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/signed-document`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });
@@ -8708,6 +8954,97 @@ export function useInvoiceRegister() {
   });
 }
 
+/**
+ * The Payment Monitor's three source reads beside the invoice register
+ * (owner ruling 2026-09-12). Each is the owning module's own wire, read
+ * whole: the Monitor derives its Storage cell from the same cases and
+ * requests the Invoice object's Storage section reads, and its clock from
+ * the same effective timing rules Settings shows — never a second store.
+ */
+export function usePaymentStorageCases() {
+  return useQuery({
+    queryKey: qk.finance.storageCases(),
+    queryFn: () => apiFetch<{
+      cases: import("@carres/shared/payment-monitor").MonitorStorageCase[];
+    }>("/api/finance/payment-storage"),
+    staleTime: 15_000,
+  });
+}
+
+export function useLaterDeliveryRequests() {
+  return useQuery({
+    queryKey: qk.finance.laterDeliveryRequests(),
+    queryFn: () => apiFetch<{
+      requests: Array<import("@carres/shared/payment-monitor").MonitorFreeRequest & {
+        id: string; requested_date: string;
+      }>;
+    }>("/api/finance/payment-storage/later-delivery-requests"),
+    staleTime: 15_000,
+  });
+}
+
+export interface PaymentSettingsPayload {
+  bank_accounts: Array<{
+    route_source: "pj_showroom" | "dealer"; bank_name: string;
+    account_name: string | null; account_no: string | null;
+  }>;
+  storage_rules: Array<{
+    id: string; product_group: "mattress_bedframe" | "sofa"; free_days: number;
+    charge_amount: number; cycle_days: number; operation_limit_day: number | null;
+    waiver_limit_day: number | null; extra_free_allowed: boolean; inspection_days: number;
+    effective_from: string;
+  }>;
+  /** 0486 — newest effective first; the head is the current rule. */
+  collection_timing: Array<{
+    id: string; ask_days_before: number; deadline_days_before: number;
+    effective_from: string; reason: string | null; created_at: string;
+  }>;
+  setting_changes: Array<{
+    id: string; what: string; old_value: Record<string, unknown> | null;
+    new_value: Record<string, unknown> | null; reason: string | null;
+    effective_from: string | null; changed_at: string;
+    actor: { name: string | null } | { name: string | null }[] | null;
+  }>;
+  online_provider: { name: string; configured: boolean };
+}
+
+/**
+ * 0489 — the order's collection owner: the Responsible Delivery Operation,
+ * normal owner · today's cover · acting person · handover history, from the
+ * same `payment_collection_owner_context` the Work feed reads.
+ */
+export function useCollectionOwner(orderId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: qk.finance.collectionOwner(orderId ?? "none"),
+    queryFn: () => apiFetch<{ owner: import("@carres/shared/payment-collection-owner").CollectionOwnerContextRow | null }>(
+      `/api/finance/collection-owner?orderId=${encodeURIComponent(orderId ?? "")}`,
+    ),
+    enabled: enabled && !!orderId,
+    staleTime: 15_000,
+  });
+}
+
+/** The order's recorded collection results (0446) — promises, disputes,
+ *  no-answers — read by Communication History so a cover or a new owner
+ *  sees every earlier conversation before contacting the customer. */
+export function useCollectionOutcomes(invoiceId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["finance", "collection-outcomes", invoiceId ?? "none"],
+    queryFn: () => apiFetch<{ outcomes: Array<import("@carres/shared/payment-collection-outcome").CollectionOutcomeRow & {
+      recorded_by_user?: { name: string | null } | null;
+    }> }>(`/api/finance/invoices/${encodeURIComponent(invoiceId ?? "")}/collection-outcomes`),
+    enabled: !!invoiceId,
+    staleTime: 15_000,
+  });
+}
+
+export function usePaymentSettings() {
+  return useQuery({
+    queryKey: qk.finance.paymentSettings(),
+    queryFn: () => apiFetch<PaymentSettingsPayload>("/api/finance/payment-settings"),
+  });
+}
+
 // useFinancePayments is gone: it read the legacy `payments` table, so a
 // receipt recorded from the AR drawer (which lands in `order_payments`) never
 // showed in the drawer's own history. The drawer reads the invoice register's
@@ -10023,6 +10360,38 @@ export function useMarkUrgentStockOrdered() {
 // ── Sofa loan flow (migration 0209) ──────────────────────────────────────────
 const loansKey = (orderId: string | null) =>
   ["operation", "orders", orderId ?? "null", "loans"] as const;
+
+/** 0492 (Card 15) — the loan offer conversation, newest first. */
+export function useLoanOffers(orderId: string | null) {
+  return useQuery({
+    queryKey: ["operation", "orders", orderId ?? "null", "loan-offers"] as const,
+    queryFn: () => apiFetch<{ offers: LoanOfferView[] }>(`/api/operation/orders/${orderId}/loan-offers`),
+    enabled: !!orderId,
+    staleTime: 10_000,
+  });
+}
+
+/** Record the offer, or the customer's answer, through the one Orders door. */
+export function useRecordLoanOffer(
+  orderId: string,
+  opts?: Partial<UseMutationOptions<{ offer: unknown }, ApiError, LoanOfferRecordInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ offer: unknown }, ApiError, LoanOfferRecordInput>({
+    mutationFn: (input) =>
+      apiFetch<{ offer: unknown }>(`/api/operation/orders/${orderId}/loan-offers`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "orders", orderId, "loan-offers"] });
+      await qc.invalidateQueries({ queryKey: qk.operation.orderRoute(orderId) });
+      await qc.invalidateQueries({ queryKey: qk.operation.order(orderId), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
 
 /** The order's sofa loans (active + returned). */
 export function useOrderLoans(orderId: string | null) {
