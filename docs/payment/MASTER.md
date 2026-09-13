@@ -569,6 +569,71 @@ Owner ruling 2026-09-12, delivered as one slice (migration `0486`):
   through the governed receipt-document door; one merged PDF package is an improvement recorded
   in `docs/carry-forwards.md`, not part of this closure.
 
+**PRODUCTION-VERIFIED on `ed76eb43`, 2026-09-13 — the complete re-walk after the cache-key fix.**
+
+- **🔴 FOUND BY THE PRODUCTION RE-WALK — the Work page was dark on a live feed.** With the feed
+  answering 200 · 215 items, `My Work` / `Team Work` still printed `No open work — every track
+  is clear` and the Quick Rail counted nothing. Root cause: the legacy tasks panel cached its
+  `/api/ops/tasks` read under `["operation","work"]` — the SAME React Query key as the shared
+  Work feed (`qk.operation.work()`), so whichever read landed second was served the other's
+  shape. Fixed on `main`: PR #1257 (`8b23c5aa`) gives the legacy read `["operation",
+  "legacy-tasks"]` and a key-distinctness test; PR #1258 (`ed76eb43`) adds the regression proof
+  against a REAL QueryClient (`work-cache-isolation.test.tsx`): both mounting orders · Quick
+  Rail + Payment Monitor + legacy read mounted together · invalidating the feed refreshes the
+  Monitor's owner and leaves the legacy entry untouched · the unassigned-duty exception
+  preserves the action · each cache entry satisfies its own zod schema and FAILS the other's
+  (the shapes cannot be shared) · a negative control with the old colliding key reproduces the
+  poisoning · every `/api/ops/tasks` reader in the app is pinned to `TASKS_KEY`. **Law: one
+  cache key per read** — a key collision is a silent wrong answer, never an error.
+- **Real production state captured first (`ed76eb43`, the owner's signed-in Chrome, read-only):**
+  Work `215 actions to do · 114 late`, Team Work grouped per owner (Alvin 2 · E2E Test 101 ·
+  Jess 1 · Shasha 6 · tan qu qu 1 · Yu Jun 104); the React Query cache holds TWO entries —
+  `["operation","work"]` = `{items: 215, staff: 5, generatedOn}` and
+  `["operation","legacy-tasks"]` = `{tasks: 10}`; the Quick Rail panel renders its three counts
+  for the signed-in account (0 · 0 · 0 — it holds no duty) with no load error. Monitor rows
+  `SO-1321` and `SO-1313` both `Arrival not confirmed | Wait`; rail `Needs attention 0 · Ask
+  customer today 0 · Promised today 0 · Should have been paid 0 · Waiting for goods 2 · Storage
+  payments 0 · All unpaid 2`; summary `Nothing needs collection today`; footer `2 orders ·
+  RM 2,999.00 still needed`; zero owner cells, because no collection action is admitted today
+  (催钱前先看货). Payment Records: the six ruled columns, `2 payments · RM 1,915.00 received`,
+  `Online payment` / `Bank transfer` method words, no `New Payment`, no Payments/Invoices
+  switch. Settings: the eight ruled sections in the ruled order; Collection timing 3 · 2
+  working days; Mattress/Bedframe `Free storage 7 calendar days · RM 150.00 every 30 · Operation
+  may approve until Day 21 · Approver until Day 30`; Sofa `14 · RM 200.00 every 14`; the change
+  record prints the 0486 row (`Staff identity not recorded … Owner ruling 2026-09-12`). Duties:
+  `payment_approver` and `storage_waiver_approver` → Jess; `payment_duty` unassigned. Browser
+  console: no errors on any walked page.
+- **INJECTED UI EVIDENCE — NOT PRODUCTION CUSTOMER DATA.** To prove the unassigned duty does not
+  lose the action, one synthetic invoice `SO-9999` (customer name = the label itself) and its
+  Work item were injected into the deployed bundle's `window.fetch` wrapper in the browser only,
+  then the two React Query entries were invalidated in memory. Scope proof: the wrapper recorded
+  every non-GET call — **zero writes issued**; `localStorage` byte-identical before and after;
+  no API, database or customer record touched. The deployed Monitor rendered `SO-9999 | … |
+  Payment should have been received | Payment Duty is not assigned · Staff & Duties | Ask
+  customer to pay`, the link resolving to `/operation?tab=staff-duties`; the rail counted `Needs
+  attention 1 · Should have been paid 1 · All unpaid 3`, summary `1 payment should have been
+  received already`, footer `3 orders · RM 3,999.00 still needed`. **Reload restored the real
+  state exactly** — wrapper gone, `SO-9999` and the label absent, the two real `Wait` rows,
+  `2 orders · RM 2,999.00 still needed`, zero unassigned cells.
+- **Deployed shared-code verification (not an observed customer event):** the clock files are
+  byte-identical between `c4517cd1` and `ed76eb43` (`git diff` empty) and the deployed bundle
+  carries the two-calendar fields (`actionDueIso` ×5, `actionAskIso` ×5). `collectionClock` on
+  the `ed76eb43` checkout, Tuesday 15 Sep confirmed delivery, ruled 3 · 2: **Company deadline
+  Saturday, 12 Sep** (ask Friday, 11 Sep) · **Operation owner action Friday, 11 Sep** (t2 from
+  Friday; `late` only after the Saturday deadline) · **Saturday-working owner action Saturday, 12 Sep** (t3 on
+  Friday, t2 on Saturday). The deadline fact never moved; only the owner's action day did, and
+  only for the owner whose calendar excludes Saturday.
+- **Bundle greps on `ed76eb43`:** `is not assigned` 1 · `legacy-tasks` 1 · `Payments · Invoices`
+  0 · `Request payment approval` 0 · `Download DO` 0.
+- **Responsive / zoom — limitation stated:** the owner's signed-in Chrome walk runs in a
+  headless tab (`window.innerWidth` 0), so 390 px and 200 % could not be produced against
+  production in that session; the Monitor's rail therefore started collapsed and was opened
+  through `Show filters`. The same deployed code was walked locally at 390 px and 720 px (rail
+  hidden below 1100 px, no horizontal page scroll, the fact column wraps) and the responsive
+  tests pass (`PaymentMonitor.test.tsx` 23 · `PaymentRecords.test.tsx` 20 ·
+  `work-cache-isolation.test.tsx` 8 on the `ed76eb43` checkout).
+- **Production surfaces on `ed76eb43`:** ERP, POS, Pages and `/health` all reported the SHA.
+
 
 **OVERALL PAYMENT DELIVERY STATUS: PARTIALLY DELIVERED.** The posting core is
 production-verified and the §16/§17 registers, objects, actions, Settings and Calendar are
