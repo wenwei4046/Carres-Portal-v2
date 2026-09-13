@@ -3,7 +3,7 @@
  *
  * The one ledger entry with no document behind it: an opening balance, a
  * correction. Principal only (ruling M). It is posted by `gl_manual_journal`
- * (migration 0462), which checks the caller itself, refuses any line on a
+ * (migration 0462; keyed by a request key since 0502), which checks the caller itself, refuses any line on a
  * control account, draws the entry's `MJ-YYYYMM-NNNN` document number and hands
  * the lines to `gl_post`, which draws the `JE-YYYYMM-NNNN` entry number.
  *
@@ -65,6 +65,10 @@ export const manualJournalInput = z
       .array(manualJournalLineInput)
       .min(2, "A journal entry needs at least two lines.")
       .max(MANUAL_JOURNAL_MAX_LINES, `A journal entry takes at most ${MANUAL_JOURNAL_MAX_LINES} lines.`),
+    /** One key per entry the person is typing (0502). The form draws it when
+     *  it opens and sends it on every press: a resend with the same key and
+     *  the same details returns the first entry and posts nothing new. */
+    requestKey: z.string().uuid("The journal entry was refused. Check it and try again.").optional(),
   })
   .strict()
   .superRefine((entry, ctx) => {
