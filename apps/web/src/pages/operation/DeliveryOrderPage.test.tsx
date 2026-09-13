@@ -609,6 +609,7 @@ describe("DeliveryOrderPage", () => {
               loaned_at: "2026-08-18T02:00:00Z",
               returned_at: null,
               loan_note_no: "LN-180826-3035",
+              ops_stock_items: { unit_code: "U1-000-082", identity_scope: "unit" },
             },
           ],
         },
@@ -616,5 +617,7 @@ describe("DeliveryOrderPage", () => {
     );
     expect(screen.getByText("Loan collection")).toBeTruthy();
     expect(screen.getByText(/Collect back on delivery day/)).toBeTruthy();
+    /* 0492 (Card 15) — the EXACT Unit the crew brings back. */
+    expect(screen.getByTestId("do-loan-lines")).toHaveTextContent("Loan U1-000-082 · collect back on delivery day");
   });
 });

@@ -25,8 +25,8 @@
 
 ## Tasks
 
-- [ ] Migration and door; probe
-- [ ] Order Route LOAN node reads the offer history
-- [ ] Monitor and DO loan line
+- [x] Migration and door; probe — `0492_the_loan_offer_is_a_record_on_the_sales_order.sql`: `ops_loan_offers` (seq append order, offer-says-what and decline-says-why CHECKs, append-only trigger, internal read), `sales_order_loan_offer_record`; rolled-back probe 2026-09-13: anon 42501 · answer before offer 22023 · offer without label 22023 · decline without reason 22023 · accept after decline 22023 · decline carries the offer's label · re-offer then accept · rewrite P0001 · four History lines
+- [x] Order Route LOAN node reads the offer history — `RouteLoanOffer`/`loanOffers` in the route input; an open or accepted offer is the node until the item is out; the route facts fan-in reads `GET /orders/:id/loan-offers`
+- [x] Monitor and DO loan line — the orders list and the DO detail carry the loaned Unit's identity; panel 4 and the DO `Loan collection` print `Loan {Unit ID} · collect back on delivery day` per loan out; the SO drawer's Loan panel gains the offer block (`Offer a loan` · `Customer accepted` · `Customer declined`)
 - [ ] Tests, typecheck, design guard
 - [ ] PR → merge → apply → deploy → authenticated production verification

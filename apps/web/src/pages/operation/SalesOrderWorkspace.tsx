@@ -1810,6 +1810,17 @@ export default function SalesOrderWorkspace() {
         label: loan.borrowed_label?.trim() || loan.item_sku || loan.borrowed_sku || "item",
         qty: 1,
         returned: loan.status === "returned",
+        unitId: loan.item_unit_code ?? null,
+      })),
+      /* 0492 (Card 15) — the offer conversation; the map prints the current
+         state, the drawer keeps the history. */
+      loanOffers: (facts.loanOffers ?? []).map((offer) => ({
+        id: offer.id,
+        seq: offer.seq,
+        event: offer.event,
+        label: offer.label,
+        reason: offer.reason,
+        recordedAt: offer.recorded_at,
       })),
       /* Sunday and Malaysian public holidays are the two days no company runs
          (§8) — the gate names the refused day instead of failing silently. */

@@ -38,6 +38,8 @@ import {
   type StockEtaImportResult,
   type SofaLoanDto,
   type BalancePayStatus,
+  loanOfferRecordInput,
+  unitIdOf,
 } from "@carres/shared";
 import { loadBookingContext } from "../../lib/booking-context";
 import {
@@ -1745,6 +1747,84 @@ orderControlRouter.get("/:id/loans", async (c) => {
   }
   const loans: SofaLoanDto[] = (data ?? []).map((r) => mapLoanRow(r));
   return c.json({ loans });
+});
+
+/**
+ * 0492 (Delivery MASTER §14.2, Card 15) — the loan OFFER and the customer's
+ * answer, recorded on the Sales Order beside the loan itself. Orders owns the
+ * record; Logistics never makes the commercial offer.
+ *
+ *   GET  /:id/loan-offers   the whole history, newest first
+ *   POST /:id/loan-offers   one record through the governed door
+ */
+orderControlRouter.get("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb
+    .from("ops_loan_offers")
+    .select("id, seq, order_id, event, item_id, label, reason, recorded_by, recorded_at, ops_stock_items(unit_code, identity_scope)")
+    .eq("order_id", idCheck.data)
+    .order("seq", { ascending: false });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  const offers = (data ?? []).map((r) => {
+    const row = r as Record<string, unknown> & {
+      ops_stock_items?: { unit_code?: string | null; identity_scope?: string | null } | null;
+    };
+    const unit = Array.isArray(row.ops_stock_items) ? row.ops_stock_items[0] : row.ops_stock_items;
+    return {
+      id: row.id,
+      seq: row.seq,
+      order_id: row.order_id,
+      event: row.event,
+      item_id: row.item_id ?? null,
+      label: row.label ?? null,
+      reason: row.reason ?? null,
+      recorded_by: row.recorded_by ?? null,
+      recorded_at: row.recorded_at,
+      unit_id: unitIdOf({ unitCode: unit?.unit_code ?? null, identityScope: unit?.identity_scope ?? null }),
+    };
+  });
+  return c.json({ offers });
+});
+
+orderControlRouter.post("/:id/loan-offers", async (c) => {
+  const auth = c.var.auth;
+  requireOperationOrPrincipal(auth.role);
+  const idCheck = ORDER_ID.safeParse(c.req.param("id"));
+  if (!idCheck.success) throw new HTTPException(404, { message: "Order not found" });
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    throw new HTTPException(400, { message: "Body must be valid JSON" });
+  }
+  const parsed = loanOfferRecordInput.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return c.json(
+      { error: "invalid_input", code: "invalid_param", message: issue?.message ?? "invalid input", field: issue?.path.join(".") ?? "unknown" },
+      422,
+    );
+  }
+  const sb = userClient(c.env, auth.jwt);
+  const { data, error } = await sb.rpc("sales_order_loan_offer_record", {
+    p_order_id: idCheck.data,
+    p_event: parsed.data.event,
+    p_item_id: parsed.data.itemId ?? null,
+    p_label: parsed.data.label ?? null,
+    p_reason: parsed.data.reason ?? null,
+  });
+  if (error) {
+    const m = mapPgError(error);
+    return c.json(m.body, m.status);
+  }
+  return c.json({ offer: data }, 201);
 });
 
 /** Map a joined ops_sofa_loans row → the general SofaLoanDto (both sources). */

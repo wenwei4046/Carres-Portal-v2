@@ -938,7 +938,13 @@ makes the commercial offer. Warehouse prepares the exact Loan Unit through Outbo
 transports it and collects it back on the delivery day; the recovered Unit goes to inspection,
 never straight to Ready Stock. Order Route holds the whole loan history; Monitor prints only the
 current loan line in panel 4 and the `Collect the loan item` Work on the day. A loan never blocks
-a Delivery Order. The offer record is **APPROVED TARGET / NOT BUILT** (§15.1).
+a Delivery Order. **The offer record is BUILT (Card 15, migration 0492):** `ops_loan_offers` on
+the Sales Order — `offered · accepted · declined`, append-only, through the one Orders door
+`sales_order_loan_offer_record` (an answer answers an OPEN offer; a decline says why); the Sales
+Order drawer's Loan panel offers and records the answer; Order Route prints the current state
+(`Loan offered · …` / `Customer accepted the loan · …`) until the item is out, then the loan row
+itself; Monitor panel 4 and the DO object print `Loan {Unit ID} · collect back on delivery day`
+per loan Unit out.
 
 ### 14.3 · Current versus intentional future
 
@@ -990,7 +996,7 @@ their absence as a design blind spot:
 | Gap | Where it lives today |
 |---|---|
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
-| the loan offer record; the append-only Correction of saved delivery facts (§6.1) | new migrations under the governed apply path |
+| the append-only Correction of saved delivery facts (§6.1) | a new migration under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
 | the split-trip DO's own issuing door (a leg DO is built; a split-trip scope still has no door) | `apps/api/src/lib/delivery-order-issue.ts` |

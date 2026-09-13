@@ -240,7 +240,7 @@ deliveryOrdersRouter.get("/:id", requireOperationOrPrincipal, async (c) => {
       .order("recorded_at", { ascending: true }),
     sb
       .from("ops_sofa_loans")
-      .select("id, item_id, do_number, status, loaned_at, returned_at, loan_note_no")
+      .select("id, item_id, do_number, status, loaned_at, returned_at, loan_note_no, ops_stock_items(unit_code, identity_scope)")
       .eq("order_id", orderId),
     sb
       .from("delivery_handover_events")
