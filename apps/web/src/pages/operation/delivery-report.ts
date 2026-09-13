@@ -385,6 +385,9 @@ export function partnerRowsOf(input: {
     if (a.recorded_at.slice(0, 7) !== input.month) continue;
     const doc = a.do_number ? byDo.get(a.do_number) : undefined;
     if (!doc) continue;
+    /* A warehouse-to-warehouse leg's arrival is not a customer delivery
+       (Card 20): the same exclusion Commitment and First Delivery state. */
+    if (!reachesCustomer(doc)) continue;
     const row = rowFor(doc.logisticsPartner ?? DR.noLogisticsNamed);
     row.trips += 1;
     if (a.result === "delivered") row.delivered += 1;

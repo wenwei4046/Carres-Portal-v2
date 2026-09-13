@@ -437,16 +437,25 @@ name the purpose, such as `Confirm New Delivery Date` or `Confirm Delivery Addre
 borrow the other's words.
 
 ```
-Delivery Order document — the DOCUMENT's own life (unchanged)
-  Created · Out for delivery · Delivered · Delivery exception · Cancelled
+Delivery Order document — the DOCUMENT's own life
+  Created · Out for delivery · Arrived · Delivered · Delivery exception · Cancelled
+  (`Arrived` only on an intermediate Journey leg's document — the goods reached the
+   named partner warehouse; `Delivered` is the customer leg's word — Card 20, 2026-09-13)
 
 Monitor `Delivery Status` — the OPERATION's progress, naming the actor and the fact
   Operation must assign logistics · {partner} must contact the customer ·
   Operation must call the customer · Waiting for customer reply ·
   Confirmed for {weekday, date} · Waiting for {partner} pickup ·
   Goods collected by {partner} · {partner} is delivering to the customer ·
-  Overdue · Delivered · Failed Delivery · Order details incomplete
+  Overdue · Arrived · Delivered · Failed Delivery · Order details incomplete
 ```
+
+**`Delivered` is reserved for goods that reached the CUSTOMER (Card 20, 2026-09-13).** An
+intermediate Journey leg's success is **`Arrived`** on line one and the partner warehouse the goods
+reached on line two (`JB transit warehouse`) — on Monitor, the Delivery Orders register, the DO
+object header, Delivery history and every report — through the same two arithmetics. A warehouse
+arrival owes no delivery photo, signed paper or proof review; the customer leg's document carries
+them. `Logistics Partner Performance` counts customer-leg results only.
 
 `{partner}` is the actual company name from the data, never a hard-coded carrier. The one
 arithmetic and the facts behind each word are `delivery/MASTER.md` §8.4.
@@ -552,7 +561,7 @@ coverage** — the exclusion is always stated, never silent:
 | `Delivery Commitment Performance` | `Kept the requested date` · `After the requested date` · `No requested date` · `{n} deliveries · Kept the requested date {rate}` |
 | `First Delivery Success` | `Delivered on the first visit` · `Partly delivered on the first visit` · `Failed on the first visit` |
 | `Failed Delivery Analysis` | the reason library's own words with the category in brackets, e.g. `Customer unreachable (Customer)` |
-| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named` |
+| `Logistics Partner Performance` | `{n} trips · {n} delivered · {n} partly delivered · {n} failed · Cannot Deliver {n}` · `Delivered {rate}` · `No logistics named`; customer-leg results only — `Journey legs before the last are warehouse trips and are excluded.` (Card 20) |
 | `Warehouse Performance` | `Ready {date} · Handed over {date} · Received by logistics {date}` · `Handed over by the delivery day` · `Handed over after the delivery day` |
 | `Delivery Proof Control` | `No proof yet` · `Not reviewed yet` · `Proof Accepted` · `More Proof Required` · `Proof Rejected` · `Delivery photo missing` · `Signed Delivery Order missing` |
 | `Schedule and Capacity` | `{n} deliveries confirmed across {n} days · busiest {day} with {n}` · `{n} deliveries · {n} booked` |
@@ -2630,7 +2639,8 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 | `Check the delivery proof` / `Accept it, ask for more, or reject it` · `Delivery proof not reviewed` | the Work sentence (act / required result) and the Work problem word of the `check_delivery_proof` rule, Delivery Duty's | **RULED 2026-09-13** |
 | `Upload delivery proof` | Monitor's WORK TO DO queue for a recorded delivered result with incomplete required evidence; each row names the exact missing file | **RULED 2026-09-07** |
 | `DELIVERY STATUS` | Monitor's operational-status filter group, a kit dropdown over the §8.4 status words of `delivery/MASTER.md` | **RULED 2026-09-07**, words re-ruled **2026-09-13** |
-| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's five words, each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `DOCUMENT STATUS` | the register rail's status group — a governed **dropdown** offering `All` plus the ladder's words (`Arrived` joined 2026-09-13, Card 20), each with its live count | **RULED 2026-09-06**, control corrected **2026-09-11** |
+| `Arrived` over `{partner warehouse}` · `This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.` | an intermediate Journey leg's document: its pill word and line two on the register, Monitor and the DO header; and the Evidence section's one sentence on such a document | **BUILT 2026-09-13** (Card 20 — the word is Card 14's ruled `Arrived`) |
 | `Driver submission` | the Delivery Orders register's column for what came back from THIS delivery order's trip. It replaces the default `Proof Status` column (retired 2026-09-11) | **RULED 2026-09-11** |
 | `Photos {n}` · `Videos {n}` | the two count buttons inside `Driver submission`. The number is the ledger's own count of files stamped with THIS document; a count is NEVER printed when the answer is unknown, and no button is offered for a kind with no files. **No video is not a shortage** — video is not required, so an absent video prints nothing at all | **RULED 2026-09-11** |
 | `Signed Delivery Order` | the viewing link to the signed paper on file, on the second line of `Driver submission`. Already the governed proof name; here it is a door | **REUSED 2026-09-11** |
@@ -2642,11 +2652,11 @@ RETIRED — the rail is ONE `WORK TO DO` group):
 
 **ONE `Status` COLUMN, AND ITS SECOND LINE SAYS WHAT HAPPENED — owner ruling 2026-09-11.** The
 Delivery Orders register prints the outcome ONCE. Line 1 is the DOCUMENT's own pill word
-(`Created` · `Out for delivery` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
+(`Created` · `Out for delivery` · `Arrived` · `Delivered` · `Delivery exception` · `Cancelled`). Line 2 of a
 `Delivery exception` carries the RESULT that was actually recorded and its reason —
 `Partially Delivered · {reason}` or `Failed Delivery · {reason}` — which is what the retired
 default `Delivery Result` column used to print three columns away. `Cancelled` keeps its void
-reason on line 2. **The search, the per-column filter and the Excel export print the same
+reason on line 2; `Arrived` carries the partner warehouse the goods reached (Card 20). **The search, the per-column filter and the Excel export print the same
 spelling as the cell**, so a reader looking for `Partially Delivered` finds the row that recorded
 it even though its pill spells `Delivery exception`. Combining a DISPLAY never changes the status
 arithmetic and never removes a recorded result: the Delivery Order's own page still holds every

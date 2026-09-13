@@ -160,7 +160,11 @@ order for the legacy readers. A split-trip DO remains approved target (§15.1).
 - **Document status is DERIVED, never stored** (`deliveryOrderStatusOf`, one arithmetic): the void
   stamp, the `delivery_attempts` history matched to the document's number and the §4 handover
   facts decide `Created · Out for delivery · Delivered · Delivery exception (+ its ONE reason) ·
-  Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** `Out for delivery`
+  Cancelled`. **This is the DOCUMENT's own vocabulary and it stays as it is.** **`Arrived`
+  (BUILT 2026-09-13, Card 20):** an intermediate Journey leg's document — a leg before the
+  last — whose `delivered` result (0491/0496) is the goods reaching the named partner warehouse
+  reads `Arrived` over that stop; `Delivered` is reserved for the customer leg and the
+  whole-order document, and a warehouse arrival owes no delivery proof. `Out for delivery`
   on the document = the §4 chain's `Received by logistics` fact with no result recorded yet; it is
   never derived from the calendar. The document ladder and the Monitor status dictionary in §8.4
   never borrow each other's words.
@@ -598,6 +602,7 @@ ever hard-coded.
 | Warehouse handed over and the partner's receipt is recorded | `Goods collected by {partner}` | none | `Collected {date} {time}` |
 | collected, and the partner recorded departure or an ETA | `{partner} is delivering to the customer` | none | `ETA {time}` |
 | confirmed day passed with no result | `Overdue` | red | `{partner} must record the result` |
+| attempt `delivered` on an intermediate Journey leg — the goods reached the named partner warehouse (Card 20) | `Arrived` | green | the stop, `JB transit warehouse`; no proof line, the customer leg owes the proof |
 | attempt `delivered` | `Delivered` | green | `Proof accepted {date}`, or `Delivery photo not uploaded` in orange |
 | attempt `partial` or `failed` | `Failed Delivery` | red | the one reason |
 | a required Sales fact missing on a Monitor row | `Order details incomplete` | orange | the missing fact |
@@ -768,7 +773,11 @@ kit `Panel`s — section one prints the customer, address, Warehouse, partner, a
 window, ETA, driver, vehicle from `ops_delivery_arrangements`), route, trip scope, site
 requirements (building, floor, lift, stairs, access, customer request, instruction for
 logistics), the goods and the live document rendered inline by the governed DO renderer;
-Delivery history lists `Delivery on {day} · {result}`; Exceptions lists failed and partial
+On a Journey leg's document the `Warehouse` fact is that leg's own source stop — leg 1 the
+configured Carres source, a later leg the previous partner's warehouse (`from_loc`) — never the
+order-level warehouse (Card 20). Delivery history lists `Delivery on {day} · {result}`, an
+intermediate leg's arrival spelled `Arrived`, and its Evidence section states that a warehouse
+arrival owes no delivery proof; Exceptions lists failed and partial
 visits, the open Finance exception, the pending payment approval, a cancellation and the Work
 action lines with their owner (`No open problems` otherwise); History merges the issue, the
 handover chain, the attempts and the order's own History lines in time order; Related records
@@ -881,7 +890,9 @@ arrival); each listing opens with its source fact, date basis and coverage sente
 five records reads `Rate withheld · fewer than 5 records`; an unreadable read prints `Not
 available`; Excel export writes one sheet per listing. The Cannot Deliver records (0417) reach the
 report through the arrangements read (`cannotDeliver`, absent when unreadable). The words are in
-`docs/COPY-STANDARD.md` (Reports → Delivery words).
+`docs/COPY-STANDARD.md` (Reports → Delivery words). A Journey leg before the last is a warehouse
+trip: Commitment, First Delivery, Proof Control and `Logistics Partner Performance` count
+customer-leg results only and say so in their coverage sentence (Card 20, 2026-09-13).
 
 ## 13 · Owners, permissions and the external boundary
 
