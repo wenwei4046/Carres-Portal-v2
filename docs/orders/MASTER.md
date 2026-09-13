@@ -234,6 +234,33 @@ Category | Unit ID | Deliver To | SKU | Qty | Item
 
 It reads Unit ID from Stock and Deliver To from Purchasing. It never infers or writes either fact.
 
+**Register correction — owner approved 2026-09-11; implemented in [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227).**
+The delivery PR carries the exact release SHA, check results and authenticated read-only closure;
+implementation or a sample browser walk alone is not deployment proof.
+Incoming Unit IDs with an exclusive PO-source-to-order-line relationship are shown as line evidence.
+Reserved/sold Units require Stock’s stored line binding; their original PO is not a substitute.
+Order/SKU-only links remain inspectable but say `Unit ID link not verified`; matching a SKU
+does not assign an exact Unit to a configured line. Proven IDs exceeding the order-line Qty
+say `Unit ID count exceeds order quantity`; never truncate the IDs to make the counts agree.
+One verified ID prints directly; multiple IDs open a read-only kit Popover with the full list. The current SO Batch and Delivery readers retain their existing `unitIds`, `unitLines`,
+`unitScopes` and Unit-to-PO evidence contract. Sales Orders uses the additional `verifiedUnitIds`
+projection for allocation counts and excludes counted stock keys from physical Unit labels.
+The newer Purchasing details table remains unchanged by this takeover.
+Deliver To uses actual `po_line_sources` quantities and the corresponding PO-line destination,
+falling back only to that PO's recorded destination. A current default destination is not an
+order fact. Missing line provenance renders `Not recorded`. Loading, failed reads and verified
+absence are distinct; failed reads offer Retry and never render `Not allocated`.
+The normal toolbar exposes Search, Export and Columns with labels, wrapping on narrow containers.
+Multiple PO numbers open one count entry with all document links; one PO remains a direct link.
+The footer explicitly labels category values as Qty and includes Other goods when counted.
+Default column widths fit the eight-column sample at 1180px without shrinking typography;
+existing saved column layouts are preserved. Destination header padding and spacing adapt on
+narrow screens. Local Edge checks at 1180/390/320px show no document overflow; the narrow grid
+retains its own horizontal scroll. The 14-ID sample expands to 85px, with every ID inspectable.
+These checks use isolated sample responses and do not establish production data correctness
+or Mac browser parity. Old Orders remains because its AutoCount import is still reachable only there.
+These are read-only corrections: Purchasing, Stock, Payment and Delivery keep their writers.
+
 ## Order view — one page, foreign facts read-only
 
 The Order view keeps the governed object header and one-page document composition.
@@ -246,18 +273,29 @@ and too fragmented: *"reduce scrolling need"*, *"put more effort into reducing s
 each card"*, *"make it merge more"*. Eleven cards became seven. **No fact left the system — two
 sections left THIS TAB because `Order Route` already owns them.**
 
-**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11. PR #1222 `a27d2896`,
-production-verified 2026-09-11.** All five canonical surfaces (`carres-portal` and `carres-pos`
-Pages, the ERP and POS canonical hosts, and the API Worker) report that SHA, and the served ERP
-bundle carries `Delivery access`, `Sales ownership`, `Recorded by` and `Line total` — the SHA
-alone has been wrong before, so the asset was read too.
+**THE CURRENT COMPOSITION — OWNER-APPROVED 2026-09-11.** PR #1222 `a27d2896` shipped
+the composition; [PR #1227](https://github.com/wenwei4046/Carres-Portal-v2/pull/1227) preserves it
+and corrects payment evidence, line provenance and visible item prices. The baseline deployment
+was verified on all five canonical surfaces (`carres-portal` and `carres-pos` Pages, ERP, POS
+and the API Worker), including served bundle content. The current delivery PR records its exact
+release SHA and authenticated read-only verification; no live version is inferred from a merge alone.
 
-⚠️ **What that record does NOT cover, stated rather than implied:** the **authenticated** page
-walk is owner-only and was not performed; the **re-cut-on-resize** path was not observed end to
-end (a hidden tab delivers neither `ResizeObserver` callbacks nor `requestAnimationFrame` —
-measured — so the padding arithmetic is unit-tested and the wiring pinned by the contract suite
-instead); browser coverage is **macOS + Chromium only**; and a **pre-existing** 120px page
-overflow at 390px comes from the shell header chrome, not from these cards.
+⚠️ **What that original record did not cover:** an authenticated page walk was not performed;
+owner-only acceptance does not prohibit engineering from read-only verification. The takeover
+walk found SO-1319's positive Paid with an empty transaction list and SO-1357's saved reference
+and slip with zero Paid. These findings require the capture/evidence states described below.
+The takeover checked the actual 574px detail content pane: both prices, all payment columns,
+saved-only/zero evidence, failed reads, keyboard Unit evidence and PDF amount parity.
+
+**Responsive evidence:** the browser viewport override was ineffective, so a temporary same-origin
+preview frame rendered the real workspace at measured 390/768/1180px widths. At 390px the
+324px goods container scrolls its 542px table internally; the saved payment facts and Paid /
+Outstanding remain visible. The PDF canvas changed from 358px to 700px to 557px and back to
+358px as the frame changed 390 → 768 → 1180 → 390, directly observing the resize/re-cut path.
+The complete 390px PDF, including its balance and signature area, was visible. Body widths
+768/1180 had no document overflow. The existing shell header still produces 120px overflow
+at 390px (body 390, scroll width 510); this remains a shared shell limitation, not a claim of a
+clean mobile shell. The temporary harness is not shipped, and this is Chromium coverage only.
 
 This
 OVERWRITES the 2026-08-26 seven-card list and the 2026-08-27 third merge pass. The page reads as
@@ -272,7 +310,7 @@ ORDER INFO              SO Date · Requested Delivery Date · Proceed date · Cu
   └ Change delivery date  the governed three fields · creates a Revision · needs approval
 DELIVERY                the MY cascade · building type · billing relationship · billing address
   └ Delivery access     floor · items needing stair carry · lift + the stair working line
-GOODS                   the six ruled columns · Unit price · Line total, and ONE Total beneath
+GOODS                   six goods facts · stacked Unit price / Line total, ONE Total beneath
 MONEY                   the payment ledger · Paid · Outstanding · Open this order in Payments →
 WHAT THIS CHANGE STARTED ELSEWHERE   only when work exists
 ```
@@ -687,10 +725,10 @@ read only as implementation history.
   Warehouse physical location is deliberately absent and must never be substituted for Deliver To.
   A physical goods line with no allocated Stock Unit says `Not allocated`; a Service says
   `Not applicable` rather than pretending a Unit should exist.
-- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Where the existing
-  Purchasing relationship cannot identify that allocation structurally, the Register must keep
-  the governed default/readable fallback and must not distribute another Sales Order's quantity
-  or destination by inference. A future allocation key may close this; this UI slice does not.
+- A consolidated PO does not by itself prove a PO-line-to-SO-line allocation. Without a
+  structural source link, the Register shows `Not recorded` for Deliver To and exposes
+  order/SKU-only Unit associations as unverified. It never substitutes a current default or
+  distributes another Sales Order's quantity or destination by matching SKU alone.
 - Search, typed filters, sort, Columns and Export remain useful register capabilities. Selection
   may scope Export; it does not license workflow bulk actions on a truth register.
 - Document numbers navigate directly to their authoritative object where the relationship exists:
@@ -1321,8 +1359,10 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   only; removing them would lose governed truth the card does not name.
 
   **THE OBJECT PAGE'S GOODS TABLE ALSO STATES THE MONEY — APPROVED + IMPLEMENTED 2026-09-11.**
-  `Unit price` and `Line total` are APPENDED to the right of those six; the six keep their ruled
-  order and alignment. This is the OBJECT page only. **The register's `▸` child mini-table stays
+  `Unit price` and `Line total` share a two-line money column to the right of those six;
+  the unit price is above the emphasized line total. The six keep their ruled order and alignment.
+  The earlier separate money columns clipped the line total in a measured 574px content pane;
+  grouping the two figures preserves both without changing the permanent PDF split. This is the OBJECT page only. **The register's `▸` child mini-table stays
   at exactly six** (§ the goods expander, and `GoodsMiniTable.tsx`) — a register answers *what
   records exist*, and a price column there would re-open the sheet the register deliberately is
   not. The reason the object page earns them: an operator could not read what the customer agreed
@@ -1456,8 +1496,34 @@ the amendment machinery, the goods truth and the Order Route architecture are un
   - **The at-sale plan is stated only where it was recorded** — `installment_months` +
     `payment_method`, as an ORDER fact above the ledger. **No monthly figure is derived**: a month
     count and a total do not say what the customer's bank charges, and a number this screen
-    invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent and no
-    approval-code mapping; neither is invented.
+    invented would be read as one Carres agreed to. ⚠️ There is no Account Sheet equivalent. Saved `orders.approval_code` is the at-sale reference;
+    `orders.payment_slip_url` is the at-sale slip in `orders-attachments`. They appear with the
+    saved method/months under `Payment details recorded at sale`, separate from transactions.
+    No payment amount, paid date or collector is inferred from the order's cumulative Paid or
+    current salesperson. When no transactions exist, a positive Paid keeps the saved capture visible and explains that
+    individual transactions are unavailable. A saved reference/slip with zero Paid flags the
+    inconsistent records and points to Payments. Only an order without those facts gets the
+    neutral empty-transaction state. Saved evidence survives a failed transaction read. The
+    detail GET explicitly carries all four capture fields. The page never substitutes an
+    inferred amount or creates a payment as a rendering side effect.
+  - **Read-only source findings, 2026-09-11:** SO-1319 records Paid RM 1,250 but no canonical
+    transactions. SO-1357 records Paid RM 0, reference FT2083020 and a slip attachment; its
+    creation history also says 0% deposit. The authenticated Sales Portal My orders drawer
+    confirms `Paid so far RM 0 / 2,874` and `0% collected`; its additional-payment input
+    pre-fills 2,874 but is not a submitted payment. The attachment cannot establish a paid
+    amount. No business rows were changed. At the initial investigation the Sales Portal create
+    did not post its deposit through the canonical writer and raw create used a best-effort
+    mirror. PR #1219, subsequently merged into this delivery base, supplies migration 0476:
+    both create wrappers use `_order_create_deposit` in the order transaction. That writer
+    correction belongs to Finance; this read-only change does not apply migrations or backfill
+    historical payments. Historical reconciliation still needs verified source amounts and
+    the governed Payments correction path; the saved zero is never replaced with a guess.
+  - **Old revisions use their own lines and services.** SKU/configuration and service amounts
+    cannot be paired with current rows by position. Current Unit IDs/destinations do not prove
+    historical allocation. Current partially allocated lines preserve all recorded Unit IDs,
+    including explicitly unverified links, while still showing the short quantity. Stock's saved
+    `reserved_order_line_id` takes precedence over the original PO source after reassignment;
+    an unknown explicit line is never replaced with a same-SKU or PO guess.
 - **`SALES OWNERSHIP` is read-only for Operation — no button.** A management-authorised role
   (principal or HR, the same lane GATE 3 lets decide it) sees the one door, worded
   **`Change salesperson`** (⛔ the `— needs approval` suffix ruled here on 2026-08-15 was retired

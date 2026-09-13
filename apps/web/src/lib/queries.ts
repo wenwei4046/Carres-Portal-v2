@@ -3100,6 +3100,10 @@ export interface SalesOrderExpansionResponse {
     lineId: string;
     sku: string;
     unitIds: string[];
+    /** Order/SKU evidence without a proven link to this configured line. */
+    unverifiedUnitIds?: string[];
+    verifiedUnitIds?: string[];
+    unitQuantityMismatch?: boolean;
     deliverTo: Array<{ name: string; qty: number }>;
   }>;
 }
@@ -3290,6 +3294,11 @@ export interface operationOrderDetailOrder {
    *  ready_to_dispatch / dispatched stages (operation records the customer's
    *  final balance payment at delivery). */
   paid: number;
+  /** Saved at-sale facts; never synthesized into a ledger transaction. */
+  payment_method?: string | null;
+  installment_months?: number | null;
+  approval_code?: string | null;
+  payment_slip_url?: string | null;
   dealers: { name: string } | null;
   outlets: { name: string } | null;
   /** STAGE 1 — who sold it. The Sales Order workspace names the salesperson on

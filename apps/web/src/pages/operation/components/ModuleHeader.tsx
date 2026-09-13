@@ -73,12 +73,12 @@ export default function ModuleHeader({
 
   return (
     <div
-      className={`shrink-0 bg-white border-b border-base-200 px-6 ${
-        destinationHeader ? "box-border h-[50px]" : ""
+      className={`shrink-0 bg-white border-b border-base-200 ${
+        destinationHeader ? "px-3 sm:px-6 box-border h-[50px]" : "px-6"
       }`}
       data-testid={testId}
     >
-      <div className={`flex items-center gap-4 ${destinationHeader ? "h-full" : "h-11"}`}>
+      <div className={`flex items-center ${destinationHeader ? "gap-1 sm:gap-4 h-full" : "gap-4 h-11"}`}>
         <span
           className={`shrink-0 flex items-center gap-1.5 font-semibold text-base-900 select-none cursor-default ${
             destinationHeader ? "text-page" : "text-body"
