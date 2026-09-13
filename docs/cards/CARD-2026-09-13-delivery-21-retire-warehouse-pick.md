@@ -9,9 +9,9 @@ The legacy `warehouse` and `transfer-ready` API routes call `operation_warehouse
 - [x] API refusal tests including permission and no database calls
 - [x] Remove the obsolete drawer act
 - [x] Green CI, merge, exact-SHA deploy and authenticated refusal proof
-- [ ] Database RPC retirement: separate reviewed SQL; not complete until tracker/all-branch maximum, rolled-back positive/negative probes and production application are verified
+- [x] Database RPC retirement: Part B migration 0501 applied, with tracker, function absence, armed guard and rolled-back negative controls verified below.
 
-Migration: no database change in the application retirement PR. The existing RPC remains a separate outstanding database boundary; do not claim it is retired by HTTP refusal alone.
+Migration: no database change in the application retirement PR. The separate database boundary was subsequently retired by Part B migration 0501; HTTP refusal alone was not its retirement proof.
 
 
 ## Part B · Database retirement — migration 0501 (the outstanding boundary above)

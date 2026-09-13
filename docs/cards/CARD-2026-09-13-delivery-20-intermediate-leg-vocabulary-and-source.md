@@ -88,9 +88,13 @@ at 00:2x MYT), then `a5646d2d` superseded it with Cards 19 and 21 on top. CI gre
 `Logistics Partner Performance` (`NETS · 1 trip · 1 delivered`), `Delivery photo not uploaded` on Monitor, and both
 leg documents printed `WAREHOUSE No warehouse recorded`; `delivery_attempts` re-read: leg 1 `delivered` on
 DO-130926-0842 (note `Arrived at JB transit warehouse · Card 14 walk`), leg 2 `delivered` on DO-130926-3223 — the facts
-the new arithmetic reads. **Production walk after deploy: OWED, not done** — the operation@ browser session
+the new arithmetic reads. **Earlier deployment-wait checkpoint (subsequently closed below for the available fixture surfaces)** — the operation@ browser session
 expired during the deploy wait (see Card 19). Minimum owner action: open `/operation/delivery-orders?q=1362`
 (DO-130926-0842 `Arrived` over `JB transit warehouse`, DO-130926-3223 `Delivered`), `/operation/delivery-orders/ac2cf852-…`
 (pill `Arrived`, `Warehouse` `Carres Klang Warehouse`, `Delivery on Sun, 13 Sep · Arrived`, the Evidence sentence that a
 warehouse arrival owes no proof), `/operation/delivery-orders/55269444-…` (`Warehouse` `JB transit warehouse`) and
 `/operation?tab=delivery-report` (`Logistics Partner Performance` lists AL only for September).
+
+### Authenticated convergence observations · 2026-09-14
+
+On all-five-converged `9dd3945b8d451e142d223752bbe91f243357bd0e`, Operation verified SO-1362’s intermediate DO-130926-0842: Arrived in header, Delivery history, Evidence and its result entry in History; Warehouse Carres Klang Warehouse; no customer proof attach/review acts. Final DO-130926-3223 remains Delivered with Warehouse JB transit warehouse. Register distinguishes Arrived / JB transit from final Delivered. September customer delivery, first-success, proof-control and partner-performance reports count only the final AL trip; warehouse performance retains both handovers. The completed SO no longer belongs in Monitor, so this fixture does not provide an active intermediate Monitor row; that projection is covered by automated regression, not claimed as a new live-row walk. Card 22 owns the separate borrowed signature and remaining Register proof-absence findings.
