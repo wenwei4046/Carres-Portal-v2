@@ -87,3 +87,19 @@ DO-130926-0842: `handed_over` OK (accepted 1 of 1, counterparty NETS, holder →
 `received_by_logistics` OK, a second handover of the same Unit REFUSED (`unit_already_handed_over`).
 The SO-1361 fixture created without a signature was cancelled through the cancel door and its
 reservation released through the release door.
+
+**After 0494 (applied 2026-09-13, merged `45238b71`):** leg 1 `handed_over` → 201 (goods JAGER-SS ×1,
+vehicle WXY 1234, proof `handover/ac2cf852-…/…-handover.jpg`, counterparty NETS) · `received_by_logistics`
+→ 201 (company NETS). Unit `id-dtd627907`: `reserved` · holder **NETS Delivery** (delivery_operator) ·
+Site still `Carres Klang Warehouse` (the Site changes only on Receiving proof, Stock law) ·
+`reserved_ref SO-1362`. The whole-order mirror stays null; stops still `1:pending 2:pending` until the
+arrival is recorded.
+
+🔴 **Found and fixed — 0496.** Leg 1's arrival (`POST …/delivery-attempt {result: delivered, leg: 1}`)
+failed with `operator does not exist: record ->> unknown`: the stop-index lookup in 0491 used
+`jsonb_array_elements(…) with ordinality s` then `s->>'leg'`. 0496 names the element (`s.value`).
+Rolled-back probe on SO-1362: leg 1 arrival OK (attempt leg 1 on DO-130926-0842, NETS), stops
+`1:handed_off 2:pending`, order still `proceed_order` / not delivered, Unit still reserved with NETS
+Delivery; the last leg through the attempt door stays refused. The negative control against the
+live door also held: `{delivered, leg: 2}` → 422 `a full success walks the delivery door — only an
+intermediate Journey leg records its arrival here`.
