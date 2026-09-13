@@ -307,6 +307,14 @@ honest Work for admitted modules.
   invalid source data fails visibly instead of presenting a false clear desk.
 - My Work, Team Work and the Quick Rail My Work counts read that same cached response. The
   retired browser composition and Quick Rail Team/duty editor have been removed.
+- **One cache key per read (production-verified 2026-09-13, `ed76eb43`).** The legacy
+  `ops_tasks` read (header Bell, Orders Control) once cached under the SAME React Query key as the
+  shared Work feed, so whichever read landed second was served the other's shape: My Work, Team
+  Work, the Quick Rail counts and the Payment Monitor's owner cells went dark while the feed
+  carried 215 items. The legacy read now owns `["operation","legacy-tasks"]`;
+  `work-cache-isolation.test.tsx` proves both mounting orders, co-mounting, feed invalidation and
+  shape incompatibility against a real QueryClient, with a negative control on the old key. A key
+  collision is a silent wrong answer, never an error — every read owns exactly one key.
 - My Work is the default for everyone. It routes by acting person; Team Work groups by normal
   owner and shows dated cover evidence without rewriting ownership.
 - Stock/Warehouse admission was re-audited against the production-verified replacement Monitor,
