@@ -311,6 +311,12 @@ import {
   type DeliveryContactRow,
   type DeliveryContactInput,
   type OperationCannotDeliverInput,
+  type PartnerCoverage,
+  type HandoverPoint,
+  type PartnerServices,
+  type ProofRules,
+  type DeliveryTemplateRow,
+  type DeliverySettingChangeRow,
 } from "@carres/shared";
 import { ApiError, apiFetch } from "./api";
 import { uploadCompartmentPhoto, uploadDeliveryProof, uploadModelPhoto } from "./photo-upload";
@@ -7112,6 +7118,50 @@ export function useDeliveryArrangement(orderId: string | undefined, leg = 0) {
       ),
     enabled: Boolean(orderId),
     staleTime: 10_000,
+  });
+}
+
+/* ── DELIVERY SETTINGS (0488, Delivery MASTER §11) — one read, section doors ── */
+export interface DeliverySettingsPartnerRow extends DeliveryPartnerRow {
+  active?: boolean;
+  address?: string | null;
+  customer_phone?: string | null;
+  office_contact?: string | null;
+  coverage?: PartnerCoverage | null;
+  kv_default?: boolean;
+  cutoff_time?: string | null;
+  handover_points?: HandoverPoint[] | null;
+  services?: PartnerServices | null;
+  customer_contact_by?: "partner" | "operation";
+  record_on_behalf_allowed?: boolean;
+  proof_rules?: ProofRules | null;
+  operating_party_id?: string | null;
+}
+export interface DeliverySettingsResponse {
+  partners: DeliverySettingsPartnerRow[];
+  drivers: Array<{ id: string; partner_id: string; name: string; phone: string | null; active: boolean }>;
+  vehicles: Array<{
+    id: string;
+    partner_id: string;
+    plate: string;
+    vehicle_type: string;
+    capacity: string | null;
+    driver_name: string | null;
+    driver_phone: string | null;
+    active: boolean;
+  }>;
+  templates: DeliveryTemplateRow[];
+  changes: DeliverySettingChangeRow[];
+  partnerAccounts: Array<{ id: string; name: string | null; email: string; partner_id: string | null; status: string }>;
+  canEdit: boolean;
+  contactLeadWorkingDays: number | null;
+}
+export const DELIVERY_SETTINGS_QUERY_KEY = ["operation", "delivery-settings"] as const;
+export function useDeliverySettings() {
+  return useQuery<DeliverySettingsResponse, ApiError>({
+    queryKey: DELIVERY_SETTINGS_QUERY_KEY,
+    queryFn: () => apiFetch<DeliverySettingsResponse>("/api/operation/delivery-settings"),
+    staleTime: 30_000,
   });
 }
 

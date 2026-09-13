@@ -3097,6 +3097,7 @@ export * from "./work-engine";
 export * from "./workspace-duty";
 export * from "./workspace-duties-catalogue";
 export * from "./delivery-contact";
+export * from "./delivery-settings";
 // Workspace Work — the one server/client wire contract. Owning modules keep
 // trigger and completion truth; this only carries their open-action projection.
 export * from "./operation-work";
