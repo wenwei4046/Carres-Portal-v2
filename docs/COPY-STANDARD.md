@@ -3116,3 +3116,8 @@ Before merging a UI change:
 - [ ] Zero jargon (rule 9).
 - [ ] Tooltips do not repeat the label.
 - [ ] Dates go through `fmtDate()`.
+
+
+### Delivery legacy warehouse pick refusal · Card 21 · 2026-09-13
+
+`This action is no longer available. Use Ready Stock in SO Batch Purchase.` — HTTP 410 refusal for the retired `warehouse` and `transfer-ready` doors. The drawer no longer offers `Transfer to ready`. The destination uses the existing governed Ready Stock journey, never a replacement stock writer.
