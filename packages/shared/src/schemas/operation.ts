@@ -487,16 +487,9 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * contract. (Corrected 2026-08-23: this said there was one wire contract; there
  * is one AUTHORITY, and more than one governed way in.) */
 
-/**
- * `warehousePickInput` — POST /api/operation/orders/:id/warehouse.
- * Maps to `operation_warehouse_pick(order_id, warehouse_id)` RPC. Manual
- * override of the auto-picked source warehouse. Only allowed when
- * `operation_stage = in_production` AND no open POs (P0001 has_open_pos).
- */
-export const warehousePickInput = z.object({
-  warehouseId: z.string().uuid(),
-}).strict();
-export type WarehousePickInput = z.infer<typeof warehousePickInput>;
+/* `warehousePickInput` (POST /:id/warehouse → `operation_warehouse_pick`) is
+ * RETIRED — 【DELIVERY】 CARD 21, migration 0499. The door wrote a stock total
+ * by hand; a total is derived from the unit register (0366). */
 
 /**
  * `confirmProceedRequestInputSchema` — POST /api/operation/orders/:id/confirm-proceed.
@@ -552,22 +545,8 @@ export const lpRejectOrderInput = z.object({
 }).strict();
 export type LpRejectOrderInput = z.infer<typeof lpRejectOrderInput>;
 
-/**
- * `transferReadyInputSchema` — POST /api/operation/orders/:id/transfer-ready
- * (Pipeline v2, C2 / migration 0024). Maps to RPC
- * `operation_warehouse_pick(p_order_id, p_warehouse_id)` — the RPC's
- * source-stage guard widens to IN ('confirmed', 'in_production'),
- * so this same RPC powers both warehouse-override and the v2 transfer flow.
- * Naming kept distinct from `warehousePickInput` because the FE entry points
- * are conceptually different (one is "change warehouse", the other is
- * "mark ready"). `warehouseId` is required — the RPC `operation_warehouse_pick`
- * rejects NULL with `warehouse_required`. confirm-proceed accepts NULL via a
- * different RPC; do not conflate.
- */
-export const transferReadyInputSchema = z.object({
-  warehouseId: z.string().uuid(),
-}).strict();
-export type TransferReadyInput = z.infer<typeof transferReadyInputSchema>;
+/* `transferReadyInputSchema` (POST /:id/transfer-ready → the same
+ * `operation_warehouse_pick`) is RETIRED with it — 【DELIVERY】 CARD 21. */
 
 /**
  * `recheckStockInput` — POST /api/operation/orders/:id/recheck-stock.
