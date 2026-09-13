@@ -103,3 +103,24 @@ Rolled-back probe on SO-1362: leg 1 arrival OK (attempt leg 1 on DO-130926-0842,
 Delivery; the last leg through the attempt door stays refused. The negative control against the
 live door also held: `{delivered, leg: 2}` → 422 `a full success walks the delivery door — only an
 intermediate Journey leg records its arrival here`.
+
+### The two-leg Journey, walked end to end (SO-1362, after 0494 · 0496 · 0497 — 2026-09-13)
+
+Every act through the normal door as operation@carres.com; nothing faked, no gate bypassed:
+
+| Step | Door | Result |
+|---|---|---|
+| Leg 1 handover | `POST …/delivery-orders/ac2cf852-…/handover` `handed_over` (proof photo, `id-dtd627907`) | 201 · counterparty NETS · holder → **NETS Delivery** |
+| Leg 1 receipt | `received_by_logistics` | 201 · company NETS |
+| Unit after leg 1 | `ops_stock_items` | `reserved` · holder NETS Delivery · Site Carres Klang Warehouse (the Site changes only on Receiving proof) |
+| Leg 1 arrival | `POST …/orders/{id}/delivery-attempt {delivered, leg 1}` | 201 · attempt leg 1 on DO-130926-0842 · stops `1:handed_off 2:pending` · order still `proceed_order`; the last leg through this door → 422 `a full success walks the delivery door` |
+| Leg 2 DO | `PUT …/delivery-arrangements/{id}?leg=2` (AL, Thu 17 Sep 2 PM to 5 PM) | **DO-130926-3223** issued (`leg 2`, AL, the same exact Unit); `orders.do_number` mirrors the LAST leg |
+| Deliver before goods out | `POST …/orders/{id}/attach-do` | 422 `the goods are not out with logistics yet — record the handover and the logistics receipt first` |
+| Leg 2 handover | `handed_over` on DO-130926-3223 (prep scanned/checked/packed, proof photo) | 201 · company **NETS** (the previous leg's partner) · counterparty AL · holder → **AL** |
+| Deliver on leg 1's document | `attach-do` with DO-130926-0842 | 422 `journey_document_required` |
+| Leg 2 receipt | `received_by_logistics` | 201 · company AL |
+| Customer delivery | `attach-do` DO-130926-3223 · signed DO + customer signature uploaded through `POST /api/storage/dos/sign-order-upload` | 200 · `status delivered` · `units_sold 1` · `pod_signed_by Card 14 Journey Walk` |
+
+After: order `delivered / delivered`, `delivered_at 2026-09-13 12:56`, `do_number DO-130926-3223`, `do_file_path order-db9c939a-…/…-DO-130926-3223.png`, signature `…-signature.png`; stops `1:handed_off (12:23) · 2:delivered (12:56)`; leg 1 document carries `ready_for_handover · handed_over→NETS · received_by_logistics@NETS` and `leg1:delivered`; leg 2 document carries `ready_for_handover · handed_over@NETS→AL · received_by_logistics@AL` and `leg2:delivered`; Unit `id-dtd627907` `sold` · sold_order SO-1362 · holder AL; History `Handed over 1 of 1 Units to AL — received by AL driver Kumar (DO-130926-3223) | Logistics confirmed receipt — DO-130926-3223 is out for delivery | Delivered · DO DO-130926-3223 · file … · signed by Card 14 Journey Walk · 1 unit(s) sold · Journey complete on leg 2`. The Delivery Orders register lists both documents `Delivered` with `Signed Delivery Order`; Monitor (before delivery) printed leg 1 `Delivered · Delivery photo not uploaded` and leg 2 `Waiting for AL pickup · DO-130926-3223`; the DO object page printed the route `Carres Klang Warehouse → JB transit warehouse` with `Open SO-1362 →` and `Open Order Route →`.
+
+🔴 Found and fixed on this walk: **0494** (leg handover read leg 0), **0496** (`with ordinality` alias on the first leg's arrival), **0497** (a later leg hands over from the previous leg's partner; the deliver door wrote a derived stock total, demanded the legacy `dispatched` stage, re-picked Units by SKU and knew no Journey). 🟡 Open: an intermediate leg's arrival prints `Delivered · Delivery photo not uploaded` on Monitor and `Delivered` in the register — the shared document vocabulary; the leg's own word (`Arrived`) and the proof demand for a warehouse-to-warehouse leg are a follow-up. The `warehouse` pick door (`operation_warehouse_pick`) still writes a derived stock total and refuses (`stock_total_is_derived`) — legacy, not this Card's.
