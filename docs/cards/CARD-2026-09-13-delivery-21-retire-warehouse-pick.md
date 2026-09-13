@@ -72,7 +72,7 @@ row, changes no RLS policy and touches no data.
 **Production acceptance surface:** After apply, `pg_proc` holds none of the three names; a
 rolled-back probe proves a hand-written `stock_balances.reserved` is still refused
 (`stock_total_is_derived`); `POST /api/operation/orders/{id}/warehouse` and `…/transfer-ready`
-answer 404; the Old Orders drawer offers no `Transfer to ready`; the Unit register and every
+answer 410; the Old Orders drawer offers no `Transfer to ready`; the Unit register and every
 Delivery/Outbound door are untouched.
 
 ## Global constraints
@@ -85,12 +85,23 @@ Delivery/Outbound door are untouched.
 
 ## Tasks
 
-- [ ] Migration 0501: drop the three functions; assert the 0366 trigger is armed; rolled-back production probe with the negative control (a hand-written `reserved` still refused)
-- [ ] API: remove `POST /:id/warehouse` and `POST /:id/transfer-ready`, their schemas and imports; route test proves both answer 404 and no route names `operation_warehouse_pick`
-- [ ] Web: remove `useWarehousePickMutation`, `useTransferReady`, `TransferReadyDialog` and the drawer's `Transfer to ready` item and prop chain
-- [ ] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
-- [ ] Typecheck ×3, design guard, `pnpm ci:migrations`
-- [ ] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 404) → Delivery MASTER §16 closure
+- [x] Migration 0501: drop the three functions; assert the 0366 trigger is armed; rolled-back production probe with the negative control (a hand-written `reserved` still refused)
+- [x] API: close `POST /:id/warehouse` and `POST /:id/transfer-ready` with the Part A retirement refusal; remove obsolete schemas and imports; route test proves both answer 410 and no route names `operation_warehouse_pick`
+- [x] Web: remove `useWarehousePickMutation`, `useTransferReady`, `TransferReadyDialog` and the drawer's `Transfer to ready` item and prop chain
+- [x] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
+- [x] Typecheck ×3, design guard, `pnpm ci:migrations`
+- [x] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 410) → Delivery MASTER §16 closure
+
+**Part B evidence (2026-09-14):** PR #1292 squash-merged as `a5646d2d` after Part A (`a38d77c8`). Migration
+**0501** was probed in a rolled-back production transaction (00:1x MYT): three names present → dropped → `0`
+remaining, `stock_balances_derived_only` armed, the four kept doors present, and the negative control
+`update stock_balances set reserved = reserved + 1` refused `P0001 stock_total_is_derived`; then applied as the
+exact committed file through the governed path — tracker tail `20260913162841 0501_the_warehouse_pick_writer_is_retired`
+(`0500`, another lane's role-gate migration, is on `main` and NOT yet applied; 0501 does not depend on it and
+0500 does not name the three functions). Re-read after apply: `retired_writers_remaining 0 · guard_armed true ·
+kept_doors operation_calc_shortages, operation_pick_warehouse, ops_stock_pool_draw, so_batch_reserve_ready_units`.
+Negative regression `apps/api/src/lib/stock-total-writers.test.ts` (4) green on CI. The 410 doors and the drawer
+are Part A's production proof; the authenticated re-probe on `a5646d2d` passed with the same refusals and unchanged allocation/order facts (supplement below).
 
 ## Supplemental convergence verification · 2026-09-14
 
@@ -101,8 +112,17 @@ Delivery/Outbound door are untouched.
 - Existing Journey Unit id-dtd627907 is UUID b384b3bf-70df-4956-a174-c4eae677c989, JAGER-SS, sold, same warehouse c03, reserved_ref SO-1362, sold_order_id db9c939a-ebb7-4836-a2b8-866770728822. Its page retains NETS→AL handover and reserved→sold history.
 - Before deployment, Operation SO-1340 Monitor smoke showed all four governed sections; draft date change cancelled back to unconfirmed; logistics edit cancelled. No order, date or logistics facts saved.
 
-Exact-SHA application convergence and final authenticated UI/API observations remain pending.
+The subsequent exact-SHA and authenticated observations follow.
 
 At 00:36 MYT all five surfaces converged exactly to 9dd3945b8d451e142d223752bbe91f243357bd0e (deploy run 34767793794 success). Authenticated Operation API calls to both obsolete endpoints returned HTTP 410 warehouse_pick_retired. SO-1362 allocation JSON and order id/so/status/operation_stage/warehouse_id/delivered_at/do_number were identical before/after; order remains delivered. Intermediate DO-130926-0842 now shows Arrived in the header, Delivery history, Evidence and current attempt in History; source warehouse Carres Klang Warehouse; no customer proof attach/review actions. Borrowed sibling signed-file display remains visibly pending Card 22.
 
 On 9dd3945b, final DO-130926-3223 remains Delivered and its Warehouse is JB transit warehouse. Register shows DO-0842 Arrived / JB transit warehouse and DO-3223 Delivered. Reports for Sep 2026: Delivery Commitment Performance and First Delivery Success each contain only DO-3223 (one customer delivery); Logistics Partner Performance contains AL 1 trip / 1 delivered / 0 failed and no NETS customer delivery. Warehouse Performance retains both leg handovers separately. Delivery Proof Control contains only final DO-3223. All ten report sections rendered.
+
+Further production UI smoke on 9dd3945b: actual browser viewport 582×704 (375/1130 override requests did not change actual width, so those widths are NOT claimed). Monitor renders narrow cards, search, all four expanded sections, the time options and logistics fields. Draft Morning selection cancelled back to No time agreed. Logistics exposes driver name, vehicle plate, condo registration, Copy message/Open WhatsApp group and reply proof, with the explicit sending-is-not-confirmation text; no message sent and no change saved. Confirmed deliveries switches Sep14 empty to Sep15’s two actual confirmed records, each honestly saying No delivery order yet.
+
+Card18 office positive form state at 00:44 MYT, principal on 9dd3945b: resumed the existing unsaved DELIVERY ACCEPTANCE UNSAVED CARD18 draft, kept its complete Selangor/Klang/41000 address and Landed type, entered native date 2026-10-02 (real keyboard change required after browser fill). Required-fact refusal disappeared and Create order was enabled. No order submitted, no paid amount entered. Navigated away to principal dashboard. This proves the complete form reaches an enabled submission state, not that a new order was created after the gate.
+
+At 00:54 MYT all five surfaces converged to a5646d2d961dab852f44c2cd8dcfc19a5e0483a1, deploy run 34768642129 success. Authenticated API: SO-1362, so-1362 and 1362 resolve to the exact SO-1362 UUID; SO-999999 returns 404; invalid text returns 400; UUID detail reads the same SO. Both legacy application doors still answer 410 and allocation/order facts remain identical.
+
+Browser Operation acceptance on a5646d2d: /operation/orders/so/SO-1362?route=1 eventually resolves to /operation/orders/so/db9c939a-ebb7-4836-a2b8-866770728822?route=1 with the route populated (goods, money, loan offer and delivered result). Initial blank loading cleared; no persistent blank-route failure. SO-999999?route=1 shows Sales Order not found. and Back to Sales Orders. This closes number fan-in/empty-route acceptance only: the existing route’s whole-order logistics/date gates are not a claim that its separate Journey projection is correct.
+

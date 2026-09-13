@@ -45,8 +45,25 @@ Orders; `GET /api/operation/orders/by-number/SO-1362` answers the id.
 
 ## Tasks
 
-- [ ] `salesOrderParamOf(param)` in `packages/shared` — `id` (UUID) · `number` (`SO-1362` · `so-1362` · `1362`) · `invalid`; its test names every spelling and the negatives
-- [ ] `GET /api/operation/orders/by-number/:so` — Operation-gated, reads `orders.id` by `so`, 404 `No sales order SO-{n}` when none, 400 for a non-number; route test with the mocked client
-- [ ] The number door in `SalesOrderWorkspace`: a number resolves once, then `replace`-navigates to the UUID URL keeping the search (`?route=1`), so every fan-in reads the canonical id; a miss prints `No sales order SO-{n}` with `Back to Sales Orders`; an invalid param prints the same absence; regression test covers UUID untouched · number → UUID · miss
-- [ ] Tests, typecheck ×3, design guard
-- [ ] PR → CI → merge → deploy → authenticated production verification of both paths, Order Route drawn on both
+- [x] `salesOrderParamOf(param)` in `packages/shared` — `id` (UUID) · `number` (`SO-1362` · `so-1362` · `1362`) · `invalid`; its test names every spelling and the negatives
+- [x] `GET /api/operation/orders/by-number/:so` — Operation-gated, reads `orders.id` by `so`, 404 `No sales order SO-{n}` when none, 400 for a non-number; route test with the mocked client
+- [x] The number door in `SalesOrderWorkspace`: a number resolves once, then `replace`-navigates to the UUID URL keeping the search (`?route=1`), so every fan-in reads the canonical id; a miss prints `No sales order SO-{n}` with `Back to Sales Orders`; an invalid param prints the same absence; regression test covers UUID untouched · number → UUID · miss
+- [x] Tests, typecheck ×3, design guard
+- [x] PR → CI → merge → deploy → authenticated production verification of both paths, Order Route drawn on both
+
+**Evidence (2026-09-14):** PR #1291 squash-merged as `334c3720` (its branch merged `main` in after
+the sibling PR #1288 landed; no history rewrite). Deployed inside `a5646d2d`, the tip that carries
+Cards 19–21 — every canonical surface reports that SHA (deploy probe). Tests green on CI: shared
+`sales-order-identity` 4 · api `orders.by-number` 5 + `orders` 129 · web `SalesOrderWorkspace.number-door`
+4 and every other `SalesOrderWorkspace.*` suite · tsc ×3 · design guard. **Measured before:** on
+`36c98830`, authenticated as operation@carres.com, `/operation/orders/so/SO-1362?route=1` printed `No route
+facts were found for this sales order` and `GET /api/operation/orders/SO-1362` → 500 `invalid input syntax for
+type uuid` (the same for `/1362`). **Production walk after deploy: OWED, not done** — the operation@ browser
+session this chat had expired at 00:02 MYT during the deploy wait and a sign-in needs a password the chat
+may not type. Minimum owner action: sign in once as operation@ (or any staff role) and open
+`/operation/orders/so/SO-1362?route=1` — it must land on `/operation/orders/so/db9c939a-…?route=1` with the
+Order Route drawn; `/operation/orders/so/SO-999999` must print `Sales Order not found.`.
+
+### Authenticated acceptance completed · 2026-09-14
+
+All five surfaces converged to `a5646d2d961dab852f44c2cd8dcfc19a5e0483a1`. As Operation, `SO-1362`, `so-1362` and `1362` resolved by API to the same UUID; unknown SO-999999 returned 404 and invalid text 400. Browser `/operation/orders/so/SO-1362?route=1` resolved to the canonical UUID with `?route=1` preserved and the route populated. Direct UUID entry also rendered Order Route; unknown SO-999999 showed `Sales Order not found.` with `Back to Sales Orders`. Initial blank loading cleared after resources loaded. This closes the previously owed number/UUID fan-in walk; no order or Unit fact was changed.

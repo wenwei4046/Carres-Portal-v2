@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,6 +58,7 @@ const RECORDED_DETAIL = { entry: RECORDED_ROW, related: [], lines: [
 ] };
 
 let recordAnswer: () => Promise<unknown>;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function answer(url: string, init?: RequestInit) {
   if (url === "/api/finance/manual-journals" && init?.method === "POST") return recordAnswer();
@@ -235,6 +236,7 @@ describe("recording", () => {
         { account_code: "1120", debit: 12500.5, credit: null, memo: "Test bank statement" },
         { account_code: "3300", debit: null, credit: 12500.5, memo: null },
       ],
+      requestKey: expect.stringMatching(UUID),
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["finance", "ledger"] });
     expect(toasts.success).toHaveBeenCalledWith("Journal entry recorded.");
@@ -310,6 +312,79 @@ describe("recording", () => {
     expect(sent.lines.map((l) => l.account_code)).toEqual(["1120", "6100"]);
     expect(within(line(2)).getByLabelText("Credit")).toHaveValue("100");
     expect(screen.queryByTestId("journal-line-3")).not.toBeInTheDocument();
+  });
+});
+
+describe("the request key", () => {
+  const sentKeys = () => api.fetch.mock.calls
+    .filter(([u]) => u === "/api/finance/manual-journals")
+    .map(([, init]) => (JSON.parse(String((init as RequestInit).body)) as { requestKey?: string }).requestKey);
+
+  async function press() {
+    fireEvent.click(screen.getByRole("button", { name: "Record journal entry" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Record journal entry" }));
+  }
+
+  it("sends the same key on a retry after an unknown outcome, and after a refusal", async () => {
+    const why = "The ledger has no start date yet.";
+    const answers = [
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      () => Promise.reject(new ApiError(409, why, { error: "rule_violation", message: why })),
+      () => Promise.resolve({ id: "e9", entry_no: "JE-202609-0009", doc_no: "MJ-202609-0001" }),
+    ];
+    recordAnswer = () => answers.shift()!();
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+
+    await press();
+    await screen.findByText("The connection dropped. Check the Journal for this entry before you record it again.");
+    await press();
+    await screen.findByText(why);
+    type(1, "Memo", "Test bank statement, checked");
+    await press();
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/finance/ledger?entry=JE-202609-0009"));
+
+    const keys = sentKeys();
+    expect(keys).toHaveLength(3);
+    expect(keys[0]).toMatch(UUID);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("draws a new key for a new entry", async () => {
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+    await press();
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/finance/ledger?entry=JE-202609-0009"));
+    cleanup();
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+    await press();
+    await waitFor(() => expect(sentKeys()).toHaveLength(2));
+    const [a, b] = sentKeys();
+    expect(a).toMatch(UUID);
+    expect(b).toMatch(UUID);
+    expect(a).not.toBe(b);
+  });
+
+  it("says a second press is safe only when the API says the key is honoured", async () => {
+    const safe = "The answer did not come back. Press Record journal entry again. This entry is never recorded twice.";
+    recordAnswer = () => Promise.reject(new ApiError(503, safe,
+      { error: "outcome_unknown", code: "outcome_unknown", message: safe, retry_safe: true }));
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+    await press();
+    expect(await screen.findByTestId("journal-refusal")).toHaveTextContent(safe);
+  });
+
+  it("keeps \"check the Journal first\" when the API cannot vouch for the key", async () => {
+    const careful = "The answer did not come back. Check the Journal for this entry before you record it again.";
+    recordAnswer = () => Promise.reject(new ApiError(503, careful,
+      { error: "outcome_unknown", code: "outcome_unknown", message: careful, retry_safe: false }));
+    show("/finance/ledger?entry=new");
+    await fillOpeningBalance();
+    await press();
+    expect(await screen.findByTestId("journal-refusal"))
+      .toHaveTextContent("The connection dropped. Check the Journal for this entry before you record it again.");
   });
 });
 
