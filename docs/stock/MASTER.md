@@ -389,15 +389,19 @@ ARRIVAL card is one expected-arrival source scope. It shows, in this order: the 
 sentence · the event name with its direction · the source document identity · the party and
 what moves · the Site. Counts aggregate only when every count drills to exact rows. It never
 shows Delivery ETA, customer-delivery proof, Failed Delivery as a generic Warehouse problem,
-or an `Edit Delivery` control. A Failed Delivery appears only through the exact governed
-return/collection work that requires a Warehouse physical act.
+or any Delivery arrangement action. Warehouse never shows or completes a Delivery arrangement
+action. A Failed Delivery appears only through the exact governed return/collection work that
+requires a Warehouse physical act.
 
 Clicking an ARRIVAL card opens **Inbound** already filtered by the selected date, Site, source
 document and exact record; a PICKUP card opens **Outbound** the same way. Monitor completes
 nothing — not receiving, not inventory, not loading, not delivery. A customer-delivery pickup
-may show a clickable `DO No`, and that DO opens as a read-only source document; Warehouse
-never enters `Edit Delivery`. Delivery remains the only owner of its partner/date/time/route
-editor.
+may show a clickable `DO No`, and that DO opens as a read-only source document. Warehouse never
+enters Delivery's `Update date and time`, `Assign logistics`, `Change logistics`, driver/vehicle
+or ETA editors (the Monitor row's expanded panels, `../delivery/MASTER.md` §8.5 and §8.6).
+Delivery remains the only owner of the Logistics Partner, the confirmed operational date and
+time, the driver and vehicle and the ETA. Warehouse only reads the relevant Delivery facts and
+owns its own physical preparation and handover facts.
 
 For any selected date, the operator journey is always:
 
