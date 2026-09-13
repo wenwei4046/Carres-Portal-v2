@@ -1,4 +1,4 @@
--- 0499 · The warehouse-pick writer is retired
+-- 0501 · The warehouse-pick writer is retired
 -- 【DELIVERY】 CARD 21 (2026-09-13) — closes Delivery MASTER §16 note (3).
 --
 -- WHY. Since 0366 a stock total is DERIVED from the unit register and never
@@ -51,7 +51,7 @@ begin
        and t.tgname = 'stock_balances_derived_only'
        and not t.tgisinternal
   ) then
-    raise exception '0499 sanity FAILED — stock_balances_derived_only (0366) is not armed';
+    raise exception '0501 sanity FAILED — stock_balances_derived_only (0366) is not armed';
   end if;
 
   if exists (
@@ -61,7 +61,7 @@ begin
      where n.nspname = 'public'
        and p.proname in ('operation_warehouse_pick', 'operation_receive_po_line', '_operation_reserve_order')
   ) then
-    raise exception '0499 sanity FAILED — a retired stock-total writer is still present';
+    raise exception '0501 sanity FAILED — a retired stock-total writer is still present';
   end if;
 end;
 $$;

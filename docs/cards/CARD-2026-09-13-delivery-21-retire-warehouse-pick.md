@@ -12,3 +12,82 @@ The legacy `warehouse` and `transfer-ready` API routes call `operation_warehouse
 - [ ] Database RPC retirement: separate reviewed SQL; not complete until tracker/all-branch maximum, rolled-back positive/negative probes and production application are verified
 
 Migration: no database change in the application retirement PR. The existing RPC remains a separate outstanding database boundary; do not claim it is retired by HTTP refusal alone.
+
+
+## Part B · Database retirement — migration 0501 (the outstanding boundary above)
+
+> Authored in the Delivery final-convergence chat on the same day, on top of Part A. Part A closed
+> the application doors (410, the drawer act); Part B retires the WRITERS in the database and keeps
+> them from returning. Migration numbered **0501** from the MAX of the tracker, the repository and
+> every branch at the moment of writing (`0499` Payment on `main`, `0500` on
+> `fix/role-gates-refuse-no-role`).
+
+**Goal:** No writer may store a second stock quantity truth. The legacy warehouse-pick door and
+its helper still write `stock_balances.reserved` by hand; they are retired through the governed
+migration path, their API routes and UI door removed, and a negative regression keeps a
+hand-written stock total from returning.
+
+**Measured (2026-09-13, production `36c98830`, `pg_proc` read live):**
+- `operation_warehouse_pick(p_order_id uuid, p_warehouse_id uuid)` (0129) — granted to
+  `authenticated`, `anon` and `PUBLIC`, gated only by `is_operation()` inside. It rewrites
+  `orders.warehouse_id`, cascades `order_supplier_threads.warehouse_id`, and when
+  `operation_calc_shortages` finds nothing short it calls `_operation_reserve_order`, which
+  runs `update stock_balances set reserved = reserved + qty` per line — the hand-written total
+  0366's `stock_balances_derived_only` trigger refuses (`stock_total_is_derived`). The
+  shortage branch still succeeds, rewriting `operation_stage` to `awaiting_operation_action`
+  and writing History — a live legacy writer on a retired model.
+- `_operation_reserve_order(p_order_id uuid)` (0125) — the hand-written total itself. Callers:
+  `operation_warehouse_pick` and `operation_receive_po_line` only.
+- `operation_receive_po_line(p_po_id text, p_sku text, p_received_qty integer)` — the Orders-side
+  receive door D2 already removed from every surface (`docs/ERP-ARCHITECTURE.md` §0); no `apps/`
+  caller; `service_role` grant only; it too calls `_operation_reserve_order`.
+- Reachable doors: `POST /api/operation/orders/:id/warehouse` (`warehousePickInput`) and
+  `POST /api/operation/orders/:id/transfer-ready` (`transferReadyInputSchema`), the latter
+  behind the Old Orders drawer's `Transfer to ready` menu item (`OrderDetailDrawer.tsx:7054`,
+  `TransferReadyDialog.tsx`). Neither is on any approved Card surface; Stock MASTER (0366,
+  0471/0472) makes `ops_stock_pool_draw` / `so_batch_reserve_ready_units` the one reservation
+  door and the Unit register the one availability authority.
+
+**Authority:** `docs/ERP-ARCHITECTURE.md` Law A · Law D · §3.5 (*the register is the authority; a
+rollup is not*) · §3.5.1 (*modules never copy quantities into parallel ledgers*) ·
+`docs/delivery/MASTER.md` §1.1 (*no independent quantity truth*), §16 note (3) ·
+`docs/stock/MASTER.md` (0366: a stock total is derived from the unit register, never written) ·
+`CLAUDE.md` red line 6 (a new migration, never an edit).
+
+**Dependencies:** none (Cards 19 and 20 are independent).
+
+**Runtime readers and writers affected:** Writers retired: the three SQL functions above;
+`POST /:id/warehouse`; `POST /:id/transfer-ready`; `useWarehousePickMutation`;
+`useTransferReady`; `TransferReadyDialog`; the drawer's `Transfer to ready` item;
+`warehousePickInput` / `transferReadyInputSchema`. Readers: none change.
+`operation_pick_warehouse` and `operation_calc_shortages` (the read-only `recheck-stock`
+door) stay.
+
+**Migrations required:** one — `0501_the_warehouse_pick_writer_is_retired.sql` (numbered from
+the MAX of the tracker, the repository and every branch at the moment of writing; `0498` is
+Payment's on `main`, `0493` sits on `build/receiving-grn-redesign`). It DROPS the three
+functions and asserts that `stock_balances_derived_only` (0366) is still armed. It writes no
+row, changes no RLS policy and touches no data.
+
+**Production acceptance surface:** After apply, `pg_proc` holds none of the three names; a
+rolled-back probe proves a hand-written `stock_balances.reserved` is still refused
+(`stock_total_is_derived`); `POST /api/operation/orders/{id}/warehouse` and `…/transfer-ready`
+answer 404; the Old Orders drawer offers no `Transfer to ready`; the Unit register and every
+Delivery/Outbound door are untouched.
+
+## Global constraints
+
+- Reuse existing Carres components, arithmetics and write doors; no duplicate quantity, owner, duty, date, payment or stock truth.
+- Every visible word comes from `docs/COPY-STANDARD.md`; dates through `fmtDate`; no em dash joins a Delivery Work sentence.
+- No `New DO`, `Issue`, `Release` or `Approve` control; no new payment exception or COD door; no Delivery-local roster; no Operations Superuser fallback.
+- Loading, error, empty and no-results states, keyboard and focus, responsive behaviour, permissions and proxy-recording boundaries are tested.
+- A Card is complete only after PR merge, exact-SHA deployment and authenticated production verification with the resulting records re-read.
+
+## Tasks
+
+- [ ] Migration 0501: drop the three functions; assert the 0366 trigger is armed; rolled-back production probe with the negative control (a hand-written `reserved` still refused)
+- [ ] API: remove `POST /:id/warehouse` and `POST /:id/transfer-ready`, their schemas and imports; route test proves both answer 404 and no route names `operation_warehouse_pick`
+- [ ] Web: remove `useWarehousePickMutation`, `useTransferReady`, `TransferReadyDialog` and the drawer's `Transfer to ready` item and prop chain
+- [ ] Negative regression: a test over `supabase/migrations/` that no migration after 0366 re-creates the three names or writes `stock_balances.qty` / `.reserved` outside the `carres.stock_rollup` guard; a source test that no `apps/` file names the retired RPC
+- [ ] Typecheck ×3, design guard, `pnpm ci:migrations`
+- [ ] PR → CI → merge → apply 0501 through the governed path → deploy → production verification (functions absent, trigger armed, routes 404) → Delivery MASTER §16 closure

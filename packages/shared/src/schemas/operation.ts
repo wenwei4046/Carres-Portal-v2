@@ -488,7 +488,7 @@ export type AbandonOrderInput = z.infer<typeof abandonOrderInput>;
  * is one AUTHORITY, and more than one governed way in.) */
 
 /* `warehousePickInput` (POST /:id/warehouse → `operation_warehouse_pick`) is
- * RETIRED — 【DELIVERY】 CARD 21, migration 0499. The door wrote a stock total
+ * RETIRED — 【DELIVERY】 CARD 21, migration 0501. The door wrote a stock total
  * by hand; a total is derived from the unit register (0366). */
 
 /**
