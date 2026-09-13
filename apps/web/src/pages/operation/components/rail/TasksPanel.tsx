@@ -3,7 +3,15 @@ import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useOpenWorkSet } from "../../use-open-work";
 
-export const TASKS_KEY = ["operation", "work"] as const;
+/**
+ * The LEGACY `ops_tasks` read's own key (the header Bell and the Orders Control
+ * page). ⛔ It used to be `["operation", "work"]` — the SAME key the shared
+ * Work feed (`useOperationWork`) caches under — so whichever read landed first
+ * poisoned the other: the Work page, the Quick Rail counts and the Payment
+ * Monitor's owner cells read `{ tasks }` and showed nothing while the feed
+ * carried 215 items (production, 2026-09-13). One key per read.
+ */
+export const TASKS_KEY = ["operation", "legacy-tasks"] as const;
 
 /** Quick Rail is a count/navigation peek at My Work, never a second queue. */
 export default function TasksPanel() {
