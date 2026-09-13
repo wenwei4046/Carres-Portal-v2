@@ -54,8 +54,8 @@
  * (its full month opens through the kit's standard date control). Arrows
  * replace the whole displayed window; the calendar never scrolls sideways.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   CalendarClock,
@@ -67,7 +67,7 @@ import {
   Phone,
 } from "lucide-react";
 import type { DeliveryWorkStatusTone, OrderActionTone } from "@carres/shared";
-import { DELIVERY_WORK_STATUS_KINDS, unitIdOf } from "@carres/shared";
+import { DELIVERY_WORK_STATUS_KINDS } from "@carres/shared";
 import {
   ARRIVAL_COPY,
   arrivalNoteOf,
@@ -86,7 +86,6 @@ import {
   useDeliveryArrangements,
   useOperationOrders,
   usePurchasingSettings,
-  useSalesOrderExpansion,
   type DeliveryArrangementRow,
 } from "@/lib/queries";
 import {
@@ -95,9 +94,7 @@ import {
   type DataGridContextMenuItem,
 } from "@/components/register/DataGrid";
 import ModuleHeader from "./components/ModuleHeader";
-import Panel from "@/components/kit/Panel";
-import Button from "@/components/kit/Button";
-import ConnectedSections from "./components/ConnectedSections";
+import DeliveryBrief, { STATUS_TONE_TEXT } from "./components/DeliveryBrief";
 import { FilterRail, FilterRailGroup, FilterRailRow } from "./components/workspace-rail";
 import AssignLogisticsDialog from "./components/AssignLogisticsDialog";
 import { requestedDeliveryText } from "./sales-order-columns";
@@ -146,10 +143,8 @@ import {
   type DeliveryMonitorFilters,
   type MonitorCalendarView,
   type MonitorDeliveryStatus,
-  type MonitorGoodsLine,
   type MonitorTopTab,
   type MonitorWorkView,
-  arrivalDayOf,
 } from "./delivery-monitor";
 import MonitorMonthCalendar from "./components/MonitorMonthCalendar";
 import MonitorMonthView from "./components/MonitorMonthView";
@@ -158,7 +153,6 @@ import DatePicker from "@/components/kit/DatePicker";
 /** The two governed action words on this workspace (COPY-STANDARD). */
 const ASSIGN_LOGISTICS = "Assign logistics";
 const CHANGE_LOGISTICS = "Change logistics";
-const EDIT_DELIVERY = "Edit Delivery";
 
 /** The rail-collapse memory (LOCAL FILTER RAIL COLLAPSE law). */
 const FILTER_RAIL_STORAGE_KEY = "carres.deliveryMonitor.filterRail";
@@ -554,16 +548,15 @@ function MonitorCard({ card }: { card: DeliveryMonitorCard }) {
  */
 function MonitorWorkCard({
   card,
-  onAssign,
-  onEdit,
   onOpenOrder,
 }: {
   card: DeliveryMonitorCard;
-  onAssign: (card: DeliveryMonitorCard) => void;
-  onEdit: (card: DeliveryMonitorCard) => void;
   onOpenOrder: (card: DeliveryMonitorCard) => void;
 }) {
   const action = monitorRowAction(card);
+  /* The phone has no ▸ column: the card itself unfolds the brief (§8.5), and
+     every Delivery-owned write lives inside it (§8.6). */
+  const [briefOpen, setBriefOpen] = useState(false);
   /* The SAME words the sheet prints — the phone never spells a date twice. */
   const requested = requestedText(card);
   const confirmed = card.confirmedDate ? fmtDate(card.confirmedDate) : DW.noConfirmedDate;
@@ -621,14 +614,14 @@ function MonitorWorkCard({
         <button
           type="button"
           className="min-h-11 rounded-control border border-kit-slate-6 bg-white px-3 text-body font-medium text-kit-slate-12"
-          data-testid={`delivery-monitor-action-${action.kind}-${card.scopeId}`}
-          onClick={() =>
-            action.kind === "assign_logistics" ? onAssign(card) : onEdit(card)
-          }
+          data-testid={`delivery-monitor-brief-toggle-${card.scopeId}`}
+          aria-expanded={briefOpen}
+          onClick={() => setBriefOpen((v) => !v)}
         >
-          {action.kind === "upload_proof" ? EDIT_DELIVERY : action.label}
+          {briefOpen ? MONITOR_COPY.hideBrief : MONITOR_COPY.showBrief}
         </button>
       </div>
+      {briefOpen ? <DeliveryBrief card={card} onOpenOrder={onOpenOrder} /> : null}
     </div>
   );
 }
@@ -636,12 +629,7 @@ function MonitorWorkCard({
 /* ── THE TWO-LINE CELL (Delivery MASTER §8.3) ──────────────────────────────
    One primary fact in its text colour, one supporting line beneath. Colour
    never replaces the word; no icon ever enters a status fact. */
-const TONE_TEXT: Record<DeliveryWorkStatusTone, string> = {
-  green: "text-kit-green-11",
-  orange: "text-kit-amber-11",
-  red: "text-kit-red-11",
-  none: "text-kit-slate-12",
-};
+const TONE_TEXT = STATUS_TONE_TEXT;
 const LINE2_TEXT: Record<"none" | "orange" | "red", string> = {
   none: "text-kit-slate-11",
   orange: "text-kit-amber-11",
@@ -726,397 +714,8 @@ function confirmedLines(r: DeliveryMonitorCard): {
   };
 }
 
-/* ── THE DELIVERY BRIEF — the expanded row's four panels (§8.5) ─────────────
-   Everything needed to act on this delivery without leaving the row: exactly
-   four panels, in this order, on the kit `Panel`, joined by the shared
-   connector. The brief reads and links; it never duplicates Sales, Stock,
-   Warehouse, Purchasing or Payment truth. */
-
-/** The kit Panel's header is `py-3` around one `text-strong` line — the elbow
- *  turns in at its middle. Stated, never measured at runtime. */
-const CONNECT_AT_PANEL = "22px";
-
-function Fact({ label, value, problem = false }: { label: string; value: ReactNode; problem?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-0.5">
-      <span className="shrink-0 text-label text-kit-slate-11">{label}</span>
-      <span className={`min-w-0 text-right text-body ${problem ? "text-kit-amber-11" : "text-kit-slate-12"}`}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-const BRIEF_COLUMNS = [
-  { key: "item", label: MONITOR_COPY.item, width: null },
-  { key: "qty", label: MONITOR_COPY.qty, width: 56 },
-  { key: "source", label: MONITOR_COPY.source, width: 160 },
-  { key: "status", label: MONITOR_COPY.status, width: 190 },
-  { key: "location", label: MONITOR_COPY.location, width: 170 },
-] as const;
-
-interface BriefLine {
-  key: string;
-  item: string;
-  qty: number;
-  /** Unit IDs with their PO, or `Counted stock`; null for a service. */
-  units: Array<{ unit: string; po: string | null }> | null;
-  status: string | null;
-  statusTone: DeliveryWorkStatusTone;
-  location: string | null;
-}
-
-function DeliveryBrief({
-  card,
-  onOpenOrder,
-  onUpdateDates,
-  onLogistics,
-}: {
-  card: DeliveryMonitorCard;
-  onOpenOrder: (card: DeliveryMonitorCard) => void;
-  onUpdateDates: (card: DeliveryMonitorCard) => void;
-  onLogistics: (card: DeliveryMonitorCard) => void;
-}) {
-  const navigate = useNavigate();
-  const row = card.scope;
-  const o = row.o;
-  const arrangement = row.arrangement;
-  const expansion = useSalesOrderExpansion(row.orderId);
-  const missing = new Set(row.missingFacts);
-  const absent = (word: string) => (
-    <span className="text-kit-slate-9" data-absence="true">
-      {word}
-    </span>
-  );
-  /* A missing REQUIRED Sales fact prints as the problem it is (orange), in
-     the place the value would stand — never as a quiet absence. */
-  const required = (problemWord: string, value: ReactNode) =>
-    missing.has(problemWord) ? (
-      <span className="text-kit-amber-11" data-testid="delivery-brief-problem">
-        {problemWord}
-      </span>
-    ) : (
-      value
-    );
-
-  /* ── PANEL 1 · Customer, Address & Access (Sales Orders, read-only) ────── */
-  const trim = (v: string | null | undefined) => (v ?? "").trim();
-  const addressLines = [
-    trim(o.customer_address_line1),
-    trim(o.customer_address_line2),
-    [trim(o.customer_address_postcode), trim(o.customer_address_city)].filter(Boolean).join(" "),
-    trim(o.customer_address_state),
-  ].filter(Boolean);
-  const address = addressLines.length > 0 ? addressLines.join(", ") : trim(o.customer_address) || null;
-  const accessParts: string[] = [];
-  if ((o.delivery_stair_items ?? 0) > 0) {
-    accessParts.push(MONITOR_COPY.stairCarry(o.delivery_stair_items ?? 0, o.delivery_floor ?? null));
-  }
-  if (trim(arrangement?.condo_registration)) {
-    accessParts.push(`${MONITOR_COPY.condoRegistration} · ${trim(arrangement?.condo_registration)}`);
-  }
-  const panelCustomer = (
-    <Panel
-      title={MONITOR_COPY.panelCustomer}
-      right={
-        <Button size="sm" onClick={() => onOpenOrder(card)}>
-          {DW.openSalesOrder}
-        </Button>
-      }
-    >
-      <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2" data-testid="delivery-brief-customer">
-        <div>
-          <Fact label={MONITOR_COPY.customer} value={card.customerName} />
-          <Fact label={MONITOR_COPY.phone} value={trim(o.customer_phone) || absent(DW.notRecorded)} />
-          <Fact
-            label={MONITOR_COPY.emergencyContact}
-            value={trim(o.customer_emergency) || absent(DW.notRecorded)}
-          />
-        </div>
-        <div>
-          <Fact label={MONITOR_COPY.address} value={address ?? absent(DW.notRecorded)} />
-          <Fact
-            label={MONITOR_COPY.buildingType}
-            value={required(DW.buildingNotRecorded, trim(o.building_type) || absent(DW.notRecorded))}
-          />
-          <Fact
-            label={MONITOR_COPY.floor}
-            value={required(
-              DW.floorNotRecorded,
-              o.delivery_floor != null ? String(o.delivery_floor) : absent(DW.notRecorded),
-            )}
-          />
-          <Fact
-            label={MONITOR_COPY.lift}
-            value={required(
-              DW.liftNotRecorded,
-              o.delivery_has_lift == null
-                ? absent(DW.notRecorded)
-                : o.delivery_has_lift
-                  ? MONITOR_COPY.hasLift
-                  : MONITOR_COPY.noLift,
-            )}
-          />
-          <Fact
-            label={MONITOR_COPY.access}
-            value={accessParts.length > 0 ? accessParts.join(" · ") : absent(DW.notRecorded)}
-          />
-          {missing.has(DW.stateNotRecorded) ? (
-            <Fact label={MONITOR_COLUMN.state} value={required(DW.stateNotRecorded, null)} />
-          ) : null}
-        </div>
-      </div>
-    </Panel>
-  );
-
-  /* ── PANEL 2 · Delivery Dates (Delivery) ───────────────────────────────── */
-  const panelDates = (
-    <Panel
-      title={MONITOR_COPY.panelDates}
-      right={
-        <Button size="sm" onClick={() => onUpdateDates(card)} data-testid="delivery-brief-update-dates">
-          {MONITOR_COPY.updateDateTime}
-        </Button>
-      }
-    >
-      <div data-testid="delivery-brief-dates">
-        <Fact
-          label={MONITOR_COPY.customerRequested}
-          value={required(DW.requestedDateNotRecorded, requestedText(card))}
-        />
-        <Fact
-          label={MONITOR_COPY.confirmedDate}
-          value={card.confirmedDate ? fmtDate(card.confirmedDate) : absent(MONITOR_COPY.notConfirmed)}
-        />
-        <Fact
-          label={MONITOR_COPY.confirmedTime}
-          value={card.confirmedTime ?? absent(MONITOR_COPY.noTimeAgreed)}
-        />
-      </div>
-    </Panel>
-  );
-
-  /* ── PANEL 3 · Logistics Details (Delivery; pickup facts from Warehouse) ─ */
-  const partner = card.logisticsPartnerName;
-  const pickup = row.handedOverAt
-    ? [
-        MONITOR_COPY.handedOver(fmtDate(row.handedOverAt, { time: true })),
-        row.receivedAt
-          ? MONITOR_COPY.receivedBy(partner ?? "logistics", fmtDate(row.receivedAt, { timeOnly: true }))
-          : null,
-      ].filter((p): p is string => Boolean(p))
-    : row.receivedAt
-      ? [MONITOR_COPY.receivedBy(partner ?? "logistics", fmtDate(row.receivedAt, { time: true }))]
-      : [];
-  const panelLogistics = (
-    <Panel
-      title={MONITOR_COPY.panelLogistics}
-      right={
-        <Button size="sm" onClick={() => onLogistics(card)} data-testid="delivery-brief-logistics-act">
-          {partner ? MONITOR_COPY.changeLogistics : MONITOR_COPY.assignLogistics}
-        </Button>
-      }
-    >
-      <div data-testid="delivery-brief-logistics">
-        <Fact
-          label={MONITOR_COPY.partner}
-          value={partner ?? <span className="text-kit-amber-11">{MONITOR_COPY.noLogistics}</span>}
-        />
-        <Fact label={MONITOR_COPY.driver} value={trim(arrangement?.driver_name) || absent(DW.notRecorded)} />
-        <Fact label={MONITOR_COPY.driverPhone} value={absent(DW.notRecorded)} />
-        <Fact label={MONITOR_COPY.vehiclePlate} value={trim(arrangement?.vehicle) || absent(DW.notRecorded)} />
-        <Fact
-          label={MONITOR_COPY.pickup}
-          value={
-            pickup.length > 0 ? (
-              <span className="block">
-                {pickup.map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))}
-              </span>
-            ) : (
-              absent(MONITOR_COPY.pickupNotRecorded)
-            )
-          }
-        />
-        <Fact label={MONITOR_COPY.eta} value={trim(arrangement?.expected_arrival) || absent(DW.notRecorded)} />
-      </div>
-    </Panel>
-  );
-
-  /* ── PANEL 4 · Items, Services & Stock (Sales, Purchasing, Stock) ──────── */
-  const factsByLine = new Map((expansion.data?.lines ?? []).map((l) => [l.lineId, l]));
-  const coverage = expansion.data?.unitCoverage ?? {};
-  const unitScopes = expansion.data?.unitScopes ?? {};
-  const placeByUnit = new Map((expansion.data?.place ?? []).map((p) => [p.unitCode, p]));
-  const unitsOf = (lineId: string | null): Array<{ unit: string; po: string | null }> =>
-    (lineId ? factsByLine.get(lineId)?.unitIds ?? [] : [])
-      .map((code) => ({
-        unit: unitIdOf({ unitCode: code, identityScope: unitScopes[code] as "unit" | "quantity" | undefined }),
-        po: coverage[code] ?? null,
-      }))
-      .filter((u): u is { unit: string; po: string | null } => u.unit !== null);
-  const locationOf = (units: Array<{ unit: string }>): string | null => {
-    const places = units
-      .map((u) => placeByUnit.get(u.unit))
-      .map((p) => (p?.siteName ? p.siteName : p?.holderName ? MONITOR_COPY.withHolder(p.holderName) : null))
-      .filter((p): p is string => Boolean(p));
-    return places.length > 0 ? [...new Set(places)].join(" · ") : null;
-  };
-  const arrivalDay = arrivalDayOf(card.arrival);
-  const arrivalWord = (): { word: string; tone: DeliveryWorkStatusTone } => {
-    if (card.arrival.kind === "no_purchase_order") {
-      return { word: ARRIVAL_COPY.noPurchaseOrder, tone: "orange" };
-    }
-    if (arrivalDay && row.customerDeliveryIso && arrivalDay > row.customerDeliveryIso) {
-      return { word: MONITOR_COPY.arrivingAfterRequested, tone: "orange" };
-    }
-    if (arrivalDay) return { word: MONITOR_COPY.arriving(fmtDate(arrivalDay)), tone: "none" };
-    return { word: MONITOR_COPY.notReceivedYet, tone: "orange" };
-  };
-  const goodsLine = (line: MonitorGoodsLine): BriefLine => {
-    const units = unitsOf(line.lineId);
-    const ready = line.shortQty === 0;
-    const arrival = ready ? null : arrivalWord();
-    return {
-      key: line.key,
-      item: line.name,
-      qty: line.qty,
-      units,
-      status: ready ? ARRIVAL_COPY.stockReady : arrival!.word,
-      statusTone: ready ? "green" : arrival!.tone,
-      location: locationOf(units),
-    };
-  };
-  const briefLines: BriefLine[] = [
-    ...card.items.map(goodsLine),
-    ...card.extras.filter((l) => l.kind === "accessory").map(goodsLine),
-    ...card.extras
-      .filter((l) => l.kind === "service")
-      .map(
-        (l): BriefLine => ({
-          key: l.key,
-          item: l.name,
-          qty: l.qty,
-          units: null,
-          status: null,
-          statusTone: "none",
-          location: null,
-        }),
-      ),
-    ...((o.delivery_stair_items ?? 0) > 0
-      ? [
-          {
-            key: "stair-carry",
-            item: MONITOR_COPY.stairCarry(o.delivery_stair_items ?? 0, o.delivery_floor ?? null),
-            qty: o.delivery_stair_items ?? 0,
-            units: null,
-            status: null,
-            statusTone: "none" as const,
-            location: null,
-          },
-        ]
-      : []),
-    ...((o.ops_sofa_loans ?? []).some((l) => l.status === "on_loan")
-      ? [
-          {
-            key: "loan",
-            item: MONITOR_COPY.loanLine(null),
-            qty: 1,
-            units: null,
-            status: null,
-            statusTone: "none" as const,
-            location: null,
-          },
-        ]
-      : []),
-  ];
-  const dash = <span className="text-kit-slate-9">—</span>;
-  const panelItems = (
-    <Panel title={MONITOR_COPY.panelItems} padding="none">
-      {briefLines.length === 0 ? (
-        <div className="px-4 py-3 text-body text-kit-slate-11">{DW.noGoods}</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-left" aria-label={MONITOR_COPY.panelItems} data-testid="delivery-brief-items">
-            <colgroup>
-              {BRIEF_COLUMNS.map((c) => (
-                <col key={c.key} style={c.width ? { width: c.width } : undefined} />
-              ))}
-            </colgroup>
-            <thead className="border-b border-base-200 bg-base-50">
-              <tr className="divide-x divide-base-200">
-                {BRIEF_COLUMNS.map((c) => (
-                  <th key={c.key} scope="col" className="px-2 py-1.5 text-label font-semibold uppercase text-base-500">
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-base-200 text-body">
-              {briefLines.map((line) => (
-                <tr key={line.key} className="divide-x divide-base-200 align-top" data-testid={`delivery-brief-line-${line.key}`}>
-                  <td className="px-2 py-1.5">{line.item}</td>
-                  <td className="px-2 py-1.5 tabular-nums">{line.qty}</td>
-                  <td className="px-2 py-1.5">
-                    {line.units === null ? (
-                      dash
-                    ) : line.units.length === 0 ? (
-                      absent(DW.notAllocated)
-                    ) : (
-                      line.units.map((u) => (
-                        <span key={u.unit} className="block">
-                          <span className="block font-mono">{u.unit}</span>
-                          <span className="block text-label">
-                            {u.po ? (
-                              <button
-                                type="button"
-                                className="text-blue-700 underline-offset-2 hover:underline"
-                                onClick={() => navigate(`/operation/procurement/${encodeURIComponent(u.po!)}`)}
-                              >
-                                {u.po}
-                              </button>
-                            ) : (
-                              <span className="text-kit-slate-11">{MONITOR_COPY.countedStock}</span>
-                            )}
-                          </span>
-                        </span>
-                      ))
-                    )}
-                  </td>
-                  <td className={`px-2 py-1.5 ${TONE_TEXT[line.statusTone]}`}>{line.status ?? dash}</td>
-                  <td className="px-2 py-1.5">
-                    {line.units === null ? dash : line.location ?? absent(DW.notRecorded)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Panel>
-  );
-
-  return (
-    <div data-testid="delivery-scope-expansion">
-      <ConnectedSections
-        testId="delivery-brief"
-        sections={[
-          { key: "customer", connectAt: CONNECT_AT_PANEL, node: panelCustomer },
-          { key: "dates", connectAt: CONNECT_AT_PANEL, node: panelDates },
-          { key: "logistics", connectAt: CONNECT_AT_PANEL, node: panelLogistics },
-          { key: "items", connectAt: CONNECT_AT_PANEL, node: panelItems },
-        ]}
-      />
-    </div>
-  );
-}
-
 export default function OperationDelivery() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const ordersQ = useOperationOrders();
   const partnersQ = useDeliveryPartners();
@@ -1232,6 +831,7 @@ export default function OperationDelivery() {
   const calendarMode = topTab === "calendar";
 
   const q = searchParams.get("q") ?? "";
+  const openScopeId = searchParams.get("open");
   const region = searchParams.get("region");
   const logistics = searchParams.get("logistics");
   /* The retired `?view=waiting_warehouse` URL (and its retired word) lands on
@@ -1409,6 +1009,7 @@ export default function OperationDelivery() {
         orders: ordersQ.data?.orders ?? [],
         deliveryOrders: docsQ.data?.deliveryOrders ?? [],
         attempts: docsQ.data?.attempts ?? [],
+        contacts: arrangementsQ.data?.contacts ?? [],
         handoverEvents: docsQ.data?.handoverEvents ?? [],
         partnerNameById,
         arrangements: arrangementsByScope,
@@ -1565,21 +1166,7 @@ export default function OperationDelivery() {
     (r: DeliveryMonitorCard) => navigate(`/operation/orders/so/${r.orderId}`),
     [navigate],
   );
-  /**
-   * The Delivery-owned editor, carrying THIS workspace back with it: the
-   * operator records the confirmed date and returns to the same queue and the
-   * same narrowing, with the row now gone from it. The Journey leg still
-   * rides the URL and never reaches the screen as a word.
-   */
-  const openEditDelivery = useCallback(
-    (r: DeliveryMonitorCard) => {
-      const params = new URLSearchParams();
-      if (r.leg != null) params.set("leg", String(r.leg));
-      params.set("from", `${location.pathname}${location.search}`);
-      navigate(`/operation/delivery/edit/${r.orderId}?${params.toString()}`);
-    },
-    [navigate, location.pathname, location.search],
-  );
+
 
   /* ── THE WORK LIST — the same shared Register engine as Sales Orders ───── */
   const columns = useMemo<DataGridColumn<DeliveryMonitorCard>[]>(
@@ -1923,7 +1510,6 @@ export default function OperationDelivery() {
 
   const contextMenu = useCallback(
     (r: DeliveryMonitorCard): DataGridContextMenuItem[] => [
-      { label: EDIT_DELIVERY, onClick: () => openEditDelivery(r) },
       /* The row's act is ALSO one right-click away. `Actions` is the last of
          twelve ruled columns and a wide sheet scrolls, so the governed door
          must not depend on the operator reaching the right-hand edge — and
@@ -1943,7 +1529,7 @@ export default function OperationDelivery() {
           ]
         : []),
     ],
-    [navigate, openOrder, openEditDelivery],
+    [navigate, openOrder],
   );
 
   const rangeLabel =
@@ -2513,8 +2099,6 @@ export default function OperationDelivery() {
                           <MonitorWorkCard
                             key={card.scopeId}
                             card={card}
-                            onAssign={(r) => setAssigning([r.scope])}
-                            onEdit={openEditDelivery}
                             onOpenOrder={openOrder}
                           />
                         ))}
@@ -2557,23 +2141,17 @@ export default function OperationDelivery() {
                      third of its width at a time. */
                   stickyIdentity={{ columnKey: ["so", "customer"] }}
                   chooserGroupOrder={["Document", "Customer", "Delivery", "Dates", "Items"]}
-                  /* A row on this workspace IS a delivery, so opening it
-                     opens the delivery (owner correction 2026-08-24). */
-                  onRowDoubleClick={openEditDelivery}
                   contextMenu={contextMenu}
                   /* ⭐ THE ONE PAGE-SPECIFIC ROW HEIGHT (ui MASTER §6.5): every
                      cell carries one primary fact and one supporting line. */
                   rowHeight={72}
                   expandTitle={DW.showItems}
                   expandable={{
-                    renderExpansion: (r) => (
-                      <DeliveryBrief
-                        card={r}
-                        onOpenOrder={openOrder}
-                        onUpdateDates={openEditDelivery}
-                        onLogistics={(c) => setAssigning([c.scope])}
-                      />
-                    ),
+                    renderExpansion: (r) => <DeliveryBrief card={r} onOpenOrder={openOrder} />,
+                    /* A retired Edit Delivery link, or a calendar card without
+                       a document, lands here with `?open=` naming the row —
+                       its brief already unfolded (§8.6). */
+                    defaultExpandedKeys: openScopeId ? [openScopeId] : undefined,
                   }}
                   selectable={{
                     selectedKeys: selected,
@@ -2604,7 +2182,7 @@ export default function OperationDelivery() {
                       ? [
                           {
                             /* ONE assigned row — the governed reason/history
-                               flow. Never a batch replacement. */
+                               flow. Never a batch replacement (§8.3). */
                             label: () => CHANGE_LOGISTICS,
                             kind: "write" as const,
                             onClick: (rows: never[]) =>
@@ -2614,17 +2192,6 @@ export default function OperationDelivery() {
                           },
                         ]
                       : []),
-                    {
-                      /* ONE row only — Edit Delivery opens a single
-                         arrangement. */
-                      label: () => EDIT_DELIVERY,
-                      kind: "write",
-                      visible: (n) => n === 1,
-                      onClick: (rows) => {
-                        const row = (rows as unknown as DeliveryMonitorCard[])[0];
-                        if (row) openEditDelivery(row);
-                      },
-                    },
                   ]}
                   toolbarStart={
                     <>

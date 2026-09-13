@@ -179,6 +179,42 @@ export const MONITOR_COPY = {
     unit ? `Loan ${unit} · collect back on delivery day` : `Loan item · collect back on delivery day`,
   services: "Services",
   accessories: "Accessories",
+  /* ── THE IN-PANEL WRITES (owner ruling 2026-09-13, MASTER §8.6) ────────── */
+  confirmedDateField: "Confirmed date",
+  confirmedTimeField: "Confirmed time",
+  informationReceivedFrom: "Information received from",
+  customerWord: "Customer",
+  operationOnBehalfOf: (partner: string) => `Operation on behalf of ${partner}`,
+  whatsappProof: "WhatsApp proof",
+  saveConfirmedDelivery: "Save confirmed delivery",
+  saveConfirmedDeliveryNeedsReply: "Save confirmed delivery — upload the WhatsApp reply",
+  cancel: "Cancel",
+  notDeliveryDay: "Sunday and Malaysian public holidays are not delivery days",
+  deliveryConfirmedDone: (date: string, slot: string | null) =>
+    slot ? `Delivery confirmed ${date} · ${slot}` : `Delivery confirmed ${date}`,
+  uploadReply: "Upload reply screenshot",
+  replaceReply: "Replace screenshot",
+  replyAttached: "Reply screenshot attached",
+  uploadFailed: "The screenshot could not be uploaded",
+  uploadWrongType: "Use a JPG, PNG or WEBP screenshot",
+  uploadTooLarge: "That screenshot is too large (max 10 MB)",
+  copyMessage: "Copy message",
+  copied: "Message copied",
+  openGroup: "Open WhatsApp group",
+  groupNotSet: "No WhatsApp group saved for this partner",
+  sentIsNotConfirmed:
+    "Sending is not confirmation. Record the date only after the partner replies, and upload the reply.",
+  whyChanging: "Why is the logistics partner changing?",
+  pickOne: "Pick one",
+  driverName: "Driver name",
+  condoRegistrationHint:
+    "What the building's management needs before the truck may enter — permit reference, registered time, in their words.",
+  recordCannotDeliver: (partner: string) => `Record Cannot Deliver on behalf of ${partner}`,
+  cannotDeliverReason: "Reason",
+  cannotDeliverNote: "Note",
+  cannotDeliverRecorded: (partner: string) => `${partner} cannot deliver — recorded`,
+  showBrief: "Show delivery brief",
+  hideBrief: "Hide delivery brief",
   /** The first carrier on a scope — the governed word, never `Set partner`. */
   assignLogistics: "Assign logistics",
   hideFilters: "Hide filters",
@@ -961,15 +997,22 @@ export function missingProofLabels(card: DeliveryMonitorCard): string[] {
 
 /**
  * The one href arithmetic. An issued DO opens the formal Delivery Order; a
- * row without one opens Edit Delivery — Monitor never issues the document.
+ * row without one opens its Monitor row, brief unfolded — Monitor never
+ * issues the document.
  */
 export function monitorCardHref(card: DeliveryMonitorCard): string {
   if (card.deliveryOrderId) {
     return `/operation/delivery-orders/${encodeURIComponent(card.deliveryOrderId)}`;
   }
-  return `/operation/delivery/edit/${encodeURIComponent(card.orderId)}${
-    card.leg != null ? `?leg=${card.leg}` : ""
-  }`;
+  /* Edit Delivery is RETIRED (owner ruling 2026-09-13): a row without a
+     document opens on Monitor with its brief already unfolded. */
+  return monitorRowHref(card.scopeId);
+}
+
+/** The Monitor row itself, brief unfolded — the one address of a scope's
+ *  Delivery-owned writes since Edit Delivery retired (§8.6). */
+export function monitorRowHref(scopeId: string): string {
+  return `/operation?tab=delivery&view=all&open=${encodeURIComponent(scopeId)}`;
 }
 
 /* ── THE CHASE — who must be called, and what the operator does next ────── */

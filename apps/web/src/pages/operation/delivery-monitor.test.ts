@@ -479,7 +479,7 @@ describe("monitorCardHref", () => {
 
   it("no DO yet opens Edit Delivery — Monitor never issues the document", () => {
     const out = cards([order({ id: "a", so: 1301 })]);
-    expect(monitorCardHref(out[0]!)).toBe("/operation/delivery/edit/a");
+    expect(monitorCardHref(out[0]!)).toBe("/operation?tab=delivery&view=all&open=a");
   });
 
   it("a Journey row's door carries its leg in the URL only", () => {
@@ -494,7 +494,7 @@ describe("monitorCardHref", () => {
       }),
     ]);
     expect(out).toHaveLength(2);
-    expect(monitorCardHref(out[0]!)).toBe("/operation/delivery/edit/b?leg=1");
+    expect(monitorCardHref(out[0]!)).toBe("/operation?tab=delivery&view=all&open=b%23leg1");
   });
 });
 

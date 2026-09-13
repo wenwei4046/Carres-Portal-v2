@@ -39,7 +39,7 @@ import SettingsWorkspace from "./SettingsWorkspace";
 // build plan. Tab-state driven like Payments / Stock (only orders and
 // procurement are path-driven), so `?tab=delivery` deep-links it.
 import OperationDelivery from "./OperationDelivery";
-import EditDelivery from "./EditDelivery";
+import EditDeliveryRedirect from "./EditDeliveryRedirect";
 import OperationWork from "./OperationWork";
 import OperationRental from "./OperationRental";
 // Purchase / Procurement MRP cockpit — the "what to buy today" guided worklist.
@@ -454,7 +454,10 @@ export default function OperationApp() {
                 scope. It is a REAL route, so the shell suppresses its slim top
                 bar the same way it does for every other page that draws its own
                 Destination Header. */}
-            <Route path="delivery/edit/:orderId" element={<EditDelivery />} />
+            {/* Edit Delivery is RETIRED (owner ruling 2026-09-13): the
+                Delivery-owned writes live inside the Monitor row's brief. A
+                saved or pasted link lands on that row, brief unfolded. */}
+            <Route path="delivery/edit/:orderId" element={<EditDeliveryRedirect />} />
             <Route path="issues" element={<OperationIssueTracker />} />
             <Route path="issues/reports" element={<IssueRelatedPartyReport />} />
             <Route path="orders/so/new" element={<SalesOrderWorkspace />} />

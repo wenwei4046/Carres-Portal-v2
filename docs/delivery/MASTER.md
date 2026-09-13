@@ -251,7 +251,9 @@ Answer` · `Asked to Call Again` · `Requested Another Date` · `Contact Details
 
 **Silence is never a result.** No surface infers `Waiting for customer reply` from a missing
 confirmed date; the words appear only when a contact record carries that result. A sent, copied
-or opened message is never reply evidence. **APPROVED TARGET / NOT BUILT** (§15.1).
+or opened message is never reply evidence. **BUILT 2026-09-13 (CARD 11, 0487
+`ops_delivery_contacts`)**: the one Worker door writes the record; the arrangement save that
+carries `Information received from` records the contact in the same request.
 
 ### 5.2 · The contact deadline
 
@@ -949,9 +951,9 @@ their absence as a design blind spot:
 
 | Gap | Where it lives today |
 |---|---|
-| the in-panel edit states (`Update date and time`, `Assign logistics` / `Change logistics` inside the brief) | `apps/web/src/pages/operation/OperationDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
-| the customer contact record, the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
+| the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
+| Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement, partner coverage and schedule facts, the Delivery Settings surface | `ops_delivery_arrangements`, `delivery_partners`, `partner_fleet`, the Settings Workspace |
 | per-leg DO issuance and results, returned-goods receipt after a failed trip, the signed-DO attach door on a delivered order | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
 | central Delivery reports | the Reports destination |

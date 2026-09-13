@@ -602,7 +602,7 @@ describe("one card", () => {
     expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery-orders/do-row-1");
   });
 
-  it("a card without a DO says so and opens Edit Delivery", () => {
+  it("a card without a DO says so and opens its Monitor row, brief unfolded", () => {
     wrap(<OperationDelivery />);
     const card = screen.getByTestId("delivery-monitor-card-b");
     expect(within(card).getByText("No delivery order yet")).toBeTruthy();
@@ -612,7 +612,7 @@ describe("one card", () => {
        `Delivery confirmed`. */
     expect(within(card).getByText("Confirmed for Sat, 5 Sep")).toBeTruthy();
     expect(within(card).queryByText("Delivery confirmed")).toBeNull();
-    expect(card.closest("a")?.getAttribute("href")).toBe("/operation/delivery/edit/b");
+    expect(card.closest("a")?.getAttribute("href")).toBe("/operation?tab=delivery&view=all&open=b");
   });
 
   it("shows ONLY the approved fields — no expected arrival, phone, owner name or upload time", () => {
@@ -982,16 +982,16 @@ describe("bulk logistics assignment on the work list", () => {
     expect(screen.getAllByText(MONITOR_COPY.notConfirmed).length).toBe(3);
   });
 
-  it("one unassigned row offers Assign logistics AND Edit Delivery; many rows never offer Edit Delivery", () => {
+  it("a selection offers Assign logistics only — Edit Delivery is retired (owner ruling 2026-09-13)", () => {
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_logistics");
     const rowBoxes = screen.getAllByRole("checkbox").slice(1);
     fireEvent.click(rowBoxes[0]!);
     expect(screen.getByText("1 selected")).toBeTruthy();
     expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
-    expect(screen.getByTestId("selection-action-edit-delivery")).toBeTruthy();
-    fireEvent.click(rowBoxes[1]!);
     expect(screen.queryByTestId("selection-action-edit-delivery")).toBeNull();
+    fireEvent.click(rowBoxes[1]!);
     expect(screen.getByTestId("selection-action-assign-logistics")).toBeTruthy();
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
   });
 
   it("a selected row that already has a partner turns the act into the governed Change logistics — never a bulk replacement", () => {
@@ -1279,7 +1279,7 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(seen).toEqual([...seen].sort((a, b) => a - b));
   });
 
-  it("a row with NO Logistics Partner offers `Assign logistics` inside its brief (§8.5 panel 3)", () => {
+  it("a row with NO Logistics Partner offers `Assign logistics` inside its brief — the panel body is the edit surface (§8.6)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     /* The rows sort by requested day: early · mid · late · none. Expand `mid`. */
@@ -1287,8 +1287,14 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     const button = screen.getByTestId("delivery-brief-logistics-act");
     expect(button.textContent).toBe("Assign logistics");
     fireEvent.click(button);
-    const dialog = screen.getByTestId("assign-logistics-dialog");
-    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
+    /* No dialog is invented: the panel flips into its edit state, and the
+       primary act carries the same governed word. */
+    expect(screen.queryByTestId("assign-logistics-dialog")).toBeNull();
+    const edit = screen.getByTestId("delivery-brief-logistics-edit");
+    expect(within(edit).getByTestId("delivery-brief-save-logistics").textContent).toBe("Assign logistics");
+    expect(within(edit).getByTestId("delivery-brief-chase-message").textContent).toContain("SO-1502");
+    fireEvent.click(within(edit).getByTestId("delivery-brief-cancel-logistics"));
+    expect(screen.queryByTestId("delivery-brief-logistics-edit")).toBeNull();
   });
 
   it("a row WITH a Logistics Partner names that partner as the actor — `NETS must contact the customer`", () => {
@@ -1309,16 +1315,59 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     }
   });
 
-  it("`Update date and time` opens THIS order's date door and carries the queue back with it", () => {
+  it("⭐ a later date than the customer asked for cannot be saved without the WhatsApp reply (§8.6)", () => {
+    ordersState.data = { orders: [order({ id: "later", so: 1505, delivery_date: "2026-09-10" })] };
+    arrangementsState.data = {
+      arrangements: [
+        arrangement({ order_id: "later", partner_id: "p-nets", partner_name: "NETS", confirmed_date: "2026-09-20" }),
+      ],
+    };
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=all");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
+    const save = screen.getByTestId("delivery-brief-save-dates");
+    /* The button names its gap while disabled — the governed sentence. */
+    expect(save.textContent).toBe("Save confirmed delivery — upload the WhatsApp reply");
+    expect(save).toBeDisabled();
+    /* `Information received from` offers the partner, the customer, and
+       Operation on behalf of the partner — nothing else. */
+    expect(screen.getByText("Information received from")).toBeTruthy();
+  });
+
+  it("the Logistics Details edit state offers `Record Cannot Deliver on behalf of {partner}` for a carried row", () => {
+    seedChase();
+    wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
+    fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
+    fireEvent.click(screen.getByTestId("delivery-brief-logistics-act"));
+    const open = screen.getByTestId("delivery-brief-cannot-open");
+    expect(open.textContent).toBe("Record Cannot Deliver on behalf of NETS");
+    fireEvent.click(open);
+    const form = screen.getByTestId("delivery-brief-cannot-deliver");
+    expect(within(form).getByText("Reason")).toBeTruthy();
+    expect(within(form).getByTestId("delivery-brief-cannot-save")).toBeDisabled();
+    /* The chase block never claims a confirmation. */
+    expect(screen.getByText(/Sending is not confirmation/)).toBeTruthy();
+  });
+
+  it("`Update date and time` flips the Delivery Dates panel into its edit state and stays on the row (§8.6)", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date&region=Selangor");
     fireEvent.click(screen.getAllByTitle("Show delivery brief")[0]!);
     expect(screen.getByTestId("delivery-brief-update-dates").textContent).toBe("Update date and time");
     fireEvent.click(screen.getByTestId("delivery-brief-update-dates"));
+    const edit = screen.getByTestId("delivery-brief-dates-edit");
+    /* Exactly the ruled fields: Confirmed date · Confirmed time · Information
+       received from · WhatsApp proof · Save confirmed delivery. */
+    for (const label of ["Confirmed date", "Confirmed time", "Information received from", "WhatsApp proof"]) {
+      expect(within(edit).getByText(label)).toBeTruthy();
+    }
+    expect(within(edit).getByTestId("delivery-brief-save-dates").textContent).toBe("Save confirmed delivery");
+    /* The workspace never left: same queue, same narrowing. */
     const url = screen.getByTestId("location-probe").textContent ?? "";
-    expect(url).toContain("/operation/delivery/edit/early");
-    expect(url).toContain("view%3Dno_confirmed_date");
-    expect(url).toContain("region%3DSelangor");
+    expect(url).toContain("view=no_confirmed_date");
+    expect(url).toContain("region=Selangor");
+    fireEvent.click(within(edit).getByTestId("delivery-brief-cancel-dates"));
+    expect(screen.getByTestId("delivery-brief-dates")).toBeTruthy();
   });
 
   it("a row whose arrangement is FINISHED leaves the queue and joins the calendar", () => {
@@ -1355,24 +1404,22 @@ describe("`No confirmed date` — the requested-vs-confirmed chase", () => {
     expect(document.body.textContent).not.toMatch(/\bleg\b/i);
   });
 
-  it("the act is also one right-click away — `Actions` is the twelfth column and a sheet scrolls", () => {
+  it("the assignment act is also one right-click away — and Edit Delivery is nowhere", () => {
     seedChase();
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     const count = (name: string) => screen.queryAllByRole("button", { name }).length;
     const assignsOnSheet = count("Assign logistics");
-    const editsOnSheet = count("Edit Delivery");
 
-    /* A row nobody carries: the menu adds BOTH doors. */
+    /* A row nobody carries: the menu adds the governed assignment door. */
     fireEvent.contextMenu(screen.getByText("SO-1502"));
     expect(count("Assign logistics")).toBe(assignsOnSheet + 1);
-    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
 
-    /* A row a partner already carries: the editor only — a partner is never
-       silently swapped from a context menu (`Change logistics` is the
-       governed act, and it asks for its reason). */
+    /* A row a partner already carries: no silent swap from a menu —
+       `Change logistics` lives in the brief and asks for its reason. */
     fireEvent.contextMenu(screen.getByText("SO-1501"));
     expect(count("Assign logistics")).toBe(assignsOnSheet);
-    expect(count("Edit Delivery")).toBe(editsOnSheet + 1);
+    expect(screen.queryByText("Edit Delivery")).toBeNull();
   });
 
   it("keeps selection, the ▸ expansion and the per-column filters", () => {
@@ -1409,7 +1456,9 @@ describe("the phone's chase list", () => {
     expect(within(card).getByText("NETS")).toBeTruthy();
     expect(within(card).getByText("Call NETS")).toBeTruthy();
     expect(within(card).getByText("Confirm the delivery date")).toBeTruthy();
-    expect(within(card).getByText("Edit Delivery")).toBeTruthy();
+    /* The card unfolds the same brief the sheet's ▸ opens — no editor page. */
+    expect(within(card).getByText("Show delivery brief")).toBeTruthy();
+    expect(within(card).queryByText("Edit Delivery")).toBeNull();
     /* Not the desktop sheet squeezed: no grid, no Columns control. */
     expect(screen.queryByRole("columnheader")).toBeNull();
     expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
@@ -1445,9 +1494,10 @@ describe("the phone's chase list", () => {
     ordersState.data = { orders: [order({ id: "mid", so: 1502, delivery_date: "2026-09-20" })] };
     wrap(<OperationDelivery />, "/operation?tab=delivery&view=no_confirmed_date");
     expect(screen.getByTestId("delivery-monitor-show-filters")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("delivery-monitor-action-assign_logistics-mid"));
-    const dialog = screen.getByTestId("assign-logistics-dialog");
-    expect(within(dialog).getByText("1 delivery")).toBeTruthy();
+    /* The phone card unfolds the same brief the sheet's ▸ opens. */
+    fireEvent.click(screen.getByTestId("delivery-monitor-brief-toggle-mid"));
+    fireEvent.click(screen.getByTestId("delivery-brief-logistics-act"));
+    expect(screen.getByTestId("delivery-brief-logistics-edit")).toBeTruthy();
   });
 });
 
