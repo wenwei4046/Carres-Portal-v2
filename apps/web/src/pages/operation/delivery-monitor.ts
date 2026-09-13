@@ -63,7 +63,13 @@ import {
   type DeliveryScopeRow,
   type ScopeInputs,
 } from "./delivery-work";
-import { DOR_COPY, tripLinesOf, type MissingDeliveryProof } from "./delivery-orders-register";
+import {
+  DOR_COPY,
+  proofReopened,
+  tripLinesOf,
+  type DoProofReview,
+  type MissingDeliveryProof,
+} from "./delivery-orders-register";
 import { lineName, moneyOfOrder } from "./sales-order-facts";
 import { fmtMoney, paymentApprovalOpensGate } from "@carres/shared";
 
@@ -122,6 +128,9 @@ export const MONITOR_COPY = {
   /** Owner correction 2026-09-07 — the queue names the JOB; each row then
    *  names the exact missing file (`DOR_COPY.uploadPhoto` / `uploadSignedDo`). */
   uploadProof: "Upload delivery proof",
+  /** §6.1 (0489) — the review queue; its door is the DO object's Evidence
+   *  section. Joins the rail now that the proof-review record exists. */
+  checkProof: "Check delivery proof",
   noDeliveryOrder: "No delivery order yet",
   /** The governed editor door (COPY-STANDARD, Delivery workspace words). */
   editDelivery: "Edit Delivery",
@@ -449,7 +458,8 @@ export type MonitorWorkView =
   | "no_confirmed_date"
   | "overdue"
   | "failed"
-  | "upload_proof";
+  | "upload_proof"
+  | "check_proof";
 
 export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "all",
@@ -458,6 +468,7 @@ export const MONITOR_WORK_VIEWS: readonly MonitorWorkView[] = [
   "overdue",
   "failed",
   "upload_proof",
+  "check_proof",
 ];
 
 export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
@@ -469,6 +480,7 @@ export const MONITOR_VIEW_LABEL: Record<MonitorWorkView, string> = {
   overdue: MONITOR_COPY.overdue,
   failed: MONITOR_COPY.failed,
   upload_proof: MONITOR_COPY.uploadProof,
+  check_proof: MONITOR_COPY.checkProof,
 };
 
 /**
@@ -548,6 +560,9 @@ export interface DeliveryMonitorCard {
    * false for any row whose result has not reached the customer.
    */
   missingProof: MissingDeliveryProof;
+  /** §6.1 (0489) — Operation's review of that evidence: pending, accepted,
+   *  more required or rejected with its reason. The register's arithmetic. */
+  proofReview: DoProofReview;
   /** THE MAIN GOODS on the truck, with their size and quantity. */
   items: MonitorGoodsLine[];
   /** Accessories and services, kept APART from the main goods (owner ruling
@@ -869,6 +884,7 @@ export function buildDeliveryMonitorCards(input: DeliveryMonitorSource): Deliver
       statusSecond: row.status.second,
       statusSecondTone: row.status.secondTone,
       missingProof,
+      proofReview: row.proofReview,
       items,
       extras,
       siteAccess: siteAccessOf(row.o),
@@ -982,16 +998,26 @@ export function overdueContactCards(
   return sortByRequestedDeliveryDate(cards.filter((c) => c.contactOverdue));
 }
 /** A recorded delivered result still owed evidence — the `Upload delivery
- *  proof` queue's one membership test. */
+ *  proof` queue's one membership test. §6.1: `Proof Rejected` and `More
+ *  Proof Required` reopen it although a file is on record. */
 export function needsProof(card: DeliveryMonitorCard): boolean {
-  return card.missingProof.photo || card.missingProof.signedDo;
+  return card.missingProof.photo || card.missingProof.signedDo || proofReopened(card.proofReview);
 }
 
-/** The exact missing action(s), in the governed words — both when both. */
+/** §6.1 — a file on record that no review has judged yet: the `Check
+ *  delivery proof` queue's one membership test. */
+export function needsProofReview(card: DeliveryMonitorCard): boolean {
+  return card.proofReview.state === "pending";
+}
+
+/** The exact missing action(s), in the governed words — both when both. A
+ *  reopened upload names the file the driver sends, with the review's reason
+ *  as the row's second line (the status line already carries it). */
 export function missingProofLabels(card: DeliveryMonitorCard): string[] {
   const out: string[] = [];
   if (card.missingProof.photo) out.push(DOR_COPY.uploadPhoto);
   if (card.missingProof.signedDo) out.push(DOR_COPY.uploadSignedDo);
+  if (out.length === 0 && proofReopened(card.proofReview)) out.push(DOR_COPY.uploadPhoto);
   return out;
 }
 
@@ -1040,6 +1066,7 @@ export function monitorRowHref(scopeId: string): string {
  */
 export type MonitorRowAction =
   | { kind: "upload_proof"; label: string }
+  | { kind: "check_proof"; label: string }
   | { kind: "assign_logistics"; label: string }
   | { kind: "confirm_date"; call: string; result: string; label: string }
   | { kind: "edit_delivery"; label: string };
@@ -1049,6 +1076,10 @@ export function monitorRowAction(card: DeliveryMonitorCard): MonitorRowAction {
     /* The EXACT missing file(s), in the register's own governed words — both
        when both are missing (owner correction 2026-09-07). */
     return { kind: "upload_proof", label: missingProofLabels(card).join(" · ") };
+  }
+  if (needsProofReview(card)) {
+    /* §6.1 — the file is there; the judgement is the next act. */
+    return { kind: "check_proof", label: MONITOR_COPY.checkProof };
   }
   if (card.logisticsPartnerId === null) {
     return { kind: "assign_logistics", label: MONITOR_COPY.assignLogistics };
@@ -1121,6 +1152,8 @@ function matchesView(card: DeliveryMonitorCard, view: MonitorWorkView, todayIso:
       return card.statusKey === "failed";
     case "upload_proof":
       return needsProof(card);
+    case "check_proof":
+      return needsProofReview(card);
   }
 }
 

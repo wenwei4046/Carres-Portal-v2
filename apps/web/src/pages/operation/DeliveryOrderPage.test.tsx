@@ -25,6 +25,8 @@ let detailState: {
 const useDeliveryOrderSpy = vi.fn((..._args: unknown[]) => detailState);
 const useDeliveryPhotosSpy = vi.fn(() => ({ data: { photos: [] }, isLoading: false }));
 const recordHandoverMutate = vi.fn();
+const reviewMutate = vi.fn();
+const attachSignedMutate = vi.fn();
 
 vi.mock("@/lib/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/queries")>("@/lib/queries");
@@ -33,8 +35,14 @@ vi.mock("@/lib/queries", async () => {
     useDeliveryOrder: (...args: unknown[]) => useDeliveryOrderSpy(...args),
     useDeliveryPhotos: () => useDeliveryPhotosSpy(),
     useRecordHandoverEvent: () => ({ mutate: recordHandoverMutate, isPending: false }),
+    useReviewDeliveryProof: () => ({ mutate: reviewMutate, isPending: false }),
+    useAttachSignedDeliveryOrder: () => ({ mutate: attachSignedMutate, isPending: false }),
+    useUploadDeliveryPhoto: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
+vi.mock("@/lib/supabase", () => ({
+  supabase: { storage: { from: () => ({ uploadToSignedUrl: vi.fn(async () => ({ error: null })) }) } },
+}));
 
 const payload = (
   over: Partial<DeliveryOrderDetailPayload["deliveryOrder"]> = {},
@@ -131,6 +139,21 @@ function mount(data: DeliveryOrderDetailPayload) {
 beforeEach(() => {
   useDeliveryOrderSpy.mockClear();
   recordHandoverMutate.mockClear();
+  reviewMutate.mockClear();
+  attachSignedMutate.mockClear();
+});
+
+/** One recorded attempt (0344) with its row id — the Delivery Visit evidence binds to. */
+const attempt = (
+  result: "delivered" | "partial" | "failed",
+  over: Partial<DeliveryOrderDetailPayload["attempts"][number]> = {},
+): DeliveryOrderDetailPayload["attempts"][number] => ({
+  id: "00000000-0000-0000-0000-0000000f0001",
+  do_number: "DO-180826-3035",
+  result,
+  reason_key: result === "failed" ? "customer_unreachable" : null,
+  recorded_at: "2026-08-20T09:00:00Z",
+  ...over,
 });
 
 describe("DeliveryOrderPage", () => {
@@ -152,8 +175,7 @@ describe("DeliveryOrderPage", () => {
       "Delivery details",
       "Source Sales Order",
       "Delivery status",
-      "Delivery photo",
-      "Signature / proof",
+      "Evidence",
       "History",
     ]) {
       expect(screen.getByText(block)).toBeTruthy();
@@ -418,6 +440,133 @@ describe("DeliveryOrderPage", () => {
     // The facts appear twice — the Warehouse block and History — so at least 2.
     expect(screen.getAllByText(/Ready for handover/).length).toBeGreaterThan(1);
     expect(screen.getAllByText(/Received by logistics/).length).toBeGreaterThan(1);
+  });
+
+  describe("Evidence — §6.1 proof review and per-attempt evidence (Card 13, 0489)", () => {
+    const received = [handoverEvent("ready_for_handover"), handoverEvent("handed_over"), handoverEvent("received_by_logistics")];
+    const evidence = (over: Partial<NonNullable<DeliveryOrderDetailPayload["attemptEvidence"]>[number]> = {}) => ({
+      id: "e1",
+      attempt_id: "00000000-0000-0000-0000-0000000f0001",
+      order_id: "00000000-0000-0000-0000-0000000a0001",
+      do_number: "DO-180826-3035",
+      path: "order/x/p.jpg",
+      kind: "photo" as const,
+      recorded_by: null,
+      recorded_at: "2026-08-20T10:00:00Z",
+      url: "https://signed/p.jpg",
+      ...over,
+    });
+
+    it("no result yet: the section says evidence binds to a delivery, and offers no review act", () => {
+      mount(payload());
+      expect(screen.getByText("Evidence")).toBeTruthy();
+      expect(screen.getByText(/evidence binds to the delivery it proves/)).toBeTruthy();
+      expect(screen.queryByTestId("do-proof-review")).toBeNull();
+      expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+    });
+
+    it("a delivered result lists its bound files under `Delivery on {day}` and offers the three governed review acts", () => {
+      mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
+      expect(screen.getByText(/^Delivery on .* · Delivered$/)).toBeTruthy();
+      expect(screen.getByTestId("do-evidence-photo")).toHaveAttribute("href", "https://signed/p.jpg");
+      /* The file is there, nobody has judged it: the pill is AMBER, the state says so. */
+      expect(screen.getByTestId("do-proof-review-state")).toHaveTextContent("Check delivery proof");
+      for (const word of ["Proof Accepted", "More Proof Required", "Proof Rejected"]) {
+        expect(screen.getByRole("button", { name: word })).toBeTruthy();
+      }
+      /* The same uploader every other surface renders — never a second picker. */
+      expect(screen.getByTestId("do-evidence-upload-photo")).toBeTruthy();
+    });
+
+    it("`Proof Accepted` saves at once against the latest attempt; a refusal must say why", () => {
+      mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
+      fireEvent.click(screen.getByTestId("do-proof-accepted"));
+      expect(reviewMutate).toHaveBeenCalledWith({ decision: "accepted", attemptId: "00000000-0000-0000-0000-0000000f0001" });
+      fireEvent.click(screen.getByTestId("do-proof-rejected"));
+      const save = screen.getByTestId("do-proof-save");
+      expect(save).toBeDisabled();
+      fireEvent.change(screen.getByLabelText(/Proof Rejected · Reason/), { target: { value: "The photo shows the lobby" } });
+      expect(save).not.toBeDisabled();
+      fireEvent.submit(screen.getByTestId("do-proof-reason-form"));
+      expect(reviewMutate).toHaveBeenLastCalledWith({
+        decision: "rejected",
+        attemptId: "00000000-0000-0000-0000-0000000f0001",
+        reason: "The photo shows the lobby",
+      });
+    });
+
+    it("the review state and its history print the governed words with the reason and reviewer", () => {
+      mount(
+        payload({}, {
+          attempts: [attempt("delivered")],
+          handoverEvents: received,
+          attemptEvidence: [evidence()],
+          proofReviews: [
+            {
+              id: "r1",
+              order_id: "00000000-0000-0000-0000-0000000a0001",
+              do_number: "DO-180826-3035",
+              attempt_id: null,
+              decision: "rejected",
+              reason: "The photo shows the lobby",
+              reviewed_by: "u1",
+              reviewed_by_name: "Shasha",
+              reviewed_at: "2026-08-21T01:00:00Z",
+            },
+          ],
+        }),
+      );
+      expect(screen.getByTestId("do-proof-review-state")).toHaveTextContent("Proof Rejected · The photo shows the lobby");
+      expect(screen.getByTestId("do-proof-review-history")).toHaveTextContent("Shasha");
+    });
+
+    it("`Proof Accepted` turns the Delivered pill green — nothing else does", () => {
+      mount(payload({}, { attempts: [attempt("delivered")], handoverEvents: received, attemptEvidence: [evidence()] }));
+      expect(document.querySelector("[data-tone]")?.getAttribute("data-tone")).toBe("warning");
+      mount(
+        payload({}, {
+          attempts: [attempt("delivered")],
+          handoverEvents: received,
+          attemptEvidence: [evidence()],
+          proofReviews: [
+            {
+              id: "r1",
+              order_id: "00000000-0000-0000-0000-0000000a0001",
+              do_number: "DO-180826-3035",
+              attempt_id: null,
+              decision: "accepted",
+              reason: null,
+              reviewed_by: null,
+              reviewed_by_name: null,
+              reviewed_at: "2026-08-21T01:00:00Z",
+            },
+          ],
+        }),
+      );
+      expect(screen.getAllByTestId("do-proof-review-state").at(-1)).toHaveTextContent("Proof Accepted");
+      const tones = [...document.querySelectorAll("[data-tone]")].map((el) => el.getAttribute("data-tone"));
+      expect(tones.at(-1)).toBe("success");
+    });
+
+    it("a PARTIALLY delivered document with no signed paper offers `Upload signed Delivery Order` through the §6.1 door — never the deliver-and-deduct one", () => {
+      mount(payload({}, { attempts: [attempt("partial")], handoverEvents: received }));
+      fireEvent.click(screen.getByTestId("do-evidence-upload-signed-do"));
+      expect(screen.getByTestId("do-signed-do-form")).toBeTruthy();
+      expect(screen.getByTestId("do-signed-do-save")).toBeDisabled();
+      expect(screen.queryByRole("button", { name: /Mark delivered/ })).toBeNull();
+    });
+
+    it("a signed paper on file is stated with its day and its viewing link, and the door is withdrawn", () => {
+      mount(
+        payload(
+          { orders: { ...payload().deliveryOrder.orders, do_file_path: "order-x/do.pdf", do_uploaded_at: "2026-08-21T03:00:00Z" } },
+          { attempts: [attempt("delivered")], handoverEvents: received },
+        ),
+      );
+      expect(screen.getByText(/Signed document on file/)).toBeTruthy();
+      expect(screen.getByTestId("signed-do-link")).toBeTruthy();
+      expect(screen.queryByTestId("do-evidence-upload-signed-do")).toBeNull();
+    });
   });
 
   it("the loan block renders only when a loan exists", () => {

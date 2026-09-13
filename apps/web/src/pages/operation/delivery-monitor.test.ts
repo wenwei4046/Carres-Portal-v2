@@ -25,8 +25,9 @@
  *  7. The Month's counts are the SAME queues the rail lists — an `Exceptions`
  *     number is exactly Overdue + Failed Delivery + Upload delivery proof.
  */
+import { NO_PROOF_REVIEW } from "./delivery-orders-register";
 import { describe, it, expect } from "vitest";
-import type { DeliveryOrderRow, operationOrderListRow } from "@/lib/queries";
+import type { DeliveryOrderRow, DeliveryProofReviewRow, operationOrderListRow } from "@/lib/queries";
 import { orderActionLines, type DeliveryArrangementRow } from "@carres/shared";
 import type { DeliveryScopeRow } from "./delivery-work";
 import {
@@ -170,6 +171,7 @@ function cards(
     deliveryOrders?: DeliveryOrderRow[];
     arrangements?: DeliveryArrangementRow[];
     attempts?: { do_number: string | null; result: "delivered" | "partial" | "failed"; reason_key: string | null; recorded_at: string }[];
+    proofReviews?: DeliveryProofReviewRow[];
   },
 ): DeliveryMonitorCard[] {
   const byScope = new Map<string, DeliveryArrangementRow>();
@@ -179,10 +181,25 @@ function cards(
     deliveryOrders: opts?.deliveryOrders ?? [],
     attempts: opts?.attempts ?? [],
     handoverEvents: [],
+    proofReviews: opts?.proofReviews ?? [],
     partnerNameById: new Map(),
     arrangements: byScope,
     todayIso: TODAY,
   });
+}
+
+/** One §6.1 review row (0489). */
+function review(over: Partial<DeliveryProofReviewRow> & { decision: DeliveryProofReviewRow["decision"] }): DeliveryProofReviewRow {
+  return {
+    id: `r-${over.decision}`,
+    order_id: "a",
+    do_number: "DO-1",
+    attempt_id: null,
+    reason: null,
+    reviewed_by: null,
+    reviewed_at: "2026-09-04T01:00:00Z",
+    ...over,
+  };
 }
 
 const noFilters: DeliveryMonitorFilters = {
@@ -450,6 +467,57 @@ describe("buildDeliveryMonitorCards", () => {
       expect(c.missingProof.photo).toBe(false);
     });
 
+    /* ── §6.1 (0489) — the review, over the SAME document row ─────────── */
+    const withFile = { ops_order_control: { delivery_photos: [{ path: "p.jpg", at: "2026-09-03T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" as const }] } };
+    const signed = { orders: { id: "a", so: 1301, customer_name: "kong chai yin", do_file_path: "signed.pdf", do_uploaded_at: "2026-09-03T12:00:00Z" } };
+    const reviewed = (reviews: DeliveryProofReviewRow[]) =>
+      cards([order({ id: "a", so: 1301, do_number: "DO-1", ...withFile })], {
+        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
+        attempts: [{ do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" }],
+        proofReviews: reviews,
+      })[0]!;
+
+    it("both files on record and no review yet → `Check delivery proof`, and Delivered stays ORANGE", () => {
+      const c = reviewed([]);
+      expect(c.proofReview.state).toBe("pending");
+      expect(needsProof(c)).toBe(false);
+      expect(monitorRowAction(c)).toEqual({ kind: "check_proof", label: "Check delivery proof" });
+      expect(c.statusTone).toBe("orange");
+      expect(c.statusSecond).toBe("Check delivery proof");
+      expect(buildMonitorRails([c], noFilters, []).work.check_proof).toBe(1);
+      expect(buildMonitorRails([c], noFilters, []).work.upload_proof).toBe(0);
+    });
+
+    it("`Proof Accepted` is the ONE fact that turns Delivered green, and the row leaves every proof queue", () => {
+      const c = reviewed([review({ decision: "accepted", reviewed_at: "2026-09-04T01:00:00Z" })]);
+      expect(c.proofReview.state).toBe("accepted");
+      expect(c.statusTone).toBe("green");
+      expect(c.statusSecond).toContain("Proof accepted");
+      expect(needsProof(c)).toBe(false);
+      expect(monitorRowAction(c).kind).not.toBe("check_proof");
+      expect(buildMonitorRails([c], noFilters, []).work.check_proof).toBe(0);
+    });
+
+    it("`Proof Rejected` reopens `Upload delivery proof` with the reason, although a file is on record", () => {
+      const c = reviewed([review({ decision: "rejected", reason: "The photo shows the lobby", reviewed_at: "2026-09-04T01:00:00Z" })]);
+      expect(c.proofReview).toMatchObject({ state: "rejected", reason: "The photo shows the lobby" });
+      expect(needsProof(c)).toBe(true);
+      expect(missingProofLabels(c)).toEqual(["Upload delivery photo"]);
+      expect(c.statusSecond).toBe("Proof Rejected · The photo shows the lobby");
+      expect(c.statusTone).toBe("orange");
+      expect(buildMonitorRails([c], noFilters, []).work.upload_proof).toBe(1);
+    });
+
+    it("a NEWER file after a rejection reopens the review — the question is pending again", () => {
+      const c = cards([order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [{ path: "p2.jpg", at: "2026-09-05T11:00:00Z", by: null, doNumber: "DO-1", kind: "photo" }] } })], {
+        deliveryOrders: [doc({ id: "do-1", do_number: "DO-1", ...signed })],
+        attempts: [{ do_number: "DO-1", result: "delivered", reason_key: null, recorded_at: "2026-09-03T10:00:00Z" }],
+        proofReviews: [review({ decision: "rejected", reason: "Lobby", reviewed_at: "2026-09-04T01:00:00Z" })],
+      })[0]!;
+      expect(c.proofReview.state).toBe("pending");
+      expect(monitorRowAction(c).kind).toBe("check_proof");
+    });
+
     it("a result that never reached the customer owes no proof", () => {
       const c = cards(
         [order({ id: "a", so: 1301, do_number: "DO-1", ops_order_control: { delivery_photos: [] } })],
@@ -583,6 +651,7 @@ function datedCard(over: Partial<DeliveryMonitorCard> & { scopeId: string }): De
     statusSecond: "09:00–11:00",
     statusSecondTone: null,
     missingProof: NO_PROOF_MISSING,
+    proofReview: NO_PROOF_REVIEW,
     items: [],
     extras: [],
     siteAccess: null,
@@ -985,7 +1054,7 @@ describe("buildMonitorRails", () => {
 });
 
 describe("the ruled rail groups (owner correction 2026-09-07)", () => {
-  it("WORK TO DO is the six queues in the ruled order — no Calendar, no Waiting for warehouse, no Proof Required", () => {
+  it("WORK TO DO is the seven queues in the ruled order — `Check delivery proof` joined with the §6.1 record (0489)", () => {
     expect(MONITOR_WORK_VIEWS).toEqual([
       "all",
       "no_logistics",
@@ -993,7 +1062,9 @@ describe("the ruled rail groups (owner correction 2026-09-07)", () => {
       "overdue",
       "failed",
       "upload_proof",
+      "check_proof",
     ]);
+    expect(MONITOR_VIEW_LABEL.check_proof).toBe("Check delivery proof");
     expect(MONITOR_VIEW_LABEL.all).toBe(MONITOR_COPY.allDeliveryWork);
     expect(MONITOR_VIEW_LABEL.no_logistics).toBe(MONITOR_COPY.noLogistics);
     expect(MONITOR_VIEW_LABEL.upload_proof).toBe("Upload delivery proof");

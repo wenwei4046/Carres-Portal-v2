@@ -26,6 +26,8 @@ import SalesOrderTabs from "./SalesOrderTabs";
 import { useOpenWorkSet, type WorkRow } from "./use-open-work";
 import WarehouseHandoverBlock from "./components/WarehouseHandoverBlock";
 import DeliveryResultAction from "./components/DeliveryResultAction";
+import DeliveryEvidencePanel from "./components/DeliveryEvidencePanel";
+import { NO_PROOF_REVIEW, proofReviewOf } from "./delivery-orders-register";
 
 /**
  * THE DELIVERY ORDER OBJECT PAGE — read-only facts + doors
@@ -126,6 +128,7 @@ export default function DeliveryOrderPage() {
     "confirm_delivery_date",
     "deliver_today",
     "upload_delivery_photo",
+    "check_delivery_proof",
     "arrange_new_delivery_date",
     "collect_loan_item",
   ]);
@@ -208,6 +211,26 @@ export default function DeliveryOrderPage() {
   const onLoan = (data?.loans ?? []).filter((l) => l.status === "on_loan");
   const returnedLoans = (data?.loans ?? []).filter((l) => l.status === "returned");
   const photoRows = photos.data?.photos ?? [];
+  /* §6.1 (0489) — the ONE review arithmetic the register and Monitor read.
+     `Proof Accepted` is what turns the delivered pill green; every other
+     delivered document is amber until Operation has judged its proof. */
+  const latestAttempt = [...(data?.attempts ?? [])].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at)).at(-1);
+  const reached = latestAttempt?.result === "delivered" || latestAttempt?.result === "partial";
+  const proofReview = reached
+    ? proofReviewOf({
+        doNumber: d.do_number,
+        ledger: photos.data ? photoRows : null,
+        signedDoUploadedAt: order.do_file_path ? order.do_uploaded_at : null,
+        reviews: data?.proofReviews ?? [],
+        attemptEvidence: data?.attemptEvidence ?? [],
+      })
+    : NO_PROOF_REVIEW;
+  const statusTone: OrderActionTone =
+    status.kind === "delivered"
+      ? proofReview.state === "accepted"
+        ? "success"
+        : "warning"
+      : STATUS_TONE[status.kind] ?? "neutral";
   const logisticsReceived = (data?.handoverEvents ?? []).some(
     (event) => event.kind === "received_by_logistics",
   );
@@ -370,7 +393,7 @@ export default function DeliveryOrderPage() {
           <Panel
             title="Delivery status"
             right={
-              <StatusPill tone={STATUS_TONE[status.kind] ?? "neutral"}>
+              <StatusPill tone={statusTone}>
                 {status.label}
               </StatusPill>
             }
@@ -506,65 +529,19 @@ export default function DeliveryOrderPage() {
             )}
           </Panel>
 
-          {/* DELIVERY PHOTO */}
-          <Panel title="Delivery photo">
-            {photoRows.length === 0 ? (
-              <Absence>
-                No delivery photo yet — delivery staff upload it after the goods are delivered.
-              </Absence>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {photoRows.map((p, i) =>
-                  p.url ? (
-                    <a
-                      key={i}
-                      href={p.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
-                    >
-                      <img
-                        src={p.url}
-                        alt={`Delivery photo ${i + 1}`}
-                        className="h-28 w-28 rounded-md border border-base-200 object-cover"
-                      />
-                      <span className="mt-1 block text-label text-base-600">
-                        Uploaded: {fmtDate(p.at)}
-                      </span>
-                    </a>
-                  ) : (
-                    <span key={i} className="text-label text-base-600">
-                      Photo on file · Uploaded: {fmtDate(p.at)}
-                    </span>
-                  ),
-                )}
-              </div>
-            )}
-          </Panel>
-
-          {/* SIGNATURE / PROOF */}
-          <Panel title="Signature / proof">
-            {order.pod_signed_at || order.pod_signature_url || order.do_file_path ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {order.pod_signed_at ? (
-                  <Fact label="Signed">
-                    {fmtDate(order.pod_signed_at)}
-                    {order.pod_signed_by ? ` · ${order.pod_signed_by}` : ""}
-                  </Fact>
-                ) : null}
-                {order.do_file_path ? (
-                  <Fact label="Signed document on file">
-                    {order.do_uploaded_at ? fmtDate(order.do_uploaded_at) : "Uploaded"}
-                  </Fact>
-                ) : null}
-              </div>
-            ) : (
-              <Absence>
-                No signed document yet — the customer signs on delivery and the signed copy is
-                uploaded here.
-              </Absence>
-            )}
-          </Panel>
+          {/* EVIDENCE — every file bound to the event it proves, and the
+              §6.1 proof-review acts (Card 13). Photos still ride the existing
+              signed-url door (0280); the signed paper its own attach door. */}
+          <DeliveryEvidencePanel
+            doNumber={d.do_number}
+            orderId={order.id}
+            attempts={data?.attempts ?? []}
+            attemptEvidence={data?.attemptEvidence ?? []}
+            proofReviews={data?.proofReviews ?? []}
+            ledger={photos.data ? photoRows : null}
+            signedDo={{ present: Boolean(order.do_file_path), uploadedAt: order.do_uploaded_at }}
+            proofReview={proofReview}
+          />
 
           {/* LOAN COLLECTION — only when a loan exists */}
           {(onLoan.length > 0 || returnedLoans.length > 0) && (

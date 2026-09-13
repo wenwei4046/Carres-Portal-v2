@@ -1230,6 +1230,32 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     return c.json(m.body, m.status);
   }
 
+  // §6.1 (0489) — the SAME act binds the file to the Delivery Visit it proves:
+  // the latest recorded attempt of the named document. One door, two records
+  // (the ledger the register counts, the evidence the review judges). FAIL-
+  // SOFT for the same reason as the audit line below: the ledger write already
+  // happened, and the response says whether the binding did.
+  let evidenceBound = false;
+  if (doCheck.value) {
+    const latest = await sb
+      .from("delivery_attempts")
+      .select("id")
+      .eq("do_number", doCheck.value)
+      .in("result", ["delivered", "partial"])
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const attemptId = (latest.data as { id: string } | null)?.id ?? null;
+    if (attemptId) {
+      const bound = await sb.rpc("delivery_attempt_evidence_record", {
+        p_attempt_id: attemptId,
+        p_path: entry.path,
+        p_kind: entry.kind === "video" ? "video" : "photo",
+      });
+      evidenceBound = !bound.error;
+    }
+  }
+
   // T6 done-when: activity logs it. The 0211 trigger doesn't watch the overlay
   // ledger, so append through the existing SECURITY DEFINER annotation door —
   // FAIL-SOFT (supabase-js reports errors in the result; an audit hiccup must
@@ -1247,7 +1273,7 @@ orderControlRouter.post("/:id/delivery-photo/attach", async (c) => {
     p_tag: null,
   });
 
-  return c.json({ control: data }, 201);
+  return c.json({ control: data, evidenceBound }, 201);
 });
 
 // GET /:id/delivery-photos — the ledger + a short-lived signed VIEW url per

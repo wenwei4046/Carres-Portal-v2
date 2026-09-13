@@ -57,6 +57,8 @@ import { detectState } from "@/lib/region";
 import type {
   DeliveryOrderAttemptRow,
   DeliveryOrderRow,
+  DeliveryProofReviewRow,
+  DeliveryAttemptEvidenceRow,
   DeliveryHandoverKindRow,
   operationOrderListRow,
 } from "@/lib/queries";
@@ -67,6 +69,10 @@ import {
   missingDeliveryProofOf,
   UNKNOWN_SUBMISSION,
   type MissingDeliveryProof,
+  NO_PROOF_REVIEW,
+  groupProofRecords,
+  proofReviewOf,
+  type DoProofReview,
 } from "./delivery-orders-register";
 
 /**
@@ -218,6 +224,9 @@ export interface DeliveryScopeRow {
   /** The evidence a RECORDED delivered result still lacks — the Delivery
    *  Orders register's own arithmetic over the SAME document row. */
   missingProof: MissingDeliveryProof;
+  /** §6.1 (0489) — Operation's review of that evidence, the register's own
+   *  arithmetic again. `NO_PROOF_REVIEW` until a result reaches the customer. */
+  proofReview: DoProofReview;
   /** Delivery's own arrangement for this scope (0386) — driver, vehicle,
    *  ETA and condo registration ride the brief from it. */
   arrangement: DeliveryArrangementRow | null;
@@ -490,6 +499,10 @@ export interface ScopeInputs {
   /** Every customer-contact record (0487); the status ladder reads the
    *  latest per scope. Absent = no contact recorded anywhere. */
   contacts?: readonly DeliveryContactRow[];
+  /** §6.1 (0489) — the proof reviews and the attempt-evidence clocks the
+   *  register read carries. Absent = no review recorded anywhere. */
+  proofReviews?: readonly DeliveryProofReviewRow[];
+  attemptEvidence?: readonly DeliveryAttemptEvidenceRow[];
 }
 
 /** PostgREST may embed a to-one overlay as an object or a one-row array. */
@@ -517,6 +530,8 @@ export function buildDeliveryScopeRows({
   holidays,
   queueLeads,
   contacts,
+  proofReviews,
+  attemptEvidence,
 }: ScopeInputs): DeliveryScopeRow[] {
   const holidaySet = holidays ?? myHolidaySet();
   const contactsByScope = new Map<string, DeliveryContactRow[]>();
@@ -572,6 +587,24 @@ export function buildDeliveryScopeRows({
   };
   const docByNumber = new Map<string, DeliveryOrderRow>();
   for (const d of deliveryOrders) docByNumber.set(d.do_number, d);
+  /* §6.1 — the review state over the SAME document row (Law D). */
+  const proofRecords = groupProofRecords(proofReviews, attemptEvidence);
+  const reviewOf = (doc: DeliveryOrderRow | null, o: operationOrderListRow): DoProofReview => {
+    if (!doc) return NO_PROOF_REVIEW;
+    const latest = [...(attemptsByDo.get(doc.do_number) ?? [])].sort((a, b) =>
+      a.recorded_at.localeCompare(b.recorded_at),
+    ).at(-1) ?? null;
+    if (latest?.result !== "delivered" && latest?.result !== "partial") return NO_PROOF_REVIEW;
+    const control =
+      overlayOf(o.ops_order_control) ?? overlayOf(doc.orders.ops_order_control ?? null);
+    return proofReviewOf({
+      doNumber: doc.do_number,
+      ledger: control?.delivery_photos,
+      signedDoUploadedAt: doc.orders.do_file_path ? doc.orders.do_uploaded_at ?? null : null,
+      reviews: proofRecords.reviewsByDo.get(doc.do_number) ?? [],
+      attemptEvidence: proofRecords.evidenceByDo.get(doc.do_number) ?? [],
+    });
+  };
 
   /** The facts a document carries — fed to BOTH ladders, never re-derived. */
   const factsOf = (doc: DeliveryOrderRow | null) => ({
@@ -642,6 +675,7 @@ export function buildDeliveryScopeRows({
       const confirmed = confirmedDeliveryOf(o, doc, arrangement);
       const facts = factsOf(doc);
       const missingProof = proofOf(doc, o);
+      const proofReview = reviewOf(doc, o);
       const logisticsName = arrangement?.partner_name ?? fallbackPartner.name;
       const liveDoc = Boolean(doc) && docStatusOf(doc!).kind !== "cancelled";
       const scopeContacts = contactsByScope.get(`${o.id}#0`) ?? [];
@@ -657,6 +691,7 @@ export function buildDeliveryScopeRows({
         doNumber: doc?.do_number ?? null,
         hasArrangement: Boolean(arrangement),
         missingProof,
+        proofReview,
         arrangement,
         handedOverAt: handoverClockOf(doc, "handed_over"),
         receivedAt: handoverClockOf(doc, "received_by_logistics"),
@@ -680,7 +715,8 @@ export function buildDeliveryScopeRows({
             proof: {
               photoUploaded: missingProof.photo ? false : null,
               signedDoUploaded: missingProof.signedDo ? false : null,
-              acceptedOn: null,
+              acceptedOn: proofReview.state === "accepted" ? proofReview.reviewedAt : null,
+              review: { state: proofReview.state, reason: proofReview.reason },
             },
             ...facts,
           },
@@ -715,6 +751,7 @@ export function buildDeliveryScopeRows({
         doNumber: null,
         hasArrangement: Boolean(arrangement),
         missingProof: proofOf(null, o),
+        proofReview: NO_PROOF_REVIEW,
         arrangement,
         handedOverAt: null,
         receivedAt: null,

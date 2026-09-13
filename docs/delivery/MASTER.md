@@ -326,8 +326,17 @@ delivery proof as **`Proof Accepted`**, **`More Proof Required`** or **`Proof Re
 with a reason. `Proof Accepted` is the fact that turns `Delivered` green everywhere and closes
 `Upload delivery proof`; `Proof Rejected` reopens it with the reason. Saved delivery facts are
 corrected through an append-only Correction containing old value, new value, reason, person, time
-and approval where governed. A per-attempt evidence record and the proof-review record are
-**APPROVED TARGET / NOT BUILT** (§15.1).
+and approval where governed.
+
+**BUILT 2026-09-13 (Card 13, migration 0489).** `delivery_attempt_evidence` binds every file to
+the Delivery Visit it proves (the photo/video uploader stamps and binds in one act; the signed
+paper's own door `delivery_signed_do_attach` files it against the latest delivered or partially
+delivered attempt and re-records nothing); `delivery_proof_reviews` holds the append-only review.
+The review state is ONE arithmetic (`proofReviewStateOf` over `latestEvidenceAtOf`): no file →
+nothing to review; a file newer than the latest review → `Check delivery proof`; the latest review
+otherwise decides. `Delivered` is orange everywhere until `Proof Accepted`; `Proof Rejected` and
+`More Proof Required` reopen `Upload delivery proof` with the reason. The append-only Correction
+record for saved delivery facts remains **APPROVED TARGET / NOT BUILT** (§15.1).
 
 ## 7 · Failed Delivery reasons and next Work
 
@@ -413,8 +422,8 @@ its accessible sentence, never colour alone. Clicking a date opens that date's D
 counts computed over the rows the other groups already narrowed (Law D):
 
 - **`WORK TO DO`**, rows in this order: `All delivery work` · `No logistics picked` · `Call
-  customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof`. `Check delivery
-  proof` joins only once the proof-review record exists (§6.1). Every queue comes from recorded
+  customer` · `Overdue delivery` · `Failed Delivery` · `Upload delivery proof` · `Check delivery
+  proof` (joined 2026-09-13 with the §6.1 record). Every queue comes from recorded
   facts, never a clock inference. The group belongs to `Work to do` and is not drawn on the
   calendar tab.
 - **`STATE`**: a kit dropdown of the direct state names the data genuinely carries, ordered by
@@ -662,7 +671,7 @@ identity, search, governed per-column filters, Export, Columns and the fixed 32p
 - **The proof gate follows the recorded result**: goods that reached the customer (delivered or
   partial) may attach a photo; a failed trip owes no delivery photo.
 - **Rail:** `WORK TO DO` (`Record delivery result` · `Upload delivery photo` · `Upload signed
-  Delivery Order`; `Check delivery proof` only once the review record exists) and the `DOCUMENT
+  Delivery Order` · `Check delivery proof`, joined 2026-09-13 with the §6.1 record) and the `DOCUMENT
   STATUS` dropdown. A picked queue puts that queue's own existing door on the row. The `Showing
   only:` strip lists every live condition. Below 1100px the rail starts collapsed.
 - **Selection:** `{N} delivery orders selected · Clear · Print {N} delivery orders` plus the
@@ -954,10 +963,10 @@ their absence as a design blind spot:
 | Gap | Where it lives today |
 |---|---|
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
-| the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
+| the loan offer record; the append-only Correction of saved delivery facts (§6.1) | new migrations under the governed apply path |
 | Payment's §6 written request filed from a later-date save (the storage-terms acknowledgement is not among the ruled edit-state fields) | `docs/payment/MASTER.md` §6, `payment_delivery_date_requests` |
 | fleet-template binding on the arrangement (the brief still types the driver and vehicle; the saved templates exist in Delivery Settings) | `ops_delivery_arrangements`, `partner_drivers`, `partner_fleet` |
-| per-leg DO issuance and results, returned-goods receipt after a failed trip, the signed-DO attach door on a delivered order | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
+| per-leg DO issuance and results, returned-goods receipt after a failed trip | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
 | central Delivery reports | the Reports destination |
 | the POS required-facts gate for address, state, building type, floor, lift and access | Sales Orders' build, a dependency |
 
@@ -1306,7 +1315,7 @@ producing `35 delivery scopes selected · Clear · Assign logistics` in place; a
 Orders register on the full Register grammar with its WORK TO DO / DOCUMENT STATUS rail and
 `Print {N} delivery orders` selection output. No migration, no RLS change, no new writer — the
 one governed assignment door is reused. Named follow-up, not an accident: the `Check delivery
-proof` queue waits for the §6 proof-review record to exist.
+proof` queue joined on 2026-09-13 with the §6 proof-review record (Card 13).
 
 **DEPLOYED 2026-09-04 — Delivery CARD 01 · Monitor Calendar, PR #1101, main SHA
 `e04dc00708eb2f40f001b8dedd8a4721a24c3875`, production converged (deploy probe).** The four-page

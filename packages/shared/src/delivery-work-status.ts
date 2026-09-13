@@ -66,6 +66,7 @@
 
 import type { DeliveryHandoverKind, DeliveryOrderAttemptFact } from "./delivery-order-status";
 import { deliveryReasonByKey } from "./delivery-reasons";
+import type { ProofReviewState } from "./delivery-proof";
 
 export type DeliveryWorkStatusKind =
   | "assign_logistics"
@@ -217,11 +218,14 @@ export interface DeliveryWorkStatusInput {
   attempts: ReadonlyArray<DeliveryOrderAttemptFact>;
   /** Today, for the one rung about the calendar. Absent = never `Overdue`. */
   todayIso?: string | null;
-  /** The proof a delivered result carries — the register's own arithmetic. */
+  /** The proof a delivered result carries — the register's own arithmetic,
+   *  and Operation's review of it (§6.1, 0489). `Proof Accepted` is the ONE
+   *  fact that turns `Delivered` green; until then the word stays orange. */
   proof?: {
     photoUploaded: boolean | null;
     signedDoUploaded: boolean | null;
     acceptedOn: string | null;
+    review?: { state: ProofReviewState; reason: string | null } | null;
   } | null;
   /** Required Sales facts this row lacks, in the operator's words. */
   missingFacts?: ReadonlyArray<string>;
@@ -241,11 +245,16 @@ export function deliveryWorkStatusOf(
   const say = (
     kind: DeliveryWorkStatusKind,
     second: string | null = null,
-    extra: { secondTone?: "orange" | "red" | null; reasonLabel?: string | null; day?: string | null } = {},
+    extra: {
+      secondTone?: "orange" | "red" | null;
+      reasonLabel?: string | null;
+      day?: string | null;
+      tone?: DeliveryWorkStatusTone;
+    } = {},
   ): DeliveryWorkStatus => ({
     kind,
     label: deliveryWorkStatusLabelOf(kind, partner, extra.day ?? null),
-    tone: DELIVERY_WORK_STATUS_TONE[kind],
+    tone: extra.tone ?? DELIVERY_WORK_STATUS_TONE[kind],
     second,
     secondTone: extra.secondTone ?? null,
     reasonLabel: extra.reasonLabel ?? null,
@@ -259,14 +268,23 @@ export function deliveryWorkStatusOf(
   if (latest) {
     if (latest.result === "delivered") {
       const proof = input.proof;
+      const review = proof?.review ?? null;
+      /* `Proof Accepted` is the fact that turns `Delivered` green everywhere
+         (§6.1). Every other delivered row is orange: a specific act is owed. */
       if (proof?.acceptedOn) return say("delivered", `Proof accepted ${spell.date(proof.acceptedOn)}`);
+      const owed = { tone: "orange" as const, secondTone: "orange" as const };
+      if (review?.state === "rejected" || review?.state === "more_required") {
+        const word = review.state === "rejected" ? "Proof Rejected" : "More Proof Required";
+        return say("delivered", review.reason ? `${word} · ${review.reason}` : word, owed);
+      }
       if (proof && proof.photoUploaded === false) {
-        return say("delivered", "Delivery photo not uploaded", { secondTone: "orange" });
+        return say("delivered", "Delivery photo not uploaded", owed);
       }
       if (proof && proof.signedDoUploaded === false) {
-        return say("delivered", "Upload signed Delivery Order", { secondTone: "orange" });
+        return say("delivered", "Upload signed Delivery Order", owed);
       }
-      return say("delivered");
+      if (review?.state === "pending") return say("delivered", "Check delivery proof", owed);
+      return say("delivered", null, { tone: "orange" });
     }
     /* `partial` and `failed` are both ONE Failed Delivery carrying ONE reason
        (§7's rule) — never a family of failure words. */

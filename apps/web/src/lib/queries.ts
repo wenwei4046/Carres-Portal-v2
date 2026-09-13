@@ -15,6 +15,10 @@ import {
   type DeliveryHandoverKind,
   type HandoverGoodsLine,
   type RecordHandoverInput,
+  type DeliveryProofReviewRow,
+  type DeliveryAttemptEvidenceRow,
+  type ProofReviewInput,
+  type SignedDoAttachInput,
   type RecordOutboundPrepInput,
   type CancelOrderInput,
   type CatalogResponse,
@@ -6975,8 +6979,10 @@ export interface DeliveryOrderRow {
     delivery_date?: string | null;
     delivery_date_tbd?: boolean | null;
     /** The signed DO on file (0087) — the `Upload signed Delivery Order`
-     *  queue's canonical fact (register correction 2026-09-06). */
+     *  queue's canonical fact (register correction 2026-09-06) — and its
+     *  clock, one of the §6.1 files that can reopen the review question. */
     do_file_path?: string | null;
+    do_uploaded_at?: string | null;
     /** The order's goods lines — the register expansion derives THIS TRIP's
      *  lines from them via `trip_groups` (one arithmetic with the DO page). */
     order_lines?: Array<{
@@ -6994,6 +7000,8 @@ export interface DeliveryOrderRow {
   };
 }
 export interface DeliveryOrderAttemptRow {
+  /** 0344's row id — the Delivery Visit a §6.1 evidence file binds to. */
+  id?: string;
   do_number: string | null;
   result: "delivered" | "partial" | "failed";
   reason_key: string | null;
@@ -7014,6 +7022,10 @@ export interface DeliveryOrdersRegisterPayload {
   deliveryOrders: DeliveryOrderRow[];
   attempts: DeliveryOrderAttemptRow[];
   handoverEvents: DeliveryHandoverKindRow[];
+  /** §6.1 (0489) — Operation's reviews and the per-attempt evidence clocks.
+   *  Absent on an older Worker = unknown, read as no review recorded. */
+  proofReviews?: DeliveryProofReviewRow[];
+  attemptEvidence?: DeliveryAttemptEvidenceRow[];
 }
 /**
  * THE STOCK REGISTER — the one current listing of controlled Units
@@ -7062,6 +7074,7 @@ export function useStockUnit(unitCode: string | undefined) {
  * window, in one read. The workspace joins them by `${order_id}#${leg}`.
  */
 export type { DeliveryArrangementRow, DeliveryArrangementEventRow } from "@carres/shared";
+export type { DeliveryProofReviewRow, DeliveryAttemptEvidenceRow } from "@carres/shared";
 
 export interface DeliveryArrangementsPayload {
   arrangements: DeliveryArrangementRow[];
@@ -7267,6 +7280,11 @@ export interface DeliveryOrderDetailPayload {
   };
   attempts: DeliveryOrderAttemptRow[];
   lineDescriptions: Record<string, string>;
+  /** §6.1 (0489) — the Evidence section's facts: every file bound to the
+   *  attempt it proves (signed for viewing) and every review with its
+   *  reviewer's name. */
+  proofReviews?: Array<DeliveryProofReviewRow & { reviewed_by_name: string | null }>;
+  attemptEvidence?: Array<DeliveryAttemptEvidenceRow & { url: string | null }>;
   loans: Array<{
     id: string;
     item_id: string | null;
@@ -7372,6 +7390,54 @@ export function useRecordDeliveryAttempt(
       await qc.invalidateQueries({ queryKey: qk.operation.stockAlerts() });
       await qc.invalidateQueries({ queryKey: ["operation", "movements"] });
       await qc.invalidateQueries({ queryKey: qk.operation.dashboard(), exact: true });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (0489) — the three review acts, through the governed door. The DO
+ *  page, the register and Monitor all re-read: a review moves the row's
+ *  queue and its status colour. */
+export function useReviewDeliveryProof(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ review: unknown }, ApiError, ProofReviewInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ review: unknown }, ApiError, ProofReviewInput>({
+    mutationFn: (input) =>
+      apiFetch<{ review: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/proof-review`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
+      opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
+    },
+  });
+}
+
+/** §6.1 (Card 13) — the signed Delivery Order filed against a delivered or
+ *  partially delivered document. Touches no status and no stock, so only the
+ *  document reads and the order tree are re-read. */
+export function useAttachSignedDeliveryOrder(
+  doId: string,
+  opts?: Partial<UseMutationOptions<{ attached: unknown }, ApiError, SignedDoAttachInput>>,
+) {
+  const qc = useQueryClient();
+  return useMutation<{ attached: unknown }, ApiError, SignedDoAttachInput>({
+    mutationFn: (input) =>
+      apiFetch<{ attached: unknown }>(
+        `/api/operation/delivery-orders/${encodeURIComponent(doId)}/signed-document`,
+        { method: "POST", body: JSON.stringify(input) },
+      ),
+    ...opts,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: ["operation", "delivery-orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "orders"] });
+      await qc.invalidateQueries({ queryKey: ["operation", "work"] });
       opts?.onSuccess?.(...(args as Parameters<NonNullable<typeof opts.onSuccess>>));
     },
   });

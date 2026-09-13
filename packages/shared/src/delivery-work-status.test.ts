@@ -165,6 +165,52 @@ describe("deliveryWorkStatusOf — the actor and the fact, never the document (�
     expect(delivered(null).second).toBeNull();
   });
 
+  it("`Proof Accepted` is the ONE fact that turns Delivered green — every other delivered row is orange (§6.1)", () => {
+    const delivered = (proof: DeliveryWorkStatusInput["proof"]) =>
+      status({
+        hasDeliveryOrder: true,
+        handoverEvents: at("received_by_logistics"),
+        attempts: [attempt("delivered")],
+        confirmedDate: "2026-08-20",
+        todayIso: "2026-09-12",
+        proof,
+      });
+    expect(delivered(null).tone).toBe("orange");
+    const pending = delivered({
+      photoUploaded: true,
+      signedDoUploaded: true,
+      acceptedOn: null,
+      review: { state: "pending", reason: null },
+    });
+    expect(pending.tone).toBe("orange");
+    expect(pending.second).toBe("Check delivery proof");
+    expect(pending.secondTone).toBe("orange");
+    const rejected = delivered({
+      photoUploaded: true,
+      signedDoUploaded: true,
+      acceptedOn: null,
+      review: { state: "rejected", reason: "Photo shows the lobby" },
+    });
+    expect(rejected.tone).toBe("orange");
+    expect(rejected.second).toBe("Proof Rejected · Photo shows the lobby");
+    const more = delivered({
+      photoUploaded: true,
+      signedDoUploaded: true,
+      acceptedOn: null,
+      review: { state: "more_required", reason: "Need the signed paper" },
+    });
+    expect(more.second).toBe("More Proof Required · Need the signed paper");
+    /* A newer upload after a rejection is pending again — and a missing file
+       still names the file before it names the review. */
+    const noPhotoRejected = delivered({
+      photoUploaded: false,
+      signedDoUploaded: true,
+      acceptedOn: null,
+      review: { state: "pending", reason: null },
+    });
+    expect(noPhotoRejected.second).toBe("Delivery photo not uploaded");
+  });
+
   it("a failure is ONE Failed Delivery carrying ONE reason, red", () => {
     const s = status({ hasDeliveryOrder: true, attempts: [attempt("failed", "customer_unreachable")] });
     expect(s.label).toBe("Failed Delivery");
