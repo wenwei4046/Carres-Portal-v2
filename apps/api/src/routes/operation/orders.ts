@@ -27,7 +27,8 @@ import {
   invoiceStorageSumOf,
   storageHold,
   storageObligation,
-
+  salesOrderNumberWord,
+  salesOrderParamOf,
   type AllocationUnit,
   type PoArrival as OrderPoArrival,
   type PoArrivalReply as OrderPoArrivalReply,
