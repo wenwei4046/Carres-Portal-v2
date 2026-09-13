@@ -55,12 +55,12 @@ import type { WorkspaceDutyResolution } from "./workspace-duty";
  *   payment_approver  the effective Payment Approver resolution from Workspace
  *                  — §12 gives void, reallocation and overpayment review to
  *                  this duty and to nobody else; unresolved fails closed
- *   delivery_duty  governed Delivery ownership — no delivery-staff roster
- *                  fact exists; the duty word stands (measured-boundary rule)
+ *   delivery_duty  the effective Delivery Duty resolution from Workspace
+ *                  (Delivery MASTER §13.1, 2026-09-13); unresolved fails
+ *                  closed — the duty word stands, never the PIC
  *   warehouse_duty §6 gives the storage check to Warehouse and names no duty;
  *                  no warehouse roster fact exists, so the word stands — the
- *                  same measured-boundary rule delivery_duty and finance_duty
- *                  already follow
+ *                  same measured-boundary rule finance_duty follows
  *   finance_duty   only Finance clears it — no roster fact; the word stands
  *   system         never a person's work
  */
@@ -151,8 +151,8 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "delivery",
     trigger: "the order needs delivering and no company is chosen",
     owner:
-      "the order's PIC as governed proxy — no delivery-staff roster fact exists (0363 records none), and choosing the company is an operations act on the order",
-    ownerRule: "order_pic",
+      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1); choosing the company is Delivery's arrangement act",
+    ownerRule: "delivery_duty",
     action: orderActionQueue("assign_logistics"),
     dueRule: "3 working days before the promised date, delivery week + MY holidays",
     completionFact: "a company recorded (orders.delivery_partners / ops_assigned_logistic)",
@@ -162,8 +162,8 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "delivery",
     trigger: "logistics assigned, customer has not confirmed date + slot",
     owner:
-      "the order's PIC as governed proxy (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line already names the partner)",
-    ownerRule: "order_pic",
+      "Delivery Duty — the holder calls the partner or the customer (§0.1: assigned Partner or governed proxy owner — the partner has no login, so the closable action is ours; the action line names the partner)",
+    ownerRule: "delivery_duty",
     action: orderActionQueue("confirm_delivery_date"),
     dueRule:
       "logistics_call_working_days (3 — Card 3's ruling) before the promised date, delivery week + MY holidays",
@@ -194,8 +194,8 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "delivery",
     trigger: "the confirmed date is today and nothing has been delivered",
     owner:
-      "the order's PIC as governed proxy — Delivery ownership has no staff roster fact yet; the PIC watches today's run reach its result",
-    ownerRule: "order_pic",
+      "Delivery Duty — the holder watches today's run reach its result (Delivery MASTER §13.1)",
+    ownerRule: "delivery_duty",
     action: orderActionQueue("deliver_today"),
     dueRule: "the confirmed date itself",
     completionFact:
@@ -206,8 +206,8 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "delivery",
     trigger: "delivered with no photo on file",
     owner:
-      "the order's PIC — the proof arrives on the order's own WhatsApp thread; filing it is the relationship owner's act",
-    ownerRule: "order_pic",
+      "Delivery Duty — the proof arrives on the order's WhatsApp thread; filing it is the arrangement owner's act (Delivery MASTER §6)",
+    ownerRule: "delivery_duty",
     action: orderActionQueue("upload_delivery_photo"),
     dueRule: "1 working day after the delivery, delivery week + MY holidays",
     completionFact: "a photo in the ledger (ops_order_control.delivery_photos, 0280)",
@@ -230,7 +230,7 @@ export const ORDER_WORK_RULES: readonly WorkRule[] = [
     module: "delivery",
     trigger: "a loan item is still out (ops_sofa_loans, on_loan) and the delivery day has arrived",
     owner:
-      "Delivery staff (blueprint card owner rule) — no delivery-staff roster fact exists yet, so no person resolves and the duty word stands (the canvas's measured-boundary rule)",
+      "Delivery Duty — the holder resolved by the Shared Duty Resolver (Delivery MASTER §13.1, §14.2)",
     ownerRule: "delivery_duty",
     action: orderActionQueue("collect_loan_item"),
     dueRule: "the delivery day itself (confirmed date, else the recorded delivery)",
@@ -480,7 +480,7 @@ export interface WorkItem {
    *  salesperson) and for a duty word. My Work filters on this. */
   ownerUserId: string | null;
   /** The OWNER RULE's duty word when no person resolves (blueprint card §7 —
-   *  Delivery staff · Finance have no roster fact yet, so the duty stands
+   *  Finance has no roster fact yet, so the duty stands
    *  where a name cannot; the canvas's measured-boundary rule). */
   ownerDuty?: string;
   tone: OrderOpenAction["tone"];
@@ -792,7 +792,10 @@ export function workItemsForOrder(
         );
       }
       case "delivery_duty":
-        return directOwner("delivery_duty", null, "Delivery staff");
+        // Delivery Duty (Delivery MASTER §13.1, 2026-09-13): resolved by the
+        // Shared Duty Resolver like PO and Payment Duty; no holder → the duty
+        // word stands, never the PIC and never a superuser fallback.
+        return dutyOwner("delivery_duty", "delivery_duty", "Delivery Duty");
       case "finance_duty":
         return directOwner("finance_duty", null, "Finance");
       case "payment_duty":

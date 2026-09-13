@@ -954,7 +954,6 @@ their absence as a design blind spot:
 | the Edit Delivery page retirement and the relocated writes | `apps/web/src/pages/operation/EditDelivery.tsx`, `apps/api/src/routes/operation/delivery-arrangements.ts` |
 | the customer contact record, the proof-review record, per-attempt evidence, the loan offer record | new migrations under the governed apply path |
 | fleet-template binding on the arrangement, partner coverage and schedule facts, the Delivery Settings surface | `ops_delivery_arrangements`, `delivery_partners`, `partner_fleet`, the Settings Workspace |
-| the `delivery_duty` key in the catalogue and its resolver path | `apps/api/src/routes/operation/workspace-duties.ts`, `packages/shared/src/work-engine.ts` |
 | per-leg DO issuance and results, returned-goods receipt after a failed trip, the signed-DO attach door on a delivered order | `apps/api/src/lib/delivery-order-issue.ts`, migrations |
 | the two-line Delivery Work sentences | `packages/shared/src/order-action-words.ts`, `work-engine.ts` |
 | central Delivery reports | the Reports destination |
