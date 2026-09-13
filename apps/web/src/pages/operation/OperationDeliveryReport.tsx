@@ -358,7 +358,7 @@ export default function OperationDeliveryReport() {
                 {/* 4 · Logistics Partner Performance */}
                 <SectionCard>
                   <div className="p-3" data-testid="report-partners">
-                    <Head note="Source: results by the partner named on the Delivery Order, and the partner's own Cannot Deliver records. Month: the day each was recorded. NETS has no acceptance-speed measure — NETS is responsible without Accept. Warehouse work is measured apart, even when both are NETS.">
+                    <Head note="Source: customer-leg results by the partner named on the Delivery Order, and the partner's own Cannot Deliver records. Month: the day each was recorded. Journey legs before the last are warehouse trips and are excluded. NETS has no acceptance-speed measure — NETS is responsible without Accept. Warehouse work is measured apart, even when both are NETS.">
                       {DR.partners}
                     </Head>
                     <div className="space-y-1">

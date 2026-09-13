@@ -392,3 +392,23 @@ describe("reportMonthsOf — the months that hold a dated Delivery event", () =>
     ).toEqual(["2026-09", "2026-08", "2026-07", "2026-06"]);
   });
 });
+
+/* ── 【DELIVERY】 CARD 20 — the partner listing counts customer legs only ── */
+describe("Logistics Partner Performance excludes a warehouse leg's arrival (Card 20)", () => {
+  it("NETS's leg-1 arrival at the JB warehouse is not a delivered trip; AL's customer leg is", () => {
+    const stops = [{ leg: 1 }, { leg: 2 }] as never;
+    const docs = [
+      doc({ id: "l1", do_number: "DO-L1", leg: 1, logistics_partner: "NETS", orders: { id: "o-sg", so: 1362, customer_name: "sg", delivery_date: "2026-09-18", delivery_date_tbd: false, delivery_stops: stops } }),
+      doc({ id: "l2", do_number: "DO-L2", leg: 2, logistics_partner: "AL", orders: { id: "o-sg", so: 1362, customer_name: "sg", delivery_date: "2026-09-18", delivery_date_tbd: false, delivery_stops: stops } }),
+    ];
+    const attempts = [
+      attempt({ do_number: "DO-L1", result: "delivered", recorded_at: "2026-09-13T12:23:00Z" }),
+      attempt({ do_number: "DO-L2", result: "delivered", recorded_at: "2026-09-13T12:56:00Z" }),
+    ];
+    const rows = registerRowsOf({ deliveryOrders: docs, attempts, handoverEvents: [] });
+    expect(rows.find((r) => r.doNumber === "DO-L1")?.status.kind).toBe("arrived");
+    const out = partnerRowsOf({ rows, attempts, cannotDeliver: [], partners, month: M });
+    expect(out.map((r) => [r.name, r.trips, r.delivered])).toEqual([["AL", 1, 1]]);
+    expect(partnerLine(out[0]!)).toBe("1 trip · 1 delivered · 0 failed · Cannot Deliver 0");
+  });
+});

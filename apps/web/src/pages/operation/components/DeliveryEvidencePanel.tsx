@@ -54,6 +54,9 @@ export const EVIDENCE_COPY = {
   title: "Evidence",
   deliveryOn: (day: string) => `Delivery on ${day}`,
   noResult: "No delivery result recorded yet — evidence binds to the delivery it proves.",
+  /* Card 20 — an intermediate Journey leg's document. */
+  arrivalOnly: "This leg ends at a partner warehouse. It owes no delivery proof — the customer leg's document carries it.",
+  arrived: "Arrived",
   noFiles: "No files from this delivery yet",
   driverSubmission: DOR_COPY.driverSubmission,
   signedDo: DOR_COPY.signedDo,
@@ -309,6 +312,7 @@ export default function DeliveryEvidencePanel({
   ledger,
   signedDo,
   proofReview,
+  arrivalOnly = false,
 }: {
   doNumber: string;
   orderId: string;
@@ -319,11 +323,17 @@ export default function DeliveryEvidencePanel({
   ledger: readonly DriverSubmissionFile[] | null | undefined;
   signedDo: { present: boolean; uploadedAt: string | null };
   proofReview: DoProofReview;
+  /** Card 20 — this document is an intermediate Journey leg: its `delivered`
+   *  result is an ARRIVAL at a partner warehouse, and no delivery proof is
+   *  owed on it (the customer leg's document carries the proof). */
+  arrivalOnly?: boolean;
 }) {
   const [attaching, setAttaching] = useState(false);
-  const reached = [...attempts]
-    .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
-    .filter((a) => a.result === "delivered" || a.result === "partial");
+  const reached = arrivalOnly
+    ? []
+    : [...attempts]
+        .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at))
+        .filter((a) => a.result === "delivered" || a.result === "partial");
   const latestReached = reached.at(-1) ?? null;
   const boundPaths = new Set(attemptEvidence.map((e) => e.path));
   /* Legacy ledger files never bound to an attempt still belong to this trip. */
@@ -362,6 +372,11 @@ export default function DeliveryEvidencePanel({
       }
     >
       <p className="text-label text-kit-slate-11">{EVIDENCE_COPY.meaning}</p>
+      {arrivalOnly ? (
+        <p className="mt-1 text-label text-kit-slate-11" data-testid="do-evidence-arrival-only">
+          {EVIDENCE_COPY.arrivalOnly}
+        </p>
+      ) : null}
 
       {/* ── Per attempt: the files bound to the event they prove ─────────── */}
       {attempts.length === 0 ? (
@@ -382,7 +397,8 @@ export default function DeliveryEvidencePanel({
             return (
               <li key={a.id ?? i} className="flex flex-col gap-1">
                 <span className="text-body font-medium text-kit-slate-12">
-                  {EVIDENCE_COPY.deliveryOn(fmtDate(a.recorded_at))} · {DELIVERY_RESULT_LABEL[a.result]}
+                  {EVIDENCE_COPY.deliveryOn(fmtDate(a.recorded_at))} ·{" "}
+                  {arrivalOnly && a.result === "delivered" ? EVIDENCE_COPY.arrived : DELIVERY_RESULT_LABEL[a.result]}
                 </span>
                 {shown.length === 0 ? (
                   <Absent>{EVIDENCE_COPY.noFiles}</Absent>
